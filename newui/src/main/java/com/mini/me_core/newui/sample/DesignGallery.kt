@@ -46,7 +46,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -171,6 +170,7 @@ import com.mini.me_core.newui.designsystem.layout.pageContentPadding
 import com.mini.me_core.newui.designsystem.layout.pageMaxWidth
 import com.mini.me_core.newui.designsystem.slot.SlotSet
 import com.mini.me_core.newui.designsystem.theme.AppTheme
+import com.mini.me_core.newui.designsystem.theme.AppType
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppElevation
 import com.mini.me_core.newui.designsystem.token.generated.AppLayout
@@ -326,6 +326,20 @@ private fun GalleryBody() {
             Text("Elevation: z0=${AppElevation.Z0} z1=${AppElevation.Z1} z2=${AppElevation.Z2} z4=${AppElevation.Z4}")
             Text("Sizing: touch=${AppSizing.TouchTarget} iconBlock=${AppSizing.IconBlock}")
             Text("Layout: pageH=${AppLayout.PageHorizontal} maxWidth=${AppLayout.ContentMaxWidth}")
+        }
+
+        Section("令牌 · 排版（iOS 类型尺度）") {
+            Text("Large Title · 导航大标题", style = AppType.LargeTitle)
+            Text("Title1 · 首屏区块主标题", style = AppType.Title1)
+            Text("Title2 · 次级区块标题", style = AppType.Title2)
+            Text("Title3 · 小标题", style = AppType.Title3)
+            Text("Headline · 加粗正文", style = AppType.Headline)
+            Text("Body · 标准正文", style = AppType.Body)
+            Text("Callout · 次要正文", style = AppType.Callout)
+            Text("Subhead · 注释行", style = AppType.Subhead)
+            Text("Footnote · 脚注", style = AppType.Footnote)
+            Text("Caption1 · 辅助说明", style = AppType.Caption1)
+            Text("Counter", style = AppType.Caption2, color = AppColor.LabelSecondary)
         }
 
         Section("原子组件") {
@@ -1266,7 +1280,7 @@ private fun iOSNavBar(title: String, onBack: (() -> Unit)? = null) {
         }
         Text(
             text = title,
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            style = AppType.LargeTitle,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(top = AppSpacing.Sm, bottom = AppSpacing.Md),
         )
@@ -1287,7 +1301,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(AppRadius.Lg),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Z0),
         ) {
             Column(
                 Modifier

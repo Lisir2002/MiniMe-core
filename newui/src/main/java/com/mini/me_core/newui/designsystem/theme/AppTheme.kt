@@ -60,8 +60,8 @@ val AppShapes = Shapes(
     extraLarge = RoundedCornerShape(AppRadius.Lg),
 )
 
-/** 独立 T 排版：暂用 M3 默认（§3.5 排版族落地后替换为 AppType） */
-val AppTypography: Typography = Typography()
+/** 独立排版族：iOS 类型尺度（AppType），页面统一走 MaterialTheme.typography 直达。 */
+val AppTypography: Typography = AppType.Material
 
 @Composable
 fun AppTheme(
