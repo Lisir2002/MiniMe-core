@@ -7,6 +7,22 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc7] - 2026-09-14
+
+> 预发行（未转正）。newui 设计系统弹窗/通知/快捷键全系归一到 `AppColor` 令牌并强化交互，新增「可搜索下拉筛选」「激活筛选 token 行」两个筛选组件；无破坏性变更。纯 UI 设计系统（`:newui`）改动，无 AI 工作流 / prompt / schema / 资产同步影响。
+
+### Added
+
+- `[ui]` 新增 `AppDropdownFilter` 可搜索下拉筛选（分子组）：参考 iOSDropDown 交互，触发胶囊内联展示当前已选（多选折叠为「label · 已选 N 项」），点击展开带内置搜索框的下拉面板；支持单选/多选语义、选中项高亮半字重 + 尾部品牌弹簧勾、实时关键字过滤 + 无匹配态，激活态描边/箭头平滑回转。
+- `[ui]` 新增 `AppFilterToken` / `AppFilterTokens` 激活筛选 token 行（参考 iOS 26 `.searchable(tokens:)`）：已生效条件以「分组名 · 值」内联展示，品牌小圆点高亮，可逐个移除（✕）+「清除全部」批量撤销，空态自动隐藏。
+
+### Changed
+
+- `[ui]` `AppDialog` / `AppDialogs`（含评分、确认等变体）、`AppDialogsAdvanced` 弹窗家族统一归一到 `AppColor` 令牌（标题 `BrandInk`、正文 `LabelSecondary`、确认键 `BrandPrimary`、卡底 `BrandCard`、描边 `SeparatorOnLight`），入场动画改为弹簧回弹缩放 + 淡入，阴影 `AppElevation.Z4`。
+- `[ui]` `AppNotificationItem` 强化为 iOS 简约通知行：图标 `accentColor@12%` 浅底 + 按压弹簧缩放反馈（替换 M3 涟漪），标题 `BrandInk`/正文 `LabelSecondary`、未读半字重 + 强调色指示点。
+- `[ui]` `AppKeyCap` / `AppKeyCombo` 快捷键强化：键帽纵向渐变底 + `SeparatorOnLight` 发丝描边 + 底部强调色光缝，等宽字体；组合以 `+` 连接、间距令牌排版。
+- `[ui]` 现有筛选组件族（`AppFilterField` / `AppChecklistFilter` / `AppRangeFilter` / `AppRangeValuePill` / `AppDateFilter` / `AppFilterSheet`、`AppFilterChip`）颜色全部从 `MaterialTheme.colorScheme` 迁移到 `AppColor` 令牌，与全系 iOS 简约风格一致。
+
 ## [0.0.0.2-rc6] - 2026-09-14
 
 > 预发行（未转正）。newui 设计系统「工作台图标」「终端日志窗口」两处按 iOS 简约风格深化并强化，无破坏性变更；纯 UI 设计系统（`:newui`）改动，无 AI 工作流 / prompt / schema / 资产同步影响。
