@@ -154,7 +154,11 @@ jobs:
           echo "上个 Release($prev_tag) applicationId = $prev_id"
           echo "当前(${cur_tag}) applicationId        = $cur_id"
           # 显式 rebrand 迁移对：仅此表中登记的旧→新过渡被放行（一次性，新增条目需评审数据保全影响）。
-          declare -A REBRAND_TRANSITIONS=( ["com.R.codecore"]="com.core.deepcode" ; ["com.core.deepcode"]="com.mini.me_core" )
+          # 关联数组元素须用「空格 / 换行」分隔（bash 语法，禁止用 `;`——会导致 syntax error 阻断构建）。
+          declare -A REBRAND_TRANSITIONS=(
+            ["com.R.codecore"]="com.core.deepcode"
+            ["com.core.deepcode"]="com.mini.me_core"
+          )
           if [[ -z "$prev_id" || "$cur_id" != "$prev_id" ]]; then
             if [[ -n "$prev_id" && "${REBRAND_TRANSITIONS[$prev_id]:-}" == "$cur_id" ]]; then
               echo "::warning::applicationId 按登记的 rebrand 迁移对过渡: $prev_id -> $cur_id（MiniMe-core 品牌迭代，rc11；原 DeepCore-Code）。已装旧包用户历史数据不可见，请走「备份导出/导入」迁移（详见 docs/plan-docs/data-preservation-design.md）。"
