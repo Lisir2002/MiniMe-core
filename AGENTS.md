@@ -79,10 +79,11 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 - 遵循[资产同步纪律](#资产同步纪律)：prompts / docs / strings.xml / 模块文档四类变更必须同步。
 - 遵循 [Git 提交规范](#git-提交规范)：Conventional Commits。
 - 新功能 / 复杂多文件改动 / 架构重构：新建分支（`feat/xxx` / `refactor/xxx`），验证后合回 `main` 并清理。
+- **合并后自动删分支**：任何分支合入 `main`、且合并后编译验证无误（见「分支与改动工作流」），**必须自动删除**该分支——先 `git branch --merged main` 确认已并入，再删本地（`git branch -d`）与已推送的远端（`git push origin --delete`）。删除是合并完成后的固定流程，无需另行确认。
 
 ### Ask First（先询问确认）
 
-- 破坏性操作：删除文件 / 删除分支 / 删除远端引用 / force push / 修改 `.githooks`。
+- 破坏性操作：删除文件 / 删除分支 / 删除远端引用 / force push / 修改 `.githooks`。（**例外**：遵循「合并后自动删分支」纪律、合并后编译验证已通过的已合并分支自动删除，无需询问。）
 - 打 Tag 发版（`v*` 推送触发 CI 发版）。
 - 架构级重构、跨模块结构变更（如新增/删除 feature 模块）。
 - 修改数据库 schema（按[迁移纪律](#数据库与迁移)执行，但需先说明改动面）。
@@ -134,7 +135,7 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 - **改动前先定分支**：涉及新功能开发时，先确认分支命名（如 `feat/session-model`），避免不同主题混在同一分支。
 - **提交前必跑冒烟**：改完编译型代码（`.kt` / `.gradle.kts` / `AndroidManifest.xml`）→ 提交前默认 `./gradlew :app:assembleDebug` 验证可编译（debug buildType 快，不跑 R8）。验证 release 链路用 `:app:assembleRelease`，**项目已无 flavor 概念，不要使用 assembleUniversalDebug/assembleArmsolo 等旧命令**。
 - **推送到远端前必跑单元测试**：任何 `git push` 到远端之前，必须先跑一次单元测试 `./gradlew :app:testReleaseUnitTest`（release classpath，与 CI 门禁同款），确认测试全部通过后再推送。改动不涉及逻辑（纯文档 / 资源文案 / 纯 `.md`）时可跳过。
-- **合并入 main**：本地合并并确认无冲突后，及时清理已被合并的本地分支（`git branch -d <branch_name>`，删前用 `git branch --merged main` 确认安全）；已推送过的分支同步删除远端（`git push origin --delete <branch_name>`），避免本地删了远端残留。分支删除不影响已打的 Tag，Tag 独立引用提交，可随时 `git show <tag>` 追溯。
+- **合并入 main · 自动清理**：本地合并并确认无冲突后，**先编译验证无误再自动删除**——涉及编译型代码按「提交前必跑冒烟」跑 `./gradlew :app:assembleDebug` 确认可编译；涉及 `git push` 按「推送到远端前必跑单元测试」跑 `:app:testReleaseUnitTest`。验证通过后**自动删除**：先 `git branch --merged main` 确认已并入（防误删未合并分支），再删本地（`git branch -d <branch_name>`），已推送过的分支同步删除远端（`git push origin --delete <branch_name>`），避免本地删了远端残留。删除是合并完成后的固定流程，无需另行确认。分支删除不影响已打的 Tag，Tag 独立引用提交，可随时 `git show <tag>` 追溯。
 
 ## 版本号规范
 
