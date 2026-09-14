@@ -7,6 +7,30 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc11] - 2026-09-14
+
+> 预发行（未转正）。对话流组件族细化全部落地：新增思考折叠块 / 计划审批卡 / 附件卡 / 工具链时间线 / 结果摘要卡；工具调用卡补齐三档审批 + 超时降级 + 记忆徽标；消息行接入左滑操作；Markdown 渲染补齐标题 / 引用 / 有序列表 / 表格 / 链接；MCP App 就绪态画布强化真实感。DesignGallery 控制条改 `FlowRow` 修复演示按钮积压。无破坏性变更。纯 UI 设计系统（`:newui`）改动，无 AI 工作流 / prompt / schema / 资产同步影响。
+
+### Added
+
+- `[ui]` 新增 `AppThinkingBlock` 思考折叠块（分子组）：Agent 推理过程流式实时追加（对齐 reasoning delta 事件），超过行数阈值自动折叠，与正文视觉分离（缩进 + 弱化底色）。
+- `[ui]` 新增 `AppPlanCard` 计划审批卡（分子组）：计划标题 + 步骤清单（完成 / 进行中 / 待定三态）+ 待定选择提问 + 批准 / 继续细化操作，对齐 PlanTool 审批链路。
+- `[ui]` 新增 `AppAttachmentCard` 附件卡（分子组）：图片 / 文件类型缩略展示、大小与容器路径元信息、点击预览，适配 sendFile 展示型工具。
+- `[ui] 新增 `AppToolChainTimeline` 工具链时间线（分子组）：一次任务内连续多次工具调用的串联视图——节点状态色点 + 连接线 + 每步标题 / 服务器徽标 / 耗时，头部汇总「N 次调用 · 总耗时」，替代 N 张全卡堆叠刷屏（对齐 LangChain / Vercel AI SDK step 时间线范式）。
+- `[ui]` 新增 `AppToolSummaryCard` 结果摘要卡（分子组）：工具链收尾后对 N 个工具结果做意图归纳的过渡卡，`Summarizing` 态带打字指示器，`Done` 态正文超行折叠展开，头部保留「N 个结果」计数徽标。
+- `[ui]` `AppMarkdownText` 补齐渲染：新增标题（`#`~`###`）、引用块（`>`）、有序列表（`1.`）、表格（`|` 分隔）、行内链接（`[text](url)`）。
+- `[ui]` `AppMcpAppCard` 就绪态画布真实感强化：模拟浏览器镀铬（红黄绿圆点 + 地址胶囊）+ 指标瓷砖（构建次数 / 平均耗时 / 失败率）+ 柱状图，直观呈现交互式界面效果。
+- `[ui]` `AppMessageRow` 接入滑扫操作：消息行左滑露出复制 / 重试 / 删除操作按钮（对齐 iOS `swipeActions`），同批只开一项、点击内容收起。
+- `[ui]` DesignGallery「AI 对话流」新增「工具链」「结果摘要」「审批超时」演示场景；控制条由 `Row` 改 `FlowRow` 自动换行，修复 13 个演示按钮横向积压；新增气泡 / 指示器 / Markdown 分子直出区与跑马灯示例。
+
+### Changed
+
+- `[ui]` `AppToolCallCard` 审批链路补齐：三档选择（拒绝 / 本次放行 / 始终允许 → 记忆）全链路闭环，新增审批超时降级展示态与「已记忆为始终允许」徽标态。
+
+### Fixed
+
+- `[ui]` 修复 `AppMarkdownText` 缺失 `androidx.compose.ui.draw.clip` 导入导致的编译失败。
+
 ## [0.0.0.2-rc10] - 2026-09-14
 
 > 预发行（未转正）。对话流组件族深化「工具 / 技能 / MCP 调用」的特殊样式表现：工具调用卡补齐**实时输出（Streaming）**与**人工审批（Intervention）**两个 surface（对齐 LobeHub 六 surface 与 assistant-ui `requires-action`），新增 **MCP App** 交互式界面渲染卡（对齐 MCP Apps 官方 extension 的沙箱 iframe 模式），技能调用卡补成功态耗时；无破坏性变更。纯 UI 设计系统（`:newui`）改动，无 AI 工作流 / prompt / schema / 资产同步影响。
