@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
@@ -42,8 +43,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +58,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 import com.mini.me_core.newui.designsystem.component.atom.AppCard
 import com.mini.me_core.newui.designsystem.component.atom.AppChip
@@ -68,7 +72,11 @@ import com.mini.me_core.newui.designsystem.component.molecule.AppBadgeDot
 import com.mini.me_core.newui.designsystem.component.molecule.AppBreadcrumb
 import com.mini.me_core.newui.designsystem.component.molecule.AppButton
 import com.mini.me_core.newui.designsystem.component.molecule.AppButtonVariant
-import com.mini.me_core.newui.designsystem.component.molecule.AppChatBubble
+import com.mini.me_core.newui.designsystem.component.molecule.AppChatMarker
+import com.mini.me_core.newui.designsystem.component.molecule.AppChatMarkerKind
+import com.mini.me_core.newui.designsystem.component.molecule.AppChatMessageState
+import com.mini.me_core.newui.designsystem.component.molecule.AppMessageRow
+import com.mini.me_core.newui.designsystem.component.molecule.AppMessageScroller
 import com.mini.me_core.newui.designsystem.component.molecule.AppCheckRow
 import com.mini.me_core.newui.designsystem.component.molecule.AppIconButton
 import com.mini.me_core.newui.designsystem.component.molecule.AppDialog
@@ -136,8 +144,8 @@ import com.mini.me_core.newui.designsystem.component.molecule.AppSwitchRow
 import com.mini.me_core.newui.designsystem.component.molecule.AppTabs
 import com.mini.me_core.newui.designsystem.component.molecule.AppTextField
 import com.mini.me_core.newui.designsystem.component.molecule.AppToast
-import com.mini.me_core.newui.designsystem.component.molecule.AppTypingIndicator
-import com.mini.me_core.newui.designsystem.component.molecule.AppConfetti
+import com.mini.me_core.newui.designsystem.component.molecule.AppTypewriterText
+import com.mini.me_core.newui.designsystem.component.molecule.AppSwipeAction
 import com.mini.me_core.newui.designsystem.component.molecule.AppDock
 import com.mini.me_core.newui.designsystem.component.molecule.AppDockItem
 import com.mini.me_core.newui.designsystem.component.molecule.AppGradientBorder
@@ -182,6 +190,39 @@ import com.mini.me_core.newui.designsystem.token.generated.AppLayout
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+
+/** 画廊对话流演示数据：消息 / 标记两类，key 唯一用于 Lazy 键与流式定位。 */
+private sealed interface ChatItem {
+    val key: Int
+
+    data class Msg(
+        override val key: Int,
+        val text: String,
+        val state: AppChatMessageState,
+        val isUser: Boolean,
+        val grouped: Boolean = false,
+    ) : ChatItem
+
+    data class Marker(
+        override val key: Int,
+        val text: String,
+        val kind: AppChatMarkerKind = AppChatMarkerKind.Tool,
+        val running: Boolean = false,
+        val tone: Color = AppColor.StatusSuccess,
+    ) : ChatItem
+}
+
+private val initialChatItems: List<ChatItem> = listOf(
+    ChatItem.Marker(key = -1, text = "今天 · 09:41", kind = AppChatMarkerKind.Date),
+    ChatItem.Msg(key = -2, text = "帮我剖析一下项目结构", state = AppChatMessageState.Complete, isUser = true),
+    ChatItem.Msg(
+        key = -3,
+        text = "好的，我扫描了 `app/src/main/java`，**核心模块**如下：\n\n- `agent`：AI Agent 核心（提示词 + 工具 + 多 Provider）\n- `terminal`：终端与会话管理\n- `workspace`：工作区与文档\n\n```kotlin\nval modules = listOf(\"agent\", \"terminal\", \"workspace\")\n```",
+        state = AppChatMessageState.Complete,
+        isUser = false,
+    ),
+    ChatItem.Marker(key = -4, text = "扫描代码库 · app/src/main/java"),
+)
 
 /**
  * 样板页（§7 S0）：在一个页面内陈列令牌 / 原子组件 / 布局 / 三态 / 槽位，
@@ -273,6 +314,53 @@ private fun GalleryBody() {
     var msgText by remember { mutableStateOf("") }
     var dialogInput by remember { mutableStateOf("") }
     var showDialogInput by remember { mutableStateOf(false) }
+    // ===== AI 对话流演示状态：状态机 + 流式/失败重试/工具卡 =====
+    val chatScope = rememberCoroutineScope()
+    var chatSeq by remember { mutableIntStateOf(100) }
+    var chatList by remember { mutableStateOf(initialChatItems) }
+    val streamText = "正在逐步分析 **Agent 工具注册链路**：\n\n- 工具经 `ToolRegistry` 注册为 `AgentTool`\n- 权限由 `ToolPermissionManager` 审批\n\n```kotlin\nregistry.register(FileTools)\nregistry.register(ExecuteCommandTool)\n```\n\n稍等，我继续读取 `AgentModule.kt` 的依赖配置…"
+    val retryText = "重试成功！已重新建立连接，`AgentRepository` 状态正常。"
+
+    fun chatStream() {
+        val id = chatSeq++
+        chatList = chatList + ChatItem.Msg(key = id, text = "", state = AppChatMessageState.Streaming, isUser = false)
+        chatScope.launch {
+            var shown = 0
+            while (shown <= streamText.length) {
+                chatList = chatList.map { if (it is ChatItem.Msg && it.key == id) it.copy(text = streamText.take(shown)) else it }
+                shown += 3
+                delay(18)
+            }
+            chatList = chatList.map { if (it is ChatItem.Msg && it.key == id) it.copy(state = AppChatMessageState.Complete) else it }
+        }
+    }
+
+    fun chatFail() {
+        val id = chatSeq++
+        chatList = chatList + ChatItem.Msg(key = id, text = "糟糕，连接 Provider 时超时了，请重试。", state = AppChatMessageState.Error, isUser = false)
+    }
+
+    fun chatRetry(id: Int) {
+        chatList = chatList.map { if (it is ChatItem.Msg && it.key == id) it.copy(state = AppChatMessageState.Streaming, text = "") else it }
+        chatScope.launch {
+            var shown = 0
+            while (shown <= retryText.length) {
+                chatList = chatList.map { if (it is ChatItem.Msg && it.key == id) it.copy(text = retryText.take(shown)) else it }
+                shown += 4
+                delay(16)
+            }
+            chatList = chatList.map { if (it is ChatItem.Msg && it.key == id) it.copy(state = AppChatMessageState.Complete) else it }
+        }
+    }
+
+    fun chatTool() {
+        val id = chatSeq++
+        chatList = chatList + ChatItem.Marker(key = id, text = "执行命令 · gradle assembleDebug", running = true)
+        chatScope.launch {
+            delay(1600)
+            chatList = chatList.map { if (it is ChatItem.Marker && it.key == id) it.copy(running = false) else it }
+        }
+    }
     // 文件卡运行态：自动循环演示（上传推进 → 完成）
     var fileProgress by remember { mutableStateOf(0f) }
     var fileState by remember { mutableStateOf(AppFileState.Uploading) }
@@ -973,13 +1061,44 @@ private fun GalleryBody() {
             AppInlineAlert(tone = AppAlertTone.Danger, message = "数据目录不可写，请检查权限。", onDismiss = {})
         }
 
-        Section("分子组建族 · AI 对话") {
-            AppChatBubble(text = "我能帮你剖析项目结构并生成设计方案。", isUser = false)
-            AppChatBubble(text = "好的，先扫描代码库并总结架构。", isUser = true)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AppChatBubble(text = "正在思考", isUser = false, modifier = Modifier.weight(1f, fill = false))
-                Spacer(Modifier.padding(start = AppSpacing.Md))
-                AppTypingIndicator()
+        Section("分子组建族 · AI 对话流") {
+            // 控制条：触发流式回复 / 失败重试 / 工具调用卡
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
+                AppButton(text = "AI 流式回复", onClick = { chatStream() }, variant = AppButtonVariant.Outlined)
+                AppButton(text = "模拟失败", onClick = { chatFail() }, variant = AppButtonVariant.Outlined)
+                AppButton(text = "工具调用", onClick = { chatTool() }, variant = AppButtonVariant.Outlined)
+            }
+            AppMessageScroller(
+                modifier = Modifier.height(440.dp),
+                newMessageKey = chatSeq,
+                onLoadHistory = { /* 演示占位：真实场景拉取更早消息 */ },
+            ) {
+                items(items = chatList.asReversed(), key = { it.key }) { item ->
+                    when (item) {
+                        is ChatItem.Marker -> AppChatMarker(
+                            text = item.text,
+                            kind = item.kind,
+                            running = item.running,
+                            tone = item.tone,
+                        )
+                        is ChatItem.Msg -> AppMessageRow(
+                            text = item.text,
+                            state = item.state,
+                            isUser = item.isUser,
+                            avatarLabel = if (item.isUser) "你" else "AI",
+                            name = if (item.isUser) "你" else "MiniMe Agent",
+                            timestamp = "09:4${item.key % 10}",
+                            grouped = item.grouped,
+                            onCopy = { /* 演示占位：写入剪贴板 */ },
+                            onRetry = if (item.state == AppChatMessageState.Error) {
+                                { chatRetry(item.key) }
+                            } else {
+                                null
+                            },
+                            onDelete = { chatList = chatList.filterNot { it.key == item.key } },
+                        )
+                    }
+                }
             }
         }
 
