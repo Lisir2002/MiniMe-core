@@ -534,11 +534,14 @@ fun AppSwipeAction(
         }
 
         // 顶层内容滑层：宽度撑满、高度 wrap（由内容决定行高）；平移用 offset{} 在 layout 阶段完成。
+        // ⚠️ offset 必须在 background 之前：offset 只平移链中位于其**内侧**的节点。若 background
+        // 写在 offset 前面，背景矩形会留在初始位置绘制、不随拖拽移动，把底层动作栏永久盖住
+        // （真机表现为：内容文字滑开了，但按钮整条不可见，右侧只见一条背景空白）。
         Box(
             Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
                 .offset { IntOffset(contentOffset.roundToInt(), 0) }
+                .background(MaterialTheme.colorScheme.surface)
                 .clickable(
                     enabled = isEngaged,
                     onClick = { scope.launch { resolvedState.close() } },
