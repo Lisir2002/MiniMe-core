@@ -7,6 +7,14 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc9] - 2026-09-14
+
+> 预发行（未转正）。修复 rc8 CI 在 Android SDK 安装阶段失败的问题（新版 cmdline-tools 已移除独立 `tools` 包）；功能内容与 rc8 一致（对话流组件族）。纯 CI 配置 + UI 设计系统（`:newui`）改动，无 AI 工作流 / prompt / schema / 资产同步影响。
+
+### Fixed
+
+- `[ci]` 修复 `android-release.yml`：`setup-android` 的 `packages` 移除已废弃的 `tools`（`sdkmanager tools` 报 `Failed to find package 'tools'` 导致 rc8 构建失败）；`platform-tools` 自带，无需显式安装。
+
 ## [0.0.0.2-rc8] - 2026-09-14
 
 > 预发行（未转正）。newui 设计系统新增「AI 对话流」组件族（消息气泡状态机 / 消息行 / 流标记 / 滚动容器 / 轻量 Markdown 渲染），并在 DesignGallery 内置可交互演示；无破坏性变更。纯 UI 设计系统（`:newui`）改动，无 AI 工作流 / prompt / schema / 资产同步影响。
