@@ -17,16 +17,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppElevation
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 
 /**
- * 键盘键帽（分子组 · AppKeyCap / AppKeyCombo）：拟物键帽（底部暗边 + 轻投影），
+ * 键盘键帽（分子组 · AppKeyCap / AppKeyCombo）：iOS 简约风格的拟态键帽，
  * 用于展示快捷键组合（如 ⌘K / Ctrl+⇧P）或短命令标签。
+ *
+ * 归一化要点（对齐 iOS 简约规范）：
+ *  - **克制拟态**：以 `surface → surfaceVariant` 纵向渐变模拟键帽由亮到暗的下沉面，
+ *    替代原 2dp 大块强调色"底部暗边"（免过于游戏化）；边缘发丝线用 [AppColor.SeparatorOnLight]。
+ *  - **微光底色**：键帽底部一条强调色 hairline（`accentColor @28%`）作为"光缝"点缀，
+ *    与主色 #0A84FF 呼应，弱化到纹理级不影响可读性。
+ *  - **度量令牌**：内边距/圆角/间距全走 [AppSpacing]/[AppRadius]，消除硬编码 px。
+ *  - **文字**：等宽字体（快捷键惯例）+ 半粗 + [AppColor.BrandInk] 一级文字。
+ *  - **组合**：[AppKeyCombo] 以「+」串联，分隔间距 `AppSpacing.Xs`、色 [AppColor.LabelTertiary]。
  */
 @Composable
 fun AppKeyCap(
@@ -38,31 +50,38 @@ fun AppKeyCap(
         modifier = modifier
             .shadow(AppElevation.Z1, RoundedCornerShape(AppRadius.Sm))
             .clip(RoundedCornerShape(AppRadius.Sm))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(AppRadius.Sm))
-            .padding(horizontal = 7.dp, vertical = 3.dp),
+            .background(
+                Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0f to MaterialTheme.colorScheme.surface,
+                        1f to MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                ),
+            )
+            .border(1.dp, AppColor.SeparatorOnLight, RoundedCornerShape(AppRadius.Sm))
+            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
         contentAlignment = Alignment.Center,
     ) {
-        // 底部暗边，模拟键帽下沉
+        // 底部"光缝" hairline：拟态键帽下沉边的微光，accent 弱化为纹理级点缀
         Box(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(2.dp)
-                .clip(RoundedCornerShape(bottomStart = AppRadius.Sm, bottomEnd = AppRadius.Sm))
-                .background(accentColor.copy(alpha = 0.55f)),
+                .height(1.dp)
+                .background(accentColor.copy(alpha = 0.28f)),
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
+            fontFamily = FontFamily.Monospace,
+            color = AppColor.BrandInk,
         )
     }
 }
 
 /**
- * 快捷键组合（分子组 · AppKeyCombo）：多个键帽以连接号串联。
+ * 快捷键组合（分子组 · AppKeyCombo）：多个键帽以「+」串联。
  */
 @Composable
 fun AppKeyCombo(
@@ -73,13 +92,13 @@ fun AppKeyCombo(
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         keys.forEachIndexed { index, key ->
             if (index > 0) {
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(AppSpacing.Xs))
                 Text(
                     text = "+",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = AppColor.LabelTertiary,
                 )
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(AppSpacing.Xs))
             }
             AppKeyCap(label = key, accentColor = accentColor)
         }
