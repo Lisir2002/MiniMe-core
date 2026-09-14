@@ -47,11 +47,11 @@ fun AppFilterChip(
     selectedColor: Color = AppColor.BrandPrimary,
 ) {
     val bg by animateColorAsState(
-        targetValue = if (selected) selectedColor else MaterialTheme.colorScheme.surfaceVariant,
+        targetValue = if (selected) selectedColor else AppColor.BrandSurfaceDim,
         label = "chipBg",
     )
     val textColor by animateColorAsState(
-        targetValue = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = if (selected) Color.White else AppColor.LabelSecondary,
         label = "chipText",
     )
     val checkScale by animateFloatAsState(

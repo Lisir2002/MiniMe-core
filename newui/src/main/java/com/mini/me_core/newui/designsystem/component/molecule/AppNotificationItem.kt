@@ -79,13 +79,13 @@ fun AppNotificationItem(
     AnimatedVisibility(
         visible = true,
         enter = slideInHorizontally(
-            animationSpec = tween(AppMotion.Med),
+            animationSpec = tween(AppMotion.Med.toInt()),
             initialOffsetX = { -it / 4 },
-        ) + fadeIn(tween(AppMotion.Med)),
+        ) + fadeIn(tween(AppMotion.Med.toInt())),
         exit = slideOutHorizontally(
-            animationSpec = tween(AppMotion.Fast),
+            animationSpec = tween(AppMotion.Fast.toInt()),
             targetOffsetX = { -it / 4 },
-        ) + fadeOut(tween(AppMotion.Fast)),
+        ) + fadeOut(tween(AppMotion.Fast.toInt())),
     ) {
         Row(
             modifier = modifier

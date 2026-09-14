@@ -113,6 +113,8 @@ import com.mini.me_core.newui.designsystem.component.molecule.AppRangeFilter
 import com.mini.me_core.newui.designsystem.component.molecule.AppBooleanFilter
 import com.mini.me_core.newui.designsystem.component.molecule.AppRatingFilter
 import com.mini.me_core.newui.designsystem.component.molecule.AppDateFilter
+import com.mini.me_core.newui.designsystem.component.molecule.AppDropdownFilter
+import com.mini.me_core.newui.designsystem.component.molecule.AppFilterTokens
 import com.mini.me_core.newui.designsystem.component.molecule.AppFilterSheet
 import com.mini.me_core.newui.designsystem.component.molecule.AppInlineAlert
 import com.mini.me_core.newui.designsystem.component.molecule.AppMenuRow
@@ -258,6 +260,11 @@ private fun GalleryBody() {
     var boolIdx by remember { mutableStateOf(0) }
     var ratingFilter by remember { mutableStateOf(3) }
     var dateIdx by remember { mutableStateOf(0) }
+    var dropdownSel by remember { mutableStateOf(setOf(0)) }
+    var dropdownSingle by remember { mutableStateOf(setOf(2)) }
+    var activeTokens by remember {
+        mutableStateOf(listOf("状态" to "进行中", "类型" to "代码文件"))
+    }
     // 输入框族演示状态
     var passText by remember { mutableStateOf("secret123") }
     var countedText by remember { mutableStateOf("Compose 语法") }
@@ -506,6 +513,36 @@ private fun GalleryBody() {
                 } else {
                     listOf("2026/9/5 至今", "2026/8/31 ~9/5", "2026/9/1 ~9/5")[dateIdx - 1]
                 },
+            )
+            Spacer(Modifier.height(AppSpacing.Sm))
+            // 可搜索下拉筛选（多选 + 单选两种语义，参考 iOSDropDown 交互）
+            AppDropdownFilter(
+                options = listOf("全部类型", "代码文件", "设计文档", "终端会话", "聊天对话"),
+                selected = dropdownSel,
+                onToggle = { i ->
+                    dropdownSel = if (i in dropdownSel) dropdownSel - i else dropdownSel + i
+                },
+                label = "类型",
+                maxPopupHeight = 240,
+                onClear = { dropdownSel = emptySet() },
+            )
+            Spacer(Modifier.height(AppSpacing.Sm))
+            AppDropdownFilter(
+                options = listOf("全部状态", "进行中", "已完成", "已归档"),
+                selected = dropdownSingle,
+                onToggle = { i ->
+                    dropdownSingle = if (i in dropdownSingle) emptySet() else setOf(i)
+                },
+                label = "状态",
+                singleSelect = true,
+                searchable = false,
+                maxPopupHeight = 200,
+            )
+            // 已激活筛选 token 行（参考 iOS 26 search tokens）：可逐个移除 + 批量清除
+            AppFilterTokens(
+                active = activeTokens,
+                onRemove = { i -> activeTokens = activeTokens.filterIndexed { idx, _ -> idx != i } },
+                onClearAll = { activeTokens = emptyList() },
             )
         }
 
