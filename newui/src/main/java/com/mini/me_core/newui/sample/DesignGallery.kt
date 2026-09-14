@@ -75,9 +75,12 @@ import com.mini.me_core.newui.designsystem.component.molecule.AppBadgeDot
 import com.mini.me_core.newui.designsystem.component.molecule.AppBreadcrumb
 import com.mini.me_core.newui.designsystem.component.molecule.AppButton
 import com.mini.me_core.newui.designsystem.component.molecule.AppButtonVariant
+import com.mini.me_core.newui.designsystem.component.molecule.AppChatBubble
 import com.mini.me_core.newui.designsystem.component.molecule.AppChatMarker
 import com.mini.me_core.newui.designsystem.component.molecule.AppChatMarkerKind
 import com.mini.me_core.newui.designsystem.component.molecule.AppChatMessageState
+import com.mini.me_core.newui.designsystem.component.molecule.AppMarkdownText
+import com.mini.me_core.newui.designsystem.component.molecule.AppMarquee
 import com.mini.me_core.newui.designsystem.component.molecule.AppMessageRow
 import com.mini.me_core.newui.designsystem.component.molecule.AppMcpAppCard
 import com.mini.me_core.newui.designsystem.component.molecule.AppMcpAppState
@@ -1668,6 +1671,36 @@ private fun GalleryBody() {
                     }
                 }
             }
+            // 分子直出：AppChatBubble 四态 / AppTypingIndicator / AppMarkdownText
+            Spacer(Modifier.height(AppSpacing.Lg))
+            AppSectionHeader(title = "分子直出 · 气泡 / 指示器 / Markdown")
+            Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
+                AppChatBubble(
+                    text = "用户侧气泡 · 品牌色胶囊",
+                    state = AppChatMessageState.Complete,
+                    isUser = true,
+                )
+                AppChatBubble(
+                    text = "AI 侧气泡 · 表面卡片描边",
+                    state = AppChatMessageState.Complete,
+                )
+                AppChatBubble(
+                    text = "",
+                    state = AppChatMessageState.Pending,
+                )
+                AppChatBubble(
+                    text = "正在生成代码…",
+                    state = AppChatMessageState.Streaming,
+                )
+                AppChatBubble(
+                    text = "连接 Provider 超时，请重试。",
+                    state = AppChatMessageState.Error,
+                    onRetry = { },
+                )
+                AppMarkdownText(
+                    text = "## 标题与引用\n\n> 引用块：`AgentTool` 经 `ToolRegistry` 注册。\n\n1. 有序列表第一项\n2. 有序列表第二项\n\n| 工具 | 状态 |\n| --- | --- |\n| FileTools | 就绪 |\n| ExecuteCommandTool | 就绪 |\n\n- 无序列表：粗体 **关键词**、行内代码 `ToolRegistry`\n- 行内链接：[查看文档](https://example.com)",
+                )
+            }
         }
 
         Section("分子组建族 · 滑扫操作") {
@@ -1740,6 +1773,20 @@ private fun GalleryBody() {
             Spacer(Modifier.height(AppSpacing.Xs))
 
             AppTerminalLog()
+            Spacer(Modifier.height(AppSpacing.Md))
+
+            AppMarquee(background = AppColor.BrandSurfaceDim) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(AppSpacing.Lg),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("容器已就绪", style = MaterialTheme.typography.bodySmall, color = AppColor.BrandPrimary)
+                    Text("·", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("MCP 服务器监听 0.0.0.0:9898", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("·", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("PRoot + Alpine 3.21 · arm64", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             Spacer(Modifier.height(AppSpacing.Md))
 
             AppGradientBorder(modifier = Modifier.fillMaxWidth()) {
