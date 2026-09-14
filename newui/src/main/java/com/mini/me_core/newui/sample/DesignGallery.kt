@@ -826,11 +826,11 @@ private fun GalleryBody() {
                 horizontalArrangement = Arrangement.spacedBy(AppSpacing.Lg),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AppShimmerBox(Modifier.size(56.dp).size(56.dp))
+                AppShimmerBox(Modifier.size(56.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
-                    AppShimmerBox(Modifier.fillMaxWidth(0.7f).size(14.dp))
-                    AppShimmerBox(Modifier.fillMaxWidth().size(14.dp))
-                    AppShimmerBox(Modifier.fillMaxWidth().size(14.dp))
+                    AppShimmerBox(Modifier.height(AppSpacing.Md).fillMaxWidth(0.7f))
+                    AppShimmerBox(Modifier.height(AppSpacing.Md).fillMaxWidth())
+                    AppShimmerBox(Modifier.height(AppSpacing.Md).fillMaxWidth())
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xl)) {

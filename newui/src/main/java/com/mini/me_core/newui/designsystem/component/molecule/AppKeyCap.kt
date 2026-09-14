@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
+import com.mini.me_core.newui.designsystem.token.generated.AppElevation
+import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 
 /**
  * 键盘键帽（分子组 · AppKeyCap / AppKeyCombo）：拟物键帽（底部暗边 + 轻投影），
@@ -34,10 +36,10 @@ fun AppKeyCap(
 ) {
     Box(
         modifier = modifier
-            .shadow(1.dp, RoundedCornerShape(6.dp))
-            .clip(RoundedCornerShape(6.dp))
+            .shadow(AppElevation.Z1, RoundedCornerShape(AppRadius.Sm))
+            .clip(RoundedCornerShape(AppRadius.Sm))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(AppRadius.Sm))
             .padding(horizontal = 7.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -47,7 +49,7 @@ fun AppKeyCap(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .height(2.dp)
-                .clip(RoundedCornerShape(bottomStart = 6.dp, bottomEnd = 6.dp))
+                .clip(RoundedCornerShape(bottomStart = AppRadius.Sm, bottomEnd = AppRadius.Sm))
                 .background(accentColor.copy(alpha = 0.55f)),
         )
         Text(

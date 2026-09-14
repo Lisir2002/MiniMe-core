@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
+import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 
 /** 迷你复选方块（分子组 · AppCheckbox）：勾选时品牌色填充 + 弹簧弹出的白勾。 */
 @Composable
@@ -51,7 +52,7 @@ fun AppCheckbox(
     Box(
         modifier = modifier
             .size(22.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(AppRadius.Sm))
             .background(boxColor)
             .toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange),
         contentAlignment = Alignment.Center,

@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 
 /** 标签/胶囊（§3.12 AppChip）：pill 圆角 + surfaceVariant 底，可带前导图标。 */
@@ -23,7 +24,7 @@ fun AppChip(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(999f),
+        shape = RoundedCornerShape(AppRadius.Pill),
         color = if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
     ) {
         Row(
