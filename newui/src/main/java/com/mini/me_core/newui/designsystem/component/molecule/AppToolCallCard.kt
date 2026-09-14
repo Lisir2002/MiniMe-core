@@ -63,20 +63,31 @@ import java.util.Locale
 enum class AppToolCallState { Streaming, Running, AwaitingApproval, Success, Error }
 
 /**
+ * 工具权限审批三档选择（对齐真实权限引擎 [PermissionChoice 的 REJECT / ONCE / ALWAYS]）：
+ * [Reject] 拒绝、[Once] 本次放行、[Always] 始终允许。
+ */
+enum class AppApprovalChoice { Reject, Once, Always }
+
+/**
  * 工具调用卡（分子组 · AppToolCallCard）：AI 对话流中工具执行的透明化展示层，
  * 对齐 Vercel AI SDK / shadcn Tool / LobeHub Inspector 六大 surface 范式：
  *
  * - 头部一句话（Inspector）：图标块 + 工具名 + 目标摘要（如 "执行命令 · ./gradlew assembleDebug"），
- *   不裸 dump 原始参数；[serverPrefix] 展示 MCP 服务器徽标（如 `github`）。
+ *   不裸 dump 原始参数；[serverPrefix] 展示 MCP 服务器徽标（如 `github`），
+ *   真实工具名 `mcp__github__search_code` 由上层解析后传入。
  * - 状态徽标：[AppToolCallState.Streaming]（三点脉动）/ [AppToolCallState.Running]（旋转）/
  *   [AppToolCallState.AwaitingApproval]（琥珀警示）/ [AppToolCallState.Success]（绿勾）/
  *   [AppToolCallState.Error]（红叉 + 红色描边）。
  * - 诚实耗时：完成态经 [durationMs] 展示 "· 1.6s"。
- * - 实时输出（Streaming）：[streamOutput] 在 Running 态直接内联展示等宽终端块 + 闪烁光标，
- *   用于 Shell 命令 stdout 等需要"看着它跑"的场景。
- * - 人工审批（Intervention）：[AppToolCallState.AwaitingApproval] 态在卡片尾部渲染
- *   允许 / 拒绝操作行（[onApprove] / [onReject]，附 [approvalHint] 说明），
- *   对齐 assistant-ui 的 `requires-action` 与 LobeHub humanIntervention。
+ * - 错误分类：[errorCode] 在失败态渲染错误码徽标（如 MCP 的 `TOOL_NOT_FOUND` / `PERMISSION_DENIED`），
+ *   [denyReason] 在审批态渲染策略拦截说明（如沙箱模式拒绝原因）。
+ * - 实时输出（Streaming）：[streamOutput] 在 Running 态直接内联等宽终端块 + 闪烁光标，
+ *   超 [streamMaxLines] 行自动折叠并可展开（Shell stdout 常见长输出）。
+ * - 命令高亮：[command] 承载 Bash/terminal 的命令参数，展开区以等宽命令行形式呈现
+ *   （优于 JSON 块的可读性）。
+ * - 人工审批（Intervention）：[AppToolCallState.AwaitingApproval] 态渲染审批操作行。
+ *   优先用三档 [onChoice]（拒绝 / 本次 / 始终允许），[alwaysDisabled] + [alwaysDisabledReason]
+ *   用于「始终允许」不可记忆（含命令替换/管道）时的置灰说明；旧二档 [onApprove]/[onReject] 兼容保留。
  * - 可展开入参 / 结果：默认折叠，点击展开（旋转箭头 + 垂直展开动画）。
  *
  * 建议用法：作为消息流 marker 层的一项（与 [AppChatMarker] 并列），
@@ -89,13 +100,20 @@ fun AppToolCallCard(
     summary: String? = null,
     state: AppToolCallState = AppToolCallState.Success,
     serverPrefix: String? = null,
+    errorCode: String? = null,
     durationMs: Long? = null,
     input: String? = null,
+    command: String? = null,
     output: String? = null,
     streamOutput: String? = null,
+    streamMaxLines: Int = 3,
     approvalHint: String? = null,
+    denyReason: String? = null,
     onApprove: (() -> Unit)? = null,
     onReject: (() -> Unit)? = null,
+    onChoice: ((AppApprovalChoice) -> Unit)? = null,
+    alwaysDisabled: Boolean = false,
+    alwaysDisabledReason: String? = null,
     leadingIcon: ImageVector = Icons.Rounded.Terminal,
 ) {
     var inputExpanded by remember { mutableStateOf(false) }
@@ -159,6 +177,10 @@ fun AppToolCallCard(
                         Spacer(Modifier.width(AppSpacing.Xs))
                         ServerChip(prefix = serverPrefix)
                     }
+                    if (isError && errorCode != null) {
+                        Spacer(Modifier.width(AppSpacing.Xs))
+                        ErrorCodeChip(code = errorCode)
+                    }
                 }
                 val meta = listOfNotNull(summary, durationMs?.let { formatDuration(it) })
                     .joinToString(" · ")
@@ -175,10 +197,20 @@ fun AppToolCallCard(
             Spacer(Modifier.width(AppSpacing.Sm))
             ToolCallStatusBadge(state = state, color = statusColor)
         }
-        // Streaming：执行中实时输出，无需展开，直接"看着它跑"
+        // Streaming：执行中实时输出，无需展开，直接"看着它跑"（多行截断可展开）
         if (state == AppToolCallState.Running && streamOutput != null) {
             CardDivider()
-            StreamBlock(text = streamOutput)
+            StreamBlock(text = streamOutput, maxLines = streamMaxLines)
+        }
+        if (command != null) {
+            CardDivider()
+            ExpandableSection(
+                label = "命令",
+                expanded = inputExpanded,
+                onToggle = { inputExpanded = !inputExpanded },
+            ) {
+                CommandBlock(text = command)
+            }
         }
         if (input != null) {
             CardDivider()
@@ -200,38 +232,59 @@ fun AppToolCallCard(
                 JsonBlock(text = output)
             }
         }
-        // Intervention：待人工审批 → 允许 / 拒绝操作行
-        if (state == AppToolCallState.AwaitingApproval && (onApprove != null || onReject != null)) {
+        // Intervention：待人工审批 → 三档 / 二档操作行
+        if (state == AppToolCallState.AwaitingApproval && (onChoice != null || onApprove != null || onReject != null)) {
             CardDivider()
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
             ) {
-                if (approvalHint != null) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
+                    if (approvalHint != null) {
+                        Text(
+                            text = approvalHint,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AppColor.LabelSecondary,
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                    if (onReject != null) {
+                        AppButton(text = "拒绝", onClick = onReject, variant = AppButtonVariant.Outlined)
+                    }
+                    if (onChoice != null) {
+                        AppButton(
+                            text = "本次",
+                            onClick = { onChoice(AppApprovalChoice.Once) },
+                            variant = AppButtonVariant.Outlined,
+                        )
+                        AppButton(
+                            text = "始终允许",
+                            onClick = { onChoice(AppApprovalChoice.Always) },
+                            variant = AppButtonVariant.Primary,
+                            enabled = !alwaysDisabled,
+                        )
+                    } else if (onApprove != null) {
+                        AppButton(text = "允许", onClick = onApprove, variant = AppButtonVariant.Primary)
+                    }
+                }
+                if (alwaysDisabled && alwaysDisabledReason != null) {
                     Text(
-                        text = approvalHint,
+                        text = alwaysDisabledReason,
                         style = MaterialTheme.typography.labelSmall,
                         color = AppColor.LabelSecondary,
-                        modifier = Modifier.weight(1f),
-                    )
-                } else {
-                    Spacer(Modifier.weight(1f))
-                }
-                if (onReject != null) {
-                    AppButton(
-                        text = "拒绝",
-                        onClick = onReject,
-                        variant = AppButtonVariant.Outlined,
+                        maxLines = 2,
                     )
                 }
-                if (onApprove != null) {
-                    AppButton(
-                        text = "允许",
-                        onClick = onApprove,
-                        variant = AppButtonVariant.Primary,
+                if (denyReason != null) {
+                    Text(
+                        text = denyReason,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppColor.StatusDanger,
+                        maxLines = 3,
                     )
                 }
             }
@@ -281,6 +334,21 @@ private fun ServerChip(prefix: String) {
         modifier = Modifier
             .clip(RoundedCornerShape(AppRadius.Sm))
             .background(AppColor.BrandPrimary.copy(alpha = 0.10f))
+            .padding(horizontal = AppSpacing.Xs, vertical = 1.dp),
+    )
+}
+
+/** 错误分类徽标：失败态的 MCP 错误码（如 `TOOL_NOT_FOUND`）。 */
+@Composable
+private fun ErrorCodeChip(code: String) {
+    Text(
+        text = code,
+        style = MaterialTheme.typography.labelSmall,
+        color = AppColor.StatusDanger,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(RoundedCornerShape(AppRadius.Sm))
+            .background(AppColor.StatusDanger.copy(alpha = 0.10f))
             .padding(horizontal = AppSpacing.Xs, vertical = 1.dp),
     )
 }
@@ -353,9 +421,39 @@ private fun JsonBlock(text: String) {
     )
 }
 
-/** 实时输出块：深色终端底 + 等宽文字 + 闪烁方块光标。 */
+/** 命令块：Bash/terminal 命令的等宽命令行呈现，品牌色前置 `$`。 */
 @Composable
-private fun StreamBlock(text: String) {
+private fun CommandBlock(text: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AppRadius.Sm))
+            .background(AppColor.BrandSurfaceDim)
+            .padding(AppSpacing.Sm),
+    ) {
+        Text(
+            text = "$ ",
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            color = AppColor.BrandPrimary,
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            color = AppColor.BrandInk,
+        )
+    }
+}
+
+/**
+ * 实时输出块：深色终端底 + 等宽文字 + 闪烁方块光标。
+ * 超过 [maxLines] 行时折叠为前 [maxLines] 行，可点击展开完整输出。
+ */
+@Composable
+private fun StreamBlock(text: String, maxLines: Int) {
+    var expanded by remember { mutableStateOf(false) }
+    val lines = text.lines()
+    val folded = lines.size > maxLines
+    val shown = if (folded && !expanded) lines.take(maxLines) else lines
     val transition = rememberInfiniteTransition(label = "streamCursor")
     val cursorAlpha by transition.animateFloat(
         initialValue = 0f,
@@ -372,18 +470,37 @@ private fun StreamBlock(text: String) {
             .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            color = AppColor.BrandPrimary,
+        Column(
             modifier = Modifier
                 .weight(1f, fill = false)
                 .clip(RoundedCornerShape(AppRadius.Sm))
                 .background(AppColor.BrandPrimary.copy(alpha = 0.06f))
-                .padding(horizontal = AppSpacing.Sm, vertical = 4.dp),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+                .padding(horizontal = AppSpacing.Sm, vertical = 4.dp)
+                .then(
+                    if (folded) Modifier.clickable { expanded = !expanded } else Modifier,
+                ),
+        ) {
+            shown.forEachIndexed { index, line ->
+                Text(
+                    text = line,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    color = AppColor.BrandPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (index != shown.lastIndex) {
+                    Spacer(Modifier.height(2.dp))
+                }
+            }
+            if (folded) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = if (expanded) "收起 · ${lines.size} 行" else "展开全部 · ${lines.size} 行",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppColor.LabelSecondary,
+                )
+            }
+        }
         Spacer(Modifier.width(AppSpacing.Xs))
         Box(
             modifier = Modifier

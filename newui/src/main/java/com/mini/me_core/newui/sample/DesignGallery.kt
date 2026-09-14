@@ -2,6 +2,7 @@ package com.mini.me_core.newui.sample
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,6 +83,12 @@ import com.mini.me_core.newui.designsystem.component.molecule.AppSkillCallCard
 import com.mini.me_core.newui.designsystem.component.molecule.AppSkillCallState
 import com.mini.me_core.newui.designsystem.component.molecule.AppToolCallCard
 import com.mini.me_core.newui.designsystem.component.molecule.AppToolCallState
+import com.mini.me_core.newui.designsystem.component.molecule.AppThinkingBlock
+import com.mini.me_core.newui.designsystem.component.molecule.AppPlanCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppPlanState
+import com.mini.me_core.newui.designsystem.component.molecule.AppPlanStep
+import com.mini.me_core.newui.designsystem.component.molecule.AppPlanStepStatus
+import com.mini.me_core.newui.designsystem.component.molecule.AppAttachmentCard
 import com.mini.me_core.newui.designsystem.component.molecule.AppMessageScroller
 import com.mini.me_core.newui.designsystem.component.molecule.AppCheckRow
 import com.mini.me_core.newui.designsystem.component.molecule.AppConfetti
@@ -250,6 +257,33 @@ private sealed interface ChatItem {
         val args: String? = null,
         val description: String? = null,
         val durationMs: Long? = null,
+    ) : ChatItem
+
+    data class Thinking(
+        override val key: Int,
+        val text: String,
+        val isStreaming: Boolean = false,
+    ) : ChatItem
+
+    data class Plan(
+        override val key: Int,
+        val title: String,
+        val steps: List<AppPlanStep>,
+        val state: AppPlanState,
+        val pendingSelection: String? = null,
+        val reason: String? = null,
+        val onApprove: (() -> Unit)? = null,
+        val onRefine: (() -> Unit)? = null,
+    ) : ChatItem
+
+    data class Attachment(
+        override val key: Int,
+        val fileName: String,
+        val mimeType: String? = null,
+        val sizeBytes: Long? = null,
+        val containerPath: String? = null,
+        val isImage: Boolean = false,
+        val onClick: (() -> Unit)? = null,
     ) : ChatItem
 }
 
@@ -567,6 +601,99 @@ private fun GalleryBody() {
             }
         }
     }
+    /** 思考过程折叠块：流式追加（ReasoningDelta）→ 完成定格。 */
+    fun chatThinking() {
+        val id = chatSeq++
+        val thinkingText = "用户请求是「剖析项目结构」。\n\n我需要先读取 AGENTS.md 确认技术栈与纪律，再按 Feature-based 架构扫描 core / feature / datalayer 三大目录，最后给出模块关系图。\n\n扫描结果显示：核心是 agent 模块的 ToolRegistry 与权限审批链路，workspace 依赖 terminal 的容器能力。"
+        chatList = chatList + ChatItem.Thinking(key = id, text = "", isStreaming = true)
+        chatScope.launch {
+            var shown = 0
+            while (shown <= thinkingText.length) {
+                chatList = chatList.map { if (it is ChatItem.Thinking && it.key == id) it.copy(text = thinkingText.take(shown)) else it }
+                shown += 4
+                delay(14)
+            }
+            chatList = chatList.map { if (it is ChatItem.Thinking && it.key == id) it.copy(isStreaming = false) else it }
+        }
+    }
+
+    /** 计划审批卡：未决 → 批准执行 → 已批准；或继续细化 → 步骤更新后再次待决。 */
+    fun chatPlan() {
+        val id = chatSeq++
+        chatList = chatList + ChatItem.Plan(
+            key = id,
+            title = "接入 SQLDelight V2 六库拓扑",
+            steps = listOf(
+                AppPlanStep("梳理现有 Room 域库的 schema 与依赖", AppPlanStepStatus.Done),
+                AppPlanStep("在 datalayer/ 下搭建 V2 引擎与迁移链", AppPlanStepStatus.InProgress),
+                AppPlanStep("改造 V1toV2FullMigrator 一次性移植器", AppPlanStepStatus.Pending),
+                AppPlanStep("切 Repository 门面并跑通全量测试", AppPlanStepStatus.Pending),
+            ),
+            state = AppPlanState.AwaitingApproval,
+            pendingSelection = "迁移器是否采用「读旧库直写新库」的直迁方案？",
+            reason = "计划待你确认后切换 BUILD 模式执行",
+            onApprove = {
+                chatList = chatList.map {
+                    if (it is ChatItem.Plan && it.key == id) {
+                        it.copy(state = AppPlanState.InProgress, onApprove = null, onRefine = null)
+                    } else {
+                        it
+                    }
+                }
+                chatScope.launch {
+                    delay(1400)
+                    chatList = chatList.map {
+                        if (it is ChatItem.Plan && it.key == id) {
+                            it.copy(
+                                state = AppPlanState.Approved,
+                                steps = it.steps.map { step ->
+                                    if (step.status == AppPlanStepStatus.Pending) step.copy(status = AppPlanStepStatus.InProgress) else step
+                                },
+                            )
+                        } else {
+                            it
+                        }
+                    }
+                }
+            },
+            onRefine = {
+                chatList = chatList.map {
+                    if (it is ChatItem.Plan && it.key == id) {
+                        it.copy(
+                            pendingSelection = null,
+                            steps = it.steps + AppPlanStep("补充直迁失败的回滚与重试策略", AppPlanStepStatus.Pending),
+                        )
+                    } else {
+                        it
+                    }
+                }
+            },
+        )
+    }
+
+    /** 附件卡：sendFile 展示型工具的产物（图片 + 文件）。 */
+    fun chatAttachment() {
+        val id = chatSeq++
+        val attachmentKeys = listOf(id, id + 1)
+        chatList = chatList + ChatItem.Attachment(
+            key = id,
+            fileName = "architecture-graph.png",
+            mimeType = "image/png",
+            sizeBytes = 1_360_000,
+            containerPath = "~/workspace/artifacts/architecture-graph.png",
+            isImage = true,
+            onClick = { /* 演示占位：打开图片预览 */ },
+        )
+        chatList = chatList + ChatItem.Attachment(
+            key = id + 1,
+            fileName = "migration-plan.md",
+            mimeType = "text/markdown",
+            sizeBytes = 12_800,
+            containerPath = "~/workspace/artifacts/migration-plan.md",
+            onClick = { /* 演示占位：打开文档 */ },
+        )
+    }
+
     // 文件卡运行态：自动循环演示（上传推进 → 完成）
     var fileProgress by remember { mutableStateOf(0f) }
     var fileState by remember { mutableStateOf(AppFileState.Uploading) }
@@ -1277,6 +1404,9 @@ private fun GalleryBody() {
                 AppButton(text = "待审批", onClick = { chatToolApproval() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "MCP App", onClick = { chatMcpApp() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "技能调用", onClick = { chatSkill() }, variant = AppButtonVariant.Outlined)
+                AppButton(text = "思考过程", onClick = { chatThinking() }, variant = AppButtonVariant.Outlined)
+                AppButton(text = "计划审批", onClick = { chatPlan() }, variant = AppButtonVariant.Outlined)
+                AppButton(text = "附件", onClick = { chatAttachment() }, variant = AppButtonVariant.Outlined)
             }
             AppMessageScroller(
                 modifier = Modifier.height(440.dp),
@@ -1320,6 +1450,30 @@ private fun GalleryBody() {
                             state = item.state,
                             description = item.description,
                             durationMs = item.durationMs,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        is ChatItem.Thinking -> AppThinkingBlock(
+                            text = item.text,
+                            isStreaming = item.isStreaming,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        is ChatItem.Plan -> AppPlanCard(
+                            title = item.title,
+                            steps = item.steps,
+                            state = item.state,
+                            pendingSelection = item.pendingSelection,
+                            reason = item.reason,
+                            onApprove = item.onApprove,
+                            onRefine = item.onRefine,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        is ChatItem.Attachment -> AppAttachmentCard(
+                            fileName = item.fileName,
+                            mimeType = item.mimeType,
+                            sizeBytes = item.sizeBytes,
+                            containerPath = item.containerPath,
+                            isImage = item.isImage,
+                            onClick = item.onClick,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         is ChatItem.Msg -> AppMessageRow(
