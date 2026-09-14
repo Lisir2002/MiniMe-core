@@ -18,10 +18,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -193,23 +193,23 @@ fun AppTerminalLog(
                     )
                 }
             }
+        }
 
-            // 底部渐隐 scrim：贴近 iOS 终端/控制台的底部纵向收尾
-            Box(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(AppSpacing.Xl)
-                    .background(
-                        Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0f to Color.Transparent,
-                                1f to AppColor.OnDarkSurface.copy(alpha = 0.55f),
-                            ),
+        // 底部渐隐 scrim：贴近 iOS 终端/控制台的底部纵向收尾（BoxScope 直接子级覆盖）
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(AppSpacing.Xl)
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0f to Color.Transparent,
+                            1f to AppColor.OnDarkSurface.copy(alpha = 0.55f),
                         ),
                     ),
-            )
-        }
+                ),
+        )
     }
 }
 
