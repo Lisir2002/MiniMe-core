@@ -43,7 +43,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
@@ -273,11 +272,12 @@ internal fun Color.blend(target: Color, t: Float): Color = Color(
  * **对齐 SwiftUI `Button(role: .destructive)` / `tint(_:)` 语义**：
  * 破坏性动作（删除）传红色令牌，普通动作传主色/语义色令牌；颜色由外部经 [background] 传入。
  *
- * 仅做两件「随态」的事：
- *  - 随拖拽的**透明度渐入**（本地 [LocalSwipeReveal]，iOS 内容平移自然露出的做法）；
- *  - 按压时把底色压暗一档（[Color.blend]），给出手感反馈。
+ * 揭示方式是**位置驱动而非 alpha 淡入**（对齐 iOS 内容平移自然露出）：
+ * 按钮绘制在底层子画布（[AppSwipeAction] 的 `matchParentSize` 层）上，顶层不透明内容层
+ * 向左平移多少、右侧按钮就被揭开多少——"顺缝露出"，无整体渐显。本地 [LocalSwipeReveal]
+ * 此刻仅用作**可点击门控**（`enabled = reveal > 0.05f`），不再修改透明度。
  *
- * 无渐变高光 / 分隔线 / 独立圆角——整条圆角由外层 [AppSwipeAction] 统一 clip，按钮紧邻无缝拼接。
+ * 按压时把底色压暗一档（[Color.blend]），给出手感反馈。
  */
 @Composable
 fun RowScope.AppSwipeButton(
@@ -299,7 +299,6 @@ fun RowScope.AppSwipeButton(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
-            .graphicsLayer { alpha = reveal.coerceIn(0.001f, 1f) }
             .background(bg, RoundedCornerShape(AppRadius.None))
             .clickable(
                 interactionSource = interaction,
@@ -350,8 +349,9 @@ fun RowScope.AppSwipeButton(
  *  - **申报防线**：仅在 `settledValue != Closed` 且正朝展开方向时才抢占展开位。
  *
  * ## 视觉
- * 按 iOS `swipeActions` 重绘：动作栏为**整条圆角容器**（[AppRadius.Md]，无阴影），
- * 内部按钮**扁平纯色拼接、无分隔线**，随拖拽透明度渐入，内容层平移露出。
+ * 按 iOS `swipeActions` 重绘：动作栏为**底层子画布**（[AppRadius.Md] 整条圆角容器，无阴影），
+ * 内部按钮**扁平纯色拼接、无分隔线**，绘制在该子画布上；顶层不透明白色内容层
+ * **向左平移多少、按钮就从右侧揭开多少**（位置驱动顺缝露出，无整体渐显）。
  */
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
