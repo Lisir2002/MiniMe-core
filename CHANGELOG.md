@@ -7,6 +7,23 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc8] - 2026-09-14
+
+> 预发行（未转正）。newui 设计系统新增「AI 对话流」组件族（消息气泡状态机 / 消息行 / 流标记 / 滚动容器 / 轻量 Markdown 渲染），并在 DesignGallery 内置可交互演示；无破坏性变更。纯 UI 设计系统（`:newui`）改动，无 AI 工作流 / prompt / schema / 资产同步影响。
+
+### Added
+
+- `[ui]` 新增 `AppChatBubble` 对话气泡（分子组）：内置消息状态机（`Pending → Streaming → Complete / Error`），流式回复带闪烁光标，失败态内联重试按钮，颜色归一化到 `AppColor` 令牌。
+- `[ui]` 新增 `AppMessageRow` 消息行：双侧头像（AI/用户）、头部信息（姓名/时间戳）、长按操作区（复制/重试/删除），同角色连续消息支持 `grouped` 合并隐藏头像。
+- `[ui]` 新增 `AppChatMarker` 消息流标记：日期分隔、系统消息、工具调用卡三种形态，工具卡支持运行中状态指示。
+- `[ui]` 新增 `AppMessageScroller` 滚动容器：反向 `LazyColumn` 列表，新消息自动跟随滚动，顶部加载历史 + 底部跳底按钮。
+- `[ui]` 新增 `AppMarkdownText` 轻量 Markdown 渲染：支持段落、粗体、行内代码、代码块、无序列表，适配 AI 回复常见排版。
+- `[ui]` DesignGallery 新增「AI 对话流」交互演示区块：流式回复 / 模拟失败重试 / 工具调用三种场景一键触发。
+
+### Changed
+
+- `[ui]` DesignGallery 对话流演示区接入 `AppMessageScroller` + 状态机驱动，支持真实流式逐字回复与失败重试闭环。
+
 ## [0.0.0.2-rc7] - 2026-09-14
 
 > 预发行（未转正）。newui 设计系统弹窗/通知/快捷键全系归一到 `AppColor` 令牌并强化交互，新增「可搜索下拉筛选」「激活筛选 token 行」两个筛选组件；无破坏性变更。纯 UI 设计系统（`:newui`）改动，无 AI 工作流 / prompt / schema / 资产同步影响。

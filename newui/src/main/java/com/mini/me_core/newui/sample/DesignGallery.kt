@@ -78,6 +78,7 @@ import com.mini.me_core.newui.designsystem.component.molecule.AppChatMessageStat
 import com.mini.me_core.newui.designsystem.component.molecule.AppMessageRow
 import com.mini.me_core.newui.designsystem.component.molecule.AppMessageScroller
 import com.mini.me_core.newui.designsystem.component.molecule.AppCheckRow
+import com.mini.me_core.newui.designsystem.component.molecule.AppConfetti
 import com.mini.me_core.newui.designsystem.component.molecule.AppIconButton
 import com.mini.me_core.newui.designsystem.component.molecule.AppDialog
 import com.mini.me_core.newui.designsystem.component.molecule.AppDialogTone
