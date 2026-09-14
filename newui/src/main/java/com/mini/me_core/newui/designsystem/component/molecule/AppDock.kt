@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -8,10 +9,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,8 +42,15 @@ data class AppDockItem(
 )
 
 /**
- * 图标坞（分子组 · AppDock）：类 macOS Dock 的胶囊形图标列，按压 / 选中项弹簧放大并浮现
- * 标签，矮胖的启动面板 / 快速切换栏。
+ * 图标坞（分子组 · AppDock）：iOS 简约风格的胶囊图标列，用于自底部快速切换/启动。
+ *
+ * 视觉对齐 iOS 简约规范：
+ *  - **选中态**：图标染 [AppColor.BrandPrimary]，背后一个浅蓝胶囊底（`BrandPrimary @ 12%`），
+ *    图标正下方一个指示小圆点（iOS dock 常用 indicator），并轻微放大弹跳。
+ *  - **未选中态**：图标染 [MaterialTheme.colorScheme.onSurfaceVariant]（灰标），无底无点。
+ *  - **标签**：仅选中态以「悬浮气泡」叠在图标上方显示，用 [Box] 叠加、不参与测量，
+ *    因此选中/未选中 Row 高度恒定、无布局跳变。
+ *  - 按压即时放大（[collectIsPressedAsState]），选中有独立选中放大，两层互不耦合。
  */
 @Composable
 fun AppDock(
@@ -52,42 +63,85 @@ fun AppDock(
         modifier = modifier
             .clip(RoundedCornerShape(AppRadius.Pill))
             .background(background)
-            .padding(AppSpacing.Sm),
+            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
         horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
         verticalAlignment = Alignment.Bottom,
     ) {
         items.forEachIndexed { index, item ->
             val interaction = remember { MutableInteractionSource() }
             val pressed by interaction.collectIsPressedAsState()
-            val active = pressed || index == selectedIndex
+            val selected = index == selectedIndex
+            val active = pressed || selected
+            // 按压即刻弹起；选中态再叠一层放大，两者取最大值避免冲突
             val scale by animateFloatAsState(
-                targetValue = if (active) 1.28f else 1f,
+                targetValue = if (active) 1.18f else 1f,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
                     stiffness = Spring.StiffnessLow,
                 ),
                 label = "dockScale",
             )
-            Column(
+            val selectBg by animateColorAsState(
+                targetValue = if (selected) Color(0x1F0A84FF) else Color.Transparent,
+                label = "dockSelectBg",
+            )
+            val iconTint by animateColorAsState(
+                targetValue = if (selected) AppColor.BrandPrimary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                label = "dockIconTint",
+            )
+
+            Box(
                 modifier = Modifier
-                    .graphicsLayer { scaleX = scale; scaleY = scale }
+                    .padding(horizontal = AppSpacing.Xs)
+                    .clip(RoundedCornerShape(AppRadius.Md))
+                    .background(selectBg)
                     .clickable(interactionSource = interaction, indication = null) { item.onClick() }
-                    .padding(horizontal = AppSpacing.Xs),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Sm),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = item.icon,
-                    contentDescription = item.label,
-                    tint = AppColor.BrandPrimary,
-                    modifier = Modifier.size(AppSizing.IconL),
-                )
-                if (active) {
-                    Text(
-                        text = item.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
+                // 悬浮气泡标签：Box 叠加，不占测量空间 → 选中/未选中高度恒定
+                if (selected) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .offset(y = (-AppSpacing.Sm - AppSizing.IconL).value.dp)
+                            .clip(RoundedCornerShape(AppRadius.Sm))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f))
+                            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
+                    ) {
+                        Text(
+                            text = item.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.surface,
+                            maxLines = 1,
+                        )
+                    }
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.label,
+                        tint = iconTint,
+                        modifier = Modifier
+                            .graphicsLayer { scaleX = scale; scaleY = scale }
+                            .size(AppSizing.IconL),
                     )
+                    // 指示点：仅选中显示，占固定高度以免抖动
+                    if (selected) {
+                        Box(
+                            modifier = Modifier
+                                .padding(top = AppSpacing.Xs)
+                                .size(AppSizing.IconXs / 2f)
+                                .clip(CircleShape)
+                                .background(AppColor.BrandPrimary),
+                        )
+                    } else {
+                        Box(modifier = Modifier.padding(top = AppSpacing.Xs).size(AppSizing.IconXs / 2f))
+                    }
                 }
             }
         }

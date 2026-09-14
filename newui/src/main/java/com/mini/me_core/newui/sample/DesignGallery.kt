@@ -139,11 +139,11 @@ import com.mini.me_core.newui.designsystem.component.molecule.AppConfetti
 import com.mini.me_core.newui.designsystem.component.molecule.AppDock
 import com.mini.me_core.newui.designsystem.component.molecule.AppDockItem
 import com.mini.me_core.newui.designsystem.component.molecule.AppGradientBorder
-import com.mini.me_core.newui.designsystem.component.molecule.AppMarquee
 import com.mini.me_core.newui.designsystem.component.molecule.AppRollingNumber
 import com.mini.me_core.newui.designsystem.component.molecule.AppScrambleText
 import com.mini.me_core.newui.designsystem.component.molecule.AppScrollProgress
 import com.mini.me_core.newui.designsystem.component.molecule.AppSpotlightCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppTerminalLog
 import com.mini.me_core.newui.designsystem.component.molecule.AppTypewriterText
 import com.mini.me_core.newui.designsystem.component.molecule.AppSwipeAction
 import com.mini.me_core.newui.designsystem.component.molecule.AppSwipeButton
@@ -1015,7 +1015,7 @@ private fun GalleryBody() {
             }
             Spacer(Modifier.height(AppSpacing.Xs))
 
-            AppMarquee { Text("　✦ MiniMe-core · 容器已就绪 ● 终端已连接 → 构建中… 　", style = MaterialTheme.typography.bodyMedium) }
+            AppTerminalLog()
             Spacer(Modifier.height(AppSpacing.Md))
 
             AppGradientBorder(modifier = Modifier.fillMaxWidth()) {
