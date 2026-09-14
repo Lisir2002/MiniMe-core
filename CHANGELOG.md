@@ -7,6 +7,18 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc6] - 2026-09-14
+
+> 预发行（未转正）。newui 设计系统「工作台图标」「终端日志窗口」两处按 iOS 简约风格深化并强化，无破坏性变更；纯 UI 设计系统（`:newui`）改动，无 AI 工作流 / prompt / schema / 资产同步影响。
+
+### Added
+
+- `[ui]` 新增 `AppTerminalLog` 终端日志面板（分子组），替换样板页原单行跑马灯展示：深色控制台卡（`AppColor.OnDarkSurface`）+ 等宽字体，标题栏呼吸态状态点 + 「● 运行中」小字；正文按 `LogLevel` 分级染色（`StatusSuccess`/`StatusWarning`/`StatusDanger`）并自动滚动到底，底部纵向渐隐 scrim + 闪烁光标示意仍在线；用 `animateContentSize` 让新日志流入时高度平滑伸展。
+
+### Changed
+
+- `[ui]` `AppDock` 深化为 iOS 简约图标坞：选中态染 `BrandPrimary` + 浅蓝胶囊底 + 指示点弹簧缩放并淡入淡出，未选中态灰标无底；悬浮气泡标签用 `Box` 叠加不参与测量，消除选中/未选中布局跳变；本次强化新增：容器 `AppElevation.Z2` 悬浮阴影、按压浅色调层反馈（`collectIsPressedAsState`）。
+
 ## [0.0.0.2-rc5] - 2026-09-14
 
 > 预发行（未转正）。修复滑扫按钮不可见的真根因（rc3/rc4 修复了真实但独立的缺陷，均未触达本遮挡源），无破坏性变更。
