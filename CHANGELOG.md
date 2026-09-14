@@ -7,6 +7,20 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc10] - 2026-09-14
+
+> 预发行（未转正）。对话流组件族深化「工具 / 技能 / MCP 调用」的特殊样式表现：工具调用卡补齐**实时输出（Streaming）**与**人工审批（Intervention）**两个 surface（对齐 LobeHub 六 surface 与 assistant-ui `requires-action`），新增 **MCP App** 交互式界面渲染卡（对齐 MCP Apps 官方 extension 的沙箱 iframe 模式），技能调用卡补成功态耗时；无破坏性变更。纯 UI 设计系统（`:newui`）改动，无 AI 工作流 / prompt / schema / 资产同步影响。
+
+### Added
+
+- `[ui]` 新增 `AppMcpAppCard` MCP App 卡（分子组）：工具声明 `_meta.ui.resourceUri` 后 Host 渲染沙箱 iframe 交互式界面（MCP Apps 规范）。头部含 `APP` 徽标 + MCP 服务器胶囊 + `ui://…` 地址；16:9 深色画布按 `Loading / Ready / Error` 三态展示（加载骨架 / 交互式仪表盘占位 / 失败重试）；底部 `sandbox · iframe` 安全提示 + 刷新 / 全屏操作（Portal 占位）。
+- `[ui]` DesignGallery「AI 对话流」新增「待审批」「MCP App」两个交互演示：待审批工具可**允许→执行→成功**或**拒绝→失败**闭环；MCP App 演示加载→就绪过渡与刷新重载。
+
+### Changed
+
+- `[ui]` `AppToolCallCard` 打磨：状态机新增 `AwaitingApproval`（琥珀警示 + 卡片尾部**允许 / 拒绝**操作行，对齐 LobeHub humanIntervention 与 assistant-ui `requires-action`，可承载工具权限审批链路）；新增 `streamOutput`——`Running` 态直接内联等宽终端块 + 闪烁方块光标（Streaming surface，适配 Shell stdout 实时可见）。
+- `[ui]` `AppSkillCallCard` 补成功态耗时显示（`· 900ms` / `1.6s`），与工具卡元信息对齐。
+
 ## [0.0.0.2-rc9] - 2026-09-14
 
 > 预发行（未转正）。修复 rc8 CI 在 Android SDK 安装阶段失败的问题（新版 cmdline-tools 已移除独立 `tools` 包）；功能内容与 rc8 一致（对话流组件族）。纯 CI 配置 + UI 设计系统（`:newui`）改动，无 AI 工作流 / prompt / schema / 资产同步影响。
