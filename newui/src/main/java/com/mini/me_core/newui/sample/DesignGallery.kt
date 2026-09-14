@@ -30,9 +30,10 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.AlertDialog
@@ -45,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -165,7 +167,6 @@ import com.mini.me_core.newui.designsystem.component.molecule.AppFileState
 import com.mini.me_core.newui.designsystem.layout.AppEmptyState
 import com.mini.me_core.newui.designsystem.layout.AppErrorState
 import com.mini.me_core.newui.designsystem.layout.AppLoadingState
-import com.mini.me_core.newui.designsystem.layout.AppTopBar
 import com.mini.me_core.newui.designsystem.layout.pageContentPadding
 import com.mini.me_core.newui.designsystem.layout.pageMaxWidth
 import com.mini.me_core.newui.designsystem.slot.SlotSet
@@ -186,18 +187,9 @@ fun DesignGallery(onNavigateBack: (() -> Unit)? = null) {
     AppTheme {
         SlotSet(
             topBar = {
-                AppTopBar(
+                iOSNavBar(
                     title = "Design Gallery",
-                    navigationIcon = if (onNavigateBack != null) {
-                        {
-                            IconButton(onClick = onNavigateBack) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = "返回",
-                                )
-                            }
-                        }
-                    } else null,
+                    onBack = onNavigateBack,
                 )
             },
             content = {
@@ -312,8 +304,9 @@ private fun GalleryBody() {
         modifier = Modifier
             .verticalScroll(scroll)
             .pageMaxWidth()
-            .pageContentPadding(),
-        verticalArrangement = Arrangement.spacedBy(AppSpacing.Lg),
+            .pageContentPadding()
+            .padding(top = AppSpacing.Md),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.Xl),
     ) {
         Section("令牌 · 色板") {
             ColorRow(
@@ -1248,16 +1241,63 @@ private fun GalleryBody() {
     }
 }
 
+/** iOS 简约导航栏：返回钮（iOS 蓝）+ 大标题，透明融入系统底。 */
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+private fun iOSNavBar(title: String, onBack: (() -> Unit)? = null) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
+    ) {
+        if (onBack != null) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.size(AppSizing.IconButton),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "返回",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        } else {
+            Spacer(Modifier.height(AppSpacing.Md))
+        }
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(top = AppSpacing.Sm, bottom = AppSpacing.Md),
         )
-        content()
+    }
+}
+
+/** iOS 简约分组：灰色小标题 + 白色圆角卡片分组（去顶部分隔线，以留白分层）。 */
+@Composable
+private fun Section(title: String, content: @Composable () -> Unit) {
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(AppRadius.Lg),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(AppSpacing.Lg),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
+            ) {
+                content()
+            }
+        }
     }
 }
 

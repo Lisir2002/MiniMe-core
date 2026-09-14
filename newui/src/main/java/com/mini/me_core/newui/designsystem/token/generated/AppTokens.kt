@@ -7,18 +7,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 object AppColor {
-    val BrandPrimary = Color(0xFF6C5CE7) // 品牌主色（紫）
-    val BrandSurface = Color(0xFFF7F8FA) // 页面底色
-    val BrandSurfaceDim = Color(0xFFECEDF1) // 次要面板底色
-    val BrandInk = Color(0xFF1A1C20) // 主文字/重色
-    val BrandAccent = Color(0xFF00BFA6) // 高亮点缀（chat accent 收纳）
-    val StatusSuccess = Color(0xFF2E7D32)
-    val StatusWarning = Color(0xFFF9A825)
-    val StatusDanger = Color(0xFFC62828)
-    val StatusInfo = Color(0xFF1976D2)
-    val OnDarkPrimary = Color(0xFFB8A6FF)
-    val OnDarkSurface = Color(0xFF16181C)
-    val OnDarkInk = Color(0xFFEDEEF2)
+    val BrandPrimary = Color(0xFF0A84FF) // 强调色 · iOS 系统蓝（主色调定板）
+    val BrandSurface = Color(0xFFF2F2F7) // 系统分组底（浅）iOS systemGroupedBackground
+    val BrandSurfaceDim = Color(0xFFE9E9EE) // 次要面/分隔（浅）
+    val BrandCard = Color(0xFFFFFFFF) // 分组卡片/成员表面（浅）
+    val BrandInk = Color(0xFF111114) // 一级文字 label.primary（浅）
+    val BrandAccent = Color(0xFF5AC8FA) // 点缀蓝（iOS 浅蓝 accent）
+    val LabelSecondary = Color(0xFF8E8E93) // 二级文字 label.secondary
+    val LabelTertiary = Color(0xFFC7C7CC) // 三级文字 label.tertiary
+    val StatusSuccess = Color(0xFF34C759) // iOS 系统绿
+    val StatusWarning = Color(0xFFFF9F0A) // iOS 系统橙
+    val StatusDanger = Color(0xFFFF3B30) // iOS 系统红
+    val StatusInfo = Color(0xFF0A84FF) // iOS 系统蓝
+    val SeparatorOnLight = Color(0xFFDCDCE0) // 分割线（浅）
+    val SeparatorOnDark = Color(0xFF38383A) // 分割线（深）
+    val OnDarkPrimary = Color(0xFF3D9BFF) // 暗色强调蓝（提亮一档）
+    val OnDarkSurface = Color(0xFF000000) // 系统分组底（深）iOS systemBackground
+    val OnDarkSurfaceRaised = Color(0xFF1C1C1E) // 分组卡片（深）iOS secondarySystemGroupedBackground
+    val OnDarkInk = Color(0xFFFFFFFF) // 一级文字（深）
+    val OnDarkSecondaryLabel = Color(0xFF98989D) // 二级文字（深）
 }
 
 object AppSpacing {

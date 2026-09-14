@@ -14,40 +14,41 @@ import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 
 /**
- * :newui 独立 M3 主题（不碰旧版 theme）。
- *
- * S0 最小自证：亮/暗两套 ColorScheme 由 DTCG 令牌（AppColor）映射到 M3 primary/surface/…，
- * 形状由 AppRadius 组装；Typography 暂用默认，待 §3.5 排版族补全。
+ * iOS 简约风映射（主风格定版）：
+ *  - 浅色：系统分组底 #F2F2F7 + 白色成员卡片 #FFFFFF，一级/二级文字分级，主强调 iOS 蓝 #0A84FF；
+ *  - 深色：纯黑系统底 #000000 + 分组卡片 #1C1C1E，文字白，强调蓝提亮 #3D9BFF；
+ *  - 分隔线统一走 Separator 令牌，卡片靠底色分区而非阴影（简约去 Elevation 靠内容分层）。
  */
 private val AppLightScheme = lightColorScheme(
     primary = AppColor.BrandPrimary,
     onPrimary = Color.White,
     background = AppColor.BrandSurface,
     onBackground = AppColor.BrandInk,
-    surface = AppColor.BrandSurface,
+    surface = AppColor.BrandCard,
     onSurface = AppColor.BrandInk,
     surfaceVariant = AppColor.BrandSurfaceDim,
-    onSurfaceVariant = AppColor.BrandInk.copy(alpha = 0.62f),
+    onSurfaceVariant = AppColor.LabelSecondary,
     secondary = AppColor.BrandAccent,
     onSecondary = Color.White,
     error = AppColor.StatusDanger,
     onError = Color.White,
-    outline = AppColor.BrandSurfaceDim,
+    outline = AppColor.SeparatorOnLight,
 )
 
 private val AppDarkScheme = darkColorScheme(
     primary = AppColor.OnDarkPrimary,
-    onPrimary = Color(0xFF1A1C20),
+    onPrimary = Color.Black,
     background = AppColor.OnDarkSurface,
     onBackground = AppColor.OnDarkInk,
-    surface = AppColor.OnDarkSurface,
+    surface = AppColor.OnDarkSurfaceRaised,
     onSurface = AppColor.OnDarkInk,
-    surfaceVariant = AppColor.BrandSurfaceDim.copy(alpha = 0.15f),
-    onSurfaceVariant = AppColor.OnDarkInk.copy(alpha = 0.68f),
-    secondary = AppColor.BrandAccent,
-    onSecondary = Color(0xFF16181C),
+    surfaceVariant = AppColor.SeparatorOnDark,
+    onSurfaceVariant = AppColor.OnDarkSecondaryLabel,
+    secondary = AppColor.BrandPrimary,
+    onSecondary = Color.Black,
     error = AppColor.StatusDanger,
     onError = Color.White,
+    outline = AppColor.SeparatorOnDark,
 )
 
 /** 圆角令牌 → M3 Shapes（§3.10 对齐 M3 形状尺度） */

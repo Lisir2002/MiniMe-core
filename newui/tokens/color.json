@@ -1,22 +1,33 @@
 {
   "color": {
     "brand": {
-      "primary":   { "$value": "#6C5CE7", "$type": "color", "$description": "品牌主色（紫）" },
-      "surface":   { "$value": "#F7F8FA", "$type": "color", "$description": "页面底色" },
-      "surfaceDim":{ "$value": "#ECEDF1", "$type": "color", "$description": "次要面板底色" },
-      "ink":       { "$value": "#1A1C20", "$type": "color", "$description": "主文字/重色" },
-      "accent":    { "$value": "#00BFA6", "$type": "color", "$description": "高亮点缀（chat accent 收纳）" }
+      "primary":   { "$value": "#0A84FF", "$type": "color", "$description": "强调色 · iOS 系统蓝（主色调定板）" },
+      "surface":   { "$value": "#F2F2F7", "$type": "color", "$description": "系统分组底（浅）iOS systemGroupedBackground" },
+      "surfaceDim":{ "$value": "#E9E9EE", "$type": "color", "$description": "次要面/分隔（浅）" },
+      "card":      { "$value": "#FFFFFF", "$type": "color", "$description": "分组卡片/成员表面（浅）" },
+      "ink":       { "$value": "#111114", "$type": "color", "$description": "一级文字 label.primary（浅）" },
+      "accent":    { "$value": "#5AC8FA", "$type": "color", "$description": "点缀蓝（iOS 浅蓝 accent）" }
+    },
+    "label": {
+      "secondary": { "$value": "#8E8E93", "$type": "color", "$description": "二级文字 label.secondary" },
+      "tertiary":  { "$value": "#C7C7CC", "$type": "color", "$description": "三级文字 label.tertiary" }
     },
     "status": {
-      "success":  { "$value": "#2E7D32", "$type": "color" },
-      "warning":  { "$value": "#F9A825", "$type": "color" },
-      "danger":   { "$value": "#C62828", "$type": "color" },
-      "info":     { "$value": "#1976D2", "$type": "color" }
+      "success": { "$value": "#34C759", "$type": "color", "$description": "iOS 系统绿" },
+      "warning": { "$value": "#FF9F0A", "$type": "color", "$description": "iOS 系统橙" },
+      "danger":  { "$value": "#FF3B30", "$type": "color", "$description": "iOS 系统红" },
+      "info":    { "$value": "#0A84FF", "$type": "color", "$description": "iOS 系统蓝" }
+    },
+    "separator": {
+      "onLight": { "$value": "#DCDCE0", "$type": "color", "$description": "分割线（浅）" },
+      "onDark":  { "$value": "#38383A", "$type": "color", "$description": "分割线（深）" }
     },
     "onDark": {
-      "primary":  { "$value": "#B8A6FF", "$type": "color" },
-      "surface":  { "$value": "#16181C", "$type": "color" },
-      "ink":      { "$value": "#EDEEF2", "$type": "color" }
+      "primary":        { "$value": "#3D9BFF", "$type": "color", "$description": "暗色强调蓝（提亮一档）" },
+      "surface":        { "$value": "#000000", "$type": "color", "$description": "系统分组底（深）iOS systemBackground" },
+      "surfaceRaised":  { "$value": "#1C1C1E", "$type": "color", "$description": "分组卡片（深）iOS secondarySystemGroupedBackground" },
+      "ink":            { "$value": "#FFFFFF", "$type": "color", "$description": "一级文字（深）" },
+      "secondaryLabel": { "$value": "#98989D", "$type": "color", "$description": "二级文字（深）" }
     }
   }
 }
