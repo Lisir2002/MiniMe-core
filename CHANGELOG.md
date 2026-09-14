@@ -7,6 +7,14 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc4] - 2026-09-14
+
+> 预发行（未转正）。重构滑扫按钮揭示机制为 iOS 原生的「位置驱动顺缝露出」，无破坏性变更。
+
+### Changed
+
+- `[ui]` AppSwipeAction 滑扫按钮揭示从「透明度整体淡入」改为「位置驱动逐格揭开」：按钮绘制在底层子画布，顶层不透明内容层平移多少即从右缘揭开多少（对齐 iOS `swipeActions` 的 `UIScrollView` 天然露出手感）；删除 `AppSwipeButton` 的 `graphicsLayer{ alpha }` 淡入，`LocalSwipeReveal` 仅保留为可点击门控（`enabled = reveal > 0.05f`）。
+
 ## [0.0.0.2-rc3] - 2026-09-14
 
 > 预发行（未转正）。修复滑扫组件的可见性缺陷，无破坏性变更。
