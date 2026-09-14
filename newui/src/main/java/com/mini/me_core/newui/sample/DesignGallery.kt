@@ -6,6 +6,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -83,12 +85,18 @@ import com.mini.me_core.newui.designsystem.component.molecule.AppSkillCallCard
 import com.mini.me_core.newui.designsystem.component.molecule.AppSkillCallState
 import com.mini.me_core.newui.designsystem.component.molecule.AppToolCallCard
 import com.mini.me_core.newui.designsystem.component.molecule.AppToolCallState
+import com.mini.me_core.newui.designsystem.component.molecule.AppApprovalChoice
 import com.mini.me_core.newui.designsystem.component.molecule.AppThinkingBlock
 import com.mini.me_core.newui.designsystem.component.molecule.AppPlanCard
 import com.mini.me_core.newui.designsystem.component.molecule.AppPlanState
 import com.mini.me_core.newui.designsystem.component.molecule.AppPlanStep
 import com.mini.me_core.newui.designsystem.component.molecule.AppPlanStepStatus
 import com.mini.me_core.newui.designsystem.component.molecule.AppAttachmentCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolChainTimeline
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolChainStep
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolChainStepState
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolSummaryCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolSummaryState
 import com.mini.me_core.newui.designsystem.component.molecule.AppMessageScroller
 import com.mini.me_core.newui.designsystem.component.molecule.AppCheckRow
 import com.mini.me_core.newui.designsystem.component.molecule.AppConfetti
@@ -238,6 +246,11 @@ private sealed interface ChatItem {
         val approvalHint: String? = null,
         val onApprove: (() -> Unit)? = null,
         val onReject: (() -> Unit)? = null,
+        val onChoice: ((AppApprovalChoice) -> Unit)? = null,
+        val alwaysDisabled: Boolean = false,
+        val alwaysDisabledReason: String? = null,
+        val approvalExpired: Boolean = false,
+        val approvalRemembered: Boolean = false,
     ) : ChatItem
 
     data class McpApp(
@@ -285,6 +298,19 @@ private sealed interface ChatItem {
         val isImage: Boolean = false,
         val onClick: (() -> Unit)? = null,
     ) : ChatItem
+
+    data class ToolChain(
+        override val key: Int,
+        val steps: List<AppToolChainStep>,
+        val label: String = "工具链",
+    ) : ChatItem
+
+    data class ToolSummary(
+        override val key: Int,
+        val text: String,
+        val state: AppToolSummaryState = AppToolSummaryState.Done,
+        val toolCount: Int = 1,
+    ) : ChatItem
 }
 
 private val initialChatItems: List<ChatItem> = listOf(
@@ -320,6 +346,7 @@ fun DesignGallery(onNavigateBack: (() -> Unit)? = null) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun GalleryBody() {
     val scroll = rememberScrollState()
@@ -464,6 +491,7 @@ private fun GalleryBody() {
     }
 
     /** 人工审批（Intervention）：工具待许可 → 允许进入执行 → 成功。 */
+    /** 人工审批（Intervention）：工具待许可 → 三档选择（拒绝 / 本次 / 始终允许 → 记忆）。 */
     fun chatToolApproval() {
         val id = chatSeq++
         chatList = chatList + ChatItem.Tool(
@@ -473,49 +501,88 @@ private fun GalleryBody() {
             state = AppToolCallState.AwaitingApproval,
             input = """{"command": "curl -X POST https://api.example.com/deploy"}""",
             approvalHint = "该命令将向生产环境发起部署请求",
-            onApprove = {
-                chatList = chatList.map {
-                    if (it is ChatItem.Tool && it.key == id) {
-                        it.copy(
-                            state = AppToolCallState.Running,
-                            approvalHint = null,
-                            onApprove = null,
-                            onReject = null,
-                        )
-                    } else {
-                        it
-                    }
-                }
-                chatScope.launch {
-                    delay(1200)
-                    chatList = chatList.map {
+            onChoice = { choice ->
+                when (choice) {
+                    AppApprovalChoice.Reject -> chatList = chatList.map {
                         if (it is ChatItem.Tool && it.key == id) {
                             it.copy(
-                                state = AppToolCallState.Success,
-                                durationMs = 1200,
-                                output = """{"deployId": "dep-20260914-01", "status": "ok"}""",
+                                state = AppToolCallState.Error,
+                                summary = "已拒绝执行 · 用户取消",
+                                approvalHint = null,
+                                onChoice = null,
                             )
                         } else {
                             it
                         }
                     }
-                }
-            },
-            onReject = {
-                chatList = chatList.map {
-                    if (it is ChatItem.Tool && it.key == id) {
-                        it.copy(
-                            state = AppToolCallState.Error,
-                            summary = "已拒绝执行 · 用户取消",
-                            approvalHint = null,
-                            onApprove = null,
-                            onReject = null,
+                    AppApprovalChoice.Once -> {
+                        chatList = chatList.map {
+                            if (it is ChatItem.Tool && it.key == id) {
+                                it.copy(
+                                    state = AppToolCallState.Running,
+                                    approvalHint = null,
+                                    onChoice = null,
+                                )
+                            } else {
+                                it
+                            }
+                        }
+                        chatScope.launch {
+                            delay(1200)
+                            chatList = chatList.map {
+                                if (it is ChatItem.Tool && it.key == id) {
+                                    it.copy(
+                                        state = AppToolCallState.Success,
+                                        durationMs = 1200,
+                                        output = """{"deployId": "dep-20260914-01", "status": "ok"}""",
+                                    )
+                                } else {
+                                    it
+                                }
+                            }
+                        }
+                    }
+                    AppApprovalChoice.Always -> {
+                        // 记忆放行：本条立即执行成功，并追加一条"已记住"的后续审批卡
+                        chatList = chatList.map {
+                            if (it is ChatItem.Tool && it.key == id) {
+                                it.copy(
+                                    state = AppToolCallState.Success,
+                                    durationMs = 820,
+                                    output = """{"deployId": "dep-20260914-02", "status": "ok"}""",
+                                    approvalHint = null,
+                                    onChoice = null,
+                                )
+                            } else {
+                                it
+                            }
+                        }
+                        chatList = chatList + ChatItem.Tool(
+                            key = chatSeq++,
+                            title = "执行命令",
+                            summary = "curl -X POST https://api.example.com/rollback",
+                            state = AppToolCallState.AwaitingApproval,
+                            input = """{"command": "curl -X POST https://api.example.com/rollback"}""",
+                            approvalHint = "同类命令已记忆为始终允许",
+                            approvalRemembered = true,
                         )
-                    } else {
-                        it
                     }
                 }
             },
+        )
+    }
+
+    /** 审批超时（Intervention 降级）：等待超时 → 默认策略拒绝，操作行收起为警示提示。 */
+    fun chatToolApprovalExpired() {
+        val id = chatSeq++
+        chatList = chatList + ChatItem.Tool(
+            key = id,
+            title = "执行命令",
+            summary = "rm -rf ./build/artifacts",
+            state = AppToolCallState.AwaitingApproval,
+            input = """{"command": "rm -rf ./build/artifacts", "force": true}""",
+            approvalHint = "该命令将删除构建产物目录",
+            approvalExpired = true,
         )
     }
 
@@ -692,6 +759,91 @@ private fun GalleryBody() {
             containerPath = "~/workspace/artifacts/migration-plan.md",
             onClick = { /* 演示占位：打开文档 */ },
         )
+    }
+
+    /** 工具链时间线：多步骤工具调用串联视图，头部汇总 + 状态节点 + 每步耗时。 */
+    fun chatToolChain() {
+        val id = chatSeq++
+        chatList = chatList + ChatItem.ToolChain(
+            key = id,
+            label = "工具链",
+            steps = listOf(
+                AppToolChainStep(
+                    title = "读取项目结构",
+                    summary = "scan app/src/main/java",
+                    state = AppToolChainStepState.Success,
+                    durationMs = 320,
+                ),
+                AppToolChainStep(
+                    title = "执行构建",
+                    summary = "./gradlew :app:assembleDebug",
+                    state = AppToolChainStepState.Success,
+                    durationMs = 1840,
+                ),
+                AppToolChainStep(
+                    title = "运行单元测试",
+                    summary = "./gradlew :app:testReleaseUnitTest",
+                    state = AppToolChainStepState.Success,
+                    durationMs = 960,
+                ),
+                AppToolChainStep(
+                    title = "发布 Release",
+                    summary = "打 tag 并推送远端",
+                    state = AppToolChainStepState.Running,
+                ),
+            ),
+        )
+        chatScope.launch {
+            delay(1400)
+            chatList = chatList.map {
+                if (it is ChatItem.ToolChain && it.key == id) {
+                    it.copy(
+                        steps = it.steps.mapIndexed { index, step ->
+                            if (index == it.steps.lastIndex) {
+                                step.copy(state = AppToolChainStepState.Success, durationMs = 1320)
+                            } else {
+                                step
+                            }
+                        },
+                    )
+                } else {
+                    it
+                }
+            }
+        }
+    }
+
+    /** 结果摘要卡：工具链完成后对结果做意图归纳（流式总结 → 完成）。 */
+    fun chatToolSummary() {
+        val id = chatSeq++
+        chatList = chatList + ChatItem.ToolSummary(
+            key = id,
+            text = "",
+            state = AppToolSummaryState.Summarizing,
+            toolCount = 4,
+        )
+        val summaryText = "已按计划完成 4 次工具调用：项目结构扫描、Debug 构建、单元测试全部通过，Release 已发布。构建耗时 1.8s，无告警。"
+        chatScope.launch {
+            var shown = 0
+            while (shown <= summaryText.length) {
+                chatList = chatList.map {
+                    if (it is ChatItem.ToolSummary && it.key == id) {
+                        it.copy(text = summaryText.take(shown))
+                    } else {
+                        it
+                    }
+                }
+                shown += 3
+                delay(16)
+            }
+            chatList = chatList.map {
+                if (it is ChatItem.ToolSummary && it.key == id) {
+                    it.copy(state = AppToolSummaryState.Done)
+                } else {
+                    it
+                }
+            }
+        }
     }
 
     // 文件卡运行态：自动循环演示（上传推进 → 完成）
@@ -1395,18 +1547,24 @@ private fun GalleryBody() {
         }
 
         Section("分子组建族 · AI 对话流") {
-            // 控制条：触发流式回复 / 失败重试 / 工具调用卡 / MCP 工具 / 待审批 / MCP App / 技能调用
-            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
+            // 控制条：触发流式回复 / 失败重试 / 工具卡 / 审批 / MCP / 技能 / 思考 / 计划 / 附件 / 链 / 摘要
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
+            ) {
                 AppButton(text = "AI 流式回复", onClick = { chatStream() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "模拟失败", onClick = { chatFail() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "工具调用", onClick = { chatTool() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "MCP 工具", onClick = { chatMcpTool() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "待审批", onClick = { chatToolApproval() }, variant = AppButtonVariant.Outlined)
+                AppButton(text = "审批超时", onClick = { chatToolApprovalExpired() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "MCP App", onClick = { chatMcpApp() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "技能调用", onClick = { chatSkill() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "思考过程", onClick = { chatThinking() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "计划审批", onClick = { chatPlan() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "附件", onClick = { chatAttachment() }, variant = AppButtonVariant.Outlined)
+                AppButton(text = "工具链", onClick = { chatToolChain() }, variant = AppButtonVariant.Outlined)
+                AppButton(text = "结果摘要", onClick = { chatToolSummary() }, variant = AppButtonVariant.Outlined)
             }
             AppMessageScroller(
                 modifier = Modifier.height(440.dp),
@@ -1476,6 +1634,17 @@ private fun GalleryBody() {
                             onClick = item.onClick,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        is ChatItem.ToolChain -> AppToolChainTimeline(
+                            steps = item.steps,
+                            label = item.label,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        is ChatItem.ToolSummary -> AppToolSummaryCard(
+                            text = item.text,
+                            state = item.state,
+                            toolCount = item.toolCount,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                         is ChatItem.Msg -> AppMessageRow(
                             text = item.text,
                             state = item.state,
@@ -1491,6 +1660,10 @@ private fun GalleryBody() {
                                 null
                             },
                             onDelete = { chatList = chatList.filterNot { it.key == item.key } },
+                            swipeEnabled = true,
+                            swipeIndex = item.key,
+                            swipeExpandedIndex = swipeExpanded,
+                            onSwipeExpanded = { swipeExpanded = it },
                         )
                     }
                 }

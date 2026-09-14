@@ -66,63 +66,112 @@ fun AppMessageRow(
     onRetry: (() -> Unit)? = null,
     onCopy: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
+    swipeEnabled: Boolean = false,
+    swipeEdge: AppSwipeEdge = AppSwipeEdge.End,
+    swipeIndex: Int? = null,
+    swipeExpandedIndex: Int? = null,
+    onSwipeExpanded: ((Int?) -> Unit)? = null,
 ) {
     val label = name ?: if (isUser) "你" else "AI"
     val avatarText = (avatarLabel ?: label).take(1)
     var actionsVisible by remember { mutableStateOf(false) }
     val hasActions = onCopy != null || onRetry != null || onDelete != null
 
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-        verticalAlignment = Alignment.Top,
-    ) {
-        if (!isUser) {
-            AvatarSlot(avatarText, showAvatar = showAvatar && !grouped)
-            Spacer(Modifier.width(AppSpacing.Sm))
-        }
-        Column(
-            modifier = Modifier.weight(1f, fill = false),
-            horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
+    val rowContent: @Composable () -> Unit = {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+            verticalAlignment = Alignment.Top,
         ) {
-            if (!grouped) {
-                HeaderRow(label = label, timestamp = timestamp, isUser = isUser)
-                Spacer(Modifier.height(2.dp))
+            if (!isUser) {
+                AvatarSlot(avatarText, showAvatar = showAvatar && !grouped)
+                Spacer(Modifier.width(AppSpacing.Sm))
             }
-            Column(horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
-                AppChatBubble(
-                    text = text,
-                    state = state,
-                    isUser = isUser,
-                    accent = accent,
-                    onRetry = onRetry,
-                    modifier = if (hasActions) {
-                        Modifier.combinedClickable(
-                            onClick = { actionsVisible = !actionsVisible },
-                            onLongClick = { actionsVisible = true },
-                        )
-                    } else {
-                        Modifier
-                    },
-                )
-                AnimatedVisibility(
-                    visible = actionsVisible,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
-                ) {
-                    MessageActionsBar(
+            Column(
+                modifier = Modifier.weight(1f, fill = false),
+                horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
+            ) {
+                if (!grouped) {
+                    HeaderRow(label = label, timestamp = timestamp, isUser = isUser)
+                    Spacer(Modifier.height(2.dp))
+                }
+                Column(horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
+                    AppChatBubble(
+                        text = text,
                         state = state,
-                        onCopy = onCopy,
+                        isUser = isUser,
+                        accent = accent,
                         onRetry = onRetry,
-                        onDelete = onDelete,
-                        onDismiss = { actionsVisible = false },
+                        modifier = if (hasActions) {
+                            Modifier.combinedClickable(
+                                onClick = { actionsVisible = !actionsVisible },
+                                onLongClick = { actionsVisible = true },
+                            )
+                        } else {
+                            Modifier
+                        },
                     )
+                    AnimatedVisibility(
+                        visible = actionsVisible,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically(),
+                    ) {
+                        MessageActionsBar(
+                            state = state,
+                            onCopy = onCopy,
+                            onRetry = onRetry,
+                            onDelete = onDelete,
+                            onDismiss = { actionsVisible = false },
+                        )
+                    }
                 }
             }
+            if (isUser) {
+                Spacer(Modifier.width(AppSpacing.Sm))
+                AvatarSlot(avatarText, showAvatar = showAvatar && !grouped)
+            }
         }
-        if (isUser) {
-            Spacer(Modifier.width(AppSpacing.Sm))
-            AvatarSlot(avatarText, showAvatar = showAvatar && !grouped)
+    }
+
+    if (swipeEnabled) {
+        AppSwipeAction(
+            modifier = modifier,
+            edge = swipeEdge,
+            index = swipeIndex,
+            expandedIndex = swipeExpandedIndex,
+            onExpanded = onSwipeExpanded,
+            actions = {
+                if (onCopy != null) {
+                    AppSwipeButton(
+                        icon = Icons.Rounded.ContentCopy,
+                        label = "复制",
+                        background = AppColor.BrandPrimary,
+                        onClick = onCopy,
+                    )
+                }
+                if (state == AppChatMessageState.Error && onRetry != null) {
+                    AppSwipeButton(
+                        icon = Icons.Rounded.Refresh,
+                        label = "重试",
+                        background = AppColor.StatusInfo,
+                        onClick = onRetry,
+                    )
+                }
+                if (onDelete != null) {
+                    AppSwipeButton(
+                        icon = Icons.Rounded.DeleteOutline,
+                        label = "删除",
+                        background = AppColor.StatusDanger,
+                        onClick = onDelete,
+                    )
+                }
+            },
+        ) {
+            rowContent()
+        }
+    } else {
+        Box(modifier = modifier) {
+            rowContent()
         }
     }
 }

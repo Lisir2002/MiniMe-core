@@ -114,6 +114,8 @@ fun AppToolCallCard(
     onChoice: ((AppApprovalChoice) -> Unit)? = null,
     alwaysDisabled: Boolean = false,
     alwaysDisabledReason: String? = null,
+    approvalExpired: Boolean = false,
+    approvalRemembered: Boolean = false,
     leadingIcon: ImageVector = Icons.Rounded.Terminal,
 ) {
     var inputExpanded by remember { mutableStateOf(false) }
@@ -232,60 +234,117 @@ fun AppToolCallCard(
                 JsonBlock(text = output)
             }
         }
-        // Intervention：待人工审批 → 三档 / 二档操作行
-        if (state == AppToolCallState.AwaitingApproval && (onChoice != null || onApprove != null || onReject != null)) {
+        // Intervention：待人工审批 → 三档 / 二档操作行；超时降级 / 记忆放行 仅展示态
+        if (
+            state == AppToolCallState.AwaitingApproval &&
+            (onChoice != null || onApprove != null || onReject != null || approvalExpired || approvalRemembered)
+        ) {
             CardDivider()
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
-                verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
+            when {
+                approvalRemembered -> Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+                    verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircle,
+                            contentDescription = "已记住",
+                            tint = AppColor.StatusSuccess,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = "已记住 · 始终允许，不再询问",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AppColor.StatusSuccess,
+                            modifier = Modifier.padding(start = AppSpacing.Xs),
+                        )
+                    }
+                }
+
+                approvalExpired -> Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+                    verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.Warning,
+                            contentDescription = "审批超时",
+                            tint = AppColor.StatusWarning,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = "审批超时，已按默认策略拒绝执行",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AppColor.StatusWarning,
+                            modifier = Modifier.padding(start = AppSpacing.Xs),
+                        )
+                    }
                     if (approvalHint != null) {
                         Text(
                             text = approvalHint,
                             style = MaterialTheme.typography.labelSmall,
                             color = AppColor.LabelSecondary,
-                            modifier = Modifier.weight(1f),
+                            maxLines = 2,
                         )
-                    } else {
-                        Spacer(Modifier.weight(1f))
-                    }
-                    if (onReject != null) {
-                        AppButton(text = "拒绝", onClick = onReject, variant = AppButtonVariant.Outlined)
-                    }
-                    if (onChoice != null) {
-                        AppButton(
-                            text = "本次",
-                            onClick = { onChoice(AppApprovalChoice.Once) },
-                            variant = AppButtonVariant.Outlined,
-                        )
-                        AppButton(
-                            text = "始终允许",
-                            onClick = { onChoice(AppApprovalChoice.Always) },
-                            variant = AppButtonVariant.Primary,
-                            enabled = !alwaysDisabled,
-                        )
-                    } else if (onApprove != null) {
-                        AppButton(text = "允许", onClick = onApprove, variant = AppButtonVariant.Primary)
                     }
                 }
-                if (alwaysDisabled && alwaysDisabledReason != null) {
-                    Text(
-                        text = alwaysDisabledReason,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AppColor.LabelSecondary,
-                        maxLines = 2,
-                    )
-                }
-                if (denyReason != null) {
-                    Text(
-                        text = denyReason,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AppColor.StatusDanger,
-                        maxLines = 3,
-                    )
+
+                else -> Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+                    verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
+                        if (approvalHint != null) {
+                            Text(
+                                text = approvalHint,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppColor.LabelSecondary,
+                                modifier = Modifier.weight(1f),
+                            )
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                        }
+                        if (onReject != null) {
+                            AppButton(text = "拒绝", onClick = onReject, variant = AppButtonVariant.Outlined)
+                        }
+                        if (onChoice != null) {
+                            AppButton(
+                                text = "本次",
+                                onClick = { onChoice(AppApprovalChoice.Once) },
+                                variant = AppButtonVariant.Outlined,
+                            )
+                            AppButton(
+                                text = "始终允许",
+                                onClick = { onChoice(AppApprovalChoice.Always) },
+                                variant = AppButtonVariant.Primary,
+                                enabled = !alwaysDisabled,
+                            )
+                        } else if (onApprove != null) {
+                            AppButton(text = "允许", onClick = onApprove, variant = AppButtonVariant.Primary)
+                        }
+                    }
+                    if (alwaysDisabled && alwaysDisabledReason != null) {
+                        Text(
+                            text = alwaysDisabledReason,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AppColor.LabelSecondary,
+                            maxLines = 2,
+                        )
+                    }
+                    if (denyReason != null) {
+                        Text(
+                            text = denyReason,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AppColor.StatusDanger,
+                            maxLines = 3,
+                        )
+                    }
                 }
             }
         }

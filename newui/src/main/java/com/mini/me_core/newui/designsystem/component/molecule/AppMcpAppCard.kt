@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -262,44 +263,113 @@ private fun McpChip(text: String, tint: Color) {
 }
 
 /**
- * 就绪态占位仪表盘：深色画布内的简化柱状图，示意"工具返回的交互式 HTML 已可交互"，
- * 真实链路中此区域由 WebView 承载 MCP App 的实际界面。
+ * 就绪态占位仪表盘：模拟真实 MCP App 在沙箱 iframe 里的首屏——
+ * 浏览器镀铬（红黄绿圆点 + 地址胶囊）+ 指标瓷砖 + 柱状图，
+ * 示意"工具返回的交互式 HTML 已可交互"。真实链路中此区域由 WebView 承载实际界面。
  */
 @Composable
 private fun MockDashboard() {
     val bars = listOf(0.34f, 0.55f, 0.42f, 0.72f, 0.50f, 0.88f, 0.63f, 0.46f)
-    Box(
+    val metrics = listOf(
+        "构建次数" to "128",
+        "平均耗时" to "2.4m",
+        "失败率" to "3.2%",
+    )
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight()
-            .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Sm),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
     ) {
+        // 浏览器镀铬：圆点 + 地址胶囊
         Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
-            verticalAlignment = Alignment.Bottom,
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            bars.forEachIndexed { index, fraction ->
+            val dotColors = listOf(AppColor.StatusDanger, AppColor.StatusWarning, AppColor.StatusSuccess)
+            dotColors.forEachIndexed { index, dotColor ->
                 Box(
+                    Modifier
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(dotColor.copy(alpha = 0.9f))
+                        .padding(0.dp),
+                )
+                if (index != dotColors.lastIndex) {
+                    Spacer(Modifier.width(3.dp))
+                }
+            }
+            Spacer(Modifier.width(AppSpacing.Sm))
+            Text(
+                text = "ui://analytics/build-duration",
+                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                color = AppColor.OnDarkSecondaryLabel,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(AppRadius.Sm))
+                    .background(AppColor.OnDarkSurfaceRaised)
+                    .padding(horizontal = AppSpacing.Sm, vertical = 2.dp),
+            )
+        }
+        // 指标瓷砖：数字 + 标签
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
+        ) {
+            metrics.forEach { (label, value) ->
+                Column(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxHeight(fraction)
-                        .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
-                        .background(
-                            if (index % 3 == 0) AppColor.BrandPrimary.copy(alpha = 0.85f)
-                            else AppColor.BrandAccent.copy(alpha = 0.65f),
-                        ),
-                )
+                        .clip(RoundedCornerShape(AppRadius.Sm))
+                        .background(AppColor.OnDarkSurfaceRaised)
+                        .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
+                ) {
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.titleSmall.copy(fontFamily = FontFamily.Monospace),
+                        fontWeight = FontWeight.Bold,
+                        color = AppColor.OnDarkInk,
+                    )
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppColor.OnDarkSecondaryLabel,
+                        maxLines = 1,
+                    )
+                }
             }
         }
-        // 基线
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(AppColor.LabelTertiary.copy(alpha = 0.4f)),
-        )
+        // 柱状图 + 基线
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                bars.forEachIndexed { index, fraction ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(fraction)
+                            .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                            .background(
+                                if (index % 3 == 0) AppColor.OnDarkPrimary.copy(alpha = 0.85f)
+                                else AppColor.BrandAccent.copy(alpha = 0.55f),
+                            ),
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(AppColor.OnDarkSecondaryLabel.copy(alpha = 0.35f)),
+            )
+        }
     }
 }
 
