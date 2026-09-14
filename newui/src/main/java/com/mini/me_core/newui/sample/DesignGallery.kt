@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -47,9 +48,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlin.random.Random
@@ -321,11 +324,43 @@ private fun GalleryBody() {
         }
 
         Section("令牌 · 度量/圆角/阴影") {
-            Text("Spacing: xs=${AppSpacing.Xs} sm=${AppSpacing.Sm} md=${AppSpacing.Md} lg=${AppSpacing.Lg}")
-            Text("Radius: sm=${AppRadius.Sm} md=${AppRadius.Md} lg=${AppRadius.Lg} pill=${AppRadius.Pill}")
-            Text("Elevation: z0=${AppElevation.Z0} z1=${AppElevation.Z1} z2=${AppElevation.Z2} z4=${AppElevation.Z4}")
-            Text("Sizing: touch=${AppSizing.TouchTarget} iconBlock=${AppSizing.IconBlock}")
-            Text("Layout: pageH=${AppLayout.PageHorizontal} maxWidth=${AppLayout.ContentMaxWidth}")
+            Text(
+                "Spacing · 间距增量（隔块间实际留白）",
+                style = AppType.SectionHeader,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SpacingBar("XS", AppSpacing.Xs)
+            SpacingBar("SM", AppSpacing.Sm)
+            SpacingBar("MD", AppSpacing.Md)
+            SpacingBar("LG", AppSpacing.Lg)
+            SpacingBar("XL", AppSpacing.Xl)
+            SpacingBar("XXL", AppSpacing.Xxl)
+            Text(
+                "Radius · 圆角（实块对照）",
+                style = AppType.SectionHeader,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Lg)) {
+                RadiusTile("SM", AppRadius.Sm)
+                RadiusTile("MD", AppRadius.Md)
+                RadiusTile("LG", AppRadius.Lg)
+                RadiusTile("PILL", AppRadius.Pill)
+            }
+            Text(
+                "Elevation · 阴影（卡片对照）",
+                style = AppType.SectionHeader,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Lg)) {
+                ElevationTile("Z0", AppElevation.Z0)
+                ElevationTile("Z1", AppElevation.Z1)
+                ElevationTile("Z2", AppElevation.Z2)
+                ElevationTile("Z4", AppElevation.Z4)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Lg)) {
+                MetricParam("Sizing", "touch=${AppSizing.TouchTarget} iconBlock=${AppSizing.IconBlock}")
+                MetricParam("Layout", "pageH=${AppLayout.PageHorizontal} max=${AppLayout.ContentMaxWidth}")
+            }
         }
 
         Section("令牌 · 排版（iOS 类型尺度）") {
@@ -1312,6 +1347,57 @@ private fun Section(title: String, content: @Composable () -> Unit) {
                 content()
             }
         }
+    }
+}
+
+/** 间距可视化：两个色块中间的留白宽度即该档令牌实际值。 */
+@Composable
+private fun SpacingBar(label: String, gap: Dp) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(AppSizing.TouchTarget).background(AppColor.BrandPrimary, RoundedCornerShape(AppRadius.None)))
+        Spacer(Modifier.width(gap))
+        Box(Modifier.size(AppSizing.TouchTarget).background(AppColor.BrandAccent, RoundedCornerShape(AppRadius.None)))
+        Spacer(Modifier.width(AppSpacing.Sm))
+        Text("$label · $gap", style = AppType.Caption2, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** 圆角可视化：实块照搬令牌圆角，直观对比 Sm / Md / Lg / Pill。 */
+@Composable
+private fun RadiusTile(label: String, radius: Dp) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
+    ) {
+        Box(Modifier.size(AppSizing.TouchTarget).background(AppColor.BrandPrimary, RoundedCornerShape(radius)))
+        Text(label, style = AppType.Caption2, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** 阴影可视化：白卡片按令牌档位加阴影，直观对比 Z0 / Z1 / Z2 / Z4。 */
+@Composable
+private fun ElevationTile(label: String, elevation: Dp) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
+    ) {
+        Box(
+            Modifier
+                .size(AppSizing.TouchTarget)
+                .shadow(elevation, RoundedCornerShape(AppRadius.Md), clip = false)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(AppRadius.Md)),
+        )
+        Text(label, style = AppType.Caption2, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** 参数速查：大小/布局令牌的文本值。 */
+@Composable
+private fun MetricParam(name: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(name, style = AppType.Caption1, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(AppSpacing.Sm))
+        Text(value, style = AppType.Caption2, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
