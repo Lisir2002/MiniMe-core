@@ -223,7 +223,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-apk-${{ github.ref_name }}
-          path: dist/${APK_PREFIX}-**.apk
+          # 用 ${{ env.APK_PREFIX }} 表达式展开（幂等动作的 path 是字面量，${APK_PREFIX} 不会自动展开）
+          path: dist/${{ env.APK_PREFIX }}-**.apk
           if-no-files-found: warn
           retention-days: 90
 
@@ -263,16 +264,20 @@ jobs:
           version="${cur_tag#v}"
           # 多行输出用 EOF 分隔符；--layer user 直接产出 GitHub Release 用户层正文
           delimiter="EOF_$(date +%s)"
-          echo "body<<${delimiter}" >> "$GITHUB_OUTPUT"
-          python3 scripts/gitops/release-log.py \
-            --layer user \
-            --prev "$prev_tag" \
-            --cur "$cur_tag" \
-            --version "$version" \
-            --date "$(date +%Y-%m-%d)"
-          echo "" >> "$GITHUB_OUTPUT"
-          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${prev_tag}...${cur_tag}" >> "$GITHUB_OUTPUT"
-          echo "${delimiter}" >> "$GITHUB_OUTPUT"
+          # 多行输出：必须把 python 产出的用户层正文「整体重定向」进 GITHUB_OUTPUT，
+          #   不能分开 append（python 的 stdout 默认不会进文件，只进步骤日志）。
+          {
+            echo "body<<${delimiter}"
+            python3 scripts/gitops/release-log.py \
+              --layer user \
+              --prev "$prev_tag" \
+              --cur "$cur_tag" \
+              --version "$version" \
+              --date "$(date +%Y-%m-%d)"
+            echo ""
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${prev_tag}...${cur_tag}"
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release & Upload assets
         uses: softprops/action-gh-release@v2
@@ -285,8 +290,9 @@ jobs:
           fail_on_unmatched_files: true
           generate_release_notes: false
           # 产物名约定 <APK_PREFIX>-<版本>.apk（见 Rename 步骤），版本段用 * 兼容 tag/manual-*。
+          # ${APK_PREFIX} 在此处是字面量不会展开，须用 ${{ env.APK_PREFIX }} 表达式。
           files: |
-            dist/${APK_PREFIX}-**.apk
+            dist/${{ env.APK_PREFIX }}-**.apk
         env:
           # RC70 修复：softprops action 对 tag/release 写操作 + 附件 upload 用 GH_RELEASE_TOKEN (细粒度 PAT)，
           # 避免默认 secrets.GITHUB_TOKEN 在 tag 已经存在 + repo 限制 Release write / tag push 时竞态失败。
