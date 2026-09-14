@@ -251,31 +251,29 @@ jobs:
           fi
 
       # GitHub 的 generate_release_notes 只列 merged PR，直接 push 的 commit 不会出现。
-      # 本仓库在 main 上直接 commit，不走 PR 流程，所以手动用 release-log.py 生成用户层 Release 正文。
-      # 三层规范见 AGENTS.md「版本日志（发版必做 · 三层写法规约）」——
-      #   本步骤只产「用户层」（用户语体），开发者层（CHANGELOG.md）、大模型层（AGENTS.md）由
-      #   发版前 gitops 生成并人工复核；CI 专注于发布正文本自动生成。
-      - name: Generate release notes (user layer)
+      # 本仓库在 main 上直接 commit，不走 PR 流程，所以手动用 release-log.py 生成 Release 正文。
+      # 【规则 · 发版说明三层日志】GitHub Release 正文必须用「完整三层日志」填充——
+      #   用户层（给用户看）/ 开发者层（Keep a Changelog 排障）/ 大模型层（AI 编排影响）分节并列。
+      #   --layer all 一次性产出三层合并正文。
+      - name: Generate release notes (three-layer logs)
         id: changelog
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           cur_tag="${GITHUB_REF_NAME}"
           prev_tag=$(git tag --sort=-creatordate | grep -vE "^${cur_tag}$" | head -1)
           version="${cur_tag#v}"
-          # 多行输出用 EOF 分隔符；--layer user 直接产出 GitHub Release 用户层正文
+          # 多行输出用 EOF 分隔符；--layer all 一次性产出「用户+开发+大模型」三层合并正文
           delimiter="EOF_$(date +%s)"
-          # 多行输出：必须把 python 产出的用户层正文「整体重定向」进 GITHUB_OUTPUT，
+          # 多行输出：必须把 python 产出的三层正文「整体重定向」进 GITHUB_OUTPUT，
           #   不能分开 append（python 的 stdout 默认不会进文件，只进步骤日志）。
           {
             echo "body<<${delimiter}"
             python3 scripts/gitops/release-log.py \
-              --layer user \
+              --layer all \
               --prev "$prev_tag" \
               --cur "$cur_tag" \
               --version "$version" \
               --date "$(date +%Y-%m-%d)"
-            echo ""
-            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${prev_tag}...${cur_tag}"
             echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
 

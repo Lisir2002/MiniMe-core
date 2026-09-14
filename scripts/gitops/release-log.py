@@ -6,9 +6,10 @@ release-log.py — MiniMe-core 三层发版日志自动生成器。
 依据 AGENTS.md「版本日志（发版必做 · 三层写法规约）」，从同一份 Conventional Commits
 来源（git log <prev_tag>..<cur_tag>）按受众渲染成三层不同语体：
 
-  --layer user   用户层：叙事、价值导向、无内部术语（供 GitHub Release 正文）
+  --layer user   用户层：叙事、价值导向、无内部术语（供 GitHub Release 正文 · 用户视角）
   --layer dev    开发者层：Keep a Changelog 六类（Added/Changed/Deprecated/Removed/Fixed/Security）
   --layer ai     大模型层：结构化、机器可解析，聚焦 AI 工作流影响（工具/prompt/schema/接口）
+  --layer all    三层合并（发版说明/ GitHub Release 正文 = 完整三层日志分节并列）
 
 用法（仓库根执行）：
   python3 scripts/gitops/release-log.py --layer user            # 用默认 cur=HEAD，prev=最近 tag
@@ -271,8 +272,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="MiniMe-core 三层发版日志生成器（见 AGENTS.md「版本日志」）"
     )
-    parser.add_argument("--layer", choices=["user", "dev", "ai"], required=True,
-                        help="输出哪一层：user=GitHub Release / dev=CHANGELOG / ai=AGENTS 结构化")
+    parser.add_argument("--layer", choices=["user", "dev", "ai", "all"], required=True,
+                        help="输出哪一层：user=GitHub Release / dev=CHANGELOG / ai=AGENTS 结构化 / all=三层合并（发版说明）")
     parser.add_argument("--prev", default=None, help="起始 tag（默认取最近一个 tag 或 HEAD 之外）")
     parser.add_argument("--cur", default="HEAD", help="结束 tag/提交（默认 HEAD）")
     parser.add_argument("--date", default=None, help="发布日期 YYYY-MM-DD（默认今天）")
@@ -312,8 +313,35 @@ def main():
         print(user_layer(commits, version, date_str))
     elif args.layer == "dev":
         print(dev_layer(commits, version, date_str, repo))
-    else:
+    elif args.layer == "ai":
         print(ai_layer(commits, version, date_str, changed_paths))
+    elif args.layer == "all":
+        # 发版说明规则：GitHub Release 正文 = 完整三层日志分节并列（用户 / 开发 / 大模型）
+        sections = [
+            "# MiniMe-core 发版说明 v%s" % version,
+            "",
+            "<details>",
+            "<summary><b>用户层 · 给用户看</b>（价值导向，无内部术语）</summary>",
+            "",
+            user_layer(commits, version, date_str),
+            "",
+            "</details>",
+            "",
+            "<details>",
+            "<summary><b>开发者层 · Keep a Changelog</b>（排障定位）</summary>",
+            "",
+            dev_layer(commits, version, date_str, repo),
+            "",
+            "</details>",
+            "",
+            "<details>",
+            "<summary><b>大模型层 · AI 编排</b>（工具/prompt/schema/接口影响）</summary>",
+            "",
+            ai_layer(commits, version, date_str, changed_paths),
+            "",
+            "</details>",
+        ]
+        print("\n".join(sections))
 
 
 def _recent(repo, n):
