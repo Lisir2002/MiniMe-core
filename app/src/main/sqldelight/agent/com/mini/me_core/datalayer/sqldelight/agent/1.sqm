@@ -1,0 +1,244 @@
+CREATE TABLE IF NOT EXISTS todo_items (
+  id          TEXT    NOT NULL PRIMARY KEY,
+  session_id  TEXT    NOT NULL,
+  subject     TEXT    NOT NULL,
+  description TEXT    NOT NULL DEFAULT '',
+  status      TEXT    NOT NULL DEFAULT 'PENDING',
+  priority    INTEGER NOT NULL DEFAULT 0,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at_ms INTEGER NOT NULL,
+  updated_at_ms INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS session_checkpoints (
+  id               TEXT    NOT NULL PRIMARY KEY,
+  session_id       TEXT    NOT NULL,
+  user_message_id  TEXT    NOT NULL,
+  prompt_snippet   TEXT    NOT NULL,
+  created_at_ms    INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS checkpoint_file_snapshots (
+  id                      TEXT    NOT NULL PRIMARY KEY,
+  checkpoint_id           TEXT    NOT NULL,
+  file_path               TEXT    NOT NULL,
+  snapshot_relative_path  TEXT    NOT NULL,
+  change_type             TEXT    NOT NULL,
+  created_at              INTEGER NOT NULL,
+  FOREIGN KEY (checkpoint_id) REFERENCES session_checkpoints(id)
+);
+
+CREATE TABLE IF NOT EXISTS file_edit_hunks (
+  id          TEXT    NOT NULL PRIMARY KEY,
+  session_id  TEXT    NOT NULL,
+  file_path   TEXT    NOT NULL,
+  operation   TEXT    NOT NULL,
+  hunk        TEXT    NOT NULL,
+  old_content TEXT    NOT NULL,
+  new_content TEXT    NOT NULL,
+  created_at_ms INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS mode_switch_history (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id  TEXT    NOT NULL,
+  from_mode   TEXT    NOT NULL,
+  to_mode     TEXT    NOT NULL,
+  reason      TEXT    NOT NULL,
+  timestamp_ms INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS model_capability_overrides (
+  id                TEXT    NOT NULL,
+  provider_type     TEXT    NOT NULL,
+  model_id          TEXT    NOT NULL,
+  override_vision   INTEGER,
+  override_tools    INTEGER,
+  override_reasoning INTEGER,
+  updated_at_ms     INTEGER NOT NULL,
+  PRIMARY KEY (provider_type, model_id)
+);
+
+CREATE TABLE IF NOT EXISTS agent_goals (
+  goal_id       TEXT    NOT NULL PRIMARY KEY,
+  session_id    TEXT    NOT NULL,
+  text          TEXT    NOT NULL,
+  status        TEXT    NOT NULL DEFAULT 'ACTIVE',
+  revision      INTEGER NOT NULL DEFAULT 0,
+  parent_goal_id TEXT   NOT NULL DEFAULT '',
+  round_seq     INTEGER NOT NULL DEFAULT 0,
+  created_at_ms INTEGER NOT NULL,
+  updated_at_ms INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agent_plans (
+  plan_id          TEXT    NOT NULL PRIMARY KEY,
+  session_id       TEXT    NOT NULL,
+  title            TEXT    NOT NULL,
+  steps            TEXT    NOT NULL DEFAULT '',
+  status           TEXT    NOT NULL DEFAULT 'DRAFT',
+  pending_selection TEXT   NOT NULL DEFAULT '',
+  created_at_ms    INTEGER NOT NULL,
+  updated_at_ms    INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agent_jobs (
+  job_id         TEXT    NOT NULL PRIMARY KEY,
+  session_id     TEXT    NOT NULL,
+  kind           TEXT    NOT NULL,
+  title          TEXT    NOT NULL,
+  status         TEXT    NOT NULL DEFAULT 'RUNNING',
+  exit_code      INTEGER,
+  output_locator TEXT    NOT NULL DEFAULT '',
+  created_at_ms  INTEGER NOT NULL,
+  finished_at_ms INTEGER,
+  updated_at_ms  INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agent_schedules (
+  schedule_id    TEXT    NOT NULL PRIMARY KEY,
+  session_id     TEXT    NOT NULL,
+  rule           TEXT    NOT NULL,
+  args           TEXT    NOT NULL DEFAULT '',
+  status         TEXT    NOT NULL DEFAULT 'PENDING',
+  enabled        INTEGER NOT NULL DEFAULT 1,
+  created_at_ms  INTEGER NOT NULL,
+  last_fired_at_ms INTEGER,
+  updated_at_ms  INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agent_trajectories (
+  trajectory_id  TEXT    NOT NULL PRIMARY KEY,
+  session_id     TEXT    NOT NULL,
+  task_id        TEXT    NOT NULL DEFAULT '',
+  turn_index     INTEGER NOT NULL DEFAULT 0,
+  kind           TEXT    NOT NULL,
+  tool_name      TEXT    NOT NULL DEFAULT '',
+  args_hash      TEXT    NOT NULL DEFAULT '',
+  result_summary TEXT    NOT NULL DEFAULT '',
+  is_error       INTEGER NOT NULL DEFAULT 0,
+  duration_ms    INTEGER NOT NULL DEFAULT 0,
+  tokens_in      INTEGER NOT NULL DEFAULT 0,
+  tokens_out     INTEGER NOT NULL DEFAULT 0,
+  ts             INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agent_playbook_runs (
+  playbook_run_id   TEXT    NOT NULL PRIMARY KEY,
+  session_id        TEXT    NOT NULL,
+  playbook_name     TEXT    NOT NULL,
+  current_stage_index INTEGER NOT NULL DEFAULT 0,
+  stage_statuses    TEXT    NOT NULL DEFAULT '',
+  status            TEXT    NOT NULL DEFAULT 'RUNNING',
+  created_at_ms     INTEGER NOT NULL,
+  updated_at_ms     INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS skill_state (
+  id                 TEXT    NOT NULL PRIMARY KEY,
+  enabled            INTEGER NOT NULL DEFAULT 1,
+  version            TEXT    NOT NULL DEFAULT '0.0.0',
+  source             TEXT    NOT NULL DEFAULT 'LOCAL',
+  installed_at_ms    INTEGER NOT NULL,
+  scope_override     TEXT,
+  agent_type_override TEXT
+);
+
+CREATE TABLE IF NOT EXISTS skill_conversation_state (
+  skill_id   TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  enabled    INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (skill_id, session_id)
+);
+
+CREATE TABLE IF NOT EXISTS wake_queue (
+  wake_id      TEXT    NOT NULL PRIMARY KEY,
+  session_id   TEXT    NOT NULL,
+  source       TEXT    NOT NULL,
+  type         TEXT    NOT NULL,
+  content      TEXT    NOT NULL,
+  status       TEXT    NOT NULL,
+  created_at_ms INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS zth_user_confirmed_sentinels (
+  id                        TEXT    NOT NULL PRIMARY KEY,
+  session_id                TEXT    NOT NULL,
+  linkage_version           INTEGER NOT NULL,
+  chain_id                  TEXT    NOT NULL,
+  chain_index               INTEGER NOT NULL,
+  card_template_id          TEXT    NOT NULL,
+  trigger_sub_class         TEXT    NOT NULL,
+  s_planPayloadCiphertext   TEXT    NOT NULL,
+  s_userTextCiphertext      TEXT,
+  s_cardPayloadCiphertext   TEXT    NOT NULL,
+  user_choice               TEXT    NOT NULL,
+  swipe_verified            INTEGER NOT NULL,
+  s_modifiedPlanCiphertext  TEXT,
+  expire_at_ms              INTEGER NOT NULL DEFAULT -1,
+  rollback_flag             INTEGER NOT NULL DEFAULT 0,
+  created_at_ms             INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS zth_hallucination_fuses (
+  id                     TEXT    NOT NULL,
+  scope                  TEXT    NOT NULL,
+  scope_id               TEXT    NOT NULL,
+  state                  TEXT    NOT NULL,
+  linkage_version        INTEGER NOT NULL,
+  failure_count          INTEGER NOT NULL DEFAULT 0,
+  open_since_ms          INTEGER NOT NULL DEFAULT 0,
+  last_probe_at_ms       INTEGER NOT NULL DEFAULT 0,
+  kill_switch1_triggered INTEGER NOT NULL DEFAULT 0,
+  kill_switch2_soft_disabled INTEGER NOT NULL DEFAULT 0,
+  last_trip_subclass     TEXT,
+  updated_at_ms          INTEGER NOT NULL,
+  PRIMARY KEY (scope, scope_id)
+);
+
+CREATE TABLE IF NOT EXISTS zth_sentinel_plan_rejection_audits (
+  id                              TEXT    NOT NULL PRIMARY KEY,
+  sentinel_id                     TEXT    NOT NULL,
+  rejection_type                  TEXT    NOT NULL,
+  s_reasonCiphertext              TEXT,
+  s_rejectedPlanSnapshotCiphertext TEXT   NOT NULL,
+  created_at_ms                   INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS zth_hard_constraint_delete_audits (
+  id                    TEXT    NOT NULL PRIMARY KEY,
+  session_id            TEXT    NOT NULL,
+  affected_table_name   TEXT    NOT NULL,
+  s_affectedKeysCiphertext TEXT  NOT NULL,
+  trigger_sub_class     TEXT    NOT NULL,
+  rollback_applied      INTEGER NOT NULL DEFAULT 0,
+  created_at_ms         INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS zth_l0_soft_compact_restore_logs (
+  id                          TEXT    NOT NULL PRIMARY KEY,
+  session_id                  TEXT    NOT NULL,
+  first_message_id            TEXT    NOT NULL,
+  last_message_id             TEXT    NOT NULL,
+  original_row_count          INTEGER NOT NULL,
+  tokens_before               INTEGER NOT NULL,
+  tokens_after                INTEGER NOT NULL,
+  s_compactSourceDigestCiphertext TEXT NOT NULL,
+  expire_at_ms                INTEGER NOT NULL,
+  restored_flag               INTEGER NOT NULL DEFAULT 0,
+  created_at_ms               INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS zth_telemetry_events (
+  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_kind           TEXT    NOT NULL,
+  event_sub_kind       TEXT    NOT NULL,
+  severity_tier        INTEGER NOT NULL,
+  session_sha256_prefix TEXT,
+  latency_ms           INTEGER,
+  flag_a               INTEGER,
+  flag_b               INTEGER,
+  metric_a             INTEGER,
+  metric_b             INTEGER,
+  created_at_ms        INTEGER NOT NULL
+);

@@ -1,0 +1,41 @@
+# Built outputs
+.gradle/
+build/
+app/build/
+
+# IDE
+.idea/
+*.iml
+
+# Local config
+local.properties
+gradle-local.properties
+
+# 签名：唯一官方 keystore 已按维护者决定**入库**（app/minime.jks + app/keystore.properties），
+# 保证每一次 release 都使用同一把正式密钥。以下不再忽略，交由 git 跟踪。
+
+# Debug / profiling
+*.hprof
+
+# Claude
+.claude/
+/.kotlin/
+/.agents/
+/.rcode/
+
+# 临时调试文件
+/*.log
+/test
+.local-maven-cache/
+
+# Design docs
+design/
+
+# Release APKs
+release/*.apk
+# Local release artifact staging (rename/copy destination before upload)
+build-dist/
+
+# Local dev tool config
+mise.toml
+.tool-versions

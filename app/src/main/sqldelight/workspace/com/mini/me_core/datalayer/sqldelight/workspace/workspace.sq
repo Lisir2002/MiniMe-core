@@ -1,0 +1,202 @@
+-- workspace 域 v1 schema（设计文档 §11.4）
+-- 生成类：WorkspaceDb / WorkspaceQueries
+
+CREATE TABLE workspace_project (
+  id          TEXT    NOT NULL PRIMARY KEY,
+  name        TEXT    NOT NULL,
+  path        TEXT    NOT NULL,
+  type        TEXT,
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
+
+CREATE TABLE workspace_file (
+  id          TEXT    NOT NULL PRIMARY KEY,
+  project_id  TEXT    NOT NULL,
+  rel_path    TEXT    NOT NULL,
+  kind        TEXT,
+  size        INTEGER,
+  hash        TEXT,
+  updated_at  INTEGER NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES workspace_project(id)
+);
+CREATE INDEX workspace_file_proj_idx ON workspace_file (project_id, rel_path);
+
+-- ── queries ──
+insertProject:
+INSERT INTO workspace_project (id, name, path, type, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+selectProjectById:
+SELECT * FROM workspace_project WHERE id = ?;
+
+selectAllProjects:
+SELECT * FROM workspace_project ORDER BY updated_at DESC;
+
+deleteProject:
+DELETE FROM workspace_project WHERE id = ?;
+
+insertFile:
+INSERT INTO workspace_file (id, project_id, rel_path, kind, size, hash, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+upsertFile:
+INSERT INTO workspace_file (id, project_id, rel_path, kind, size, hash, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+  rel_path = excluded.rel_path,
+  kind = excluded.kind,
+  size = excluded.size,
+  hash = excluded.hash,
+  updated_at = excluded.updated_at;
+
+selectFilesByProject:
+SELECT * FROM workspace_file WHERE project_id = ? ORDER BY rel_path ASC;
+
+deleteFile:
+DELETE FROM workspace_file WHERE id = ?;
+
+-- ── 旧 Room workspace 域补表（阶段 1：V2 全面接管前置）──
+-- 列名用 snake_case，业务层由 V2 Repository 做字段映射（旧 Room 列多为 camelCase）。
+
+CREATE TABLE remote_connections (
+  id         TEXT    NOT NULL PRIMARY KEY,
+  name       TEXT    NOT NULL,
+  protocol   TEXT    NOT NULL,
+  host       TEXT    NOT NULL,
+  port       INTEGER NOT NULL,
+  username   TEXT    NOT NULL,
+  auth_type  TEXT    NOT NULL,
+  auth_data  TEXT    NOT NULL,
+  passphrase TEXT
+);
+
+CREATE TABLE remote_mounts (
+  id               TEXT    NOT NULL PRIMARY KEY,
+  connection_id    TEXT    NOT NULL,
+  remote_path      TEXT    NOT NULL,
+  local_mount_path TEXT    NOT NULL,
+  is_active        INTEGER NOT NULL DEFAULT 0,
+  auto_connect     INTEGER NOT NULL DEFAULT 1,
+  FOREIGN KEY (connection_id) REFERENCES remote_connections(id) ON DELETE CASCADE
+);
+CREATE INDEX remote_mounts_conn_idx ON remote_mounts (connection_id);
+
+CREATE TABLE remote_audit_logs (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  category        TEXT    NOT NULL,
+  action          TEXT    NOT NULL,
+  connection_id   TEXT,
+  connection_name TEXT,
+  remote_host     TEXT,
+  success         INTEGER NOT NULL,
+  message         TEXT,
+  source_ip       TEXT,
+  created_at      INTEGER NOT NULL
+);
+CREATE INDEX remote_audit_logs_created_idx ON remote_audit_logs (created_at);
+CREATE INDEX remote_audit_logs_category_idx ON remote_audit_logs (category);
+CREATE INDEX remote_audit_logs_conn_idx ON remote_audit_logs (connection_id);
+
+-- 单行配置表（id 恒 =1）：加密状态（DEK/轮换/生物识别）。
+CREATE TABLE credential_encryption_state (
+  id                    INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  master_key_fingerprint TEXT   NOT NULL,
+  dek_ciphertext        TEXT   NOT NULL,
+  enc_scheme            TEXT   NOT NULL DEFAULT 'V2',
+  last_rotated_at       INTEGER NOT NULL DEFAULT 0,
+  rotation_counter      INTEGER NOT NULL DEFAULT 0,
+  biometric_required    INTEGER NOT NULL DEFAULT 0,
+  migrated_from_v1      INTEGER NOT NULL DEFAULT 0
+);
+
+-- ── queries ──
+insertRemoteConnection:
+INSERT INTO remote_connections (id, name, protocol, host, port, username, auth_type, auth_data, passphrase)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- P0-2：对齐 Room `@Insert(onConflict = REPLACE)` 语义。
+insertOrReplaceRemoteConnection:
+INSERT OR REPLACE INTO remote_connections (id, name, protocol, host, port, username, auth_type, auth_data, passphrase)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectRemoteConnectionById:
+SELECT * FROM remote_connections WHERE id = ?;
+
+selectAllRemoteConnections:
+SELECT * FROM remote_connections ORDER BY name ASC;
+
+deleteRemoteConnection:
+DELETE FROM remote_connections WHERE id = ?;
+
+-- P0-2：补齐 Room 侧列级 setter（缺这些则批 1 无法切换业务）──
+
+updateConnectionCredentials:
+UPDATE remote_connections SET auth_data = ?, passphrase = ? WHERE id = ?;
+
+insertRemoteMount:
+INSERT INTO remote_mounts (id, connection_id, remote_path, local_mount_path, is_active, auto_connect)
+VALUES (?, ?, ?, ?, ?, ?);
+
+-- P0-2：对齐 Room `@Insert(onConflict = REPLACE)` 语义。
+insertOrReplaceRemoteMount:
+INSERT OR REPLACE INTO remote_mounts (id, connection_id, remote_path, local_mount_path, is_active, auto_connect)
+VALUES (?, ?, ?, ?, ?, ?);
+
+selectRemoteMountsByConnection:
+SELECT * FROM remote_mounts WHERE connection_id = ? ORDER BY remote_path ASC;
+
+-- P2-2 批 2：对齐 Room RemoteMountDao 剩余方法（getMountById/getAllMountsOnce Flow/update/delete）。
+selectRemoteMountById:
+SELECT * FROM remote_mounts WHERE id = ?;
+
+selectAllRemoteMounts:
+SELECT * FROM remote_mounts ORDER BY remote_path ASC;
+
+updateRemoteMount:
+UPDATE remote_mounts SET connection_id = ?, remote_path = ?, local_mount_path = ?, is_active = ?, auto_connect = ? WHERE id = ?;
+
+deleteRemoteMount:
+DELETE FROM remote_mounts WHERE id = ?;
+
+deleteRemoteMountsByConnection:
+DELETE FROM remote_mounts WHERE connection_id = ?;
+
+insertAuditLog:
+INSERT INTO remote_audit_logs (category, action, connection_id, connection_name, remote_host, success, message, source_ip, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAuditLogsByConnection:
+SELECT * FROM remote_audit_logs WHERE connection_id = ? ORDER BY created_at DESC;
+
+selectAuditLogsPage:
+SELECT * FROM remote_audit_logs ORDER BY created_at DESC LIMIT ? OFFSET ?;
+
+selectAuditLogsByConnectionPage:
+SELECT * FROM remote_audit_logs WHERE connection_id = ? ORDER BY created_at DESC LIMIT ?;
+
+-- 多维筛选：category IN (:cats) AND success IN (:successes) AND created_at >= :since。
+-- SQLDelight 需用 ? 占位 + IN 列表，故拆成三个布尔参数的动态 SQL 由业务层拼装。
+selectAuditLogsFiltered:
+SELECT * FROM remote_audit_logs
+WHERE category IN ? AND success IN ? AND created_at >= ?
+ORDER BY created_at DESC LIMIT ?;
+
+selectAllAuditLogs:
+SELECT * FROM remote_audit_logs ORDER BY created_at DESC;
+
+deleteAuditLogsOlderThan:
+DELETE FROM remote_audit_logs WHERE created_at < ?;
+
+selectAuditLogCount:
+SELECT COUNT(1) FROM remote_audit_logs;
+
+selectAuditCategories:
+SELECT DISTINCT category FROM remote_audit_logs ORDER BY category;
+
+selectEncryptionState:
+SELECT * FROM credential_encryption_state WHERE id = 1;
+
+upsertEncryptionState:
+INSERT OR REPLACE INTO credential_encryption_state (id, master_key_fingerprint, dek_ciphertext, enc_scheme, last_rotated_at, rotation_counter, biometric_required, migrated_from_v1)
+VALUES (1, ?, ?, ?, ?, ?, ?, ?);
