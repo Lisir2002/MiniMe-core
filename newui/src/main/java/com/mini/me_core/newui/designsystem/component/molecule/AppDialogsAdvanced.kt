@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 import kotlinx.coroutines.delay
@@ -93,7 +94,7 @@ fun AppFormDialog(
         modifier = modifier,
         actions = {
             TextButton(onClick = onDismiss) {
-                Text(cancelText, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(cancelText, color = AppColor.LabelSecondary)
             }
             Spacer(Modifier.width(AppSpacing.Sm))
             Button(
@@ -101,7 +102,7 @@ fun AppFormDialog(
                 colors = if (tone == AppDialogTone.Danger) {
                     ButtonDefaults.buttonColors(containerColor = tone.color())
                 } else {
-                    ButtonDefaults.buttonColors()
+                    ButtonDefaults.buttonColors(containerColor = AppColor.BrandPrimary)
                 },
                 onClick = AppHaptics.click { onConfirm(subject, body) },
             ) {
@@ -164,14 +165,14 @@ fun AppPermissionDialog(
         modifier = modifier,
         actions = {
             TextButton(onClick = onDismiss) {
-                Text(deniedText, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(deniedText, color = AppColor.LabelSecondary)
             }
             Spacer(Modifier.width(AppSpacing.Sm))
             Button(
                 colors = if (tone == AppDialogTone.Danger) {
                     ButtonDefaults.buttonColors(containerColor = tone.color())
                 } else {
-                    ButtonDefaults.buttonColors()
+                    ButtonDefaults.buttonColors(containerColor = AppColor.BrandPrimary)
                 },
                 onClick = AppHaptics.click { onAllow() },
             ) {
@@ -182,7 +183,7 @@ fun AppPermissionDialog(
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = AppColor.LabelSecondary,
             )
             Spacer(Modifier.height(AppSpacing.Sm))
             Text(
@@ -234,7 +235,7 @@ fun AppSuccessDialog(
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = AppColor.LabelSecondary,
                 )
             }
             if (detail.isNotEmpty()) {
@@ -243,7 +244,7 @@ fun AppSuccessDialog(
                     detail.forEach { line ->
                         Row {
                             Text("• ", color = tone.color(), style = MaterialTheme.typography.bodySmall)
-                            Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                            Text(line, style = MaterialTheme.typography.bodySmall, color = AppColor.BrandInk)
                         }
                     }
                 }
@@ -286,14 +287,14 @@ fun AppMultiSelectDialog(
         modifier = modifier,
         actions = {
             TextButton(onClick = onDismiss) {
-                Text(cancelText, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(cancelText, color = AppColor.LabelSecondary)
             }
             Spacer(Modifier.width(AppSpacing.Sm))
             Button(
                 colors = if (tone == AppDialogTone.Danger) {
                     ButtonDefaults.buttonColors(containerColor = tone.color())
                 } else {
-                    ButtonDefaults.buttonColors()
+                    ButtonDefaults.buttonColors(containerColor = AppColor.BrandPrimary)
                 },
                 onClick = AppHaptics.click(onConfirm),
             ) {
@@ -324,7 +325,7 @@ fun AppMultiSelectDialog(
                         Text(
                             text = opt,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = AppColor.BrandInk,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -365,7 +366,7 @@ fun AppErrorDialog(
         modifier = modifier,
         actions = {
             TextButton(onClick = onDismiss) {
-                Text(closeText, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(closeText, color = AppColor.LabelSecondary)
             }
             Spacer(Modifier.width(AppSpacing.Sm))
             Button(
@@ -379,7 +380,7 @@ fun AppErrorDialog(
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = AppColor.LabelSecondary,
             )
             if (detail.isNotEmpty()) {
                 Spacer(Modifier.height(AppSpacing.Sm))
@@ -387,7 +388,7 @@ fun AppErrorDialog(
                     detail.forEach { line ->
                         Row {
                             Text("• ", color = tone.color(), style = MaterialTheme.typography.bodySmall)
-                            Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                            Text(line, style = MaterialTheme.typography.bodySmall, color = AppColor.BrandInk)
                         }
                     }
                 }
@@ -429,7 +430,7 @@ fun AppConsentDialog(
         modifier = modifier,
         actions = {
             TextButton(onClick = onDismiss) {
-                Text(declineText, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(declineText, color = AppColor.LabelSecondary)
             }
             Spacer(Modifier.width(AppSpacing.Sm))
             Button(
@@ -437,7 +438,7 @@ fun AppConsentDialog(
                 colors = if (tone == AppDialogTone.Danger) {
                     ButtonDefaults.buttonColors(containerColor = tone.color())
                 } else {
-                    ButtonDefaults.buttonColors()
+                    ButtonDefaults.buttonColors(containerColor = AppColor.BrandPrimary)
                 },
                 onClick = AppHaptics.click(onAgree),
             ) {
@@ -448,7 +449,7 @@ fun AppConsentDialog(
             Text(
                 text = body,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = AppColor.LabelSecondary,
             )
             Spacer(Modifier.height(AppSpacing.Md))
             Row(
@@ -463,7 +464,7 @@ fun AppConsentDialog(
                 Text(
                     text = termsLabel,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = AppColor.BrandInk,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -513,7 +514,7 @@ fun AppReminderDialog(
                 colors = if (tone == AppDialogTone.Danger) {
                     ButtonDefaults.buttonColors(containerColor = tone.color())
                 } else {
-                    ButtonDefaults.buttonColors()
+                    ButtonDefaults.buttonColors(containerColor = AppColor.BrandPrimary)
                 },
                 onClick = AppHaptics.click { onConfirm(checked) },
             ) {
@@ -524,7 +525,7 @@ fun AppReminderDialog(
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = AppColor.LabelSecondary,
             )
             Spacer(Modifier.height(AppSpacing.Md))
             Row(
@@ -539,7 +540,7 @@ fun AppReminderDialog(
                 Text(
                     text = checkText,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = AppColor.LabelSecondary,
                 )
             }
         },
@@ -590,7 +591,7 @@ fun AppCountdownDialog(
         modifier = modifier,
         actions = {
             TextButton(onClick = onDismiss) {
-                Text(cancelText, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(cancelText, color = AppColor.LabelSecondary)
             }
             Spacer(Modifier.width(AppSpacing.Sm))
             Button(
@@ -598,7 +599,7 @@ fun AppCountdownDialog(
                 colors = if (tone == AppDialogTone.Danger) {
                     ButtonDefaults.buttonColors(containerColor = tone.color())
                 } else {
-                    ButtonDefaults.buttonColors()
+                    ButtonDefaults.buttonColors(containerColor = AppColor.BrandPrimary)
                 },
                 onClick = AppHaptics.click(onConfirm),
             ) {
@@ -614,7 +615,7 @@ fun AppCountdownDialog(
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = AppColor.LabelSecondary,
             )
         },
         trailingUnderActions = {
@@ -626,7 +627,7 @@ fun AppCountdownDialog(
                         .fillMaxWidth()
                         .padding(end = AppSpacing.Md),
                     color = tone.color(),
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    trackColor = AppColor.BrandSurfaceDim,
                 )
             }
         },
@@ -652,7 +653,7 @@ fun AppLoadingOverlay(
     message: String? = null,
     progress: Float? = null,
     scrimAlpha: Float = 0.42f,
-    spinnerColor: Color = MaterialTheme.colorScheme.primary,
+    spinnerColor: Color = AppColor.BrandPrimary,
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -678,7 +679,7 @@ fun AppLoadingOverlay(
                             .height(8.dp)
                             .clip(RoundedCornerShape(percent = 50)),
                         color = spinnerColor,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        trackColor = AppColor.BrandSurfaceDim,
                     )
                 } else {
                     CircularProgressIndicator(
@@ -691,7 +692,7 @@ fun AppLoadingOverlay(
                     Text(
                         text = message,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = AppColor.BrandInk,
                     )
                 }
             }
