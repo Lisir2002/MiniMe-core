@@ -384,7 +384,8 @@ fun AppSwipeAction(
     // —— 直接读 MutableFloatState，Compose 必然追踪变化。
     val rawOffset = resolvedState.anchored.offset
 
-    // progress：起始滑动阈值之后线性攀升，驱动按钮透明度渐入。
+    // progress：起始滑动阈值之后线性攀升至 1。揭示本身由「顶层内容层平移顺缝揭开」完成
+    // （非 alpha 渐入）；progress 经 LocalSwipeReveal 下发，仅作按钮可点击门控。
     val travelled = abs(rawOffset) - resolvedState.startSwipeAbs
     val span = (resolvedState.openAnchorAbs - resolvedState.startSwipeAbs).coerceAtLeast(1f)
     val progress = (travelled / span).coerceIn(0f, 1f)
