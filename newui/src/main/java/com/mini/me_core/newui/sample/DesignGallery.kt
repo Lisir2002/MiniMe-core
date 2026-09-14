@@ -76,6 +76,12 @@ import com.mini.me_core.newui.designsystem.component.molecule.AppChatMarker
 import com.mini.me_core.newui.designsystem.component.molecule.AppChatMarkerKind
 import com.mini.me_core.newui.designsystem.component.molecule.AppChatMessageState
 import com.mini.me_core.newui.designsystem.component.molecule.AppMessageRow
+import com.mini.me_core.newui.designsystem.component.molecule.AppMcpAppCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppMcpAppState
+import com.mini.me_core.newui.designsystem.component.molecule.AppSkillCallCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppSkillCallState
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolCallCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolCallState
 import com.mini.me_core.newui.designsystem.component.molecule.AppMessageScroller
 import com.mini.me_core.newui.designsystem.component.molecule.AppCheckRow
 import com.mini.me_core.newui.designsystem.component.molecule.AppConfetti
@@ -210,6 +216,40 @@ private sealed interface ChatItem {
         val kind: AppChatMarkerKind = AppChatMarkerKind.Tool,
         val running: Boolean = false,
         val tone: Color = AppColor.StatusSuccess,
+    ) : ChatItem
+
+    data class Tool(
+        override val key: Int,
+        val title: String,
+        val state: AppToolCallState,
+        val summary: String? = null,
+        val serverPrefix: String? = null,
+        val durationMs: Long? = null,
+        val input: String? = null,
+        val output: String? = null,
+        val streamOutput: String? = null,
+        val approvalHint: String? = null,
+        val onApprove: (() -> Unit)? = null,
+        val onReject: (() -> Unit)? = null,
+    ) : ChatItem
+
+    data class McpApp(
+        override val key: Int,
+        val title: String,
+        val state: AppMcpAppState,
+        val serverPrefix: String? = null,
+        val resourceUri: String? = null,
+        val onReload: (() -> Unit)? = null,
+        val onExpand: (() -> Unit)? = null,
+    ) : ChatItem
+
+    data class Skill(
+        override val key: Int,
+        val name: String,
+        val state: AppSkillCallState,
+        val args: String? = null,
+        val description: String? = null,
+        val durationMs: Long? = null,
     ) : ChatItem
 }
 
@@ -356,10 +396,175 @@ private fun GalleryBody() {
 
     fun chatTool() {
         val id = chatSeq++
-        chatList = chatList + ChatItem.Marker(key = id, text = "执行命令 · gradle assembleDebug", running = true)
+        chatList = chatList + ChatItem.Tool(
+            key = id,
+            title = "执行命令",
+            summary = "./gradlew :app:assembleDebug",
+            state = AppToolCallState.Running,
+            input = """{"command": "./gradlew :app:assembleDebug", "cwd": "/workspace"}""",
+            streamOutput = "> Task :app:compileDebugKotlin",
+        )
         chatScope.launch {
-            delay(1600)
-            chatList = chatList.map { if (it is ChatItem.Marker && it.key == id) it.copy(running = false) else it }
+            delay(700)
+            chatList = chatList.map {
+                if (it is ChatItem.Tool && it.key == id) {
+                    it.copy(streamOutput = "> Task :app:compileDebugKotlin UP-TO-DATE\n> Task :app:assembleDebug")
+                } else {
+                    it
+                }
+            }
+            delay(900)
+            chatList = chatList.map {
+                if (it is ChatItem.Tool && it.key == id) {
+                    it.copy(
+                        state = AppToolCallState.Success,
+                        durationMs = 1600,
+                        streamOutput = null,
+                        output = """{"exitCode": 0, "tookMs": 1600}""",
+                    )
+                } else {
+                    it
+                }
+            }
+        }
+    }
+
+    /** 人工审批（Intervention）：工具待许可 → 允许进入执行 → 成功。 */
+    fun chatToolApproval() {
+        val id = chatSeq++
+        chatList = chatList + ChatItem.Tool(
+            key = id,
+            title = "执行命令",
+            summary = "curl -X POST https://api.example.com/deploy",
+            state = AppToolCallState.AwaitingApproval,
+            input = """{"command": "curl -X POST https://api.example.com/deploy"}""",
+            approvalHint = "该命令将向生产环境发起部署请求",
+            onApprove = {
+                chatList = chatList.map {
+                    if (it is ChatItem.Tool && it.key == id) {
+                        it.copy(
+                            state = AppToolCallState.Running,
+                            approvalHint = null,
+                            onApprove = null,
+                            onReject = null,
+                        )
+                    } else {
+                        it
+                    }
+                }
+                chatScope.launch {
+                    delay(1200)
+                    chatList = chatList.map {
+                        if (it is ChatItem.Tool && it.key == id) {
+                            it.copy(
+                                state = AppToolCallState.Success,
+                                durationMs = 1200,
+                                output = """{"deployId": "dep-20260914-01", "status": "ok"}""",
+                            )
+                        } else {
+                            it
+                        }
+                    }
+                }
+            },
+            onReject = {
+                chatList = chatList.map {
+                    if (it is ChatItem.Tool && it.key == id) {
+                        it.copy(
+                            state = AppToolCallState.Error,
+                            summary = "已拒绝执行 · 用户取消",
+                            approvalHint = null,
+                            onApprove = null,
+                            onReject = null,
+                        )
+                    } else {
+                        it
+                    }
+                }
+            },
+        )
+    }
+
+    /** MCP App：工具声明 `ui://` 资源，Host 渲染沙箱 iframe 交互式界面。 */
+    fun chatMcpApp() {
+        val id = chatSeq++
+        chatList = chatList + ChatItem.McpApp(
+            key = id,
+            title = "构建耗时分析",
+            state = AppMcpAppState.Loading,
+            serverPrefix = "github",
+            resourceUri = "ui://analytics/build-duration",
+            onReload = {
+                chatList = chatList.map {
+                    if (it is ChatItem.McpApp && it.key == id) {
+                        it.copy(state = AppMcpAppState.Loading)
+                    } else {
+                        it
+                    }
+                }
+                chatScope.launch {
+                    delay(600)
+                    chatList = chatList.map {
+                        if (it is ChatItem.McpApp && it.key == id) {
+                            it.copy(state = AppMcpAppState.Ready)
+                        } else {
+                            it
+                        }
+                    }
+                }
+            },
+        )
+        chatScope.launch {
+            delay(800)
+            chatList = chatList.map {
+                if (it is ChatItem.McpApp && it.key == id) it.copy(state = AppMcpAppState.Ready) else it
+            }
+        }
+    }
+
+    fun chatMcpTool() {
+        val id = chatSeq++
+        chatList = chatList + ChatItem.Tool(
+            key = id,
+            title = "列出会话文件",
+            serverPrefix = "github",
+            state = AppToolCallState.Running,
+            input = """{"query": "repo:minime/minime-core issues/42"}""",
+        )
+        chatScope.launch {
+            delay(1200)
+            chatList = chatList.map {
+                if (it is ChatItem.Tool && it.key == id) {
+                    it.copy(
+                        state = AppToolCallState.Success,
+                        durationMs = 1200,
+                        output = """{"total": 3, "items": ["issue-42.md", "design-notes.md", "rc-log.md"]}""",
+                    )
+                } else {
+                    it
+                }
+            }
+        }
+    }
+
+    fun chatSkill() {
+        val id = chatSeq++
+        chatList = chatList + ChatItem.Skill(
+            key = id,
+            name = "review-code",
+            args = "--scope agent",
+            state = AppSkillCallState.Running,
+            description = "审查 MiniMe agent 模块的代码质量：检查 ToolRegistry 注册、权限审批链路与错误处理，并给出修改建议。",
+        )
+        chatScope.launch {
+            delay(900)
+            chatList = chatList.map {
+                if (it is ChatItem.Skill && it.key == id) {
+                    it.copy(state = AppSkillCallState.Success, durationMs = 900)
+                } else {
+                    it
+                }
+            }
         }
     }
     // 文件卡运行态：自动循环演示（上传推进 → 完成）
@@ -1063,11 +1268,15 @@ private fun GalleryBody() {
         }
 
         Section("分子组建族 · AI 对话流") {
-            // 控制条：触发流式回复 / 失败重试 / 工具调用卡
+            // 控制条：触发流式回复 / 失败重试 / 工具调用卡 / MCP 工具 / 待审批 / MCP App / 技能调用
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
                 AppButton(text = "AI 流式回复", onClick = { chatStream() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "模拟失败", onClick = { chatFail() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "工具调用", onClick = { chatTool() }, variant = AppButtonVariant.Outlined)
+                AppButton(text = "MCP 工具", onClick = { chatMcpTool() }, variant = AppButtonVariant.Outlined)
+                AppButton(text = "待审批", onClick = { chatToolApproval() }, variant = AppButtonVariant.Outlined)
+                AppButton(text = "MCP App", onClick = { chatMcpApp() }, variant = AppButtonVariant.Outlined)
+                AppButton(text = "技能调用", onClick = { chatSkill() }, variant = AppButtonVariant.Outlined)
             }
             AppMessageScroller(
                 modifier = Modifier.height(440.dp),
@@ -1081,6 +1290,37 @@ private fun GalleryBody() {
                             kind = item.kind,
                             running = item.running,
                             tone = item.tone,
+                        )
+                        is ChatItem.Tool -> AppToolCallCard(
+                            title = item.title,
+                            summary = item.summary,
+                            state = item.state,
+                            serverPrefix = item.serverPrefix,
+                            durationMs = item.durationMs,
+                            input = item.input,
+                            output = item.output,
+                            streamOutput = item.streamOutput,
+                            approvalHint = item.approvalHint,
+                            onApprove = item.onApprove,
+                            onReject = item.onReject,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        is ChatItem.McpApp -> AppMcpAppCard(
+                            title = item.title,
+                            state = item.state,
+                            serverPrefix = item.serverPrefix,
+                            resourceUri = item.resourceUri,
+                            onReload = item.onReload,
+                            onExpand = item.onExpand,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        is ChatItem.Skill -> AppSkillCallCard(
+                            name = item.name,
+                            args = item.args,
+                            state = item.state,
+                            description = item.description,
+                            durationMs = item.durationMs,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                         is ChatItem.Msg -> AppMessageRow(
                             text = item.text,
