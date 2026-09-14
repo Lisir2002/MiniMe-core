@@ -21,9 +21,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -513,15 +511,15 @@ fun AppSwipeAction(
             .clip(shape),
         contentAlignment = if (edge == AppSwipeEdge.End) Alignment.CenterEnd else Alignment.CenterStart,
     ) {
-        // 底层动作栏：整条圆角容器（无阴影、无渐变），内部按钮扁平纯色拼接并随拖拽淡入。
-        Box(modifier = Modifier.fillMaxSize()) {
+        // 底层动作栏：用 matchParentSize() 与内容层最终尺寸一致——该修饰符不参与外层 Box 的
+        // 尺寸测量（Box 在兄弟测完后再用最终尺寸 tight 测量本子项），因此在 verticalScroll 等
+        // 「高度无界」父级下也不会像 fillMaxSize() 那样被压成 0 高（真机实测：按钮因此整条不可见）。
+        Box(modifier = Modifier.matchParentSize()) {
             Row(
                 modifier = Modifier
                     .width(actionWidth)
                     .fillMaxHeight()
-                    .heightIn(min = AppSizing.TouchTarget)
                     .align(if (edge == AppSwipeEdge.End) Alignment.CenterEnd else Alignment.CenterStart)
-                    .clip(RoundedCornerShape(AppRadius.Md))
                     .background(
                         // 兜底色：按钮 fillMaxHeight 无缝拼接，理论上不会露出；留 surfaceVariant 以防缝隙透视。
                         MaterialTheme.colorScheme.surfaceVariant,

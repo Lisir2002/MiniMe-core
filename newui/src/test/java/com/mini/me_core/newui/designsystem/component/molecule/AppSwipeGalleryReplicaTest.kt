@@ -105,6 +105,10 @@ class AppSwipeGalleryReplicaTest {
         val rootW = compose.onRoot().fetchSemanticsNode().boundsInRoot.width
         val del = compose.onAllNodesWithText("删除")[0].fetchSemanticsNode().boundsInRoot
         assertTrue("删除按钮宽>0（${del.width}）", del.width > 0f)
+        // 【B3】verticalScroll 无界高度下，动作栏不得被 fillMaxSize 压成 0 高（真机实测按钮整条不可见）。
+        assertTrue("删除按钮高>0（${del.height}）——无界高度下动作栏被压塌", del.height > 0f)
+        val arc = compose.onAllNodesWithText("归档")[0].fetchSemanticsNode().boundsInRoot
+        assertTrue("归档按钮高>0（${arc.height}）——无界高度下动作栏被压塌", arc.height > 0f)
         assertTrue("删除按钮应在右半区 left=${del.left} rootW=$rootW", del.left >= rootW * 0.4f)
 
         compose.onAllNodesWithText("会话 C · terminal local")[0].swipeRowLeft()

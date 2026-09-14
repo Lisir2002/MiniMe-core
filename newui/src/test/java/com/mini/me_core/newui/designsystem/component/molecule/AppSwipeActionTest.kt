@@ -181,6 +181,11 @@ class AppSwipeActionTest {
             row1x in -130f..-126f,
         )
 
+        // 【B3】本用例处于 verticalScroll 无界高度：展开后动作按钮必须有非零高度，
+        // 防止 fillMaxSize 把底层动作栏压成 0 高（真机：内容滑开了但按钮整条不可见）。
+        val action1 = compose.onAllNodesWithText("动作1")[0].fetchSemanticsNode().boundsInRoot
+        assertTrue("动作1 高度应>0（实际 ${action1.height}）——动作栏在无界高度下被压塌", action1.height > 0f)
+
         compose.onAllNodesWithText("行2")[0].swipeRowLeft()
         compose.mainClock.advanceTimeBy(2500)
         compose.waitForIdle()
