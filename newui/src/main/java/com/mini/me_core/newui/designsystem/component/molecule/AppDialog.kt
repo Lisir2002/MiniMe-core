@@ -10,11 +10,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
-import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 
 /**
  * 弹窗统一封装（§3.12 AppDialog / AppTokens 圆角边距）。
  * 破坏性确认：confirmText 用 StatusDanger，调用方在 onClick 外套 [AppHaptics.click]。
+ *
+ * 归一化：卡片底 [AppColor.BrandCard]、标题 [AppColor.BrandInk]、正文 [AppColor.LabelSecondary]、
+ * 确认键缺省 iOS 蓝 [AppColor.BrandPrimary]，与其余弹窗分子保持同一主风格色阶。
  */
 @Composable
 fun AppDialog(
@@ -35,7 +37,7 @@ fun AppDialog(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = AppColor.BrandInk,
             )
         },
         text = if (text != null) {
@@ -43,22 +45,22 @@ fun AppDialog(
                 Text(
                     text = text,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = AppColor.LabelSecondary,
                 )
             }
         } else null,
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(text = confirmText, color = if (confirmButtonColor != Color.Unspecified) confirmButtonColor else MaterialTheme.colorScheme.primary)
+                Text(text = confirmText, color = if (confirmButtonColor != Color.Unspecified) confirmButtonColor else AppColor.BrandPrimary)
             }
         },
         dismissButton = if (dismissText != null) {
             {
                 TextButton(onClick = onDismiss) {
-                    Text(text = dismissText, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(text = dismissText, color = AppColor.LabelSecondary)
                 }
             }
         } else null,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = AppColor.BrandCard,
     )
 }

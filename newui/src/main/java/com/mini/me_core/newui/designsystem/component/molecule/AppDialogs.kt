@@ -667,6 +667,7 @@ fun AppRatingDialog(
             Spacer(Modifier.width(AppSpacing.Sm))
             Button(
                 enabled = onConfirm != null && rating > 0,
+                colors = ButtonDefaults.buttonColors(containerColor = AppColor.BrandPrimary),
                 onClick = AppHaptics.click { onConfirm?.invoke(rating, feedback) },
             ) {
                 Text(confirmText)
