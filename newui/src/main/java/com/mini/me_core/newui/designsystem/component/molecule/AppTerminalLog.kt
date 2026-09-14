@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -32,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -117,7 +120,7 @@ fun AppTerminalLog(
             .clip(RoundedCornerShape(AppRadius.Md))
             .background(AppColor.OnDarkSurface),
     ) {
-        Column(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxSize()) {
             // 标题栏：呼吸状态点 + 标题 + 右缘"运行中"胶囊
             Row(
                 modifier = Modifier
@@ -157,6 +160,7 @@ fun AppTerminalLog(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(osc)
+                    .animateContentSize()
                     .padding(start = AppSpacing.Lg, end = AppSpacing.Lg, top = AppSpacing.Sm),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
             ) {
@@ -189,6 +193,22 @@ fun AppTerminalLog(
                     )
                 }
             }
+
+            // 底部渐隐 scrim：贴近 iOS 终端/控制台的底部纵向收尾
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(AppSpacing.Xl)
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0f to Color.Transparent,
+                                1f to AppColor.OnDarkSurface.copy(alpha = 0.55f),
+                            ),
+                        ),
+                    ),
+            )
         }
     }
 }

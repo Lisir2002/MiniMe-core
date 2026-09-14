@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,10 +28,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
+import com.mini.me_core.newui.designsystem.token.generated.AppElevation
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
@@ -61,6 +65,7 @@ fun AppDock(
 ) {
     Row(
         modifier = modifier
+            .shadow(elevation = AppElevation.Z2, shape = RoundedCornerShape(AppRadius.Pill), clip = false)
             .clip(RoundedCornerShape(AppRadius.Pill))
             .background(background)
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
@@ -100,6 +105,19 @@ fun AppDock(
                     .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Sm),
                 contentAlignment = Alignment.Center,
             ) {
+                // 按压叠加浅色调层，增强触觉反馈（iOS 按压感知）
+                val pressAlpha by animateFloatAsState(
+                    targetValue = if (pressed) 1f else 0f,
+                    animationSpec = tween(120),
+                    label = "dockPressAlpha",
+                )
+                if (pressAlpha > 0f) {
+                    Box(
+                        Modifier
+                            .matchParentSize()
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f * pressAlpha)),
+                    )
+                }
                 // 悬浮气泡标签：Box 叠加，不占测量空间 → 选中/未选中高度恒定
                 if (selected) {
                     Box(
@@ -130,18 +148,28 @@ fun AppDock(
                             .graphicsLayer { scaleX = scale; scaleY = scale }
                             .size(AppSizing.IconL),
                     )
-                    // 指示点：仅选中显示，占固定高度以免抖动
-                    if (selected) {
-                        Box(
-                            modifier = Modifier
-                                .padding(top = AppSpacing.Xs)
-                                .size(AppSizing.IconXs / 2f)
-                                .clip(CircleShape)
-                                .background(AppColor.BrandPrimary),
-                        )
-                    } else {
-                        Box(modifier = Modifier.padding(top = AppSpacing.Xs).size(AppSizing.IconXs / 2f))
-                    }
+                    // 指示点：始终占位，缩放 + 淡入淡出动画显现，避免高度跳变
+                    val dotScale by animateFloatAsState(
+                        targetValue = if (selected) 1f else 0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium,
+                        ),
+                        label = "dockDotScale",
+                    )
+                    val dotAlpha by animateFloatAsState(
+                        targetValue = if (selected) 1f else 0f,
+                        animationSpec = tween(180),
+                        label = "dockDotAlpha",
+                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(top = AppSpacing.Xs)
+                            .size(AppSizing.IconXs / 2f)
+                            .graphicsLayer { scaleX = dotScale; scaleY = dotScale; alpha = dotAlpha }
+                            .clip(CircleShape)
+                            .background(AppColor.BrandPrimary),
+                    )
                 }
             }
         }
