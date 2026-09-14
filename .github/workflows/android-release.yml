@@ -48,8 +48,10 @@ jobs:
           # android-actions/setup-android@v3 只接受 cmdline-tools-version + packages 两个参数：
           #   cmdline-tools-version 对应 cmdline-tools zip 版本号（见 action.yml 默认 14742923 = 20.0）
           #   packages 用 sdkmanager 语法传，多包空格分隔；platforms + build-tools 是构建必须
+          # 注意：新版 cmdline-tools 已移除独立 tools 包（sdkmanager tools 报 Failed to find package 'tools'），
+          #        rc8 因此失败；platform-tools 自带，无需再列 tools。
           cmdline-tools-version: '14742923'
-          packages: 'tools platform-tools platforms;android-36 build-tools;36.0.0'
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
