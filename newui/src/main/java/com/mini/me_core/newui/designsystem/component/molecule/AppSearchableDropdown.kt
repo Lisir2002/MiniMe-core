@@ -5,6 +5,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,9 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDropDown
@@ -115,7 +114,6 @@ fun AppSearchableDropdown(
     var expanded by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var highlight by remember { mutableIntStateOf(0) }
-    val listState = rememberLazyListState()
 
     val isRemote = remoteQuery != null
     val results: List<AppSearchableOption> = remember(query, options, isRemote, remoteQuery) {
@@ -134,10 +132,17 @@ fun AppSearchableDropdown(
         }
     }
 
-    // 高亮项自动滚动到可见区。
+    // 每个候选项一个 BringIntoViewRequester：键盘上下移动高亮时，驱动外层 DropdownMenu
+    // 自带的 verticalScroll 把高亮项滚入可见区。不能用 LazyColumn——M3 DropdownMenu 内容容器
+    // 本身是 width(IntrinsicSize.Max) + verticalScroll，内嵌 SubcomposeLayout（Lazy*）会在
+    // intrinsic 测量阶段直接崩溃。
+    val bringRequesters = remember(results.size) {
+        List(results.size) { BringIntoViewRequester() }
+    }
     LaunchedEffect(highlight, results.size) {
         if (results.isNotEmpty()) {
-            listState.animateScrollToItem(highlight.coerceIn(0, results.lastIndex))
+            bringRequesters.getOrNull(highlight.coerceIn(0, results.lastIndex))
+                ?.bringIntoView()
         }
     }
 
@@ -246,19 +251,28 @@ fun AppSearchableDropdown(
             shape = RoundedCornerShape(AppRadius.Md),
             modifier = Modifier.widthIn(min = 220.dp),
         ) {
+            // 用普通 Column 渲染候选项：DropdownMenu 内容容器自带 width(IntrinsicSize.Max)
+            // 与 verticalScroll，再嵌套 LazyColumn（SubcomposeLayout）会触发 intrinsic 测量崩溃。
+            // 高度上限交给外层容器；候选项数量受控（本地全量/远程单页），无需懒加载。
             Column(
                 modifier = Modifier
                     .heightIn(max = 280.dp)
                     .onPreviewKeyEvent(::handleKey),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.Tiny),
             ) {
                 when {
                     loading -> SearchDropdownLoadingRow()
                     results.isEmpty() -> SearchDropdownEmptyState()
-                    else -> LazyColumn(
-                        state = listState,
-                        modifier = Modifier.heightIn(max = 280.dp),
-                    ) {
-                        itemsIndexed(results) { index, opt ->
+                    else -> results.forEachIndexed { index, opt ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    bringRequesters.getOrNull(index)?.let {
+                                        Modifier.bringIntoViewRequester(it)
+                                    } ?: Modifier
+                                ),
+                        ) {
                             SearchDropdownRow(
                                 option = opt,
                                 highlighted = index == highlight,
