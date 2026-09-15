@@ -1334,6 +1334,7 @@ private fun GalleryBody() {
             AppIconButton(
                 text = "命令面板 ⌘K",
                 variant = AppButtonVariant.FilledTonal,
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                 onClick = { paletteOpen = true },
             )
@@ -1342,6 +1343,7 @@ private fun GalleryBody() {
                 AppIconButton(
                     text = "级联子菜单",
                     variant = AppButtonVariant.FilledTonal,
+                    // 装饰图标：旁侧已有文字/语义，跳过无障碍
                     leadingIcon = { Icon(Icons.Rounded.InsertDriveFile, contentDescription = null) },
                     onClick = { cascadeExpanded = !cascadeExpanded },
                 )
@@ -1546,9 +1548,12 @@ private fun GalleryBody() {
 
         Section("分子组件族 · AI 对话流") {
             // 控制条：触发流式回复 / 失败重试 / 工具卡 / 审批 / MCP / 技能 / 思考 / 计划 / 附件 / 链 / 摘要
-            FlowRow(
+            // 横向可滑动，不换行堆叠；按钮自身 wrapContentWidth，避免被强制均分宽度。
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
-                verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
             ) {
                 AppButton(text = "AI 流式回复", onClick = { chatStream() }, variant = AppButtonVariant.Outlined)
                 AppButton(text = "模拟失败", onClick = { chatFail() }, variant = AppButtonVariant.Outlined)
