@@ -76,6 +76,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
+import com.mini.me_core.newui.designsystem.token.generated.AppElevation
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
@@ -149,12 +150,13 @@ fun AppContextMenu(
             modifier = modifier
                 .widthIn(min = 168.dp, max = 256.dp)
                 .wrapContentWidth()
-                .shadow(14.dp, corner)
+                .shadow(AppElevation.Z3, corner)
                 .clip(corner)
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(vertical = AppSpacing.Xs),
         ) {
-            val grouped = items.filter { it.danger } + items.filter { !it.danger }
+            // 常规项在前、危险项（删除等）沉底，符合常见菜单范式。
+            val grouped = items.filter { !it.danger } + items.filter { it.danger }
             grouped.forEach { item ->
                 val tint = if (item.danger) AppColor.StatusDanger else MaterialTheme.colorScheme.onSurface
                 Row(
@@ -276,7 +278,7 @@ fun AppCommandPalette(
                 .padding(top = AppSpacing.Xl + 8.dp)
                 .padding(horizontal = AppSpacing.Lg)
                 .fillMaxWidth()
-                .shadow(24.dp, corner)
+                .shadow(AppElevation.Z4, corner)
                 .clip(corner)
                 .background(MaterialTheme.colorScheme.surface)
         ) {
@@ -799,7 +801,7 @@ private fun CascadeLevel(
             modifier = Modifier
                 .offset(x = x)
                 .width(columnWidth)
-                .shadow(16.dp, corner, clip = true)
+                .shadow(AppElevation.Z3, corner, clip = true)
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(vertical = AppSpacing.Xs),
         ) {

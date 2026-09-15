@@ -44,6 +44,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -67,6 +70,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.mini.me_core.newui.designsystem.theme.appPalette
 import kotlin.math.roundToInt
+import com.mini.me_core.newui.designsystem.token.generated.AppElevation
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
@@ -130,6 +134,7 @@ fun AppSearchableDropdown(
     var query by remember { mutableStateOf("") }
     var highlight by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
+    val focusRequester = remember { FocusRequester() }
     // 字段宽度（px）：让弹出面板与字段同宽，避免面板忽宽忽窄。
     var fieldWidthPx by remember { mutableIntStateOf(0) }
 
@@ -142,18 +147,21 @@ fun AppSearchableDropdown(
         }
     }
 
-    // 展开时把已选 label 灌入输入框并重置高亮；收起后字段回显外部 value。
-    LaunchedEffect(expanded) {
-        if (expanded) {
-            query = value ?: ""
-            highlight = 0
-        }
-    }
     // 键盘 ↑↓ 移动高亮后，把高亮项滚入可见区（独立 Popup + LazyColumn，安全可滚）。
     LaunchedEffect(highlight, results.size) {
         if (results.isNotEmpty() && highlight < listState.layoutInfo.totalItemsCount) {
             listState.animateScrollToItem(highlight.coerceIn(0, results.lastIndex))
         }
+    }
+
+    /** 点开下拉：灌入当前已选值作为搜索起点，并请求输入焦点（拉起 IME）。 */
+    fun open() {
+        if (expanded) return
+        query = value ?: ""
+        onQueryChange?.invoke(query)
+        highlight = 0
+        expanded = true
+        focusRequester.requestFocus()
     }
 
     fun pick(opt: AppSearchableOption) {
@@ -249,6 +257,7 @@ fun AppSearchableDropdown(
                         shape = fieldShape,
                     )
                     .onPreviewKeyEvent(::handleKey)
+                    .clickable { open() }
                     .padding(start = AppSpacing.Md, end = AppSpacing.Sm, top = AppSpacing.Sm, bottom = AppSpacing.Sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -276,9 +285,11 @@ fun AppSearchableDropdown(
                         onValueChange = {
                             query = it
                             onQueryChange?.invoke(it)
-                            if (!expanded) expanded = true
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester)
+                            .onFocusChanged { if (!it.isFocused && expanded) expanded = false },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = palette.ink),
                         cursorBrush = SolidColor(palette.primary),
@@ -310,17 +321,19 @@ fun AppSearchableDropdown(
             }
 
             // —— 弹出面板：独立 Popup + 固定高度 LazyColumn，安全且可滚 ——
+            // focusable=false：弹窗不抢输入焦点，字段的 IME 与光标保持；
+            // 外部点击由字段 onFocusChanged 失焦时关闭。
             if (expanded) {
                 Popup(
                     popupPositionProvider = positionProvider,
                     onDismissRequest = { expanded = false },
-                    properties = PopupProperties(focusable = true),
+                    properties = PopupProperties(focusable = false),
                 ) {
                     val panelShape = RoundedCornerShape(AppRadius.Md)
                     val panelWidth = with(density) { fieldWidthPx.toDp() }.coerceAtLeast(220.dp)
                     Column(
                         modifier = Modifier
-                            .shadow(16.dp, panelShape, clip = false)
+                            .shadow(AppElevation.Z3, panelShape, clip = false)
                             .width(panelWidth)
                             .clip(panelShape)
                             .background(palette.card)

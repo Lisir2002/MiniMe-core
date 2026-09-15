@@ -58,13 +58,14 @@ DEV_MAP = {
 # 开发者层分类输出顺序（空分类不输出）
 DEV_ORDER = ["新增", "变更", "废弃", "删除", "修复", "安全"]
 
-# 用户层状态分类（仅用户可见 type；ci/test/style/docs/chore/build/refactor 等内部改动不进用户层）
+# 用户层状态分类（面向用户：功能/性能/修复/UI 重构都属用户可感知的样式与交互变化）
 USER_GROUPS = [
     ("feat", "新增"),
     ("perf", "优化"),
+    ("refactor", "优化"),
     ("fix", "修复"),
 ]
-USER_EXCLUDE = {"ci", "test", "style", "docs", "chore", "build", "refactor", "deps"}
+USER_EXCLUDE = {"ci", "test", "style", "docs", "chore", "build", "deps"}
 
 # AI 层：与 AI 工作流强相关，重点标注
 AI_RELEVANT_TYPES = {"feat", "fix", "refactor", "perf"}
