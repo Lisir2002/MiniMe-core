@@ -891,8 +891,8 @@ private fun GalleryBody() {
             .verticalScroll(scroll)
             .pageMaxWidth()
             .pageContentPadding()
-            .padding(top = AppSpacing.Md),
-        verticalArrangement = Arrangement.spacedBy(AppSpacing.Xl),
+            .padding(top = AppSpacing.Sm),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.Md),
     ) {
         Section("令牌 · 色板") {
             ColorRow(
@@ -2061,39 +2061,43 @@ private fun GalleryBody() {
     }
 }
 
-/** iOS 简约导航栏：返回钮（iOS 蓝）+ 大标题，透明融入系统底。 */
+/** iOS 简约导航栏：返回钮（iOS 蓝）+ 紧凑内联标题，透明融入系统底。 */
 @Composable
 private fun iOSNavBar(title: String, onBack: (() -> Unit)? = null) {
     Column(
         Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
+            .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Xs),
     ) {
-        if (onBack != null) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.size(AppSizing.IconButton),
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "返回",
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onBack != null) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(AppSizing.IconButton),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "返回",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            } else {
+                Spacer(Modifier.width(AppSpacing.Sm))
             }
-        } else {
-            Spacer(Modifier.height(AppSpacing.Md))
+            Text(
+                text = title,
+                style = AppType.Title3,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+            )
         }
-        Text(
-            text = title,
-            style = AppType.LargeTitle,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(top = AppSpacing.Sm, bottom = AppSpacing.Md),
-        )
     }
 }
 
-/** iOS 简约分组：灰色小标题 + 白色圆角卡片分组（去顶部分隔线，以留白分层）。 */
+/** iOS 简约分组：紧凑灰标题 + 白色圆角卡片分组（去顶部分隔线，以留白分层）。 */
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
     Column {
@@ -2101,19 +2105,19 @@ private fun Section(title: String, content: @Composable () -> Unit) {
             text = title,
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
+            modifier = Modifier.padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Xs),
         )
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(AppRadius.Lg),
+            shape = RoundedCornerShape(AppRadius.Md),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = AppElevation.Z0),
         ) {
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(AppSpacing.Lg),
-                verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
+                    .padding(AppSpacing.Sm),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
             ) {
                 content()
             }
