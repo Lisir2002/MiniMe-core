@@ -153,6 +153,8 @@ import com.mini.me_core.newui.designsystem.component.molecule.AppProgressBar
 import com.mini.me_core.newui.designsystem.component.molecule.AppRatingBar
 import com.mini.me_core.newui.designsystem.component.molecule.AppRingProgress
 import com.mini.me_core.newui.designsystem.component.molecule.AppSearchBar
+import com.mini.me_core.newui.designsystem.component.molecule.AppSearchableDropdown
+import com.mini.me_core.newui.designsystem.component.molecule.AppSearchableOption
 import com.mini.me_core.newui.designsystem.component.molecule.AppSectionGroup
 import com.mini.me_core.newui.designsystem.component.molecule.AppSectionHeader
 import com.mini.me_core.newui.designsystem.component.molecule.AppSegmentedToggle
@@ -378,6 +380,12 @@ private fun GalleryBody() {
     var showUpdateDialog by remember { mutableStateOf(false) }
     // 新增列表/弹窗补充类型演示状态
     var comboValue by remember { mutableStateOf("Auto") }
+    // AppSearchableDropdown 演示：本地 / 远程（150ms 假延迟）双数据源
+    var localPick by remember { mutableStateOf("") }
+    var remotePick by remember { mutableStateOf("") }
+    var remoteQ by remember { mutableStateOf("") }
+    var remoteLoading by remember { mutableStateOf(false) }
+    var remoteResults by remember { mutableStateOf<List<AppSearchableOption>>(emptyList()) }
     var contextVisible by remember { mutableStateOf(false) }
     var contextPos by remember { mutableStateOf(Offset.Zero) }
     var paletteOpen by remember { mutableStateOf(false) }
@@ -1428,6 +1436,74 @@ private fun GalleryBody() {
                 onValueChange = { searchText = it },
                 placeholder = "搜索项目 / 命令 / 会话…",
                 onClear = { searchText = "" },
+            )
+            // 可搜索下拉 · 本地数据源：组件内前缀优先过滤，支持键盘 ↑↓·Enter·Esc
+            Text(
+                "可搜索下拉 · 本地数据源（前缀优先 · 键盘 ↑↓·Enter·Esc）",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            AppSearchableDropdown(
+                value = localPick,
+                onSelect = { localPick = it.label },
+                label = "选择城市",
+                placeholder = "输入城市名…",
+                leadingIcon = Icons.Rounded.Search,
+                options = remember {
+                    listOf(
+                        AppSearchableOption("北京", subtitle = "Beijing · 华北", trailing = "2189万"),
+                        AppSearchableOption("上海", subtitle = "Shanghai · 华东", trailing = "2487万"),
+                        AppSearchableOption("广州", subtitle = "Guangzhou · 华南"),
+                        AppSearchableOption("深圳", subtitle = "Shenzhen · 华南"),
+                        AppSearchableOption("杭州", subtitle = "Hangzhou · 华东"),
+                        AppSearchableOption("成都", subtitle = "Chengdu · 西南"),
+                        AppSearchableOption("南京", subtitle = "Nanjing · 华东"),
+                        AppSearchableOption("武汉", subtitle = "Wuhan · 华中"),
+                        AppSearchableOption("西安", subtitle = "Xi'an · 西北"),
+                        AppSearchableOption("苏州", subtitle = "Suzhou · 华东"),
+                        AppSearchableOption("重庆", subtitle = "Chongqing · 西南"),
+                        AppSearchableOption("长沙", subtitle = "Changsha · 华中"),
+                    )
+                },
+            )
+            // 可搜索下拉 · 远程数据源：150ms 假延迟 + loading 转圈 + 无结果空态
+            Text(
+                "可搜索下拉 · 远程数据源（150ms 假延迟 · 输入无结果显示空态）",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            val remoteCatalog = remember {
+                listOf(
+                    "Anthropic", "OpenAI", "Google Gemini", "DeepSeek", "Qwen", "Llama",
+                    "Mistral", "Grok", "Gemma", "Claude", "Yi Large", "Baichuan",
+                    "Doubao", "Skylark", "Hunyuan",
+                ).map { AppSearchableOption(it, subtitle = "远程模型") }
+            }
+            // 调用方自行防抖：150ms 后产出远程结果，期间 loading=true
+            LaunchedEffect(remoteQ) {
+                if (remoteQ.isBlank()) {
+                    remoteResults = emptyList()
+                    remoteLoading = false
+                    return@LaunchedEffect
+                }
+                remoteLoading = true
+                delay(150)
+                val needle = remoteQ.trim()
+                remoteResults = remoteCatalog.filter { it.label.contains(needle, ignoreCase = true) }
+                remoteLoading = false
+            }
+            AppSearchableDropdown(
+                value = remotePick,
+                onSelect = { remotePick = it.label },
+                label = "远端模型检索",
+                placeholder = "输入 ≥1 个字触发远程…",
+                leadingIcon = Icons.Rounded.Search,
+                options = emptyList(),
+                remoteQuery = { q ->
+                    if (q.isBlank() || q == remotePick) remoteCatalog else remoteResults
+                },
+                loading = remoteLoading,
+                onQueryChange = { remoteQ = it },
             )
         }
 

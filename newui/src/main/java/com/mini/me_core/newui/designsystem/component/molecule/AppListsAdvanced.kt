@@ -165,16 +165,16 @@ fun AppContextMenu(
 }
 
 /**
- * 可搜索下拉选择框（分子组 · AppComboBox）：文本框常驻显示当前值，点击展开候选，
- * **输入即过滤**（对 [options] 做不区分大小写子串匹配），选中后回填。
+ * 可搜索下拉选择框（分子组 · AppComboBox）：[AppSearchableDropdown] 的字符串薄封装。
  *
- * 对齐 Material `ExposedDropdownMenu` + 可搜索 `Combobox` 范式：
- * 过滤时无匹配显示"无匹配项"空态；清空按钮一键还原已选值前的搜索。
+ * 保留旧签名以兼容 DesignGallery 调用；内部把 `List<String>` 映射为 [AppSearchableOption]，
+ * 选中回调仍回传 label 字符串。过滤排序 / 键盘 ↑↓·Enter·Esc / 空态 / 加载态 / 翻转等
+ * 交互全部由 [AppSearchableDropdown] 提供。
  *
  * @param value 当前选中文本；不是候选时显示自身并可继续输入。
  * @param options 候选选项。
  * @param onSelect 选中回调（同时收起下拉）。
- * @param onQueryChange 过滤输入内容变化回调（可驱动外部 state，也可忽略让内部过滤）。
+ * @param onQueryChange 过滤输入内容变化回调（透传给 [AppSearchableDropdown]）。
  */
 @Composable
 fun AppComboBox(
@@ -187,98 +187,16 @@ fun AppComboBox(
     leadingIcon: ImageVector? = null,
     onQueryChange: ((String) -> Unit)? = null,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf(value) }
-    val filtered = if (query.isBlank()) options else options.filter {
-        it.contains(query, ignoreCase = true)
-    }
-    val shape = RoundedCornerShape(AppRadius.Sm)
-
-    Box(modifier) {
-        Column {
-            if (label != null) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = AppSpacing.Xs),
-                )
-            }
-            TextField(
-                value = query,
-                onValueChange = {
-                    query = it
-                    onQueryChange?.invoke(it)
-                    if (!expanded) expanded = true
-                },
-                singleLine = true,
-                placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                leadingIcon = leadingIcon?.let {
-                    // 装饰图标：旁侧已有文字/语义，跳过无障碍
-                    { Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                },
-                trailingIcon = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (query.isNotEmpty()) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = "清空",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .size(AppSizing.IconM)
-                                    .clickable {
-                                        query = ""
-                                        onQueryChange?.invoke("")
-                                    },
-                            )
-                            Spacer(Modifier.width(AppSpacing.Sm))
-                        }
-                        // 装饰图标：旁侧已有文字/语义，跳过无障碍
-                        Icon(
-                            imageVector = Icons.Rounded.ArrowDropDown,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                shape = shape,
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        AppMenu(expanded = expanded, onDismiss = { expanded = false }) {
-            if (filtered.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Md),
-                ) {
-                    Text(
-                        text = "无匹配项",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                filtered.forEach { opt ->
-                    AppSelectMenuItem(
-                        label = opt,
-                        selected = opt == value,
-                        onClick = {
-                            query = opt
-                            expanded = false
-                            onSelect(opt)
-                        },
-                        radio = true,
-                    )
-                }
-            }
-        }
-    }
+    AppSearchableDropdown(
+        value = value.ifBlank { null },
+        onSelect = { onSelect(it.label) },
+        modifier = modifier,
+        label = label,
+        placeholder = placeholder,
+        leadingIcon = leadingIcon,
+        options = options.map { AppSearchableOption(label = it) },
+        onQueryChange = onQueryChange,
+    )
 }
 
 /**
