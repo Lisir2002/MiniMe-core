@@ -16,14 +16,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Archive
@@ -37,7 +35,6 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -207,7 +204,7 @@ import com.mini.me_core.newui.designsystem.layout.AppErrorState
 import com.mini.me_core.newui.designsystem.layout.AppLoadingState
 import com.mini.me_core.newui.designsystem.layout.pageContentPadding
 import com.mini.me_core.newui.designsystem.layout.pageMaxWidth
-import com.mini.me_core.newui.designsystem.slot.SlotSet
+import com.mini.me_core.newui.designsystem.slot.AppShell
 import com.mini.me_core.newui.designsystem.theme.AppTheme
 import com.mini.me_core.newui.designsystem.theme.AppType
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
@@ -336,17 +333,12 @@ private val initialChatItems: List<ChatItem> = listOf(
 @Composable
 fun DesignGallery(onNavigateBack: (() -> Unit)? = null) {
     AppTheme {
-        SlotSet(
-            topBar = {
-                iOSNavBar(
-                    title = "Design Gallery",
-                    onBack = onNavigateBack,
-                )
-            },
-            content = {
-                GalleryBody()
-            },
-        )
+        AppShell(
+            title = "Design Gallery",
+            onNavigateBack = onNavigateBack,
+        ) {
+            GalleryBody()
+        }
     }
 }
 
@@ -2059,43 +2051,6 @@ private fun GalleryBody() {
             cancelText = "取消",
             tone = AppDialogTone.Danger,
         )
-    }
-}
-
-/** iOS 简约导航栏：返回钮（iOS 蓝）+ 紧凑内联标题，透明融入系统底。 */
-@Composable
-private fun iOSNavBar(title: String, onBack: (() -> Unit)? = null) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
-            .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Xs),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (onBack != null) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(AppSizing.IconButton),
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = "返回",
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            } else {
-                Spacer(Modifier.width(AppSpacing.Sm))
-            }
-            Text(
-                text = title,
-                style = AppType.Title3,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 1,
-            )
-        }
     }
 }
 
