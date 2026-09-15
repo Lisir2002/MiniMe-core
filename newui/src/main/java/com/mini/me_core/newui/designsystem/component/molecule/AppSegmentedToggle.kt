@@ -42,8 +42,9 @@ fun AppSegmentedToggle(
     val safeIndex = selectedIndex.coerceIn(0, options.size - 1)
     BoxWithConstraints(modifier.fillMaxWidth().height(itemHeight)) {
         val itemWidth = maxWidth / options.size
-        // 滑块宽度 = 单项宽度 - 左右 inset 各一份；起始 x = inset + 每项宽度 * index
         val sliderWidth = itemWidth - inset * 2
+        val sliderHeight = itemHeight - inset * 2
+        // 高亮滑块：宽=itemWidth-inset*2、高=itemHeight-inset*2、起点 x=inset+itemWidth*index
         val indicatorOffset by animateDpAsState(
             targetValue = inset + itemWidth * safeIndex.toFloat(),
             animationSpec = tween(durationMillis = AppMotion.Med.toInt()),
@@ -60,7 +61,7 @@ fun AppSegmentedToggle(
                 Modifier
                     .offset(x = indicatorOffset)
                     .width(sliderWidth)
-                    .height(itemHeight - inset * 2)
+                    .height(sliderHeight)
                     .clip(RoundedCornerShape(AppRadius.Pill))
                     .background(MaterialTheme.colorScheme.surface),
             )

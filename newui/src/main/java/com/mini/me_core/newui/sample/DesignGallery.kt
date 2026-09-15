@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -71,6 +72,7 @@ import com.mini.me_core.newui.designsystem.component.molecule.AppAvatar
 import com.mini.me_core.newui.designsystem.component.molecule.AppBadge
 import com.mini.me_core.newui.designsystem.component.molecule.AppBadgeDot
 import com.mini.me_core.newui.designsystem.component.molecule.AppBreadcrumb
+import com.mini.me_core.newui.designsystem.component.molecule.AppCrumb
 import com.mini.me_core.newui.designsystem.component.molecule.AppButton
 import com.mini.me_core.newui.designsystem.component.molecule.AppButtonVariant
 import com.mini.me_core.newui.designsystem.component.molecule.AppChatBubble
@@ -1336,7 +1338,7 @@ private fun GalleryBody() {
                 )
             }
             Text(
-                text = "命令面板 = 系统快捷键命令中枢（🚀 桌面入口）",
+                text = "命令面板 = 系统快捷键命令中枢（桌面入口）",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1348,31 +1350,37 @@ private fun GalleryBody() {
                 onClick = { paletteOpen = true },
             )
             // 级联子菜单：文件 → 导出 → 格式 的多级飞墙
-            Box {
-                AppIconButton(
-                    text = "级联子菜单",
-                    variant = AppButtonVariant.FilledTonal,
-                    // 装饰图标：旁侧已有文字/语义，跳过无障碍
-                    leadingIcon = { Icon(Icons.Rounded.InsertDriveFile, contentDescription = null) },
-                    onClick = { cascadeExpanded = !cascadeExpanded },
-                )
-                AppCascadingMenu(
-                    expanded = cascadeExpanded,
-                    onDismiss = { cascadeExpanded = false },
-                    items = listOf(
-                        AppCascadeNode("文件", icon = Icons.Rounded.InsertDriveFile, children = listOf(
-                            AppCascadeNode("打开…", icon = Icons.Rounded.Search),
-                            AppCascadeNode("导出", icon = Icons.Rounded.Archive, children = listOf(
-                                AppCascadeNode("Markdown", icon = Icons.Rounded.Code),
-                                AppCascadeNode("JSON", icon = Icons.Rounded.Code),
-                                AppCascadeNode("PNG 插图", icon = Icons.Rounded.Palette),
+            // 按钮靠右放置，验证子列空间不足时自动翻左不溢出
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Box {
+                    AppIconButton(
+                        text = "级联子菜单",
+                        variant = AppButtonVariant.FilledTonal,
+                        // 装饰图标：旁侧已有文字/语义，跳过无障碍
+                        leadingIcon = { Icon(Icons.Rounded.InsertDriveFile, contentDescription = null) },
+                        onClick = { cascadeExpanded = !cascadeExpanded },
+                    )
+                    AppCascadingMenu(
+                        expanded = cascadeExpanded,
+                        onDismiss = { cascadeExpanded = false },
+                        items = listOf(
+                            AppCascadeNode("文件", icon = Icons.Rounded.InsertDriveFile, children = listOf(
+                                AppCascadeNode("打开…", icon = Icons.Rounded.Search),
+                                AppCascadeNode("导出", icon = Icons.Rounded.Archive, children = listOf(
+                                    AppCascadeNode("Markdown", icon = Icons.Rounded.Code),
+                                    AppCascadeNode("JSON", icon = Icons.Rounded.Code),
+                                    AppCascadeNode("PNG 插图", icon = Icons.Rounded.Palette),
+                                )),
                             )),
-                        )),
-                        AppCascadeNode("分享", icon = Icons.Rounded.Notifications),
-                        AppCascadeNode("删除", icon = Icons.Rounded.Delete, danger = true),
-                    ),
-                    onItemClick = { cascadeExpanded = false },
-                )
+                            AppCascadeNode("分享", icon = Icons.Rounded.Notifications),
+                            AppCascadeNode("删除", icon = Icons.Rounded.Delete, danger = true),
+                        ),
+                        onItemClick = { cascadeExpanded = false },
+                    )
+                }
             }
             // 导航/侧栏列表：带计数徽标与危险项
             AppNavigationMenu(
@@ -1523,7 +1531,13 @@ private fun GalleryBody() {
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xl)) {
                 Box {
                     AppIcon(icon = Icons.Rounded.Notifications)
-                    AppBadge(count = 12, modifier = Modifier.align(Alignment.TopEnd))
+                    // 角标锚定图标右上角并向外偏移（半压角），不压住图标中心
+                    AppBadge(
+                        count = 12,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 5.dp, y = (-5).dp),
+                    )
                 }
                 AppBadge(count = 999, maxShow = 99)
                 AppBadgeDot()
@@ -1535,7 +1549,21 @@ private fun GalleryBody() {
                 AppAvatar(text = "MiniMe-core", online = true)
                 AppAvatar(text = "AI", online = false)
             }
+            // 短路径：不触发折叠
             AppBreadcrumb(items = listOf("工作区", "remote", "agents", "prompts"))
+            // 长路径（>4 段）：首项 + … + 末 2 项折叠演示
+            AppBreadcrumb(
+                items = listOf(
+                    AppCrumb(label = "根目录"),
+                    AppCrumb(label = "projects"),
+                    AppCrumb(label = "mini-me"),
+                    AppCrumb(label = "src"),
+                    AppCrumb(label = "main"),
+                    AppCrumb(label = "kotlin"),
+                    AppCrumb(label = "designsystem"),
+                    AppCrumb(label = "BreadcrumbDemo.kt"),
+                ),
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Md)) {
                 AppStatCard(
                     label = "已执行命令",

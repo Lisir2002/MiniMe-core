@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -61,8 +62,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -116,8 +120,27 @@ fun AppContextMenu(
 ) {
     if (!visible) return
     val corner = RoundedCornerShape(AppRadius.Md)
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+    // 菜单预估宽度 ≈ 256dp 上限，高度按项数估算，边缘内收避免出屏
+    val menuWidthPx = with(density) { 256.dp.toPx() }
+    val menuHeightPx = items.size * with(density) { 48.dp.toPx() } + with(density) { AppSpacing.Xs.toPx() }
+    // 计算安全偏移：右/下边缘内收 8dp
+    val marginPx = with(density) { 8.dp.toPx() }
+    var offX = (position.x - 8).roundToInt()
+    var offY = position.y.roundToInt()
+    // 右边缘内收
+    if (offX + menuWidthPx > screenWidthPx - marginPx) {
+        offX = (screenWidthPx - marginPx - menuWidthPx).roundToInt()
+    }
+    // 下边缘内收
+    if (offY + menuHeightPx > screenHeightPx - marginPx) {
+        offY = (screenHeightPx - marginPx - menuHeightPx).roundToInt()
+    }
     Popup(
-        offset = IntOffset(position.x.roundToInt() - 8, position.y.roundToInt()),
+        offset = IntOffset(offX, offY),
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
@@ -219,7 +242,7 @@ fun AppCommandPalette(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     query: String = "",
-    hint: String = "↑↓ 选择 · Enter 执行 · Esc 关闭",
+    hint: String = "上下方向键 选择 · Enter 执行 · Esc 关闭",
     onQueryChange: ((String) -> Unit)? = null,
 ) {
     if (!visible) return
@@ -617,17 +640,16 @@ data class AppCascadeNode(
 )
 
 /**
- * 级联子菜单（分子组 · AppCascadingMenu）：点父级菜单项，**平级飞墙（flyout）**在右侧依次铺开，
+ * 级联子菜单（分子组 · AppCascadingMenu）：点父级菜单项，**平级飞墙（flyout）**依次铺开，
  * 各级之间以滑入/滑出动画衔接；父级个头带「返回」可逐级回退，叶子点击即收起并回调。
  *
  * 对齐 Cascade（Nested Popup Menu）/ Google Drive 的多级菜单：用**导航栈**维护当前级链，
  * 在同一个 Popup 内渲染多列，避免原生 DropdownMenu 不支持嵌套、切换生硬跳变的短板。
  *
  * 设计要点：
- *  - 同一玻璃浮层内多列飞墙：每点一个父项，新列从右侧滑入（≈220ms），收起时滑出；
- *  - 父项右侧缀 ChevronRight，叶子无箭头；进入子级后子列头部有「← 返回」；
- *  - 破坏性叶子红色标注；点外部 / 返回键关闭整套菜单；
- *  - 深度限 4 级（足够覆盖绝大多数多级菜单），避免过度嵌套。
+ *  - 空间感知：先测锚点右侧剩余宽度，不足一列时子列自动翻左（从展开侧滑入 220ms）；
+ *  - 父项右侧缀 ChevronRight，叶子无箭头；进入子级后子列头部有 ArrowBack「返回」；
+ *  - 破坏性叶子红色标注；点外部 / 返回键关闭整套菜单；深度不写死，按 path 动态渲染。
  *
  * @param expanded 是否展开；由调用方控制（配合触发按钮点击翻转）。
  * @param offset 相对锚点的像素偏移（常用 Popup 位），默认从左上角弹出。
@@ -647,74 +669,107 @@ fun AppCascadingMenu(
     val corner = RoundedCornerShape(AppRadius.Md)
     // 导航栈：path[0].children 渲染在第 1 列，path[1].children 渲染在第 2 列……
     var path by remember { mutableStateOf<List<AppCascadeNode>>(emptyList()) }
-    val currentPath by rememberUpdatedState(path)
     // 每次打开时重置导航栈（回到根级）。
     LaunchedEffect(expanded) { if (expanded) path = emptyList() }
+
+    // —— 空间感知：测量锚点右侧剩余宽度，决定子列向右还是向左展开 ——
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val slotDp = columnWidth + AppSpacing.Sm
+    val columnWidthPx = with(density) { columnWidth.toPx() }
+    val slotPx = with(density) { slotDp.toPx() }
+
+    // 锚点（根列左边缘）在屏幕上的 x 坐标，由 onGloballyPositioned 测量。
+    var anchorLeftPx by remember { mutableStateOf(0f) }
+    // 首次合成时 anchorLeftPx 仍为 0，此时默认向右；测量到真实位置后再决定是否翻左。
+    val flipLeft = anchorLeftPx > 0f && (screenWidthPx - anchorLeftPx - columnWidthPx) < slotPx
 
     Popup(
         offset = offset,
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
-        Box(modifier) {
-            // 根级（第 0 列）
-            CascadeLevel(
-                index = 0,
-                items = items,
-                active = true,
-                corner = corner,
-                columnWidth = columnWidth,
-                onLeafClick = { node ->
-                    onItemClick(node)
-                    onDismiss()
-                },
-                onParentClick = { path = currentPath + it },
-            )
-            // 子级列：深度 <= 3 的飞墙，按导航栈取对应父节点；无父节点则该列隐藏。
-            repeat(3) { depth ->
-                val parent = currentPath.getOrNull(depth)
+        val visibleCount = path.size + 1
+        val totalWidthDp = slotDp * visibleCount - AppSpacing.Sm
+        // 翻左时把整组列向左偏移，使根列对齐锚点（子列在根列左侧铺开）。
+        val contentShiftX = if (flipLeft) -(slotDp * (visibleCount - 1)) else 0.dp
+
+        Box(
+            modifier = modifier.onGloballyPositioned { coords ->
+                anchorLeftPx = coords.boundsInWindow().left
+            },
+        ) {
+            Box(
+                modifier = Modifier
+                    .offset(x = contentShiftX)
+                    .width(totalWidthDp),
+            ) {
+                // 根级（depth = 0）
                 CascadeLevel(
-                    index = depth + 1,
-                    items = parent?.children ?: emptyList(),
-                    active = parent != null,
+                    depth = 0,
+                    items = items,
+                    totalDepth = path.size,
+                    flipLeft = flipLeft,
                     corner = corner,
                     columnWidth = columnWidth,
                     onLeafClick = { node ->
                         onItemClick(node)
                         onDismiss()
                     },
-                    onParentClick = { path = currentPath + it },
-                    onBack = { path = currentPath.take(depth) },
+                    onParentClick = { path = path + it },
                 )
+                // 动态子列：按 path 长度渲染，不写死 repeat(N)
+                path.forEachIndexed { depth, parent ->
+                    CascadeLevel(
+                        depth = depth + 1,
+                        items = parent.children,
+                        totalDepth = path.size,
+                        flipLeft = flipLeft,
+                        corner = corner,
+                        columnWidth = columnWidth,
+                        onLeafClick = { node ->
+                            onItemClick(node)
+                            onDismiss()
+                        },
+                        onParentClick = { path = path + it },
+                        onBack = { path = path.take(depth) },
+                    )
+                }
             }
         }
     }
 }
 
-/** 级联菜单的单列飞墙（内部）：水平按 [index] 逐级右移，进出带滑入/滑出动画。 */
+/** 级联菜单的单列飞墙（内部）：水平按 [depth] 逐级展开，进出带滑入/滑出动画。 */
 @Composable
 private fun CascadeLevel(
-    index: Int,
+    depth: Int,
     items: List<AppCascadeNode>,
-    active: Boolean,
+    totalDepth: Int,
+    flipLeft: Boolean,
     onLeafClick: (AppCascadeNode) -> Unit,
     onParentClick: (AppCascadeNode) -> Unit,
     corner: RoundedCornerShape,
     columnWidth: Dp,
     onBack: (() -> Unit)? = null,
 ) {
-    val density = LocalDensity.current
-    val slotPx = with(density) { (columnWidth + AppSpacing.Sm).toPx() }.roundToInt()
+    val slotDp = columnWidth + AppSpacing.Sm
+    // 向右展开：depth=0 在最左，depth 越大越靠右；
+    // 向左展开：depth=0（根列）在最右，子列依次在其左侧。
+    val x = if (flipLeft) {
+        slotDp * (totalDepth - depth)
+    } else {
+        slotDp * depth
+    }
     AnimatedVisibility(
-        visible = active,
-        enter = slideInHorizontally(initialOffsetX = { it / 2 }, animationSpec = tween(220)) +
-            fadeIn(animationSpec = tween(180)),
-        exit = slideOutHorizontally(targetOffsetX = { -it / 4 }, animationSpec = tween(170)) +
-            fadeOut(animationSpec = tween(130)),
+        visible = true,
+        enter = fadeIn(animationSpec = tween(180)),
+        exit = fadeOut(animationSpec = tween(130)),
     ) {
         Column(
             modifier = Modifier
-                .offset { IntOffset(x = index * slotPx, y = 0) }
+                .offset(x = x)
                 .width(columnWidth)
                 .shadow(16.dp, corner, clip = true)
                 .background(MaterialTheme.colorScheme.surface)
@@ -729,10 +784,10 @@ private fun CascadeLevel(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                        imageVector = Icons.Rounded.ArrowBack,
                         contentDescription = "返回",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(AppSizing.IconS).graphicsLayer { rotationZ = 90f },
+                        modifier = Modifier.size(AppSizing.IconS),
                     )
                     Spacer(Modifier.width(AppSpacing.Sm))
                     Text(

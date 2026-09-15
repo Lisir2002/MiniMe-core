@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -663,10 +664,17 @@ fun AppLoadingOverlay(
         exit = fadeOut(animationSpec = tween(150)),
         modifier = modifier,
     ) {
+        val interactionSource = remember { MutableInteractionSource() }
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = scrimAlpha)),
+                .background(Color.Black.copy(alpha = scrimAlpha))
+                // 消费触摸：阻塞遮罩应吞掉所有点击，防止穿透到下层内容
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = {},
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Column(
