@@ -169,18 +169,30 @@ def dev_layer(commits, version, date_str, repo):
     out = _render_groups(buckets, DEV_ORDER)
     if other:
         out += "\n\n### 待归类\n\n" + "\n".join(other)
+    # 硬性要求：有提交就不许出现「无变更」；分类全落空时把所有提交列待归类
+    if not any(buckets.values()) and not other and commits:
+        out = "### 待归类\n\n" + "\n".join(format_entry(c) for c in commits)
     return out
 
 
 def user_layer(commits, version, date_str):
-    """第 1 层：用户视角，按 新增/优化/修复 状态分类，条目不带 sha、无内部术语。"""
+    """第 1 层：用户视角，按 新增/优化/修复 状态分类，条目不带 sha、无内部术语。
+    硬性要求：本区间有提交时绝不写「无用户可见变更」——分类落空时把非噪音条目原样列出。"""
     buckets = {"新增": [], "优化": [], "修复": []}
+    fallbacks = []
     for c in commits:
+        matched = False
         for type_, label in USER_GROUPS:
             if c["type"] == type_:
                 buckets[label].append(f"- {c['subject']}")
+                matched = True
                 break
-    return _render_groups(buckets, ["新增", "优化", "修复"], empty_hint="- 无用户可见变更")
+        if not matched and c["type"] not in USER_EXCLUDE:
+            fallbacks.append(f"- {c['subject']}")
+    body = _render_groups(buckets, ["新增", "优化", "修复"])
+    if fallbacks and not any(buckets.values()):
+        body += "\n\n### 其他\n\n" + "\n".join(fallbacks)
+    return body
 
 
 def _changed_paths(repo, prev, cur):
@@ -192,53 +204,81 @@ def _changed_paths(repo, prev, cur):
     return out
 
 
-def ai_layer(commits, version, date_str, changed_paths):
-    """第 3 层：给大模型看的结构化、机器可解析摘要。"""
-    relevant = [
-        c for c in commits
-        if c["type"] in AI_RELEVANT_TYPES or c["breaking"]
-    ]
-    ai_rel = [c for c in relevant if any(p in c["subject"] for p in AI_HINT_PATTERNS)]
-    schema_like = [
-        p for p in changed_paths.splitlines()
-        if any(s in p for s in
-               (".sq", "sqldelight", "datalayer", "migration", "database"))
-    ]
-    tools_like = [
-        p for p in changed_paths.splitlines()
-        if any(s in p for s in ("prompts/", "Tool", "tool/", "mcp"))
-    ]
+def _commit_files(repo, sha):
+    """单个提交改动的文件路径列表（短 sha 也可解析）。"""
+    try:
+        out = run(["git", "show", "--name-only", "--pretty=format:", sha], repo)
+    except Exception:
+        return []
+    return [p for p in out.splitlines() if p.strip()]
+
+
+# AI 层（面向 agent）按 Conventional type 归到的处置小标题
+AI_GROUPS = [
+    ("fix", "修复"),
+    ("feat", "新增"),
+    ("perf", "优化"),
+    ("refactor", "变更"),
+    ("revert", "回退"),
+    ("docs", "文档"),
+    ("build", "构建"),
+    ("ci", "CI"),
+    ("chore", "杂项"),
+]
+
+
+def ai_layer(commits, version, date_str, changed_paths, repo):
+    """第 3 层（面向 agent）：逐条列问题出处 + 文件/代码定位 + 处置方向，
+    永不写「无变更/无内容」。只要本区间有提交，就必须落到文件级。"""
+    # 按 AI_GROUPS 分桶，保持顺序
+    buckets = {label: [] for _, label in AI_GROUPS}
+    other = []
+    for c in commits:
+        files = _commit_files(repo, c["sha"])
+        # 处置方向：取 commit body 的非空要点行（commit message 里写的根因/方案）
+        notes = [ln.strip() for ln in (c.get("body") or "").splitlines() if ln.strip()]
+        entry_lines = [f"- `{c['sha']}` {c['subject']}"]
+        if c["scope"]:
+            entry_lines[-1] += f"  _(scope: {c['scope']})_"
+        if notes:
+            entry_lines.append("  - 出处 / 方案：")
+            entry_lines.extend(f"    - {n}" for n in notes)
+        if files:
+            entry_lines.append("  - 涉及文件：")
+            entry_lines.extend(f"    - `{p}`" for p in files)
+        elif not notes:
+            entry_lines.append("  - 涉及文件：见 `git show " + c["sha"] + "`")
+        block = "\n".join(entry_lines)
+
+        label = next((lb for ty, lb in AI_GROUPS if ty == c["type"]), None)
+        if label and label in buckets:
+            buckets[label].append(block)
+        else:
+            other.append(block)
 
     lines = []
-    lines.append("### TYPE")
+    for label in [lb for _, lb in AI_GROUPS]:
+        entries = buckets.get(label, [])
+        if not entries:
+            continue
+        if lines:
+            lines.append("")
+        lines.append(f"### {label}")
+        lines.append("")
+        lines.extend(entries)
+    if other:
+        lines.append("")
+        lines.append("### 待归类")
+        lines.append("")
+        lines.extend(other)
+
+    # 末尾补一行整体影响面（客观、非占位）
+    all_files = [p for p in changed_paths.splitlines() if p.strip()]
     lines.append("")
-    lines.append(f"- 发布范围: {len(commits)} 提交（含 breaking {sum(1 for c in commits if c['breaking'])}）")
+    lines.append("### 影响面")
     lines.append("")
-    lines.append("### DATA / SCHEMA")
-    lines.append("")
-    if schema_like:
-        lines.append("- ⚠️ 涉及数据/schema 变更，需检查迁移链与 `V1toV2FullMigrator`：")
-        lines.extend(f"  - `{p}`" for p in schema_like)
-    else:
-        lines.append("- 无 schema / 数据层变更（显式声明）。")
-    lines.append("")
-    lines.append("### TOOLS & PROMPTS")
-    lines.append("")
-    if tools_like:
-        lines.append("- ⚠️ 涉及工具/提示词变更，需同步 `app/src/main/assets/prompts/`：")
-        lines.extend(f"  - `{p}`" for p in tools_like)
-    elif ai_rel:
-        lines.append("- 未命中提示词/工具路径，但存在 AI 工作流相关主题提交，建议人工复核：")
-        lines.extend(f"  - {format_entry(c)}" for c in ai_rel)
-    else:
-        lines.append("- 无工具/提示词变更。")
-    lines.append("")
-    lines.append("### COMPATIBILITY")
-    lines.append("")
-    if any(c["breaking"] for c in commits):
-        lines.append("- ⚠️ 含 Breaking Change，须在开发者层标注迁移说明。")
-    else:
-        lines.append("- 无 Breaking Change。")
+    lines.append(f"- 本区间共 {len(commits)} 个提交，改动 {len(all_files)} 个文件：")
+    lines.extend(f"  - `{p}`" for p in all_files)
     return "\n".join(lines)
 
 
@@ -298,7 +338,7 @@ def main():
     elif args.layer == "dev":
         print(dev_layer(commits, version, date_str, repo))
     elif args.layer == "ai":
-        print(ai_layer(commits, version, date_str, changed_paths))
+        print(ai_layer(commits, version, date_str, changed_paths, repo))
     elif args.layer == "all":
         # 发版说明规则：GitHub Release 正文 = 三层平铺，不折叠、不加价值导向修辞。
         sections = [
@@ -312,7 +352,7 @@ def main():
             "",
             "## 大模型层",
             "",
-            ai_layer(commits, version, date_str, changed_paths),
+            ai_layer(commits, version, date_str, changed_paths, repo),
         ]
         print("\n".join(sections))
 
