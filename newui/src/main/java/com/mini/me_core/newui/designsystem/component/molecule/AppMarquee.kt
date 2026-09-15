@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -62,11 +63,16 @@ fun AppMarquee(
             .background(background),
     ) {
         Row(Modifier.graphicsLayer { translationX = -periodPx * offset }) {
+            // 跑马灯内容必须用无界宽度测量：两份内容 + gap 总宽远超容器，
+            // 若用容器 maxWidth 约束，Text 会被压到逐字符换行（竖排 bug）。
             Box(Modifier
+                .wrapContentWidth(unbounded = true)
                 .onSizeChanged { periodPx = (it.width + gapPx).toFloat() }
                 .padding(AppSpacing.Sm)) { content() }
             Spacer(Modifier.width(gap))
-            Box(Modifier.padding(AppSpacing.Sm)) { content() }
+            Box(Modifier
+                .wrapContentWidth(unbounded = true)
+                .padding(AppSpacing.Sm)) { content() }
         }
     }
 }
