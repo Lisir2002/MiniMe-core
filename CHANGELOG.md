@@ -7,6 +7,24 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc13] - 2026-09-14
+
+> 预发行（未转正）。页⾯骨架槽位收口（样板页先行）：新增统一壳 `AppShell`，把顶栏 / 顶栏 Tab / 内容区 / 底栏 / 侧栏五槽位固化为紧凑移动端壳并统一窗口 insets；顶栏规格唯一化为紧凑 `ShellTopBar`（44dp 内容行 + statusBarPadding），删除零消费的 M3 `AppTopBar`；精简剔除断点 / 停靠 / 多栏 / 装配图整套未落地理论；样板页改用 `AppShell`，同步修复顶栏与状态栏重合问题。纯 UI 设计系统（`:newui`）改动，app 模块未动，无 AI 工作流 / prompt / schema / 资产同步影响。
+
+### Added
+
+- `[ui]` 新增 `AppShell` 统一页面骨架壳：提供 `title/onNavigateBack/topBarActions/topTabs/bottomBar/sideRail/content` 五槽位具名插槽；状态栏 / 导航栏 insets 在顶栏、底栏各自处理，content 不双算；compact 单栏为默认形态。
+
+### Changed
+
+- `[ui]` 顶栏规格统一为紧凑 `ShellTopBar`（44dp 内容行 + `statusBarsPadding` + 40/20dp 图标规)，成为全局唯一事实源，替代 M3 默认 64dp 顶栏。
+- `[ui]` DesignGallery 改用 `AppShell` 承载，删除私有 `iOSNavBar`，顶栏与状态栏重合问题随之修复。
+
+### Removed
+
+- `[ui]` 删除零消费的 `AppTopBar` / `TopBarBackButton`（M3 64dp 版，与紧凑规格冲突）。
+- `[ui]` 精简 `Slot.kt`：剔除断点装配（`AppBreakpoint`/`AppAdaptiveScope`）、停靠（`DockPlacement`）、多栏（`PaneSpec`）、装配图（`SlotAssembly`）、策略（`SlotStrategy`）整套未落地理论，保留五槽位 `BlockSlotKind` + `SlotKey` + `BlockSlot` 最小契约。
+
 ## [0.0.0.2-rc12] - 2026-09-14
 
 > 预发行（未转正）。DesignGallery 样板页框架重写为紧凑简约的 iOS 风格：导航栏由超大内联标题收紧为单行紧凑标题；分区槽位卡（`Section`）内边距/行距/圆角收细；主容器分区间距压缩。视觉密度提升、布局更轻，用于校准组件在紧凑容态下的真实观感。纯 UI 设计系统（`:newui`）改动，无 AI 工作流 / prompt / schema / 资产同步影响。
