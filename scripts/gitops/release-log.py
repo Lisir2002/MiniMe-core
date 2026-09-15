@@ -316,30 +316,19 @@ def main():
     elif args.layer == "ai":
         print(ai_layer(commits, version, date_str, changed_paths))
     elif args.layer == "all":
-        # 发版说明规则：GitHub Release 正文 = 完整三层日志分节并列（用户 / 开发 / 大模型）
+        # 发版说明规则：GitHub Release 正文 = 三层平铺，不折叠、不加价值导向修辞。
         sections = [
-            "# MiniMe-core 发版说明 v%s" % version,
-            "",
-            "<details>",
-            "<summary><b>用户层 · 给用户看</b>（价值导向，无内部术语）</summary>",
+            "## 用户层",
             "",
             user_layer(commits, version, date_str),
             "",
-            "</details>",
-            "",
-            "<details>",
-            "<summary><b>开发者层 · Keep a Changelog</b>（排障定位）</summary>",
+            "## 开发者层",
             "",
             dev_layer(commits, version, date_str, repo),
             "",
-            "</details>",
-            "",
-            "<details>",
-            "<summary><b>大模型层 · AI 编排</b>（工具/prompt/schema/接口影响）</summary>",
+            "## 大模型层",
             "",
             ai_layer(commits, version, date_str, changed_paths),
-            "",
-            "</details>",
         ]
         print("\n".join(sections))
 
