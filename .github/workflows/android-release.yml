@@ -42,6 +42,12 @@ jobs:
       # app/ 下的 minime.jks 与 keystore.properties 随 checkout 自带，Gradle signingConfigs.release 直接读取，
       # 缺少即构建失败（require 强制），不存在「静默回退 debug keystore 当正式签名」。
       # debug keystore（~/.android/debug.keystore）仅由 AGP 开发期自动生成用于 debug 构建，release 与它无关。
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/android/sdk
+          key: android-sdk-36
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
