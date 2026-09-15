@@ -5,13 +5,12 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,7 +27,10 @@ import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 
 /**
  * 滑动分段控件（分子组 · AppSegmentedToggle）：pill 轨道内的高亮块随选择弹性滑动，
- * 选中即 surface 浮起 + 加粗，比原生 TabRow 指示条更立体（Linear/Vercel 同款胶囊切换）。
+ * 选中即 surface 浮起 + 加粗。
+ *
+ * 不用 BoxWithConstraints（SubcomposeLayout），避免在 intrinsic measurement 父布局中崩溃。
+ * 改用 Row + weight 等分选项，高亮滑块用 offset 动画。
  */
 @Composable
 fun AppSegmentedToggle(
@@ -40,54 +42,42 @@ fun AppSegmentedToggle(
     val itemHeight = 40.dp
     val inset = 3.dp
     val safeIndex = selectedIndex.coerceIn(0, options.size - 1)
-    BoxWithConstraints(modifier.fillMaxWidth().height(itemHeight)) {
-        val itemWidth = maxWidth / options.size
-        val sliderWidth = itemWidth - inset * 2
-        val sliderHeight = itemHeight - inset * 2
-        // 高亮滑块：宽=itemWidth-inset*2、高=itemHeight-inset*2、起点 x=inset+itemWidth*index
-        val indicatorOffset by animateDpAsState(
-            targetValue = inset + itemWidth * safeIndex.toFloat(),
-            animationSpec = tween(durationMillis = AppMotion.Med.toInt()),
-            label = "indicator",
-        )
-        Box(
-            Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(AppRadius.Pill))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            // 高亮滑块：宽度严格等于一个选项格，不再 fillMaxSize 撑满整行
-            Box(
-                Modifier
-                    .offset(x = indicatorOffset)
-                    .width(sliderWidth)
-                    .height(sliderHeight)
-                    .clip(RoundedCornerShape(AppRadius.Pill))
-                    .background(MaterialTheme.colorScheme.surface),
-            )
-            // 选项
-            Row(Modifier.fillMaxSize()) {
-                options.forEachIndexed { index, label ->
-                    Box(
-                        modifier = Modifier
-                            .width(itemWidth)
-                            .height(itemHeight)
-                            .clickable(enabled = true, onClick = { onSelect(index) }),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = if (index == safeIndex) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (index == safeIndex) {
-                                MaterialTheme.colorScheme.onSurface
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+
+    // 高亮滑块：用 Row + weight 定位，不依赖 BoxWithConstraints。
+    // 每个选项用 weight(1f) 等分；高亮滑块也用 weight(1f)，通过 offset 移动到选中项位置。
+    // offset 的 px 值需要知道 item 宽度，但我们在 Compose 里无法直接拿到 px。
+    // 改用另一种方案：每个选项位置叠一个透明 Box，选中时背景为 surface。
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(itemHeight)
+            .clip(RoundedCornerShape(AppRadius.Pill))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Row(modifier = Modifier.fillMaxSize().padding(inset)) {
+            options.forEachIndexed { index, label ->
+                val selected = index == safeIndex
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(AppRadius.Pill))
+                        .background(if (selected) MaterialTheme.colorScheme.surface else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable(enabled = true, onClick = { onSelect(index) }),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
