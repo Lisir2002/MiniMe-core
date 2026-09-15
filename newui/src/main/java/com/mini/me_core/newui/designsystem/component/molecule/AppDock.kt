@@ -66,8 +66,9 @@ fun AppDock(
     Row(
         modifier = modifier
             .shadow(elevation = AppElevation.Z2, shape = RoundedCornerShape(AppRadius.Pill), clip = false)
-            .clip(RoundedCornerShape(AppRadius.Pill))
-            .background(background)
+            // 不能在此 clip(Pill)：选中态标签气泡用 offset 画在胶囊边界外，会被整体裁掉导致永不显示。
+            // 背景直接用 shape 绘制，外观与 clip 后填色等价；按压/选中层在各自图标盒内自裁。
+            .background(color = background, shape = RoundedCornerShape(AppRadius.Pill))
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
         horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
         verticalAlignment = Alignment.Bottom,

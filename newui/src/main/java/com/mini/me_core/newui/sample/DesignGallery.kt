@@ -1015,7 +1015,7 @@ private fun GalleryBody() {
             )
         }
 
-        Section("分子组建族 · 筛选（按数据类型个性化）") {
+        Section("分子组件族 · 筛选（按数据类型个性化）") {
             // 综合筛选面板：把多种数据类型的筛选控件组合进抽屉卡片，联动「已选计数」。
             val sheetActive =
                 (if (filterText.isNotEmpty()) 1 else 0) +
@@ -1117,7 +1117,7 @@ private fun GalleryBody() {
             )
         }
 
-        Section("分子组建族 · 输入框") {
+        Section("分子组件族 · 输入框") {
             // 填充式文本输入框（带前置图标 + 一键清除）
             AppFilledTextField(
                 value = fieldText,
@@ -1221,7 +1221,7 @@ private fun GalleryBody() {
             }
         }
 
-        Section("分子组建族 · 列表菜单") {
+        Section("分子组件族 · 列表菜单") {
             // 下拉菜单：锚定到按钮的 DropdownMenu
             Box {
                 AppButton(
@@ -1402,7 +1402,7 @@ private fun GalleryBody() {
             }
         }
 
-        Section("分子组建族 · 表单 & 检索") {
+        Section("分子组件族 · 表单 & 检索") {
             AppSegmentedToggle(
                 options = listOf("全部", "进行中", "已完成"),
                 selectedIndex = segmentedIndex,
@@ -1428,7 +1428,7 @@ private fun GalleryBody() {
             )
         }
 
-        Section("分子组建族 · 反馈高动效") {
+        Section("分子组件族 · 反馈高动效") {
             AppProgressBar(progress = progressBar)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(AppSpacing.Lg),
@@ -1451,7 +1451,7 @@ private fun GalleryBody() {
             }
         }
 
-        Section("分子组建族 · 数据 / 导航 / 操作") {
+        Section("分子组件族 · 数据 / 导航 / 操作") {
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Md)) {
                 AppAvatar(text = "MiniMe-core", online = true)
                 AppAvatar(text = "AI", online = false)
@@ -1492,7 +1492,7 @@ private fun GalleryBody() {
             )
         }
 
-        Section("分子组建族 · 数据可视化") {
+        Section("分子组件族 · 数据可视化") {
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xl), verticalAlignment = Alignment.CenterVertically) {
                 AppRingProgress(progress = ringProgress)
                 AppRingProgress(progress = ringProgress, boxSize = 64.dp, strokeWidth = 6.dp)
@@ -1503,7 +1503,7 @@ private fun GalleryBody() {
             )
         }
 
-        Section("分子组建族 · 表单增强") {
+        Section("分子组件族 · 表单增强") {
             AppRatingBar(value = rating, onValueChange = { rating = it })
             AppSlider(value = sliderValue, onValueChange = { sliderValue = it }, valueRange = 0f..100f)
             AppCheckRow(
@@ -1514,7 +1514,7 @@ private fun GalleryBody() {
             )
         }
 
-        Section("分子组建族 · 分级 / 导航 / 检索") {
+        Section("分子组件族 · 分级 / 导航 / 检索") {
             AppTabs(
                 tabs = listOf("会话", "工具", "进程"),
                 selectedIndex = tabIndex,
@@ -1537,14 +1537,14 @@ private fun GalleryBody() {
             }
         }
 
-        Section("分子组建族 · 反馈层") {
+        Section("分子组件族 · 反馈层") {
             AppSkeletonList(rows = 2)
             AppInlineAlert(tone = AppAlertTone.Success, title = "配置已保存", message = "更改已同步到远端仓库。")
             AppInlineAlert(tone = AppAlertTone.Warning, message = "该命令需要容器运行时，请先启动 PRoot。")
             AppInlineAlert(tone = AppAlertTone.Danger, message = "数据目录不可写，请检查权限。", onDismiss = {})
         }
 
-        Section("分子组建族 · AI 对话流") {
+        Section("分子组件族 · AI 对话流") {
             // 控制条：触发流式回复 / 失败重试 / 工具卡 / 审批 / MCP / 技能 / 思考 / 计划 / 附件 / 链 / 摘要
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
@@ -1703,7 +1703,7 @@ private fun GalleryBody() {
             }
         }
 
-        Section("分子组建族 · 滑扫操作") {
+        Section("分子组件族 · 滑扫操作") {
             val swipeRows = listOf("会话 A · minime-agent", "会话 B · settings refactor", "会话 C · terminal local")
             swipeRows.forEachIndexed { index, title ->
                 Column {
@@ -1736,7 +1736,7 @@ private fun GalleryBody() {
             }
         }
 
-        Section("分子组建族 · 高动效展示") {
+        Section("分子组件族 · 高动效展示") {
             var progress by remember { mutableStateOf(0f) }
             var rolling by remember { mutableStateOf(0) }
             LaunchedEffect(Unit) {
@@ -1748,7 +1748,15 @@ private fun GalleryBody() {
                     delay(2400)
                 }
             }
-            AppScrollProgress(fraction = progress)
+            // 进度条补标签：满进度时单独一条全宽蓝线语义不明，标签让其成为"执行进度"控件。
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = AppSpacing.Sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("执行进度", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(AppSpacing.Sm))
+                AppScrollProgress(fraction = progress, modifier = Modifier.weight(1f))
+            }
             Spacer(Modifier.height(AppSpacing.Sm))
 
             Row(
@@ -1756,7 +1764,8 @@ private fun GalleryBody() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column {
+                // weight(1f) 占剩余空间：窄屏上压缩文本列，避免与 AppDock 互相叠压。
+                Column(Modifier.weight(1f)) {
                     Text("令牌速率", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     AppRollingNumber(value = rolling, style = MaterialTheme.typography.headlineMedium, color = AppColor.BrandPrimary)
                 }
@@ -1801,7 +1810,8 @@ private fun GalleryBody() {
             Spacer(Modifier.height(AppSpacing.Md))
 
             AppSpotlightCard(modifier = Modifier.fillMaxWidth().height(112.dp)) {
-                Column {
+                // 内容垂直居中：卡高 112dp 只有两行文案，顶对齐会留下大片空白且高光在底部孤悬。
+                Column(Modifier.align(Alignment.CenterStart).fillMaxWidth()) {
                     Text("聚光高亮卡", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(AppSpacing.Xs))
                     Text("舞台高光沿卡片缓慢游弋", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1821,7 +1831,7 @@ private fun GalleryBody() {
             }
         }
 
-        Section("分子组建族 · 时序 / 流程") {
+        Section("分子组件族 · 时序 / 流程") {
             AppTimeline(
                 items = listOf(
                     AppTimelineItem(title = "创建会话", subtitle = "初始化 AI Agent 上下文", time = "10:02", icon = Icons.Rounded.Add),
@@ -1833,7 +1843,7 @@ private fun GalleryBody() {
             AppProgressSteps(steps = listOf("解析", "授权", "执行", "完成"), currentIndex = stepIndex)
         }
 
-        Section("分子组建族 · 标签 / 分页") {
+        Section("分子组件族 · 标签 / 分页") {
             AppTagInput(
                 tags = tags,
                 onAdd = { if (it !in tags) tags = tags + it },
@@ -1847,7 +1857,7 @@ private fun GalleryBody() {
             )
         }
 
-        Section("分子组建族 · 快捷键 / 通知") {
+        Section("分子组件族 · 快捷键 / 通知") {
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Md), verticalAlignment = Alignment.CenterVertically) {
                 AppKeyCombo(keys = listOf("⌘", "K"))
                 AppKeyCombo(keys = listOf("Ctrl", "⇧", "P"))
@@ -1867,7 +1877,7 @@ private fun GalleryBody() {
             )
         }
 
-        Section("分子组建族 · 数据可视化 / 文件") {
+        Section("分子组件族 · 数据可视化 / 文件") {
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Md)) {
                 AppMiniBarChart(
                     values = barData,

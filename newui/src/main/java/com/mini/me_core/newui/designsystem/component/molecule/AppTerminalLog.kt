@@ -155,13 +155,19 @@ fun AppTerminalLog(
                 )
             }
 
-            // 正文：等宽字体日志，自动滚动
+            // 正文：等宽字体日志，自动滚动；底部预留 scrim 等高内边距，
+            // 否则滚到底时最后一行 / 光标被底部渐隐层盖住（看似被裁切）。
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(osc)
                     .animateContentSize()
-                    .padding(start = AppSpacing.Lg, end = AppSpacing.Lg, top = AppSpacing.Sm),
+                    .padding(
+                        start = AppSpacing.Lg,
+                        end = AppSpacing.Lg,
+                        top = AppSpacing.Sm,
+                        bottom = AppSpacing.Xl,
+                    ),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
             ) {
                 lines.forEach { line ->

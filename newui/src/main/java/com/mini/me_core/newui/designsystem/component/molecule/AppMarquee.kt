@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -62,17 +63,21 @@ fun AppMarquee(
             .clip(RoundedCornerShape(AppRadius.Sm))
             .background(background),
     ) {
-        Row(Modifier.graphicsLayer { translationX = -periodPx * offset }) {
-            // 跑马灯内容必须用无界宽度测量：两份内容 + gap 总宽远超容器，
-            // 若用容器 maxWidth 约束，Text 会被压到逐字符换行（竖排 bug）。
-            Box(Modifier
-                .wrapContentWidth(unbounded = true)
-                .onSizeChanged { periodPx = (it.width + gapPx).toFloat() }
-                .padding(AppSpacing.Sm)) { content() }
+        Row(
+            Modifier
+                .graphicsLayer { translationX = -periodPx * offset }
+                // 必须在 Row 层做无界测量 + Start 摆放：若只给子 Box 加 wrapContentWidth，
+                // Row 用有界宽度依次测量两份内容时，第二份剩余空间不足，其节点被压窄、
+                // 内容居中到负 x 起点，两份内容在同一区域叠印（重影 bug）。
+                .wrapContentWidth(align = Alignment.Start, unbounded = true),
+        ) {
+            Box(
+                Modifier
+                    .onSizeChanged { periodPx = (it.width + gapPx).toFloat() }
+                    .padding(AppSpacing.Sm),
+            ) { content() }
             Spacer(Modifier.width(gap))
-            Box(Modifier
-                .wrapContentWidth(unbounded = true)
-                .padding(AppSpacing.Sm)) { content() }
+            Box(Modifier.padding(AppSpacing.Sm)) { content() }
         }
     }
 }
