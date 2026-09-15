@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -44,14 +45,14 @@ fun AppFilterChip(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    selectedColor: Color = AppColor.BrandPrimary,
+    selectedColor: Color = appPalette().primary,
 ) {
     val bg by animateColorAsState(
-        targetValue = if (selected) selectedColor else AppColor.BrandSurfaceDim,
+        targetValue = if (selected) selectedColor else appPalette().surfaceDim,
         label = "chipBg",
     )
     val textColor by animateColorAsState(
-        targetValue = if (selected) Color.White else AppColor.LabelSecondary,
+        targetValue = if (selected) Color.White else appPalette().labelSecondary,
         label = "chipText",
     )
     val checkScale by animateFloatAsState(
@@ -103,7 +104,7 @@ fun AppFilterChips(
     selectedIndices: Set<Int>,
     onToggle: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    selectedColor: Color = AppColor.BrandPrimary,
+    selectedColor: Color = appPalette().primary,
 ) {
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),

@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
@@ -59,7 +60,7 @@ fun AppTagInput(
     onRemove: (String) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String = "输入后回车添加…",
-    accentColor: Color = AppColor.BrandPrimary,
+    accentColor: Color = appPalette().primary,
 ) {
     var text by remember { mutableStateOf("") }
     Column(

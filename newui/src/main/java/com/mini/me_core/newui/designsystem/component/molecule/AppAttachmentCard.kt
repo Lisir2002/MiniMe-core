@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,8 +64,8 @@ fun AppAttachmentCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(AppColor.BrandSurface)
-            .border(1.dp, AppColor.SeparatorOnLight, shape)
+            .background(appPalette().surface)
+            .border(1.dp, appPalette().separator, shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -75,14 +76,14 @@ fun AppAttachmentCard(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(AppRadius.Sm))
-                    .background(AppColor.BrandSurfaceDim),
+                    .background(appPalette().surfaceDim),
                 contentAlignment = Alignment.Center,
             ) {
                 // 占位：缩略图绘制由上层以 Image composable 注入（此组件保持纯数据层）
                 Icon(
                     imageVector = if (isImage) Icons.Rounded.Image else Icons.Rounded.Description,
                     contentDescription = null,
-                    tint = AppColor.LabelSecondary,
+                    tint = appPalette().labelSecondary,
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -91,13 +92,13 @@ fun AppAttachmentCard(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(AppRadius.Sm))
-                    .background(AppColor.BrandPrimary.copy(alpha = 0.10f)),
+                    .background(appPalette().primary.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = if (isImage) Icons.Rounded.Image else Icons.Rounded.Description,
                     contentDescription = null,
-                    tint = AppColor.BrandPrimary,
+                    tint = appPalette().primary,
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -108,7 +109,7 @@ fun AppAttachmentCard(
                 text = fileName,
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
-                color = AppColor.BrandInk,
+                color = appPalette().ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -121,7 +122,7 @@ fun AppAttachmentCard(
                 Text(
                     text = meta,
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -130,7 +131,7 @@ fun AppAttachmentCard(
                 Text(
                     text = containerPath,
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColor.LabelTertiary,
+                    color = appPalette().labelTertiary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -141,7 +142,7 @@ fun AppAttachmentCard(
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
                 contentDescription = "打开附件",
-                tint = AppColor.LabelSecondary,
+                tint = appPalette().labelSecondary,
                 modifier = Modifier.size(16.dp),
             )
         }

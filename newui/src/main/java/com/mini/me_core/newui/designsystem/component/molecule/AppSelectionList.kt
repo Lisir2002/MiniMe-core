@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -136,7 +137,7 @@ private fun AppSelectionListRow(
             IconContainer(
                 icon = item.icon,
                 tint = Color.White,
-                background = if (selected) AppColor.BrandPrimary else AppColor.BrandSurfaceDim,
+                background = if (selected) appPalette().primary else appPalette().surfaceDim,
                 modifier = Modifier.padding(end = AppSpacing.Md),
             )
         }
@@ -174,6 +175,7 @@ private fun SelectionIndicator(
     checkScale: Float,
 ) {
     val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val selectedColor = appPalette().primary
     if (mode == AppSelectionMode.Single) {
         Box(
             modifier = Modifier.size(22.dp),
@@ -186,7 +188,7 @@ private fun SelectionIndicator(
                     radius = size.minDimension * 0.42f,
                 )
                 if (selected) {
-                    drawCircle(color = AppColor.BrandPrimary, radius = size.minDimension * 0.26f)
+                    drawCircle(color = selectedColor, radius = size.minDimension * 0.26f)
                 }
             }
         }
@@ -195,7 +197,7 @@ private fun SelectionIndicator(
             modifier = Modifier
                 .size(22.dp)
                 .background(
-                    color = if (selected) AppColor.BrandPrimary else MaterialTheme.colorScheme.surfaceVariant,
+                    color = if (selected) appPalette().primary else MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(6.dp),
                 ),
             contentAlignment = Alignment.Center,

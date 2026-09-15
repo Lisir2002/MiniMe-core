@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -62,7 +63,7 @@ fun AppMessageRow(
     name: String? = null,
     timestamp: String? = null,
     grouped: Boolean = false,
-    accent: Color = AppColor.BrandPrimary,
+    accent: Color = appPalette().primary,
     onRetry: (() -> Unit)? = null,
     onCopy: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
@@ -145,7 +146,7 @@ fun AppMessageRow(
                     AppSwipeButton(
                         icon = Icons.Rounded.ContentCopy,
                         label = "复制",
-                        background = AppColor.BrandPrimary,
+                        background = appPalette().primary,
                         onClick = onCopy,
                     )
                 }
@@ -184,13 +185,13 @@ private fun HeaderRow(label: String, timestamp: String?, isUser: Boolean) {
             text = label,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
-            color = AppColor.LabelSecondary,
+            color = appPalette().labelSecondary,
         )
         if (timestamp != null) {
             Text(
                 text = timestamp,
                 style = MaterialTheme.typography.labelSmall,
-                color = AppColor.LabelTertiary,
+                color = appPalette().labelTertiary,
                 modifier = Modifier.padding(start = AppSpacing.Xs),
             )
         }

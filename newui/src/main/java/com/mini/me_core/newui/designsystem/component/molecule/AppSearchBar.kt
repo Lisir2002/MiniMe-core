@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -77,7 +78,7 @@ fun AppSearchBar(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 textStyle = TextStyle(color = textColor),
-                cursorBrush = SolidColor(AppColor.BrandPrimary),
+                cursorBrush = SolidColor(appPalette().primary),
                 keyboardOptions = keyboardOptions,
                 keyboardActions = keyboardActions,
             )

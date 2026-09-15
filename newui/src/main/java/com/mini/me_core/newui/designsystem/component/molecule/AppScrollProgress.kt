@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -29,7 +30,7 @@ fun AppScrollProgress(
     modifier: Modifier = Modifier,
     height: Dp = 3.dp,
     trackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
-    barColor: Color = AppColor.BrandPrimary,
+    barColor: Color = appPalette().primary,
 ) {
     val clamped = fraction.coerceIn(0f, 1f)
     val animated by animateFloatAsState(

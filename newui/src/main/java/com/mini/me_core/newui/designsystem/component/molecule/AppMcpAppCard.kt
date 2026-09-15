@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -75,8 +76,8 @@ fun AppMcpAppCard(
     Column(
         modifier = modifier
             .clip(cardShape)
-            .background(AppColor.BrandCard)
-            .border(1.dp, AppColor.SeparatorOnLight, cardShape),
+            .background(appPalette().card)
+            .border(1.dp, appPalette().separator, cardShape),
     ) {
         // 头部：Inspector 一行话
         Row(
@@ -89,13 +90,13 @@ fun AppMcpAppCard(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(RoundedCornerShape(AppRadius.Sm))
-                    .background(AppColor.BrandPrimary.copy(alpha = 0.12f)),
+                    .background(appPalette().primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Rounded.WebAsset,
                     contentDescription = null,
-                    tint = AppColor.BrandPrimary,
+                    tint = appPalette().primary,
                     modifier = Modifier.size(16.dp),
                 )
             }
@@ -106,22 +107,22 @@ fun AppMcpAppCard(
                         text = title,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = AppColor.BrandInk,
+                        color = appPalette().ink,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (serverPrefix != null) {
                         Spacer(Modifier.width(AppSpacing.Xs))
-                        McpChip(text = serverPrefix, tint = AppColor.BrandPrimary)
+                        McpChip(text = serverPrefix, tint = appPalette().primary)
                     }
                     Spacer(Modifier.width(AppSpacing.Xs))
-                    McpChip(text = "APP", tint = AppColor.BrandAccent)
+                    McpChip(text = "APP", tint = appPalette().accent)
                 }
                 if (resourceUri != null) {
                     Text(
                         text = resourceUri,
                         style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                        color = AppColor.LabelSecondary,
+                        color = appPalette().labelSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -140,7 +141,7 @@ fun AppMcpAppCard(
                 .height(132.dp)
                 .padding(horizontal = AppSpacing.Md)
                 .clip(RoundedCornerShape(AppRadius.Md))
-                .background(AppColor.BrandInk),
+                .background(appPalette().ink),
             contentAlignment = Alignment.Center,
         ) {
             when (state) {
@@ -150,13 +151,13 @@ fun AppMcpAppCard(
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
-                        color = AppColor.BrandPrimary,
+                        color = appPalette().primary,
                         strokeWidth = 2.dp,
                     )
                     Text(
                         text = "正在加载交互式界面…",
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppColor.LabelTertiary,
+                        color = appPalette().labelTertiary,
                     )
                 }
 
@@ -175,7 +176,7 @@ fun AppMcpAppCard(
                     Text(
                         text = "界面加载失败",
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppColor.LabelTertiary,
+                        color = appPalette().labelTertiary,
                     )
                 }
             }
@@ -191,11 +192,11 @@ fun AppMcpAppCard(
             Text(
                 text = "sandbox · iframe",
                 style = MaterialTheme.typography.labelSmall,
-                color = AppColor.LabelSecondary,
+                color = appPalette().labelSecondary,
                 maxLines = 1,
                 modifier = Modifier
                     .clip(RoundedCornerShape(AppRadius.Sm))
-                    .background(AppColor.BrandSurfaceDim)
+                    .background(appPalette().surfaceDim)
                     .padding(horizontal = AppSpacing.Xs, vertical = 1.dp),
             )
             Spacer(Modifier.weight(1f))
@@ -204,7 +205,7 @@ fun AppMcpAppCard(
                     Icon(
                         imageVector = Icons.Rounded.Refresh,
                         contentDescription = "刷新界面",
-                        tint = AppColor.LabelSecondary,
+                        tint = appPalette().labelSecondary,
                         modifier = Modifier.size(16.dp),
                     )
                 }
@@ -214,7 +215,7 @@ fun AppMcpAppCard(
                     Icon(
                         imageVector = Icons.Rounded.OpenInFull,
                         contentDescription = "全屏查看",
-                        tint = AppColor.LabelSecondary,
+                        tint = appPalette().labelSecondary,
                         modifier = Modifier.size(16.dp),
                     )
                 }
@@ -229,7 +230,7 @@ private fun McpAppStatusBadge(state: AppMcpAppState) {
     when (state) {
         AppMcpAppState.Loading -> CircularProgressIndicator(
             modifier = Modifier.size(14.dp),
-            color = AppColor.BrandPrimary,
+            color = appPalette().primary,
             strokeWidth = 2.dp,
         )
         AppMcpAppState.Ready -> Icon(
@@ -357,7 +358,7 @@ private fun MockDashboard() {
                             .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
                             .background(
                                 if (index % 3 == 0) AppColor.OnDarkPrimary.copy(alpha = 0.85f)
-                                else AppColor.BrandAccent.copy(alpha = 0.55f),
+                                else appPalette().accent.copy(alpha = 0.55f),
                             ),
                     )
                 }
@@ -379,6 +380,6 @@ private fun McpDivider() {
         Modifier
             .fillMaxWidth()
             .height(1.dp)
-            .background(AppColor.SeparatorOnLight),
+            .background(appPalette().separator),
     )
 }

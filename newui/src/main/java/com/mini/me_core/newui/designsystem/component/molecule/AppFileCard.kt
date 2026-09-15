@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,7 +49,7 @@ fun AppFileCard(
     state: AppFileState = AppFileState.Ready,
     icon: ImageVector = Icons.Rounded.InsertDriveFile,
     progress: Float? = null,
-    accentColor: Color = AppColor.BrandPrimary,
+    accentColor: Color = appPalette().primary,
     onClick: (() -> Unit)? = null,
 ) {
     val stateColor: Color = when (state) {

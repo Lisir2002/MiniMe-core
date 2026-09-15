@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -69,7 +70,7 @@ fun AppSkillCallCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val statusColor = when (state) {
-        AppSkillCallState.Running -> AppColor.BrandPrimary
+        AppSkillCallState.Running -> appPalette().primary
         AppSkillCallState.Success -> AppColor.StatusSuccess
         AppSkillCallState.Error -> AppColor.StatusDanger
     }
@@ -79,13 +80,13 @@ fun AppSkillCallCard(
     Column(
         modifier = modifier
             .clip(cardShape)
-            .background(AppColor.BrandSurface)
+            .background(appPalette().surface)
             .border(
                 width = 1.dp,
                 color = if (state == AppSkillCallState.Error) {
                     AppColor.StatusDanger.copy(alpha = 0.45f)
                 } else {
-                    AppColor.SeparatorOnLight
+                    appPalette().separator
                 },
                 shape = cardShape,
             ),
@@ -102,14 +103,14 @@ fun AppSkillCallCard(
                 text = "▸",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
-                color = AppColor.BrandAccent,
+                color = appPalette().accent,
             )
             Spacer(Modifier.width(AppSpacing.Xs))
             Text(
                 text = name,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
-                color = AppColor.BrandInk,
+                color = appPalette().ink,
                 fontFamily = FontFamily.Monospace,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -119,7 +120,7 @@ fun AppSkillCallCard(
                 Text(
                     text = args,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                     fontFamily = FontFamily.Monospace,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -130,7 +131,7 @@ fun AppSkillCallCard(
                 Text(
                     text = meta,
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                     maxLines = 1,
                 )
             }
@@ -159,7 +160,7 @@ fun AppSkillCallCard(
                 Icon(
                     imageVector = Icons.Rounded.KeyboardArrowDown,
                     contentDescription = if (expanded) "收起技能说明" else "展开技能说明",
-                    tint = AppColor.LabelTertiary,
+                    tint = appPalette().labelTertiary,
                     modifier = Modifier
                         .size(16.dp)
                         .rotate(rotation),
@@ -174,7 +175,7 @@ fun AppSkillCallCard(
             Text(
                 text = description.orEmpty(),
                 style = MaterialTheme.typography.bodySmall,
-                color = AppColor.LabelSecondary,
+                color = appPalette().labelSecondary,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = AppSpacing.Md, end = AppSpacing.Md, bottom = AppSpacing.Md),

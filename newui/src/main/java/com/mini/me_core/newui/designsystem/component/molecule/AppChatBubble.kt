@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -60,7 +61,7 @@ fun AppChatBubble(
     modifier: Modifier = Modifier,
     state: AppChatMessageState = AppChatMessageState.Complete,
     isUser: Boolean = false,
-    accent: Color = AppColor.BrandPrimary,
+    accent: Color = appPalette().primary,
     onRetry: (() -> Unit)? = null,
 ) {
     var entered by remember { mutableStateOf(false) }
@@ -77,13 +78,13 @@ fun AppChatBubble(
         bottomStart = AppRadius.Lg,
         bottomEnd = AppRadius.Lg,
     )
-    val bg = if (isUser) accent else AppColor.BrandCard
+    val bg = if (isUser) accent else appPalette().card
     val borderColor = when {
         state == AppChatMessageState.Error -> AppColor.StatusDanger
-        !isUser -> AppColor.SeparatorOnLight
+        !isUser -> appPalette().separator
         else -> Color.Transparent
     }
-    val contentColor = if (isUser) Color.White else AppColor.BrandInk
+    val contentColor = if (isUser) Color.White else appPalette().ink
 
     Box(
         modifier = modifier
@@ -101,7 +102,7 @@ fun AppChatBubble(
         when (state) {
             AppChatMessageState.Pending -> Row(verticalAlignment = Alignment.CenterVertically) {
                 AppTypingIndicator(
-                    dotColor = if (isUser) Color.White.copy(alpha = 0.85f) else AppColor.BrandPrimary,
+                    dotColor = if (isUser) Color.White.copy(alpha = 0.85f) else appPalette().primary,
                     dotSize = 6.dp,
                 )
             }
@@ -110,20 +111,20 @@ fun AppChatBubble(
                     text = text,
                     style = MaterialTheme.typography.bodyMedium,
                     color = contentColor,
-                    codeBlockBackground = if (isUser) Color.White.copy(alpha = 0.14f) else AppColor.BrandSurfaceDim,
-                    inlineCodeColor = if (isUser) Color.White else AppColor.BrandPrimary,
-                    inlineCodeBackground = if (isUser) Color.White.copy(alpha = 0.14f) else AppColor.BrandSurfaceDim,
+                    codeBlockBackground = if (isUser) Color.White.copy(alpha = 0.14f) else appPalette().surfaceDim,
+                    inlineCodeColor = if (isUser) Color.White else appPalette().primary,
+                    inlineCodeBackground = if (isUser) Color.White.copy(alpha = 0.14f) else appPalette().surfaceDim,
                 )
-                StreamingCaret(color = if (isUser) Color.White else AppColor.BrandPrimary)
+                StreamingCaret(color = if (isUser) Color.White else appPalette().primary)
             }
             AppChatMessageState.Error -> Column {
                 AppMarkdownText(
                     text = text,
                     style = MaterialTheme.typography.bodyMedium,
                     color = contentColor,
-                    codeBlockBackground = if (isUser) Color.White.copy(alpha = 0.14f) else AppColor.BrandSurfaceDim,
-                    inlineCodeColor = if (isUser) Color.White else AppColor.BrandPrimary,
-                    inlineCodeBackground = if (isUser) Color.White.copy(alpha = 0.14f) else AppColor.BrandSurfaceDim,
+                    codeBlockBackground = if (isUser) Color.White.copy(alpha = 0.14f) else appPalette().surfaceDim,
+                    inlineCodeColor = if (isUser) Color.White else appPalette().primary,
+                    inlineCodeBackground = if (isUser) Color.White.copy(alpha = 0.14f) else appPalette().surfaceDim,
                 )
                 if (onRetry != null) {
                     Row(
@@ -142,9 +143,9 @@ fun AppChatBubble(
                 style = MaterialTheme.typography.bodyMedium,
                 color = contentColor,
                 fontWeight = if (isUser) FontWeight.Medium else FontWeight.Normal,
-                codeBlockBackground = if (isUser) Color.White.copy(alpha = 0.14f) else AppColor.BrandSurfaceDim,
-                inlineCodeColor = if (isUser) Color.White else AppColor.BrandPrimary,
-                inlineCodeBackground = if (isUser) Color.White.copy(alpha = 0.14f) else AppColor.BrandSurfaceDim,
+                codeBlockBackground = if (isUser) Color.White.copy(alpha = 0.14f) else appPalette().surfaceDim,
+                inlineCodeColor = if (isUser) Color.White else appPalette().primary,
+                inlineCodeBackground = if (isUser) Color.White.copy(alpha = 0.14f) else appPalette().surfaceDim,
             )
         }
     }

@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -100,7 +101,7 @@ private fun StepButton(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (enabled) AppColor.BrandPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+            tint = if (enabled) appPalette().primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
             modifier = Modifier.size(AppSizing.IconM),
         )
     }

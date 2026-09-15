@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,7 +33,7 @@ fun AppMenuRow(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     iconContainer: Boolean = false,
-    iconColor: Color = AppColor.BrandPrimary,
+    iconColor: Color = appPalette().primary,
     subtitle: String? = null,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,

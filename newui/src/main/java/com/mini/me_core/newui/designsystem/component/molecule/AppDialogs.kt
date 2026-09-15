@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -130,8 +131,8 @@ internal fun AppDialogSurface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .shadow(AppElevation.Z4, shape, clip = true)
-                    .background(AppColor.BrandCard)
-                    .border(1.dp, AppColor.SeparatorOnLight, shape)
+                    .background(appPalette().card)
+                    .border(1.dp, appPalette().separator, shape)
                     .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Xl),
             ) {
                 if (icon != null || title.isNotEmpty()) {
@@ -153,7 +154,7 @@ internal fun AppDialogSurface(
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleLarge,
-                            color = AppColor.BrandInk,
+                            color = appPalette().ink,
                             modifier = Modifier.padding(start = if (icon != null) AppSpacing.Md else 0.dp),
                         )
                     }
@@ -210,7 +211,7 @@ fun AppConfirmDialog(
         modifier = modifier,
         actions = {
             TextButton(onClick = onDismiss) {
-                Text(cancelText, color = AppColor.LabelSecondary)
+                Text(cancelText, color = appPalette().labelSecondary)
             }
             Spacer(Modifier.width(AppSpacing.Sm))
             Button(
@@ -218,7 +219,7 @@ fun AppConfirmDialog(
                 colors = if (tone == AppDialogTone.Danger) {
                     ButtonDefaults.buttonColors(containerColor = tone.color())
                 } else {
-                    ButtonDefaults.buttonColors(containerColor = AppColor.BrandPrimary)
+                    ButtonDefaults.buttonColors(containerColor = appPalette().primary)
                 },
             ) {
                 Text(confirmText)
@@ -229,7 +230,7 @@ fun AppConfirmDialog(
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                 )
             }
         } else null,
@@ -263,7 +264,7 @@ fun AppPromptDialog(
         modifier = modifier,
         actions = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = AppColor.LabelSecondary)
+                Text("取消", color = appPalette().labelSecondary)
             }
             Spacer(Modifier.width(AppSpacing.Sm))
             Button(
@@ -271,7 +272,7 @@ fun AppPromptDialog(
                 colors = if (tone == AppDialogTone.Danger) {
                     ButtonDefaults.buttonColors(containerColor = tone.color())
                 } else {
-                    ButtonDefaults.buttonColors(containerColor = AppColor.BrandPrimary)
+                    ButtonDefaults.buttonColors(containerColor = appPalette().primary)
                 },
             ) {
                 Text(confirmText)
@@ -314,7 +315,7 @@ fun AppUpdateDialog(
         modifier = modifier,
         actions = {
             TextButton(onClick = onDismiss) {
-                Text("稍后", color = AppColor.LabelSecondary)
+                Text("稍后", color = appPalette().labelSecondary)
             }
             Spacer(Modifier.width(AppSpacing.Sm))
             Button(
@@ -322,7 +323,7 @@ fun AppUpdateDialog(
                 colors = if (tone == AppDialogTone.Danger) {
                     ButtonDefaults.buttonColors(containerColor = tone.color())
                 } else {
-                    ButtonDefaults.buttonColors(containerColor = AppColor.BrandPrimary)
+                    ButtonDefaults.buttonColors(containerColor = appPalette().primary)
                 },
             ) {
                 Text(if (progress == null) confirmText else if (progress > 0f && progress < 1f) "${(progress * 100).toInt()}%" else confirmText)
@@ -332,7 +333,7 @@ fun AppUpdateDialog(
             Text(
                 text = "版本 $version",
                 style = MaterialTheme.typography.bodyMedium,
-                color = AppColor.LabelSecondary,
+                color = appPalette().labelSecondary,
             )
             if (notes.isNotEmpty()) {
                 SpacerV(AppSpacing.Sm)
@@ -340,7 +341,7 @@ fun AppUpdateDialog(
                     notes.forEach { note ->
                         Row {
                             Text("• ", color = tone.color(), style = MaterialTheme.typography.bodySmall)
-                            Text(note, style = MaterialTheme.typography.bodySmall, color = AppColor.BrandInk)
+                            Text(note, style = MaterialTheme.typography.bodySmall, color = appPalette().ink)
                         }
                     }
                 }
@@ -383,7 +384,7 @@ fun AppAlertDialog(
                 colors = if (tone == AppDialogTone.Danger) {
                     ButtonDefaults.buttonColors(containerColor = tone.color())
                 } else {
-                    ButtonDefaults.buttonColors(containerColor = AppColor.BrandPrimary)
+                    ButtonDefaults.buttonColors(containerColor = appPalette().primary)
                 },
             ) {
                 Text(confirmText)
@@ -394,7 +395,7 @@ fun AppAlertDialog(
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                 )
             }
         } else null,
@@ -428,7 +429,7 @@ fun AppSelectionDialog(
         modifier = modifier,
         actions = {
             TextButton(onClick = onDismiss) {
-                Text(cancelText, color = AppColor.LabelSecondary)
+                Text(cancelText, color = appPalette().labelSecondary)
             }
         },
         text = {
@@ -453,9 +454,9 @@ fun AppSelectionDialog(
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                             color = if (isSelected) {
-                                AppColor.BrandPrimary
+                                appPalette().primary
                             } else {
-                                AppColor.BrandInk
+                                appPalette().ink
                             },
                             modifier = Modifier.weight(1f),
                         )
@@ -467,9 +468,9 @@ fun AppSelectionDialog(
                             },
                             contentDescription = null,
                             tint = if (isSelected) {
-                                AppColor.BrandPrimary
+                                appPalette().primary
                             } else {
-                                AppColor.LabelTertiary
+                                appPalette().labelTertiary
                             },
                             modifier = Modifier.size(20.dp),
                         )
@@ -509,7 +510,7 @@ fun AppProgressDialog(
         Column(
             modifier = modifier
                 .shadow(AppElevation.Z4, shape, clip = true)
-                .background(AppColor.BrandCard)
+                .background(appPalette().card)
                 .padding(horizontal = AppSpacing.Xl, vertical = AppSpacing.Xl),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -531,20 +532,20 @@ fun AppProgressDialog(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                color = AppColor.BrandInk,
+                color = appPalette().ink,
             )
             if (subtitle != null) {
                 SpacerV(AppSpacing.Xs)
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                 )
             }
             if (onCancel != null) {
                 SpacerV(AppSpacing.Lg)
                 TextButton(onClick = AppHaptics.click(onCancel)) {
-                    Text(cancelText, color = AppColor.LabelSecondary)
+                    Text(cancelText, color = appPalette().labelSecondary)
                 }
             }
         }
@@ -580,7 +581,7 @@ fun AppFullScreenDialog(
             modifier = modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .background(AppColor.BrandSurface),
+                .background(appPalette().surface),
         ) {
             Row(
                 modifier = Modifier
@@ -592,13 +593,13 @@ fun AppFullScreenDialog(
                     Icon(
                         imageVector = Icons.Rounded.Close,
                         contentDescription = "关闭",
-                        tint = AppColor.BrandInk,
+                        tint = appPalette().ink,
                     )
                 }
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,
-                    color = AppColor.BrandInk,
+                    color = appPalette().ink,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
@@ -607,11 +608,11 @@ fun AppFullScreenDialog(
                 )
                 if (confirmText != null && onConfirm != null) {
                     TextButton(onClick = AppHaptics.click(onConfirm)) {
-                        Text(confirmText, color = AppColor.BrandPrimary)
+                        Text(confirmText, color = appPalette().primary)
                     }
                 }
             }
-            HorizontalDivider(color = AppColor.SeparatorOnLight)
+            HorizontalDivider(color = appPalette().separator)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -662,12 +663,12 @@ fun AppRatingDialog(
         modifier = modifier,
         actions = {
             TextButton(onClick = onDismiss) {
-                Text(cancelText, color = AppColor.LabelSecondary)
+                Text(cancelText, color = appPalette().labelSecondary)
             }
             Spacer(Modifier.width(AppSpacing.Sm))
             Button(
                 enabled = onConfirm != null && rating > 0,
-                colors = ButtonDefaults.buttonColors(containerColor = AppColor.BrandPrimary),
+                colors = ButtonDefaults.buttonColors(containerColor = appPalette().primary),
                 onClick = AppHaptics.click { onConfirm?.invoke(rating, feedback) },
             ) {
                 Text(confirmText)
@@ -754,7 +755,7 @@ fun AppDestructiveConfirmDialog(
         modifier = modifier,
         actions = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = AppColor.LabelSecondary)
+                Text("取消", color = appPalette().labelSecondary)
             }
             Spacer(Modifier.width(AppSpacing.Sm))
             Button(
@@ -769,7 +770,7 @@ fun AppDestructiveConfirmDialog(
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
-                color = AppColor.LabelSecondary,
+                color = appPalette().labelSecondary,
             )
             SpacerV(AppSpacing.Md)
             AppTextField(

@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -49,7 +50,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
  *   一律默认折叠（对齐 app 侧 `ReasoningBubble` 的 `REASONING_COLLAPSE_LINE_LIMIT` 语义）。
  * - 流式实时追加：[isStreaming] 时标题栏头部展示三点脉动（对应 `AgentEvent.ReasoningDelta`），
  *   折叠态下新内容持续累积、不刷屏，用户可随时点开看最新。
- * - 弱化呈现：正文用 [AppColor.LabelSecondary] + 浅灰底，与主回复（白底墨色）形成层级差。
+ * - 弱化呈现：正文用 [appPalette().labelSecondary] + 浅灰底，与主回复（白底墨色）形成层级差。
  *
  * 建议用法：作为消息行正文之前的一个独立块（user 气泡对齐 Start），
  * 同一助手消息若有思考 + 正文，两者并列渲染而非嵌套。
@@ -75,8 +76,8 @@ fun AppThinkingBlock(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(AppColor.BrandSurface)
-            .border(1.dp, AppColor.SeparatorOnLight, shape),
+            .background(appPalette().surface)
+            .border(1.dp, appPalette().separator, shape),
     ) {
         Row(
             modifier = Modifier
@@ -91,14 +92,14 @@ fun AppThinkingBlock(
             Icon(
                 imageVector = Icons.Rounded.Lightbulb,
                 contentDescription = null,
-                tint = AppColor.BrandAccent,
+                tint = appPalette().accent,
                 modifier = Modifier.size(16.dp),
             )
             Spacer(Modifier.width(AppSpacing.Sm))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = AppColor.LabelSecondary,
+                color = appPalette().labelSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
@@ -106,14 +107,14 @@ fun AppThinkingBlock(
             // 元信息：流式脉动 + 行数
             if (isStreaming) {
                 Spacer(Modifier.width(AppSpacing.Sm))
-                AppTypingIndicator(dotColor = AppColor.BrandAccent, dotSize = 3.dp)
+                AppTypingIndicator(dotColor = appPalette().accent, dotSize = 3.dp)
             }
             if (overThreshold) {
                 Spacer(Modifier.width(AppSpacing.Sm))
                 Text(
                     text = "$lineCount 行",
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColor.LabelTertiary,
+                    color = appPalette().labelTertiary,
                     maxLines = 1,
                 )
             }
@@ -125,7 +126,7 @@ fun AppThinkingBlock(
             Icon(
                 imageVector = Icons.Rounded.KeyboardArrowDown,
                 contentDescription = if (effectiveExpanded) "收起$label" else "展开$label",
-                tint = AppColor.LabelTertiary,
+                tint = appPalette().labelTertiary,
                 modifier = Modifier
                     .size(16.dp)
                     .rotate(rotation),
@@ -139,7 +140,7 @@ fun AppThinkingBlock(
             AppMarkdownText(
                 text = text,
                 style = MaterialTheme.typography.bodySmall,
-                color = AppColor.LabelSecondary,
+                color = appPalette().labelSecondary,
                 modifier = Modifier.padding(
                     start = AppSpacing.Md,
                     end = AppSpacing.Md,

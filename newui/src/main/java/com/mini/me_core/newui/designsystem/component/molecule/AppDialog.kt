@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -15,8 +16,8 @@ import com.mini.me_core.newui.designsystem.token.generated.AppRadius
  * 弹窗统一封装（§3.12 AppDialog / AppTokens 圆角边距）。
  * 破坏性确认：confirmText 用 StatusDanger，调用方在 onClick 外套 [AppHaptics.click]。
  *
- * 归一化：卡片底 [AppColor.BrandCard]、标题 [AppColor.BrandInk]、正文 [AppColor.LabelSecondary]、
- * 确认键缺省 iOS 蓝 [AppColor.BrandPrimary]，与其余弹窗分子保持同一主风格色阶。
+ * 归一化：卡片底 [appPalette().card]、标题 [appPalette().ink]、正文 [appPalette().labelSecondary]、
+ * 确认键缺省 iOS 蓝 [appPalette().primary]，与其余弹窗分子保持同一主风格色阶。
  */
 @Composable
 fun AppDialog(
@@ -37,7 +38,7 @@ fun AppDialog(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                color = AppColor.BrandInk,
+                color = appPalette().ink,
             )
         },
         text = if (text != null) {
@@ -45,22 +46,22 @@ fun AppDialog(
                 Text(
                     text = text,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                 )
             }
         } else null,
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(text = confirmText, color = if (confirmButtonColor != Color.Unspecified) confirmButtonColor else AppColor.BrandPrimary)
+                Text(text = confirmText, color = if (confirmButtonColor != Color.Unspecified) confirmButtonColor else appPalette().primary)
             }
         },
         dismissButton = if (dismissText != null) {
             {
                 TextButton(onClick = onDismiss) {
-                    Text(text = dismissText, color = AppColor.LabelSecondary)
+                    Text(text = dismissText, color = appPalette().labelSecondary)
                 }
             }
         } else null,
-        containerColor = AppColor.BrandCard,
+        containerColor = appPalette().card,
     )
 }

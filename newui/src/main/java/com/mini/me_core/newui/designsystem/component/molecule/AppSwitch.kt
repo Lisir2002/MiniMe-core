@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -52,7 +53,7 @@ fun AppSwitch(
         label = "knob",
     )
     val trackColor by animateColorAsState(
-        targetValue = if (checked) AppColor.BrandPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f),
+        targetValue = if (checked) appPalette().primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f),
         label = "track",
     )
     Box(

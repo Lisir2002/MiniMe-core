@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -45,7 +46,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
  * 通知项（分子组 · AppNotificationItem）：iOS 简约风格的通知行。
  *
  * 归一化要点（对齐 iOS 简约规范）：
- *  - **文字令牌**：标题用 [AppColor.BrandInk]、时间/正文用 [AppColor.LabelSecondary]，
+ *  - **文字令牌**：标题用 [appPalette().ink]、时间/正文用 [appPalette().labelSecondary]，
  *    替换原 `colorScheme.onSurface/onSurfaceVariant` 混用，色阶严格走 label 分级。
  *  - **图标**：浅色强调底色（`accentColor @12%`）+ 纯强调色图标，修复"白字 on 0.12f 浅底"不可见缺陷
  *    （iOS 通知图标即「彩色 glyph + 浅色色块」形态）。
@@ -62,7 +63,7 @@ fun AppNotificationItem(
     modifier: Modifier = Modifier,
     body: String? = null,
     unread: Boolean = false,
-    accentColor: Color = AppColor.BrandPrimary,
+    accentColor: Color = appPalette().primary,
     onClick: (() -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -120,14 +121,14 @@ fun AppNotificationItem(
                         text = title,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Normal,
-                        color = AppColor.BrandInk,
+                        color = appPalette().ink,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                     )
                     Text(
                         text = time,
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppColor.LabelSecondary,
+                        color = appPalette().labelSecondary,
                         modifier = Modifier.padding(start = AppSpacing.Sm),
                         maxLines = 1,
                     )
@@ -136,7 +137,7 @@ fun AppNotificationItem(
                     Text(
                         text = body,
                         style = MaterialTheme.typography.bodySmall,
-                        color = AppColor.LabelSecondary,
+                        color = appPalette().labelSecondary,
                         modifier = Modifier.padding(top = AppSpacing.Xs),
                         maxLines = 2,
                     )

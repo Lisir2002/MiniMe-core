@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -101,7 +102,7 @@ fun AppMessageScroller(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(AppColor.BrandPrimary)
+                        .background(appPalette().primary)
                         .clickable {
                             coroutineScope.launch { listState.animateScrollToItem(0) }
                         },
@@ -131,7 +132,7 @@ private fun LoadHistoryRow(loading: Boolean, onLoad: () -> Unit) {
         Text(
             text = if (loading) "正在加载更早消息…" else "加载更早消息",
             style = MaterialTheme.typography.labelMedium,
-            color = AppColor.BrandPrimary,
+            color = appPalette().primary,
             modifier = Modifier
                 .clip(RoundedCornerShape(AppRadius.Pill))
                 .clickable(enabled = !loading, onClick = onLoad)

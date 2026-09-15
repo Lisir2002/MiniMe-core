@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -37,7 +38,7 @@ fun AppSpotlightCard(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(AppRadius.Lg),
     durationMillis: Int = 7000,
-    highlight: Color = AppColor.BrandPrimary,
+    highlight: Color = appPalette().primary,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val transition = rememberInfiniteTransition(label = "spotlight")

@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -45,7 +46,7 @@ fun AppPagination(
     pageCount: Int,
     onPageChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    accentColor: Color = AppColor.BrandPrimary,
+    accentColor: Color = appPalette().primary,
     showPrevNext: Boolean = true,
 ) {
     if (pageCount <= 1) return

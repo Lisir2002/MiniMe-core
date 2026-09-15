@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -22,7 +23,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppMotion
 fun AppProgressBar(
     progress: Float,
     modifier: Modifier = Modifier,
-    color: Color = AppColor.BrandPrimary,
+    color: Color = appPalette().primary,
     trackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
 ) {
     val animated by animateFloatAsState(

@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -28,7 +29,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 fun AppSectionHeader(
     title: String,
     modifier: Modifier = Modifier,
-    iconBarColor: androidx.compose.ui.graphics.Color = AppColor.BrandPrimary,
+    iconBarColor: androidx.compose.ui.graphics.Color = appPalette().primary,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(

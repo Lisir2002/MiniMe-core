@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -97,7 +98,7 @@ fun AppDropdownFilter(
     val hasSelection = selected.isNotEmpty()
 
     val triggerBorder by animateColorAsState(
-        targetValue = if (expanded || hasSelection) AppColor.BrandPrimary else AppColor.SeparatorOnLight,
+        targetValue = if (expanded || hasSelection) appPalette().primary else appPalette().separator,
         label = "triggerBorder",
     )
     val rotation by animateFloatAsState(
@@ -114,7 +115,7 @@ fun AppDropdownFilter(
         Row(
             modifier = Modifier
                 .clip(triggerShape)
-                .background(AppColor.BrandCard)
+                .background(appPalette().card)
                 .border(1.dp, triggerBorder, triggerShape)
                 .clickable {
                     expanded = !expanded
@@ -128,21 +129,21 @@ fun AppDropdownFilter(
                     Modifier
                         .size(AppSizing.IconXs)
                         .clip(RoundedCornerShape(AppRadius.Pill))
-                        .background(AppColor.BrandPrimary.copy(alpha = 0.15f)),
+                        .background(appPalette().primary.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = selected.size.toString(),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = AppColor.BrandPrimary,
+                        color = appPalette().primary,
                     )
                 }
             } else {
                 Icon(
                     imageVector = Icons.Rounded.Search,
                     contentDescription = null,
-                    tint = if (expanded) AppColor.BrandPrimary else AppColor.LabelSecondary,
+                    tint = if (expanded) appPalette().primary else appPalette().labelSecondary,
                     modifier = Modifier.size(AppSizing.IconS),
                 )
             }
@@ -151,7 +152,7 @@ fun AppDropdownFilter(
                 text = displayText,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (hasSelection) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (expanded || hasSelection) AppColor.BrandInk else AppColor.LabelSecondary,
+                color = if (expanded || hasSelection) appPalette().ink else appPalette().labelSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -159,7 +160,7 @@ fun AppDropdownFilter(
             Icon(
                 imageVector = Icons.Rounded.ArrowDropDown,
                 contentDescription = null,
-                tint = AppColor.LabelSecondary,
+                tint = appPalette().labelSecondary,
                 modifier = Modifier
                     .size(AppSizing.IconM)
                     .rotate(rotation),
@@ -197,8 +198,8 @@ fun AppDropdownFilter(
                         Modifier
                             .fillMaxWidth()
                             .shadow(AppElevation.Z3, shape, clip = true)
-                            .background(AppColor.BrandCard)
-                            .border(1.dp, AppColor.SeparatorOnLight, shape)
+                            .background(appPalette().card)
+                            .border(1.dp, appPalette().separator, shape)
                             .clip(shape)
                             .padding(AppSpacing.Sm),
                     ) {
@@ -216,7 +217,7 @@ fun AppDropdownFilter(
                                     Text(
                                         text = "无匹配项",
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = AppColor.LabelSecondary,
+                                        color = appPalette().labelSecondary,
                                     )
                                 }
                             }
@@ -270,7 +271,7 @@ private fun AppDropdownRow(
 ) {
     val shape = RoundedCornerShape(AppRadius.Md)
     val bg by animateColorAsState(
-        targetValue = if (checked) AppColor.BrandPrimary.copy(alpha = 0.1f) else Color.Transparent,
+        targetValue = if (checked) appPalette().primary.copy(alpha = 0.1f) else Color.Transparent,
         label = "rowBg",
     )
     Row(
@@ -286,7 +287,7 @@ private fun AppDropdownRow(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (checked) AppColor.BrandInk else AppColor.LabelSecondary,
+            color = if (checked) appPalette().ink else appPalette().labelSecondary,
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -304,7 +305,7 @@ private fun AppDropdownRow(
             Icon(
                 imageVector = Icons.Rounded.Check,
                 contentDescription = null,
-                tint = AppColor.BrandPrimary,
+                tint = appPalette().primary,
                 modifier = Modifier.size(AppSizing.IconM),
             )
         }
@@ -323,14 +324,14 @@ private fun FilterDropdownSearch(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(AppColor.BrandSurfaceDim)
+            .background(appPalette().surfaceDim)
             .padding(horizontal = AppSpacing.Md, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Icons.Rounded.Search,
             contentDescription = null,
-            tint = AppColor.LabelSecondary,
+            tint = appPalette().labelSecondary,
             modifier = Modifier.size(AppSizing.IconS),
         )
         Box(
@@ -342,7 +343,7 @@ private fun FilterDropdownSearch(
                 Text(
                     text = "搜索筛选",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppColor.LabelTertiary,
+                    color = appPalette().labelTertiary,
                 )
             }
             BasicTextField(
@@ -350,15 +351,15 @@ private fun FilterDropdownSearch(
                 onValueChange = onQueryChange,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = AppColor.BrandInk),
-                cursorBrush = SolidColor(AppColor.BrandPrimary),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(color = appPalette().ink),
+                cursorBrush = SolidColor(appPalette().primary),
             )
         }
         if (query.isNotEmpty()) {
             Icon(
                 imageVector = Icons.Rounded.Close,
                 contentDescription = "清除",
-                tint = AppColor.LabelSecondary,
+                tint = appPalette().labelSecondary,
                 modifier = Modifier
                     .size(AppSizing.IconButton)
                     .clip(RoundedCornerShape(AppRadius.Pill))

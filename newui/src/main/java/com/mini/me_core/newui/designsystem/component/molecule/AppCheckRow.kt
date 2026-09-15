@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -38,7 +39,7 @@ fun AppCheckbox(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    color: Color = AppColor.BrandPrimary,
+    color: Color = appPalette().primary,
 ) {
     val boxColor by animateColorAsState(
         targetValue = if (checked) color else MaterialTheme.colorScheme.surfaceVariant,

@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -65,8 +66,8 @@ fun AppToolSummaryCard(
     Column(
         modifier = modifier
             .clip(cardShape)
-            .background(AppColor.BrandCard)
-            .border(1.dp, AppColor.SeparatorOnLight, cardShape),
+            .background(appPalette().card)
+            .border(1.dp, appPalette().separator, cardShape),
     ) {
         Row(
             modifier = Modifier
@@ -78,13 +79,13 @@ fun AppToolSummaryCard(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(RoundedCornerShape(AppRadius.Sm))
-                    .background(AppColor.BrandPrimary.copy(alpha = 0.12f)),
+                    .background(appPalette().primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Summarize,
                     contentDescription = null,
-                    tint = AppColor.BrandPrimary,
+                    tint = appPalette().primary,
                     modifier = Modifier.size(16.dp),
                 )
             }
@@ -93,17 +94,17 @@ fun AppToolSummaryCard(
                 text = "工具结果摘要",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
-                color = AppColor.BrandInk,
+                color = appPalette().ink,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = "$toolCount 个结果",
                 style = MaterialTheme.typography.labelSmall,
-                color = AppColor.BrandPrimary,
+                color = appPalette().primary,
                 maxLines = 1,
                 modifier = Modifier
                     .clip(RoundedCornerShape(AppRadius.Sm))
-                    .background(AppColor.BrandPrimary.copy(alpha = 0.10f))
+                    .background(appPalette().primary.copy(alpha = 0.10f))
                     .padding(horizontal = AppSpacing.Xs, vertical = 1.dp),
             )
         }
@@ -112,7 +113,7 @@ fun AppToolSummaryCard(
             Modifier
                 .fillMaxWidth()
                 .height(1.dp)
-                .background(AppColor.SeparatorOnLight),
+                .background(appPalette().separator),
         )
 
         when (state) {
@@ -122,11 +123,11 @@ fun AppToolSummaryCard(
                     .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AppTypingIndicator(dotColor = AppColor.BrandPrimary, dotSize = 4.dp)
+                AppTypingIndicator(dotColor = appPalette().primary, dotSize = 4.dp)
                 Text(
                     text = "正在总结工具结果…",
                     style = MaterialTheme.typography.bodySmall,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                     modifier = Modifier.padding(start = AppSpacing.Sm),
                 )
             }
@@ -153,7 +154,7 @@ private fun SummaryTextBlock(text: String, maxLines: Int) {
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodySmall,
-                color = AppColor.BrandInk,
+                color = appPalette().ink,
                 maxLines = if (expanded) Int.MAX_VALUE else maxLines,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -169,13 +170,13 @@ private fun SummaryTextBlock(text: String, maxLines: Int) {
                 Text(
                     text = if (expanded) "收起" else "展开全部 · $lineCount 行",
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                     modifier = Modifier.weight(1f),
                 )
                 Icon(
                     imageVector = Icons.Rounded.KeyboardArrowDown,
                     contentDescription = null,
-                    tint = AppColor.LabelSecondary,
+                    tint = appPalette().labelSecondary,
                     modifier = Modifier
                         .size(16.dp)
                         .rotate(if (expanded) 180f else 0f),

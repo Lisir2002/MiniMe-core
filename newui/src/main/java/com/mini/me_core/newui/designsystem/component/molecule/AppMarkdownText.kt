@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -48,19 +50,20 @@ fun AppMarkdownText(
     text: String,
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyMedium,
-    color: Color = AppColor.BrandInk,
+    color: Color = appPalette().ink,
     fontWeight: FontWeight? = null,
-    codeBlockBackground: Color = AppColor.BrandSurfaceDim,
-    inlineCodeColor: Color = AppColor.BrandPrimary,
-    inlineCodeBackground: Color = AppColor.BrandSurfaceDim,
-    linkColor: Color = AppColor.BrandPrimary,
+    codeBlockBackground: Color = appPalette().surfaceDim,
+    inlineCodeColor: Color = appPalette().primary,
+    inlineCodeBackground: Color = appPalette().surfaceDim,
+    linkColor: Color = appPalette().primary,
     onLinkClick: ((String) -> Unit)? = null,
 ) {
+    val segments = remember(text) { parseSegments(text) }
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
     ) {
-        parseSegments(text).forEach { segment ->
+        segments.forEach { segment ->
             when (segment) {
                 is MdSegment.CodeBlock -> CodeBlockView(
                     code = segment.code,
@@ -111,7 +114,7 @@ fun AppMarkdownText(
 
 // ===== 解析层（轻量、无外部依赖）=====
 
-private sealed interface MdSegment {
+internal sealed interface MdSegment {
     data class Paragraph(val content: String) : MdSegment
     data class CodeBlock(val code: String) : MdSegment
     data class Heading(val level: Int, val content: String) : MdSegment
@@ -119,7 +122,7 @@ private sealed interface MdSegment {
     data class Table(val headers: List<String>, val rows: List<List<String>>) : MdSegment
 }
 
-private fun parseSegments(text: String): List<MdSegment> {
+internal fun parseSegments(text: String): List<MdSegment> {
     val result = mutableListOf<MdSegment>()
     val lines = text.split("\n")
     var i = 0
@@ -257,14 +260,14 @@ private fun BlockquoteView(
             Modifier
                 .width(3.dp)
                 .fillMaxHeight()
-                .background(AppColor.LabelTertiary, RoundedCornerShape(AppRadius.Sm)),
+                .background(appPalette().labelTertiary, RoundedCornerShape(AppRadius.Sm)),
         )
         Spacer(Modifier.width(AppSpacing.Sm))
         Text(
             text = buildInline(
                 content,
                 style,
-                AppColor.LabelSecondary,
+                appPalette().labelSecondary,
                 inlineCodeColor,
                 inlineCodeBackground,
                 linkColor,
@@ -272,7 +275,7 @@ private fun BlockquoteView(
             ),
             style = style,
             fontWeight = fontWeight,
-            color = AppColor.LabelSecondary,
+            color = appPalette().labelSecondary,
             modifier = Modifier.padding(vertical = 2.dp),
         )
     }
@@ -292,7 +295,7 @@ private fun TableView(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(AppRadius.Sm))
-            .background(AppColor.BrandSurfaceDim)
+            .background(appPalette().surfaceDim)
             .padding(AppSpacing.Sm),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -301,7 +304,7 @@ private fun TableView(
                 Text(
                     text = header,
                     style = cellStyle.copy(fontWeight = FontWeight.SemiBold),
-                    color = AppColor.BrandInk,
+                    color = appPalette().ink,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -312,7 +315,7 @@ private fun TableView(
                     Text(
                         text = row.getOrNull(column) ?: "",
                         style = cellStyle,
-                        color = AppColor.LabelSecondary,
+                        color = appPalette().labelSecondary,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -395,7 +398,7 @@ private fun CodeBlockView(code: String, background: Color) {
         Text(
             text = code,
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            color = AppColor.BrandInk,
+            color = appPalette().ink,
         )
     }
 }

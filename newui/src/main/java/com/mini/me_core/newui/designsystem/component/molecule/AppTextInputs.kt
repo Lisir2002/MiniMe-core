@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -110,9 +111,9 @@ fun AppFilledTextField(
         colors = TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-            focusedIndicatorColor = AppColor.BrandPrimary,
+            focusedIndicatorColor = appPalette().primary,
             unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = AppColor.BrandPrimary,
+            cursorColor = appPalette().primary,
         ),
     )
 }
@@ -158,9 +159,9 @@ fun AppPasswordField(
         colors = TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-            focusedIndicatorColor = AppColor.BrandPrimary,
+            focusedIndicatorColor = appPalette().primary,
             unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = AppColor.BrandPrimary,
+            cursorColor = appPalette().primary,
         ),
     )
 }
@@ -192,9 +193,9 @@ fun AppCountedTextField(
         colors = TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-            focusedIndicatorColor = if (limited) AppColor.StatusDanger else AppColor.BrandPrimary,
+            focusedIndicatorColor = if (limited) AppColor.StatusDanger else appPalette().primary,
             unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = AppColor.BrandPrimary,
+            cursorColor = appPalette().primary,
         ),
     )
 }
@@ -219,7 +220,7 @@ fun AppValidatedTextField(
     val accent = when (validity) {
         AppInputValidity.Error -> AppColor.StatusDanger
         AppInputValidity.Success -> AppColor.StatusSuccess
-        AppInputValidity.Normal -> AppColor.BrandPrimary
+        AppInputValidity.Normal -> appPalette().primary
     }
     val checkAlpha by animateFloatAsState(
         targetValue = if (validity == AppInputValidity.Success) 1f else 0f,
@@ -286,9 +287,9 @@ fun AppMultiLineTextField(
         colors = TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-            focusedIndicatorColor = AppColor.BrandPrimary,
+            focusedIndicatorColor = appPalette().primary,
             unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = AppColor.BrandPrimary,
+            cursorColor = appPalette().primary,
         ),
     )
 }
@@ -310,7 +311,7 @@ fun AppMessageField(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val border by animateColorAsState(
-        targetValue = if (focused) AppColor.BrandPrimary else MaterialTheme.colorScheme.outlineVariant,
+        targetValue = if (focused) appPalette().primary else MaterialTheme.colorScheme.outlineVariant,
         label = "border",
     )
     val canSend = value.isNotBlank()
@@ -319,7 +320,7 @@ fun AppMessageField(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "send",
     )
-    val sendColor: Color = if (canSend) AppColor.BrandPrimary else MaterialTheme.colorScheme.surfaceVariant
+    val sendColor: Color = if (canSend) appPalette().primary else MaterialTheme.colorScheme.surfaceVariant
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -365,7 +366,7 @@ fun AppMessageField(
                 minLines = 1,
                 maxLines = 4,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                cursorBrush = SolidColor(AppColor.BrandPrimary),
+                cursorBrush = SolidColor(appPalette().primary),
             )
         }
         Box(

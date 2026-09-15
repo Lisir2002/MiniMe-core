@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -49,7 +50,7 @@ data class AppDockItem(
  * 图标坞（分子组 · AppDock）：iOS 简约风格的胶囊图标列，用于自底部快速切换/启动。
  *
  * 视觉对齐 iOS 简约规范：
- *  - **选中态**：图标染 [AppColor.BrandPrimary]，背后一个浅蓝胶囊底（`BrandPrimary @ 12%`），
+ *  - **选中态**：图标染 [appPalette().primary]，背后一个浅蓝胶囊底（`BrandPrimary @ 12%`），
  *    图标正下方一个指示小圆点（iOS dock 常用 indicator），并轻微放大弹跳。
  *  - **未选中态**：图标染 [MaterialTheme.colorScheme.onSurfaceVariant]（灰标），无底无点。
  *  - **标签**：仅选中态以「悬浮气泡」叠在图标上方显示，用 [Box] 叠加、不参与测量，
@@ -92,7 +93,7 @@ fun AppDock(
                 label = "dockSelectBg",
             )
             val iconTint by animateColorAsState(
-                targetValue = if (selected) AppColor.BrandPrimary
+                targetValue = if (selected) appPalette().primary
                 else MaterialTheme.colorScheme.onSurfaceVariant,
                 label = "dockIconTint",
             )
@@ -169,7 +170,7 @@ fun AppDock(
                             .size(AppSizing.IconXs / 2f)
                             .graphicsLayer { scaleX = dotScale; scaleY = dotScale; alpha = dotAlpha }
                             .clip(CircleShape)
-                            .background(AppColor.BrandPrimary),
+                            .background(appPalette().primary),
                     )
                 }
             }

@@ -17,9 +17,7 @@ import androidx.compose.ui.Modifier
  *  - 子级描述符 SlotContent（描述轨，可持久化）；渲染轨由调用方传 @Composable lambda
  *  - SlotSet：声明式装配顶栏/内容/底栏，对标官方 Scaffold 插槽语言
  *
- * 扩展方向见设计文档 §2.5（槽位插件扩展方案，全网检索对照）：
- * 断点驱动装配（AppBreakpoint）/ 导航四态换型 / 停靠强度（DockPlacement）/ 多栏调宽（PaneSpec）
- * / 装配图序列化（SlotAssembly），P1 起按该节落地；不重写官方 Scaffold 布局骨架。
+ * 扩展方向：仅保留五槽位最小契约（见 AppShell），断点/停靠/多栏等未落地理论已移除，勿再加回。
  */
 
 /** 五种标准块级槽位（§2.3.2） */

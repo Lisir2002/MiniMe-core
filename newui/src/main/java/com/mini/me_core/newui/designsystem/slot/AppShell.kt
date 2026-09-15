@@ -56,7 +56,7 @@ fun AppShell(
     if (sideRail != null) {
         Row(Modifier.fillMaxSize()) {
             Surface(Modifier.fillMaxSize()) {
-                Column(Modifier.fillMaxSize().navigationBarsPadding()) { sideRail() }
+                Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) { sideRail() }
             }
             Column(Modifier.weight(1f).fillMaxSize()) {
                 ShellContent(
@@ -93,26 +93,23 @@ private fun ShellContent(
     bottomBar: (@Composable () -> Unit)?,
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            // 顶栏：背景逼近状态栏，insets 内移内容
-            ShellTopBar(
-                title = title,
-                onNavigateBack = onNavigateBack,
-                navigationIcon = navigationIcon,
-                actions = topBarActions,
-            )
-            if (topTabs != null) topTabs()
-            // 系统栏已由顶栏 / 底栏各自处理，内容不再加 inset；留白交给页面自身（pageContentPadding 等）。
+    Column(Modifier.fillMaxSize()) {
+        // 顶栏：背景逼近状态栏，insets 内移内容
+        ShellTopBar(
+            title = title,
+            onNavigateBack = onNavigateBack,
+            navigationIcon = navigationIcon,
+            actions = topBarActions,
+        )
+        if (topTabs != null) topTabs()
+        // 内容区占剩余空间；bottomBar 在内容下方挤压布局，不再覆盖内容。
+        Column(Modifier.weight(1f).fillMaxWidth()) {
             content(PaddingValues(0.dp))
         }
         if (bottomBar != null) {
-            // 背景延伸到导航栏后（Surface 本体不加 inset），内容经 navigationBarsPadding 内移。
             Surface(
                 color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
                     bottomBar()

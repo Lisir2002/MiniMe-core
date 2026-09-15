@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -44,8 +45,8 @@ fun AppConfetti(
     count: Int = 26,
     durationMillis: Int = 3800,
     colors: List<Color> = listOf(
-        AppColor.BrandPrimary,
-        AppColor.BrandAccent,
+        appPalette().primary,
+        appPalette().accent,
         AppColor.StatusDanger,
         AppColor.StatusWarning,
         AppColor.StatusInfo,

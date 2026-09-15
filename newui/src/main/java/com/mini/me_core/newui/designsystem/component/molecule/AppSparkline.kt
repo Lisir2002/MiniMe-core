@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -30,7 +31,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppMotion
 fun AppSparkline(
     data: List<Float>,
     modifier: Modifier = Modifier,
-    strokeColor: Color = AppColor.BrandPrimary,
+    strokeColor: Color = appPalette().primary,
     fillColor: Color = strokeColor.copy(alpha = 0.16f),
     strokeWidth: Dp = 2.dp,
     showDot: Boolean = true,

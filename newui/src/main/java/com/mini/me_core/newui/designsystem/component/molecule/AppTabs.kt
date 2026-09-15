@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -35,7 +36,7 @@ fun AppTabs(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    indicatorColor: Color = AppColor.BrandPrimary,
+    indicatorColor: Color = appPalette().primary,
 ) {
     if (tabs.isEmpty()) return
     val safeIndex = selectedIndex.coerceIn(0, tabs.size - 1)

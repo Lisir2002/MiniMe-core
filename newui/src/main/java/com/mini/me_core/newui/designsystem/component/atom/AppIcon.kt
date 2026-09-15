@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.atom
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -44,7 +45,7 @@ fun IconContainer(
     tint: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier,
     size: Dp = AppSizing.IconBlock,
-    background: androidx.compose.ui.graphics.Color = AppColor.BrandPrimary,
+    background: androidx.compose.ui.graphics.Color = appPalette().primary,
 ) {
     Box(
         modifier = modifier

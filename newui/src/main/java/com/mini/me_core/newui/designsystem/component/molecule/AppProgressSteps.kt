@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -43,7 +44,7 @@ fun AppProgressSteps(
     steps: List<String>,
     currentIndex: Int,
     modifier: Modifier = Modifier,
-    activeColor: Color = AppColor.BrandPrimary,
+    activeColor: Color = appPalette().primary,
 ) {
     val safeCurrent = currentIndex.coerceIn(0, steps.size)
     Row(

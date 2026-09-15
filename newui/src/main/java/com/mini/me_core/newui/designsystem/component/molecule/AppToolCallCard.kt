@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -121,7 +122,7 @@ fun AppToolCallCard(
     var inputExpanded by remember { mutableStateOf(false) }
     var outputExpanded by remember { mutableStateOf(false) }
     val statusColor = when (state) {
-        AppToolCallState.Streaming, AppToolCallState.Running -> AppColor.BrandPrimary
+        AppToolCallState.Streaming, AppToolCallState.Running -> appPalette().primary
         AppToolCallState.AwaitingApproval -> AppColor.StatusWarning
         AppToolCallState.Success -> AppColor.StatusSuccess
         AppToolCallState.Error -> AppColor.StatusDanger
@@ -132,13 +133,13 @@ fun AppToolCallCard(
     Column(
         modifier = modifier
             .clip(cardShape)
-            .background(AppColor.BrandCard)
+            .background(appPalette().card)
             .border(
                 width = 1.dp,
                 color = if (isError) {
                     AppColor.StatusDanger.copy(alpha = 0.45f)
                 } else {
-                    AppColor.SeparatorOnLight
+                    appPalette().separator
                 },
                 shape = cardShape,
             ),
@@ -171,7 +172,7 @@ fun AppToolCallCard(
                         text = title,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = AppColor.BrandInk,
+                        color = appPalette().ink,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -190,7 +191,7 @@ fun AppToolCallCard(
                     Text(
                         text = meta,
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isError) AppColor.StatusDanger else AppColor.LabelSecondary,
+                        color = if (isError) AppColor.StatusDanger else appPalette().labelSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -287,7 +288,7 @@ fun AppToolCallCard(
                         Text(
                             text = approvalHint,
                             style = MaterialTheme.typography.labelSmall,
-                            color = AppColor.LabelSecondary,
+                            color = appPalette().labelSecondary,
                             maxLines = 2,
                         )
                     }
@@ -304,7 +305,7 @@ fun AppToolCallCard(
                             Text(
                                 text = approvalHint,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = AppColor.LabelSecondary,
+                                color = appPalette().labelSecondary,
                                 modifier = Modifier.weight(1f),
                             )
                         } else {
@@ -333,7 +334,7 @@ fun AppToolCallCard(
                         Text(
                             text = alwaysDisabledReason,
                             style = MaterialTheme.typography.labelSmall,
-                            color = AppColor.LabelSecondary,
+                            color = appPalette().labelSecondary,
                             maxLines = 2,
                         )
                     }
@@ -388,11 +389,11 @@ private fun ServerChip(prefix: String) {
     Text(
         text = prefix,
         style = MaterialTheme.typography.labelSmall,
-        color = AppColor.BrandPrimary,
+        color = appPalette().primary,
         maxLines = 1,
         modifier = Modifier
             .clip(RoundedCornerShape(AppRadius.Sm))
-            .background(AppColor.BrandPrimary.copy(alpha = 0.10f))
+            .background(appPalette().primary.copy(alpha = 0.10f))
             .padding(horizontal = AppSpacing.Xs, vertical = 1.dp),
     )
 }
@@ -431,7 +432,7 @@ private fun ExpandableSection(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = AppColor.LabelSecondary,
+                color = appPalette().labelSecondary,
                 modifier = Modifier.weight(1f),
             )
             val rotation by animateFloatAsState(
@@ -441,7 +442,7 @@ private fun ExpandableSection(
             Icon(
                 imageVector = Icons.Rounded.KeyboardArrowDown,
                 contentDescription = if (expanded) "收起$label" else "展开$label",
-                tint = AppColor.LabelSecondary,
+                tint = appPalette().labelSecondary,
                 modifier = Modifier
                     .size(16.dp)
                     .rotate(rotation),
@@ -471,11 +472,11 @@ private fun JsonBlock(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-        color = AppColor.BrandInk,
+        color = appPalette().ink,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(AppRadius.Sm))
-            .background(AppColor.BrandSurfaceDim)
+            .background(appPalette().surfaceDim)
             .padding(AppSpacing.Sm),
     )
 }
@@ -487,18 +488,18 @@ private fun CommandBlock(text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(AppRadius.Sm))
-            .background(AppColor.BrandSurfaceDim)
+            .background(appPalette().surfaceDim)
             .padding(AppSpacing.Sm),
     ) {
         Text(
             text = "$ ",
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            color = AppColor.BrandPrimary,
+            color = appPalette().primary,
         )
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            color = AppColor.BrandInk,
+            color = appPalette().ink,
         )
     }
 }
@@ -533,7 +534,7 @@ private fun StreamBlock(text: String, maxLines: Int) {
             modifier = Modifier
                 .weight(1f, fill = false)
                 .clip(RoundedCornerShape(AppRadius.Sm))
-                .background(AppColor.BrandPrimary.copy(alpha = 0.06f))
+                .background(appPalette().primary.copy(alpha = 0.06f))
                 .padding(horizontal = AppSpacing.Sm, vertical = 4.dp)
                 .then(
                     if (folded) Modifier.clickable { expanded = !expanded } else Modifier,
@@ -543,7 +544,7 @@ private fun StreamBlock(text: String, maxLines: Int) {
                 Text(
                     text = line,
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    color = AppColor.BrandPrimary,
+                    color = appPalette().primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -556,7 +557,7 @@ private fun StreamBlock(text: String, maxLines: Int) {
                 Text(
                     text = if (expanded) "收起 · ${lines.size} 行" else "展开全部 · ${lines.size} 行",
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                 )
             }
         }
@@ -565,7 +566,7 @@ private fun StreamBlock(text: String, maxLines: Int) {
             modifier = Modifier
                 .size(width = 6.dp, height = 12.dp)
                 .graphicsLayer { alpha = cursorAlpha }
-                .background(AppColor.BrandPrimary, RoundedCornerShape(1.dp)),
+                .background(appPalette().primary, RoundedCornerShape(1.dp)),
         )
     }
 }
@@ -576,7 +577,7 @@ private fun CardDivider() {
         Modifier
             .fillMaxWidth()
             .height(1.dp)
-            .background(AppColor.SeparatorOnLight),
+            .background(appPalette().separator),
     )
 }
 

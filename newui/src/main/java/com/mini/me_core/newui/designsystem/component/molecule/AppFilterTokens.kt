@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
@@ -48,7 +49,7 @@ fun AppFilterToken(
     Row(
         modifier = modifier
             .clip(shape)
-            .background(AppColor.BrandPrimary.copy(alpha = 0.12f))
+            .background(appPalette().primary.copy(alpha = 0.12f))
             .padding(start = AppSpacing.Sm, end = AppSpacing.Xs, top = 5.dp, bottom = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -56,21 +57,21 @@ fun AppFilterToken(
             Modifier
                 .size(5.dp)
                 .clip(RoundedCornerShape(AppRadius.Pill))
-                .background(AppColor.BrandPrimary),
+                .background(appPalette().primary),
         )
         Spacer(Modifier.size(AppSpacing.Xs))
         Text(
             text = "$group · $value",
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium,
-            color = AppColor.BrandInk,
+            color = appPalette().ink,
             maxLines = 1,
         )
         Spacer(Modifier.size(AppSpacing.Sm))
         Icon(
             imageVector = Icons.Rounded.Close,
             contentDescription = "移除",
-            tint = AppColor.BrandPrimary,
+            tint = appPalette().primary,
             modifier = Modifier
                 .size(AppSizing.IconXs)
                 .clip(RoundedCornerShape(AppRadius.Pill))

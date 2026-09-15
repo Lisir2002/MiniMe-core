@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -76,9 +77,9 @@ fun AppPlanCard(
 ) {
     val statusColor = when (state) {
         AppPlanState.AwaitingApproval -> AppColor.StatusWarning
-        AppPlanState.InProgress -> AppColor.BrandPrimary
+        AppPlanState.InProgress -> appPalette().primary
         AppPlanState.Approved -> AppColor.StatusSuccess
-        AppPlanState.Abandoned -> AppColor.LabelTertiary
+        AppPlanState.Abandoned -> appPalette().labelTertiary
     }
     val cardShape = RoundedCornerShape(AppRadius.Md)
 
@@ -86,13 +87,13 @@ fun AppPlanCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(cardShape)
-            .background(AppColor.BrandCard)
+            .background(appPalette().card)
             .border(
                 width = 1.dp,
                 color = if (state == AppPlanState.AwaitingApproval) {
                     AppColor.StatusWarning.copy(alpha = 0.55f)
                 } else {
-                    AppColor.SeparatorOnLight
+                    appPalette().separator
                 },
                 shape = cardShape,
             ),
@@ -122,7 +123,7 @@ fun AppPlanCard(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
-                color = AppColor.BrandInk,
+                color = appPalette().ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -135,7 +136,7 @@ fun AppPlanCard(
             Text(
                 text = reason,
                 style = MaterialTheme.typography.labelSmall,
-                color = AppColor.LabelSecondary,
+                color = appPalette().labelSecondary,
                 modifier = Modifier.padding(horizontal = AppSpacing.Md),
             )
         }
@@ -173,7 +174,7 @@ fun AppPlanCard(
                 Text(
                     text = pendingSelection,
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
@@ -256,7 +257,7 @@ private fun PlanStepRow(step: AppPlanStep) {
             AppPlanStepStatus.Pending -> Icon(
                 imageVector = Icons.Rounded.RadioButtonUnchecked,
                 contentDescription = "待办",
-                tint = AppColor.LabelTertiary,
+                tint = appPalette().labelTertiary,
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -264,9 +265,9 @@ private fun PlanStepRow(step: AppPlanStep) {
             text = step.text,
             style = MaterialTheme.typography.bodySmall,
             color = when (step.status) {
-                AppPlanStepStatus.Pending -> AppColor.LabelSecondary
-                AppPlanStepStatus.Done -> AppColor.LabelSecondary
-                AppPlanStepStatus.InProgress -> AppColor.BrandInk
+                AppPlanStepStatus.Pending -> appPalette().labelSecondary
+                AppPlanStepStatus.Done -> appPalette().labelSecondary
+                AppPlanStepStatus.InProgress -> appPalette().ink
                 AppPlanStepStatus.Failed -> AppColor.StatusDanger
             },
             fontWeight = if (step.status == AppPlanStepStatus.InProgress) FontWeight.Medium else FontWeight.Normal,

@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
@@ -41,7 +42,7 @@ fun AppFAB(
     expanded: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = AppColor.BrandPrimary,
+    containerColor: Color = appPalette().primary,
     contentColor: Color = Color.White,
 ) {
     val hPadding by animateDpAsState(

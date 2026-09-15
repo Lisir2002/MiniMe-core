@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -71,8 +72,8 @@ fun AppToolChainTimeline(
     Column(
         modifier = modifier
             .clip(cardShape)
-            .background(AppColor.BrandCard)
-            .border(1.dp, AppColor.SeparatorOnLight, cardShape),
+            .background(appPalette().card)
+            .border(1.dp, appPalette().separator, cardShape),
     ) {
         Row(
             modifier = Modifier
@@ -84,13 +85,13 @@ fun AppToolChainTimeline(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(RoundedCornerShape(AppRadius.Sm))
-                    .background(AppColor.BrandPrimary.copy(alpha = 0.12f)),
+                    .background(appPalette().primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Hub,
                     contentDescription = null,
-                    tint = AppColor.BrandPrimary,
+                    tint = appPalette().primary,
                     modifier = Modifier.size(16.dp),
                 )
             }
@@ -100,7 +101,7 @@ fun AppToolChainTimeline(
                     text = label,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
-                    color = AppColor.BrandInk,
+                    color = appPalette().ink,
                 )
                 val meta = listOfNotNull(
                     "${steps.size} 次调用",
@@ -109,7 +110,7 @@ fun AppToolChainTimeline(
                 Text(
                     text = meta,
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                 )
             }
             Spacer(Modifier.width(AppSpacing.Sm))
@@ -120,7 +121,7 @@ fun AppToolChainTimeline(
             Modifier
                 .fillMaxWidth()
                 .height(1.dp)
-                .background(AppColor.SeparatorOnLight),
+                .background(appPalette().separator),
         )
 
         Column(
@@ -166,7 +167,7 @@ private fun ChainStateBadge(steps: List<AppToolChainStep>) {
 @Composable
 private fun ChainStepRow(step: AppToolChainStep, isLast: Boolean) {
     val tone = when (step.state) {
-        AppToolChainStepState.Running -> AppColor.BrandPrimary
+        AppToolChainStepState.Running -> appPalette().primary
         AppToolChainStepState.AwaitingApproval -> AppColor.StatusWarning
         AppToolChainStepState.Success -> AppColor.StatusSuccess
         AppToolChainStepState.Error -> AppColor.StatusDanger
@@ -224,7 +225,7 @@ private fun ChainStepRow(step: AppToolChainStep, isLast: Boolean) {
                         .padding(top = 22.dp)
                         .width(2.dp)
                         .fillMaxHeight()
-                        .background(AppColor.SeparatorOnLight),
+                        .background(appPalette().separator),
                 )
             }
         }
@@ -241,7 +242,7 @@ private fun ChainStepRow(step: AppToolChainStep, isLast: Boolean) {
                     text = step.title,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Medium,
-                    color = AppColor.BrandInk,
+                    color = appPalette().ink,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
@@ -255,7 +256,7 @@ private fun ChainStepRow(step: AppToolChainStep, isLast: Boolean) {
                     Text(
                         text = formatChainDuration(step.durationMs),
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppColor.LabelSecondary,
+                        color = appPalette().labelSecondary,
                     )
                 }
             }
@@ -263,7 +264,7 @@ private fun ChainStepRow(step: AppToolChainStep, isLast: Boolean) {
                 Text(
                     text = step.summary,
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 1.dp),
@@ -279,11 +280,11 @@ private fun ChainServerChip(prefix: String) {
     Text(
         text = prefix,
         style = MaterialTheme.typography.labelSmall,
-        color = AppColor.BrandPrimary,
+        color = appPalette().primary,
         maxLines = 1,
         modifier = Modifier
             .clip(RoundedCornerShape(AppRadius.Sm))
-            .background(AppColor.BrandPrimary.copy(alpha = 0.10f))
+            .background(appPalette().primary.copy(alpha = 0.10f))
             .padding(horizontal = AppSpacing.Xs, vertical = 1.dp),
     )
 }

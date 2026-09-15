@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -38,7 +39,7 @@ fun AppAvatar(
                 .clip(CircleShape)
                 .background(
                     Brush.linearGradient(
-                        listOf(AppColor.BrandPrimary, AppColor.BrandAccent),
+                        listOf(appPalette().primary, appPalette().accent),
                     ),
                 ),
             contentAlignment = Alignment.Center,

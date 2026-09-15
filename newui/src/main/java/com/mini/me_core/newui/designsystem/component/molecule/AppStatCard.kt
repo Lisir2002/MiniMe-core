@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -42,7 +43,7 @@ fun AppStatCard(
     modifier: Modifier = Modifier,
     format: (Double) -> String = { it.toInt().toString() },
     icon: ImageVector? = null,
-    iconColor: Color = AppColor.BrandPrimary,
+    iconColor: Color = appPalette().primary,
     trend: String? = null,
     trendUp: Boolean = true,
 ) {

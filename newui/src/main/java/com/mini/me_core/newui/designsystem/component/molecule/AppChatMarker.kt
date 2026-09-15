@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -55,9 +56,9 @@ private fun DateMarker(text: String, modifier: Modifier) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            color = AppColor.LabelSecondary,
+            color = appPalette().labelSecondary,
             modifier = Modifier
-                .background(AppColor.BrandSurfaceDim, RoundedCornerShape(AppRadius.Pill))
+                .background(appPalette().surfaceDim, RoundedCornerShape(AppRadius.Pill))
                 .padding(horizontal = AppSpacing.Md, vertical = 3.dp),
         )
     }
@@ -69,7 +70,7 @@ private fun SystemMarker(text: String, modifier: Modifier) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            color = AppColor.LabelTertiary,
+            color = appPalette().labelTertiary,
         )
     }
 }
@@ -78,13 +79,13 @@ private fun SystemMarker(text: String, modifier: Modifier) {
 private fun ToolMarker(text: String, modifier: Modifier, tone: Color, running: Boolean) {
     Row(
         modifier = modifier
-            .background(AppColor.BrandSurface, RoundedCornerShape(AppRadius.Pill))
-            .border(1.dp, AppColor.SeparatorOnLight, RoundedCornerShape(AppRadius.Pill))
+            .background(appPalette().surface, RoundedCornerShape(AppRadius.Pill))
+            .border(1.dp, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
             .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (running) {
-            AppTypingIndicator(dotColor = AppColor.BrandPrimary, dotSize = 4.dp)
+            AppTypingIndicator(dotColor = appPalette().primary, dotSize = 4.dp)
         } else {
             Icon(
                 imageVector = if (tone == AppColor.StatusDanger) Icons.Rounded.ErrorOutline else Icons.Rounded.CheckCircle,
@@ -96,7 +97,7 @@ private fun ToolMarker(text: String, modifier: Modifier, tone: Color, running: B
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            color = AppColor.LabelSecondary,
+            color = appPalette().labelSecondary,
             modifier = Modifier.padding(start = AppSpacing.Sm),
         )
     }

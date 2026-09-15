@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -924,7 +925,7 @@ fun AppNavigationMenu(
             val selected = index == selectedIndex
             val tint = when {
                 item.danger && !selected -> AppColor.StatusDanger
-                selected -> AppColor.BrandPrimary
+                selected -> appPalette().primary
                 else -> MaterialTheme.colorScheme.onSurfaceVariant
             }
             Row(
@@ -935,7 +936,7 @@ fun AppNavigationMenu(
                     .clip(RoundedCornerShape(AppRadius.Md))
                     .background(
                         color = if (selected) {
-                            AppColor.BrandPrimary.copy(alpha = 0.14f)
+                            appPalette().primary.copy(alpha = 0.14f)
                         } else Color.Transparent,
                         shape = RoundedCornerShape(AppRadius.Md),
                     )
@@ -949,7 +950,7 @@ fun AppNavigationMenu(
                         Modifier
                             .padding(end = AppSpacing.Md)
                             .size(width = 4.dp, height = 18.dp)
-                            .background(AppColor.BrandPrimary, RoundedCornerShape(percent = 50)),
+                            .background(appPalette().primary, RoundedCornerShape(percent = 50)),
                     )
                 }
                 Icon(
@@ -963,7 +964,7 @@ fun AppNavigationMenu(
                     text = item.label,
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (selected) {
-                        AppColor.BrandPrimary.copy(alpha = 0.9f)
+                        appPalette().primary.copy(alpha = 0.9f)
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     },
@@ -976,11 +977,11 @@ fun AppNavigationMenu(
                     Text(
                         text = if (item.badge > 99) "99+" else item.badge.toString(),
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (selected) AppColor.BrandPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (selected) appPalette().primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .clip(RoundedCornerShape(percent = 50))
                             .background(
-                                if (selected) AppColor.BrandPrimary.copy(alpha = 0.14f)
+                                if (selected) appPalette().primary.copy(alpha = 0.14f)
                                 else MaterialTheme.colorScheme.surfaceVariant,
                             )
                             .padding(horizontal = AppSpacing.Sm, vertical = 2.dp),

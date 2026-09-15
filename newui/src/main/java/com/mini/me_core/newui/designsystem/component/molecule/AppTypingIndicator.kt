@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -34,7 +35,7 @@ import kotlin.math.sin
 @Composable
 fun AppTypingIndicator(
     modifier: Modifier = Modifier,
-    dotColor: Color = AppColor.BrandPrimary,
+    dotColor: Color = appPalette().primary,
     dotSize: Dp = 8.dp,
 ) {
     val transition = rememberInfiniteTransition(label = "typing")

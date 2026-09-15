@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -71,11 +72,11 @@ fun AppFilterField(
     val focused by interaction.collectIsFocusedAsState()
     val active = focused || value.isNotEmpty()
     val border by animateColorAsState(
-        targetValue = if (active) AppColor.BrandPrimary else AppColor.SeparatorOnLight,
+        targetValue = if (active) appPalette().primary else appPalette().separator,
         label = "border",
     )
     val bg by animateColorAsState(
-        targetValue = if (focused) AppColor.BrandCard else AppColor.BrandSurfaceDim,
+        targetValue = if (focused) appPalette().card else appPalette().surfaceDim,
         label = "bg",
     )
     val iconAlpha by animateFloatAsState(
@@ -99,7 +100,7 @@ fun AppFilterField(
         Icon(
             imageVector = Icons.Rounded.FilterList,
             contentDescription = null,
-            tint = AppColor.BrandPrimary.copy(alpha = iconAlpha),
+            tint = appPalette().primary.copy(alpha = iconAlpha),
             modifier = Modifier.size(AppSizing.IconM),
         )
         Box(
@@ -111,7 +112,7 @@ fun AppFilterField(
                 Text(
                     text = placeholder,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppColor.LabelSecondary,
+                    color = appPalette().labelSecondary,
                 )
             }
             BasicTextField(
@@ -119,15 +120,15 @@ fun AppFilterField(
                 onValueChange = onValueChange,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = AppColor.BrandInk),
-                cursorBrush = SolidColor(AppColor.BrandPrimary),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(color = appPalette().ink),
+                cursorBrush = SolidColor(appPalette().primary),
             )
         }
         if (value.isNotEmpty()) {
             Icon(
                 imageVector = Icons.Rounded.Close,
                 contentDescription = "清除",
-                tint = AppColor.LabelSecondary,
+                tint = appPalette().labelSecondary,
                 modifier = Modifier
                     .size(AppSizing.IconButton)
                     .clip(RoundedCornerShape(AppRadius.Pill))
@@ -152,18 +153,18 @@ fun AppChecklistFilter(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(AppColor.BrandSurfaceDim.copy(alpha = 0.6f))
+            .background(appPalette().surfaceDim.copy(alpha = 0.6f))
             .padding(AppSpacing.Sm),
         verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
     ) {
         options.forEachIndexed { index, label ->
             val isChecked = index in selected
             val checkBg by animateColorAsState(
-                targetValue = if (isChecked) AppColor.BrandPrimary else Color.Transparent,
+                targetValue = if (isChecked) appPalette().primary else Color.Transparent,
                 label = "checkBg",
             )
             val checkBorder by animateColorAsState(
-                targetValue = if (isChecked) AppColor.BrandPrimary else AppColor.SeparatorOnLight,
+                targetValue = if (isChecked) appPalette().primary else appPalette().separator,
                 label = "checkBorder",
             )
             val tickAlpha by animateFloatAsState(
@@ -198,14 +199,14 @@ fun AppChecklistFilter(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppColor.BrandInk,
+                    color = appPalette().ink,
                     modifier = Modifier.weight(1f),
                 )
                 if (counts.getOrNull(index) != null) {
                     Text(
                         text = counts[index].toString(),
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppColor.LabelSecondary,
+                        color = appPalette().labelSecondary,
                     )
                 }
             }
@@ -229,7 +230,7 @@ fun AppChecklistToolbar(
         Text(
             text = "已选 $selectedCount/$total",
             style = MaterialTheme.typography.labelMedium,
-            color = AppColor.LabelSecondary,
+            color = appPalette().labelSecondary,
         )
         Spacer(Modifier.weight(1f))
         TextButton(onClick = onSelectAll) { Text("全选") }
@@ -262,9 +263,9 @@ fun AppRangeFilter(
             onValueChange = onValueChange,
             valueRange = valueRange,
             colors = SliderDefaults.colors(
-                activeTrackColor = AppColor.BrandPrimary,
-                inactiveTrackColor = AppColor.BrandSurfaceDim,
-                thumbColor = AppColor.BrandPrimary,
+                activeTrackColor = appPalette().primary,
+                inactiveTrackColor = appPalette().surfaceDim,
+                thumbColor = appPalette().primary,
             ),
         )
     }
@@ -279,8 +280,8 @@ private fun RowScope.RangeValuePill(
     Box(
         modifier = modifier
             .clip(shape)
-            .background(AppColor.BrandPrimary.copy(alpha = 0.1f))
-            .border(1.dp, AppColor.BrandPrimary.copy(alpha = 0.35f), shape)
+            .background(appPalette().primary.copy(alpha = 0.1f))
+            .border(1.dp, appPalette().primary.copy(alpha = 0.35f), shape)
             .padding(horizontal = AppSpacing.Md, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -288,7 +289,7 @@ private fun RowScope.RangeValuePill(
             text = text,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
-            color = AppColor.BrandPrimary,
+            color = appPalette().primary,
         )
     }
 }
@@ -360,7 +361,7 @@ fun AppDateFilter(
             Text(
                 text = selectedRangeText,
                 style = MaterialTheme.typography.labelMedium,
-                color = AppColor.LabelSecondary,
+                color = appPalette().labelSecondary,
             )
         }
     }
@@ -383,8 +384,8 @@ fun AppFilterSheet(
         modifier = modifier
             .fillMaxWidth()
             .shadow(AppElevation.Z3, shape, clip = true)
-            .background(AppColor.BrandCard, shape)
-            .border(1.dp, AppColor.SeparatorOnLight, shape)
+            .background(appPalette().card, shape)
+            .border(1.dp, appPalette().separator, shape)
             .padding(AppSpacing.Lg),
         verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
     ) {
@@ -393,7 +394,7 @@ fun AppFilterSheet(
             Icon(
                 imageVector = Icons.Rounded.FilterList,
                 contentDescription = null,
-                tint = AppColor.BrandPrimary,
+                tint = appPalette().primary,
                 modifier = Modifier.size(AppSizing.IconM),
             )
             Spacer(Modifier.width(AppSpacing.Sm))
@@ -401,14 +402,14 @@ fun AppFilterSheet(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = AppColor.BrandInk,
+                color = appPalette().ink,
             )
             if (activeCount > 0) {
                 Spacer(Modifier.width(AppSpacing.Sm))
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(AppRadius.Pill))
-                        .background(AppColor.BrandPrimary)
+                        .background(appPalette().primary)
                         .padding(horizontal = AppSpacing.Sm, vertical = 2.dp),
                 ) {
                     Text(
@@ -439,7 +440,7 @@ fun AppFilterSheet(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(AppRadius.Pill))
-                            .background(AppColor.BrandPrimary)
+                            .background(appPalette().primary)
                             .clickable { onApply() }
                             .padding(vertical = AppSpacing.Md),
                         contentAlignment = Alignment.Center,

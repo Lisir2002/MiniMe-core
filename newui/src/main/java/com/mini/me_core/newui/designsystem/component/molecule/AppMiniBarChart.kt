@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -24,8 +25,8 @@ import com.mini.me_core.newui.designsystem.token.generated.AppMotion
 fun AppMiniBarChart(
     values: List<Float>,
     modifier: Modifier = Modifier,
-    barColor: Color = AppColor.BrandPrimary,
-    highlightColor: Color = AppColor.BrandAccent,
+    barColor: Color = appPalette().primary,
+    highlightColor: Color = appPalette().accent,
     highlightIndex: Int? = null,
 ) {
     if (values.isEmpty()) return

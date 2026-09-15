@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -35,7 +36,7 @@ fun AppRingProgress(
     modifier: Modifier = Modifier,
     boxSize: Dp = 96.dp,
     strokeWidth: Dp = 8.dp,
-    progressColor: Color = AppColor.BrandPrimary,
+    progressColor: Color = appPalette().primary,
     trackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     showLabel: Boolean = true,
     labelFormat: (Float) -> String = { "${(it * 100).toInt()}%" },
@@ -50,6 +51,7 @@ fun AppRingProgress(
         contentAlignment = Alignment.Center,
     ) {
         val surfaceColor = MaterialTheme.colorScheme.surface
+        val accentColor = appPalette().accent
         Canvas(Modifier.fillMaxSize()) {
             val stroke = strokeWidth.toPx()
             val inset = stroke / 2f
@@ -71,7 +73,7 @@ fun AppRingProgress(
             // 进度渐变扫环
             drawArc(
                 brush = Brush.sweepGradient(
-                    colors = listOf(progressColor, surfaceColor.copy(alpha = 0f), AppColor.BrandAccent, progressColor),
+                    colors = listOf(progressColor, surfaceColor.copy(alpha = 0f), accentColor, progressColor),
                     center = Offset(size.width / 2f, size.height / 2f),
                 ),
                 startAngle = -90f,

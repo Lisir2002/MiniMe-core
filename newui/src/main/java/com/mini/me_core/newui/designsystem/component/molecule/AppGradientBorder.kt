@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -37,10 +38,10 @@ fun AppGradientBorder(
     shape: Shape = RoundedCornerShape(AppRadius.Lg),
     borderWidth: Dp = 2.dp,
     colors: List<Color> = listOf(
-        AppColor.BrandPrimary,
-        AppColor.BrandAccent,
+        appPalette().primary,
+        appPalette().accent,
         AppColor.StatusInfo,
-        AppColor.BrandPrimary,
+        appPalette().primary,
     ),
     durationMillis: Int = 4500,
     background: Color = MaterialTheme.colorScheme.surface,

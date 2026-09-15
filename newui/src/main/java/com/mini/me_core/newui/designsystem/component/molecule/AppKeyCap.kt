@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -33,18 +34,18 @@ import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
  *
  * 归一化要点（对齐 iOS 简约规范）：
  *  - **克制拟态**：以 `surface → surfaceVariant` 纵向渐变模拟键帽由亮到暗的下沉面，
- *    替代原 2dp 大块强调色"底部暗边"（免过于游戏化）；边缘发丝线用 [AppColor.SeparatorOnLight]。
+ *    替代原 2dp 大块强调色"底部暗边"（免过于游戏化）；边缘发丝线用 [appPalette().separator]。
  *  - **微光底色**：键帽底部一条强调色 hairline（`accentColor @28%`）作为"光缝"点缀，
  *    与主色 #0A84FF 呼应，弱化到纹理级不影响可读性。
  *  - **度量令牌**：内边距/圆角/间距全走 [AppSpacing]/[AppRadius]，消除硬编码 px。
- *  - **文字**：等宽字体（快捷键惯例）+ 半粗 + [AppColor.BrandInk] 一级文字。
- *  - **组合**：[AppKeyCombo] 以「+」串联，分隔间距 `AppSpacing.Xs`、色 [AppColor.LabelTertiary]。
+ *  - **文字**：等宽字体（快捷键惯例）+ 半粗 + [appPalette().ink] 一级文字。
+ *  - **组合**：[AppKeyCombo] 以「+」串联，分隔间距 `AppSpacing.Xs`、色 [appPalette().labelTertiary]。
  */
 @Composable
 fun AppKeyCap(
     label: String,
     modifier: Modifier = Modifier,
-    accentColor: Color = AppColor.BrandPrimary,
+    accentColor: Color = appPalette().primary,
 ) {
     Box(
         modifier = modifier
@@ -58,7 +59,7 @@ fun AppKeyCap(
                     ),
                 ),
             )
-            .border(1.dp, AppColor.SeparatorOnLight, RoundedCornerShape(AppRadius.Sm))
+            .border(1.dp, appPalette().separator, RoundedCornerShape(AppRadius.Sm))
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
         contentAlignment = Alignment.Center,
     ) {
@@ -75,7 +76,7 @@ fun AppKeyCap(
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             fontFamily = FontFamily.Monospace,
-            color = AppColor.BrandInk,
+            color = appPalette().ink,
         )
     }
 }
@@ -87,7 +88,7 @@ fun AppKeyCap(
 fun AppKeyCombo(
     keys: List<String>,
     modifier: Modifier = Modifier,
-    accentColor: Color = AppColor.BrandPrimary,
+    accentColor: Color = appPalette().primary,
 ) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         keys.forEachIndexed { index, key ->
@@ -96,7 +97,7 @@ fun AppKeyCombo(
                 Text(
                     text = "+",
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColor.LabelTertiary,
+                    color = appPalette().labelTertiary,
                 )
                 Spacer(Modifier.width(AppSpacing.Xs))
             }

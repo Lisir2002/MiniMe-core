@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.component.molecule
 
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -61,7 +62,7 @@ data class AppTimelineItem(
 fun AppTimeline(
     items: List<AppTimelineItem>,
     modifier: Modifier = Modifier,
-    defaultToneColor: Color = AppColor.BrandPrimary,
+    defaultToneColor: Color = appPalette().primary,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         items.forEachIndexed { index, item ->
