@@ -2,9 +2,9 @@ package com.mini.me_core.newui.designsystem.component.molecule
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -125,7 +125,6 @@ fun AppToolChainTimeline(
 
         Column(
             modifier = Modifier.padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
         ) {
             steps.forEachIndexed { index, step ->
                 ChainStepRow(step = step, isLast = index == steps.lastIndex)
@@ -172,7 +171,12 @@ private fun ChainStepRow(step: AppToolChainStep, isLast: Boolean) {
         AppToolChainStepState.Success -> AppColor.StatusSuccess
         AppToolChainStepState.Error -> AppColor.StatusDanger
     }
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+    // IntrinsicSize.Min 让 Row 高度取内容固有高度：滚动容器（无限高度约束）下
+    // fillMaxHeight 会塌陷为 0，轨道与连接线必须依赖有限行高才能贯通。
+    Row(
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        verticalAlignment = Alignment.Top,
+    ) {
         // 左侧轨道：状态节点 + 连接线
         Box(
             modifier = Modifier
@@ -224,10 +228,13 @@ private fun ChainStepRow(step: AppToolChainStep, isLast: Boolean) {
                 )
             }
         }
+        // 行间距以 bottom padding 承载（替代 spacedBy）：padding 计入行高，
+        // 连接线得以贯通到下一节点；末行不加，避免底部空白。
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(start = AppSpacing.Sm),
+                .padding(start = AppSpacing.Sm)
+                .then(if (isLast) Modifier else Modifier.padding(bottom = AppSpacing.Sm)),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

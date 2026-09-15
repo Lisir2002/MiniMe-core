@@ -736,8 +736,10 @@ private fun GalleryBody() {
 
     /** 附件卡：sendFile 展示型工具的产物（图片 + 文件）。 */
     fun chatAttachment() {
+        // 两个附件各自从 chatSeq 取号：若第二条偷懒用 id+1，chatSeq 未同步自增，
+        // 下一个演示项会复用相同 key，LazyColumn key 冲突直接崩溃。
         val id = chatSeq++
-        val attachmentKeys = listOf(id, id + 1)
+        val id2 = chatSeq++
         chatList = chatList + ChatItem.Attachment(
             key = id,
             fileName = "architecture-graph.png",
@@ -748,7 +750,7 @@ private fun GalleryBody() {
             onClick = { /* 演示占位：打开图片预览 */ },
         )
         chatList = chatList + ChatItem.Attachment(
-            key = id + 1,
+            key = id2,
             fileName = "migration-plan.md",
             mimeType = "text/markdown",
             sizeBytes = 12_800,
@@ -1587,6 +1589,11 @@ private fun GalleryBody() {
                             approvalHint = item.approvalHint,
                             onApprove = item.onApprove,
                             onReject = item.onReject,
+                            onChoice = item.onChoice,
+                            alwaysDisabled = item.alwaysDisabled,
+                            alwaysDisabledReason = item.alwaysDisabledReason,
+                            approvalExpired = item.approvalExpired,
+                            approvalRemembered = item.approvalRemembered,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         is ChatItem.McpApp -> AppMcpAppCard(

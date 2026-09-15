@@ -55,8 +55,8 @@ fun AppShell(
     // 内容区固定占主位；侧栏仅存在时左排（compact 移动端几乎不用，保留槽位契约）。
     if (sideRail != null) {
         Row(Modifier.fillMaxSize()) {
-            Surface(Modifier.fillMaxSize().navigationBarsPadding()) {
-                Column(Modifier.fillMaxSize()) { sideRail() }
+            Surface(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().navigationBarsPadding()) { sideRail() }
             }
             Column(Modifier.weight(1f).fillMaxSize()) {
                 ShellContent(
@@ -107,22 +107,24 @@ private fun ShellContent(
             content(PaddingValues(0.dp))
         }
         if (bottomBar != null) {
+            // 背景延伸到导航栏后（Surface 本体不加 inset），内容经 navigationBarsPadding 内移。
             Surface(
                 color = MaterialTheme.colorScheme.surface,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .navigationBarsPadding(),
+                    .fillMaxWidth(),
             ) {
-                bottomBar()
+                Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
+                    bottomBar()
+                }
             }
         }
     }
 }
 
 /**
- * 紧凑顶栏（统一规格事实源）：surface 背景延伸到状态栏，`statusBarsPadding` 内移内容行，
- * 内容行固定 44dp，返回 / 操作图标钮 40dp、图标 20dp。
+ * 紧凑顶栏（统一规格事实源）：surface 背景延伸到状态栏（Surface 本体不加 inset），
+ * `statusBarsPadding` 内移内容行，内容行固定 44dp，返回 / 操作图标钮 40dp、图标 20dp。
  */
 @Composable
 private fun ShellTopBar(
@@ -133,10 +135,13 @@ private fun ShellTopBar(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth().statusBarsPadding(),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(44.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(44.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (onNavigateBack != null && navigationIcon != null) {

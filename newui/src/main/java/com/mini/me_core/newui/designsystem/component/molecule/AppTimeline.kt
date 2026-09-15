@@ -6,10 +6,12 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -95,8 +97,10 @@ private fun TimelineRow(
         AppTimelineTone.Info -> AppColor.StatusInfo
         AppTimelineTone.Danger -> AppColor.StatusDanger
     }
+    // IntrinsicSize.Min 让 Row 高度取内容固有高度：滚动容器（无限高度约束）下
+    // fillMaxHeight 会塌陷为 0，轨道与连接线必须依赖有限行高才能贯通。
     Row(
-        modifier = Modifier.fillMaxWidth().alpha(fade),
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).alpha(fade),
         verticalAlignment = Alignment.Top,
     ) {
         // 左侧轨道：节点 + 连接线
