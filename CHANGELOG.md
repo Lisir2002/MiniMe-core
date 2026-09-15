@@ -7,6 +7,18 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc14] - 2026-09-15
+
+> 预发行（未转正）。新版 UI 设计系统深度核查修复轮：修复样板上多处「不能用 / 显示不对」的问题——附件演示第二个附件 key 复用导致 LazyColumn 崩溃、工具卡漏传审批参数导致三档审批/超时/记忆徽标不渲染、时间线连接线在滚动容器中塌陷不可见、跑马灯文本竖排、AppShell 顶栏/底栏背景未延伸进系统栏区域。纯 UI 设计系统（`:newui`）改动，app 模块未动，无 AI 工作流 / prompt / schema / 资产同步影响。
+
+### Fixed
+
+- `[ui]` 修复附件演示崩溃（崩溃级）：`chatAttachment()` 第二个附件用 `id+1` 作 key 但 `chatSeq` 未同步自增，点击「附件」后任何演示项复用相同 key，LazyColumn key 冲突直接崩溃；改为每个附件独立自增取号。
+- `[ui]` 修复工具卡审批功能不可用：`ChatItem.Tool` → `AppToolCallCard` 漏传 `onChoice` / `alwaysDisabled` / `alwaysDisabledReason` / `approvalExpired` / `approvalRemembered`，导致「待审批」三档 /「审批超时」降级 /「已记住」徽标不渲染；已补全。
+- `[ui]` 修复时间线连接线塌陷：`AppToolChainTimeline` / `AppTimeline` 连接线用 `fillMaxHeight()`，在滚动容器（无限高度约束）下高度塌为 0、整条不可见；改用 `IntrinsicSize.Min` 固定行高（行间距移入行内 bottom padding 保连接线贯通）。
+- `[ui]` 修复跑马灯文本竖排：`AppMarquee` 内容 Box 未被容器宽度约束，Text 被压到逐字符换行；补 `wrapContentWidth(unbounded = true)` 让内容按自然宽度展开。
+- `[ui]` 修复系统栏背景：`AppShell` 的 `ShellTopBar` / 底栏 / 侧栏把 insets 挂在 `Surface` 上，导致背景未延伸进状态栏 / 导航栏（透出窗口底色）；改为 Surface 全尺寸绘制背景、内容行内移 insets。
+
 ## [0.0.0.2-rc13] - 2026-09-14
 
 > 预发行（未转正）。页⾯骨架槽位收口（样板页先行）：新增统一壳 `AppShell`，把顶栏 / 顶栏 Tab / 内容区 / 底栏 / 侧栏五槽位固化为紧凑移动端壳并统一窗口 insets；顶栏规格唯一化为紧凑 `ShellTopBar`（44dp 内容行 + statusBarPadding），删除零消费的 M3 `AppTopBar`；精简剔除断点 / 停靠 / 多栏 / 装配图整套未落地理论；样板页改用 `AppShell`，同步修复顶栏与状态栏重合问题。纯 UI 设计系统（`:newui`）改动，app 模块未动，无 AI 工作流 / prompt / schema / 资产同步影响。
