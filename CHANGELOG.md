@@ -7,6 +7,26 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc16] - 2026-09-15
+
+> 预发行（未转正）。架构安全审计后的一轮加固：SFTP 强制 HostKey 校验、MCP DELETE 端点补鉴权、DEK 轮换改安全两阶段、备份/提取规则排除凭据库、CI 接入 OSV SCA；附带修复 CI 长期红屏的废弃 `tools` 包。纯安全与 CI 配置改动，无 UI / AI 工作流 / prompt / schema 变化。
+
+### Security
+
+- `[remote]` `SftpSyncClient` 构造函数改为必传 `HostKeyVerifier`，删除 `PromiscuousVerifier` 兜底；现有 3 个调用点（RemoteRepository）本就传 TOFU verifier，杜绝 SSH 中间人。
+- `[mcp]` `McpHttpServer` 的 `DELETE /mcp` 端点补 Bearer 校验（此前 POST/GET 有鉴权，DELETE 裸奔）。
+- `[core/security]` 修复 `CredentialEncryptor.scheduleRotateDek` 原实现"换新 DEK 却不重写已加密字段，导致存量凭据用新 DEK 解旧密文全部报废"的缺陷；改为暂存旧 DEK → 各 `CredentialFieldRewriter` 旧解新加 → 全部成功才落新 DEK，任一字段失败或重写器集合为空则不切换。
+- `[backup]` `full_backup_rules.xml` / `data_extraction_rules.xml` 排除凭据库 `minime_credentials_v2.db`，防止 Android Auto Backup 与 adb backup 把加密凭据库带出设备。
+
+### Added
+
+- `[core/security]` 新增 `CredentialFieldRewriter` 接口（DEK 轮换字段重写契约，当前空集安全，后续各加密域按需 `@IntoSet` 接入）。
+- `[ci]` `.github/workflows/dependency-audit.yml` 接入 `google/osv-scanner-action@v1.9.0` 真实 SCA。
+
+### Fixed
+
+- `[ci]` `ci.yml` / `dependency-audit.yml` / `weekly-health-check.yml` 移除已废弃的 `tools` 包（新版 cmdline-tools 无此包，`sdkmanager tools` 报 `Failed to find package 'tools'` 导致 CI 长期红屏），与 `android-release.yml` 对齐。
+
 ## [0.0.0.2-rc15] - 2026-09-15
 
 > 预发行（未转正）。rc14 上机截图核查后的第二轮显示修复：跑马灯两份内容叠印重影、庆祝彩带挤成一条线、图标坞选中标签气泡永不显示、窄屏令牌速率行与图标坞横向重叠、终端末行被渐隐层遮盖，外加样板观感与文案修正。纯 UI 设计系统（`:newui`）改动，app 模块未动，无 AI 工作流 / prompt / schema / 资产同步影响。
