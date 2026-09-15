@@ -6,8 +6,8 @@ release-log.py — MiniMe-core 三层发版日志自动生成器。
 依据 AGENTS.md「版本日志（发版必做 · 三层写法规约）」，从同一份 Conventional Commits
 来源（git log <prev_tag>..<cur_tag>）按受众渲染成三层不同语体：
 
-  --layer user   用户层：叙事、价值导向、无内部术语（供 GitHub Release 正文 · 用户视角）
-  --layer dev    开发者层：Keep a Changelog 六类（Added/Changed/Deprecated/Removed/Fixed/Security）
+  --layer user   用户层：用户视角，按「新增 / 优化 / 修复」状态分类小标题列条目（无内部术语）
+  --layer dev    开发者层：Keep a Changelog 六类（新增/变更/废弃/删除/修复/安全），带 scope 与 sha
   --layer ai     大模型层：结构化、机器可解析，聚焦 AI 工作流影响（工具/prompt/schema/接口）
   --layer all    三层合并（发版说明/ GitHub Release 正文 = 完整三层日志分节并列）
 
@@ -19,8 +19,9 @@ release-log.py — MiniMe-core 三层发版日志自动生成器。
 可通过 PATH 环境变量 `GITOPS_REPO` 覆盖仓库根（默认 git rev-parse --show-toplevel）。
 
 设计约束：
-  - 仅为开发者层辅助草稿，永不替代人工复核：Breaking 判定、文案价值化润色仍需人工完成。
-  - 用户层/大模型层的字体措辞由脚本按规则生成，可被人工在发布说明/AGENTS.md 中修订。
+  - 三层平铺（## 用户层 / ## 开发者层 / ## 大模型层），不折叠、不写营销修辞。
+  - 用户层、开发者层内部保留「新增/变更/删除/修复」等状态分类小标题（###），空分类不输出。
+  - Breaking 判定仍需人工复核；脚本只做按 Conventional type 归类，不替人润色。
 """
 
 from __future__ import annotations
@@ -38,23 +39,32 @@ TYPE_REGEX = re.compile(
     r"(?P<breaking>!)?:\s*(?P<subject>.+)$"
 )
 
-# Conventional type -> 开发者层 Keep a Changelog 分类
+# Conventional type -> 开发者层状态分类（中文，对应 Keep a Changelog 六类）
 DEV_MAP = {
-    "feat": "Added",
-    "fix": "Fixed",
-    "perf": "Changed",
-    "refactor": "Changed",
-    "chore": "Changed",
-    "build": "Changed",
-    "deps": "Changed",
-    "docs": "Changed",
+    "feat": "新增",
+    "fix": "修复",
+    "perf": "变更",
+    "refactor": "变更",
+    "chore": "变更",
+    "build": "变更",
+    "deps": "变更",
+    "docs": "变更",
+    "revert": "变更",
     "ci": None,          # 纯 CI 噪音，不进开发者层
     "test": None,        # 纯测试噪音
     "style": None,       # 纯格式噪音
 }
 
-# 用户层会更细：feat->新功能，fix->修复，perf->改进，breaking 提到亮点
-USER_EXCLUDE = {"ci", "test", "style", "docs", "chore", "build"}
+# 开发者层分类输出顺序（空分类不输出）
+DEV_ORDER = ["新增", "变更", "废弃", "删除", "修复", "安全"]
+
+# 用户层状态分类（仅用户可见 type；ci/test/style/docs/chore/build/refactor 等内部改动不进用户层）
+USER_GROUPS = [
+    ("feat", "新增"),
+    ("perf", "优化"),
+    ("fix", "修复"),
+]
+USER_EXCLUDE = {"ci", "test", "style", "docs", "chore", "build", "refactor", "deps"}
 
 # AI 层：与 AI 工作流强相关，重点标注
 AI_RELEVANT_TYPES = {"feat", "fix", "refactor", "perf"}
@@ -125,9 +135,26 @@ def format_entry(c):
     return f"- {marker}{scope}{c['subject']} ({c['sha']})"
 
 
+def _render_groups(buckets, order, empty_hint=None):
+    """按 order 输出非空分类：### 分类名 + 条目；全空时返回 empty_hint。"""
+    lines = []
+    for cat in order:
+        entries = buckets.get(cat, [])
+        if not entries:
+            continue
+        if lines:
+            lines.append("")
+        lines.append(f"### {cat}")
+        lines.append("")
+        lines.extend(entries)
+    if not lines:
+        return empty_hint or "- 无变更"
+    return "\n".join(lines).rstrip()
+
+
 def dev_layer(commits, version, date_str, repo):
-    """第 2 层：Keep a Changelog 六类。"""
-    buckets = {k: [] for k in DEV_MAP.values() if k}
+    """第 2 层：开发者状态分类（新增/变更/废弃/删除/修复/安全），条目带 scope 与 sha。"""
+    buckets = {k: [] for k in DEV_ORDER}
     other = []
     for c in commits:
         cat = DEV_MAP.get(c["type"])
@@ -138,29 +165,21 @@ def dev_layer(commits, version, date_str, repo):
         else:
             buckets[cat].append(format_entry(c))
 
-    lines = []
-    order = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
-    for cat in order:
-        entry = buckets.get(cat, [])
-        if entry:
-            lines.append(f"### {cat}")
-            lines.append("")
-            lines.extend(entry)
-            lines.append("")
+    out = _render_groups(buckets, DEV_ORDER)
     if other:
-        lines.append("### Unclassified（待归类）")
-        lines.append("")
-        lines.extend(other)
-        lines.append("")
-    return "\n".join(lines).rstrip()
+        out += "\n\n### 待归类\n\n" + "\n".join(other)
+    return out
 
 
 def user_layer(commits, version, date_str):
-    """第 1 层：给用户看，直接列条目，不加子标题。"""
-    items = [c for c in commits if c["type"] in ("feat", "fix", "perf")]
-    if not items:
-        return "- 无用户可见变更"
-    return "\n".join(f"- {c['subject']}" for c in items)
+    """第 1 层：用户视角，按 新增/优化/修复 状态分类，条目不带 sha、无内部术语。"""
+    buckets = {"新增": [], "优化": [], "修复": []}
+    for c in commits:
+        for type_, label in USER_GROUPS:
+            if c["type"] == type_:
+                buckets[label].append(f"- {c['subject']}")
+                break
+    return _render_groups(buckets, ["新增", "优化", "修复"], empty_hint="- 无用户可见变更")
 
 
 def _changed_paths(repo, prev, cur):
