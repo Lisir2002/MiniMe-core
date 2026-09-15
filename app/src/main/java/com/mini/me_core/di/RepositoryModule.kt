@@ -1,5 +1,6 @@
 package com.mini.me_core.di
 
+import com.mini.me_core.core.security.CredentialFieldRewriter
 import com.mini.me_core.feature.credentials.data.repository.CredentialRepositoryV2Impl
 import com.mini.me_core.feature.credentials.domain.repository.CredentialRepository
 import com.mini.me_core.feature.settings.data.repository.AIProviderRepositoryV2Impl
@@ -10,6 +11,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.ElementsIntoSet
 import javax.inject.Singleton
 
 /**
@@ -33,4 +35,15 @@ object RepositoryModule {
     @Provides
     @Singleton
     fun provideT2IRepository(v2Impl: T2IRepositoryV2Impl): T2IRepository = v2Impl
+
+    /**
+     * DEK 轮换字段重写器集合（multibinding）。
+     *
+     * 当前尚无任何加密域接入，提供空集合使 Hilt 可注入 `Set<CredentialFieldRewriter>`。
+     * 后续某域接入时，新增 `@Provides @IntoSet fun xxx(): CredentialFieldRewriter` 即可并入；
+     * 轮换在集合非空且真正重写字段时才会切换 DEK，否则安全拒绝（见 CredentialEncryptor）。
+     */
+    @Provides
+    @ElementsIntoSet
+    fun provideEmptyCredentialFieldRewriters(): Set<CredentialFieldRewriter> = emptySet()
 }

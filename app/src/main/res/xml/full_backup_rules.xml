@@ -8,6 +8,9 @@
     <include domain="file" path="database_crashes" />
     <include domain="file" path="zth_security" />
     <include domain="sharedpref" path="." />
+    <!-- 纵深防御：凭据库（Git token / API key 密文）不进 Android 自动备份。
+         密文虽由 Android Keystore MasterKey 保护、换机本就无法解出，但排除可避免备份文件中携带密文副本。 -->
+    <exclude domain="database" path="minime_credentials_v2.db" />
     <exclude domain="cache" path="." />
     <exclude domain="code_cache" path="." />
     <exclude domain="no_backup" path="." />

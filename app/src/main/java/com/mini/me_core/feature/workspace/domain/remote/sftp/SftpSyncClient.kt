@@ -10,8 +10,15 @@ import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.HostKeyVerifier
 import java.io.File
 
+/**
+ * SFTP 文件同步客户端。
+ *
+ * 安全约束：[hostKeyVerifier] 为必传参数，调用方必须显式传入真实的主机密钥校验器
+ * （通常为 HostKeyManager.createVerifier() 的 TOFU 实现），禁止再回退到 PromiscuousVerifier
+ * （接受任意主机密钥，存在中间人攻击风险）。
+ */
 class SftpSyncClient(
-    private val hostKeyVerifier: HostKeyVerifier? = null
+    private val hostKeyVerifier: HostKeyVerifier
 ) : RemoteSyncClient {
 
     private var sshClient: SSHClient? = null
@@ -19,7 +26,8 @@ class SftpSyncClient(
 
     override suspend fun connect(host: String, port: Int, username: String, auth: RemoteAuth) = withContext(Dispatchers.IO) {
         sshClient = SSHClient().apply {
-            addHostKeyVerifier(hostKeyVerifier ?: net.schmizz.sshj.transport.verification.PromiscuousVerifier())
+            // 强制走真实主机密钥校验（TOFU），不再静默接受任意主机。
+            addHostKeyVerifier(hostKeyVerifier)
             connect(host, port)
             
             when (auth) {

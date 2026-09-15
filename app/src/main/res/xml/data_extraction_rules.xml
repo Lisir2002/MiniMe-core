@@ -17,6 +17,8 @@
         <include domain="file" path="database_crashes" />
         <include domain="file" path="zth_security" />
         <include domain="sharedpref" path="." />
+        <!-- 凭据库密文不进云备份（纵深防御） -->
+        <exclude domain="database" path="minime_credentials_v2.db" />
         <exclude domain="cache" path="." />
         <exclude domain="code_cache" path="." />
         <exclude domain="no_backup" path="." />
@@ -26,6 +28,8 @@
         <include domain="file" path="database_crashes" />
         <include domain="file" path="zth_security" />
         <include domain="sharedpref" path="." />
+        <!-- 凭据库密文不进换机克隆（纵深防御） -->
+        <exclude domain="database" path="minime_credentials_v2.db" />
         <exclude domain="cache" path="." />
         <exclude domain="code_cache" path="." />
         <exclude domain="no_backup" path="." />

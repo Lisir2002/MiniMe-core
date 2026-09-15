@@ -105,6 +105,10 @@ class McpHttpServer(
                     handleGet(call)
                 }
                 delete {
+                    if (!authenticate(call)) {
+                        call.respondText("Unauthorized", ContentType.Text.Plain, HttpStatusCode.Unauthorized)
+                        return@delete
+                    }
                     call.respondText("OK", ContentType.Text.Plain, HttpStatusCode.OK)
                 }
             }

@@ -43,7 +43,19 @@ jobs:
       - name: Grant execute permission
         run: chmod +x ./gradlew
 
-      # 1. 检查可更新的依赖
+      # 1. 真实 SCA：OSV Scanner 对接 OSV 漏洞数据库，扫描项目依赖。
+      #    覆盖 Maven Central / GitHub 生态的已知 CVE；发现漏洞输出到步骤日志与 Step Summary。
+      #    此处仅报告不阻断（continue-on-error），PR 门禁可另设严格策略。
+      - name: OSV vulnerability scan
+        id: osv
+        continue-on-error: true
+        uses: google/osv-scanner-action@v1.9.0
+        with:
+          scan-args: |
+            --format=table
+            ./app
+
+      # 2. 检查可更新的依赖
       - name: Check dependency updates
         run: |
           # 直接解析 gradle 依赖树，提取所有外部依赖版本
@@ -51,7 +63,7 @@ jobs:
           echo "=== 依赖列表 ==="
           grep -E '^[a-z]+ ' /tmp/deps.txt | grep -v 'project :' | sort -u | head -100 || true
 
-      # 2. 统计依赖数量
+      # 3. 统计依赖数量
       - name: Count dependencies
         id: deps
         run: |
@@ -60,7 +72,7 @@ jobs:
           echo "dependency_count=${count}" >> "$GITHUB_OUTPUT"
           echo "依赖数量: $count"
 
-      # 3. 检查 Gradle wrapper 版本
+      # 4. 检查 Gradle wrapper 版本
       - name: Check Gradle version
         run: |
           echo "当前 Gradle 版本:"
@@ -69,7 +81,7 @@ jobs:
           echo "当前 AGP 版本:"
           grep -r 'com.android.tools.build:gradle' build.gradle.kts app/build.gradle.kts 2>/dev/null || echo "未找到"
 
-      # 4. 生成审计摘要
+      # 5. 生成审计摘要
       - name: Generate audit summary
         if: always()
         run: |
@@ -78,6 +90,7 @@ jobs:
             echo ""
             echo "- **日期**: $(date '+%Y-%m-%d')"
             echo "- **配置**: releaseRuntimeClasspath"
+            echo "- **OSV 扫描步骤**: ${{ steps.osv.outcome }}"
             echo ""
             echo "### 📦 依赖清单（Top 30）"
             echo '```'
@@ -86,7 +99,7 @@ jobs:
             echo '```'
             echo ""
             echo "### 📝 说明"
+            echo "- OSV Scanner 已对接 OSV 漏洞数据库，CVE 结果见上方「OSV vulnerability scan」步骤输出。"
             echo "- 如需查看完整依赖树: \`./gradlew :app:dependencies\`"
-            echo "- 如需检查依赖更新: 建议定期检查 AndroidX、Kotlin、Compose 等核心库版本"
             echo "- 安全建议: 关注 GitHub Dependabot alerts（Settings → Code security → Dependabot alerts）"
           } >> "$GITHUB_STEP_SUMMARY"

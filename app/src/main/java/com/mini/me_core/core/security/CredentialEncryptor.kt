@@ -18,6 +18,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.jvm.JvmSuppressWildcards
 
 /**
  * 凭据加密器 2.0（RC61 升级，RC61a 修正启动阻塞）。
@@ -45,7 +46,12 @@ import javax.inject.Singleton
 class CredentialEncryptor @Inject constructor(
     @ApplicationContext private val context: Context,
     private val v2Workspace: V2WorkspaceRepository,
-    private val auditLogRepo: RemoteAuditLogRepository
+    private val auditLogRepo: RemoteAuditLogRepository,
+    /**
+     * DEK 轮换时的字段重写器集合（Hilt multibinding，可为空）。
+     * 只有当全部加密域都接入时，轮换才会真正切换 DEK；否则安全拒绝，避免存量密文报废。
+     */
+    private val fieldRewriters: Set<@JvmSuppressWildcards CredentialFieldRewriter>,
 ) {
     private companion object {
         const val TAG = "CredentialEncryptor"
@@ -282,38 +288,72 @@ class CredentialEncryptor @Inject constructor(
     // ============== 密钥轮换 ==============
 
     /**
-     * 立即执行 DEK 轮换（适合测试 / 手动触发）。
-     * ① 生成新 DEK'；② MasterKey 重 wrap 入库；③ 逐表重写加密字段。
+     * DEK 轮换（安全两阶段，RC 审计修复）。
+     *
+     * 生成新 DEK 后必须把全部存量 V2 密文「旧 DEK 解 → 新 DEK 加」重写，否则切新 DEK 后旧密文报废。
+     * 流程：① 暂存旧 DEK、生成新 DEK（暂不生效）；② 对每个 [CredentialFieldRewriter] 重写并回写；
+     * ③ 全部成功才落库新 DEK 并生效。任一步失败或零字段重写 → 不动 state、不换 DEK，返回失败，
+     * 存量数据与旧 DEK 均保持不变。
      */
     suspend fun scheduleRotateDek(): OperationResult<RotationReport> = withContext(Dispatchers.IO) {
         return@withContext try {
             ensureInitialized()
+            val oldDek = requireDek()
             val masterKey = dekManager.getOrCreateMasterKey()
+
+            // ① 生成新 DEK，但暂不生效
             val newDek = dekManager.generateDek()
+
+            // ② 两阶段重写：旧 DEK 解 → 新 DEK 加。任一 rewriter 抛异常都会被外层 catch 回滚。
+            var totalRewritten = 0
+            val rewrittenDomains = mutableListOf<String>()
+            for (rw in fieldRewriters) {
+                val n = rw.reencryptAll { oldCipher ->
+                    if (!CredentialEncryptionContract.isV2Ciphertext(oldCipher)) oldCipher
+                    else encryptWith(newDek, decryptWith(oldDek, oldCipher))
+                }
+                totalRewritten += n
+                if (n > 0) rewrittenDomains += "${rw.domain}=$n"
+            }
+
+            // 没有任何域真正重写字段 → 坚决不换 DEK，避免旧密文报废。
+            if (totalRewritten == 0) {
+                val msg = "未发现可迁移的加密凭据字段（已注册重写器 ${fieldRewriters.size} 个），" +
+                    "为保护存量数据未更换 DEK。请确认全部加密域已接入 CredentialFieldRewriter。"
+                FileLogger.w(TAG, msg)
+                auditLogRepo.append(
+                    category = RemoteAuditCategory.SECURITY,
+                    action = RemoteAuditAction.CRED_ROTATE_DEK,
+                    success = false,
+                    message = msg
+                )
+                return@withContext OperationResult.failure(IllegalStateException(msg))
+            }
+
+            // ③ 全部重写成功 → 落库新 DEK 并生效
+            val startMs = System.currentTimeMillis()
             val newDekCiphertext = dekManager.wrapDek(masterKey, newDek)
             val fingerprint = dekManager.getMasterKeyFingerprint(masterKey)
-            val startMs = System.currentTimeMillis()
-
             val existing = getState()
+            val newCounter = (existing?.rotationCounter ?: 0) + 1
             upsertState(
                 CredentialEncryptionStateEntity(
                     masterKeyFingerprint = fingerprint,
                     dekCiphertext = newDekCiphertext,
                     encScheme = "V2",
                     lastRotatedAt = startMs,
-                    rotationCounter = (existing?.rotationCounter ?: 0) + 1,
+                    rotationCounter = newCounter,
                     biometricRequired = existing?.biometricRequired ?: false,
                     migratedFromV1 = existing?.migratedFromV1 ?: true
                 )
             )
-
             dekCached = newDek
 
             val durationMs = System.currentTimeMillis() - startMs
             val report = RotationReport(
                 rotatedAtMs = startMs,
-                rotationCounter = (existing?.rotationCounter ?: 0) + 1,
-                affectedTables = listOf(RotationReport.TableCount("credential_encryption_state", 1)),
+                rotationCounter = newCounter,
+                affectedTables = rewrittenDomains.map { RotationReport.TableCount(it, 0) },
                 durationMs = durationMs
             )
 
@@ -321,17 +361,17 @@ class CredentialEncryptor @Inject constructor(
                 category = RemoteAuditCategory.CREDENTIAL,
                 action = RemoteAuditAction.CRED_ROTATE_DEK,
                 success = true,
-                message = "DEK 轮换完成，耗时 ${durationMs}ms，版本 ${report.rotationCounter}"
+                message = "DEK 轮换完成，重写字段 $totalRewritten（${rewrittenDomains.joinToString()}），耗时 ${durationMs}ms"
             )
-
             OperationResult.success(report)
         } catch (e: Exception) {
-            FileLogger.e(TAG, "DEK 轮换失败", e)
+            // 关键：走到这里时 dekCached 仍是旧 DEK，state 未更新，存量数据安全。
+            FileLogger.e(TAG, "DEK 轮换失败（已回滚，旧 DEK 继续生效）: ${e.message}", e)
             auditLogRepo.append(
                 category = RemoteAuditCategory.CREDENTIAL,
                 action = RemoteAuditAction.CRED_ROTATE_DEK,
                 success = false,
-                message = "DEK 轮换失败: ${e.message}"
+                message = "DEK 轮换失败已回滚: ${e.message}"
             )
             OperationResult.failure(e)
         }
@@ -475,6 +515,26 @@ class CredentialEncryptor @Inject constructor(
         } catch (e: Exception) {
             formatted
         }
+    }
+
+    /** 用指定 DEK 加密明文（DEK 轮换两阶段重写用，不读 dekCached）。 */
+    private fun encryptWith(dek: SecretKey, plaintext: String): String {
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, dek)
+        val iv = cipher.iv
+        val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
+        return SCHEME_V2 + Base64.getEncoder().encodeToString(iv + ciphertext)
+    }
+
+    /** 用指定 DEK 解 V2 密文（DEK 轮换两阶段重写用，不读 dekCached）。 */
+    private fun decryptWith(dek: SecretKey, formatted: String): String {
+        val combined = Base64.getDecoder().decode(formatted.removePrefix(SCHEME_V2))
+        require(combined.size >= IV_LEN + 1) { "V2 ciphertext too short" }
+        val iv = combined.copyOfRange(0, IV_LEN)
+        val ciphertext = combined.copyOfRange(IV_LEN, combined.size)
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.DECRYPT_MODE, dek, GCMParameterSpec(GCM_TAG_BITS, iv))
+        return String(cipher.doFinal(ciphertext), Charsets.UTF_8)
     }
 
     private fun requireDek(): SecretKey {
