@@ -138,7 +138,7 @@ def dev_layer(commits, version, date_str, repo):
         else:
             buckets[cat].append(format_entry(c))
 
-    lines = [f"## [{version}] - {date_str}", ""]
+    lines = []
     order = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
     for cat in order:
         entry = buckets.get(cat, [])
@@ -152,46 +152,15 @@ def dev_layer(commits, version, date_str, repo):
         lines.append("")
         lines.extend(other)
         lines.append("")
-    lines.append(
-        f"**Full Changelog**: {_compare_url(repo, version)}"
-    )
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip()
 
 
 def user_layer(commits, version, date_str):
-    """第 1 层：给用户看的价值导向文案。"""
-    by_type = {}
-    breaking = []
-    for c in commits:
-        if c["breaking"]:
-            breaking.append(c)
-        if c["type"]:
-            by_type.setdefault(c["type"], []).append(c)
-
-    lines = [f"# MiniMe-core {version}（{date_str}）", ""]
-    if breaking:
-        lines.append("## 亮点 Highlights")
-        lines.append("")
-        lines.extend(f"- ⚠️ {c['subject']}" for c in breaking)
-        lines.append("")
-    for cat, label in (("feat", "新功能 New Features"), ("perf", "改进 Improvements"),
-                       ("fix", "修复 Fixes"), ("other", "其他 Other")):
-        items = by_type.get(cat, [])
-        if not items and cat != "other":
-            continue
-        if cat == "other":
-            used = {"feat", "perf", "fix", *USER_EXCLUDE}
-            items = [c for c in commits if c["type"] and c["type"] not in used]
-        if not items:
-            continue
-        lines.append(f"## {label}")
-        lines.append("")
-        lines.extend(f"- {c['subject']}" for c in items)
-        lines.append("")
-    lines.append("## 已知问题 Known Issues")
-    lines.append("")
-    lines.append("_（如需，可在发版前补充已知问题列表）_")
-    return "\n".join(lines)
+    """第 1 层：给用户看，直接列条目，不加子标题。"""
+    items = [c for c in commits if c["type"] in ("feat", "fix", "perf")]
+    if not items:
+        return "- 无用户可见变更"
+    return "\n".join(f"- {c['subject']}" for c in items)
 
 
 def _changed_paths(repo, prev, cur):
@@ -220,7 +189,7 @@ def ai_layer(commits, version, date_str, changed_paths):
         if any(s in p for s in ("prompts/", "Tool", "tool/", "mcp"))
     ]
 
-    lines = [f"## {version}（{date_str}）", ""]
+    lines = []
     lines.append("### TYPE")
     lines.append("")
     lines.append(f"- 发布范围: {len(commits)} 提交（含 breaking {sum(1 for c in commits if c['breaking'])}）")
@@ -250,11 +219,6 @@ def ai_layer(commits, version, date_str, changed_paths):
         lines.append("- ⚠️ 含 Breaking Change，须在开发者层标注迁移说明。")
     else:
         lines.append("- 无 Breaking Change。")
-    lines.append("")
-    lines.append("### AI ACTION")
-    lines.append("")
-    lines.append("- 发版前核对 schema/tool 变更是否已同步 assets/prompts 与迁移链；")
-    lines.append("- 无 schema 变化时保持本条显式声明，防误判版本号触发迁移。")
     return "\n".join(lines)
 
 
