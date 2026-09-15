@@ -1407,17 +1407,30 @@ private fun GalleryBody() {
                 AppButton(text = "更新", variant = AppButtonVariant.Outlined, onClick = { showUpdateDialog = true })
                 AppButton(text = "动作面板", variant = AppButtonVariant.Outlined, onClick = { showActionSheet = true })
             }
+            // 次级动作：等宽两列网格，左对齐；右列起始 x 不随左列文字宽度漂移
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
-                AppButton(text = "表单", variant = AppButtonVariant.Text, onClick = { showFormDialog = true })
-                AppButton(text = "权限", variant = AppButtonVariant.Text, onClick = { showPermissionDialog = true })
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    AppButton(text = "表单", variant = AppButtonVariant.Text, onClick = { showFormDialog = true })
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    AppButton(text = "权限", variant = AppButtonVariant.Text, onClick = { showPermissionDialog = true })
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
-                AppButton(text = "成功", variant = AppButtonVariant.Text, onClick = { showSuccessDialog = true })
-                AppButton(text = "多选", variant = AppButtonVariant.Text, onClick = { showMultiSelectDialog = true })
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    AppButton(text = "成功", variant = AppButtonVariant.Text, onClick = { showSuccessDialog = true })
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    AppButton(text = "多选", variant = AppButtonVariant.Text, onClick = { showMultiSelectDialog = true })
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
-                AppButton(text = "倒计时防误", variant = AppButtonVariant.Text, onClick = { showCountdownDialog = true })
-                AppButton(text = "阻塞遮罩", variant = AppButtonVariant.Text, onClick = { showLoadingOverlay = true })
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    AppButton(text = "倒计时防误", variant = AppButtonVariant.Text, onClick = { showCountdownDialog = true })
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    AppButton(text = "阻塞遮罩", variant = AppButtonVariant.Text, onClick = { showLoadingOverlay = true })
+                }
             }
         }
 

@@ -62,17 +62,18 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
@@ -662,7 +663,7 @@ fun AppCascadingMenu(
     items: List<AppCascadeNode>,
     onItemClick: (AppCascadeNode) -> Unit,
     modifier: Modifier = Modifier,
-    offset: IntOffset = IntOffset(0, 32),
+    offset: IntOffset = IntOffset(0, 0),
     columnWidth: Dp = 200.dp,
 ) {
     if (!expanded) return
@@ -672,33 +673,60 @@ fun AppCascadingMenu(
     // 每次打开时重置导航栈（回到根级）。
     LaunchedEffect(expanded) { if (expanded) path = emptyList() }
 
-    // —— 空间感知：测量锚点右侧剩余宽度，决定子列向右还是向左展开 ——
-    val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
     val slotDp = columnWidth + AppSpacing.Sm
-    val columnWidthPx = with(density) { columnWidth.toPx() }
-    val slotPx = with(density) { slotDp.toPx() }
+    // 菜单是否向左展开（子列在根列左侧）：由 PopupPositionProvider 依据触发按钮真实位置决定。
+    var openLeft by remember { mutableStateOf(false) }
 
-    // 锚点（根列左边缘）在屏幕上的 x 坐标，由 onGloballyPositioned 测量。
-    var anchorLeftPx by remember { mutableStateOf(0f) }
-    // 首次合成时 anchorLeftPx 仍为 0，此时默认向右；测量到真实位置后再决定是否翻左。
-    val flipLeft = anchorLeftPx > 0f && (screenWidthPx - anchorLeftPx - columnWidthPx) < slotPx
+    // 标准定位提供者：直接拿到触发按钮（anchorBounds）在窗口中的真实矩形，
+    // 不再硬编码 offset 下偏、也不再"测菜单自己的位置"来猜方向（鸡生蛋）。
+    val positionProvider = remember {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset {
+                val marginPx = with(density) { 8.dp.roundToPx() }
+                // 水平：默认左对齐触发按钮左缘；右缘会溢出则右对齐触发按钮右缘（向左翻），再夹紧屏幕边距
+                var x = anchorBounds.left + offset.x
+                openLeft = if (x + popupContentSize.width > windowSize.width - marginPx) {
+                    x = anchorBounds.right + offset.x - popupContentSize.width
+                    true
+                } else {
+                    false
+                }
+                x = x.coerceIn(
+                    marginPx,
+                    (windowSize.width - popupContentSize.width - marginPx).coerceAtLeast(marginPx),
+                )
+                // 垂直：默认贴在触发按钮下方；底部放不下则翻到上方
+                var y = anchorBounds.bottom + offset.y
+                if (y + popupContentSize.height > windowSize.height - marginPx) {
+                    y = anchorBounds.top - popupContentSize.height + offset.y
+                }
+                y = y.coerceIn(
+                    marginPx,
+                    (windowSize.height - popupContentSize.height - marginPx).coerceAtLeast(marginPx),
+                )
+                return IntOffset(x, y)
+            }
+        }
+    }
 
     Popup(
-        offset = offset,
+        popupPositionProvider = positionProvider,
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
         val visibleCount = path.size + 1
         val totalWidthDp = slotDp * visibleCount - AppSpacing.Sm
-        // 翻左时把整组列向左偏移，使根列对齐锚点（子列在根列左侧铺开）。
-        val contentShiftX = if (flipLeft) -(slotDp * (visibleCount - 1)) else 0.dp
+        // 向左展开时把整组列向左偏移，使根列对齐触发按钮右缘（子列在根列左侧铺开）。
+        val contentShiftX = if (openLeft) -(slotDp * (visibleCount - 1)) else 0.dp
 
         Box(
-            modifier = modifier.onGloballyPositioned { coords ->
-                anchorLeftPx = coords.boundsInWindow().left
-            },
+            modifier = modifier,
         ) {
             Box(
                 modifier = Modifier
@@ -710,7 +738,7 @@ fun AppCascadingMenu(
                     depth = 0,
                     items = items,
                     totalDepth = path.size,
-                    flipLeft = flipLeft,
+                    flipLeft = openLeft,
                     corner = corner,
                     columnWidth = columnWidth,
                     onLeafClick = { node ->
@@ -725,7 +753,7 @@ fun AppCascadingMenu(
                         depth = depth + 1,
                         items = parent.children,
                         totalDepth = path.size,
-                        flipLeft = flipLeft,
+                        flipLeft = openLeft,
                         corner = corner,
                         columnWidth = columnWidth,
                         onLeafClick = { node ->
