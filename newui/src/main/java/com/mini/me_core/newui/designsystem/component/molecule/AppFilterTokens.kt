@@ -76,7 +76,7 @@ fun AppFilterToken(
                 .size(AppSizing.IconXs)
                 .clip(RoundedCornerShape(AppRadius.Pill))
                 .clickable(onClick = onRemove)
-                .padding(2.dp),
+                .padding(AppSpacing.Tiny),
         )
     }
 }

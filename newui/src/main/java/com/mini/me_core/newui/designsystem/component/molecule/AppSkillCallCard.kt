@@ -41,7 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 import java.util.Locale
 
 /**
@@ -82,7 +84,7 @@ fun AppSkillCallCard(
             .clip(cardShape)
             .background(appPalette().surface)
             .border(
-                width = 1.dp,
+                width = AppStroke.Thin,
                 color = if (state == AppSkillCallState.Error) {
                     AppColor.StatusDanger.copy(alpha = 0.45f)
                 } else {
@@ -142,13 +144,13 @@ fun AppSkillCallCard(
                     imageVector = Icons.Rounded.CheckCircle,
                     contentDescription = "成功",
                     tint = statusColor,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(AppSizing.IconXs),
                 )
                 AppSkillCallState.Error -> Icon(
                     imageVector = Icons.Rounded.ErrorOutline,
                     contentDescription = "失败",
                     tint = statusColor,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(AppSizing.IconXs),
                 )
             }
             if (description != null) {
@@ -162,7 +164,7 @@ fun AppSkillCallCard(
                     contentDescription = if (expanded) "收起技能说明" else "展开技能说明",
                     tint = appPalette().labelTertiary,
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(AppSizing.IconXs)
                         .rotate(rotation),
                 )
             }

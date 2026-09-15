@@ -69,7 +69,7 @@ fun AppFilterChip(
         contentAlignment = Alignment.Center,
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             androidx.compose.animation.AnimatedVisibility(
@@ -77,6 +77,7 @@ fun AppFilterChip(
                 enter = expandHorizontally() + fadeIn(),
                 exit = shrinkHorizontally() + fadeOut(),
             ) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = null,

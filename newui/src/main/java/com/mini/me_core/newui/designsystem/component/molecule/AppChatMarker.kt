@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /** 消息流标记类型：日期分隔 / 系统提示 / 工具调用卡。 */
 enum class AppChatMarkerKind { Date, System, Tool }
@@ -80,13 +81,14 @@ private fun ToolMarker(text: String, modifier: Modifier, tone: Color, running: B
     Row(
         modifier = modifier
             .background(appPalette().surface, RoundedCornerShape(AppRadius.Pill))
-            .border(1.dp, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
+            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
             .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (running) {
             AppTypingIndicator(dotColor = appPalette().primary, dotSize = 4.dp)
         } else {
+            // 装饰图标：旁侧已有文字/语义，跳过无障碍
             Icon(
                 imageVector = if (tone == AppColor.StatusDanger) Icons.Rounded.ErrorOutline else Icons.Rounded.CheckCircle,
                 contentDescription = null,

@@ -54,6 +54,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /* =========================================================================
  * 输入框族（Text Input Family）
@@ -85,6 +86,7 @@ fun AppFilledTextField(
             { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else null,
         leadingIcon = if (leadingIcon != null) {
+            // 装饰图标：旁侧已有文字/语义，跳过无障碍
             {
                 Icon(
                     imageVector = leadingIcon,
@@ -103,6 +105,7 @@ fun AppFilledTextField(
                         .size(AppSizing.IconButton)
                         .clip(RoundedCornerShape(AppRadius.Pill))
                         .clickable { onValueChange("") }
+                        // 非标准尺寸，特殊场景保留
                         .padding(10.dp),
                 )
             }
@@ -153,6 +156,7 @@ fun AppPasswordField(
                     .size(AppSizing.IconButton)
                     .clip(RoundedCornerShape(AppRadius.Pill))
                     .clickable { visible = !visible }
+                    // 非标准尺寸，特殊场景保留
                     .padding(10.dp),
             )
         },
@@ -242,12 +246,14 @@ fun AppValidatedTextField(
             { Text(helper, color = if (validity == AppInputValidity.Normal) MaterialTheme.colorScheme.onSurfaceVariant else accent) }
         } else null,
         trailingIcon = {
+            // 装饰图标：旁侧已有文字/语义，跳过无障碍
             Icon(
                 imageVector = if (validity == AppInputValidity.Error) Icons.Rounded.Close else Icons.Rounded.Check,
                 contentDescription = null,
                 tint = accent.copy(alpha = if (validity == AppInputValidity.Error) 1f else checkAlpha),
                 modifier = Modifier
                     .size(AppSizing.IconButton)
+                    // 非标准尺寸，特殊场景保留
                     .padding(10.dp),
             )
         },
@@ -326,7 +332,7 @@ fun AppMessageField(
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, border, shape)
+            .border(AppStroke.Thin, border, shape)
             .padding(6.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
@@ -342,6 +348,7 @@ fun AppMessageField(
                     .size(AppSizing.IconButton)
                     .clip(RoundedCornerShape(AppRadius.Pill))
                     .clickable {}
+                    // 非标准尺寸，特殊场景保留
                     .padding(10.dp),
             )
         }
@@ -362,7 +369,7 @@ fun AppMessageField(
                 onValueChange = onValueChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 2.dp),
+                    .padding(vertical = AppSpacing.Tiny),
                 minLines = 1,
                 maxLines = 4,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
@@ -378,12 +385,13 @@ fun AppMessageField(
                 .semantics { contentDescription = "发送" },
             contentAlignment = Alignment.Center,
         ) {
+            // 装饰图标：父级 Box 已声明 contentDescription="发送"，跳过无障碍
             Icon(
                 imageVector = Icons.Rounded.Send,
                 contentDescription = null,
                 tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
-                    .size(18.dp)
+                    .size(AppSizing.IconS)
                     .graphicsLayer {
                         scaleX = sendScale
                         scaleY = sendScale

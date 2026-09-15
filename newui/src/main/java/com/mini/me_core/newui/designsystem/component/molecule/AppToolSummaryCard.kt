@@ -36,7 +36,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /** 工具结果摘要状态：正在总结（流式三点） / 完成（定格文本）。 */
 enum class AppToolSummaryState { Summarizing, Done }
@@ -67,7 +69,7 @@ fun AppToolSummaryCard(
         modifier = modifier
             .clip(cardShape)
             .background(appPalette().card)
-            .border(1.dp, appPalette().separator, cardShape),
+            .border(AppStroke.Thin, appPalette().separator, cardShape),
     ) {
         Row(
             modifier = Modifier
@@ -77,16 +79,17 @@ fun AppToolSummaryCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(AppSizing.IconXl)
                     .clip(RoundedCornerShape(AppRadius.Sm))
                     .background(appPalette().primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = Icons.Rounded.Summarize,
                     contentDescription = null,
                     tint = appPalette().primary,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(AppSizing.IconXs),
                 )
             }
             Spacer(Modifier.width(AppSpacing.Sm))
@@ -112,7 +115,7 @@ fun AppToolSummaryCard(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(1.dp)
+                .height(AppStroke.Thin)
                 .background(appPalette().separator),
         )
 
@@ -173,12 +176,13 @@ private fun SummaryTextBlock(text: String, maxLines: Int) {
                     color = appPalette().labelSecondary,
                     modifier = Modifier.weight(1f),
                 )
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = Icons.Rounded.KeyboardArrowDown,
                     contentDescription = null,
                     tint = appPalette().labelSecondary,
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(AppSizing.IconXs)
                         .rotate(if (expanded) 180f else 0f),
                 )
             }

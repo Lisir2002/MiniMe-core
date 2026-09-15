@@ -39,7 +39,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /**
  * MCP 应用生命周期状态：加载交互式界面 → 就绪（可交互） / 失败。
@@ -77,7 +79,7 @@ fun AppMcpAppCard(
         modifier = modifier
             .clip(cardShape)
             .background(appPalette().card)
-            .border(1.dp, appPalette().separator, cardShape),
+            .border(AppStroke.Thin, appPalette().separator, cardShape),
     ) {
         // 头部：Inspector 一行话
         Row(
@@ -88,16 +90,17 @@ fun AppMcpAppCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(AppSizing.IconXl)
                     .clip(RoundedCornerShape(AppRadius.Sm))
                     .background(appPalette().primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = Icons.Rounded.WebAsset,
                     contentDescription = null,
                     tint = appPalette().primary,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(AppSizing.IconXs),
                 )
             }
             Spacer(Modifier.width(AppSpacing.Sm))
@@ -150,7 +153,7 @@ fun AppMcpAppCard(
                     verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
                 ) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(AppSizing.IconS),
                         color = appPalette().primary,
                         strokeWidth = 2.dp,
                     )
@@ -167,11 +170,12 @@ fun AppMcpAppCard(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
                 ) {
+                    // 装饰图标：旁侧已有文字/语义，跳过无障碍
                     Icon(
                         imageVector = Icons.Rounded.ErrorOutline,
                         contentDescription = null,
                         tint = AppColor.StatusDanger,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(AppSizing.IconM),
                     )
                     Text(
                         text = "界面加载失败",
@@ -201,22 +205,22 @@ fun AppMcpAppCard(
             )
             Spacer(Modifier.weight(1f))
             if (onReload != null) {
-                IconButton(onClick = onReload, modifier = Modifier.size(28.dp)) {
+                IconButton(onClick = onReload, modifier = Modifier.size(AppSizing.IconXl)) {
                     Icon(
                         imageVector = Icons.Rounded.Refresh,
                         contentDescription = "刷新界面",
                         tint = appPalette().labelSecondary,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(AppSizing.IconXs),
                     )
                 }
             }
             if (onExpand != null) {
-                IconButton(onClick = onExpand, modifier = Modifier.size(28.dp)) {
+                IconButton(onClick = onExpand, modifier = Modifier.size(AppSizing.IconXl)) {
                     Icon(
                         imageVector = Icons.Rounded.OpenInFull,
                         contentDescription = "全屏查看",
                         tint = appPalette().labelSecondary,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(AppSizing.IconXs),
                     )
                 }
             }
@@ -237,13 +241,13 @@ private fun McpAppStatusBadge(state: AppMcpAppState) {
             imageVector = Icons.Rounded.CheckCircle,
             contentDescription = "就绪",
             tint = AppColor.StatusSuccess,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(AppSizing.IconXs),
         )
         AppMcpAppState.Error -> Icon(
             imageVector = Icons.Rounded.ErrorOutline,
             contentDescription = "失败",
             tint = AppColor.StatusDanger,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(AppSizing.IconXs),
         )
     }
 }
@@ -305,14 +309,14 @@ private fun MockDashboard() {
             Text(
                 text = "ui://analytics/build-duration",
                 style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                color = AppColor.OnDarkSecondaryLabel,
+                color = appPalette().labelSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(AppRadius.Sm))
-                    .background(AppColor.OnDarkSurfaceRaised)
-                    .padding(horizontal = AppSpacing.Sm, vertical = 2.dp),
+                    .background(appPalette().card)
+                    .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
             )
         }
         // 指标瓷砖：数字 + 标签
@@ -325,19 +329,19 @@ private fun MockDashboard() {
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(AppRadius.Sm))
-                        .background(AppColor.OnDarkSurfaceRaised)
+                        .background(appPalette().card)
                         .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
                 ) {
                     Text(
                         text = value,
                         style = MaterialTheme.typography.titleSmall.copy(fontFamily = FontFamily.Monospace),
                         fontWeight = FontWeight.Bold,
-                        color = AppColor.OnDarkInk,
+                        color = appPalette().ink,
                     )
                     Text(
                         text = label,
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppColor.OnDarkSecondaryLabel,
+                        color = appPalette().labelSecondary,
                         maxLines = 1,
                     )
                 }
@@ -357,7 +361,7 @@ private fun MockDashboard() {
                             .fillMaxHeight(fraction)
                             .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
                             .background(
-                                if (index % 3 == 0) AppColor.OnDarkPrimary.copy(alpha = 0.85f)
+                                if (index % 3 == 0) appPalette().primary.copy(alpha = 0.85f)
                                 else appPalette().accent.copy(alpha = 0.55f),
                             ),
                     )
@@ -367,8 +371,8 @@ private fun MockDashboard() {
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .height(1.dp)
-                    .background(AppColor.OnDarkSecondaryLabel.copy(alpha = 0.35f)),
+                    .height(AppStroke.Thin)
+                    .background(appPalette().labelSecondary.copy(alpha = 0.35f)),
             )
         }
     }
@@ -379,7 +383,7 @@ private fun McpDivider() {
     Box(
         Modifier
             .fillMaxWidth()
-            .height(1.dp)
+            .height(AppStroke.Thin)
             .background(appPalette().separator),
     )
 }

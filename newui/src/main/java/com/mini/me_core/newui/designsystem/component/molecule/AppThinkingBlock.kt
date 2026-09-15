@@ -38,7 +38,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /**
  * 思考过程折叠块（分子组 · AppThinkingBlock）：AI 消息正文前/后的 reasoning 展示层，
@@ -77,7 +79,7 @@ fun AppThinkingBlock(
             .fillMaxWidth()
             .clip(shape)
             .background(appPalette().surface)
-            .border(1.dp, appPalette().separator, shape),
+            .border(AppStroke.Thin, appPalette().separator, shape),
     ) {
         Row(
             modifier = Modifier
@@ -89,11 +91,12 @@ fun AppThinkingBlock(
                 .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // 装饰图标：旁侧已有文字/语义，跳过无障碍
             Icon(
                 imageVector = Icons.Rounded.Lightbulb,
                 contentDescription = null,
                 tint = appPalette().accent,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(AppSizing.IconXs),
             )
             Spacer(Modifier.width(AppSpacing.Sm))
             Text(
@@ -128,7 +131,7 @@ fun AppThinkingBlock(
                 contentDescription = if (effectiveExpanded) "收起$label" else "展开$label",
                 tint = appPalette().labelTertiary,
                 modifier = Modifier
-                    .size(16.dp)
+                    .size(AppSizing.IconXs)
                     .rotate(rotation),
             )
         }

@@ -209,6 +209,7 @@ private fun SelectionIndicator(
                         alpha = revealAlpha
                     },
             ) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 androidx.compose.material3.Icon(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = null,

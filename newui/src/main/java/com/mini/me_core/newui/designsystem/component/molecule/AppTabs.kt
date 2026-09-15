@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppMotion
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 
 /**
  * 滑动指示器标签栏（分子组 · AppTabs）：品牌色下划线指示块随选择滑动
@@ -58,7 +59,7 @@ fun AppTabs(
                     Box(
                         modifier = Modifier
                             .width(tabWidth)
-                            .height(40.dp)
+                            .height(AppSizing.IconButton)
                             .clickable { onSelect(index) },
                         contentAlignment = Alignment.Center,
                     ) {

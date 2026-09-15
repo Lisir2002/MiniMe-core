@@ -57,7 +57,7 @@ fun AppRatingBar(
             }
             Icon(
                 imageVector = if (filled) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                contentDescription = null,
+                contentDescription = "评分 ${i + 1} 星",
                 tint = if (filled) color else MaterialTheme.colorScheme.outlineVariant,
                 modifier = Modifier
                     .size(size)

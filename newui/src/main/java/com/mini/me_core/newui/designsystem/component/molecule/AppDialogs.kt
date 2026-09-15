@@ -77,6 +77,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppElevation
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /** 弹窗强调色语义：Info / Success / Warning / Danger。 */
 enum class AppDialogTone { Info, Success, Warning, Danger }
@@ -132,7 +133,7 @@ internal fun AppDialogSurface(
                     .fillMaxWidth()
                     .shadow(AppElevation.Z4, shape, clip = true)
                     .background(appPalette().card)
-                    .border(1.dp, appPalette().separator, shape)
+                    .border(AppStroke.Thin, appPalette().separator, shape)
                     .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Xl),
             ) {
                 if (icon != null || title.isNotEmpty()) {
@@ -337,7 +338,7 @@ fun AppUpdateDialog(
             )
             if (notes.isNotEmpty()) {
                 SpacerV(AppSpacing.Sm)
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs)) {
                     notes.forEach { note ->
                         Row {
                             Text("• ", color = tone.color(), style = MaterialTheme.typography.bodySmall)
@@ -460,6 +461,7 @@ fun AppSelectionDialog(
                             },
                             modifier = Modifier.weight(1f),
                         )
+                        // 装饰图标：旁侧已有文字/语义，跳过无障碍
                         Icon(
                             imageVector = if (isSelected) {
                                 Icons.Rounded.RadioButtonChecked
@@ -472,7 +474,7 @@ fun AppSelectionDialog(
                             } else {
                                 appPalette().labelTertiary
                             },
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(AppSizing.IconM),
                         )
                     }
                 }
@@ -519,13 +521,13 @@ fun AppProgressDialog(
                     progress = progress.coerceIn(0f, 1f),
                     color = tone.color(),
                     strokeWidth = 4.dp,
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier.size(AppSizing.TouchTarget),
                 )
             } else {
                 CircularProgressIndicator(
                     color = tone.color(),
                     strokeWidth = 4.dp,
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier.size(AppSizing.TouchTarget),
                 )
             }
             SpacerV(AppSpacing.Md)

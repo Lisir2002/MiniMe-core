@@ -32,6 +32,7 @@ fun AppChip(
             modifier = Modifier.padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
         ) {
             if (icon != null) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = icon,
                     contentDescription = null,

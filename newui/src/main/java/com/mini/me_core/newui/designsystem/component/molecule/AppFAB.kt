@@ -61,7 +61,7 @@ fun AppFAB(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = null,
+            contentDescription = text,
             tint = contentColor,
             modifier = Modifier.size(AppSizing.IconM),
         )

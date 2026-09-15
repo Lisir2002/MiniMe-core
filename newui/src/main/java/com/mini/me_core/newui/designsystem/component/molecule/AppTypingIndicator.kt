@@ -41,7 +41,7 @@ fun AppTypingIndicator(
     val transition = rememberInfiniteTransition(label = "typing")
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         repeat(3) { i ->

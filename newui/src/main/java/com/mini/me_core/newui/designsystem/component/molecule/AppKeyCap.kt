@@ -27,6 +27,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppElevation
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /**
  * 键盘键帽（分子组 · AppKeyCap / AppKeyCombo）：iOS 简约风格的拟态键帽，
@@ -59,7 +60,7 @@ fun AppKeyCap(
                     ),
                 ),
             )
-            .border(1.dp, appPalette().separator, RoundedCornerShape(AppRadius.Sm))
+            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Sm))
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
         contentAlignment = Alignment.Center,
     ) {
@@ -68,7 +69,7 @@ fun AppKeyCap(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(1.dp)
+                .height(AppStroke.Thin)
                 .background(accentColor.copy(alpha = 0.28f)),
         )
         Text(

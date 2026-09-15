@@ -40,6 +40,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppMotion
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /** 内联提示色调（分子组 · AppInlineAlert 的 tone）。 */
 enum class AppAlertTone { Info, Success, Warning, Danger }
@@ -70,10 +71,11 @@ fun AppInlineAlert(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(AppRadius.Md))
                 .background(fg.copy(alpha = 0.10f))
-                .border(1.dp, fg.copy(alpha = 0.28f), RoundedCornerShape(AppRadius.Md))
+                .border(AppStroke.Thin, fg.copy(alpha = 0.28f), RoundedCornerShape(AppRadius.Md))
                 .padding(start = AppSpacing.Lg, top = AppSpacing.Md, bottom = AppSpacing.Md, end = AppSpacing.Sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // 装饰图标：旁侧已有文字/语义，跳过无障碍
             Icon(
                 imageVector = icon ?: iconVec,
                 contentDescription = null,

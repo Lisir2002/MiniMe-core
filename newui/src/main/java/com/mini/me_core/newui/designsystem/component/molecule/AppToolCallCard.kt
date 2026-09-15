@@ -55,7 +55,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 import java.util.Locale
 
 /**
@@ -135,7 +137,7 @@ fun AppToolCallCard(
             .clip(cardShape)
             .background(appPalette().card)
             .border(
-                width = 1.dp,
+                width = AppStroke.Thin,
                 color = if (isError) {
                     AppColor.StatusDanger.copy(alpha = 0.45f)
                 } else {
@@ -153,16 +155,17 @@ fun AppToolCallCard(
             // 图标块：状态色浅底 + 状态色图标
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(AppSizing.IconXl)
                     .clip(RoundedCornerShape(AppRadius.Sm))
                     .background(statusColor.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = leadingIcon,
                     contentDescription = null,
                     tint = statusColor,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(AppSizing.IconXs),
                 )
             }
             Spacer(Modifier.width(AppSpacing.Sm))
@@ -253,7 +256,7 @@ fun AppToolCallCard(
                             imageVector = Icons.Rounded.CheckCircle,
                             contentDescription = "已记住",
                             tint = AppColor.StatusSuccess,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(AppSizing.IconXs),
                         )
                         Text(
                             text = "已记住 · 始终允许，不再询问",
@@ -275,7 +278,7 @@ fun AppToolCallCard(
                             imageVector = Icons.Rounded.Warning,
                             contentDescription = "审批超时",
                             tint = AppColor.StatusWarning,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(AppSizing.IconXs),
                         )
                         Text(
                             text = "审批超时，已按默认策略拒绝执行",
@@ -366,19 +369,19 @@ private fun ToolCallStatusBadge(state: AppToolCallState, color: Color) {
             imageVector = Icons.Rounded.Warning,
             contentDescription = "待审批",
             tint = color,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(AppSizing.IconXs),
         )
         AppToolCallState.Success -> Icon(
             imageVector = Icons.Rounded.CheckCircle,
             contentDescription = "成功",
             tint = color,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(AppSizing.IconXs),
         )
         AppToolCallState.Error -> Icon(
             imageVector = Icons.Rounded.ErrorOutline,
             contentDescription = "失败",
             tint = color,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(AppSizing.IconXs),
         )
     }
 }
@@ -444,7 +447,7 @@ private fun ExpandableSection(
                 contentDescription = if (expanded) "收起$label" else "展开$label",
                 tint = appPalette().labelSecondary,
                 modifier = Modifier
-                    .size(16.dp)
+                    .size(AppSizing.IconXs)
                     .rotate(rotation),
             )
         }
@@ -535,7 +538,7 @@ private fun StreamBlock(text: String, maxLines: Int) {
                 .weight(1f, fill = false)
                 .clip(RoundedCornerShape(AppRadius.Sm))
                 .background(appPalette().primary.copy(alpha = 0.06f))
-                .padding(horizontal = AppSpacing.Sm, vertical = 4.dp)
+                .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs)
                 .then(
                     if (folded) Modifier.clickable { expanded = !expanded } else Modifier,
                 ),
@@ -549,11 +552,11 @@ private fun StreamBlock(text: String, maxLines: Int) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (index != shown.lastIndex) {
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(AppSpacing.Tiny))
                 }
             }
             if (folded) {
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(AppSpacing.Tiny))
                 Text(
                     text = if (expanded) "收起 · ${lines.size} 行" else "展开全部 · ${lines.size} 行",
                     style = MaterialTheme.typography.labelSmall,
@@ -576,7 +579,7 @@ private fun CardDivider() {
     Box(
         Modifier
             .fillMaxWidth()
-            .height(1.dp)
+            .height(AppStroke.Thin)
             .background(appPalette().separator),
     )
 }

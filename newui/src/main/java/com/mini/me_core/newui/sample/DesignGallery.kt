@@ -207,6 +207,7 @@ import com.mini.me_core.newui.designsystem.layout.pageMaxWidth
 import com.mini.me_core.newui.designsystem.slot.AppShell
 import com.mini.me_core.newui.designsystem.theme.AppTheme
 import com.mini.me_core.newui.designsystem.theme.AppType
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppElevation
 import com.mini.me_core.newui.designsystem.token.generated.AppLayout
@@ -892,9 +893,9 @@ private fun GalleryBody() {
         Section("令牌 · 色板") {
             ColorRow(
                 listOf(
-                    "BrandPrimary" to AppColor.BrandPrimary,
-                    "BrandSurface" to AppColor.BrandSurface,
-                    "BrandAccent" to AppColor.BrandAccent,
+                    "BrandPrimary" to appPalette().primary,
+                    "BrandSurface" to appPalette().surface,
+                    "BrandAccent" to appPalette().accent,
                     "StatusSuccess" to AppColor.StatusSuccess,
                     "StatusDanger" to AppColor.StatusDanger,
                 ),
@@ -952,7 +953,7 @@ private fun GalleryBody() {
             Text("Subhead · 注释行", style = AppType.Subhead)
             Text("Footnote · 脚注", style = AppType.Footnote)
             Text("Caption1 · 辅助说明", style = AppType.Caption1)
-            Text("Counter", style = AppType.Caption2, color = AppColor.LabelSecondary)
+            Text("Counter", style = AppType.Caption2, color = appPalette().labelSecondary)
         }
 
         Section("原子组件") {
@@ -1332,7 +1333,7 @@ private fun GalleryBody() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             AppIconButton(
-                text = "命令面板 ⌘K",
+                text = "命令面板 Ctrl+K",
                 variant = AppButtonVariant.FilledTonal,
                 // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
@@ -1446,7 +1447,7 @@ private fun GalleryBody() {
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xl)) {
                 Box {
                     AppIcon(icon = Icons.Rounded.Notifications)
-                    AppBadge(count = 12)
+                    AppBadge(count = 12, modifier = Modifier.align(Alignment.TopEnd))
                 }
                 AppBadge(count = 999, maxShow = 99)
                 AppBadgeDot()
@@ -1772,7 +1773,7 @@ private fun GalleryBody() {
                 // weight(1f) 占剩余空间：窄屏上压缩文本列，避免与 AppDock 互相叠压。
                 Column(Modifier.weight(1f)) {
                     Text("令牌速率", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    AppRollingNumber(value = rolling, style = MaterialTheme.typography.headlineMedium, color = AppColor.BrandPrimary)
+                    AppRollingNumber(value = rolling, style = MaterialTheme.typography.headlineMedium, color = appPalette().primary)
                 }
                 AppDock(
                     selectedIndex = 0,
@@ -1789,12 +1790,12 @@ private fun GalleryBody() {
             AppTerminalLog()
             Spacer(Modifier.height(AppSpacing.Md))
 
-            AppMarquee(background = AppColor.BrandSurfaceDim) {
+            AppMarquee(background = appPalette().surfaceDim) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(AppSpacing.Lg),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("容器已就绪", style = MaterialTheme.typography.bodySmall, color = AppColor.BrandPrimary)
+                    Text("容器已就绪", style = MaterialTheme.typography.bodySmall, color = appPalette().primary)
                     Text("·", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("MCP 服务器监听 0.0.0.0:9898", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("·", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2056,10 +2057,22 @@ private fun GalleryBody() {
             showLoadingOverlay = false
         }
     }
-    AppLoadingOverlay(
-        visible = showLoadingOverlay,
-        message = "正在同步工作区…",
-    )
+    // 阻塞遮罩必须包在全屏 Dialog 里，否则在滚动 Column 中只占当前视口、且不拦截穿透点击
+    if (showLoadingOverlay) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { /* 阻塞遮罩不可点外/返回关闭，3.2s 后自动收起 */ },
+            properties = androidx.compose.ui.window.DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+                usePlatformDefaultWidth = false,
+            ),
+        ) {
+            AppLoadingOverlay(
+                visible = true,
+                message = "正在同步工作区…",
+            )
+        }
+    }
     // 倒计时防误弹窗：删除操作前强制读秒
     if (showCountdownDialog) {
         AppCountdownDialog(
@@ -2108,9 +2121,9 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 @Composable
 private fun SpacingBar(label: String, gap: Dp) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(AppSizing.TouchTarget).background(AppColor.BrandPrimary, RoundedCornerShape(AppRadius.None)))
+        Box(Modifier.size(AppSizing.TouchTarget).background(appPalette().primary, RoundedCornerShape(AppRadius.None)))
         Spacer(Modifier.width(gap))
-        Box(Modifier.size(AppSizing.TouchTarget).background(AppColor.BrandAccent, RoundedCornerShape(AppRadius.None)))
+        Box(Modifier.size(AppSizing.TouchTarget).background(appPalette().accent, RoundedCornerShape(AppRadius.None)))
         Spacer(Modifier.width(AppSpacing.Sm))
         Text("$label · $gap", style = AppType.Caption2, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -2123,7 +2136,7 @@ private fun RadiusTile(label: String, radius: Dp) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
     ) {
-        Box(Modifier.size(AppSizing.TouchTarget).background(AppColor.BrandPrimary, RoundedCornerShape(radius)))
+        Box(Modifier.size(AppSizing.TouchTarget).background(appPalette().primary, RoundedCornerShape(radius)))
         Text(label, style = AppType.Caption2, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

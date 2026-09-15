@@ -32,7 +32,9 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.component.atom.IconContainer
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /** 文件状态（分子组 · AppFileCard 的 state）。 */
 enum class AppFileState { Ready, Uploading, Downloaded, Error }
@@ -67,7 +69,7 @@ fun AppFileCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(AppRadius.Md))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(AppRadius.Md))
+            .border(AppStroke.Thin, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(AppRadius.Md))
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
             .padding(AppSpacing.Lg),
         verticalAlignment = Alignment.CenterVertically,
@@ -98,7 +100,7 @@ fun AppFileCard(
                     text = fileSize,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp),
+                    modifier = Modifier.padding(top = AppSpacing.Tiny),
                 )
             }
         }
@@ -117,7 +119,7 @@ fun AppFileCard(
                     imageVector = Icons.Rounded.CheckCircle,
                     contentDescription = "已完成",
                     tint = AppColor.StatusSuccess,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(AppSizing.IconM),
                 )
             }
             AppFileState.Error -> {
@@ -125,7 +127,7 @@ fun AppFileCard(
                     imageVector = Icons.Rounded.ErrorOutline,
                     contentDescription = "失败",
                     tint = AppColor.StatusDanger,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(AppSizing.IconM),
                 )
             }
             AppFileState.Ready -> {

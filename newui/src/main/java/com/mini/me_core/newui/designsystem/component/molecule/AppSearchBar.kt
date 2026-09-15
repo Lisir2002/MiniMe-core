@@ -58,6 +58,7 @@ fun AppSearchBar(
             .padding(start = AppSpacing.Lg, end = AppSpacing.Sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // 装饰图标：旁侧已有文字/语义，跳过无障碍
         Icon(
             imageVector = leadingIcon,
             contentDescription = null,

@@ -33,7 +33,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /**
  * 步骤进度条（分子组 · AppProgressSteps）：向导 / 安装 / 分步表单的进度提示，
@@ -121,22 +123,23 @@ private fun StepNode(
         )
         Box(
             modifier = Modifier
-                .size(28.dp)
+                .size(AppSizing.IconXl)
                 .graphicsLayer {
                     scaleX = nodeScale
                     scaleY = nodeScale
                 }
                 .clip(CircleShape)
                 .background(bg)
-                .border(if (done || active) 0.dp else 1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+                .border(if (done || active) 0.dp else AppStroke.Thin, MaterialTheme.colorScheme.outline, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             if (done) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(16.dp).graphicsLayer {
+                    modifier = Modifier.size(AppSizing.IconXs).graphicsLayer {
                         scaleX = checkScale
                         scaleY = checkScale
                     },

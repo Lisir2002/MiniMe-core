@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 
 /** 时间线节点色调（分子组 · AppTimeline 的 item.tone）。 */
@@ -111,8 +112,8 @@ private fun TimelineRow(
         ) {
             Box(
                 modifier = Modifier
-                    .padding(top = 2.dp)
-                    .size(20.dp)
+                    .padding(top = AppSpacing.Tiny)
+                    .size(AppSizing.IconM)
                     .graphicsLayer {
                         scaleX = 0.6f + 0.4f * pop
                         scaleY = 0.6f + 0.4f * pop
@@ -123,6 +124,7 @@ private fun TimelineRow(
             ) {
                 Box(
                     Modifier
+                        // 非标准尺寸，特殊场景保留
                         .size(10.dp)
                         .clip(CircleShape)
                         .background(tone),
@@ -145,6 +147,7 @@ private fun TimelineRow(
                 .weight(1f),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = item.icon ?: when (item.tone) {
                         AppTimelineTone.Success -> Icons.Rounded.Check
@@ -153,7 +156,7 @@ private fun TimelineRow(
                     },
                     contentDescription = null,
                     tint = tone,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(AppSizing.IconXs),
                 )
                 Spacer(Modifier.width(AppSpacing.Sm))
                 Text(
@@ -176,7 +179,7 @@ private fun TimelineRow(
                     text = item.subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp),
+                    modifier = Modifier.padding(top = AppSpacing.Tiny),
                 )
             }
         }

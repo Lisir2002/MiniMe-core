@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 
 /**
@@ -94,7 +95,7 @@ fun AppMessageRow(
             ) {
                 if (!grouped) {
                     HeaderRow(label = label, timestamp = timestamp, isUser = isUser)
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(AppSpacing.Tiny))
                 }
                 Column(horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
                     AppChatBubble(
@@ -202,9 +203,9 @@ private fun HeaderRow(label: String, timestamp: String?, isUser: Boolean) {
 @Composable
 private fun AvatarSlot(avatarText: String, showAvatar: Boolean) {
     if (showAvatar) {
-        AppAvatar(text = avatarText, size = 28.dp)
+        AppAvatar(text = avatarText, size = AppSizing.IconXl)
     } else {
-        Spacer(Modifier.size(28.dp))
+        Spacer(Modifier.size(AppSizing.IconXl))
     }
 }
 
@@ -221,23 +222,23 @@ private fun MessageActionsBar(
         modifier = Modifier
             .padding(top = AppSpacing.Xs)
             .clip(RoundedCornerShape(AppRadius.Pill))
-            .background(AppColor.OnDarkSurfaceRaised)
+            .background(appPalette().card)
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
         horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ActionChip(Icons.Rounded.ContentCopy, "复制", AppColor.OnDarkInk) {
+        ActionChip(Icons.Rounded.ContentCopy, "复制", appPalette().ink) {
             onCopy?.invoke()
             onDismiss()
         }
         if (state == AppChatMessageState.Error && onRetry != null) {
-            ActionChip(Icons.Rounded.Refresh, "重试", AppColor.OnDarkInk) {
+            ActionChip(Icons.Rounded.Refresh, "重试", appPalette().ink) {
                 onRetry()
                 onDismiss()
             }
         }
         if (onDelete != null) {
-            ActionChip(Icons.Rounded.DeleteOutline, "删除", AppColor.OnDarkInk) {
+            ActionChip(Icons.Rounded.DeleteOutline, "删除", appPalette().ink) {
                 onDelete()
                 onDismiss()
             }
@@ -251,7 +252,7 @@ private fun ActionChip(icon: ImageVector, label: String, tint: Color, onClick: (
         modifier = Modifier
             .clip(RoundedCornerShape(AppRadius.Pill))
             .clickable(onClick = onClick)
-            .padding(horizontal = AppSpacing.Sm, vertical = 2.dp),
+            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -264,7 +265,7 @@ private fun ActionChip(icon: ImageVector, label: String, tint: Color, onClick: (
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = tint,
-            modifier = Modifier.padding(start = 2.dp),
+            modifier = Modifier.padding(start = AppSpacing.Tiny),
         )
     }
 }

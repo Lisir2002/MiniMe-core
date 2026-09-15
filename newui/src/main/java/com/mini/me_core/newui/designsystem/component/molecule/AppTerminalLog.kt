@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.mini.me_core.newui.designsystem.theme.appPalette
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
@@ -55,8 +56,8 @@ data class TerminalLogLine(
     val at: String,
 )
 
-private fun logLevelTint(level: LogLevel): Color = when (level) {
-    LogLevel.Info -> AppColor.OnDarkSecondaryLabel
+private fun logLevelTint(level: LogLevel, secondary: Color): Color = when (level) {
+    LogLevel.Info -> secondary
     LogLevel.Success -> AppColor.StatusSuccess
     LogLevel.Warning -> AppColor.StatusWarning
     LogLevel.Danger -> AppColor.StatusDanger
@@ -67,7 +68,7 @@ private fun logLevelTint(level: LogLevel): Color = when (level) {
  * 替代单行跑马灯，以"控制台"形态连续投递日志。
  *
  * 视觉对齐 iOS 简约规范：
- *  - **深色控制台**：正文采用 [AppColor.OnDarkSurface] 深底 + 等宽字体，
+ *  - **深色控制台**：正文采用 [appPalette]().surface 深底 + 等宽字体，
  *    在浅色页面下形成高对比 "terminal" 区块（类 iOS 深色系统背景）。
  *  - **状态点**：标题栏一枚呼吸态绿色圆点 + 标题文本；正文按 [LogLevel]
  *    染 [AppColor.StatusSuccess]/[AppColor.StatusWarning]/[AppColor.StatusDanger]。
@@ -118,14 +119,14 @@ fun AppTerminalLog(
             .fillMaxWidth()
             .height(height)
             .clip(RoundedCornerShape(AppRadius.Md))
-            .background(AppColor.OnDarkSurface),
+            .background(appPalette().surface),
     ) {
         Column(Modifier.fillMaxSize()) {
             // 标题栏：呼吸状态点 + 标题 + 右缘"运行中"胶囊
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(AppColor.OnDarkSurfaceRaised)
+                    .background(appPalette().surfaceDim)
                     .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -143,14 +144,14 @@ fun AppTerminalLog(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppColor.OnDarkInk,
+                    color = appPalette().ink,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = "● 运行中",
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColor.OnDarkSecondaryLabel,
+                    color = appPalette().labelSecondary,
                     fontFamily = FontFamily.Monospace,
                 )
             }
@@ -175,14 +176,14 @@ fun AppTerminalLog(
                         Text(
                             text = line.at,
                             style = MaterialTheme.typography.labelSmall,
-                            color = AppColor.OnDarkSecondaryLabel.copy(alpha = 0.72f),
+                            color = appPalette().labelSecondary.copy(alpha = 0.72f),
                             fontFamily = FontFamily.Monospace,
                         )
                         Spacer(Modifier.size(AppSpacing.Sm))
                         Text(
                             text = line.text,
                             style = MaterialTheme.typography.bodySmall,
-                            color = logLevelTint(line.level),
+                            color = logLevelTint(line.level, appPalette().labelSecondary),
                             fontFamily = FontFamily.Monospace,
                             fontWeight = if (line.level == LogLevel.Danger) FontWeight.SemiBold else FontWeight.Normal,
                         )
@@ -211,7 +212,7 @@ fun AppTerminalLog(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
                             0f to Color.Transparent,
-                            1f to AppColor.OnDarkSurface.copy(alpha = 0.55f),
+                            1f to appPalette().surface.copy(alpha = 0.55f),
                         ),
                     ),
                 ),

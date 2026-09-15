@@ -138,7 +138,7 @@ private fun ShellTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .height(44.dp),
+                .height(AppSizing.TouchTarget),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (onNavigateBack != null && navigationIcon != null) {
@@ -148,7 +148,7 @@ private fun ShellTopBar(
                 ) {
                     Icon(
                         imageVector = navigationIcon,
-                        contentDescription = null,
+                        contentDescription = "返回",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(AppSizing.IconM),
                     )

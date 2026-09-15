@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 
 /**
@@ -59,6 +60,7 @@ fun AppPagination(
         if (showPrevNext) {
             PageArrow(
                 icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                contentDescription = "上一页",
                 enabled = safePage > 1,
                 onClick = { onPageChange(safePage - 1) },
                 accentColor = accentColor,
@@ -84,6 +86,7 @@ fun AppPagination(
         if (showPrevNext) {
             PageArrow(
                 icon = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = "下一页",
                 enabled = safePage < pageCount,
                 onClick = { onPageChange(safePage + 1) },
                 accentColor = accentColor,
@@ -106,7 +109,7 @@ private fun PageNumber(
     )
     Box(
         modifier = Modifier
-            .padding(horizontal = 2.dp)
+            .padding(horizontal = AppSpacing.Tiny)
             .widthIn(min = 34.dp)
             .height(34.dp)
             .graphicsLayer {
@@ -130,6 +133,7 @@ private fun PageNumber(
 @Composable
 private fun PageArrow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
     enabled: Boolean,
     onClick: () -> Unit,
     accentColor: Color,
@@ -144,9 +148,9 @@ private fun PageArrow(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = null,
+            contentDescription = contentDescription,
             tint = tint,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(AppSizing.IconM),
         )
     }
 }

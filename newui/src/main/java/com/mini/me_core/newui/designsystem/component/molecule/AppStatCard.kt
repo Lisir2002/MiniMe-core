@@ -31,6 +31,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppElevation
 import com.mini.me_core.newui.designsystem.token.generated.AppMotion
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /**
  * 统计卡（分子组 · AppStatCard）：主数字用 animateFloat 平滑滚动到目标值（count-up），
@@ -59,7 +60,7 @@ fun AppStatCard(
         tonalElevation = 0.dp,
         shadowElevation = AppElevation.Z1,
         border = androidx.compose.foundation.BorderStroke(
-            1.dp,
+            AppStroke.Thin,
             MaterialTheme.colorScheme.outlineVariant,
         ),
     ) {

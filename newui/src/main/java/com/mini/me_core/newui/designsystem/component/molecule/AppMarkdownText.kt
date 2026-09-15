@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
@@ -107,6 +108,21 @@ fun AppMarkdownText(
                     linkColor = linkColor,
                     onLinkClick = onLinkClick,
                 )
+                is MdSegment.MarkdownList -> MarkdownListView(
+                    items = segment.items,
+                    style = style,
+                    color = color,
+                    fontWeight = fontWeight,
+                    inlineCodeColor = inlineCodeColor,
+                    inlineCodeBackground = inlineCodeBackground,
+                    linkColor = linkColor,
+                    onLinkClick = onLinkClick,
+                )
+                is MdSegment.Image -> ImagePlaceholderView(
+                    alt = segment.alt,
+                    url = segment.url,
+                    color = color,
+                )
             }
         }
     }
@@ -120,6 +136,15 @@ internal sealed interface MdSegment {
     data class Heading(val level: Int, val content: String) : MdSegment
     data class Blockquote(val content: String) : MdSegment
     data class Table(val headers: List<String>, val rows: List<List<String>>) : MdSegment
+
+    /** 列表项：[level] 为嵌套层级（0 一级，每多缩进 2 空格 +1），[marker] 为项目符号或有序号。 */
+    data class ListItem(val level: Int, val marker: String, val text: String)
+
+    /** 无序/有序列表块，支持多级嵌套。 */
+    data class MarkdownList(val items: List<ListItem>) : MdSegment
+
+    /** 图片占位：暂不下载，仅以 [alt] + “图片”标记渲染。 */
+    data class Image(val alt: String, val url: String) : MdSegment
 }
 
 internal fun parseSegments(text: String): List<MdSegment> {
@@ -167,6 +192,31 @@ internal fun parseSegments(text: String): List<MdSegment> {
                 }
                 if (headers.isNotEmpty()) result += MdSegment.Table(headers, rows)
             }
+            isListStart(trimmedStart) -> {
+                // 多级列表：连续的 - / * / N. 行，缩进每 2 空格提升一级
+                val items = mutableListOf<MdSegment.ListItem>()
+                val baseIndent = leadingSpaces(lines[i])
+                while (i < lines.size) {
+                    val raw = lines[i]
+                    val ts = raw.trimStart()
+                    if (ts.isEmpty()) break
+                    val indent = leadingSpaces(raw)
+                    val bullet = ts.startsWith("- ") || ts.startsWith("* ")
+                    val ordered = ORDERED_ITEM_REGEX.matches(ts)
+                    if (!bullet && !ordered) break
+                    val relLevel = ((indent - baseIndent) / 2).coerceAtLeast(0)
+                    val body = if (bullet) ts.drop(2) else ts.substringAfter(".").trimStart()
+                    val marker = if (bullet) "•" else ts.substringBefore(".").trim()
+                    items += MdSegment.ListItem(relLevel, marker, body)
+                    i++
+                }
+                if (items.isNotEmpty()) result += MdSegment.MarkdownList(items)
+            }
+            isImageLine(trimmedStart) -> {
+                val m = IMAGE_LINE_REGEX.find(trimmedStart)!!
+                result += MdSegment.Image(m.groupValues[1], m.groupValues[2])
+                i++
+            }
             else -> {
                 val buf = StringBuilder()
                 while (
@@ -175,7 +225,9 @@ internal fun parseSegments(text: String): List<MdSegment> {
                     !lines[i].trimStart().startsWith("```") &&
                     !lines[i].trimStart().startsWith("#") &&
                     !lines[i].trimStart().startsWith(">") &&
-                    !isTableStart(lines[i].trimStart(), lines, i)
+                    !isTableStart(lines[i].trimStart(), lines, i) &&
+                    !isListStart(lines[i].trimStart()) &&
+                    !isImageLine(lines[i].trimStart())
                 ) {
                     if (buf.isNotEmpty()) buf.append('\n')
                     buf.append(lines[i].trimEnd())
@@ -202,6 +254,49 @@ private fun splitTableRow(line: String): List<String> {
         .map { it.trim() }
         .dropWhile { it.isEmpty() }
         .dropLastWhile { it.isEmpty() }
+}
+
+/** 有序列表项：`1. ` / `12. ` 开头。 */
+private val ORDERED_ITEM_REGEX = Regex("""\d+\.\s+.*""")
+
+/** 整行图片：`![alt](url)`。 */
+private val IMAGE_LINE_REGEX = Regex("""^!\[([^\]]*)\]\(([^)]*)\)\s*$""")
+
+/** 行首是否为列表项（无序短横线/星号或有序 N.）。 */
+private fun isListStart(trimmed: String): Boolean =
+    trimmed.startsWith("- ") || trimmed.startsWith("* ") || ORDERED_ITEM_REGEX.matches(trimmed)
+
+/** 整行是否为图片占位。 */
+private fun isImageLine(trimmed: String): Boolean = IMAGE_LINE_REGEX.matches(trimmed)
+
+/** 统计行首空格数。 */
+private fun leadingSpaces(s: String): Int {
+    var n = 0
+    while (n < s.length && s[n] == ' ') n++
+    return n
+}
+
+/** 行内可转义字符：\* \_ \[ \]。 */
+private val INLINE_ESCAPABLE = charArrayOf('*', '_', '[', ']')
+
+/**
+ * 行内转义处理：`\*` `\_` `\[` `\]` 还原为字面字符。
+ * 抽为 internal 纯函数便于单测，渲染期在 [buildInline] 逐字符同步使用同一规则。
+ */
+internal fun unescapeInline(text: String): String {
+    val sb = StringBuilder(text.length)
+    var i = 0
+    while (i < text.length) {
+        val c = text[i]
+        if (c == '\\' && i + 1 < text.length && text[i + 1] in INLINE_ESCAPABLE) {
+            sb.append(text[i + 1])
+            i += 2
+        } else {
+            sb.append(c)
+            i++
+        }
+    }
+    return sb.toString()
 }
 
 // ===== 渲染层 =====
@@ -388,6 +483,67 @@ private fun ParagraphView(
 }
 
 @Composable
+private fun MarkdownListView(
+    items: List<MdSegment.ListItem>,
+    style: TextStyle,
+    color: Color,
+    fontWeight: FontWeight?,
+    inlineCodeColor: Color,
+    inlineCodeBackground: Color,
+    linkColor: Color,
+    onLinkClick: ((String) -> Unit)?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        items.forEach { item ->
+            Row(
+                modifier = Modifier.padding(start = (item.level * 16).dp),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Text(
+                    text = item.marker,
+                    style = style,
+                    fontWeight = fontWeight,
+                    color = color,
+                )
+                Text(
+                    text = buildInline(
+                        item.text,
+                        style,
+                        color,
+                        inlineCodeColor,
+                        inlineCodeBackground,
+                        linkColor,
+                        onLinkClick,
+                    ),
+                    style = style,
+                    fontWeight = fontWeight,
+                    color = color,
+                )
+            }
+        }
+    }
+}
+
+/** 图片占位：不真下载，仅显示 alt 文字 + “图片”标记。 */
+@Composable
+private fun ImagePlaceholderView(alt: String, url: String, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = "🖼",
+            style = MaterialTheme.typography.bodyMedium,
+            color = color,
+        )
+        Spacer(Modifier.width(AppSpacing.Sm))
+        Text(
+            text = if (alt.isBlank()) "图片" else "$alt（图片）",
+            style = MaterialTheme.typography.bodySmall,
+            color = appPalette().labelSecondary,
+        )
+    }
+}
+
+@Composable
 private fun CodeBlockView(code: String, background: Color) {
     Box(
         modifier = Modifier
@@ -402,7 +558,6 @@ private fun CodeBlockView(code: String, background: Color) {
         )
     }
 }
-
 /**
  * 行内样式：`**粗体**`、`` `行内代码` ``、`[链接](url)`。
  * 有 [onLinkClick] 时链接可点击（[LinkAnnotation.Clickable]），否则仅品牌色 + 下划线。
@@ -419,6 +574,11 @@ private fun buildInline(
     var i = 0
     while (i < raw.length) {
         when {
+            raw[i] == '\\' && i + 1 < raw.length && raw[i + 1] in INLINE_ESCAPABLE -> {
+                // 行内转义：\* \_ \[ \] 还原为字面字符，不触发粗体/链接解析
+                append(raw[i + 1])
+                i += 2
+            }
             raw.startsWith("**", i) -> {
                 val end = raw.indexOf("**", i + 2)
                 if (end > i + 2) {

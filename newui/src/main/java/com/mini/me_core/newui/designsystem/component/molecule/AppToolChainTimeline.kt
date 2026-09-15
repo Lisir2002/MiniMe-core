@@ -35,7 +35,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 import java.util.Locale
 
 /** 工具链步骤状态（对齐 [AppToolCallState] 语义子集，供时间线紧凑呈现）。 */
@@ -73,7 +75,7 @@ fun AppToolChainTimeline(
         modifier = modifier
             .clip(cardShape)
             .background(appPalette().card)
-            .border(1.dp, appPalette().separator, cardShape),
+            .border(AppStroke.Thin, appPalette().separator, cardShape),
     ) {
         Row(
             modifier = Modifier
@@ -83,16 +85,17 @@ fun AppToolChainTimeline(
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(AppSizing.IconXl)
                     .clip(RoundedCornerShape(AppRadius.Sm))
                     .background(appPalette().primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = Icons.Rounded.Hub,
                     contentDescription = null,
                     tint = appPalette().primary,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(AppSizing.IconXs),
                 )
             }
             Spacer(Modifier.width(AppSpacing.Sm))
@@ -120,7 +123,7 @@ fun AppToolChainTimeline(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(1.dp)
+                .height(AppStroke.Thin)
                 .background(appPalette().separator),
         )
 
@@ -187,14 +190,15 @@ private fun ChainStepRow(step: AppToolChainStep, isLast: Boolean) {
         ) {
             Box(
                 modifier = Modifier
-                    .padding(top = 2.dp)
-                    .size(20.dp)
+                    .padding(top = AppSpacing.Tiny)
+                    .size(AppSizing.IconM)
                     .clip(CircleShape)
                     .background(tone.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center,
             ) {
                 when (step.state) {
                     AppToolChainStepState.Running -> CircularProgressIndicator(
+                        // 非标准尺寸，特殊场景保留
                         modifier = Modifier.size(10.dp),
                         color = tone,
                         strokeWidth = 1.5.dp,
@@ -203,18 +207,21 @@ private fun ChainStepRow(step: AppToolChainStep, isLast: Boolean) {
                         imageVector = Icons.Rounded.Warning,
                         contentDescription = "待审批",
                         tint = tone,
+                        // 非标准尺寸，特殊场景保留
                         modifier = Modifier.size(11.dp),
                     )
                     AppToolChainStepState.Success -> Icon(
                         imageVector = Icons.Rounded.Check,
                         contentDescription = "成功",
                         tint = tone,
+                        // 非标准尺寸，特殊场景保留
                         modifier = Modifier.size(11.dp),
                     )
                     AppToolChainStepState.Error -> Icon(
                         imageVector = Icons.Rounded.ErrorOutline,
                         contentDescription = "失败",
                         tint = tone,
+                        // 非标准尺寸，特殊场景保留
                         modifier = Modifier.size(11.dp),
                     )
                 }

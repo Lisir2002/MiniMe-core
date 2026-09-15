@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -43,8 +42,10 @@ fun AppSegmentedToggle(
     val safeIndex = selectedIndex.coerceIn(0, options.size - 1)
     BoxWithConstraints(modifier.fillMaxWidth().height(itemHeight)) {
         val itemWidth = maxWidth / options.size
+        // 滑块宽度 = 单项宽度 - 左右 inset 各一份；起始 x = inset + 每项宽度 * index
+        val sliderWidth = itemWidth - inset * 2
         val indicatorOffset by animateDpAsState(
-            targetValue = itemWidth * safeIndex.toFloat(),
+            targetValue = inset + itemWidth * safeIndex.toFloat(),
             animationSpec = tween(durationMillis = AppMotion.Med.toInt()),
             label = "indicator",
         )
@@ -54,12 +55,12 @@ fun AppSegmentedToggle(
                 .clip(RoundedCornerShape(AppRadius.Pill))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
-            // 高亮滑块
+            // 高亮滑块：宽度严格等于一个选项格，不再 fillMaxSize 撑满整行
             Box(
                 Modifier
-                    .padding(all = inset)
                     .offset(x = indicatorOffset)
-                    .fillMaxSize()
+                    .width(sliderWidth)
+                    .height(itemHeight - inset * 2)
                     .clip(RoundedCornerShape(AppRadius.Pill))
                     .background(MaterialTheme.colorScheme.surface),
             )

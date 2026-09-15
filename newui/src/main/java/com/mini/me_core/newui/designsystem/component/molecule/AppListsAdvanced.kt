@@ -72,6 +72,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 import kotlin.math.roundToInt
 
@@ -146,7 +147,7 @@ fun AppContextMenu(
                         imageVector = item.icon,
                         contentDescription = item.label,
                         tint = tint,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(AppSizing.IconM),
                     )
                     Spacer(Modifier.width(AppSpacing.Md))
                     Text(
@@ -213,6 +214,7 @@ fun AppComboBox(
                 singleLine = true,
                 placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 leadingIcon = leadingIcon?.let {
+                    // 装饰图标：旁侧已有文字/语义，跳过无障碍
                     { Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 },
                 trailingIcon = {
@@ -223,7 +225,7 @@ fun AppComboBox(
                                 contentDescription = "清空",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
-                                    .size(20.dp)
+                                    .size(AppSizing.IconM)
                                     .clickable {
                                         query = ""
                                         onQueryChange?.invoke("")
@@ -231,6 +233,7 @@ fun AppComboBox(
                             )
                             Spacer(Modifier.width(AppSpacing.Sm))
                         }
+                        // 装饰图标：旁侧已有文字/语义，跳过无障碍
                         Icon(
                             imageVector = Icons.Rounded.ArrowDropDown,
                             contentDescription = null,
@@ -310,6 +313,11 @@ fun AppCommandPalette(
     }
     val corner = RoundedCornerShape(AppRadius.Lg)
 
+    // 命令面板必须用全屏 Dialog，否则在滚动 Column 里 fillMaxSize 只占视口、不覆盖屏幕
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter,
@@ -337,6 +345,7 @@ fun AppCommandPalette(
                     .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Md + 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = Icons.Rounded.Search,
                     contentDescription = null,
@@ -363,7 +372,7 @@ fun AppCommandPalette(
                         contentDescription = "清空",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
-                            .size(20.dp)
+                            .size(AppSizing.IconM)
                             .clickable { setQ("") },
                     )
                 }
@@ -402,7 +411,7 @@ fun AppCommandPalette(
                                 imageVector = cmd.icon,
                                 contentDescription = cmd.label,
                                 tint = tint,
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(AppSizing.IconM),
                             )
                             Spacer(Modifier.width(AppSpacing.Md))
                             Text(
@@ -426,6 +435,7 @@ fun AppCommandPalette(
                 modifier = Modifier.padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Md),
             )
         }
+    }
     }
 }
 
@@ -502,7 +512,7 @@ fun AppMultiSelectMenu(
                     Checkbox(checked = checked, onCheckedChange = { onToggle(index) })
                 },
                 trailingIcon = if (checked) {
-                    { Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) }
+                    { Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(AppSizing.IconS)) }
                 } else null,
             )
         }
@@ -535,7 +545,7 @@ fun AppSplitButtonMenu(
         modifier = modifier
             .clip(shape)
             .background(MaterialTheme.colorScheme.primary)
-            .height(40.dp),
+            .height(AppSizing.IconButton),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
@@ -548,7 +558,7 @@ fun AppSplitButtonMenu(
             horizontalArrangement = Arrangement.Center,
         ) {
             if (icon != null) {
-                Icon(icon, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
+                Icon(icon, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(AppSizing.IconS))
                 Spacer(Modifier.width(AppSpacing.Xs))
             }
             Text(label, color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelLarge)
@@ -581,7 +591,7 @@ fun AppSplitButtonMenu(
                             imageVector = opt.icon,
                             contentDescription = opt.label,
                             tint = if (opt.danger) AppColor.StatusDanger else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(AppSizing.IconM),
                         )
                     },
                     onClick = AppHaptics.click {
@@ -668,7 +678,7 @@ fun AppQuickActionMenu(
                         imageVector = action.icon,
                         contentDescription = action.label,
                         tint = if (action.danger) AppColor.StatusDanger else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(AppSizing.IconS),
                     )
                 }
             }
@@ -804,7 +814,7 @@ private fun CascadeLevel(
                         imageVector = Icons.Rounded.KeyboardArrowDown,
                         contentDescription = "返回",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = 90f },
+                        modifier = Modifier.size(AppSizing.IconS).graphicsLayer { rotationZ = 90f },
                     )
                     Spacer(Modifier.width(AppSpacing.Sm))
                     Text(
@@ -832,7 +842,7 @@ private fun CascadeLevel(
                             imageVector = node.icon,
                             contentDescription = node.label,
                             tint = tint,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(AppSizing.IconM),
                         )
                         Spacer(Modifier.width(AppSpacing.Md))
                     }
@@ -845,11 +855,12 @@ private fun CascadeLevel(
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (hasChild) {
+                        // 装饰图标：旁侧已有文字/语义，跳过无障碍
                         Icon(
                             imageVector = Icons.Rounded.ChevronRight,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(AppSizing.IconS),
                         )
                     }
                 }
@@ -910,7 +921,7 @@ fun AppNavigationMenu(
             .clip(corner)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(vertical = AppSpacing.Xs),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.Tiny),
     ) {
         if (header != null) {
             Box(
@@ -957,7 +968,7 @@ fun AppNavigationMenu(
                     imageVector = item.icon,
                     contentDescription = item.label,
                     tint = tint,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(AppSizing.IconM),
                 )
                 Spacer(Modifier.width(AppSpacing.Md))
                 Text(

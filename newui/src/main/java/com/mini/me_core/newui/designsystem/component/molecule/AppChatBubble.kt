@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /**
  * 消息状态机：发送中 → 流式输出 → 完成 / 失败（失败可重试）。
@@ -96,7 +97,7 @@ fun AppChatBubble(
             }
             .clip(shape)
             .background(bg)
-            .then(if (borderColor != Color.Transparent) Modifier.border(1.dp, borderColor, shape) else Modifier)
+            .then(if (borderColor != Color.Transparent) Modifier.border(AppStroke.Thin, borderColor, shape) else Modifier)
             .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Md),
     ) {
         when (state) {
@@ -179,9 +180,10 @@ private fun RetryLabel(color: Color, onClick: () -> Unit) {
         modifier = Modifier
             .clip(RoundedCornerShape(AppRadius.Pill))
             .clickable(onClick = onClick)
-            .padding(horizontal = AppSpacing.Sm, vertical = 2.dp),
+            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // 装饰图标：旁侧已有文字/语义，跳过无障碍
         Icon(
             imageVector = Icons.Rounded.Refresh,
             contentDescription = null,
@@ -192,7 +194,7 @@ private fun RetryLabel(color: Color, onClick: () -> Unit) {
             text = "重试",
             style = MaterialTheme.typography.labelSmall,
             color = color,
-            modifier = Modifier.padding(start = 2.dp),
+            modifier = Modifier.padding(start = AppSpacing.Tiny),
         )
     }
 }

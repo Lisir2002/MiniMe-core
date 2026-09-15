@@ -49,6 +49,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppElevation
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 import kotlin.math.roundToInt
 
 /* =========================================================================
@@ -89,7 +90,7 @@ fun AppFilterField(
             .fillMaxWidth()
             .clip(shape)
             .background(bg)
-            .border(width = 1.dp, color = border, shape = shape)
+            .border(width = AppStroke.Thin, color = border, shape = shape)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -97,6 +98,7 @@ fun AppFilterField(
             .padding(horizontal = AppSpacing.Md, vertical = 0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // 装饰图标：旁侧已有文字/语义，跳过无障碍
         Icon(
             imageVector = Icons.Rounded.FilterList,
             contentDescription = null,
@@ -182,12 +184,13 @@ fun AppChecklistFilter(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(20.dp)
+                        .size(AppSizing.IconM)
                         .clip(RoundedCornerShape(AppRadius.Sm))
                         .background(checkBg)
-                        .border(1.dp, checkBorder, RoundedCornerShape(AppRadius.Sm)),
+                        .border(AppStroke.Thin, checkBorder, RoundedCornerShape(AppRadius.Sm)),
                     contentAlignment = Alignment.Center,
                 ) {
+                    // 装饰图标：旁侧已有文字/语义，跳过无障碍
                     Icon(
                         imageVector = Icons.Rounded.Check,
                         contentDescription = null,
@@ -281,8 +284,8 @@ private fun RowScope.RangeValuePill(
         modifier = modifier
             .clip(shape)
             .background(appPalette().primary.copy(alpha = 0.1f))
-            .border(1.dp, appPalette().primary.copy(alpha = 0.35f), shape)
-            .padding(horizontal = AppSpacing.Md, vertical = 4.dp),
+            .border(AppStroke.Thin, appPalette().primary.copy(alpha = 0.35f), shape)
+            .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Xs),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -385,12 +388,13 @@ fun AppFilterSheet(
             .fillMaxWidth()
             .shadow(AppElevation.Z3, shape, clip = true)
             .background(appPalette().card, shape)
-            .border(1.dp, appPalette().separator, shape)
+            .border(AppStroke.Thin, appPalette().separator, shape)
             .padding(AppSpacing.Lg),
         verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
     ) {
         // Header：标题 + 已选 badge + 清除全部
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // 装饰图标：旁侧已有文字/语义，跳过无障碍
             Icon(
                 imageVector = Icons.Rounded.FilterList,
                 contentDescription = null,
@@ -410,7 +414,7 @@ fun AppFilterSheet(
                     modifier = Modifier
                         .clip(RoundedCornerShape(AppRadius.Pill))
                         .background(appPalette().primary)
-                        .padding(horizontal = AppSpacing.Sm, vertical = 2.dp),
+                        .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
                 ) {
                     Text(
                         text = activeCount.toString(),

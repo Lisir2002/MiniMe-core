@@ -35,7 +35,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /**
  * 计划步骤单步状态（对齐 plan 工具 `[ {text, status} ]` 的 status 取值）：
@@ -89,7 +91,7 @@ fun AppPlanCard(
             .clip(cardShape)
             .background(appPalette().card)
             .border(
-                width = 1.dp,
+                width = AppStroke.Thin,
                 color = if (state == AppPlanState.AwaitingApproval) {
                     AppColor.StatusWarning.copy(alpha = 0.55f)
                 } else {
@@ -106,16 +108,17 @@ fun AppPlanCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(AppSizing.IconXl)
                     .clip(RoundedCornerShape(AppRadius.Sm))
                     .background(statusColor.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.Assignment,
                     contentDescription = null,
                     tint = statusColor,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(AppSizing.IconXs),
                 )
             }
             Spacer(Modifier.width(AppSpacing.Sm))
@@ -165,6 +168,7 @@ fun AppPlanCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
             ) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = Icons.Rounded.Warning,
                     contentDescription = null,
@@ -214,18 +218,18 @@ private fun PlanStatusBadge(state: AppPlanState, color: Color) {
             imageVector = Icons.Rounded.Warning,
             contentDescription = "待审批",
             tint = color,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(AppSizing.IconXs),
         )
         AppPlanState.InProgress -> AppTypingIndicator(dotColor = color, dotSize = 4.dp)
         AppPlanState.Approved -> Icon(
             imageVector = Icons.Rounded.CheckCircle,
             contentDescription = "已批准",
             tint = color,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(AppSizing.IconXs),
         )
         AppPlanState.Abandoned -> Box(
             modifier = Modifier
-                .size(16.dp)
+                .size(AppSizing.IconXs)
                 .clip(CircleShape)
                 .background(color.copy(alpha = 0.5f)),
         )
@@ -245,20 +249,20 @@ private fun PlanStepRow(step: AppPlanStep) {
                 imageVector = Icons.Rounded.CheckCircle,
                 contentDescription = "完成",
                 tint = AppColor.StatusSuccess,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(AppSizing.IconXs),
             )
             AppPlanStepStatus.InProgress -> AppTypingIndicator(dotColor = AppColor.StatusWarning, dotSize = 3.dp)
             AppPlanStepStatus.Failed -> Icon(
                 imageVector = Icons.Rounded.ErrorOutline,
                 contentDescription = "失败",
                 tint = AppColor.StatusDanger,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(AppSizing.IconXs),
             )
             AppPlanStepStatus.Pending -> Icon(
                 imageVector = Icons.Rounded.RadioButtonUnchecked,
                 contentDescription = "待办",
                 tint = appPalette().labelTertiary,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(AppSizing.IconXs),
             )
         }
         Text(

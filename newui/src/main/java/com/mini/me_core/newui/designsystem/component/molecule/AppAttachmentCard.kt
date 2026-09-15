@@ -32,7 +32,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 import java.util.Locale
 
 /**
@@ -65,7 +67,7 @@ fun AppAttachmentCard(
             .fillMaxWidth()
             .clip(shape)
             .background(appPalette().surface)
-            .border(1.dp, appPalette().separator, shape)
+            .border(AppStroke.Thin, appPalette().separator, shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -80,11 +82,12 @@ fun AppAttachmentCard(
                 contentAlignment = Alignment.Center,
             ) {
                 // 占位：缩略图绘制由上层以 Image composable 注入（此组件保持纯数据层）
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = if (isImage) Icons.Rounded.Image else Icons.Rounded.Description,
                     contentDescription = null,
                     tint = appPalette().labelSecondary,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(AppSizing.IconS),
                 )
             }
         } else {
@@ -95,11 +98,12 @@ fun AppAttachmentCard(
                     .background(appPalette().primary.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center,
             ) {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = if (isImage) Icons.Rounded.Image else Icons.Rounded.Description,
                     contentDescription = null,
                     tint = appPalette().primary,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(AppSizing.IconS),
                 )
             }
         }
@@ -118,7 +122,7 @@ fun AppAttachmentCard(
                 sizeBytes?.let { formatBytes(it) },
             ).joinToString(" · ")
             if (meta.isNotEmpty()) {
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(AppSpacing.Tiny))
                 Text(
                     text = meta,
                     style = MaterialTheme.typography.labelSmall,
@@ -143,7 +147,7 @@ fun AppAttachmentCard(
                 imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
                 contentDescription = "打开附件",
                 tint = appPalette().labelSecondary,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(AppSizing.IconXs),
             )
         }
     }

@@ -29,10 +29,12 @@ object AppColor {
 }
 
 object AppSpacing {
+    val Tiny = 2.dp
     val Xs = 4.dp
     val Sm = 8.dp
     val Md = 12.dp
     val Lg = 16.dp
+    val Section = 20.dp // 卡片/列表区间距（介于 Lg 与 Xl 之间）
     val Xl = 24.dp
     val Xxl = 32.dp
 }
@@ -43,6 +45,11 @@ object AppRadius {
     val Md = 12.dp
     val Lg = 16.dp
     val Pill = 999.dp
+}
+
+/** 边框/stroke 描边宽度专用。 */
+object AppStroke {
+    val Thin = 1.dp
 }
 
 object AppElevation {
@@ -60,6 +67,7 @@ object AppSizing {
     val IconS = 18.dp
     val IconM = 20.dp
     val IconL = 24.dp
+    val IconXl = 28.dp // 卡片操作图标钮 / 中号头像
     val IconBlock = 40.dp // 图标块规格
 }
 

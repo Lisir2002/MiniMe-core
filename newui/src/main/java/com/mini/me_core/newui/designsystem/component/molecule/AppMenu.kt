@@ -19,7 +19,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /**
  * 下拉菜单（分子组 · AppMenu）：M3 `DropdownMenu` 的玻璃态统一封装。
@@ -46,7 +48,7 @@ fun AppMenu(
         shape = MaterialTheme.shapes.medium,
         tonalElevation = 12.dp,
         shadowElevation = 12.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(AppStroke.Thin, MaterialTheme.colorScheme.outlineVariant),
         content = content,
     )
 }
@@ -76,10 +78,11 @@ fun AppMenuItem(
         onClick = AppHaptics.click(onClick),
         modifier = modifier,
         leadingIcon = leadingIcon?.let {
-            { Icon(it, contentDescription = label, tint = tint, modifier = Modifier.size(20.dp)) }
+            { Icon(it, contentDescription = label, tint = tint, modifier = Modifier.size(AppSizing.IconM)) }
         },
         trailingIcon = trailingIcon?.let {
-            { Icon(it, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp)) }
+            // 装饰图标：旁侧已有文字/语义，跳过无障碍
+            { Icon(it, contentDescription = null, tint = tint, modifier = Modifier.size(AppSizing.IconS)) }
         },
     )
 }
@@ -105,9 +108,11 @@ fun AppSelectMenuItem(
         onClick = AppHaptics.click(onClick),
         modifier = modifier,
         leadingIcon = leadingIcon?.let {
-            { Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) }
+            // 装饰图标：旁侧已有文字/语义，跳过无障碍
+            { Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(AppSizing.IconM)) }
         },
         trailingIcon = {
+            // 装饰图标：旁侧已有文字/语义，跳过无障碍
             Icon(
                 imageVector = if (radio) {
                     if (selected) Icons.Rounded.RadioButtonChecked else Icons.Rounded.RadioButtonUnchecked
@@ -116,7 +121,7 @@ fun AppSelectMenuItem(
                 },
                 contentDescription = null,
                 tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(AppSizing.IconS),
             )
         },
     )
@@ -144,6 +149,6 @@ fun AppMenuDivider(
     HorizontalDivider(
         modifier = modifier.padding(vertical = AppSpacing.Xs),
         color = MaterialTheme.colorScheme.surfaceVariant,
-        thickness = 1.dp,
+        thickness = AppStroke.Thin,
     )
 }

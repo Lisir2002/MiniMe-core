@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppMotion
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /**
  * 折叠面板（分子组 · AppAccordion）：标题行 + 箭头旋转（展开 90°）+ 内容 AnimatedVisibility
@@ -56,7 +57,7 @@ fun AppAccordion(
             .clip(RoundedCornerShape(AppRadius.Md))
             .background(MaterialTheme.colorScheme.surface)
             .then(Modifier.border(
-                width = 1.dp,
+                width = AppStroke.Thin,
                 color = MaterialTheme.colorScheme.outlineVariant,
                 shape = RoundedCornerShape(AppRadius.Md),
             )),
@@ -80,10 +81,11 @@ fun AppAccordion(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp),
+                        modifier = Modifier.padding(top = AppSpacing.Tiny),
                     )
                 }
             }
+            // 装饰图标：旁侧已有文字/语义，跳过无障碍
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,

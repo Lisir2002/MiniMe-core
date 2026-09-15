@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 import kotlinx.coroutines.delay
 
@@ -241,7 +242,7 @@ fun AppSuccessDialog(
             }
             if (detail.isNotEmpty()) {
                 Spacer(Modifier.height(AppSpacing.Sm))
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs)) {
                     detail.forEach { line ->
                         Row {
                             Text("• ", color = tone.color(), style = MaterialTheme.typography.bodySmall)
@@ -385,7 +386,7 @@ fun AppErrorDialog(
             )
             if (detail.isNotEmpty()) {
                 Spacer(Modifier.height(AppSpacing.Sm))
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs)) {
                     detail.forEach { line ->
                         Row {
                             Text("• ", color = tone.color(), style = MaterialTheme.typography.bodySmall)
@@ -686,7 +687,7 @@ fun AppLoadingOverlay(
                     CircularProgressIndicator(
                         color = spinnerColor,
                         strokeWidth = 3.dp,
-                        modifier = Modifier.size(44.dp),
+                        modifier = Modifier.size(AppSizing.TouchTarget),
                     )
                 }
                 if (message != null) {

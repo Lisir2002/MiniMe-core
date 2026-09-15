@@ -59,6 +59,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppElevation
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /**
  * 可搜索下拉筛选（分子组 · AppDropdownFilter）
@@ -116,7 +117,7 @@ fun AppDropdownFilter(
             modifier = Modifier
                 .clip(triggerShape)
                 .background(appPalette().card)
-                .border(1.dp, triggerBorder, triggerShape)
+                .border(AppStroke.Thin, triggerBorder, triggerShape)
                 .clickable {
                     expanded = !expanded
                     if (expanded) query = ""
@@ -140,6 +141,7 @@ fun AppDropdownFilter(
                     )
                 }
             } else {
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = Icons.Rounded.Search,
                     contentDescription = null,
@@ -157,6 +159,7 @@ fun AppDropdownFilter(
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.width(AppSpacing.Xs))
+            // 装饰图标：旁侧已有文字/语义，跳过无障碍
             Icon(
                 imageVector = Icons.Rounded.ArrowDropDown,
                 contentDescription = null,
@@ -199,7 +202,7 @@ fun AppDropdownFilter(
                             .fillMaxWidth()
                             .shadow(AppElevation.Z3, shape, clip = true)
                             .background(appPalette().card)
-                            .border(1.dp, appPalette().separator, shape)
+                            .border(AppStroke.Thin, appPalette().separator, shape)
                             .clip(shape)
                             .padding(AppSpacing.Sm),
                     ) {
@@ -224,7 +227,7 @@ fun AppDropdownFilter(
                             else -> {
                                 LazyColumn(
                                     modifier = Modifier.heightIn(max = maxPopupHeight.dp),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                    verticalArrangement = Arrangement.spacedBy(AppSpacing.Tiny),
                                 ) {
                                     items(filtered, key = { it }) { item ->
                                         val index = options.indexOf(item)
@@ -245,7 +248,7 @@ fun AppDropdownFilter(
                                     .padding(top = AppSpacing.Xs, bottom = AppSpacing.Xs)
                                     .clip(RoundedCornerShape(AppRadius.Md))
                                     .clickable(onClick = onClear)
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = AppSpacing.Sm),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
@@ -302,6 +305,7 @@ private fun AppDropdownRow(
             ),
             exit = scaleOut(animationSpec = tween(90)),
         ) {
+            // 装饰图标：旁侧已有文字/语义，跳过无障碍
             Icon(
                 imageVector = Icons.Rounded.Check,
                 contentDescription = null,
@@ -325,9 +329,10 @@ private fun FilterDropdownSearch(
             .fillMaxWidth()
             .clip(shape)
             .background(appPalette().surfaceDim)
-            .padding(horizontal = AppSpacing.Md, vertical = 2.dp),
+            .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Tiny),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // 装饰图标：旁侧已有文字/语义，跳过无障碍
         Icon(
             imageVector = Icons.Rounded.Search,
             contentDescription = null,

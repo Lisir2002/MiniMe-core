@@ -21,6 +21,7 @@ data class AppPalette(
     val labelTertiary: Color,
     val separator: Color,
     val accent: Color,
+    val primaryOverlay12: Color,
 )
 
 val LightPalette = AppPalette(
@@ -33,6 +34,7 @@ val LightPalette = AppPalette(
     labelTertiary = AppColor.LabelTertiary,
     separator = AppColor.SeparatorOnLight,
     accent = AppColor.BrandAccent,
+    primaryOverlay12 = Color(0x1F0A84FF),
 )
 
 val DarkPalette = AppPalette(
@@ -45,6 +47,7 @@ val DarkPalette = AppPalette(
     labelTertiary = AppColor.OnDarkSecondaryLabel,
     separator = AppColor.SeparatorOnDark,
     accent = Color(0xFF64D2FF),
+    primaryOverlay12 = Color(0x1F3D9BFF),
 )
 
 val LocalAppPalette = staticCompositionLocalOf { LightPalette }

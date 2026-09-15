@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 
 /** 迷你复选方块（分子组 · AppCheckbox）：勾选时品牌色填充 + 弹簧弹出的白勾。 */
 @Composable
@@ -58,6 +59,7 @@ fun AppCheckbox(
             .toggleable(value = checked, role = Role.Checkbox, onValueChange = onCheckedChange),
         contentAlignment = Alignment.Center,
     ) {
+        // 装饰图标：旁侧已有文字/语义，跳过无障碍
         Icon(
             imageVector = Icons.Rounded.Check,
             contentDescription = null,
@@ -86,7 +88,7 @@ fun AppCheckRow(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 4.dp),
+            .padding(vertical = AppSpacing.Xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -100,11 +102,11 @@ fun AppCheckRow(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp),
+                    modifier = Modifier.padding(top = AppSpacing.Tiny),
                 )
             }
         }
-        Spacer(Modifier.padding(start = 8.dp))
+        Spacer(Modifier.padding(start = AppSpacing.Sm))
         AppCheckbox(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

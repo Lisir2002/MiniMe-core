@@ -37,7 +37,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /**
  * 动作面板（Action Sheet）行项：图标 + 文本。
@@ -113,7 +115,7 @@ fun AppActionSheet(
                             onItemClick(item)
                             onDismiss()
                         })
-                        .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Md + 4.dp),
+                        .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Md + AppSpacing.Xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -132,7 +134,7 @@ fun AppActionSheet(
                 }
             }
             Spacer(Modifier.height(AppSpacing.Sm))
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 1.dp)
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = AppStroke.Thin)
             Spacer(Modifier.height(AppSpacing.Sm))
             // 取消：与主动作区分隔，恒置底部。
             Row(
@@ -140,7 +142,7 @@ fun AppActionSheet(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(AppRadius.Md))
                     .clickable(onClick = onDismiss)
-                    .padding(vertical = AppSpacing.Md + 4.dp),
+                    .padding(vertical = AppSpacing.Md + AppSpacing.Xs),
                 horizontalArrangement = Arrangement.Center,
             ) {
                 Text(
@@ -194,15 +196,16 @@ fun AppSelectField(
                     .clip(shape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable { expanded = true }
-                    .padding(horizontal = AppSpacing.Md + 4.dp, vertical = AppSpacing.Md),
+                    .padding(horizontal = AppSpacing.Md + AppSpacing.Xs, vertical = AppSpacing.Md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (leadingIcon != null) {
+                    // 装饰图标：旁侧已有文字/语义，跳过无障碍
                     Icon(
                         imageVector = leadingIcon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(AppSizing.IconM),
                     )
                     Spacer(Modifier.width(AppSpacing.Sm))
                 }
@@ -217,6 +220,7 @@ fun AppSelectField(
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                 )
+                // 装饰图标：旁侧已有文字/语义，跳过无障碍
                 Icon(
                     imageVector = if (expanded) Icons.Rounded.ArrowDropUp else Icons.Rounded.ArrowDropDown,
                     contentDescription = null,

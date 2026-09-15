@@ -89,7 +89,7 @@ fun AppDock(
                 label = "dockScale",
             )
             val selectBg by animateColorAsState(
-                targetValue = if (selected) Color(0x1F0A84FF) else Color.Transparent,
+                targetValue = if (selected) appPalette().primaryOverlay12 else Color.Transparent,
                 label = "dockSelectBg",
             )
             val iconTint by animateColorAsState(

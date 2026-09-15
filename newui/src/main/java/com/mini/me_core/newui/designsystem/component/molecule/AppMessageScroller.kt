@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 import kotlinx.coroutines.launch
 
@@ -112,7 +113,7 @@ fun AppMessageScroller(
                         imageVector = Icons.Rounded.KeyboardArrowDown,
                         contentDescription = "回到底部",
                         tint = Color.White,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(AppSizing.IconM),
                     )
                 }
             }

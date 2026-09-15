@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
 /**
  * 标签输入器（分子组 · AppTagInput）：回车添加标签（chip 回弹进入、可删），
@@ -91,7 +92,7 @@ fun AppTagInput(
                 modifier = Modifier
                     .clip(RoundedCornerShape(AppRadius.Pill))
                     .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(AppRadius.Pill))
+                    .border(AppStroke.Thin, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(AppRadius.Pill))
                     .padding(horizontal = AppSpacing.Md, vertical = 6.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
@@ -122,7 +123,7 @@ fun AppTagInput(
                     },
                     modifier = Modifier
                         .width(96.dp)
-                        .padding(vertical = 2.dp),
+                        .padding(vertical = AppSpacing.Tiny),
                 )
             }
         }
@@ -139,7 +140,7 @@ private fun AppTagChip(
         modifier = Modifier
             .clip(RoundedCornerShape(AppRadius.Pill))
             .background(accentColor.copy(alpha = 0.10f))
-            .border(1.dp, accentColor.copy(alpha = 0.30f), RoundedCornerShape(AppRadius.Pill))
+            .border(AppStroke.Thin, accentColor.copy(alpha = 0.30f), RoundedCornerShape(AppRadius.Pill))
             .padding(start = AppSpacing.Md, top = 6.dp, bottom = 6.dp, end = AppSpacing.Sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -154,7 +155,7 @@ private fun AppTagChip(
             contentDescription = "移除标签",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
-                .padding(start = 4.dp)
+                .padding(start = AppSpacing.Xs)
                 .size(14.dp)
                 .clip(RoundedCornerShape(AppRadius.Pill))
                 .clickable { onRemove() },
