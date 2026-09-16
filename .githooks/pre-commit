@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# pre-commit hook（已停用校验）：docs/modules 与 docs/plan-docs 已按维护者决定删除，
+# 原「功能模块↔模块文档」同步校验与 Spec 规范预检不再适用，故此处直接通过。
+# Conventional Commits 校验仍由 commit-msg hook 负责（未受影响）。
+# 若未来恢复模块文档纪律，可在此重新接入 docs/modules 校验。
+exit 0

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MiniMe-core Launcher Icon 前景矢量 v3 — 白色圆角方块 + 黑色代码符号 >{ 
+  viewBox = 108×108，自适应图标 foreground 规范。
+  构图：中央白色圆角方块（圆角 22%），内嵌黑色 >  + {  代码符号。
+  配色：方块 #FFFFFF，代码符号 #000000，背景透明。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 白色圆角方块主体 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M14,10 L94,10 A4,4 0 0 1 98,14 L98,94 A4,4 0 0 1 94,98 L14,98 A4,4 0 0 1 10,94 L10,14 A4,4 0 0 1 14,10 Z" />
+
+    <!-- 代码符号 > （左半，粗线条圆角） -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M24,32 L42,50 L24,68 L20,64 L34,50 L20,36 Z" />
+
+    <!-- 代码符号 { （右半，花括号风格） -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M66,24 C70,24 72,26 72,30 L72,40 C72,43 70,44 66,46 L62,48 C60,49 60,50 62,51 L66,53 C70,55 72,56 72,59 L72,78 C72,82 70,84 66,84 L62,84 C58,84 56,82 56,78 L56,59 C56,56 58,55 62,53 L62,51 C58,49 56,48 56,45 L56,30 C56,26 58,24 62,24 Z" />
+
+    <!-- 代码符号 _ （下划线，表示命令行） -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M36,72 L60,72 L60,78 L36,78 Z" />
+</vector>

@@ -1,0 +1,133 @@
+name: CI
+
+# push 到 main 或 PR 时触发：构建 release（签名不存在则 unsigned）+ 跑 release 变体单元测试。
+# 用户策略：所有测试/验证都用发行版（release），不打 debug，也不发 debug。
+# 所以 CI 门禁统一跑 release 链路：
+#   :app:assembleRelease        — R8 fullMode + 资源收缩 + DEX/SO ZIP 压缩都走一遍，
+#                                 真正验证"即将发出的包"能不能构出来（14MB 级最终产物）。
+#   :app:testReleaseUnitTest    — 纯 JVM 单测在 release classpath 下跑，
+#                                 与将来用户安装的 release 运行时一致（debug 专用代码路径不再被掩盖）。
+# 打 v* tag 的正式发版构建走 android-release.yml（额外有 keystore 还原 + Release 页上传），不在这里。
+on:
+  push:
+    branches: [ main ]
+    # 纯文档/资源改动不影响构建产物，跳过 CI 省时间（public 仓库虽不扣额度，但省 11 分钟等待）。
+    # 注意：只要本次 push 含任一非忽略路径的改动，CI 仍会触发。
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+
+# 同分支新提交到来时取消正在跑的旧 run，省 CI 额度。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # versionCode/versionName 由 build.gradle.kts 的 gitVersionCode()/gitVersionName() 在配置阶段
+          # 基于 git tag 推导，浅克隆（默认 depth=1）会拿不到 tag，必须拉完整历史。
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # skill 脚本语法冒烟护栏：内置技能入口脚本运行于 Alpine(busybox ash)，语法必须兼容 POSIX sh。
+      # 用 sh -n（dash 解析，与 busybox ash 同为 POSIX 语法）对所有 SCRIPT 型技能入口做语法校验，
+      # 防止 gawk/GNU 专属语法（\x{...}、\s、\d）合入导致容器内执行即崩。
+      - name: Check skill script syntax (sh -n)
+        run: |
+          set -e
+          find app/src/main/assets/skills -type f -name '*.sh' -print0 | while IFS= read -r -d '' f; do
+            echo "==> sh -n $f"
+            sh -n "$f"
+          done
+          echo "All skill scripts pass POSIX sh syntax check"
+
+      # CI 跑 Ubuntu runner：自动生成 debug keystore 供 signingConfigs.release/androidDebug 回退使用。
+      # 必须放在 Set up JDK 之后（keytool 是 JDK bin 下的工具，JAVA_HOME 未注入前调不到）。
+      # 若 ~/.android/debug.keystore 缺失，AGP 会报 Keystore file not found，本步骤零配置兜底。
+      - name: Generate debug keystore (CI fallback signing)
+        run: |
+          set -e
+          echo "JAVA_HOME=$JAVA_HOME"
+          "$JAVA_HOME/bin/java" -version
+          mkdir -p ~/.android
+          if [[ ! -f ~/.android/debug.keystore ]]; then
+            "$JAVA_HOME/bin/keytool" -genkey -v -keystore ~/.android/debug.keystore \
+              -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            echo "debug keystore created at ~/.android/debug.keystore"
+            ls -lh ~/.android/debug.keystore
+          else
+            echo "debug keystore already exists, skip creation"
+          fi
+
+      # 缓存 Android SDK（platform-36 / build-tools-36 / platform-tools），避免每次 runner 重装。
+      # key 固定到 SDK 版本，升级 build-tools 时手动改 key。
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/android/sdk
+          key: android-sdk-36
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # android-actions/setup-android@v3 只接受 cmdline-tools-version + packages 两个参数：
+          #   cmdline-tools-version 对应 cmdline-tools zip 版本号（见 action.yml 默认 14742923 = 20.0）
+          #   packages 用 sdkmanager 语法传，多包空格分隔；platforms + build-tools 是构建必须
+          # 注意：新版 cmdline-tools 已移除独立 tools 包（sdkmanager tools 报 Failed to find package 'tools'），platform-tools 自带
+          cmdline-tools-version: '14742923'
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # PR 用只读缓存，仅 main 的 push 写回缓存，避免被 PR 污染。
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Grant execute permission for gradlew
+        run: |
+          set -e
+          chmod +x ./gradlew
+          # 构建前先打印环境：避免 gradle.properties 里有硬编码路径导致 "Java home does not exist"
+          echo "--- build env sanity ---"
+          echo "JAVA_HOME=$JAVA_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls -la gradle.properties gradle/wrapper/gradle-wrapper.properties
+          echo "--- gradle properties (without sensitive values) ---"
+          grep -vE '^(systemProp\.)' gradle.properties || true
+
+      # 构建收敛为单一 release 变体：真机 arm64-v8a 单架构（已开 R8 fullMode + shrinkResources
+      # + useLegacyPackaging=false），验证"用户真正会下载安装的发布包"能否完整编出来。
+      # 签名配置缺失时也会用 debug keystore 兜底（见 Generate debug keystore 步骤），
+      # 因为 signingConfigs.release 永远绑定了 signingConfig，不会产出 unsigned 包。
+      # --warning-mode=all 把所有弃用告警打到日志，便于提前发现 R8/AGP 升级时的破坏性变更；
+      # --stacktrace 失败时打印完整异常栈，便于在 CI 一眼定位根因。
+      - name: Build release (smoke)
+        run: ./gradlew --warning-mode=all :app:assembleRelease --stacktrace
+
+      # 单元测试（app/src/test 下的 Kotlin 单测），在 release 变体 classpath 下执行：
+      # 与用户拿到的最终发布包运行时一致，避免 debug-only 代码掩盖问题。
+      - name: Run unit tests (release)
+        run: ./gradlew --warning-mode=all :app:testReleaseUnitTest --stacktrace

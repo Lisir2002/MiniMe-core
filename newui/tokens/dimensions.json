@@ -1,0 +1,60 @@
+{
+  "spacing": {
+    "tiny":   { "$value": "2",   "$type": "dimension", "$description": "极小间距（图标内边距/紧凑分隔）" },
+    "xs":     { "$value": "4",   "$type": "dimension" },
+    "sm":     { "$value": "8",   "$type": "dimension" },
+    "md":     { "$value": "12",  "$type": "dimension" },
+    "lg":     { "$value": "16",  "$type": "dimension" },
+    "section":{ "$value": "20",  "$type": "dimension", "$description": "卡片/列表区间距（介于 Lg 与 Xl 之间）" },
+    "xl":     { "$value": "24",  "$type": "dimension" },
+    "xxl":    { "$value": "32",  "$type": "dimension" }
+  },
+  "radius": {
+    "none": { "$value": "0",   "$type": "dimension" },
+    "sm":   { "$value": "8",   "$type": "dimension" },
+    "md":   { "$value": "12",  "$type": "dimension" },
+    "lg":   { "$value": "16",  "$type": "dimension" },
+    "pill": { "$value": "999", "$type": "dimension" }
+  },
+  "elevation": {
+    "z0": { "$value": "0",  "$type": "dimension", "$description": "静止（无阴影，靠内容色分层）" },
+    "z1": { "$value": "1",  "$type": "dimension" },
+    "z2": { "$value": "3",  "$type": "dimension", "$description": "滚动抬升" },
+    "z3": { "$value": "8",  "$type": "dimension" },
+    "z4": { "$value": "12", "$type": "dimension" }
+  },
+  "sizing": {
+    "touchTarget": { "$value": "44", "$type": "dimension" },
+    "iconButton":  { "$value": "40", "$type": "dimension" },
+    "iconXs":      { "$value": "16", "$type": "dimension" },
+    "iconS":       { "$value": "18", "$type": "dimension" },
+    "iconM":       { "$value": "20", "$type": "dimension" },
+    "iconL":       { "$value": "24", "$type": "dimension" },
+    "iconBlock":   { "$value": "40", "$type": "dimension", "$description": "图标块规格" }
+  },
+  "layout": {
+    "pageHorizontal": { "$value": "16", "$type": "dimension" },
+    "blockGap":       { "$value": "16", "$type": "dimension" },
+    "rowGap":         { "$value": "8",  "$type": "dimension" },
+    "contentMaxWidth":{ "$value": "720", "$type": "dimension" },
+    "dividerThickness":{ "$value": "1", "$type": "dimension", "$description": "分割线统一厚度" }
+  },
+  "motion": {
+    "fast": { "$value": "150", "$type": "dimension" },
+    "med":  { "$value": "250", "$type": "dimension" },
+    "slow": { "$value": "400", "$type": "dimension" },
+    "easing": {
+      "standard":    { "$value": "CubicBezier(0.2, 0.0, 0, 1.0)", "$type": "cubic-bezier", "$description": "M3 Standard easing，用于进场/退场" },
+      "emphasized":  { "$value": "CubicBezier(0.2, 0.0, 0, 1.0)", "$type": "cubic-bezier", "$description": "M3 Emphasized easing，用于强调性过渡" },
+      "decelerate":  { "$value": "CubicBezier(0.0, 0.0, 0.2, 1.0)", "$type": "cubic-bezier", "$description": "减速曲线，用于元素进场" }
+    },
+    "spring": {
+      "standardDamping":   { "$value": "0.75", "$type": "number", "$description": "标准弹簧阻尼比（MediumBouncy）" },
+      "standardStiffness": { "$value": "400",  "$type": "number", "$description": "标准弹簧刚度（Medium）" },
+      "emphasizedDamping": { "$value": "0.55", "$type": "number", "$description": "强调弹簧阻尼比（MediumBouncy 低刚度）" },
+      "emphasizedStiffness": { "$value": "300", "$type": "number", "$description": "强调弹簧刚度（MediumLow）" },
+      "noBounceDamping":   { "$value": "1.0",  "$type": "number", "$description": "无回弹阻尼比" },
+      "noBounceStiffness": { "$value": "300",  "$type": "number", "$description": "无回弹刚度（MediumLow）" }
+    }
+  }
+}

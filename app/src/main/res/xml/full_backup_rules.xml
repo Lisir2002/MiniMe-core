@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DB-SHIELD-PERSIST-1 RC68：Android 9..11 fullBackupContent 规则（与 data_extraction_rules 语义对齐）。
+  ensure 系统级「更新 APK / 换机克隆 / 开发者 adb backup」保留 Room DB + 崩溃备份 + ZTH 加密元数据 + 共享偏好。
+-->
+<full-backup-content>
+    <include domain="database" path="." />
+    <include domain="file" path="database_crashes" />
+    <include domain="file" path="zth_security" />
+    <include domain="sharedpref" path="." />
+    <!-- 纵深防御：凭据库（Git token / API key 密文）不进 Android 自动备份。
+         密文虽由 Android Keystore MasterKey 保护、换机本就无法解出，但排除可避免备份文件中携带密文副本。 -->
+    <exclude domain="database" path="minime_credentials_v2.db" />
+    <exclude domain="cache" path="." />
+    <exclude domain="code_cache" path="." />
+    <exclude domain="no_backup" path="." />
+</full-backup-content>

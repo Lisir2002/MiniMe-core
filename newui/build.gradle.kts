@@ -1,0 +1,141 @@
+plugins {
+    id("com.android.library")
+    kotlin("android")
+    kotlin("plugin.compose")
+}
+
+/**
+ * :newui 模块版本独立声明：
+ *
+ * 本模块是独立设计系统库，其 versionName / versionCode 独立于 :app 模块，
+ * 不随 app 的 versionCode 增长而变化。版本号用于未来将 newui 作为独立 AAR /
+ *  Maven 产物发布时的版本标识。当前为 0.1.0（experimental），所有公共组件均标注
+ *  `@since 0.1.0-experimental`，API 可能在后续 minor 版本中调整。
+ */
+android {
+    namespace = "com.mini.me_core.newui"
+    compileSdk = 36
+    buildToolsVersion = "36.0.0"
+
+    defaultConfig {
+        minSdk = 26
+        versionCode = 1
+        versionName = "0.1.0"
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    @Suppress("DEPRECATION")
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            "-opt-in=androidx.compose.animation.ExperimentalAnimationApi",
+        )
+    }
+
+    buildFeatures {
+        compose = true
+        buildConfig = false
+    }
+
+    // :newui 是独立设计系统库，不走 app 的 lintVital；放行常用 deprecation 检查即可。
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+}
+
+dependencies {
+    val composeBom = platform("androidx.compose:compose-bom:2025.12.01")
+    implementation(composeBom)
+
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.animation:animation")
+    implementation("androidx.compose.animation:animation-graphics")
+
+    // 自适应导航（AppAdaptiveNav）：NavigationSuiteScaffold / 五断点
+    implementation("androidx.compose.material3:material3-window-size-class")
+    implementation("androidx.compose.material3:material3-adaptive-navigation-suite")
+
+    debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // 组件 UI 测试（Robolectric 上跑 Compose 语义树/手势，不需要真机）：
+    // 用途：滑扫组件等手势分子的回归验证（按钮揭示、互斥收起等视觉/状态断言）。
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+
+    testImplementation("junit:junit:4.13.2")
+}
+
+android {
+    testOptions {
+        unitTests {
+            // Robolectric + Compose UI 测试必需：让 unit test 能访问 res 与主题资源。
+            isIncludeAndroidResources = true
+        }
+    }
+}
+
+/**
+ * 令牌生成（Style Dictionary / DTCG）：把 newui/tokens/**/*.tokens.json
+ * （W3C DTCG 2025.10 格式）经 style-dictionary build 生成到
+ * build/generated/designTokens/kotlin/{AppColors,AppSpacing,...}.kt。
+ *
+ * 依赖 node + npm（仓库根已有 node v24）。断网/无 node 时跳过并给出提示，
+ * 不拉崩整个构建（生成产物可由已提交的 generated/ 兜底）。
+ */
+tasks.register<Exec>("generateDesignTokens") {
+    group = "ui"
+    description = "用 Style Dictionary 从 tokens/*.tokens.json 生成 Compose 令牌常量"
+    workingDir(projectDir)
+    val nodeBin = findNodeBinary()
+    val styleDictBin = file("node_modules/style-dictionary/bin/style-dictionary.js").absolutePath
+    if (nodeBin == null || !file(styleDictBin).exists()) {
+        logger.warn("(newui) 未找到 node 或 style-dictionary，跳过令牌生成；使用已提交的 generated/ 产物。")
+        enabled = false
+        return@register
+    }
+    // 直接调本地 style-dictionary 二进制；npm exec 会把 --config 误吞成 npm 参数，故不用。
+    commandLine(nodeBin, styleDictBin, "build", "--config", "style-dictionary.config.js")
+}
+
+// 编译前先产令牌；IDE 直接 compileDebugKotlin 时由该依赖兜底生成
+afterEvaluate {
+    tasks.configureEach {
+        if (name.startsWith("compile") && (name.contains("Kotlin") || name.contains("Java"))) {
+            if (name.endsWith("Kotlin") || name.startsWith("compileDebugKotlin")) {
+                dependsOn("generateDesignTokens")
+            }
+        }
+    }
+}
+
+/** 优先找 node 可执行路径（node / ~/.nvm/.../bin/node）。 */
+fun findNodeBinary(): String? {
+    val candidates = listOf(
+        System.getenv("NODE_BIN"),
+        "node",
+        "/usr/local/bin/node",
+        "/usr/bin/node",
+        "/opt/homebrew/bin/node",
+    )
+    return candidates.firstOrNull { candidate ->
+        candidate != null && runCatching {
+            val p = ProcessBuilder(candidate, "--version")
+                .redirectErrorStream(false).start()
+            p.waitFor() == 0
+        }.getOrDefault(false)
+    }
+}
