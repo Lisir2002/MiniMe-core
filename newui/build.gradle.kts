@@ -19,8 +19,9 @@ android {
 
     defaultConfig {
         minSdk = 26
-        versionCode = 1
-        versionName = "0.1.0"
+        // Library 模块不设置 versionCode/versionName（仅 Application 模块支持）；
+        // 模块版本号通过 @since 0.1.0-experimental 标注在组件 KDoc 中管理，
+        // 未来独立发布 AAR 时由 Maven 发布配置指定版本。
     }
 
     compileOptions {
