@@ -46,9 +46,19 @@ import com.mini.me_core.newui.designsystem.component.AppButtonVariant
 import com.mini.me_core.newui.designsystem.component.AppChatMarker
 import com.mini.me_core.newui.designsystem.component.AppChatMarkerKind
 import com.mini.me_core.newui.designsystem.component.AppChatMessageState
+import com.mini.me_core.newui.designsystem.component.AppAcceptChangesBar
 import com.mini.me_core.newui.designsystem.component.AppCitationCard
 import com.mini.me_core.newui.designsystem.component.AppCitationSource
+import com.mini.me_core.newui.designsystem.component.AppClarifyCard
+import com.mini.me_core.newui.designsystem.component.AppCommitChip
 import com.mini.me_core.newui.designsystem.component.AppDiffCard
+import com.mini.me_core.newui.designsystem.component.AppErrorCard
+import com.mini.me_core.newui.designsystem.component.AppFollowUpChips
+import com.mini.me_core.newui.designsystem.component.AppModelBadge
+import com.mini.me_core.newui.designsystem.component.AppTestResultCard
+import com.mini.me_core.newui.designsystem.component.AppTurnSummaryBar
+import com.mini.me_core.newui.designsystem.component.AppWebHit
+import com.mini.me_core.newui.designsystem.component.AppWebSearchCard
 import com.mini.me_core.newui.designsystem.component.AppDiffLine
 import com.mini.me_core.newui.designsystem.component.AppDiffLineType
 import com.mini.me_core.newui.designsystem.component.AppFileCard
@@ -374,6 +384,58 @@ private fun FlowNode(item: FlowItem, state: ChatFlowState) {
                 modifier = Modifier,
             )
 
+            is FlowItem.TestResult -> AppTestResultCard(
+                passed = item.passed,
+                failed = item.failed,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.ErrorCard -> AppErrorCard(
+                title = item.title,
+                location = item.location,
+                message = item.message,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.FollowUps -> AppFollowUpChips(
+                suggestions = item.suggestions,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.TurnSummary -> AppTurnSummaryBar(
+                filesChanged = item.filesChanged,
+                toolsRun = item.toolsRun,
+                duration = item.duration,
+                tokens = item.tokens,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.AcceptBar -> AppAcceptChangesBar(
+                changedCount = item.changedCount,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.Clarify -> AppClarifyCard(
+                question = item.question,
+                options = item.options,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.Commit -> AppCommitChip(
+                hash = item.hash,
+                modifier = Modifier,
+            )
+
+            is FlowItem.WebSearch -> AppWebSearchCard(
+                hits = item.hits,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.ModelTag -> AppModelBadge(
+                model = item.model,
+                modifier = Modifier,
+            )
+
             // 消息组：头像/姓名行 → 思考过程（头像下方、与气泡同列）→ 气泡 → 附件（用户气泡下方）。
             // 三者同属一个 Msg 节点，不再拆成独立列表项，避免视觉分离。
             is FlowItem.Msg -> Column(
@@ -586,6 +648,67 @@ private sealed interface FlowItem {
         override val key: Int,
         val branch: String,
         val dirtyCount: Int,
+    ) : FlowItem
+
+    /** 测试结果卡。 */
+    data class TestResult(
+        override val key: Int,
+        val passed: Int,
+        val failed: List<String>,
+    ) : FlowItem
+
+    /** 编译 / 运行错误卡。 */
+    data class ErrorCard(
+        override val key: Int,
+        val title: String,
+        val location: String?,
+        val message: String,
+    ) : FlowItem
+
+    /** 建议追问 chips。 */
+    data class FollowUps(
+        override val key: Int,
+        val suggestions: List<String>,
+    ) : FlowItem
+
+    /** 回合总结条。 */
+    data class TurnSummary(
+        override val key: Int,
+        val filesChanged: Int,
+        val toolsRun: Int,
+        val duration: String,
+        val tokens: String,
+    ) : FlowItem
+
+    /** 批量接受/拒绝条。 */
+    data class AcceptBar(
+        override val key: Int,
+        val changedCount: Int,
+    ) : FlowItem
+
+    /** 反问/澄清卡。 */
+    data class Clarify(
+        override val key: Int,
+        val question: String,
+        val options: List<String>,
+    ) : FlowItem
+
+    /** 提交/回滚 chip。 */
+    data class Commit(
+        override val key: Int,
+        val hash: String,
+    ) : FlowItem
+
+    /** 联网搜索命中。 */
+    data class WebSearch(
+        override val key: Int,
+        val hits: List<AppWebHit>,
+    ) : FlowItem
+
+    /** 模型徽章。 */
+    data class ModelTag(
+        override val key: Int,
+        val model: String,
     ) : FlowItem
 }
 
@@ -1260,9 +1383,56 @@ post("/auth/login") {
             ),
         )
     },
+    // 扩展组件展示轮：测试失败 → 修复 → 全绿 → 总结/提交/建议追问。
+    {
+        delay(900)
+        put(
+            FlowItem.Clarify(
+                key = nextKey(),
+                question = "登录失败时的错误提示要多详细？",
+                options = listOf("统一模糊提示", "区分账号/密码错误"),
+            ),
+        )
+        delay(1200)
+        put(
+            FlowItem.WebSearch(
+                key = nextKey(),
+                hits = listOf(
+                    AppWebHit("OWASP 认证最佳实践", "cheatsheetseries.owasp.org", "密码勿明文存储，登录失败应使用泛化提示以降低枚举风险。"),
+                    AppWebHit("JWT 过期与刷新设计", "auth0.com", "access token 短期有效，配合 refresh token 轮换。"),
+                ),
+            ),
+        )
+        delay(1100)
+        put(FlowItem.ModelTag(key = nextKey(), model = "深度模型"))
+        delay(800)
+        put(FlowItem.TestResult(key = nextKey(), passed = 18, failed = listOf("AuthApiTest 登录失败用例期望 401 实际 200")))
+        delay(1100)
+        put(
+            FlowItem.ErrorCard(
+                key = nextKey(),
+                title = "AuthApiTest 未通过",
+                location = "AuthApiTest.kt:42",
+                message = "登录失败用例期望返回 401，但当前实现对错误密码也返回了 200，缺少状态码断言。",
+            ),
+        )
+        delay(1400)
+        put(FlowItem.TestResult(key = nextKey(), passed = 24, failed = emptyList()))
+        delay(1000)
+        put(FlowItem.TurnSummary(key = nextKey(), filesChanged = 4, toolsRun = 7, duration = "38s", tokens = "4.2k"))
+        delay(900)
+        put(FlowItem.AcceptBar(key = nextKey(), changedCount = 4))
+        delay(900)
+        put(FlowItem.Commit(key = nextKey(), hash = "a1b2c3d"))
+        delay(900)
+        put(
+            FlowItem.FollowUps(
+                key = nextKey(),
+                suggestions = listOf("再写个集成测试", "解释 JWT 过期逻辑", "加 refresh token"),
+            ),
+        )
+    },
 )
-
-private enum class PlanDecision { Approve, Refine }
 
 /** 首次放入或在「继续细化」后刷新计划卡，使其按钮回调绑定到当前等待的决策。 */
 private suspend fun ChatFlowState.patchOrPutPlan(
