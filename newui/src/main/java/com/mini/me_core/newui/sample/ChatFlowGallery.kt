@@ -1,0 +1,1021 @@
+package com.mini.me_core.newui.sample
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.mini.me_core.newui.designsystem.component.molecule.AppApprovalChoice
+import com.mini.me_core.newui.designsystem.component.molecule.AppAttachmentCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppButton
+import com.mini.me_core.newui.designsystem.component.molecule.AppButtonVariant
+import com.mini.me_core.newui.designsystem.component.molecule.AppChatMarker
+import com.mini.me_core.newui.designsystem.component.molecule.AppChatMarkerKind
+import com.mini.me_core.newui.designsystem.component.molecule.AppChatMessageState
+import com.mini.me_core.newui.designsystem.component.molecule.AppMcpAppCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppMcpAppState
+import com.mini.me_core.newui.designsystem.component.molecule.AppMessageRow
+import com.mini.me_core.newui.designsystem.component.molecule.AppMessageScroller
+import com.mini.me_core.newui.designsystem.component.molecule.AppPlanCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppPlanState
+import com.mini.me_core.newui.designsystem.component.molecule.AppPlanStep
+import com.mini.me_core.newui.designsystem.component.molecule.AppPlanStepStatus
+import com.mini.me_core.newui.designsystem.component.molecule.AppSkillCallCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppSkillCallState
+import com.mini.me_core.newui.designsystem.component.molecule.AppTerminalLog
+import com.mini.me_core.newui.designsystem.component.molecule.AppThinkingBlock
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolCallCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolCallState
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolChainStep
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolChainStepState
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolChainTimeline
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolSummaryCard
+import com.mini.me_core.newui.designsystem.component.molecule.AppToolSummaryState
+import com.mini.me_core.newui.designsystem.component.molecule.AppTypingIndicator
+import com.mini.me_core.newui.designsystem.slot.AppShell
+import com.mini.me_core.newui.designsystem.theme.AppTheme
+import com.mini.me_core.newui.designsystem.theme.appPalette
+import com.mini.me_core.newui.designsystem.token.generated.AppColor
+import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+/**
+ * 对话流完整演示页（样板页子页）：
+ *
+ * 与 [DesignGallery] 中「点一个按钮塞一种组件」的组件调试台不同，本页用一段有起承转合的
+ * 多轮任务对话（"给后端加登录接口并跑通测试"），在剧情推进中把对话流的**全部分子组件**
+ * 自然用一遍：日期/阶段标记、用户与 AI 气泡（Markdown/流式/失败重试）、打字指示、思考过程、
+ * 计划审批、技能调用、MCP App、MCP 工具、工具链时间线、普通工具卡（流式输出/审批三选一/
+ * 审批超时）、附件、终端日志、结果摘要。
+ *
+ * 演出方式：可重播的逐步推进——▶ 自动播放 / ⏵ 单步 / ⏩ 一键展开全部 / ↺ 重置；
+ * 审批、计划、失败重试等节点是真实可交互的本地闭环（点击卡片按钮推进剧情）。
+ */
+@Composable
+fun ChatFlowGallery(onNavigateBack: (() -> Unit)? = null) {
+    val state = rememberChatFlow()
+    AppTheme {
+        AppShell(
+            title = "AI 对话流 · 完整演示",
+            onNavigateBack = onNavigateBack,
+            bottomBar = { FlowPlayerBar(state) },
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AppMessageScroller(
+                    modifier = Modifier.fillMaxSize(),
+                    newMessageKey = state.items.size,
+                    onLoadHistory = if (!state.historyLoaded) ({ state.loadHistory() }) else null,
+                    loadingHistory = state.loadingHistory,
+                ) {
+                    items(items = state.items.asReversed(), key = { it.key }) { item ->
+                        FlowNode(item, state)
+                    }
+                }
+                if (state.items.isEmpty()) {
+                    EmptyHint()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyHint() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
+            modifier = Modifier.padding(AppSpacing.Xl),
+        ) {
+            Text(
+                text = "完整对话流演示",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = appPalette().ink,
+            )
+            Text(
+                text = "底部「自动播放」连续演出，「单步」逐轮推进；\n审批与重试可直接在卡片上操作。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = appPalette().labelSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FlowPlayerBar(state: ChatFlowState) {
+    val canAdvance = !state.busy && !state.finished
+    Surface(color = appPalette().surface) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
+        ) {
+            Text(
+                text = state.statusText(),
+                style = MaterialTheme.typography.labelMedium,
+                color = appPalette().labelSecondary,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
+                AppButton(
+                    text = "▶ 自动播放",
+                    onClick = state::play,
+                    enabled = canAdvance,
+                    modifier = Modifier.weight(1f),
+                )
+                AppButton(
+                    text = "⏵ 单步",
+                    onClick = state::step,
+                    enabled = canAdvance,
+                    variant = AppButtonVariant.FilledTonal,
+                    modifier = Modifier.weight(1f),
+                )
+                AppButton(
+                    text = "⏩ 展开全部",
+                    onClick = state::expandAll,
+                    enabled = !state.busy,
+                    variant = AppButtonVariant.Outlined,
+                    modifier = Modifier.weight(1f),
+                )
+                AppButton(
+                    text = "↺ 重置",
+                    onClick = state::reset,
+                    enabled = state.turnIndex > 0 || state.items.isNotEmpty(),
+                    variant = AppButtonVariant.Text,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/** 单条对话节点：复用样板页同一套分子组件，新增打字指示与终端日志两类节点。 */
+@Composable
+private fun FlowNode(item: FlowItem, state: ChatFlowState) {
+    when (item) {
+        is FlowItem.Marker -> AppChatMarker(
+            text = item.text,
+            kind = item.kind,
+            running = item.running,
+            tone = item.tone,
+        )
+
+        is FlowItem.Typing -> Row(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(AppRadius.Pill))
+                    .background(appPalette().card)
+                    .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Md),
+            ) {
+                AppTypingIndicator()
+            }
+        }
+
+        is FlowItem.Tool -> AppToolCallCard(
+            title = item.title,
+            summary = item.summary,
+            state = item.state,
+            serverPrefix = item.serverPrefix,
+            durationMs = item.durationMs,
+            input = item.input,
+            output = item.output,
+            streamOutput = item.streamOutput,
+            approvalHint = item.approvalHint,
+            onApprove = item.onApprove,
+            onReject = item.onReject,
+            onChoice = item.onChoice,
+            alwaysDisabled = item.alwaysDisabled,
+            alwaysDisabledReason = item.alwaysDisabledReason,
+            approvalExpired = item.approvalExpired,
+            approvalRemembered = item.approvalRemembered,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        is FlowItem.McpApp -> AppMcpAppCard(
+            title = item.title,
+            state = item.state,
+            serverPrefix = item.serverPrefix,
+            resourceUri = item.resourceUri,
+            onReload = item.onReload,
+            onExpand = item.onExpand,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        is FlowItem.Skill -> AppSkillCallCard(
+            name = item.name,
+            args = item.args,
+            state = item.state,
+            description = item.description,
+            durationMs = item.durationMs,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        is FlowItem.Thinking -> AppThinkingBlock(
+            text = item.text,
+            isStreaming = item.isStreaming,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        is FlowItem.Plan -> AppPlanCard(
+            title = item.title,
+            steps = item.steps,
+            state = item.state,
+            pendingSelection = item.pendingSelection,
+            reason = item.reason,
+            onApprove = item.onApprove,
+            onRefine = item.onRefine,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        is FlowItem.Attachment -> AppAttachmentCard(
+            fileName = item.fileName,
+            mimeType = item.mimeType,
+            sizeBytes = item.sizeBytes,
+            containerPath = item.containerPath,
+            isImage = item.isImage,
+            onClick = item.onClick,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        is FlowItem.ToolChain -> AppToolChainTimeline(
+            steps = item.steps,
+            label = item.label,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        is FlowItem.ToolSummary -> AppToolSummaryCard(
+            text = item.text,
+            state = item.state,
+            toolCount = item.toolCount,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        is FlowItem.Terminal -> AppTerminalLog(modifier = Modifier.fillMaxWidth())
+
+        is FlowItem.Msg -> AppMessageRow(
+            text = item.text,
+            state = item.state,
+            isUser = item.isUser,
+            avatarLabel = if (item.isUser) "你" else "AI",
+            name = if (item.isUser) "你" else "MiniMe Agent",
+            timestamp = item.ts,
+            grouped = item.grouped,
+            onCopy = { /* 演示占位：写入剪贴板 */ },
+            onRetry = item.onRetry,
+            onDelete = { state.items.removeAll { it.key == item.key } },
+            swipeEnabled = true,
+            swipeIndex = item.key,
+            swipeExpandedIndex = state.swipeExpanded,
+            onSwipeExpanded = { state.swipeExpanded = it },
+        )
+    }
+}
+
+// =====================================================================================
+// 演示数据模型（与 DesignGallery 的私有 ChatItem 同构，额外含打字指示 / 终端日志节点）
+// =====================================================================================
+
+private sealed interface FlowItem {
+    val key: Int
+
+    data class Msg(
+        override val key: Int,
+        val text: String,
+        val state: AppChatMessageState,
+        val isUser: Boolean,
+        val grouped: Boolean = false,
+        val ts: String = "",
+        val onRetry: (() -> Unit)? = null,
+    ) : FlowItem
+
+    data class Marker(
+        override val key: Int,
+        val text: String,
+        val kind: AppChatMarkerKind = AppChatMarkerKind.Tool,
+        val running: Boolean = false,
+        val tone: Color = AppColor.StatusSuccess,
+    ) : FlowItem
+
+    data class Typing(override val key: Int) : FlowItem
+
+    data class Terminal(override val key: Int) : FlowItem
+
+    data class Tool(
+        override val key: Int,
+        val title: String,
+        val state: AppToolCallState,
+        val summary: String? = null,
+        val serverPrefix: String? = null,
+        val durationMs: Long? = null,
+        val input: String? = null,
+        val output: String? = null,
+        val streamOutput: String? = null,
+        val approvalHint: String? = null,
+        val onApprove: (() -> Unit)? = null,
+        val onReject: (() -> Unit)? = null,
+        val onChoice: ((AppApprovalChoice) -> Unit)? = null,
+        val alwaysDisabled: Boolean = false,
+        val alwaysDisabledReason: String? = null,
+        val approvalExpired: Boolean = false,
+        val approvalRemembered: Boolean = false,
+    ) : FlowItem
+
+    data class McpApp(
+        override val key: Int,
+        val title: String,
+        val state: AppMcpAppState,
+        val serverPrefix: String? = null,
+        val resourceUri: String? = null,
+        val onReload: (() -> Unit)? = null,
+        val onExpand: (() -> Unit)? = null,
+    ) : FlowItem
+
+    data class Skill(
+        override val key: Int,
+        val name: String,
+        val state: AppSkillCallState,
+        val args: String? = null,
+        val description: String? = null,
+        val durationMs: Long? = null,
+    ) : FlowItem
+
+    data class Thinking(
+        override val key: Int,
+        val text: String,
+        val isStreaming: Boolean = false,
+    ) : FlowItem
+
+    data class Plan(
+        override val key: Int,
+        val title: String,
+        val steps: List<AppPlanStep>,
+        val state: AppPlanState,
+        val pendingSelection: String? = null,
+        val reason: String? = null,
+        val onApprove: (() -> Unit)? = null,
+        val onRefine: (() -> Unit)? = null,
+    ) : FlowItem
+
+    data class Attachment(
+        override val key: Int,
+        val fileName: String,
+        val mimeType: String? = null,
+        val sizeBytes: Long? = null,
+        val containerPath: String? = null,
+        val isImage: Boolean = false,
+        val onClick: (() -> Unit)? = null,
+    ) : FlowItem
+
+    data class ToolChain(
+        override val key: Int,
+        val steps: List<AppToolChainStep>,
+        val label: String = "工具链",
+    ) : FlowItem
+
+    data class ToolSummary(
+        override val key: Int,
+        val text: String,
+        val state: AppToolSummaryState = AppToolSummaryState.Done,
+        val toolCount: Int = 1,
+    ) : FlowItem
+}
+
+// =====================================================================================
+// 播放器状态机：自动播放 / 单步 / 展开全部 / 重置；审批与重试为可交互 gate
+// =====================================================================================
+
+private enum class FlowMode { Auto, Manual, Instant }
+
+@Composable
+private fun rememberChatFlow(): ChatFlowState {
+    val scope = rememberCoroutineScope()
+    return remember { ChatFlowState(scope) }
+}
+
+private class ChatFlowState(val scope: CoroutineScope) {
+    val items = mutableStateListOf<FlowItem>()
+
+    var seq by mutableIntStateOf(0)
+        private set
+    var turnIndex by mutableIntStateOf(0)
+        private set
+    var mode by mutableStateOf(FlowMode.Auto)
+        private set
+    var busy by mutableStateOf(false)
+        private set
+    var finished by mutableStateOf(false)
+        private set
+    var swipeExpanded by mutableStateOf<Int?>(null)
+    var loadingHistory by mutableStateOf(false)
+        private set
+    var historyLoaded by mutableStateOf(false)
+        private set
+
+    private var job: Job? = null
+    private var histKey = -100
+
+    val totalTurns get() = flowTurns.size
+
+    fun statusText(): String = when {
+        finished && turnIndex >= totalTurns -> "演示完成 · 共 $totalTurns 轮，可「重置」重播"
+        busy && mode == FlowMode.Auto -> "自动播放中… 第 ${(turnIndex + 1).coerceAtMost(totalTurns)} / $totalTurns 轮"
+        busy -> "第 ${(turnIndex + 1).coerceAtMost(totalTurns)} / $totalTurns 轮 · 请在卡片上完成操作"
+        items.isEmpty() -> "就绪 · 共 $totalTurns 轮"
+        else -> "已演 $turnIndex / $totalTurns 轮"
+    }
+
+    // ---- 基础原语 ----
+    fun nextKey(): Int = ++seq
+
+    fun put(item: FlowItem) {
+        items.add(item)
+    }
+
+    internal inline fun <reified T : FlowItem> patch(key: Int, transform: (T) -> T) {
+        val idx = items.indexOfFirst { it.key == key }
+        val cur = items.getOrNull(idx)
+        if (cur is T) items[idx] = transform(cur)
+    }
+
+    fun removeKey(key: Int) {
+        items.removeAll { it.key == key }
+    }
+
+    suspend fun tick(ms: Long) {
+        if (mode != FlowMode.Instant) delay(ms)
+    }
+
+    /** 交互检查点：自动/单步等待用户在卡片上操作；展开全部时取默认决策。 */
+    suspend fun <T> gate(deferred: CompletableDeferred<T>, instantDefault: () -> T): T =
+        if (mode == FlowMode.Instant) instantDefault() else deferred.await()
+
+    suspend fun typewrite(
+        full: String,
+        chunk: Int = 3,
+        perMs: Long = 15L,
+        onText: (String) -> Unit,
+    ) {
+        if (mode == FlowMode.Instant) {
+            onText(full)
+            return
+        }
+        var n = 0
+        while (n <= full.length) {
+            onText(full.take(n))
+            n += chunk
+            delay(perMs)
+        }
+    }
+
+    /** 先显示打字指示，停顿后移除再演后续（展开全部时跳过指示）。 */
+    suspend fun withTyping(waitMs: Long = 650L, block: suspend () -> Unit) {
+        if (mode == FlowMode.Instant) {
+            block()
+            return
+        }
+        val k = nextKey()
+        put(FlowItem.Typing(k))
+        tick(waitMs)
+        removeKey(k)
+        block()
+    }
+
+    suspend fun userSays(text: String, ts: String) {
+        put(FlowItem.Msg(nextKey(), text, AppChatMessageState.Complete, isUser = true, ts = ts))
+    }
+
+    suspend fun aiReply(full: String, ts: String, chunk: Int = 3, perMs: Long = 14L) {
+        val k = nextKey()
+        put(FlowItem.Msg(k, "", AppChatMessageState.Streaming, isUser = false, ts = ts))
+        typewrite(full, chunk, perMs) { s -> patch<FlowItem.Msg>(k) { it.copy(text = s) } }
+        patch<FlowItem.Msg>(k) { it.copy(state = AppChatMessageState.Complete) }
+    }
+
+    // ---- 播放控制 ----
+    fun play() = start(FlowMode.Auto, continuous = true)
+
+    fun step() = start(FlowMode.Manual, continuous = false)
+
+    private fun start(m: FlowMode, continuous: Boolean) {
+        if (busy || finished) return
+        mode = m
+        busy = true
+        job = scope.launch {
+            val from = turnIndex
+            val end = if (continuous) totalTurns else (from + 1).coerceAtMost(totalTurns)
+            for (i in from until end) {
+                flowTurns[i]()
+                turnIndex = i + 1
+            }
+            if (turnIndex >= totalTurns) finished = true
+            busy = false
+        }
+    }
+
+    fun reset() {
+        job?.cancel()
+        items.clear()
+        seq = 0
+        turnIndex = 0
+        finished = false
+        busy = false
+        swipeExpanded = null
+        loadingHistory = false
+        historyLoaded = false
+        histKey = -100
+    }
+
+    fun expandAll() {
+        if (busy) return
+        job?.cancel()
+        items.clear()
+        seq = 0
+        swipeExpanded = null
+        mode = FlowMode.Instant
+        busy = true
+        turnIndex = totalTurns
+        finished = true
+        job = scope.launch {
+            flowTurns.forEach { it() }
+            busy = false
+        }
+    }
+
+    fun loadHistory() {
+        if (historyLoaded || loadingHistory) return
+        loadingHistory = true
+        scope.launch {
+            delay(500)
+            val older = listOf(
+                FlowItem.Marker(histKey--, "昨天 · 18:20", kind = AppChatMarkerKind.Date),
+                FlowItem.Msg(
+                    histKey--,
+                    "上次我们把 `feature/auth` 的路由骨架搭好了，今天接着补登录。",
+                    AppChatMessageState.Complete,
+                    isUser = false,
+                    ts = "昨天 18:20",
+                ),
+                FlowItem.Msg(
+                    histKey--,
+                    "好，明天我把 token 鉴权也一起设计进去。",
+                    AppChatMessageState.Complete,
+                    isUser = true,
+                    ts = "昨天 18:21",
+                    grouped = true,
+                ),
+            )
+            items.addAll(0, older)
+            historyLoaded = true
+            loadingHistory = false
+        }
+    }
+}
+
+// =====================================================================================
+// 剧情脚本：围绕「给后端加登录接口（token 鉴权）并跑通测试」的多轮任务
+// =====================================================================================
+
+private val flowTurns: List<suspend ChatFlowState.() -> Unit> = listOf(
+    // T0 开场：用户提需求并附上需求文档与原型
+    {
+        put(FlowItem.Marker(nextKey(), "今天 · 10:02", kind = AppChatMarkerKind.Date))
+        userSays(
+            "帮我给后端加一个**登录接口**，要带 token 鉴权，最后把测试跑通。需求文档和原型我放下面了。",
+            "10:02",
+        )
+        put(
+            FlowItem.Attachment(
+                nextKey(),
+                fileName = "login-api-spec.md",
+                mimeType = "text/markdown",
+                sizeBytes = 8_420,
+                containerPath = "~/workspace/docs/login-api-spec.md",
+                onClick = { },
+            ),
+        )
+        put(
+            FlowItem.Attachment(
+                nextKey(),
+                fileName = "login-flow.png",
+                mimeType = "image/png",
+                sizeBytes = 1_360_000,
+                containerPath = "~/workspace/design/login-flow.png",
+                isImage = true,
+                onClick = { },
+            ),
+        )
+    },
+    // T1 思考过程（流式推理）
+    {
+        val k = nextKey()
+        val reasoning = "用户要新增登录接口并带 token 鉴权。\n\n我需要先确认现有 `feature/auth` 的路由与依赖注入方式，" +
+            "再决定 token 用无状态 JWT 还是服务端会话；随后按「路由 → Service → 鉴权中间件 → 测试」推进，" +
+            "最后跑编译与单测验证。附件里的需求文档先读一遍，对齐字段与错误码。"
+        put(FlowItem.Thinking(k, "", isStreaming = true))
+        typewrite(reasoning, chunk = 4, perMs = 13L) { s ->
+            patch<FlowItem.Thinking>(k) { it.copy(text = s) }
+        }
+        patch<FlowItem.Thinking>(k) { it.copy(isStreaming = false) }
+    },
+    // T2 打字指示 → AI 简短回应 + 阶段标记
+    {
+        withTyping {
+            aiReply(
+                "收到。我先读一下现有鉴权代码和需求文档，再给你一份实现计划确认。",
+                "10:03",
+            )
+        }
+        put(FlowItem.Marker(nextKey(), "读取鉴权模块 · feature/auth", running = true))
+    },
+    // T3 计划审批（gate：批准 / 继续细化）
+    {
+        val k = nextKey()
+        var refined = false
+        while (true) {
+            val decision = CompletableDeferred<PlanDecision>()
+            patchOrPutPlan(
+                k,
+                refined = refined,
+                onApprove = { decision.complete(PlanDecision.Approve) },
+                onRefine = { decision.complete(PlanDecision.Refine) },
+            )
+            if (gate(decision) { PlanDecision.Approve } == PlanDecision.Approve) break
+            refined = true
+        }
+        patch<FlowItem.Plan>(k) { it.copy(state = AppPlanState.InProgress, onApprove = null, onRefine = null) }
+        tick(1200)
+        patch<FlowItem.Plan>(k) { plan ->
+            plan.copy(
+                state = AppPlanState.Approved,
+                steps = plan.steps.map { step ->
+                    if (step.status == AppPlanStepStatus.Pending) {
+                        step.copy(status = AppPlanStepStatus.InProgress)
+                    } else {
+                        step
+                    }
+                },
+            )
+        }
+    },
+    // T4 技能调用：代码审查
+    {
+        val k = nextKey()
+        put(
+            FlowItem.Skill(
+                key = k,
+                name = "review-code",
+                args = "--scope feature/auth",
+                state = AppSkillCallState.Running,
+                description = "审查登录接口改动：检查 JWT 签发/校验、密钥存放、鉴权中间件顺序与错误处理，并给出建议。",
+            ),
+        )
+        tick(1000)
+        patch<FlowItem.Skill>(k) { it.copy(state = AppSkillCallState.Success, durationMs = 1000) }
+    },
+    // T5 MCP App：构建耗时分析沙箱卡（可点重新加载）
+    {
+        val k = nextKey()
+        fun reload() {
+            patch<FlowItem.McpApp>(k) { it.copy(state = AppMcpAppState.Loading) }
+            scope.launch {
+                delay(600)
+                patch<FlowItem.McpApp>(k) { it.copy(state = AppMcpAppState.Ready) }
+            }
+        }
+        put(
+            FlowItem.McpApp(
+                key = k,
+                title = "登录接口构建耗时分析",
+                state = AppMcpAppState.Loading,
+                serverPrefix = "github",
+                resourceUri = "ui://analytics/auth-build-duration",
+                onReload = { reload() },
+                onExpand = { },
+            ),
+        )
+        tick(900)
+        patch<FlowItem.McpApp>(k) { it.copy(state = AppMcpAppState.Ready) }
+    },
+    // T6 工具链时间线：读结构 → 写接口 → 编译 → 测试
+    {
+        val k = nextKey()
+        put(
+            FlowItem.ToolChain(
+                key = k,
+                label = "工具链",
+                steps = listOf(
+                    AppToolChainStep("读取项目结构", summary = "scan feature/auth", state = AppToolChainStepState.Success, durationMs = 320),
+                    AppToolChainStep("新增登录路由", summary = "write AuthApi.kt", state = AppToolChainStepState.Success, durationMs = 540),
+                    AppToolChainStep("实现 token 鉴权", summary = "edit AuthMiddleware", state = AppToolChainStepState.Success, durationMs = 760),
+                    AppToolChainStep("编译并运行测试", summary = "./gradlew test", state = AppToolChainStepState.Running),
+                ),
+            ),
+        )
+        tick(1500)
+        patch<FlowItem.ToolChain>(k) { chain ->
+            chain.copy(
+                steps = chain.steps.mapIndexed { index, step ->
+                    if (index == chain.steps.lastIndex) {
+                        step.copy(state = AppToolChainStepState.Success, durationMs = 1320)
+                    } else {
+                        step
+                    }
+                },
+            )
+        }
+    },
+    // T7 MCP 工具：经 github server 拉取相关 issue 参考
+    {
+        val k = nextKey()
+        put(
+            FlowItem.Tool(
+                key = k,
+                title = "列出会话文件",
+                serverPrefix = "github",
+                state = AppToolCallState.Running,
+                input = """{"query": "repo:minime/minime-core issues/auth-token"}""",
+            ),
+        )
+        tick(1200)
+        patch<FlowItem.Tool>(k) {
+            it.copy(
+                state = AppToolCallState.Success,
+                durationMs = 1200,
+                output = """{"total": 2, "items": ["auth-token-draft.md", "error-codes.md"]}""",
+            )
+        }
+    },
+    // T8 普通工具：读取现有鉴权文件（流式输出 → 成功）
+    {
+        val k = nextKey()
+        put(
+            FlowItem.Tool(
+                key = k,
+                title = "读取文件",
+                summary = "feature/auth/AuthApi.kt",
+                state = AppToolCallState.Running,
+                input = """{"path": "feature/auth/AuthApi.kt"}""",
+                streamOutput = "// routing: /auth/login (not found)",
+            ),
+        )
+        tick(800)
+        patch<FlowItem.Tool>(k) {
+            it.copy(streamOutput = "// routing: /auth/login (not found)\n// TODO: add JWT verify middleware")
+        }
+        tick(800)
+        patch<FlowItem.Tool>(k) {
+            it.copy(
+                state = AppToolCallState.Success,
+                durationMs = 1600,
+                streamOutput = null,
+                output = """{"lines": 86, "hasMiddleware": false}""",
+            )
+        }
+    },
+    // T9 普通工具：执行编译命令（流式输出 → 成功）
+    {
+        val k = nextKey()
+        put(
+            FlowItem.Tool(
+                key = k,
+                title = "执行命令",
+                summary = "./gradlew :app:compileDebugKotlin",
+                state = AppToolCallState.Running,
+                input = """{"command": "./gradlew :app:compileDebugKotlin", "cwd": "/workspace"}""",
+                streamOutput = "> Task :app:compileDebugKotlin",
+            ),
+        )
+        tick(900)
+        patch<FlowItem.Tool>(k) {
+            it.copy(streamOutput = "> Task :app:compileDebugKotlin\n> Task :app:compileDebugKotlin UP-TO-DATE")
+        }
+        tick(900)
+        patch<FlowItem.Tool>(k) {
+            it.copy(
+                state = AppToolCallState.Success,
+                durationMs = 1800,
+                streamOutput = null,
+                output = """{"exitCode": 0, "tookMs": 1800}""",
+            )
+        }
+    },
+    // T10 终端日志（自驱动控制台）
+    {
+        put(FlowItem.Terminal(nextKey()))
+        tick(900)
+    },
+    // T11 失败气泡 → 等待用户点重试 → 流式恢复成功（gate）
+    {
+        val k = nextKey()
+        val retried = CompletableDeferred<Unit>()
+        put(
+            FlowItem.Msg(
+                key = k,
+                text = "连接测试 Provider 时超时了，登录链路的集成测试没能跑完，请重试。",
+                state = AppChatMessageState.Error,
+                isUser = false,
+                ts = "10:09",
+                onRetry = { retried.complete(Unit) },
+            ),
+        )
+        gate(retried) { }
+        patch<FlowItem.Msg>(k) { it.copy(state = AppChatMessageState.Streaming, text = "", onRetry = null) }
+        val ok = "重试成功，已重新建立连接。`AuthApiTest` 与 `TokenMiddlewareTest` 全部通过：\n\n" +
+            "- 登录成功签发 JWT（200）\n- 错误密码返回 401\n- 过期/伪造 token 返回 401"
+        typewrite(ok, chunk = 4, perMs = 15L) { s -> patch<FlowItem.Msg>(k) { it.copy(text = s) } }
+        patch<FlowItem.Msg>(k) { it.copy(state = AppChatMessageState.Complete) }
+    },
+    // T12 审批超时（Intervention 降级终态，静态警示）
+    {
+        put(
+            FlowItem.Tool(
+                key = nextKey(),
+                title = "执行命令",
+                summary = "rm -rf ./build/auth-tmp",
+                state = AppToolCallState.AwaitingApproval,
+                input = """{"command": "rm -rf ./build/auth-tmp", "force": true}""",
+                approvalHint = "该命令将删除鉴权模块的临时构建目录",
+                approvalExpired = true,
+            ),
+        )
+    },
+    // T13 部署命令人工审批（gate：拒绝 / 本次允许 / 始终允许并记忆）
+    {
+        val k = nextKey()
+        val choice = CompletableDeferred<AppApprovalChoice>()
+        put(
+            FlowItem.Tool(
+                key = k,
+                title = "执行命令",
+                summary = "curl -X POST https://api.example.com/deploy/auth",
+                state = AppToolCallState.AwaitingApproval,
+                input = """{"command": "curl -X POST https://api.example.com/deploy/auth"}""",
+                approvalHint = "该命令将向生产环境部署鉴权服务",
+                onChoice = { choice.complete(it) },
+            ),
+        )
+        when (gate(choice) { AppApprovalChoice.Once }) {
+            AppApprovalChoice.Reject -> patch<FlowItem.Tool>(k) {
+                it.copy(
+                    state = AppToolCallState.Error,
+                    summary = "已拒绝执行 · 用户取消",
+                    approvalHint = null,
+                    onChoice = null,
+                )
+            }
+
+            AppApprovalChoice.Once -> {
+                patch<FlowItem.Tool>(k) {
+                    it.copy(state = AppToolCallState.Running, approvalHint = null, onChoice = null)
+                }
+                tick(1300)
+                patch<FlowItem.Tool>(k) {
+                    it.copy(
+                        state = AppToolCallState.Success,
+                        durationMs = 1300,
+                        output = """{"deployId": "auth-20260916-01", "status": "ok"}""",
+                    )
+                }
+            }
+
+            AppApprovalChoice.Always -> {
+                patch<FlowItem.Tool>(k) {
+                    it.copy(
+                        state = AppToolCallState.Success,
+                        durationMs = 820,
+                        output = """{"deployId": "auth-20260916-02", "status": "ok"}""",
+                        approvalHint = null,
+                        onChoice = null,
+                    )
+                }
+                put(
+                    FlowItem.Tool(
+                        key = nextKey(),
+                        title = "执行命令",
+                        summary = "curl -X POST https://api.example.com/rollback/auth",
+                        state = AppToolCallState.AwaitingApproval,
+                        input = """{"command": "curl -X POST https://api.example.com/rollback/auth"}""",
+                        approvalHint = "同类部署命令已记忆为始终允许",
+                        approvalRemembered = true,
+                    ),
+                )
+            }
+        }
+    },
+    // T14 结果摘要（流式总结 → 完成）
+    {
+        val k = nextKey()
+        put(FlowItem.ToolSummary(k, "", state = AppToolSummaryState.Summarizing, toolCount = 6))
+        val summary = "已按计划完成 6 次工具调用：新增登录路由与 JWT 鉴权中间件，编译 0 错误，" +
+            "鉴权相关单测全部通过，鉴权服务已部署到生产。"
+        typewrite(summary, chunk = 3, perMs = 15L) { s -> patch<FlowItem.ToolSummary>(k) { it.copy(text = s) } }
+        patch<FlowItem.ToolSummary>(k) { it.copy(state = AppToolSummaryState.Done) }
+    },
+    // T15 打字指示 → 最终 Markdown 长回复
+    {
+        withTyping {
+            aiReply(
+                """## 登录接口已完成 ✅
+
+鉴权采用**无状态 JWT**，接入在路由中间件层，业务代码无侵入。
+
+### 接口约定
+
+| 项 | 值 |
+| --- | --- |
+| 路径 | `POST /auth/login` |
+| 入参 | `{ username, password }` |
+| 成功 | `200` + `{ token, expiresIn }` |
+| 失败 | `401` + 统一错误码 |
+
+### 本次改动
+
+1. `AuthApi.kt`：新增登录路由与参数校验
+2. `TokenMiddleware.kt`：签发/校验 JWT，拦截未授权请求
+3. `AuthApiTest.kt` / `TokenMiddlewareTest.kt`：覆盖成功、错密、过期、伪造四类用例
+
+```kotlin
+post("/auth/login") {
+    val token = authService.login(req.username, req.password)
+        ?: return@post call.respondError(401, "AUTH_INVALID")
+    call.respond(LoginResponse(token, expiresIn = 3600))
+}
+```
+
+> 密钥通过环境变量注入，未硬编码；部署前请确认生产环境的 `JWT_SECRET` 已配置。
+
+需要我把刷新 token（refresh token）流程也补上吗？""",
+                "10:14",
+                chunk = 4,
+                perMs = 10L,
+            )
+        }
+    },
+)
+
+private enum class PlanDecision { Approve, Refine }
+
+/** 首次放入或在「继续细化」后刷新计划卡，使其按钮回调绑定到当前等待的决策。 */
+private suspend fun ChatFlowState.patchOrPutPlan(
+    key: Int,
+    refined: Boolean,
+    onApprove: () -> Unit,
+    onRefine: () -> Unit,
+) {
+    val existing = items.firstOrNull { it.key == key } as? FlowItem.Plan
+    val baseSteps = listOf(
+        AppPlanStep("梳理现有 feature/auth 路由与依赖注入", AppPlanStepStatus.Done),
+        AppPlanStep("新增 POST /auth/login 路由与参数校验", AppPlanStepStatus.InProgress),
+        AppPlanStep("实现 JWT 签发与 TokenMiddleware 鉴权", AppPlanStepStatus.Pending),
+        AppPlanStep("补齐登录/鉴权单测并跑通全量测试", AppPlanStepStatus.Pending),
+    )
+    val steps = if (refined) {
+        baseSteps + AppPlanStep("补充 refresh token 与密钥轮换的回滚策略", AppPlanStepStatus.Pending)
+    } else {
+        baseSteps
+    }
+    val plan = FlowItem.Plan(
+        key = key,
+        title = "登录接口 + JWT 鉴权落地计划",
+        steps = steps,
+        state = AppPlanState.AwaitingApproval,
+        pendingSelection = if (refined) null else "token 采用无状态 JWT（密钥走环境变量），可以吗？",
+        reason = if (refined) "已按你的要求补充细化步骤，请再次确认" else "计划待你确认后开始执行",
+        onApprove = onApprove,
+        onRefine = onRefine,
+    )
+    if (existing == null) {
+        put(plan)
+    } else {
+        items[items.indexOfFirst { it.key == key }] = plan
+    }
+}

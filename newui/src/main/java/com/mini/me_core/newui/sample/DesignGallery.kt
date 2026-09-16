@@ -337,19 +337,25 @@ private val initialChatItems: List<ChatItem> = listOf(
  */
 @Composable
 fun DesignGallery(onNavigateBack: (() -> Unit)? = null) {
+    // 对话流完整演示页：样板页内部本地切换，不进 app 主导航；返回回到样板页。
+    var showChatFlow by remember { mutableStateOf(false) }
     AppTheme {
-        AppShell(
-            title = "Design Gallery",
-            onNavigateBack = onNavigateBack,
-        ) {
-            GalleryBody()
+        if (showChatFlow) {
+            ChatFlowGallery(onNavigateBack = { showChatFlow = false })
+        } else {
+            AppShell(
+                title = "Design Gallery",
+                onNavigateBack = onNavigateBack,
+            ) {
+                GalleryBody(onOpenChatFlow = { showChatFlow = true })
+            }
         }
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun GalleryBody() {
+private fun GalleryBody(onOpenChatFlow: () -> Unit = {}) {
     val scroll = rememberScrollState()
     var showDialog by remember { mutableStateOf(false) }
     var fieldText by remember { mutableStateOf("") }
@@ -1668,6 +1674,19 @@ private fun GalleryBody() {
         }
 
         Section("分子组件族 · AI 对话流") {
+            // 完整剧情演示入口：独立全屏页，多轮对话串起对话流全部组件
+            AppButton(
+                text = "打开完整对话流演示 →",
+                onClick = onOpenChatFlow,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "一段多轮任务对话，串联气泡 / 思考 / 计划审批 / 工具 / MCP / 技能 / 附件 / 终端 / 摘要等全部组件，支持自动播放、单步与卡片交互。",
+                style = MaterialTheme.typography.bodySmall,
+                color = appPalette().labelSecondary,
+                modifier = Modifier.padding(top = AppSpacing.Xs),
+            )
+            Spacer(Modifier.height(AppSpacing.Md))
             // 控制条：触发流式回复 / 失败重试 / 工具卡 / 审批 / MCP / 技能 / 思考 / 计划 / 附件 / 链 / 摘要
             // 横向可滑动，不换行堆叠；按钮自身 wrapContentWidth，避免被强制均分宽度。
             Row(
