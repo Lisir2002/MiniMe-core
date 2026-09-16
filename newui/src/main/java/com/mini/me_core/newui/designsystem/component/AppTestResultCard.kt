@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +45,8 @@ fun AppTestResultCard(
     failed: List<String>,
     modifier: Modifier = Modifier,
     title: String = "测试",
+    onRetry: (() -> Unit)? = null,
+    onOpenFailure: ((String) -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val ok = failed.isEmpty()
@@ -96,13 +99,19 @@ fun AppTestResultCard(
                 Modifier.padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Xs),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
             ) {
-                failed.forEach {
+                failed.forEach { f ->
                     Text(
-                        it,
+                        f,
                         style = MaterialTheme.typography.bodySmall,
                         color = appPalette().labelSecondary,
+                        modifier = if (onOpenFailure != null) Modifier.clickable { onOpenFailure(f) } else Modifier,
                     )
                 }
+            }
+        }
+        if (!ok && onRetry != null) {
+            TextButton(onClick = onRetry, modifier = Modifier.padding(horizontal = AppSpacing.Sm)) {
+                Text("重跑测试")
             }
         }
     }

@@ -387,6 +387,8 @@ private fun FlowNode(item: FlowItem, state: ChatFlowState) {
             is FlowItem.TestResult -> AppTestResultCard(
                 passed = item.passed,
                 failed = item.failed,
+                onRetry = { /* 演示：真实接入时由 Agent 重跑测试 */ },
+                onOpenFailure = { /* 演示：真实接入时跳转对应失败用例 */ },
                 modifier = Modifier.fillMaxWidth(),
             )
 
