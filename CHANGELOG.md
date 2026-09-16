@@ -9,6 +9,14 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc38] - 2026-09-17
+
+> 预发行。对话流组件布局修复，纯 `:newui` component 层。
+
+### Fixed
+
+- `[newui]` 建议追问 chips（`AppFollowUpChips`）与澄清卡选项（`AppClarifyCard`）改用 `FlowRow` 自动换行，修复长选项被挤出屏幕、文字竖排折行的问题。
+
 ## [0.0.0.2-rc37] - 2026-09-17
 
 > 预发行。对话流新增 9 类适配组件并接入演示剧情，纯 `:newui` component / sample 层 additive 改动。
