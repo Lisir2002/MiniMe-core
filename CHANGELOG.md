@@ -20,7 +20,7 @@
 - `[newui]` 新增模板层组件 2 个：`ListPageTemplate`（四态 Loading/Empty/Error/Content 切换）、`DetailPageTemplate`（可滚动内容区）。
 - `[newui]` 新增 `DESIGN.md`（373行）：设计原则、令牌体系、组件规范、布局规范、无障碍规范、动效规范 + 附录令牌速查表。
 - `[newui]` 新增 UI 测试 7 个文件：AppDialog、AppTextField、AppTabs、AppSegmentedToggle、AppMarkdownTextParse、AppSwipeAction、AppSwipeGalleryReplica，共 14+ 测试用例。
-- `[newui]` 模块独立版本化：`build.gradle.kts` 声明模块版本（组件 KDoc 统一标注 `@since 0.1.0-experimental`，共 134 处）。
+- `[newui]` 模块 API 版本标注：134 个公共组件 KDoc 统一标注 `@since 0.1.0-experimental`，标记当前为实验性 API。
 
 ### Changed
 
@@ -38,12 +38,8 @@
 
 ### Fixed
 
-- `[newui]` 修复 `AppSparkline.kt` 中 `appPalette()` 在 `drawBehind` lambda（非 @Composable 上下文）中调用导致的编译错误，移到 Canvas 外获取。
-- `[newui]` 修复 `DetailPageTemplate.kt` / `ListPageTemplate.kt` 中 `AppShell` 调用传入不存在的 `modifier` 参数导致的编译错误。
-- `[newui]` 修复 `SampleData.kt` 中 `reason: String = null` 类型不匹配（非空类型不能赋值 null），改为 `String?`。
-- `[newui]` 修复 `build.gradle.kts` 中 Library 模块 `defaultConfig` 错误使用 `versionCode`/`versionName`（仅 Application 模块支持）导致的编译错误。
 - `[brand]` 清理旧仓库名 `mini_me_core-R` 残留 3 处（app-settings-guide.md / environment-guides.md）。
-- `[brand]` 清理容器旧路径 `~/.mini_me_core/` → `~/.minime/` 残留 30+ 处（docs + prompts）。
+- `[brand]` 清理容器旧路径 `~/.mini_me_core/` → `~/.minime/` 残留 30+ 处（docs + prompts），修复文档路径与代码实际路径不一致导致 AI 操作指向错误目录的问题。
 - `[brand]` 清理旧包名 `com.core.mini_me_core` → `com.mini.me_core` 残留 5 处。
 - `[brand]` 清理 `.gitignore` 中 `/.rcode/` 旧品牌工具目录（目录已不存在，无效残留）。
 - `[brand]` 清理工具名 `mini_me_core-wrap-android-buildtools` → `minime-wrap-android-buildtools`（与代码中实际名称对齐）。
