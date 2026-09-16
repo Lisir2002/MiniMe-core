@@ -47,6 +47,7 @@ import com.mini.me_core.newui.designsystem.component.AppChatMarker
 import com.mini.me_core.newui.designsystem.component.AppChatMarkerKind
 import com.mini.me_core.newui.designsystem.component.AppChatMessageState
 import com.mini.me_core.newui.designsystem.component.AppAcceptChangesBar
+import com.mini.me_core.newui.designsystem.component.AppComposer
 import com.mini.me_core.newui.designsystem.component.AppCitationCard
 import com.mini.me_core.newui.designsystem.component.AppCitationSource
 import com.mini.me_core.newui.designsystem.component.AppClarifyCard
@@ -173,6 +174,22 @@ private fun FlowPlayerBar(state: ChatFlowState) {
                 .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
             verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
         ) {
+            // 输入框演示：固定示例状态，按钮仅占位交互，不接真实 Agent。
+            var input by remember { mutableStateOf("") }
+            var web by remember { mutableStateOf(false) }
+            var deep by remember { mutableStateOf(true) }
+            var atts by remember { mutableStateOf(listOf("login.kt", "后端目录")) }
+            AppComposer(
+                value = input,
+                onValueChange = { input = it },
+                attachments = atts,
+                onRemoveAttachment = { atts = atts.toMutableList().apply { removeAt(it) } },
+                webSearch = web,
+                onToggleWeb = { web = !web },
+                deepMode = deep,
+                onToggleDeep = { deep = !deep },
+                modifier = Modifier.fillMaxWidth(),
+            )
             Text(
                 text = state.statusText(),
                 style = MaterialTheme.typography.labelMedium,
