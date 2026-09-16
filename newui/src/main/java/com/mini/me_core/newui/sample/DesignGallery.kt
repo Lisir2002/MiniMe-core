@@ -13,7 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.mini.me_core.newui.designsystem.layout.pageContentPadding
 import com.mini.me_core.newui.designsystem.layout.pageMaxWidth
-import com.mini.me_core.newui.designsystem.slot.AppShell
+import com.mini.me_core.newui.designsystem.layout.AppShell
 import com.mini.me_core.newui.designsystem.theme.AppTheme
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 

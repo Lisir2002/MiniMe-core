@@ -209,9 +209,14 @@ AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。�
 
 独立 Android Library 模块 `newui/`，承载新版 UI 设计系统（iOS 简约风 + W3C DTCG 令牌），app 模块逐步迁移接入。**改 newui 前必读 `newui/DESIGN.md`（373行，设计原则/令牌/组件/布局/无障碍/动效规范）**。
 
-- **组件四层**（`newui/src/main/java/com/mini/me_core/newui/designsystem/component/`）：`atom/`（AppText/AppIcon/AppIconButton/AppCard/AppChip/AppSurface/AppDivider）→ `molecule/`（50+ 业务组件）→ `organism/`（ChatMessageList/SettingsSectionGroup）→ `template/`（ListPageTemplate/DetailPageTemplate）。新组件按层归位，禁止跨层反向依赖。
+- **组件三层 + 业务复合层**（2026-09 重排，废弃旧 atom/molecule/organism/template 四层隐喻）。根包 `com.mini.me_core.newui`：
+  - `designsystem/primitive/`：单元素基元（AppText/AppIcon/AppIconButton/AppCard/AppChip/AppSurface/AppDivider/AppTouchTarget）。
+  - `designsystem/component/`：通用可复用组合（约 66 个）——**只放"无业务名词、入参只有基础类型/令牌/lambda"的纯通用组件**，这一层未来会独立发 AAR。
+  - `designsystem/layout/`：页面级骨架/槽位（AppShell/AppPage/AppState/ChatMessageList/List|DetailPageTemplate）。
+  - `composite/`（与 designsystem 平级，根包 `com.mini.me_core.newui.composite`）：**本 App 业务复合组件**（AppChatBubble/AppToolCallCard/AppMcpAppCard/AppPlanCard/AppTerminalLog 等），依赖 app 领域模型，不属于可发布设计系统。
+  - **归位纪律**：新建组件先问"换个 App 还用得上吗？"——用得上且无业务含义→`component/`；只服务本产品业务→`composite/`；定义页面结构→`layout/`。**禁止把业务卡片塞回 `component/`，禁止跨层反向依赖。**
 - **令牌单一事实源**：`token/generated/AppTokens.kt`（由 Style Dictionary 从 DTCG JSON 自动生成，**勿手改 generated 文件**）。颜色经 `AppColor`（原始令牌）→ `AppPalette`（语义令牌，`appPalette()` 取值）；间距 `AppSpacing`、圆角 `AppRadius`、尺寸 `AppSizing`、动效 `AppMotion`、层级 `AppLayout`。**组件内禁止硬编码 `Color.White/Black`、`.dp`/`.sp` 表外数值、裸 `Spring.DampingRatio*` 常量**——一律走令牌。
-- **统一骨架**：`slot/AppShell.kt` 是唯一页面壳（五槽位：title/onNavigateBack/topBarActions/topTabs/bottomBar/sideRail/content），`topBarStyle` 支持 `Compact`(44dp,默认)/`Standard`(64dp)。旧 `SlotSet`（`slot/Slot.kt`）已 `@Deprecated`，禁止新页面使用。
+- **统一骨架**：`layout/AppShell.kt` 是唯一页面壳（五槽位：title/onNavigateBack/topBarActions/topTabs/bottomBar/sideRail/content），`topBarStyle` 支持 `Compact`(44dp,默认)/`Standard`(64dp)。旧 `SlotSet`（`layout/Slot.kt`）已 `@Deprecated`，禁止新页面使用。
 - **三态收口**：`layout/AppState.kt` 的 `AppUiState<T>` 密封接口（Loading/Empty/Error/Content）+ `AppLoadingState`/`AppEmptyState`/`AppErrorState`；页面级状态用 `when` 强穷尽，**禁止各页自造三态**。
 - **布局卫生**：`layout/AppPage.kt` 提供 `pageContentPadding()` / `pageMaxWidth()` 修饰符与 `AppPage.horizontalPadding` 门面；页面根布局统一用令牌留白，禁止散落表外边距。
 - **废弃组件迁移**：`AppDialogs.kt`（9函数）+ `AppDialogsAdvanced.kt`（9函数）共 18 个旧对话框已废弃 → 统一用 `AppDialog`（支持 `scrimAlpha`/`containerColor`/`tonalElevation`）；`AppMenus.kt`（3函数）已废弃 → 统一用 `AppMenu`（M3 DropdownMenu）。迁移指引见 DESIGN.md §3.9。
@@ -271,7 +276,7 @@ Hilt 被广泛使用。各 Feature 模块定义自己的 DI 模块（如 `AgentM
 | `app/src/main/java/com/mini/me_core/MainActivity.kt` | 主 Activity（导航 + 全局凭据弹窗） |
 | `newui/DESIGN.md` | newui 设计规范（改 newui 前必读：原则/令牌/组件/布局/无障碍/动效） |
 | `newui/src/main/java/com/mini/me_core/newui/designsystem/token/generated/AppTokens.kt` | 设计令牌生成产物（AppColor/AppSpacing/AppRadius/AppMotion/AppLayout，勿手改） |
-| `newui/src/main/java/com/mini/me_core/newui/designsystem/slot/AppShell.kt` | 唯一页面骨架壳（五槽位 + topBarStyle + insets） |
+| `newui/src/main/java/com/mini/me_core/newui/designsystem/layout/AppShell.kt` | 唯一页面骨架壳（五槽位 + topBarStyle + insets） |
 | `newui/src/main/java/com/mini/me_core/newui/designsystem/layout/AppState.kt` | 三态收口（AppUiState 密封接口 + Loading/Empty/Error 组件） |
 | `newui/src/main/java/com/mini/me_core/newui/designsystem/layout/AppPage.kt` | 页面布局卫生（pageContentPadding/pageMaxWidth） |
 

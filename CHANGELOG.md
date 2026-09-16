@@ -9,6 +9,25 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc31] - 2026-09-16
+
+> 预发行。`:newui` 设计系统内部结构重构：按"复用边界"重排分层、把业务复合组件从通用层剥离、统一最小触控目标、接入视觉回归、解耦令牌生成对 Node 的编译期依赖。app 模块生产界面未迁移（仅嵌入 DesignGallery），无 AI 工作流 / prompt / schema / 运行行为变化。
+
+### Changed
+
+- `[newui]` 组件分层由旧 atom/molecule/organism/template 四层改为 **primitive / component / layout 三层 + 平级 `composite/` 业务层**：`component/atom/`→`designsystem/primitive/`、`component/molecule/`→`designsystem/component/`、`organism/`+`template/`+`slot/`→`designsystem/layout/`。全部 90+ 文件随 `git mv` 保留历史，跨文件导入与测试包路径同步更新。
+- `[newui]` 业务复合组件（`AppChatBubble`/`AppToolCallCard`/`AppToolChainTimeline`/`AppToolSummaryCard`/`AppSkillCallCard`/`AppMcpAppCard`/`AppPlanCard`/`AppTerminalLog`/`AppChatMarker`）从通用层迁入新包 `com.mini.me_core.newui.composite/`，与未来可独立发 AAR 的通用层隔离；通用层只保留无业务含义的纯可复用组件。
+- `[newui]` 新增统一最小触控目标 `Modifier.touchTarget()`（primitive/AppTouchTarget.kt，默认 48dp + M3 居中热区），`AppIconButton` 由原来被 `.size(40dp)` 压窄的 40dp 热区改为走统一 48dp 触控封装。
+- `[newui]` 令牌生成任务解耦：移除"每次编译都挂 Node"的全局 `afterEvaluate`，`generateDesignTokens` 声明正规 inputs/outputs 由 Gradle 自动判断；新增 `verifyDesignTokens` 任务供 CI 对账"令牌源 JSON 与提交产物一致"。
+
+### Added
+
+- `[newui]` 接入 Roborazzi 截图金标依赖，并提供 `AppButtonsScreenshotTest` 视觉回归示例（仅对通用组件拍金标，业务 composite 不拍）。
+
+### Fixed
+
+- `[docs]` 同步 `AGENTS.md` 与 `newui/DESIGN.md` 的分层归属纪律与组件路径，避免业务组件被塞回通用层。
+
 ## [0.0.0.2-rc30] - 2026-09-16
 
 > 预发行。对话流完整演示页（ChatFlowGallery）的布局修复与播放控制栏美化，纯 `:newui` sample 层改动，app 模块未动，无 AI 工作流 / prompt / schema 变化。

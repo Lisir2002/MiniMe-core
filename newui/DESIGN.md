@@ -45,7 +45,7 @@ iOS 分组背景语义映射为三级表面，组件不得自创第四层：
 
 - 优先复用 M3 原语（`Surface` / `Text` / `Icon` / `OutlinedTextField` / `Scaffold`），newui 只做**令牌化薄封装**，不发明并行组件体系。
 - 组件源码禁止硬编码颜色 / 间距 / 圆角 / 尺寸 / 时长数字，一切数值从令牌读取（§2）。
-- 新组件先在 atom/molecule 找是否已有可组合件；确无空缺再新增，并在 §3.12 登记。
+- 新组件先在 primitive/component 找是否已有可组合件；确无空缺再新增，并在 §3.12 登记。
 
 ---
 
@@ -140,16 +140,18 @@ tokens/dimensions.json ├─ Style Dictionary ─► token/generated/AppTokens.
 
 ## 3. 组件规范
 
-组件按 **原子 atom → 分子 molecule → organism → template** 四层组织，下层不反向依赖上层。
+组件按 **primitive → component → layout 三层 + 业务 composite** 组织（2026-09 重排，废弃旧 atom/molecule/organism/template 隐喻），下层不反向依赖上层。
 
 ### 3.1 分层总览
 
 | 层 | 目录 | 职责 | 代表 |
 | --- | --- | --- | --- |
-| 原子 atom/ | `component/atom/` | 不可再分的基础原语 | `AppCard` `AppChip` `AppIcon` `IconContainer` `AppText` |
-| 分子 molecule/ | `component/molecule/` | 由原子组合的可复用控件 | `AppButton` `AppTextField` `AppDialog` `AppMenu` `AppTabs` `AppSegmentedToggle` `AppChatBubble` `AppSwitch` `AppBadge` 等 |
-| organism | （由 molecule 组合） | 业务复合区块 | `ChatMessageList`、`SettingsSectionGroup` |
-| template | （基于 `AppShell`） | 整页骨架 | `ListPageTemplate`、`DetailPageTemplate` |
+| primitive 基元 | `designsystem/primitive/` | 不可再分的基础原语 | `AppCard` `AppChip` `AppIcon` `IconContainer` `AppText` `AppIconButton` `AppTouchTarget` |
+| component 通用组件 | `designsystem/component/` | 无业务含义、可复用的纯通用控件（未来独立发 AAR） | `AppButton` `AppTextField` `AppDialog` `AppMenu` `AppTabs` `AppSegmentedToggle` `AppSwitch` `AppBadge` 等约 66 个 |
+| layout 页面骨架 | `designsystem/layout/` | 页面级壳/骨架/三态 | `AppShell` `AppPage` `AppState` `ChatMessageList` `SettingsSectionGroup` `ListPageTemplate` `DetailPageTemplate` |
+| composite 业务复合 | `composite/`（与 designsystem 平级） | 本 App 业务复合组件，依赖领域模型，**不进可发布设计系统** | `AppChatBubble` `AppToolCallCard` `AppMcpAppCard` `AppPlanCard` `AppTerminalLog` 等 |
+
+> 归位判据：换个 App 还用得上、且入参只有基础类型/令牌/lambda → `component/`；只服务本产品业务 → `composite/`；定义页面结构 → `layout/`。禁止把业务卡片塞回 `component/`。
 
 ### 3.2 排版尺度（AppText，§3.2.1 / §3.2.2 / §3.2.3）
 
@@ -163,7 +165,7 @@ tokens/dimensions.json ├─ Style Dictionary ─► token/generated/AppTokens.
 
 SF Pro 尺度经 `AppType` 映射到 M3 槽位：`LargeTitle 34/41 Bold`、`Title1 28/34 Bold`、`Title2 22/28 SemiBold`、`Title3 20/25 SemiBold`、`Headline 17/22 SemiBold`、`Body 17/22 Regular`、`Callout 16/21 Regular`、`Subhead 15/20 Regular`、`Footnote 13/18 Regular`、`Caption1 12/16`、`Caption2 11/13`、`SectionHeader 13/16 SemiBold`。
 
-### 3.3 原子层（atom/）
+### 3.3 基元层（primitive/）
 
 | 组件 | 用途 | 关键规格 |
 | --- | --- | --- |
@@ -173,10 +175,10 @@ SF Pro 尺度经 `AppType` 映射到 M3 槽位：`LargeTitle 34/41 Bold`、`Titl
 | `IconContainer`（§3.6.3） | 40dp 色块 + 白图标，作设置 / 入口行前缀 | 用 `AppSizing.IconBlock` |
 | `AppText`（§3.2） | 统一文字薄封装 | 默认一级 ink，禁 `Color.Black` / 裸 `.sp` |
 | `AppDivider` | 列表 / 区块内行分隔 | 厚度恒为 `AppLayout.DividerThickness=1dp`，色取 `appPalette().separator` |
-| `AppIconButton`（§3.12） | 40dp 热区图标按钮 | 热区 `AppSizing.IconButton`，图标 `AppSizing.IconM` |
+| `AppIconButton`（§3.12） | 图标按钮 | 命中热区走 `Modifier.touchTarget()`（最小 48dp，见 primitive/AppTouchTarget），图标 `AppSizing.IconM` |
 | `AppSurface` | 统一表面容器（明暗感知底色 + 圆角） | 是卡片 / 弹层底色的统一入口，禁止业务自取 `Color` 当底 |
 
-### 3.4 分子层（molecule/）
+### 3.4 通用组件层（component/）
 
 列举主要控件及用途（完整清单见 §3.12）：
 
@@ -187,7 +189,7 @@ SF Pro 尺度经 `AppType` 映射到 M3 槽位：`LargeTitle 34/41 Bold`、`Titl
 | `AppDialog`（§3.12） | 弹窗统一封装，收敛圆角 / 边距令牌（替代旧 `AppDialogs*`） |
 | `AppMenu` / `AppMenuItem` / `AppMenuRow`（§3.12） | 下拉 / 上下文菜单与菜单项，行高 `TouchTarget` |
 | `AppTabs` / `AppSegmentedToggle` | 顶部分页 Tab / 分段选择器 |
-| `AppChatBubble` | 聊天气泡（用户 / 助手双形态） |
+| `AppChatBubble` | 聊天气泡（用户 / 助手双形态）——已迁至 `composite/`（业务组件），通用层不再保留 |
 | `AppSwitch` / `AppCheckbox` / `AppSlider` | 开关 / 复选 / 滑杆 |
 | `AppBadge` / `AppBadgeDot` / `AppStatusDot` | 徽标 / 状态点，语义色走 `AppColor.Status*` |
 | `AppSearchBar` / `AppSearchableDropdown` | 搜索栏 / 可搜索下拉 |
@@ -195,10 +197,11 @@ SF Pro 尺度经 `AppType` 映射到 M3 槽位：`LargeTitle 34/41 Bold`、`Titl
 | `AppSectionGroup`（§3.12） | 分组容器：标题 + 卡片化内容，行间 `AppDivider` |
 | `AppSwitch` / `AppChip` 系 | 过滤 chips / filter tokens / dropdown filter |
 
-### 3.5 organism 层 / template 层
+### 3.5 layout 层（页面骨架）
 
-- **organism**：`ChatMessageList`（由 `AppMessageRow` + `AppChatBubble` + `AppMessageScroller` 组合的消息流区块）；`SettingsSectionGroup`（由多个 `AppSectionGroup` 堆叠而成的设置整段）。organism 不直接写布局数字，只编排 molecule 与 §4 布局令牌。
-- **template**：`ListPageTemplate`（列表整页：`AppShell` + 顶部搜索 / 过滤 + `AppSelectionList` + 空 / 加载三态）；`DetailPageTemplate`（详情整页：`AppShell` 紧凑顶栏 + 滚动内容 + 底部固定操作栏）。二者都基于 `AppShell`，不重复造骨架。
+- **layout**：`AppShell`（唯一页面壳）、`AppPage`（布局卫生）、`AppState`（三态）；`ChatMessageList`（由 `AppMessageRow` + `AppChatBubble` + `AppMessageScroller` 组合的消息流区块）；`SettingsSectionGroup`（由多个 `AppSectionGroup` 堆叠而成的设置整段）。layout 不直接写布局数字，只编排 component/composite 与 §4 布局令牌。
+- **整页模板**：`ListPageTemplate`（列表整页：`AppShell` + 顶部搜索 / 过滤 + `AppSelectionList` + 空 / 加载三态）；`DetailPageTemplate`（详情整页：`AppShell` 紧凑顶栏 + 滚动内容 + 底部固定操作栏）。二者都基于 `AppShell`，不重复造骨架。
+- 业务复合组件（聊天气泡、工具调用卡、MCP 卡、计划卡、终端日志等）见根包 `composite/`，不属本设计系统可发布部分。
 
 ### 3.6 图标规范（AppIcon，§3.6）
 

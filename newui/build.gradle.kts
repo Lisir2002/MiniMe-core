@@ -77,6 +77,11 @@ dependencies {
     testImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("org.robolectric:robolectric:4.14.1")
 
+    // 视觉回归截图金标（UI-4b）：只给通用 component 拍金标，业务 composite 不拍。
+    // 用法见 component/AppButtonsScreenshotTest.kt；CI 跑 verifyRoborazziDebug 对比金标。
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.29.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-junit-rule:1.29.0")
+
     testImplementation("junit:junit:4.13.2")
 }
 
@@ -91,16 +96,22 @@ android {
 
 /**
  * 令牌生成（Style Dictionary / DTCG）：把 newui/tokens/**/*.tokens.json
- * （W3C DTCG 2025.10 格式）经 style-dictionary build 生成到
- * build/generated/designTokens/kotlin/{AppColors,AppSpacing,...}.kt。
+ * （W3C DTCG 2025.10 格式）经 style-dictionary build 直接写回已提交的 committed 产物
+ * src/main/java/.../designsystem/token/generated/AppTokens.kt（单一事实源，IDE 可直接 import）。
  *
- * 依赖 node + npm（仓库根已有 node v24）。断网/无 node 时跳过并给出提示，
- * 不拉崩整个构建（生成产物可由已提交的 generated/ 兜底）。
+ * UI-5 修缮：不再每次编译硬挂 Node（改令牌频率极低，本地手动跑即可）；任务声明正规
+ * inputs/outputs 由 Gradle 自动判断是否重跑；防漂移交给 verifyDesignTokens 在 CI 对账。
+ * 依赖 node + npm；断网/无 node 时自动停用（沿用已提交产物，不拉垮整个构建）。
  */
+val designTokenOut =
+    file("src/main/java/com/mini/me_core/newui/designsystem/token/generated/AppTokens.kt")
+
 tasks.register<Exec>("generateDesignTokens") {
     group = "ui"
-    description = "用 Style Dictionary 从 tokens/*.tokens.json 生成 Compose 令牌常量"
+    description = "用 Style Dictionary 从 tokens/*.json 生成令牌常量（写回 committed AppTokens.kt）"
     workingDir(projectDir)
+    inputs.files(fileTree("tokens") { include("**/*.json") })
+    outputs.file(designTokenOut)
     val nodeBin = findNodeBinary()
     val styleDictBin = file("node_modules/style-dictionary/bin/style-dictionary.js").absolutePath
     if (nodeBin == null || !file(styleDictBin).exists()) {
@@ -112,13 +123,28 @@ tasks.register<Exec>("generateDesignTokens") {
     commandLine(nodeBin, styleDictBin, "build", "--config", "style-dictionary.config.js")
 }
 
-// 编译前先产令牌；IDE 直接 compileDebugKotlin 时由该依赖兜底生成
-afterEvaluate {
-    tasks.configureEach {
-        if (name.startsWith("compile") && (name.contains("Kotlin") || name.contains("Java"))) {
-            if (name.endsWith("Kotlin") || name.startsWith("compileDebugKotlin")) {
-                dependsOn("generateDesignTokens")
-            }
+/**
+ * 令牌对账（CI 用）：重新生成令牌后，若 committed AppTokens.kt 出现未提交 diff 即失败。
+ * 本地：改完 tokens/*.json 跑 ./gradlew :newui:generateDesignTokens 后提交产物；
+ * CI：跑 ./gradlew :newui:verifyDesignTokens 做门禁。
+ */
+tasks.register("verifyDesignTokens") {
+    group = "ui"
+    description = "校验 tokens 源与 committed AppTokens.kt 一致；不一致即失败（CI 对账门禁）"
+    dependsOn("generateDesignTokens")
+    doLast {
+        val rel = designTokenOut.relativeTo(rootProjectDir).path
+        val exit = ProcessBuilder("git", "diff", "--exit-code", "--", rel)
+            .redirectErrorStream(true).start().apply { waitFor() }.exitValue()
+        if (exit != 0) {
+            throw GradleException(
+                "tokens/*.json 已变更但 AppTokens.kt 未重新生成/提交。" +
+                    "请执行 ./gradlew :newui:generateDesignTokens 后提交产物。"
+            )
+        }
+        logger.lifecycle("\u2713 design tokens 与 committed 产物一致。")
+    }
+}
         }
     }
 }

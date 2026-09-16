@@ -14,7 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import com.mini.me_core.newui.designsystem.component.atom.AppIcon
+import com.mini.me_core.newui.designsystem.primitive.AppIcon
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 
 /**
