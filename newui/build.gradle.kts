@@ -106,6 +106,25 @@ android {
 val designTokenOut =
     file("src/main/java/com/mini/me_core/newui/designsystem/token/generated/AppTokens.kt")
 
+/** 优先找 node 可执行路径（node / ~/.nvm/.../bin/node）。 */
+fun findNodeBinary(): String? {
+    val candidates = listOf(
+        System.getenv("NODE_BIN"),
+        "node",
+        "/usr/local/bin/node",
+        "/usr/bin/node",
+        "/opt/homebrew/bin/node",
+    )
+    return candidates.firstOrNull { candidate ->
+        candidate != null && runCatching {
+            val p = ProcessBuilder(candidate, "--version")
+                .redirectErrorStream(false).start()
+            p.waitFor() == 0
+        }.getOrDefault(false)
+    }
+}
+
+
 tasks.register<Exec>("generateDesignTokens") {
     group = "ui"
     description = "用 Style Dictionary 从 tokens/*.json 生成令牌常量（写回 committed AppTokens.kt）"
@@ -143,23 +162,5 @@ tasks.register("verifyDesignTokens") {
             )
         }
         logger.lifecycle("\u2713 design tokens 与 committed 产物一致。")
-    }
-}
-
-/** 优先找 node 可执行路径（node / ~/.nvm/.../bin/node）。 */
-fun findNodeBinary(): String? {
-    val candidates = listOf(
-        System.getenv("NODE_BIN"),
-        "node",
-        "/usr/local/bin/node",
-        "/usr/bin/node",
-        "/opt/homebrew/bin/node",
-    )
-    return candidates.firstOrNull { candidate ->
-        candidate != null && runCatching {
-            val p = ProcessBuilder(candidate, "--version")
-                .redirectErrorStream(false).start()
-            p.waitFor() == 0
-        }.getOrDefault(false)
     }
 }
