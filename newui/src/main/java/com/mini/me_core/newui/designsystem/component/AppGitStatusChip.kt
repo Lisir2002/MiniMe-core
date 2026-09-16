@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
@@ -33,31 +34,36 @@ fun AppGitStatusChip(
     modifier: Modifier = Modifier,
     dirtyCount: Int = 0,
 ) {
+    val dirty = dirtyCount > 0
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(AppRadius.Pill))
-            .background(appPalette().surface)
+            .background(
+                if (dirty) appPalette().primary.copy(alpha = 0.10f)
+                else appPalette().surface
+            )
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Icons.Rounded.CallMerge,
             contentDescription = null,
-            tint = appPalette().labelSecondary,
+            tint = if (dirty) appPalette().primary else appPalette().labelSecondary,
             modifier = Modifier.size(AppSizing.IconXs),
         )
         Spacer(Modifier.width(AppSpacing.Xs))
         Text(
             text = branch,
             style = MaterialTheme.typography.labelSmall,
-            color = appPalette().labelSecondary,
+            color = if (dirty) appPalette().primary else appPalette().labelSecondary,
         )
-        if (dirtyCount > 0) {
+        if (dirty) {
             Spacer(Modifier.width(AppSpacing.Xs))
             Text(
                 text = "$dirtyCount 改",
                 style = MaterialTheme.typography.labelSmall,
-                color = appPalette().labelTertiary,
+                fontWeight = FontWeight.Medium,
+                color = appPalette().primary,
             )
         }
     }

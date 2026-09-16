@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Archive
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -109,6 +110,26 @@ fun AppDiffCard(
                 text = "-$deletions",
                 style = MaterialTheme.typography.labelMedium,
                 color = AppColor.StatusDanger,
+            )
+            Spacer(Modifier.width(AppSpacing.Xs))
+            val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+            Icon(
+                imageVector = Icons.Rounded.ContentCopy,
+                contentDescription = "复制 diff",
+                tint = appPalette().labelSecondary,
+                modifier = Modifier
+                    .size(AppSizing.IconXs)
+                    .clip(RoundedCornerShape(AppRadius.Sm))
+                    .clickable {
+                        val joined = lines.joinToString("\n") {
+                            (when (it.type) {
+                                AppDiffLineType.Add -> "+"
+                                AppDiffLineType.Remove -> "-"
+                                AppDiffLineType.Context -> " "
+                            }) + it.text
+                        }
+                        clipboard.setText(androidx.compose.ui.text.AnnotatedString("$filePath\n$joined"))
+                    },
             )
             Spacer(Modifier.width(AppSpacing.Xs))
             Icon(
