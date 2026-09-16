@@ -35,6 +35,5 @@ fun AppAcceptChangesBar(
         OutlinedButton(onClick = onReject) {
             Text("全部拒绝")
         }
-        Spacer(Modifier.width(0))
     }
 }

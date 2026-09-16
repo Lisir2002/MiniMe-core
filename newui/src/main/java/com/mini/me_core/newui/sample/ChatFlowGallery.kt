@@ -1434,6 +1434,8 @@ post("/auth/login") {
     },
 )
 
+private enum class PlanDecision { Approve, Refine }
+
 /** 首次放入或在「继续细化」后刷新计划卡，使其按钮回调绑定到当前等待的决策。 */
 private suspend fun ChatFlowState.patchOrPutPlan(
     key: Int,
