@@ -44,6 +44,7 @@ fun AppSparkline(
         reveal.snapTo(0f)
         reveal.animateTo(1f, tween(durationMillis = AppMotion.Slow.toInt(), easing = FastOutSlowInEasing))
     }
+    val palette = appPalette()
     Canvas(modifier) {
         val maxV = data.max()
         val minV = data.min()
@@ -89,7 +90,7 @@ fun AppSparkline(
             val last = data.lastIndex
             val dot = Offset(stepX * last, yFor(data[last]))
             drawCircle(strokeColor, radius = strokeWidth.toPx() * 1.5f, center = dot)
-            drawCircle(appPalette().card, radius = strokeWidth.toPx() * 0.85f, center = dot)
+            drawCircle(palette.card, radius = strokeWidth.toPx() * 0.85f, center = dot)
         }
     }
 }

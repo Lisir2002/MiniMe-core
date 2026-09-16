@@ -112,7 +112,6 @@ fun <T> ListPageTemplate(
         title = title,
         onNavigateBack = onNavigateBack,
         topBarActions = topBarActions,
-        modifier = modifier,
     ) { innerPadding ->
         when (state) {
             is ListPageState.Loading -> LoadingContent(modifier = Modifier.padding(innerPadding))

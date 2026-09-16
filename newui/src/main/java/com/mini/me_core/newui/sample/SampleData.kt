@@ -86,7 +86,7 @@ internal sealed interface ChatItem {
         val steps: List<AppPlanStep>,
         val state: AppPlanState,
         val pendingSelection: String? = null,
-        val reason: String = null,
+        val reason: String? = null,
         val onApprove: (() -> Unit)? = null,
         val onRefine: (() -> Unit)? = null,
     ) : ChatItem

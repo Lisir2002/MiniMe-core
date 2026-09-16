@@ -56,7 +56,6 @@ fun DetailPageTemplate(
         onNavigateBack = onNavigateBack,
         topBarActions = topBarActions,
         bottomBar = bottomBar,
-        modifier = modifier,
     ) { innerPadding ->
         Column(
             modifier = Modifier
