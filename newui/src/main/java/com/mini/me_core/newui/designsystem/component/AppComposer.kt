@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.theme.appPalette
@@ -151,6 +152,7 @@ private fun AttachmentChip(name: String, onRemove: () -> Unit) {
         modifier = Modifier
             .clip(RoundedCornerShape(AppRadius.Pill))
             .background(appPalette().surface)
+            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
     ) {
         Text(
@@ -187,15 +189,21 @@ private fun CircleIconBtn(
 
 @Composable
 private fun ToggleChip(active: Boolean, label: String, onClick: () -> Unit) {
-    val bg = if (active) appPalette().primary.copy(alpha = 0.12f) else appPalette().surface
+    val bg = if (active) appPalette().primary.copy(alpha = 0.15f) else appPalette().surface
     val fg = if (active) appPalette().primary else appPalette().labelSecondary
     Text(
         label,
         style = MaterialTheme.typography.labelMedium,
+        fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
         color = fg,
         modifier = Modifier
             .clip(RoundedCornerShape(AppRadius.Pill))
             .background(bg)
+            .border(
+                AppStroke.Thin,
+                if (active) appPalette().primary.copy(alpha = 0.35f) else appPalette().separator,
+                RoundedCornerShape(AppRadius.Pill),
+            )
             .clickable { onClick() }
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
     )
