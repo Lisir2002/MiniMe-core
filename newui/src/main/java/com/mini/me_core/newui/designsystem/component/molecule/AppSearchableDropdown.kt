@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -46,9 +45,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.key.Key
@@ -94,25 +91,30 @@ data class AppSearchableOption(
 /**
  * 可搜索下拉选择框（分子组 · AppSearchableDropdown）——设计系统统一 Combobox。
  *
- * 设计参考 shadcn/ui Combobox（Radix cmdk + Popover）、Ariakit useComboboxState、M3 ExposedDropdownMenu：
- * 文本输入框常驻，聚焦即过滤；键盘焦点始终留在输入框，↑↓ 只移动高亮索引（不切焦），
- * Enter 选中、Esc 关闭。支持本地全量与远程/异步两种数据源。
+ * 范式（与同仓库 [AppDropdownFilter] 一致，参考 shadcn/ui Combobox、iOS 下拉、Ariakit useCombobox）：
+ *  - **触发器是只读字段**（只展示当前选中值，不内嵌输入框），整块只有一个 [clickable]，
+ *    点任何位置都展开面板——彻底避免「父 clickable 与内部 TextField 抢触摸 / 抢焦点」。
+ *  - **搜索框位于弹出面板内部**，[Popup] 用 `focusable=true` 合法持有输入焦点，打开即聚焦、
+ *    拉起 IME；query 是搜索框唯一数据源（受控），输入 / 删除 / 清空 / 空查询全部直接生效，
+ *    不再有「展开显 query、收起显 value」的双数据源切换，也不依赖「失焦即关闭」的竞态判断。
+ *  - 键盘焦点常驻面板内搜索框：↑↓ 只移动高亮索引（不切焦），Enter 选中、Esc 关闭。
+ *  - 空查询展示全部候选；支持本地全量过滤与远程/异步两种数据源。
  *
- * 架构要点（相对旧版的关键修正）：
- *  - 弹出层**不用 M3 DropdownMenu**（其内容容器是 `width(IntrinsicSize.Max)+verticalScroll`，
- *    内嵌任何 SubcomposeLayout 都会在 intrinsic 测量阶段崩溃），改用独立 `Popup` +
- *    [PopupPositionProvider]，锚定字段真实窗口矩形，下方空间不足自动翻上、右缘不足自动翻左、
- *    夹紧屏幕边距；面板内可以安全地用 [LazyColumn]。
- *  - 颜色一律走 [appPalette]（明暗感知），尺寸 / 圆角 / 描边 / 间距走 AppTokens，不再写死
- *    `MaterialTheme.colorScheme` 浅色值或 `Color(0x...)`。
+ * 崩溃规避：弹出层**不用 M3 DropdownMenu**（其容器是 `width(IntrinsicSize.Max)+verticalScroll`，
+ * 内嵌任何 SubcomposeLayout 都会在 intrinsic 测量阶段崩溃），改用独立 [Popup] +
+ * [PopupPositionProvider]，锚定字段真实窗口矩形，下方不足翻上、右缘不足翻左、夹紧边距；
+ * 面板内可安全使用 [LazyColumn]。
+ *
+ * 颜色一律走 [appPalette]（明暗感知），尺寸 / 圆角 / 描边 / 阴影 / 间距走 AppTokens。
  *
  * @param value 当前选中 label；null 表示未选。外部改值即时回显。
  * @param onSelect 选中候选项回调（组件同时收起下拉）。
  * @param options 本地数据源。
- * @param remoteQuery 远程/异步数据源：非空时忽略 [options]，组件把当前 query 透传给它取结果
+ * @param remoteQuery 远程/异步数据源：非空时忽略 [options]，把当前 query 透传给它取结果
  *   （调用方自行防抖 150–300ms）。
  * @param loading 远程过滤中（显示加载行）。
  * @param onQueryChange query 透传（驱动外部远程检索，也可忽略让组件内部过滤）。
+ * @param onClear 可选：提供后触发器在已选态显示「清除」按钮，点击清空已选。
  */
 @Composable
 fun AppSearchableDropdown(
@@ -126,6 +128,7 @@ fun AppSearchableDropdown(
     remoteQuery: ((String) -> List<AppSearchableOption>)? = null,
     loading: Boolean = false,
     onQueryChange: ((String) -> Unit)? = null,
+    onClear: (() -> Unit)? = null,
 ) {
     val palette = appPalette()
     val density = LocalDensity.current
@@ -134,7 +137,8 @@ fun AppSearchableDropdown(
     var query by remember { mutableStateOf("") }
     var highlight by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
-    val focusRequester = remember { FocusRequester() }
+    // 焦点给「面板内」搜索框；触发器只读、不持焦。
+    val searchFocusRequester = remember { FocusRequester() }
     // 字段宽度（px）：让弹出面板与字段同宽，避免面板忽宽忽窄。
     var fieldWidthPx by remember { mutableIntStateOf(0) }
 
@@ -147,21 +151,28 @@ fun AppSearchableDropdown(
         }
     }
 
-    // 键盘 ↑↓ 移动高亮后，把高亮项滚入可见区（独立 Popup + LazyColumn，安全可滚）。
+    // 展开后把焦点交给面板内搜索框并拉起 IME（Popup focusable=true，焦点合法、不被抢）。
+    LaunchedEffect(expanded) {
+        if (expanded) {
+            highlight = 0
+            runCatching { searchFocusRequester.requestFocus() }
+        }
+    }
+
+    // 键盘 ↑↓ 移动高亮后，把高亮项滚入可见区。
     LaunchedEffect(highlight, results.size) {
         if (results.isNotEmpty() && highlight < listState.layoutInfo.totalItemsCount) {
             listState.animateScrollToItem(highlight.coerceIn(0, results.lastIndex))
         }
     }
 
-    /** 点开下拉：灌入当前已选值作为搜索起点，并请求输入焦点（拉起 IME）。 */
+    /** 点开下拉：每次从空查询开始（展示全部候选），焦点进面板内搜索框。 */
     fun open() {
         if (expanded) return
-        query = value ?: ""
-        onQueryChange?.invoke(query)
+        query = ""
+        onQueryChange?.invoke("")
         highlight = 0
         expanded = true
-        focusRequester.requestFocus()
     }
 
     fun pick(opt: AppSearchableOption) {
@@ -169,7 +180,7 @@ fun AppSearchableDropdown(
         onSelect(opt)
     }
 
-    // 键盘导航：焦点留在输入框，↑↓ 循环高亮、Enter 选中、Esc 关闭。
+    // 键盘导航：焦点常驻面板内搜索框，↑↓ 循环高亮、Enter 选中、Esc 关闭。
     fun handleKey(ev: KeyEvent): Boolean {
         if (ev.type != KeyEventType.KeyDown) return false
         return when (ev.key) {
@@ -199,7 +210,6 @@ fun AppSearchableDropdown(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "searchDropdownArrow",
     )
-    val fieldText = if (expanded) query else (value ?: "")
 
     // 标准定位提供者：直接以字段（anchorBounds）窗口矩形计算落点。
     val positionProvider = remember {
@@ -244,7 +254,7 @@ fun AppSearchableDropdown(
             )
         }
         Box {
-            // —— 字段：填充式输入框，聚焦主色描边 ——
+            // —— 触发器：只读字段，整块一个 clickable，点哪里都开面板（无内嵌输入框、不抢焦） ——
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -256,7 +266,6 @@ fun AppSearchableDropdown(
                         color = if (expanded) palette.primary else palette.separator,
                         shape = fieldShape,
                     )
-                    .onPreviewKeyEvent(::handleKey)
                     .clickable { open() }
                     .padding(start = AppSpacing.Md, end = AppSpacing.Sm, top = AppSpacing.Sm, bottom = AppSpacing.Sm),
                 verticalAlignment = Alignment.CenterVertically,
@@ -270,43 +279,25 @@ fun AppSearchableDropdown(
                     )
                     Spacer(Modifier.width(AppSpacing.Sm))
                 }
-                Box(Modifier.weight(1f)) {
-                    if (fieldText.isEmpty()) {
-                        Text(
-                            text = placeholder,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = palette.labelTertiary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    BasicTextField(
-                        value = fieldText,
-                        onValueChange = {
-                            query = it
-                            onQueryChange?.invoke(it)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester)
-                            .onFocusChanged { if (!it.isFocused && expanded) expanded = false },
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = palette.ink),
-                        cursorBrush = SolidColor(palette.primary),
-                    )
-                }
-                if (query.isNotEmpty()) {
+                Text(
+                    text = value ?: placeholder,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (value != null) palette.ink else palette.labelTertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (value != null && onClear != null) {
                     Icon(
                         imageVector = Icons.Rounded.Close,
-                        contentDescription = "清空",
+                        contentDescription = "清除已选",
                         tint = palette.labelSecondary,
                         modifier = Modifier
                             .size(AppSizing.IconM)
                             .clip(RoundedCornerShape(AppRadius.Pill))
-                            .clickable {
-                                query = ""
-                                onQueryChange?.invoke("")
-                            },
+                            // 内层 clickable 消费事件，不会冒泡到触发器的 open()。
+                            .clickable { onClear() }
+                            .padding(AppSpacing.Tiny),
                     )
                     Spacer(Modifier.width(AppSpacing.Sm))
                 }
@@ -316,18 +307,16 @@ fun AppSearchableDropdown(
                     tint = palette.labelSecondary,
                     modifier = Modifier
                         .size(AppSizing.IconM)
-                        .graphicsLayer { rotationZ = arrowRotation },
+                        .rotate(arrowRotation),
                 )
             }
 
-            // —— 弹出面板：独立 Popup + 固定高度 LazyColumn，安全且可滚 ——
-            // focusable=false：弹窗不抢输入焦点，字段的 IME 与光标保持；
-            // 外部点击由字段 onFocusChanged 失焦时关闭。
+            // —— 弹出面板：focusable=true 的独立 Popup，搜索框在面板内、单一数据源 ——
             if (expanded) {
                 Popup(
                     popupPositionProvider = positionProvider,
                     onDismissRequest = { expanded = false },
-                    properties = PopupProperties(focusable = false),
+                    properties = PopupProperties(focusable = true),
                 ) {
                     val panelShape = RoundedCornerShape(AppRadius.Md)
                     val panelWidth = with(density) { fieldWidthPx.toDp() }.coerceAtLeast(220.dp)
@@ -337,8 +326,21 @@ fun AppSearchableDropdown(
                             .width(panelWidth)
                             .clip(panelShape)
                             .background(palette.card)
-                            .padding(vertical = AppSpacing.Xs),
+                            .border(AppStroke.Thin, palette.separator, panelShape)
+                            .padding(AppSpacing.Xs),
                     ) {
+                        // 面板内搜索框：唯一可输入处，value=query 单一受控源，焦点 / IME 稳定。
+                        SearchPanelField(
+                            query = query,
+                            onQueryChange = { newText ->
+                                query = newText
+                                onQueryChange?.invoke(newText)
+                                highlight = 0
+                            },
+                            focusRequester = searchFocusRequester,
+                            onPreviewKeyEvent = ::handleKey,
+                        )
+                        Spacer(Modifier.height(AppSpacing.Xs))
                         when {
                             loading -> SearchDropdownLoadingRow(palette.primary)
                             results.isEmpty() -> SearchDropdownEmptyState(palette.labelSecondary)
@@ -363,6 +365,74 @@ fun AppSearchableDropdown(
     }
 }
 
+/**
+ * 面板内搜索框：填充式圆角字段 + 前置放大镜 + 单一受控文本 + 一键清空。
+ * 焦点（[focusRequester]）与键盘预览事件（[onPreviewKeyEvent]）都挂在这里，
+ * 因为 Popup focusable=true 后，只有面板内组件能合法持焦。
+ */
+@Composable
+private fun SearchPanelField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    focusRequester: FocusRequester,
+    onPreviewKeyEvent: (KeyEvent) -> Boolean,
+) {
+    val palette = appPalette()
+    val shape = RoundedCornerShape(AppRadius.Md)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(palette.surfaceDim)
+            .border(AppStroke.Thin, palette.separator, shape)
+            .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Search,
+            contentDescription = null,
+            tint = palette.labelSecondary,
+            modifier = Modifier.size(AppSizing.IconS),
+        )
+        Box(
+            Modifier
+                .weight(1f)
+                .padding(horizontal = AppSpacing.Sm),
+        ) {
+            if (query.isEmpty()) {
+                Text(
+                    text = "搜索…",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = palette.labelTertiary,
+                    maxLines = 1,
+                )
+            }
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+                    .onPreviewKeyEvent(onPreviewKeyEvent),
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = palette.ink),
+                cursorBrush = SolidColor(palette.primary),
+            )
+        }
+        if (query.isNotEmpty()) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = "清空输入",
+                tint = palette.labelSecondary,
+                modifier = Modifier
+                    .size(AppSizing.IconS)
+                    .clip(RoundedCornerShape(AppRadius.Pill))
+                    .clickable { onQueryChange("") },
+            )
+        }
+    }
+}
+
 /** 候选项行：高亮底 + 可选 icon/副标题/尾部信息 + 选中主色对勾。 */
 @Composable
 private fun SearchDropdownRow(
@@ -376,7 +446,7 @@ private fun SearchDropdownRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = AppSpacing.Xs, vertical = AppSpacing.Tiny)
+            .padding(vertical = AppSpacing.Tiny)
             .background(
                 color = if (highlighted) palette.primaryOverlay12 else androidx.compose.ui.graphics.Color.Transparent,
                 shape = rowShape,

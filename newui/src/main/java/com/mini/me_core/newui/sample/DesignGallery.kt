@@ -383,8 +383,8 @@ private fun GalleryBody() {
     // 新增列表/弹窗补充类型演示状态
     var comboValue by remember { mutableStateOf("Auto") }
     // AppSearchableDropdown 演示：本地 / 远程（150ms 假延迟）双数据源
-    var localPick by remember { mutableStateOf("") }
-    var remotePick by remember { mutableStateOf("") }
+    var localPick by remember { mutableStateOf<String?>(null) }
+    var remotePick by remember { mutableStateOf<String?>(null) }
     var remoteQ by remember { mutableStateOf("") }
     var remoteLoading by remember { mutableStateOf(false) }
     var remoteResults by remember { mutableStateOf<List<AppSearchableOption>>(emptyList()) }
@@ -1306,6 +1306,7 @@ private fun GalleryBody() {
                 onSelect = { comboValue = it },
                 label = "可搜索下拉选择框",
                 leadingIcon = Icons.Rounded.Search,
+                onClear = { comboValue = "" },
             )
             // 上下文菜单：长按目标弹出
             Box(
@@ -1470,6 +1471,7 @@ private fun GalleryBody() {
                 label = "选择城市",
                 placeholder = "输入城市名…",
                 leadingIcon = Icons.Rounded.Search,
+                onClear = { localPick = null },
                 options = remember {
                     listOf(
                         AppSearchableOption("北京", subtitle = "Beijing · 华北", trailing = "2189万"),
@@ -1525,6 +1527,7 @@ private fun GalleryBody() {
                 },
                 loading = remoteLoading,
                 onQueryChange = { remoteQ = it },
+                onClear = { remotePick = null },
             )
         }
 

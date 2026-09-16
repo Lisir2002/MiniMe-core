@@ -212,6 +212,7 @@ fun AppComboBox(
     placeholder: String = "输入或选择…",
     leadingIcon: ImageVector? = null,
     onQueryChange: ((String) -> Unit)? = null,
+    onClear: (() -> Unit)? = null,
 ) {
     AppSearchableDropdown(
         value = value.ifBlank { null },
@@ -222,6 +223,7 @@ fun AppComboBox(
         leadingIcon = leadingIcon,
         options = options.map { AppSearchableOption(label = it) },
         onQueryChange = onQueryChange,
+        onClear = onClear,
     )
 }
 
