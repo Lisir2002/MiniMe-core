@@ -9,6 +9,19 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc36] - 2026-09-17
+
+> 预发行。对话流组件交互/反馈强化，纯 `:newui` component 层 additive 改动，无工作流 / prompt / schema / 运行行为变化。
+
+### Added
+
+- `[newui]` 引用来源卡（`AppCitationCard`）来源行可点击，直接用系统浏览器打开 URL。
+- `[newui]` Diff 卡（`AppDiffCard`）头部新增复制按钮，一键把整段 diff（含文件头与 +/- 前缀）写入剪贴板。
+
+### Changed
+
+- `[newui]` Git 状态 chip（`AppGitStatusChip`）当存在未提交改动时高亮：图标、分支名、「N 改」计数统一用主色并加浅底，脏文件一眼可见。
+
 ## [0.0.0.2-rc35] - 2026-09-17
 
 > 预发行。修复 rc34 引入的崩溃：对话流每条 AI 流式回复结束时主线程 NPE。纯 `:newui` 修复。
