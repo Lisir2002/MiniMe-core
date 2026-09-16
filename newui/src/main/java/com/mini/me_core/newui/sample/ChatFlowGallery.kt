@@ -49,7 +49,7 @@ import com.mini.me_core.newui.designsystem.component.AppMessageRow
 import com.mini.me_core.newui.designsystem.component.AppMessageScroller
 import com.mini.me_core.newui.composite.AppPlanCard
 import com.mini.me_core.newui.composite.AppPlanState
-import com.mini.me_core.newui.designsystem.component.AppPlanStep
+import com.mini.me_core.newui.composite.AppPlanStep
 import com.mini.me_core.newui.composite.AppPlanStepStatus
 import com.mini.me_core.newui.composite.AppSkillCallCard
 import com.mini.me_core.newui.composite.AppSkillCallState
@@ -57,7 +57,7 @@ import com.mini.me_core.newui.composite.AppTerminalLog
 import com.mini.me_core.newui.designsystem.component.AppThinkingBlock
 import com.mini.me_core.newui.composite.AppToolCallCard
 import com.mini.me_core.newui.composite.AppToolCallState
-import com.mini.me_core.newui.designsystem.component.AppToolChainStep
+import com.mini.me_core.newui.composite.AppToolChainStep
 import com.mini.me_core.newui.composite.AppToolChainStepState
 import com.mini.me_core.newui.composite.AppToolChainTimeline
 import com.mini.me_core.newui.composite.AppToolSummaryCard

@@ -6,11 +6,11 @@ import com.mini.me_core.newui.composite.AppChatMarkerKind
 import com.mini.me_core.newui.composite.AppChatMessageState
 import com.mini.me_core.newui.composite.AppMcpAppState
 import com.mini.me_core.newui.composite.AppPlanState
-import com.mini.me_core.newui.designsystem.component.AppPlanStep
+import com.mini.me_core.newui.composite.AppPlanStep
 import com.mini.me_core.newui.composite.AppPlanStepStatus
 import com.mini.me_core.newui.composite.AppSkillCallState
 import com.mini.me_core.newui.composite.AppToolCallState
-import com.mini.me_core.newui.designsystem.component.AppToolChainStep
+import com.mini.me_core.newui.composite.AppToolChainStep
 import com.mini.me_core.newui.composite.AppToolChainStepState
 import com.mini.me_core.newui.composite.AppToolSummaryState
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
