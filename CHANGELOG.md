@@ -9,6 +9,23 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc37] - 2026-09-17
+
+> 预发行。对话流新增 9 类适配组件并接入演示剧情，纯 `:newui` component / sample 层 additive 改动。
+
+### Added
+
+- `[newui]` `AppTestResultCard` 测试结果卡：通过/失败数，失败用例可展开。
+- `[newui]` `AppErrorCard` 编译/运行错误卡：文件:行号、错误摘要与「让我修」操作。
+- `[newui]` `AppFollowUpChips` 建议追问 chips。
+- `[newui]` `AppTurnSummaryBar` 回合总结条（文件/工具/耗时/token）。
+- `[newui]` `AppAcceptChangesBar` 全部接受 / 全部拒绝批量操作条。
+- `[newui]` `AppClarifyCard` 反问/澄清卡，带快速选项。
+- `[newui]` `AppCommitChip` 已提交 hash + 可撤销标记。
+- `[newui]` `AppWebSearchCard` 联网搜索命中列表。
+- `[newui]` `AppModelBadge` 模型/档位小字徽章。
+- `[newui]` 演示剧情新增一轮：反问 → 联网搜索 → 测试失败 → 错误卡 → 修复后全绿 → 回合总结 → 批量接受 → 提交 → 建议追问的完整闭环。
+
 ## [0.0.0.2-rc36] - 2026-09-17
 
 > 预发行。对话流组件交互/反馈强化，纯 `:newui` component 层 additive 改动，无工作流 / prompt / schema / 运行行为变化。
