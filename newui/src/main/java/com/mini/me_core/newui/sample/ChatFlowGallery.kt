@@ -12,6 +12,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,13 +35,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mini.me_core.newui.designsystem.component.atom.AppIconButton as AppCircleIconButton
 import com.mini.me_core.newui.designsystem.component.molecule.AppApprovalChoice
 import com.mini.me_core.newui.designsystem.component.molecule.AppAttachmentCard
-import com.mini.me_core.newui.designsystem.component.molecule.AppButton
 import com.mini.me_core.newui.designsystem.component.molecule.AppButtonVariant
 import com.mini.me_core.newui.designsystem.component.molecule.AppChatMarker
 import com.mini.me_core.newui.designsystem.component.molecule.AppChatMarkerKind
 import com.mini.me_core.newui.designsystem.component.molecule.AppChatMessageState
+import com.mini.me_core.newui.designsystem.component.molecule.AppIconButton
 import com.mini.me_core.newui.designsystem.component.molecule.AppMcpAppCard
 import com.mini.me_core.newui.designsystem.component.molecule.AppMcpAppState
 import com.mini.me_core.newui.designsystem.component.molecule.AppMessageRow
@@ -148,33 +155,47 @@ private fun FlowPlayerBar(state: ChatFlowState) {
                 color = appPalette().labelSecondary,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
-                AppButton(
-                    text = "▶ 自动播放",
-                    onClick = state::play,
-                    enabled = canAdvance,
-                    modifier = Modifier.weight(1f),
-                )
-                AppButton(
-                    text = "⏵ 单步",
+            // 主操作独占一行：最宽、最高视觉权重，标签始终横排。
+            AppIconButton(
+                text = "自动播放",
+                onClick = state::play,
+                enabled = canAdvance,
+                leadingIcon = {
+                    Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            // 次要操作一行：单步 / 展开全部 等宽分担，重置为低频操作收为纯图标钮。
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AppIconButton(
+                    text = "单步",
                     onClick = state::step,
                     enabled = canAdvance,
                     variant = AppButtonVariant.FilledTonal,
+                    leadingIcon = {
+                        Icon(Icons.Rounded.SkipNext, contentDescription = null)
+                    },
                     modifier = Modifier.weight(1f),
                 )
-                AppButton(
-                    text = "⏩ 展开全部",
+                AppIconButton(
+                    text = "展开全部",
                     onClick = state::expandAll,
                     enabled = !state.busy,
                     variant = AppButtonVariant.Outlined,
+                    leadingIcon = {
+                        Icon(Icons.Rounded.FastForward, contentDescription = null)
+                    },
                     modifier = Modifier.weight(1f),
                 )
-                AppButton(
-                    text = "↺ 重置",
+                AppCircleIconButton(
                     onClick = state::reset,
+                    icon = Icons.Rounded.RestartAlt,
                     enabled = state.turnIndex > 0 || state.items.isNotEmpty(),
-                    variant = AppButtonVariant.Text,
-                    modifier = Modifier.weight(1f),
+                    contentDescription = "重置",
                 )
             }
         }
