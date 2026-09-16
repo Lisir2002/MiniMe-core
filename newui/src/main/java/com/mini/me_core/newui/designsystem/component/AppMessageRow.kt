@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -72,6 +73,8 @@ fun AppMessageRow(
     onRetry: (() -> Unit)? = null,
     onCopy: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
+    onRegenerate: (() -> Unit)? = null,
+    onStop: (() -> Unit)? = null,
     swipeEnabled: Boolean = false,
     swipeEdge: AppSwipeEdge = AppSwipeEdge.End,
     swipeIndex: Int? = null,
@@ -81,7 +84,7 @@ fun AppMessageRow(
     val label = name ?: if (isUser) "你" else "AI"
     val avatarText = (avatarLabel ?: label).take(1)
     var actionsVisible by remember { mutableStateOf(false) }
-    val hasActions = onCopy != null || onRetry != null || onDelete != null
+    val hasActions = onCopy != null || onRetry != null || onDelete != null || onRegenerate != null
 
     val rowContent: @Composable () -> Unit = {
         Row(
@@ -123,6 +126,13 @@ fun AppMessageRow(
                         },
                     )
                     AnimatedVisibility(
+                        visible = state == AppChatMessageState.Streaming && onStop != null,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically(),
+                    ) {
+                        StopStreamingButton(onStop = onStop!!)
+                    }
+                    AnimatedVisibility(
                         visible = actionsVisible,
                         enter = fadeIn() + expandVertically(),
                         exit = fadeOut() + shrinkVertically(),
@@ -132,6 +142,7 @@ fun AppMessageRow(
                             onCopy = onCopy,
                             onRetry = onRetry,
                             onDelete = onDelete,
+                            onRegenerate = onRegenerate,
                             onDismiss = { actionsVisible = false },
                         )
                     }
@@ -218,13 +229,14 @@ private fun AvatarSlot(avatarText: String, showAvatar: Boolean) {
     }
 }
 
-/** 长按操作区：深色胶囊内复制 / 重试 / 删除。 */
+/** 长按操作区：深色胶囊内复制 / 重新生成 / 重试 / 删除。 */
 @Composable
 private fun MessageActionsBar(
     state: AppChatMessageState,
     onCopy: (() -> Unit)?,
     onRetry: (() -> Unit)?,
     onDelete: (() -> Unit)?,
+    onRegenerate: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     Row(
@@ -240,6 +252,12 @@ private fun MessageActionsBar(
             onCopy?.invoke()
             onDismiss()
         }
+        if (onRegenerate != null) {
+            ActionChip(Icons.Rounded.Refresh, "重新生成", appPalette().ink) {
+                onRegenerate()
+                onDismiss()
+            }
+        }
         if (state == AppChatMessageState.Error && onRetry != null) {
             ActionChip(Icons.Rounded.Refresh, "重试", appPalette().ink) {
                 onRetry()
@@ -252,6 +270,33 @@ private fun MessageActionsBar(
                 onDismiss()
             }
         }
+    }
+}
+
+/** 流式输出期间的「停止生成」小钮：常驻在气泡下方，不必长按才出现。 */
+@Composable
+private fun StopStreamingButton(onStop: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .padding(top = AppSpacing.Xs)
+            .clip(RoundedCornerShape(AppRadius.Pill))
+            .background(appPalette().card)
+            .clickable(onClick = onStop)
+            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Stop,
+            contentDescription = "停止生成",
+            tint = appPalette().ink,
+            modifier = Modifier.size(14.dp),
+        )
+        Text(
+            text = "停止生成",
+            style = MaterialTheme.typography.labelSmall,
+            color = appPalette().ink,
+            modifier = Modifier.padding(start = AppSpacing.Tiny),
+        )
     }
 }
 

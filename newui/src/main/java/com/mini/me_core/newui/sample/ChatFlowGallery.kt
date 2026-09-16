@@ -46,8 +46,14 @@ import com.mini.me_core.newui.designsystem.component.AppButtonVariant
 import com.mini.me_core.newui.designsystem.component.AppChatMarker
 import com.mini.me_core.newui.designsystem.component.AppChatMarkerKind
 import com.mini.me_core.newui.designsystem.component.AppChatMessageState
+import com.mini.me_core.newui.designsystem.component.AppCitationCard
+import com.mini.me_core.newui.designsystem.component.AppCitationSource
+import com.mini.me_core.newui.designsystem.component.AppDiffCard
+import com.mini.me_core.newui.designsystem.component.AppDiffLine
+import com.mini.me_core.newui.designsystem.component.AppDiffLineType
 import com.mini.me_core.newui.designsystem.component.AppFileCard
 import com.mini.me_core.newui.designsystem.component.AppFileState
+import com.mini.me_core.newui.designsystem.component.AppGitStatusChip
 import com.mini.me_core.newui.designsystem.component.AppIconButton
 import com.mini.me_core.newui.designsystem.component.AppMcpAppCard
 import com.mini.me_core.newui.designsystem.component.AppMcpAppState
@@ -68,6 +74,9 @@ import com.mini.me_core.newui.designsystem.component.AppToolChainStepState
 import com.mini.me_core.newui.designsystem.component.AppToolChainTimeline
 import com.mini.me_core.newui.designsystem.component.AppToolSummaryCard
 import com.mini.me_core.newui.designsystem.component.AppToolSummaryState
+import com.mini.me_core.newui.designsystem.component.AppTodoCard
+import com.mini.me_core.newui.designsystem.component.AppTodoItem
+import com.mini.me_core.newui.designsystem.component.AppTodoStatus
 import com.mini.me_core.newui.designsystem.component.AppTypingIndicator
 import com.mini.me_core.newui.designsystem.layout.AppShell
 import com.mini.me_core.newui.designsystem.theme.AppTheme
@@ -341,6 +350,30 @@ private fun FlowNode(item: FlowItem, state: ChatFlowState) {
 
             is FlowItem.Terminal -> AppTerminalLog(modifier = Modifier.fillMaxWidth())
 
+            is FlowItem.Diff -> AppDiffCard(
+                filePath = item.filePath,
+                additions = item.additions,
+                deletions = item.deletions,
+                lines = item.lines,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.Todo -> AppTodoCard(
+                items = item.items,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.Citation -> AppCitationCard(
+                sources = item.sources,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.GitChip -> AppGitStatusChip(
+                branch = item.branch,
+                dirtyCount = item.dirtyCount,
+                modifier = Modifier,
+            )
+
             // 消息组：头像/姓名行 → 思考过程（头像下方、与气泡同列）→ 气泡 → 附件（用户气泡下方）。
             // 三者同属一个 Msg 节点，不再拆成独立列表项，避免视觉分离。
             is FlowItem.Msg -> Column(
@@ -369,6 +402,8 @@ private fun FlowNode(item: FlowItem, state: ChatFlowState) {
                     onCopy = { /* 演示占位：写入剪贴板 */ },
                     onRetry = item.onRetry,
                     onDelete = { state.items.removeAll { it.key == item.key } },
+                    onRegenerate = item.onRegenerate,
+                    onStop = item.onStop,
                     swipeEnabled = true,
                     swipeIndex = item.key,
                     swipeExpandedIndex = state.swipeExpanded,
@@ -407,6 +442,8 @@ private sealed interface FlowItem {
         val grouped: Boolean = false,
         val ts: String = "",
         val onRetry: (() -> Unit)? = null,
+        val onRegenerate: (() -> Unit)? = null,
+        val onStop: (() -> Unit)? = null,
         val attachments: List<AttachmentData> = emptyList(),
         val thinking: String? = null,
         val thinkingStreaming: Boolean = false,
@@ -522,6 +559,34 @@ private sealed interface FlowItem {
         val name: String,
         val detail: String,
     )
+
+    /** 文件 Diff：路径 + 增删行统计 + 行级 diff。 */
+    data class Diff(
+        override val key: Int,
+        val filePath: String,
+        val additions: Int,
+        val deletions: Int,
+        val lines: List<AppDiffLine>,
+    ) : FlowItem
+
+    /** 实时任务清单。 */
+    data class Todo(
+        override val key: Int,
+        val items: List<AppTodoItem>,
+    ) : FlowItem
+
+    /** 引用来源。 */
+    data class Citation(
+        override val key: Int,
+        val sources: List<AppCitationSource>,
+    ) : FlowItem
+
+    /** Git 分支 chip。 */
+    data class GitChip(
+        override val key: Int,
+        val branch: String,
+        val dirtyCount: Int,
+    ) : FlowItem
 }
 
 // =====================================================================================
@@ -628,11 +693,28 @@ private class ChatFlowState(val scope: CoroutineScope) {
         put(FlowItem.Msg(nextKey(), text, AppChatMessageState.Complete, isUser = true, ts = ts))
     }
 
-    suspend fun aiReply(full: String, ts: String, chunk: Int = 3, perMs: Long = 14L) {
+    suspend fun aiReply(
+        full: String,
+        ts: String,
+        chunk: Int = 3,
+        perMs: Long = 14L,
+        onStop: (() -> Unit)? = null,
+        onRegenerate: (() -> Unit)? = null,
+    ) {
         val k = nextKey()
-        put(FlowItem.Msg(k, "", AppChatMessageState.Streaming, isUser = false, ts = ts))
+        put(
+            FlowItem.Msg(
+                k, "", AppChatMessageState.Streaming, isUser = false, ts = ts,
+                onStop = onStop ?: {
+                    patch<FlowItem.Msg>(k) { it.copy(state = AppChatMessageState.Complete, onStop = null) }
+                },
+                onRegenerate = onRegenerate ?: {
+                    patch<FlowItem.Msg>(k) { it.copy(text = full, state = AppChatMessageState.Complete) }
+                },
+            ),
+        )
         typewrite(full, chunk, perMs) { s -> patch<FlowItem.Msg>(k) { it.copy(text = s) } }
-        patch<FlowItem.Msg>(k) { it.copy(state = AppChatMessageState.Complete) }
+        patch<FlowItem.Msg>(k) { it.copy(state = AppChatMessageState.Complete, onStop = null) }
     }
 
     // ---- 播放控制 ----
@@ -792,6 +874,42 @@ private val flowTurns: List<suspend ChatFlowState.() -> Unit> = listOf(
             )
         }
     },
+    // T3.5 进入工作分支 + 实时任务清单（Pending→Running→Done 逐条推进）
+    {
+        put(FlowItem.GitChip(nextKey(), branch = "feature/auth-login", dirtyCount = 0))
+        val tk = nextKey()
+        put(
+            FlowItem.Todo(
+                tk,
+                items = listOf(
+                    AppTodoItem("读取项目结构与鉴权现状", AppTodoStatus.Running),
+                    AppTodoItem("新增 POST /auth/login 路由", AppTodoStatus.Pending),
+                    AppTodoItem("实现 JWT 签发与校验中间件", AppTodoStatus.Pending),
+                    AppTodoItem("补单测并跑通", AppTodoStatus.Pending),
+                ),
+            ),
+        )
+        tick(900)
+        patch<FlowItem.Todo>(tk) {
+            it.copy(items = it.items.mapIndexed { i, s ->
+                when (i) {
+                    0 -> s.copy(status = AppTodoStatus.Done)
+                    1 -> s.copy(status = AppTodoStatus.Running)
+                    else -> s
+                }
+            })
+        }
+        tick(900)
+        patch<FlowItem.Todo>(tk) {
+            it.copy(items = it.items.mapIndexed { i, s ->
+                when (i) {
+                    1 -> s.copy(status = AppTodoStatus.Done)
+                    2 -> s.copy(status = AppTodoStatus.Running)
+                    else -> s
+                }
+            })
+        }
+    },
     // T4 技能调用：代码审查
     {
         val k = nextKey()
@@ -879,6 +997,27 @@ private val flowTurns: List<suspend ChatFlowState.() -> Unit> = listOf(
                 output = """{"total": 2, "items": ["auth-token-draft.md", "error-codes.md"]}""",
             )
         }
+    },
+    // T7.5 联网检索 JWT 最佳实践 → 引用来源卡
+    {
+        put(
+            FlowItem.Citation(
+                nextKey(),
+                sources = listOf(
+                    AppCitationSource(
+                        title = "JWT 最佳实践 · OWASP",
+                        url = "https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html",
+                        snippet = "使用强签名算法（RS256/ES256），禁止 none；密钥长度充足并定期轮换。",
+                    ),
+                    AppCitationSource(
+                        title = "Stateless JWT 鉴权实践",
+                        url = "https://example.dev/blog/jwt-vs-session",
+                        snippet = "无状态 JWT 适合横向扩展；登出/吊销需配合短期 access token + 黑名单。",
+                    ),
+                ),
+            ),
+        )
+        tick(600)
     },
     // T8 普通工具：读取现有鉴权文件（流式输出 → 成功）
     {
@@ -1045,6 +1184,27 @@ private val flowTurns: List<suspend ChatFlowState.() -> Unit> = listOf(
             "鉴权相关单测全部通过，鉴权服务已部署到生产。"
         typewrite(summary, chunk = 3, perMs = 15L) { s -> patch<FlowItem.ToolSummary>(k) { it.copy(text = s) } }
         patch<FlowItem.ToolSummary>(k) { it.copy(state = AppToolSummaryState.Done) }
+    },
+    // T14.5 挑一个核心文件展示行级 diff
+    {
+        put(
+            FlowItem.Diff(
+                nextKey(),
+                filePath = "feature/auth/TokenMiddleware.kt",
+                additions = 24,
+                deletions = 6,
+                lines = listOf(
+                    AppDiffLine(AppDiffLineType.Context, "fun install(pipeline: Routing) {"),
+                    AppDiffLine(AppDiffLineType.Context, "    pipeline.intercept(Call::respond)"),
+                    AppDiffLine(AppDiffLineType.Remove, "-    pipeline.send(\"no auth\")"),
+                    AppDiffLine(AppDiffLineType.Add, "+    val token = call.request.bearerAuthToken()"),
+                    AppDiffLine(AppDiffLineType.Add, "+    if (token == null) return call.respondError(401, \"AUTH_MISSING\")"),
+                    AppDiffLine(AppDiffLineType.Add, "+    if (!jwt.verify(token)) return call.respondError(401, \"AUTH_INVALID\")"),
+                    AppDiffLine(AppDiffLineType.Context, "}"),
+                ),
+            ),
+        )
+        tick(500)
     },
     // T15 打字指示 → 最终 Markdown 长回复
     {
