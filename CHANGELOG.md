@@ -11,27 +11,29 @@
 
 ## [0.0.0.2-rc29] - 2026-09-16
 
-> 预发行。newui 设计系统 P0-P3 全量优化（18项）+ 旧品牌残留深度清理 + 原创声明。newui 模块新增原子/组织/模板三层组件、统一骨架、清理硬编码颜色、合并对话框/菜单、拆分画廊、补充动效令牌与 UI 测试；全项目清理旧仓库名/旧容器路径/旧包名残留；README/CHANGELOG 新增原创声明并清空品牌更名史。
+> 预发行。newui 设计系统 P0-P3 全量优化（18项）+ 旧品牌残留深度清理 + 原创声明。newui 模块补全 atom/organism/template 三层组件、收口三态与页面布局卫生、统一骨架/对话框/菜单、清理硬编码颜色与弹簧常量、拆分画廊巨型文件、补充动效令牌与 UI 测试、建立设计规范文档；全项目清理旧仓库名/旧容器路径/旧包名残留；README/CHANGELOG 新增原创声明并清空品牌更名史。
 
 ### Added
 
-- `[newui]` 新增原子层组件 4 个：`AppText`（Title/Body/Caption 变体）、`AppIconButton`（40dp）、`AppDivider`、`AppSurface`，均基于 M3 基础组件封装。
+- `[newui]` 新增原子层组件 4 个：`AppText`（Title/Body/Caption 变体）、`AppIconButton`（40dp）、`AppDivider`、`AppSurface`，均基于 M3 基础组件封装；atom 层由 3 个扩充至 7 个。
 - `[newui]` 新增组织层组件 2 个：`ChatMessageList`（组合 AppChatBubble + AppMessageScroller）、`SettingsSectionGroup`（组合 AppSectionHeader + AppCard + AppMenuRow）。
-- `[newui]` 新增模板层组件 2 个：`ListPageTemplate`（四态 Loading/Empty/Error/Content 切换）、`DetailPageTemplate`（可滚动内容区）。
-- `[newui]` 新增 `DESIGN.md`（373行）：设计原则、令牌体系、组件规范、布局规范、无障碍规范、动效规范 + 附录令牌速查表。
+- `[newui]` 新增模板层组件 2 个：`ListPageTemplate`（Loading/Empty/Error/Content 四态密封切换，内置重试按钮）、`DetailPageTemplate`（可滚动内容区 + 统一页面边距）。
+- `[newui]` 新增三态收口 `layout/AppState.kt`：`AppUiState<T>` 密封接口（Loading/Empty/Error/Content 强穷尽）+ `AppLoadingState`/`AppEmptyState`/`AppErrorState` 三个公共组件，禁止各页面自造加载/空/错误态。
+- `[newui]` 新增页面布局卫生 `layout/AppPage.kt`：`AppPage` 门面统一左右留白（PageHorizontal）、区块间距（BlockGap）、行间距（RowGap）；`Modifier.pageContentPadding()` 与 `Modifier.pageMaxWidth()` 收口宽屏最大内容宽，禁止页面散落表外数值。
+- `[newui]` 新增 `DESIGN.md`（373行）：设计原则（iOS 简约风/三级层次/44dp 紧凑顶栏/扁平分层）、令牌体系（颜色/布局/间距/动效）、组件分层规范与速查索引、AppShell 五槽位布局规范、**无障碍规范**（44dp 触摸目标/图标语义/语义化角色/对比度/动态字体/键盘焦点导航）、废弃组件迁移指引、动效规范与红线 + 附录令牌↔代码落点速查表。
 - `[newui]` 新增 UI 测试 7 个文件：AppDialog、AppTextField、AppTabs、AppSegmentedToggle、AppMarkdownTextParse、AppSwipeAction、AppSwipeGalleryReplica，共 14+ 测试用例。
 - `[newui]` 模块 API 版本标注：134 个公共组件 KDoc 统一标注 `@since 0.1.0-experimental`，标记当前为实验性 API。
 
 ### Changed
 
-- `[newui]` `AppShell` 新增 `topBarStyle` 参数（`Compact`=44dp / `Standard`=64dp，默认 Compact），统一页面骨架；`SlotSet` 标记 `@Deprecated`。
-- `[newui]` `AppDialog` 增强：新增 `scrimAlpha`、`containerColor`、`tonalElevation` 三个可选参数；`AppDialogs.kt`（9函数）和 `AppDialogsAdvanced.kt`（9函数）全部标记 `@Deprecated`。
-- `[newui]` `AppMenu` 统一为唯一推荐（基于 M3 `DropdownMenu`），`12.dp` 阴影替换为 `AppElevation.Z4`；`AppMenus.kt`（AppActionSheet/AppSelectField/AppActionSheetItem）标记 `@Deprecated`。
-- `[newui]` `DesignGallery` 从 2326 行拆分为 5 个 sample 文件（SampleData/GalleryComponents/ChatSamples/FormSamples/FeedbackSamples），入口精简为 72 行。
-- `[newui]` 深色模式层次优化：`DarkPalette.surfaceDim` 改为 `#2C2C2E`（iOS tertiarySystemBackground），与 `card`(#1C1C1E) 区分。
-- `[newui]` 动效令牌扩充：`AppMotion` 新增 `EasingStandard`/`EasingEmphasized`/`EasingDecelerate` 曲线 + `standardSpring()`/`emphasizedSpring()`/`noBounceSpring()` + `standardTween()`/`emphasizedTween()`；19 个文件中的硬编码 `Spring.DampingRatio*`/`Spring.Stiffness*` 全部替换为令牌。
-- `[newui]` `AppCard` 统一底色：有/无 `onClick` 统一使用 `MaterialTheme.colorScheme.surface`，移除 `surfaceVariant` 分支。
-- `[newui]` 20 个文件中的 `Color.White`/`Color.Black` 全部替换为语义令牌（`AppPalette` 新增 `onPrimary`、`primaryOverlay14` 字段）。
+- `[newui]` `AppShell` 新增 `topBarStyle` 参数（`Compact`=44dp / `Standard`=64dp，默认 Compact），统一页面骨架；`SlotSet` 标记 `@Deprecated`，五槽位以 AppShell 为唯一事实源。
+- `[newui]` `AppDialog` 增强：新增 `scrimAlpha`、`containerColor`、`tonalElevation` 三个可选参数；`AppDialogs.kt`（9函数）和 `AppDialogsAdvanced.kt`（9函数）共 18 个旧对话框函数全部标记 `@Deprecated`，迁移指引见 DESIGN.md §3.9。
+- `[newui]` `AppMenu` 统一为唯一推荐（基于 M3 `DropdownMenu`），`12.dp` 阴影替换为 `AppElevation.Z4`；`AppMenus.kt`（AppActionSheet/AppSelectField/AppActionSheetItem）3 个旧菜单函数标记 `@Deprecated`。
+- `[newui]` `DesignGallery` 从 2326 行巨型文件拆分为 5 个专题文件（`SampleData`/`GalleryComponents`/`ChatSamples`/`FormSamples`/`FeedbackSamples`），入口精简为 72 行；连同 `ChatFlowGallery`，sample 层共 7 个文件、职责单一。
+- `[newui]` 深色模式层次优化：`DarkPalette.surfaceDim` 改为 `#2C2C2E`（iOS tertiarySystemBackground），与 `card`(#1C1C1E) 区分，修复深色下卡片与背景层次糊在一起的问题。
+- `[newui]` 动效令牌扩充：`AppMotion` 新增 `EasingStandard`/`EasingEmphasized`/`EasingDecelerate` 三条缓动曲线 + `standardSpring()`/`emphasizedSpring()`/`noBounceSpring()` 三个弹簧预设 + `standardTween()`/`emphasizedTween()` 两个补间预设；19 个文件中的硬编码 `Spring.DampingRatio*`/`Spring.Stiffness*` 全部替换为令牌。
+- `[newui]` `AppCard` 统一底色：有/无 `onClick` 统一使用 `MaterialTheme.colorScheme.surface`，移除 `surfaceVariant` 分支，可点击性改由涟漪表达。
+- `[newui]` 20 个文件中的 `Color.White`/`Color.Black` 全部替换为语义令牌；`AppPalette` 同步新增 `onPrimary`、`primaryOverlay12`、`primaryOverlay14` 三个语义字段（含深色模式对应值）。
 - `[docs]` README 中英文新增「项目声明」章节，明确原创声明；CHANGELOG 新增原创声明引用块。
 - `[docs]` `backup-and-restore.md` 简化包名变更描述，删除旧包名列表，保留功能性说明。
 - `[ci]` `android-release.yml` 注释清理品牌更名史描述，保留功能性包名迁移映射表。
