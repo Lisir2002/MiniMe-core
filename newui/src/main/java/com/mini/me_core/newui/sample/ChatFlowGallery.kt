@@ -5,10 +5,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -317,14 +320,21 @@ private fun FlowNode(item: FlowItem, state: ChatFlowState) {
                     onToggle = { expanded = !expanded },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    item.files.forEach { f ->
-                        AppFileCard(
-                            fileName = f.name,
-                            fileSize = f.detail,
-                            state = AppFileState.Downloaded,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Spacer(Modifier.height(AppSpacing.Sm))
+                    // 展开后最多露出约 3 张，超出在卡片内部纵向滚动，不把整屏撑长。
+                    Column(
+                        modifier = Modifier
+                            .heightIn(max = 240.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        item.files.forEach { f ->
+                            AppFileCard(
+                                fileName = f.name,
+                                fileSize = f.detail,
+                                state = AppFileState.Downloaded,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(Modifier.height(AppSpacing.Sm))
+                        }
                     }
                 }
             }
