@@ -9,6 +9,14 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc39] - 2026-09-17
+
+> 预发行。对话流组件接口补齐，纯 `:newui` component / sample 层。
+
+### Added
+
+- `[newui]` `AppTestResultCard` 新增 `onRetry`（重跑测试）与 `onOpenFailure`（点击失败用例）回调，组件保持纯展示 + 回调，由上层/Agent 注入实际动作。
+
 ## [0.0.0.2-rc38] - 2026-09-17
 
 > 预发行。对话流组件布局修复，纯 `:newui` component 层。
