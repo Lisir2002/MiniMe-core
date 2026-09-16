@@ -9,6 +9,45 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc29] - 2026-09-16
+
+> 预发行。newui 设计系统 P0-P3 全量优化（18项）+ 旧品牌残留深度清理 + 原创声明。newui 模块新增原子/组织/模板三层组件、统一骨架、清理硬编码颜色、合并对话框/菜单、拆分画廊、补充动效令牌与 UI 测试；全项目清理旧仓库名/旧容器路径/旧包名残留；README/CHANGELOG 新增原创声明并清空品牌更名史。
+
+### Added
+
+- `[newui]` 新增原子层组件 4 个：`AppText`（Title/Body/Caption 变体）、`AppIconButton`（40dp）、`AppDivider`、`AppSurface`，均基于 M3 基础组件封装。
+- `[newui]` 新增组织层组件 2 个：`ChatMessageList`（组合 AppChatBubble + AppMessageScroller）、`SettingsSectionGroup`（组合 AppSectionHeader + AppCard + AppMenuRow）。
+- `[newui]` 新增模板层组件 2 个：`ListPageTemplate`（四态 Loading/Empty/Error/Content 切换）、`DetailPageTemplate`（可滚动内容区）。
+- `[newui]` 新增 `DESIGN.md`（373行）：设计原则、令牌体系、组件规范、布局规范、无障碍规范、动效规范 + 附录令牌速查表。
+- `[newui]` 新增 UI 测试 7 个文件：AppDialog、AppTextField、AppTabs、AppSegmentedToggle、AppMarkdownTextParse、AppSwipeAction、AppSwipeGalleryReplica，共 14+ 测试用例。
+- `[newui]` 模块独立版本化：`build.gradle.kts` 声明模块版本（组件 KDoc 统一标注 `@since 0.1.0-experimental`，共 134 处）。
+
+### Changed
+
+- `[newui]` `AppShell` 新增 `topBarStyle` 参数（`Compact`=44dp / `Standard`=64dp，默认 Compact），统一页面骨架；`SlotSet` 标记 `@Deprecated`。
+- `[newui]` `AppDialog` 增强：新增 `scrimAlpha`、`containerColor`、`tonalElevation` 三个可选参数；`AppDialogs.kt`（9函数）和 `AppDialogsAdvanced.kt`（9函数）全部标记 `@Deprecated`。
+- `[newui]` `AppMenu` 统一为唯一推荐（基于 M3 `DropdownMenu`），`12.dp` 阴影替换为 `AppElevation.Z4`；`AppMenus.kt`（AppActionSheet/AppSelectField/AppActionSheetItem）标记 `@Deprecated`。
+- `[newui]` `DesignGallery` 从 2326 行拆分为 5 个 sample 文件（SampleData/GalleryComponents/ChatSamples/FormSamples/FeedbackSamples），入口精简为 72 行。
+- `[newui]` 深色模式层次优化：`DarkPalette.surfaceDim` 改为 `#2C2C2E`（iOS tertiarySystemBackground），与 `card`(#1C1C1E) 区分。
+- `[newui]` 动效令牌扩充：`AppMotion` 新增 `EasingStandard`/`EasingEmphasized`/`EasingDecelerate` 曲线 + `standardSpring()`/`emphasizedSpring()`/`noBounceSpring()` + `standardTween()`/`emphasizedTween()`；19 个文件中的硬编码 `Spring.DampingRatio*`/`Spring.Stiffness*` 全部替换为令牌。
+- `[newui]` `AppCard` 统一底色：有/无 `onClick` 统一使用 `MaterialTheme.colorScheme.surface`，移除 `surfaceVariant` 分支。
+- `[newui]` 20 个文件中的 `Color.White`/`Color.Black` 全部替换为语义令牌（`AppPalette` 新增 `onPrimary`、`primaryOverlay14` 字段）。
+- `[docs]` README 中英文新增「项目声明」章节，明确原创声明；CHANGELOG 新增原创声明引用块。
+- `[docs]` `backup-and-restore.md` 简化包名变更描述，删除旧包名列表，保留功能性说明。
+- `[ci]` `android-release.yml` 注释清理品牌更名史描述，保留功能性包名迁移映射表。
+
+### Fixed
+
+- `[newui]` 修复 `AppSparkline.kt` 中 `appPalette()` 在 `drawBehind` lambda（非 @Composable 上下文）中调用导致的编译错误，移到 Canvas 外获取。
+- `[newui]` 修复 `DetailPageTemplate.kt` / `ListPageTemplate.kt` 中 `AppShell` 调用传入不存在的 `modifier` 参数导致的编译错误。
+- `[newui]` 修复 `SampleData.kt` 中 `reason: String = null` 类型不匹配（非空类型不能赋值 null），改为 `String?`。
+- `[newui]` 修复 `build.gradle.kts` 中 Library 模块 `defaultConfig` 错误使用 `versionCode`/`versionName`（仅 Application 模块支持）导致的编译错误。
+- `[brand]` 清理旧仓库名 `mini_me_core-R` 残留 3 处（app-settings-guide.md / environment-guides.md）。
+- `[brand]` 清理容器旧路径 `~/.mini_me_core/` → `~/.minime/` 残留 30+ 处（docs + prompts）。
+- `[brand]` 清理旧包名 `com.core.mini_me_core` → `com.mini.me_core` 残留 5 处。
+- `[brand]` 清理 `.gitignore` 中 `/.rcode/` 旧品牌工具目录（目录已不存在，无效残留）。
+- `[brand]` 清理工具名 `mini_me_core-wrap-android-buildtools` → `minime-wrap-android-buildtools`（与代码中实际名称对齐）。
+
 ## [0.0.0.2-rc16] - 2026-09-15
 
 > 预发行（未转正）。架构安全审计后的一轮加固：SFTP 强制 HostKey 校验、MCP DELETE 端点补鉴权、DEK 轮换改安全两阶段、备份/提取规则排除凭据库、CI 接入 OSV SCA；附带修复 CI 长期红屏的废弃 `tools` 包。纯安全与 CI 配置改动，无 UI / AI 工作流 / prompt / schema 变化。
