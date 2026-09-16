@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -59,6 +61,7 @@ import com.mini.me_core.newui.designsystem.theme.AppTheme
 import com.mini.me_core.newui.designsystem.theme.appPalette
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -181,122 +184,154 @@ private fun FlowPlayerBar(state: ChatFlowState) {
 /** 单条对话节点：复用样板页同一套分子组件，新增打字指示与终端日志两类节点。 */
 @Composable
 private fun FlowNode(item: FlowItem, state: ChatFlowState) {
-    when (item) {
-        is FlowItem.Marker -> AppChatMarker(
-            text = item.text,
-            kind = item.kind,
-            running = item.running,
-            tone = item.tone,
-        )
+    // 统一水平边距：AppMessageScroller 默认仅带 vertical contentPadding，卡片会贴屏幕左右边缘。
+    // 与底部操作条一致采用 AppSpacing.Lg 作为页面水平留白。
+    Column(modifier = Modifier.padding(horizontal = AppSpacing.Lg)) {
+        when (item) {
+            is FlowItem.Marker -> AppChatMarker(
+                text = item.text,
+                kind = item.kind,
+                running = item.running,
+                tone = item.tone,
+            )
 
-        is FlowItem.Typing -> Row(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(AppRadius.Pill))
-                    .background(appPalette().card)
-                    .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Md),
+            is FlowItem.Typing -> Row(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(AppRadius.Pill))
+                        .background(appPalette().card)
+                        .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Md),
+                ) {
+                    AppTypingIndicator()
+                }
+            }
+
+            is FlowItem.Tool -> AppToolCallCard(
+                title = item.title,
+                summary = item.summary,
+                state = item.state,
+                serverPrefix = item.serverPrefix,
+                durationMs = item.durationMs,
+                input = item.input,
+                output = item.output,
+                streamOutput = item.streamOutput,
+                approvalHint = item.approvalHint,
+                onApprove = item.onApprove,
+                onReject = item.onReject,
+                onChoice = item.onChoice,
+                alwaysDisabled = item.alwaysDisabled,
+                alwaysDisabledReason = item.alwaysDisabledReason,
+                approvalExpired = item.approvalExpired,
+                approvalRemembered = item.approvalRemembered,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.McpApp -> AppMcpAppCard(
+                title = item.title,
+                state = item.state,
+                serverPrefix = item.serverPrefix,
+                resourceUri = item.resourceUri,
+                onReload = item.onReload,
+                onExpand = item.onExpand,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.Skill -> AppSkillCallCard(
+                name = item.name,
+                args = item.args,
+                state = item.state,
+                description = item.description,
+                durationMs = item.durationMs,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.Thinking -> AppThinkingBlock(
+                text = item.text,
+                isStreaming = item.isStreaming,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.Plan -> AppPlanCard(
+                title = item.title,
+                steps = item.steps,
+                state = item.state,
+                pendingSelection = item.pendingSelection,
+                reason = item.reason,
+                onApprove = item.onApprove,
+                onRefine = item.onRefine,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.Attachment -> AppAttachmentCard(
+                fileName = item.fileName,
+                mimeType = item.mimeType,
+                sizeBytes = item.sizeBytes,
+                containerPath = item.containerPath,
+                isImage = item.isImage,
+                onClick = item.onClick,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.ToolChain -> AppToolChainTimeline(
+                steps = item.steps,
+                label = item.label,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.ToolSummary -> AppToolSummaryCard(
+                text = item.text,
+                state = item.state,
+                toolCount = item.toolCount,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            is FlowItem.Terminal -> AppTerminalLog(modifier = Modifier.fillMaxWidth())
+
+            // 消息组：思考过程（AI 气泡上方，与气泡共用头像/姓名行）→ 气泡 → 附件（用户气泡下方）。
+            // 三者同属一个 Msg 节点，不再拆成独立列表项，避免视觉分离。
+            is FlowItem.Msg -> Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
             ) {
-                AppTypingIndicator()
+                if (!item.isUser && !item.thinking.isNullOrEmpty()) {
+                    // 与气泡左沿对齐：让出头像(AppSizing.IconXl)与头像间隔(AppSpacing.Sm)。
+                    AppThinkingBlock(
+                        text = item.thinking,
+                        isStreaming = item.thinkingStreaming,
+                        modifier = Modifier.padding(start = AppSizing.IconXl + AppSpacing.Sm),
+                    )
+                }
+                AppMessageRow(
+                    text = item.text,
+                    state = item.state,
+                    isUser = item.isUser,
+                    avatarLabel = if (item.isUser) "你" else "AI",
+                    name = if (item.isUser) "你" else "MiniMe Agent",
+                    timestamp = item.ts,
+                    grouped = item.grouped,
+                    onCopy = { /* 演示占位：写入剪贴板 */ },
+                    onRetry = item.onRetry,
+                    onDelete = { state.items.removeAll { it.key == item.key } },
+                    swipeEnabled = true,
+                    swipeIndex = item.key,
+                    swipeExpandedIndex = state.swipeExpanded,
+                    onSwipeExpanded = { state.swipeExpanded = it },
+                )
+                if (item.attachments.isNotEmpty()) {
+                    item.attachments.forEach { att ->
+                        AppAttachmentCard(
+                            fileName = att.fileName,
+                            mimeType = att.mimeType,
+                            sizeBytes = att.sizeBytes,
+                            containerPath = att.containerPath,
+                            isImage = att.isImage,
+                            onClick = att.onClick,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             }
         }
-
-        is FlowItem.Tool -> AppToolCallCard(
-            title = item.title,
-            summary = item.summary,
-            state = item.state,
-            serverPrefix = item.serverPrefix,
-            durationMs = item.durationMs,
-            input = item.input,
-            output = item.output,
-            streamOutput = item.streamOutput,
-            approvalHint = item.approvalHint,
-            onApprove = item.onApprove,
-            onReject = item.onReject,
-            onChoice = item.onChoice,
-            alwaysDisabled = item.alwaysDisabled,
-            alwaysDisabledReason = item.alwaysDisabledReason,
-            approvalExpired = item.approvalExpired,
-            approvalRemembered = item.approvalRemembered,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        is FlowItem.McpApp -> AppMcpAppCard(
-            title = item.title,
-            state = item.state,
-            serverPrefix = item.serverPrefix,
-            resourceUri = item.resourceUri,
-            onReload = item.onReload,
-            onExpand = item.onExpand,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        is FlowItem.Skill -> AppSkillCallCard(
-            name = item.name,
-            args = item.args,
-            state = item.state,
-            description = item.description,
-            durationMs = item.durationMs,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        is FlowItem.Thinking -> AppThinkingBlock(
-            text = item.text,
-            isStreaming = item.isStreaming,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        is FlowItem.Plan -> AppPlanCard(
-            title = item.title,
-            steps = item.steps,
-            state = item.state,
-            pendingSelection = item.pendingSelection,
-            reason = item.reason,
-            onApprove = item.onApprove,
-            onRefine = item.onRefine,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        is FlowItem.Attachment -> AppAttachmentCard(
-            fileName = item.fileName,
-            mimeType = item.mimeType,
-            sizeBytes = item.sizeBytes,
-            containerPath = item.containerPath,
-            isImage = item.isImage,
-            onClick = item.onClick,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        is FlowItem.ToolChain -> AppToolChainTimeline(
-            steps = item.steps,
-            label = item.label,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        is FlowItem.ToolSummary -> AppToolSummaryCard(
-            text = item.text,
-            state = item.state,
-            toolCount = item.toolCount,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        is FlowItem.Terminal -> AppTerminalLog(modifier = Modifier.fillMaxWidth())
-
-        is FlowItem.Msg -> AppMessageRow(
-            text = item.text,
-            state = item.state,
-            isUser = item.isUser,
-            avatarLabel = if (item.isUser) "你" else "AI",
-            name = if (item.isUser) "你" else "MiniMe Agent",
-            timestamp = item.ts,
-            grouped = item.grouped,
-            onCopy = { /* 演示占位：写入剪贴板 */ },
-            onRetry = item.onRetry,
-            onDelete = { state.items.removeAll { it.key == item.key } },
-            swipeEnabled = true,
-            swipeIndex = item.key,
-            swipeExpandedIndex = state.swipeExpanded,
-            onSwipeExpanded = { state.swipeExpanded = it },
-        )
     }
 }
 
@@ -315,7 +350,19 @@ private sealed interface FlowItem {
         val grouped: Boolean = false,
         val ts: String = "",
         val onRetry: (() -> Unit)? = null,
+        val attachments: List<AttachmentData> = emptyList(),
+        val thinking: String? = null,
+        val thinkingStreaming: Boolean = false,
     ) : FlowItem
+
+    data class AttachmentData(
+        val fileName: String,
+        val mimeType: String? = null,
+        val sizeBytes: Long? = null,
+        val containerPath: String? = null,
+        val isImage: Boolean = false,
+        val onClick: (() -> Unit)? = null,
+    )
 
     data class Marker(
         override val key: Int,
@@ -605,55 +652,62 @@ private class ChatFlowState(val scope: CoroutineScope) {
 // =====================================================================================
 
 private val flowTurns: List<suspend ChatFlowState.() -> Unit> = listOf(
-    // T0 开场：用户提需求并附上需求文档与原型
+    // T0 开场：用户提需求并附上需求文档与原型（附件并入用户消息，气泡下方同组渲染）
     {
         put(FlowItem.Marker(nextKey(), "今天 · 10:02", kind = AppChatMarkerKind.Date))
-        userSays(
-            "帮我给后端加一个**登录接口**，要带 token 鉴权，最后把测试跑通。需求文档和原型我放下面了。",
-            "10:02",
-        )
         put(
-            FlowItem.Attachment(
+            FlowItem.Msg(
                 nextKey(),
-                fileName = "login-api-spec.md",
-                mimeType = "text/markdown",
-                sizeBytes = 8_420,
-                containerPath = "~/workspace/docs/login-api-spec.md",
-                onClick = { },
-            ),
-        )
-        put(
-            FlowItem.Attachment(
-                nextKey(),
-                fileName = "login-flow.png",
-                mimeType = "image/png",
-                sizeBytes = 1_360_000,
-                containerPath = "~/workspace/design/login-flow.png",
-                isImage = true,
-                onClick = { },
+                "帮我给后端加一个**登录接口**，要带 token 鉴权，最后把测试跑通。需求文档和原型我放下面了。",
+                AppChatMessageState.Complete,
+                isUser = true,
+                ts = "10:02",
+                attachments = listOf(
+                    FlowItem.AttachmentData(
+                        fileName = "login-api-spec.md",
+                        mimeType = "text/markdown",
+                        sizeBytes = 8_420,
+                        containerPath = "~/workspace/docs/login-api-spec.md",
+                        onClick = { },
+                    ),
+                    FlowItem.AttachmentData(
+                        fileName = "login-flow.png",
+                        mimeType = "image/png",
+                        sizeBytes = 1_360_000,
+                        containerPath = "~/workspace/design/login-flow.png",
+                        isImage = true,
+                        onClick = { },
+                    ),
+                ),
             ),
         )
     },
-    // T1 思考过程（流式推理）
+    // T1 思考过程 + T2 正文回复合并为同一 AI 消息组：先流式输出思考过程，再流式输出正文
     {
         val k = nextKey()
+        put(
+            FlowItem.Msg(
+                k,
+                "",
+                AppChatMessageState.Streaming,
+                isUser = false,
+                ts = "10:03",
+                thinking = "",
+                thinkingStreaming = true,
+            ),
+        )
         val reasoning = "用户要新增登录接口并带 token 鉴权。\n\n我需要先确认现有 `feature/auth` 的路由与依赖注入方式，" +
             "再决定 token 用无状态 JWT 还是服务端会话；随后按「路由 → Service → 鉴权中间件 → 测试」推进，" +
             "最后跑编译与单测验证。附件里的需求文档先读一遍，对齐字段与错误码。"
-        put(FlowItem.Thinking(k, "", isStreaming = true))
         typewrite(reasoning, chunk = 4, perMs = 13L) { s ->
-            patch<FlowItem.Thinking>(k) { it.copy(text = s) }
+            patch<FlowItem.Msg>(k) { it.copy(thinking = s) }
         }
-        patch<FlowItem.Thinking>(k) { it.copy(isStreaming = false) }
-    },
-    // T2 打字指示 → AI 简短回应 + 阶段标记
-    {
-        withTyping {
-            aiReply(
-                "收到。我先读一下现有鉴权代码和需求文档，再给你一份实现计划确认。",
-                "10:03",
-            )
+        patch<FlowItem.Msg>(k) { it.copy(thinkingStreaming = false) }
+        val reply = "收到。我先读一下现有鉴权代码和需求文档，再给你一份实现计划确认。"
+        typewrite(reply, chunk = 3, perMs = 14L) { s ->
+            patch<FlowItem.Msg>(k) { it.copy(text = s) }
         }
+        patch<FlowItem.Msg>(k) { it.copy(state = AppChatMessageState.Complete) }
         put(FlowItem.Marker(nextKey(), "读取鉴权模块 · feature/auth", running = true))
     },
     // T3 计划审批（gate：批准 / 继续细化）
