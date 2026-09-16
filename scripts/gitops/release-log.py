@@ -166,9 +166,9 @@ def dev_layer(commits, version, date_str, repo):
         else:
             buckets[cat].append(format_entry(c))
 
-    out = _render_groups(buckets, DEV_ORDER)
+    out = _render_groups(buckets, DEV_ORDER, empty_hint="")
     if other:
-        out += "\n\n### 待归类\n\n" + "\n".join(other)
+        out += ("\n\n" if out else "") + "### 待归类\n\n" + "\n".join(other)
     # 硬性要求：有提交就不许出现「无变更」；分类全落空时把所有提交列待归类
     if not any(buckets.values()) and not other and commits:
         out = "### 待归类\n\n" + "\n".join(format_entry(c) for c in commits)
@@ -187,10 +187,14 @@ def user_layer(commits, version, date_str):
                 buckets[label].append(f"- {c['subject']}")
                 matched = True
                 break
-        if not matched and c["type"] not in USER_EXCLUDE:
+        if not matched:
+            # 硬性要求：有提交就不许出现「无变更」——任何未命中新增/优化/修复的
+            # 提交（含 ci/docs/chore 等）都原样列入「其他」，保证用户层不空。
             fallbacks.append(f"- {c['subject']}")
-    body = _render_groups(buckets, ["新增", "优化", "修复"])
+    body = _render_groups(buckets, ["新增", "优化", "修复"], empty_hint="")
     if fallbacks and not any(buckets.values()):
+        body = "### 其他\n\n" + "\n".join(fallbacks)
+    elif fallbacks:
         body += "\n\n### 其他\n\n" + "\n".join(fallbacks)
     return body
 
