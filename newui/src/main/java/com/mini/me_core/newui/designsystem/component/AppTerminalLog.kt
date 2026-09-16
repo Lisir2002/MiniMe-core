@@ -1,4 +1,4 @@
-package com.mini.me_core.newui.composite
+package com.mini.me_core.newui.designsystem.component
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.animateColorAsState

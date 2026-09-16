@@ -1,18 +1,18 @@
 package com.mini.me_core.newui.sample
 
 import androidx.compose.ui.graphics.Color
-import com.mini.me_core.newui.composite.AppApprovalChoice
-import com.mini.me_core.newui.composite.AppChatMarkerKind
-import com.mini.me_core.newui.composite.AppChatMessageState
-import com.mini.me_core.newui.composite.AppMcpAppState
-import com.mini.me_core.newui.composite.AppPlanState
-import com.mini.me_core.newui.composite.AppPlanStep
-import com.mini.me_core.newui.composite.AppPlanStepStatus
-import com.mini.me_core.newui.composite.AppSkillCallState
-import com.mini.me_core.newui.composite.AppToolCallState
-import com.mini.me_core.newui.composite.AppToolChainStep
-import com.mini.me_core.newui.composite.AppToolChainStepState
-import com.mini.me_core.newui.composite.AppToolSummaryState
+import com.mini.me_core.newui.designsystem.component.AppApprovalChoice
+import com.mini.me_core.newui.designsystem.component.AppChatMarkerKind
+import com.mini.me_core.newui.designsystem.component.AppChatMessageState
+import com.mini.me_core.newui.designsystem.component.AppMcpAppState
+import com.mini.me_core.newui.designsystem.component.AppPlanState
+import com.mini.me_core.newui.designsystem.component.AppPlanStep
+import com.mini.me_core.newui.designsystem.component.AppPlanStepStatus
+import com.mini.me_core.newui.designsystem.component.AppSkillCallState
+import com.mini.me_core.newui.designsystem.component.AppToolCallState
+import com.mini.me_core.newui.designsystem.component.AppToolChainStep
+import com.mini.me_core.newui.designsystem.component.AppToolChainStepState
+import com.mini.me_core.newui.designsystem.component.AppToolSummaryState
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 
 /** 画廊对话流演示数据：消息 / 标记两类，key 唯一用于 Lazy 键与流式定位。 */

@@ -110,7 +110,7 @@ import com.mini.me_core.newui.designsystem.component.AppStatCard
 import com.mini.me_core.newui.designsystem.component.AppSuccessDialog
 import com.mini.me_core.newui.designsystem.component.AppSwipeAction
 import com.mini.me_core.newui.designsystem.component.AppSwipeButton
-import com.mini.me_core.newui.composite.AppTerminalLog
+import com.mini.me_core.newui.designsystem.component.AppTerminalLog
 import com.mini.me_core.newui.designsystem.component.AppTimeline
 import com.mini.me_core.newui.designsystem.component.AppTimelineItem
 import com.mini.me_core.newui.designsystem.component.AppTimelineTone

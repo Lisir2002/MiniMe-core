@@ -1,4 +1,4 @@
-package com.mini.me_core.newui.composite
+package com.mini.me_core.newui.designsystem.component
 
 import com.mini.me_core.newui.designsystem.theme.appPalette
 import androidx.compose.animation.core.LinearEasing

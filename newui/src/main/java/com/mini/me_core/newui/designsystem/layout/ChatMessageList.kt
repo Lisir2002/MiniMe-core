@@ -11,8 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.mini.me_core.newui.designsystem.primitive.AppTextCaption
-import com.mini.me_core.newui.composite.AppChatBubble
-import com.mini.me_core.newui.composite.AppChatMessageState
+import com.mini.me_core.newui.designsystem.component.AppChatBubble
+import com.mini.me_core.newui.designsystem.component.AppChatMessageState
 import com.mini.me_core.newui.designsystem.component.AppMessageScroller
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 
