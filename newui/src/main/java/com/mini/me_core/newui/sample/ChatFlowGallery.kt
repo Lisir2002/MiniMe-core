@@ -37,11 +37,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.primitive.AppIconButton as AppCircleIconButton
 import com.mini.me_core.newui.designsystem.component.AppApprovalChoice
+import com.mini.me_core.newui.designsystem.component.AppAccordion
 import com.mini.me_core.newui.designsystem.component.AppAttachmentCard
 import com.mini.me_core.newui.designsystem.component.AppButtonVariant
 import com.mini.me_core.newui.designsystem.component.AppChatMarker
 import com.mini.me_core.newui.designsystem.component.AppChatMarkerKind
 import com.mini.me_core.newui.designsystem.component.AppChatMessageState
+import com.mini.me_core.newui.designsystem.component.AppFileCard
+import com.mini.me_core.newui.designsystem.component.AppFileState
 import com.mini.me_core.newui.designsystem.component.AppIconButton
 import com.mini.me_core.newui.designsystem.component.AppMcpAppCard
 import com.mini.me_core.newui.designsystem.component.AppMcpAppState
@@ -68,7 +71,6 @@ import com.mini.me_core.newui.designsystem.theme.AppTheme
 import com.mini.me_core.newui.designsystem.theme.appPalette
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
-import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -306,22 +308,35 @@ private fun FlowNode(item: FlowItem, state: ChatFlowState) {
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            is FlowItem.ChangedFiles -> {
+                var expanded by remember { mutableStateOf(false) }
+                AppAccordion(
+                    title = "本次改动的文件",
+                    subtitle = "${item.files.size} 个文件",
+                    expanded = expanded,
+                    onToggle = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    item.files.forEach { f ->
+                        AppFileCard(
+                            fileName = f.name,
+                            fileSize = f.detail,
+                            state = AppFileState.Downloaded,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(AppSpacing.Sm))
+                    }
+                }
+            }
+
             is FlowItem.Terminal -> AppTerminalLog(modifier = Modifier.fillMaxWidth())
 
-            // 消息组：思考过程（AI 气泡上方，与气泡共用头像/姓名行）→ 气泡 → 附件（用户气泡下方）。
+            // 消息组：头像/姓名行 → 思考过程（头像下方、与气泡同列）→ 气泡 → 附件（用户气泡下方）。
             // 三者同属一个 Msg 节点，不再拆成独立列表项，避免视觉分离。
             is FlowItem.Msg -> Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
             ) {
-                if (!item.isUser && !item.thinking.isNullOrEmpty()) {
-                    // 与气泡左沿对齐：让出头像(AppSizing.IconXl)与头像间隔(AppSpacing.Sm)。
-                    AppThinkingBlock(
-                        text = item.thinking,
-                        isStreaming = item.thinkingStreaming,
-                        modifier = Modifier.padding(start = AppSizing.IconXl + AppSpacing.Sm),
-                    )
-                }
                 AppMessageRow(
                     text = item.text,
                     state = item.state,
@@ -330,6 +345,17 @@ private fun FlowNode(item: FlowItem, state: ChatFlowState) {
                     name = if (item.isUser) "你" else "MiniMe Agent",
                     timestamp = item.ts,
                     grouped = item.grouped,
+                    leadingContent = if (!item.isUser && !item.thinking.isNullOrEmpty()) {
+                        {
+                            AppThinkingBlock(
+                                text = item.thinking,
+                                isStreaming = item.thinkingStreaming,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    } else {
+                        null
+                    },
                     onCopy = { /* 演示占位：写入剪贴板 */ },
                     onRetry = item.onRetry,
                     onDelete = { state.items.removeAll { it.key == item.key } },
@@ -475,6 +501,17 @@ private sealed interface FlowItem {
         val state: AppToolSummaryState = AppToolSummaryState.Done,
         val toolCount: Int = 1,
     ) : FlowItem
+
+    /** 本次改动的文件（结尾折叠卡）：折叠态只露一行标题，展开后逐张出文件卡。 */
+    data class ChangedFiles(
+        override val key: Int,
+        val files: List<ChangedFile>,
+    ) : FlowItem
+
+    data class ChangedFile(
+        val name: String,
+        val detail: String,
+    )
 }
 
 // =====================================================================================
@@ -673,33 +710,17 @@ private class ChatFlowState(val scope: CoroutineScope) {
 // =====================================================================================
 
 private val flowTurns: List<suspend ChatFlowState.() -> Unit> = listOf(
-    // T0 开场：用户提需求并附上需求文档与原型（附件并入用户消息，气泡下方同组渲染）
+    // T0 开场：用户提需求（需求文档与原型已在上下文里，不在对话流顶部铺文件卡片；
+    // 改动产物统一收敛到结尾的「本次改动的文件」折叠卡）。
     {
         put(FlowItem.Marker(nextKey(), "今天 · 10:02", kind = AppChatMarkerKind.Date))
         put(
             FlowItem.Msg(
                 nextKey(),
-                "帮我给后端加一个**登录接口**，要带 token 鉴权，最后把测试跑通。需求文档和原型我放下面了。",
+                "帮我给后端加一个**登录接口**，要带 token 鉴权，最后把测试跑通。",
                 AppChatMessageState.Complete,
                 isUser = true,
                 ts = "10:02",
-                attachments = listOf(
-                    FlowItem.AttachmentData(
-                        fileName = "login-api-spec.md",
-                        mimeType = "text/markdown",
-                        sizeBytes = 8_420,
-                        containerPath = "~/workspace/docs/login-api-spec.md",
-                        onClick = { },
-                    ),
-                    FlowItem.AttachmentData(
-                        fileName = "login-flow.png",
-                        mimeType = "image/png",
-                        sizeBytes = 1_360_000,
-                        containerPath = "~/workspace/design/login-flow.png",
-                        isImage = true,
-                        onClick = { },
-                    ),
-                ),
             ),
         )
     },
@@ -1054,6 +1075,20 @@ post("/auth/login") {
                 perMs = 10L,
             )
         }
+    },
+    // T16 结尾：折叠卡收拢本次改动的文件，展开才逐张出现改动文件卡片（不在开头铺文件）
+    {
+        put(
+            FlowItem.ChangedFiles(
+                key = nextKey(),
+                files = listOf(
+                    FlowItem.ChangedFile("AuthApi.kt", "新增登录路由与参数校验 · +120 行"),
+                    FlowItem.ChangedFile("TokenMiddleware.kt", "JWT 签发/校验中间件 · +86 行"),
+                    FlowItem.ChangedFile("AuthApiTest.kt", "覆盖成功/错密用例 · +64 行"),
+                    FlowItem.ChangedFile("TokenMiddlewareTest.kt", "覆盖过期/伪造用例 · +58 行"),
+                ),
+            ),
+        )
     },
 )
 

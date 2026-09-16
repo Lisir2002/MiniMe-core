@@ -13,6 +13,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -67,6 +68,7 @@ fun AppMessageRow(
     timestamp: String? = null,
     grouped: Boolean = false,
     accent: Color = appPalette().primary,
+    leadingContent: @Composable (ColumnScope.() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
     onCopy: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
@@ -98,6 +100,11 @@ fun AppMessageRow(
                 if (!grouped) {
                     HeaderRow(label = label, timestamp = timestamp, isUser = isUser)
                     Spacer(Modifier.height(AppSpacing.Tiny))
+                }
+                // 头像下方、气泡上方的引导内容（如思考过程块），与气泡同列对齐。
+                if (leadingContent != null) {
+                    leadingContent()
+                    Spacer(Modifier.height(AppSpacing.Sm))
                 }
                 Column(horizontalAlignment = if (isUser) Alignment.End else Alignment.Start) {
                     AppChatBubble(
