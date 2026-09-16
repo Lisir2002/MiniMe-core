@@ -205,6 +205,19 @@ AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。�
 - **客户端（已实施）**：应用实现了 MCP 客户端（`feature/agent/domain/mcp/`），可连接远程 HTTP / 本地 stdio 服务器并动态注册其提供的工具（`McpManager` / `McpClient` / `McpTool`）。
 - **服务器（已实施）**：内置 MCP 服务器（`feature/agent/domain/mcp/server/`）使应用成为「客户端 + 服务器」双角色：`McpServerManager` 管理开关/端口/token/审批，`McpHttpServer` 用 Ktor CIO 起 Streamable HTTP 端点（`POST/GET/DELETE /mcp`，Bearer 鉴权 + SSE），`McpServerSession` 解析 JSON-RPC（initialize / tools/list / tools/call / ping），`AgentToolMcpAdapter` 把 `ToolRegistry` 中允许暴露的 `AgentTool` 映射为 MCP 工具并复用 `ToolPermissionManager` 审批，把 App 能力开放给外部 MCP 客户端（手机当开发后端）。
 
+### newui 设计系统模块（`:newui`）
+
+独立 Android Library 模块 `newui/`，承载新版 UI 设计系统（iOS 简约风 + W3C DTCG 令牌），app 模块逐步迁移接入。**改 newui 前必读 `newui/DESIGN.md`（373行，设计原则/令牌/组件/布局/无障碍/动效规范）**。
+
+- **组件四层**（`newui/src/main/java/com/mini/me_core/newui/designsystem/component/`）：`atom/`（AppText/AppIcon/AppIconButton/AppCard/AppChip/AppSurface/AppDivider）→ `molecule/`（50+ 业务组件）→ `organism/`（ChatMessageList/SettingsSectionGroup）→ `template/`（ListPageTemplate/DetailPageTemplate）。新组件按层归位，禁止跨层反向依赖。
+- **令牌单一事实源**：`token/generated/AppTokens.kt`（由 Style Dictionary 从 DTCG JSON 自动生成，**勿手改 generated 文件**）。颜色经 `AppColor`（原始令牌）→ `AppPalette`（语义令牌，`appPalette()` 取值）；间距 `AppSpacing`、圆角 `AppRadius`、尺寸 `AppSizing`、动效 `AppMotion`、层级 `AppLayout`。**组件内禁止硬编码 `Color.White/Black`、`.dp`/`.sp` 表外数值、裸 `Spring.DampingRatio*` 常量**——一律走令牌。
+- **统一骨架**：`slot/AppShell.kt` 是唯一页面壳（五槽位：title/onNavigateBack/topBarActions/topTabs/bottomBar/sideRail/content），`topBarStyle` 支持 `Compact`(44dp,默认)/`Standard`(64dp)。旧 `SlotSet`（`slot/Slot.kt`）已 `@Deprecated`，禁止新页面使用。
+- **三态收口**：`layout/AppState.kt` 的 `AppUiState<T>` 密封接口（Loading/Empty/Error/Content）+ `AppLoadingState`/`AppEmptyState`/`AppErrorState`；页面级状态用 `when` 强穷尽，**禁止各页自造三态**。
+- **布局卫生**：`layout/AppPage.kt` 提供 `pageContentPadding()` / `pageMaxWidth()` 修饰符与 `AppPage.horizontalPadding` 门面；页面根布局统一用令牌留白，禁止散落表外边距。
+- **废弃组件迁移**：`AppDialogs.kt`（9函数）+ `AppDialogsAdvanced.kt`（9函数）共 18 个旧对话框已废弃 → 统一用 `AppDialog`（支持 `scrimAlpha`/`containerColor`/`tonalElevation`）；`AppMenus.kt`（3函数）已废弃 → 统一用 `AppMenu`（M3 DropdownMenu）。迁移指引见 DESIGN.md §3.9。
+- **sample 调试台**：`sample/` 下 DesignGallery（组件调试台，拆为 GalleryComponents/ChatSamples/FormSamples/FeedbackSamples/SampleData + 72行入口）与 ChatFlowGallery（对话流完整演示）。sample 中硬编码中文文案属演示用途，豁免 strings.xml 纪律。
+- **公共 API 标注**：所有对外组件 KDoc 标注 `@since 0.1.0-experimental`（实验性 API，后续可能调整签名）。
+
 ### 依赖注入
 
 Hilt 被广泛使用。各 Feature 模块定义自己的 DI 模块（如 `AgentModule.kt`、`RepositoryModule.kt`、`BackupModule.kt`）向实现提供接口。
@@ -238,6 +251,9 @@ Hilt 被广泛使用。各 Feature 模块定义自己的 DI 模块（如 `AgentM
 | APK 装不上/装后崩溃 | ABI 不符 | 通用包含 arm64-v8a + x86_64；若宿主为其它 ABI（少见），走无容器降级（AI 核心仍可用） |
 | 版本号对不上 | 手改 `versionName` | 靠 Git Tag 动态推导，代码中勿手写版本号 |
 | 提交被 commit-msg 阻断 | 提交信息不合 Conventional Commits | 按 `type(scope): subject` 重写提交信息 |
+| newui 组件颜色/间距不对 | 硬编码了 `Color.White`/裸 `.dp`/裸 Spring 常量 | 一律改用 `appPalette()`/`AppSpacing`/`AppMotion` 令牌，勿手改 generated 令牌文件 |
+| newui 页面各写一套加载/空/错误态 | 未收口三态 | 用 `layout/AppState.kt` 的 `AppUiState<T>` + 三态组件，`when` 强穷尽 |
+| newui 页面顶栏高度/insets 不一致 | 没用统一壳 | 页面根必须用 `AppShell`，禁止自写 Scaffold/TopAppBar；旧 `SlotSet` 已废弃 |
 
 ## 关键文件
 
@@ -253,6 +269,11 @@ Hilt 被广泛使用。各 Feature 模块定义自己的 DI 模块（如 `AgentM
 | `app/src/main/assets/docs/` | 用户使用文档资产（运行时「设置 → 帮助」） |
 | `app/src/main/java/com/mini/me_core/AIEditorApp.kt` | Application 入口（核心服务初始化） |
 | `app/src/main/java/com/mini/me_core/MainActivity.kt` | 主 Activity（导航 + 全局凭据弹窗） |
+| `newui/DESIGN.md` | newui 设计规范（改 newui 前必读：原则/令牌/组件/布局/无障碍/动效） |
+| `newui/src/main/java/com/mini/me_core/newui/designsystem/token/generated/AppTokens.kt` | 设计令牌生成产物（AppColor/AppSpacing/AppRadius/AppMotion/AppLayout，勿手改） |
+| `newui/src/main/java/com/mini/me_core/newui/designsystem/slot/AppShell.kt` | 唯一页面骨架壳（五槽位 + topBarStyle + insets） |
+| `newui/src/main/java/com/mini/me_core/newui/designsystem/layout/AppState.kt` | 三态收口（AppUiState 密封接口 + Loading/Empty/Error 组件） |
+| `newui/src/main/java/com/mini/me_core/newui/designsystem/layout/AppPage.kt` | 页面布局卫生（pageContentPadding/pageMaxWidth） |
 
 ## 维护本文件
 
