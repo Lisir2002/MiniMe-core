@@ -9,6 +9,19 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc34] - 2026-09-17
+
+> 预发行。`:newui` 对话流扩展 5 类适配组件并接入演示剧情，纯 `:newui` component / sample 层 additive 改动；app 模块生产界面未迁移，无 AI 工作流 / prompt / schema / 运行行为变化。
+
+### Added
+
+- `[newui]` 新增 `AppDiffCard`：文件行级 diff 卡，文件头带 `+N/-N` 红绿计数，新增浅绿 / 删除浅红行底、等宽字体，默认折叠、展开限高内部滚动。
+- `[newui]` 新增 `AppTodoCard`：实时任务清单卡，Pending 空心圆 / Running 旋转 / Done 绿勾，头部带 `已完成/总数`。
+- `[newui]` 新增 `AppCitationCard`：引用来源折叠卡，展开后列标题 + URL + 摘要。
+- `[newui]` 新增 `AppGitStatusChip`：当前分支 + 脏文件数小 chip。
+- `[newui]` `AppMessageRow` 新增 `onRegenerate`（操作条「重新生成」）与 `onStop`（流式时常驻「停止生成」）。
+- `[newui]` 对话流演示接入：进入工作分支 chip、Todo 逐条推进、联网引用来源、核心文件行级 diff、最终回复可停止/重新生成。
+
 ## [0.0.0.2-rc33] - 2026-09-16
 
 > 预发行。`:newui` 对话流演示页「本次改动的文件」折叠卡展开态限高与内部滚动优化，纯 sample 层改动；app 模块未动，无 AI 工作流 / prompt / schema 变化。
