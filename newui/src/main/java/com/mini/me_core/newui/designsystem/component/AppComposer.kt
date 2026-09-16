@@ -133,7 +133,7 @@ fun AppComposer(
             Spacer(Modifier.width(AppSpacing.Xs))
             ToggleChip(active = deepMode, label = "深度", onClick = onToggleDeep)
 
-            Spacer(Modifier.width(0).weight(1f))
+            Spacer(Modifier.weight(1f))
 
             ModelChip(label = modelLabel, onClick = onPickModel)
             Spacer(Modifier.width(AppSpacing.Xs))
