@@ -145,9 +145,6 @@ tasks.register("verifyDesignTokens") {
         logger.lifecycle("\u2713 design tokens 与 committed 产物一致。")
     }
 }
-        }
-    }
-}
 
 /** 优先找 node 可执行路径（node / ~/.nvm/.../bin/node）。 */
 fun findNodeBinary(): String? {
