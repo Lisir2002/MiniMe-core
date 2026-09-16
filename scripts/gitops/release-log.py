@@ -83,9 +83,33 @@ def run(cmd, repo):
     ).stdout.strip()
 
 
+# Git 著名空树对象（任意仓库恒定）：用于首版「从无到有」的文件清单 diff。
+EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+
+def _is_root(repo, rev):
+    """rev 是否解析为仓库初始提交（无父提交）。"""
+    try:
+        full = run(["git", "rev-parse", rev], repo)
+        roots = run(["git", "rev-list", "--max-parents=0", rev], repo).splitlines()
+        return full in roots
+    except Exception:
+        return False
+
+
 def get_commits(repo, prev, cur):
-    """取 <prev>..<cur> 之间的提交，解析为结构体列表。"""
-    rng = f"{prev}..{cur}"
+    """取区间内的提交，解析为结构体列表。
+
+    首版特例：当 prev 就是初始提交时，普通 ``prev..cur`` 会把初始提交自身排除，
+    导致首版日志只剩发版杂项、丢失整条能力基线；此时直接列 cur 可达的全部早期历史
+    （首版 tag 位于历史最早期，即含初始提交在内的全部提交）。
+    """
+    if prev and _is_root(repo, prev):
+        rng = cur
+    elif prev:
+        rng = f"{prev}..{cur}"
+    else:
+        rng = cur
     raw = run(
         ["git", "log", rng, "--pretty=format:%H%x1f%s%x1f%b%x1e"], repo
     )
@@ -200,9 +224,15 @@ def user_layer(commits, version, date_str):
 
 
 def _changed_paths(repo, prev, cur):
-    """返回 <prev>..<cur> 变更的文件路径（用于 AI 层推断影响面）。"""
+    """返回区间变更的文件路径（用于 AI 层推断影响面）。
+
+    首版特例：prev 为初始提交时，对 Git 空树做 diff，得到含初始提交在内的全部文件。
+    """
     try:
-        out = run(["git", "diff", "--name-only", f"{prev}..{cur}"], repo)
+        if prev and _is_root(repo, prev):
+            out = run(["git", "diff", "--name-only", EMPTY_TREE_SHA, cur], repo)
+        else:
+            out = run(["git", "diff", "--name-only", f"{prev}..{cur}"], repo)
     except Exception:
         return ""
     return out
