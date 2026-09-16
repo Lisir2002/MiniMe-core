@@ -9,6 +9,14 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## [0.0.0.2-rc35] - 2026-09-17
+
+> 预发行。修复 rc34 引入的崩溃：对话流每条 AI 流式回复结束时主线程 NPE。纯 `:newui` 修复。
+
+### Fixed
+
+- `[newui]` 修复 `AppMessageRow`「停止生成」按钮在流式结束时崩溃：`AnimatedVisibility` 退出动画帧会在 `onStop` 回调已被置空后仍重组，原实现对其使用 `!!` 强解导致 `NullPointerException`（每条 AI 流式回复收尾必现）。改为退出帧安全判空，回调为空时不渲染按钮。
+
 ## [0.0.0.2-rc34] - 2026-09-17
 
 > 预发行。`:newui` 对话流扩展 5 类适配组件并接入演示剧情，纯 `:newui` component / sample 层 additive 改动；app 模块生产界面未迁移，无 AI 工作流 / prompt / schema / 运行行为变化。

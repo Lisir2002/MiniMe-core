@@ -130,7 +130,11 @@ fun AppMessageRow(
                         enter = fadeIn() + expandVertically(),
                         exit = fadeOut() + shrinkVertically(),
                     ) {
-                        StopStreamingButton(onStop = onStop!!)
+                        // 退出动画帧可能在 onStop 已被置空后仍重组，禁止用 !!（否则 NPE）。
+                        val stopHandler = onStop
+                        if (stopHandler != null) {
+                            StopStreamingButton(onStop = stopHandler)
+                        }
                     }
                     AnimatedVisibility(
                         visible = actionsVisible,
