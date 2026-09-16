@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +33,7 @@ import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 /**
  * 反问 / 澄清卡（对话流）：AI 信息不足时提问并给出快速选项。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AppClarifyCard(
     question: String,
@@ -63,7 +66,7 @@ fun AppClarifyCard(
             )
         }
         Spacer(Modifier.width(AppSpacing.Sm))
-        Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs)) {
             options.forEach { o ->
                 Text(
                     o,
