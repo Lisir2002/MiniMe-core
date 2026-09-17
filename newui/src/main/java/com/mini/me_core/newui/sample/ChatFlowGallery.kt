@@ -203,6 +203,7 @@ private fun FlowPlayerBar(state: ChatFlowState) {
             var reasoning by remember { mutableStateOf(AppComposerReasoning.MEDIUM) }
             var atts by remember { mutableStateOf<List<String>>(emptyList()) }
             var modelLabel by remember { mutableStateOf("Claude Sonnet") }
+            var modelId by remember { mutableStateOf("claude-sonnet") }
             var showPicker by remember { mutableStateOf(false) }
             AppComposer(
                 value = input,
@@ -236,8 +237,8 @@ private fun FlowPlayerBar(state: ChatFlowState) {
                             AppModelOption("gpt", "GPT-4.1", "OpenAI", caption = "通用", supportsVision = true, supportsTools = true, supportsReasoning = true),
                         ),
                     ),
-                    selectedId = "claude-sonnet",
-                    onSelect = { modelLabel = it.name; showPicker = false },
+                    selectedId = modelId,
+                    onSelect = { modelLabel = it.name; modelId = it.id; showPicker = false },
                     onDismiss = { showPicker = false },
                 )
             }

@@ -1,9 +1,13 @@
 package com.mini.me_core.newui.designsystem.component
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,10 +16,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,9 +27,12 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.theme.appPalette
@@ -46,7 +53,7 @@ data class AppModelOption(
     val supportsReasoning: Boolean = false,
 )
 
-/** 模型选择底部弹层：按 provider 分组，单选高亮。 */
+/** 模型选择底部弹层：按 provider 分组，紧凑列表，单选高亮 + 选中对勾弹跳。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppModelPickerSheet(
@@ -59,69 +66,32 @@ fun AppModelPickerSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(),
         containerColor = appPalette().card,
+        dragHandle = null,
     ) {
-        Column(Modifier.padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm)) {
-            Text("选择模型", style = MaterialTheme.typography.titleMedium, color = appPalette().ink, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.padding(AppSpacing.Xs))
+        Column(Modifier.padding(horizontal = AppSpacing.Lg)) {
+            Row(
+                Modifier.fillMaxWidth().padding(top = AppSpacing.Md, bottom = AppSpacing.Xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("选择模型", style = MaterialTheme.typography.titleMedium, color = appPalette().ink, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                providers.flatten().size.let { n ->
+                    Text("$n 个模型", style = MaterialTheme.typography.labelSmall, color = appPalette().labelTertiary)
+                }
+            }
             providers.forEach { (provider, models) ->
                 Text(
                     provider,
                     style = MaterialTheme.typography.labelSmall,
                     color = appPalette().labelTertiary,
-                    modifier = Modifier.padding(top = AppSpacing.Md, bottom = AppSpacing.Xs),
+                    modifier = Modifier.padding(top = AppSpacing.Sm, bottom = AppSpacing.Tiny),
                 )
                 models.forEach { m ->
-                    val selected = m.id == selectedId
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(AppRadius.Md))
-                            .background(if (selected) appPalette().primary.copy(alpha = 0.10f) else appPalette().surface)
-                            .border(
-                                AppStroke.Thin,
-                                if (selected) appPalette().primary.copy(alpha = 0.4f) else appPalette().separator,
-                                RoundedCornerShape(AppRadius.Md),
-                            )
-                            .clickable { onSelect(m) }
-                            .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(m.name, style = MaterialTheme.typography.bodyLarge, color = appPalette().ink, fontWeight = FontWeight.Medium)
-                                if (m.badge != null) {
-                                    Spacer(Modifier.width(AppSpacing.Xs))
-                                    Text(
-                                        m.badge,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = appPalette().primary,
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(AppRadius.Pill))
-                                            .background(appPalette().primary.copy(alpha = 0.12f))
-                                            .padding(horizontal = AppSpacing.Xs, vertical = 1.dp),
-                                    )
-                                }
-                            }
-                            if (m.caption != null) {
-                                Spacer(Modifier.padding(2.dp))
-                                Text(m.caption, style = MaterialTheme.typography.labelSmall, color = appPalette().labelTertiary)
-                            }
-                            // 能力标识：识图 / 工具调用 / 推理。
-                            Row(
-                                Modifier.padding(top = AppSpacing.Tiny),
-                                horizontalArrangement = Arrangement.spacedBy(AppSpacing.Tiny),
-                            ) {
-                                if (m.supportsVision) CapabilityTag("识图")
-                                if (m.supportsTools) CapabilityTag("工具")
-                                if (m.supportsReasoning) CapabilityTag("推理")
-                            }
-                        }
-                        if (selected) {
-                            Icon(Icons.Rounded.Check, contentDescription = "已选", tint = appPalette().primary, modifier = Modifier.width(AppSizing.IconM))
-                        } else {
-                            Icon(Icons.Rounded.KeyboardArrowRight, contentDescription = null, tint = appPalette().labelTertiary)
-                        }
-                    }
+                    ModelRow(
+                        model = m,
+                        selected = m.id == selectedId,
+                        onClick = { onSelect(m) },
+                    )
                 }
             }
             Spacer(Modifier.padding(AppSpacing.Lg))
@@ -130,14 +100,70 @@ fun AppModelPickerSheet(
 }
 
 @Composable
-private fun CapabilityTag(label: String) {
-    Text(
-        label,
-        style = MaterialTheme.typography.labelSmall,
-        color = appPalette().labelSecondary,
-        modifier = Modifier
-            .clip(RoundedCornerShape(AppRadius.Pill))
-            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
-            .padding(horizontal = AppSpacing.Sm, vertical = 1.dp),
+private fun ModelRow(model: AppModelOption, selected: Boolean, onClick: () -> Unit) {
+    val bg by animateColorAsState(
+        if (selected) appPalette().primary.copy(alpha = 0.10f) else appPalette().surface,
+        label = "bg",
     )
+    val border by animateColorAsState(
+        if (selected) appPalette().primary.copy(alpha = 0.45f) else appPalette().separator,
+        label = "bd",
+    )
+    val checkScale by animateFloatAsState(if (selected) 1f else 0.6f, label = "chk")
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = AppSpacing.Tiny)
+            .clip(RoundedCornerShape(AppRadius.Md))
+            .background(bg)
+            .border(AppStroke.Thin, border, RoundedCornerShape(AppRadius.Md))
+            .clickable(interactionSource = interaction, indication = null) { onClick() }
+            .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(model.name, style = MaterialTheme.typography.bodyLarge, color = appPalette().ink, fontWeight = FontWeight.Medium)
+                if (!model.badge.isNullOrBlank()) {
+                    Spacer(Modifier.width(AppSpacing.Xs))
+                    Text(
+                        model.badge!!,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = appPalette().primary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(AppRadius.Pill))
+                            .background(appPalette().primary.copy(alpha = 0.12f))
+                            .padding(horizontal = AppSpacing.Xs, vertical = 1.dp),
+                    )
+                }
+            }
+            val caps = buildList {
+                if (model.supportsVision) add("识图")
+                if (model.supportsTools) add("工具")
+                if (model.supportsReasoning) add("推理")
+            }
+            if (caps.isNotEmpty() || !model.caption.isNullOrBlank()) {
+                Spacer(Modifier.padding(1.dp))
+                Text(
+                    (listOfNotNull(model.caption) + caps).joinToString(" · "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = appPalette().labelTertiary,
+                )
+            }
+        }
+        // 选中圆点 + 对勾。
+        Box(
+            Modifier
+                .size(AppSizing.IconM)
+                .scale(checkScale)
+                .clip(CircleShape)
+                .background(if (selected) appPalette().primary else appPalette().surface),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) {
+                Icon(Icons.Rounded.Check, contentDescription = "已选", tint = appPalette().onPrimary, modifier = Modifier.size(AppSizing.IconXs))
+            }
+        }
+    }
 }
