@@ -260,7 +260,7 @@ fun AppComposer(
                     Spacer(Modifier.width(AppSpacing.Sm))
                     Text("思考强度", style = MaterialTheme.typography.bodyMedium, color = appPalette().ink)
                     Spacer(Modifier.weight(1f))
-                    ReasoningSegmented(reasoning = reasoning, onCycle = onCycleReasoning)
+                    ReasoningSegmented(current = reasoning, onCycle = onCycleReasoning)
                 }
                 AttachmentRow(icon = Icons.Rounded.Build, label = "技能 / Playbook") { showToolsPanel = false; onOpenSkills() }
             }
