@@ -96,6 +96,7 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 - **禁止把 `targetSdk` 从 28 改高**（锁定 28 以绕过 Android 10+ W^X 策略，使 PRoot 可执行）。
 - **禁止把签名 secrets / API token 等敏感信息写入代码或文档**。
 - **禁止随意修改本 AGENTS.md**（用户指定的纪律内容；如需修订先说明原因并保留原意）。
+- **禁止手写页面骨架**：newui 任何新页面/子页面根节点必须直接包裹 `designsystem/layout/AppShell.kt`（唯一页面壳，统一 insets/顶栏/槽位/主题）；禁止自行 `Scaffold`、`TopAppBar`、自绘返回箭头或自算状态栏内边距。页面内只写 content，标题/返回/顶栏动作全部走 AppShell 槽位。
 
 ## 资产同步纪律
 

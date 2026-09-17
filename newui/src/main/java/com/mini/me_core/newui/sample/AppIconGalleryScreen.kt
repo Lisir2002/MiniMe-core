@@ -70,6 +70,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mini.me_core.newui.designsystem.layout.AppShell
 import com.mini.me_core.newui.designsystem.theme.appPalette
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
@@ -150,56 +151,49 @@ private val sections = listOf(
     ),
 )
 
-/** 新版 UI 图标样板页：两列图标砖，每个标注替换的旧版图标。 */
+/** 新版 UI 图标样板页：必须走统一 AppShell 容器，禁止自绘顶栏/边距。 */
 @Composable
 fun AppIconGalleryScreen(onBack: () -> Unit) {
-    LazyColumn(
-        Modifier
-            .fillMaxSize()
-            .background(appPalette().surface)
-            .padding(horizontal = AppSpacing.Lg),
-    ) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = AppSpacing.Lg)) {
-                Text(
-                    "←",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = appPalette().primary,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(AppRadius.Sm))
-                        .clickable { onBack() }
-                        .padding(AppSpacing.Xs),
-                )
-                Spacer(Modifier.width(AppSpacing.Sm))
-                Text("图标样板", style = MaterialTheme.typography.headlineSmall, color = appPalette().ink)
-            }
-            Text(
-                "每个图标砖下方标注它替换的旧版图标名，统一使用新主题圆角与配色。",
-                style = MaterialTheme.typography.bodySmall,
-                color = appPalette().labelTertiary,
-                modifier = Modifier.padding(top = AppSpacing.Xs, bottom = AppSpacing.Sm),
-            )
-        }
-        sections.forEach { sec ->
+    AppShell(
+        title = "图标样板",
+        onNavigateBack = onBack,
+    ) { inner ->
+        LazyColumn(
+            Modifier
+                .fillMaxSize()
+                .background(appPalette().surface)
+                .padding(inner)
+                .padding(horizontal = AppSpacing.Lg),
+        ) {
             item {
                 Text(
-                    sec.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = appPalette().labelSecondary,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(top = AppSpacing.Md, bottom = AppSpacing.Sm),
+                    "每个图标砖下方标注它替换的旧版图标名，统一使用新主题圆角与配色。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = appPalette().labelTertiary,
+                    modifier = Modifier.padding(vertical = AppSpacing.Sm),
                 )
             }
-            sec.items.chunked(2).forEach { pair ->
+            sections.forEach { sec ->
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
-                        pair.forEach { e -> IconTile(e, Modifier.weight(1f)) }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                    Text(
+                        sec.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = appPalette().labelSecondary,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(top = AppSpacing.Md, bottom = AppSpacing.Sm),
+                    )
+                }
+                sec.items.chunked(2).forEach { pair ->
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
+                            pair.forEach { e -> IconTile(e, Modifier.weight(1f)) }
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        }
                     }
                 }
             }
+            item { Spacer(Modifier.height(AppSpacing.Xl)) }
         }
-        item { Spacer(Modifier.height(AppSpacing.Xl)) }
     }
 }
 
