@@ -9,6 +9,11 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## v0.0.0.2-rc58 — 2026-09-17
+
+### 改进
+- **文件类型图标换真实品牌 SVG**：Kotlin/Python/JS/TS/Go/Rust/HTML/Markdown/Docker/Gradle/SQLite 接入官方品牌矢量图形（Simple Icons），其余类型保留专属图形+品牌色砖。
+
 ## v0.0.0.2-rc57 — 2026-09-17
 
 ### 新功能
