@@ -1,6 +1,7 @@
 package com.mini.me_core.newui.designsystem.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,13 +35,16 @@ import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
-/** 一个可选模型。 */
+/** 一个可选模型。能力项与生产 ModelMetadata 同构：识图 / 工具调用 / 推理。 */
 data class AppModelOption(
     val id: String,
     val name: String,
     val provider: String,
     val badge: String? = null,
     val caption: String? = null,
+    val supportsVision: Boolean = false,
+    val supportsTools: Boolean = false,
+    val supportsReasoning: Boolean = false,
 )
 
 /** 模型选择底部弹层：按 provider 分组，单选高亮。 */
@@ -103,6 +107,15 @@ fun AppModelPickerSheet(
                                 Spacer(Modifier.padding(2.dp))
                                 Text(m.caption, style = MaterialTheme.typography.labelSmall, color = appPalette().labelTertiary)
                             }
+                            // 能力标识：识图 / 工具调用 / 推理。
+                            Row(
+                                Modifier.padding(top = AppSpacing.Tiny),
+                                horizontalArrangement = Arrangement.spacedBy(AppSpacing.Tiny),
+                            ) {
+                                if (m.supportsVision) CapabilityTag("识图")
+                                if (m.supportsTools) CapabilityTag("工具")
+                                if (m.supportsReasoning) CapabilityTag("推理")
+                            }
                         }
                         if (selected) {
                             Icon(Icons.Rounded.Check, contentDescription = "已选", tint = appPalette().primary, modifier = Modifier.width(AppSizing.IconM))
@@ -115,4 +128,17 @@ fun AppModelPickerSheet(
             Spacer(Modifier.padding(AppSpacing.Lg))
         }
     }
+}
+
+@Composable
+private fun CapabilityTag(label: String) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall,
+        color = appPalette().labelSecondary,
+        modifier = Modifier
+            .clip(RoundedCornerShape(AppRadius.Pill))
+            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
+            .padding(horizontal = AppSpacing.Sm, vertical = 1.dp),
+    )
 }

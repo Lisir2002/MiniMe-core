@@ -210,12 +210,12 @@ private fun FlowPlayerBar(state: ChatFlowState) {
                 AppModelPickerSheet(
                     providers = listOf(
                         "Anthropic" to listOf(
-                            AppModelOption("claude-sonnet", "Claude Sonnet", "Anthropic", caption = "平衡速度与质量，日常默认"),
-                            AppModelOption("claude-opus", "Claude Opus", "Anthropic", badge = "强推理", caption = "复杂任务优先"),
-                            AppModelOption("claude-haiku", "Claude Haiku", "Anthropic", caption = "快速响应"),
+                            AppModelOption("claude-sonnet", "Claude Sonnet", "Anthropic", caption = "平衡速度与质量，日常默认", supportsVision = true, supportsTools = true),
+                            AppModelOption("claude-opus", "Claude Opus", "Anthropic", badge = "强推理", caption = "复杂任务优先", supportsVision = true, supportsTools = true, supportsReasoning = true),
+                            AppModelOption("claude-haiku", "Claude Haiku", "Anthropic", caption = "快速响应", supportsVision = true, supportsTools = true),
                         ),
                         "OpenAI" to listOf(
-                            AppModelOption("gpt", "GPT-4.1", "OpenAI", caption = "通用"),
+                            AppModelOption("gpt", "GPT-4.1", "OpenAI", caption = "通用", supportsVision = true, supportsTools = true, supportsReasoning = true),
                         ),
                     ),
                     selectedId = "claude-sonnet",
