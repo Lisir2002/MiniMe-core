@@ -127,18 +127,7 @@ fun ChatFlowGallery(onNavigateBack: (() -> Unit)? = null) {
         AppShell(
             title = "AI 对话流 · 完整演示",
             onNavigateBack = onNavigateBack,
-            topBarActions = {
-                Text(
-                    "图标",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = appPalette().primary,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(AppRadius.Pill))
-                        .clickable { showIconGallery = true }
-                        .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Tiny),
-                )
-            },
-            bottomBar = { FlowPlayerBar(state) },
+            bottomBar = { FlowPlayerBar(state, onOpenIcons = { showIconGallery = true }) },
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 AppMessageScroller(
@@ -186,7 +175,7 @@ private fun EmptyHint() {
 }
 
 @Composable
-private fun FlowPlayerBar(state: ChatFlowState) {
+private fun FlowPlayerBar(state: ChatFlowState, onOpenIcons: () -> Unit) {
     val canAdvance = !state.busy && !state.finished
     Surface(color = appPalette().surface) {
         Column(
@@ -289,6 +278,16 @@ private fun FlowPlayerBar(state: ChatFlowState) {
                     contentDescription = "重置",
                 )
             }
+            Text(
+                "图标样板 →",
+                style = MaterialTheme.typography.labelMedium,
+                color = appPalette().primary,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .clip(RoundedCornerShape(AppRadius.Pill))
+                    .clickable { onOpenIcons() }
+                    .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Tiny),
+            )
         }
     }
 }

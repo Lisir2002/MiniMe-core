@@ -128,29 +128,15 @@ private fun ModelRow(model: AppModelOption, selected: Boolean, onClick: () -> Un
                 Text(model.name, style = MaterialTheme.typography.bodyLarge, color = appPalette().ink, fontWeight = FontWeight.Medium)
                 if (!model.badge.isNullOrBlank()) {
                     Spacer(Modifier.width(AppSpacing.Xs))
-                    Text(
-                        model.badge!!,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = appPalette().primary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(AppRadius.Pill))
-                            .background(appPalette().primary.copy(alpha = 0.12f))
-                            .padding(horizontal = AppSpacing.Xs, vertical = 1.dp),
-                    )
+                    CapTag(model.badge!!, Color(0xFFFF9F0A), Color(0x22FF9F0A))
                 }
+                if (model.supportsVision) { Spacer(Modifier.width(AppSpacing.Tiny)); CapTag("识图", Color(0xFF0A84FF), Color(0x220A84FF)) }
+                if (model.supportsTools) { Spacer(Modifier.width(AppSpacing.Tiny)); CapTag("工具", Color(0xFF34C759), Color(0x2234C759)) }
+                if (model.supportsReasoning) { Spacer(Modifier.width(AppSpacing.Tiny)); CapTag("推理", Color(0xFFBF5AF2), Color(0x22BF5AF2)) }
             }
-            val caps = buildList {
-                if (model.supportsVision) add("识图")
-                if (model.supportsTools) add("工具")
-                if (model.supportsReasoning) add("推理")
-            }
-            if (caps.isNotEmpty() || !model.caption.isNullOrBlank()) {
+            if (!model.caption.isNullOrBlank()) {
                 Spacer(Modifier.padding(1.dp))
-                Text(
-                    (listOfNotNull(model.caption) + caps).joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = appPalette().labelTertiary,
-                )
+                Text(model.caption!!, style = MaterialTheme.typography.labelSmall, color = appPalette().labelTertiary)
             }
         }
         // 选中圆点 + 对勾。
@@ -167,4 +153,17 @@ private fun ModelRow(model: AppModelOption, selected: Boolean, onClick: () -> Un
             }
         }
     }
+}
+
+@Composable
+private fun CapTag(label: String, fg: androidx.compose.ui.graphics.Color, bg: androidx.compose.ui.graphics.Color) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall,
+        color = fg,
+        modifier = Modifier
+            .clip(RoundedCornerShape(AppRadius.Pill))
+            .background(bg)
+            .padding(horizontal = AppSpacing.Xs, vertical = 1.dp),
+    )
 }
