@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -119,6 +120,7 @@ fun AppComposer(
 ) {
     val shape = RoundedCornerShape(AppRadius.Lg)
     var showAttachmentSheet by remember { mutableStateOf(false) }
+    var showToolsPanel by remember { mutableStateOf(false) }
     val showSlashMenu = slashCommands.isNotEmpty() && value.startsWith("/") && !streaming
     val matchedSlash = slashCommands.filter { value.length == 1 || it.trigger.startsWith(value) }
     val sendEnabled = streaming || value.isNotBlank() || attachments.isNotEmpty()
@@ -208,13 +210,16 @@ fun AppComposer(
 
         // 工具行。
         Row(verticalAlignment = Alignment.CenterVertically) {
-            CircleIconBtn(icon = Icons.Rounded.Add, contentDescription = "附件", onClick = { showAttachmentSheet = !showAttachmentSheet })
+            CircleIconBtn(icon = Icons.Rounded.Add, contentDescription = "附件", onClick = { showAttachmentSheet = !showAttachmentSheet; showToolsPanel = false })
             Spacer(Modifier.width(AppSpacing.Xs))
-            CircleIconBtn(icon = Icons.Rounded.Build, contentDescription = "技能", onClick = onOpenSkills)
+            CircleIconBtn(
+                icon = Icons.Rounded.Tune,
+                contentDescription = "更多功能",
+                active = showToolsPanel,
+                onClick = { showToolsPanel = !showToolsPanel; showAttachmentSheet = false },
+            )
             Spacer(Modifier.width(AppSpacing.Sm))
             ModeChip(mode = mode, onClick = onCycleMode)
-            Spacer(Modifier.width(AppSpacing.Xs))
-            ReasoningChip(reasoning = reasoning, onClick = onCycleReasoning)
 
             Spacer(Modifier.weight(1f))
 
@@ -237,6 +242,27 @@ fun AppComposer(
                 AttachmentRow(icon = Icons.Rounded.Article, label = "选择文件") { showAttachmentSheet = false; onPickFile() }
                 AttachmentRow(icon = Icons.Rounded.Image, label = "选择图片") { showAttachmentSheet = false; onPickImage() }
                 AttachmentRow(icon = Icons.Rounded.CameraAlt, label = "拍照") { showAttachmentSheet = false; onTakePhoto() }
+            }
+        }
+
+        // 更多功能面板：默认折叠，思考强度、技能等放这里，后续可继续加。
+        AnimatedVisibility(visible = showToolsPanel) {
+            Column(Modifier.padding(top = AppSpacing.Sm)) {
+                // 思考强度：三档分段选择。
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(AppRadius.Sm))
+                        .padding(vertical = AppSpacing.Xs),
+                ) {
+                    Icon(Icons.Rounded.Psychology, contentDescription = null, tint = appPalette().labelSecondary, modifier = Modifier.size(AppSizing.IconM))
+                    Spacer(Modifier.width(AppSpacing.Sm))
+                    Text("思考强度", style = MaterialTheme.typography.bodyMedium, color = appPalette().ink)
+                    Spacer(Modifier.weight(1f))
+                    ReasoningSegmented(reasoning = reasoning, onCycle = onCycleReasoning)
+                }
+                AttachmentRow(icon = Icons.Rounded.Build, label = "技能 / Playbook") { showToolsPanel = false; onOpenSkills() }
             }
         }
     }
@@ -278,12 +304,31 @@ private fun RemoveChip(label: String, tone: ChipTone, onRemove: () -> Unit) {
 }
 
 @Composable
-private fun CircleIconBtn(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
+private fun CircleIconBtn(icon: ImageVector, contentDescription: String, onClick: () -> Unit, active: Boolean = false) {
     Box(
-        modifier = Modifier.size(AppSizing.IconXl).clip(CircleShape).background(appPalette().surface).clickable { onClick() },
+        modifier = Modifier
+            .size(AppSizing.IconXl)
+            .clip(CircleShape)
+            .background(if (active) appPalette().primary.copy(alpha = 0.15f) else appPalette().surface)
+            .clickable { onClick() },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = appPalette().labelSecondary, modifier = Modifier.size(AppSizing.IconM))
+        Icon(icon, contentDescription = contentDescription, tint = if (active) appPalette().primary else appPalette().labelSecondary, modifier = Modifier.size(AppSizing.IconM))
+    }
+}
+
+@Composable
+private fun ReasoningSegmented(current: AppComposerReasoning, onCycle: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(AppRadius.Pill))
+            .background(appPalette().surface)
+            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
+            .clickable { onCycle() }
+            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("当前·${current.label}", style = MaterialTheme.typography.labelMedium, color = appPalette().primary, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -309,23 +354,6 @@ private fun ModeChip(mode: AppComposerMode, onClick: () -> Unit) {
             color = if (active) appPalette().primary else appPalette().labelSecondary,
             fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
         )
-    }
-}
-
-@Composable
-private fun ReasoningChip(reasoning: AppComposerReasoning, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(AppRadius.Pill))
-            .background(appPalette().surface)
-            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
-            .clickable { onClick() }
-            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Rounded.Psychology, contentDescription = null, tint = appPalette().labelSecondary, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.width(AppSpacing.Xs))
-        Text("思考·${reasoning.label}", style = MaterialTheme.typography.labelMedium, color = appPalette().labelSecondary)
     }
 }
 

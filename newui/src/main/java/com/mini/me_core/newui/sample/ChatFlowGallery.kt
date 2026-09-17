@@ -182,14 +182,11 @@ private fun FlowPlayerBar(state: ChatFlowState) {
             var mode by remember { mutableStateOf(AppComposerMode.BUILD) }
             var reasoning by remember { mutableStateOf(AppComposerReasoning.MEDIUM) }
             var atts by remember { mutableStateOf(listOf("login.kt", "后端目录")) }
-            var queued by remember { mutableStateOf(listOf("解释 token 过期逻辑")) }
             AppComposer(
                 value = input,
                 onValueChange = { input = it },
                 attachments = atts,
                 onRemoveAttachment = { atts = atts.toMutableList().apply { removeAt(it) } },
-                queued = queued,
-                onRemoveQueued = { queued = queued.toMutableList().apply { removeAt(it) } },
                 mode = mode,
                 onCycleMode = { mode = mode.next() },
                 reasoning = reasoning,
