@@ -351,7 +351,7 @@ private fun SkillsChip(onClick: () -> Unit) {
 @Composable
 private fun ModeChip(mode: AppComposerMode, onClick: () -> Unit) {
     val (fg, bg, border) = when (mode) {
-        AppComposerMode.BUILD -> Triple(Color(0xFF30B0C0), Color(0x2230B0C0), Color(0x6630B0C0))
+        AppComposerMode.BUILD -> Triple(Color(0xFFB8860B), Color(0x22B8860B), Color(0x66B8860B))
         AppComposerMode.PLAN -> Triple(AppColor.StatusInfo, AppColor.StatusInfo.copy(alpha = 0.12f), AppColor.StatusInfo.copy(alpha = 0.35f))
         AppComposerMode.AUTO -> Triple(AppColor.StatusDanger, AppColor.StatusDanger.copy(alpha = 0.16f), AppColor.StatusDanger.copy(alpha = 0.45f))
     }
@@ -377,28 +377,28 @@ private fun TokenProgressBar(progress: Float) {
     val track = appPalette().separator
     val fill = if (over) AppColor.StatusDanger else appPalette().primary
     val pct = (clamped * 100).toInt()
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(14.dp)
-            .clip(RoundedCornerShape(AppRadius.Pill))
-            .background(track.copy(alpha = 0.5f)),
-        contentAlignment = Alignment.CenterStart,
-    ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier
-                .fillMaxWidth(anim)
-                .height(14.dp)
-                .clip(RoundedCornerShape(AppRadius.Pill))
-                .background(fill.copy(alpha = if (over) 0.9f else 0.8f)),
-        )
-        // 中央百分比，叠在进度条上。
+                .weight(1f)
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(track.copy(alpha = 0.5f)),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(anim)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(fill.copy(alpha = if (over) 0.95f else 0.85f)),
+            )
+        }
+        Spacer(Modifier.width(AppSpacing.Xs))
         Text(
             "$pct%",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Medium,
-            color = if (anim > 0.55f) Color.White else appPalette().labelSecondary,
-            modifier = Modifier.align(Alignment.Center),
+            color = if (over) AppColor.StatusDanger else appPalette().labelTertiary,
         )
     }
 }
