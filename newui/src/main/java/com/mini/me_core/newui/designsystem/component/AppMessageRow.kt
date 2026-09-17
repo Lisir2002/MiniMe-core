@@ -109,10 +109,10 @@ fun AppMessageRow(
                     leadingContent()
                     Spacer(Modifier.height(AppSpacing.Sm))
                 }
-                // 气泡包裹内容，长文本最多占约 8 成宽后换行，短消息贴边不撑满。
+                // 气泡包裹内容：用户消息靠右收窄到约 7 成，AI 消息最多 8 成。
                 Column(
                     horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
-                    modifier = Modifier.widthIn(max = 300.dp),
+                    modifier = Modifier.widthIn(max = if (isUser) 260.dp else 300.dp),
                 ) {
                     AppChatBubble(
                         text = text,
