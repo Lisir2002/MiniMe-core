@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.sample
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -121,6 +122,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ChatFlowGallery(onNavigateBack: (() -> Unit)? = null) {
     val state = rememberChatFlow()
+    var showIconGallery by remember { mutableStateOf(false) }
     AppTheme {
         AppShell(
             title = "AI 对话流 · 完整演示",
@@ -142,6 +144,22 @@ fun ChatFlowGallery(onNavigateBack: (() -> Unit)? = null) {
                     EmptyHint()
                 }
             }
+            // 图标样板页入口：悬浮按钮。
+            Box(Modifier.fillMaxSize().padding(AppSpacing.Lg), contentAlignment = Alignment.BottomEnd) {
+                Text(
+                    "图标",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = appPalette().onPrimary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(AppRadius.Pill))
+                        .background(appPalette().primary)
+                        .clickable { showIconGallery = true }
+                        .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+                )
+            }
+        }
+        if (showIconGallery) {
+            AppIconGalleryScreen(onBack = { showIconGallery = false })
         }
     }
 }
