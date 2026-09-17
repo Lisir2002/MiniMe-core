@@ -9,6 +9,11 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## v0.0.0.2-rc51 — 2026-09-17
+
+### 改进
+- **模型选择弹层能力标识**：每个模型项下方按真实能力显示「识图 / 工具 / 推理」小标签，字段对齐生产 ModelMetadata（supportsVision / supportsTools / supportsReasoning）。
+
 ## v0.0.0.2-rc50 — 2026-09-17
 
 ### 新功能
