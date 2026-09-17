@@ -127,6 +127,17 @@ fun ChatFlowGallery(onNavigateBack: (() -> Unit)? = null) {
         AppShell(
             title = "AI 对话流 · 完整演示",
             onNavigateBack = onNavigateBack,
+            topBarActions = {
+                Text(
+                    "图标",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = appPalette().primary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(AppRadius.Pill))
+                        .clickable { showIconGallery = true }
+                        .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Tiny),
+                )
+            },
             bottomBar = { FlowPlayerBar(state) },
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -143,19 +154,6 @@ fun ChatFlowGallery(onNavigateBack: (() -> Unit)? = null) {
                 if (state.items.isEmpty()) {
                     EmptyHint()
                 }
-            }
-            // 图标样板页入口：悬浮按钮。
-            Box(Modifier.fillMaxSize().padding(AppSpacing.Lg), contentAlignment = Alignment.BottomEnd) {
-                Text(
-                    "图标",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = appPalette().onPrimary,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(AppRadius.Pill))
-                        .background(appPalette().primary)
-                        .clickable { showIconGallery = true }
-                        .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
-                )
             }
         }
         if (showIconGallery) {
