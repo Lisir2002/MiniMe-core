@@ -9,6 +9,11 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## v0.0.0.2-rc57 — 2026-09-17
+
+### 新功能
+- **文件类型专属图标**：新增 `FileTypeIcon`，按扩展名渲染独立图形 + 品牌色圆角砖（kt/java/py/js/ts/go/rs/c/cpp/swift/html/css/json/yaml/sh/md/txt/pdf/图片/音视频/压缩包/数据库/gradle/docker 等），样板页新增「文件类型」分区预览。
+
 ## v0.0.0.2-rc56 — 2026-09-17
 
 ### 新功能
