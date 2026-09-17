@@ -18,42 +18,62 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Archive
+import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Construction
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Power
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Smartphone
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Tag
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Upload
@@ -147,6 +167,31 @@ private val sections = listOf(
             IconEntry(Icons.Rounded.Link, "链接", "Link"),
             IconEntry(Icons.Rounded.Language, "语言", "Language / Public"),
             IconEntry(Icons.Rounded.ChatBubble, "对话", "ChatBubble / Forum"),
+        ),
+    ),
+    IconSection(
+        "系统与设置",
+        listOf(
+            IconEntry(Icons.Rounded.DarkMode, "深色模式", "DarkMode"),
+            IconEntry(Icons.Rounded.LightMode, "浅色模式", "LightMode"),
+            IconEntry(Icons.Rounded.Palette, "外观", "Palette"),
+            IconEntry(Icons.Rounded.Notifications, "通知", "Notifications"),
+            IconEntry(Icons.Rounded.Lock, "锁定", "Lock"),
+            IconEntry(Icons.Rounded.Key, "密钥", "Key"),
+            IconEntry(Icons.Rounded.Security, "安全", "Security"),
+            IconEntry(Icons.Rounded.Shield, "防护", "Shield"),
+            IconEntry(Icons.Rounded.Smartphone, "设备", "Smartphone / Mobile"),
+            IconEntry(Icons.Rounded.Memory, "内存", "Memory"),
+            IconEntry(Icons.Rounded.Dashboard, "仪表盘", "Dashboard"),
+            IconEntry(Icons.Rounded.Cloud, "云端", "Cloud"),
+            IconEntry(Icons.Rounded.Bookmark, "书签", "Bookmark"),
+            IconEntry(Icons.Rounded.Star, "收藏", "Star / Favorite"),
+            IconEntry(Icons.Rounded.Flag, "标记", "Flag"),
+            IconEntry(Icons.Rounded.Tag, "标签", "Tag"),
+            IconEntry(Icons.Rounded.BarChart, "图表", "BarChart / TableChart"),
+            IconEntry(Icons.Rounded.Article, "文档", "Article / Notes"),
+            IconEntry(Icons.Rounded.Menu, "菜单", "Menu"),
+            IconEntry(Icons.Rounded.Power, "电源", "Power"),
         ),
     ),
 )
