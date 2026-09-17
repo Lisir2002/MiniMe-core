@@ -1,5 +1,8 @@
 package com.mini.me_core.newui.designsystem.component
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,16 +18,19 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.Article
+import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Psychology
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
@@ -38,7 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,14 +56,32 @@ import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 
+/** 对话行为模式（与生产 AgentMode 同构，避免跨模块依赖）。 */
+enum class AppComposerMode(val label: String) {
+    BUILD("构建"),
+    PLAN("计划"),
+    AUTO("自动");
+
+    fun next(): AppComposerMode = entries[(ordinal + 1) % entries.size]
+}
+
+/** 思考强度（与生产 ReasoningEffort 同构）。 */
+enum class AppComposerReasoning(val label: String) {
+    LOW("低"),
+    MEDIUM("中"),
+    HIGH("高");
+
+    fun next(): AppComposerReasoning = entries[(ordinal + 1) % entries.size]
+}
+
+/** 斜杠命令条目。 */
+data class AppComposerSlashCommand(val trigger: String, val description: String)
+
 /**
- * 对话输入框（composer）：iOS 简约风，卡片式圆角容器。
+ * 对话输入框（composer）—— newui iOS 简约风。
  *
- * 分层约定：本组件只持有输入文本与开关状态，附件/模型/发送等动作全部以回调上抛，
- * 由上层（Agent / ViewModel）注入实际数据与行为。语音输入暂不内置。
- *
- * @param attachments 已附加的文件名，顶部以 chip 横排展示。
- * @param streaming true 时发送按钮变为停止按钮。
+ * 与生产 ChatInputBar 同构契约：只持有输入文本与开关状态，附件/模式/模型/发送等全部以回调上抛，
+ * 由上层注入真实数据与行为。不暴露"联网开关"之类无接入口的摆设。
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -64,21 +89,40 @@ fun AppComposer(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    // 附件 / 排队
     attachments: List<String> = emptyList(),
     onRemoveAttachment: (Int) -> Unit = {},
-    modelLabel: String = "深度",
+    queued: List<String> = emptyList(),
+    onRemoveQueued: (Int) -> Unit = {},
+    // 模式 / 思考
+    mode: AppComposerMode = AppComposerMode.BUILD,
+    onCycleMode: () -> Unit = {},
+    reasoning: AppComposerReasoning = AppComposerReasoning.MEDIUM,
+    onCycleReasoning: () -> Unit = {},
+    // 模型 / 技能
+    modelLabel: String = "",
     onPickModel: () -> Unit = {},
-    webSearch: Boolean = false,
-    onToggleWeb: () -> Unit = {},
-    deepMode: Boolean = false,
-    onToggleDeep: () -> Unit = {},
+    onOpenSkills: () -> Unit = {},
+    // 上下文进度 0f..1f，<=0 不显示
+    tokenProgress: Float = 0f,
+    // 附件面板动作
+    onPickFile: () -> Unit = {},
+    onPickImage: () -> Unit = {},
+    onTakePhoto: () -> Unit = {},
+    // 斜杠命令
+    slashCommands: List<AppComposerSlashCommand> = emptyList(),
+    onRunSlash: (AppComposerSlashCommand) -> Unit = {},
+    // 发送
     streaming: Boolean = false,
     onSend: () -> Unit = {},
     onStop: () -> Unit = {},
-    onAddAttachment: () -> Unit = {},
-    onMention: () -> Unit = {},
 ) {
     val shape = RoundedCornerShape(AppRadius.Lg)
+    var showAttachmentSheet by remember { mutableStateOf(false) }
+    val showSlashMenu = slashCommands.isNotEmpty() && value.startsWith("/") && !streaming
+    val matchedSlash = slashCommands.filter { value.length == 1 || it.trigger.startsWith(value) }
+    val sendEnabled = streaming || value.isNotBlank() || attachments.isNotEmpty()
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -87,25 +131,63 @@ fun AppComposer(
             .border(AppStroke.Thin, appPalette().separator, shape)
             .padding(AppSpacing.Sm),
     ) {
-        if (attachments.isNotEmpty()) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
-                verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
-                modifier = Modifier.padding(bottom = AppSpacing.Xs),
+        // 顶部：附件 chips + 排队请求 chips。
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
+        ) {
+            attachments.forEachIndexed { i, name ->
+                RemoveChip(label = name, tone = ChipTone.File, onRemove = { onRemoveAttachment(i) })
+            }
+            queued.forEachIndexed { i, q ->
+                RemoveChip(label = q, tone = ChipTone.Queued, onRemove = { onRemoveQueued(i) })
+            }
+        }
+
+        if (attachments.isNotEmpty() || queued.isNotEmpty()) Spacer(Modifier.size(AppSpacing.Xs))
+
+        // 斜杠命令浮层：输入 "/" 时展开候选。
+        AnimatedVisibility(visible = showSlashMenu && matchedSlash.isNotEmpty()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = AppSpacing.Xs)
+                    .clip(RoundedCornerShape(AppRadius.Md))
+                    .background(appPalette().surface),
             ) {
-                attachments.forEachIndexed { i, name ->
-                    AttachmentChip(name = name, onRemove = { onRemoveAttachment(i) })
+                matchedSlash.take(6).forEach { cmd ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onRunSlash(cmd) }
+                            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            cmd.trigger,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = appPalette().primary,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.width(AppSpacing.Sm))
+                        Text(
+                            cmd.description,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = appPalette().labelTertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
 
-        // 文本区：多行自适应，最多约 5 行后内部滚动。
+        // 文本区。
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
             textStyle = LocalTextStyle.current.copy(color = appPalette().ink),
-            cursorBrush = androidx.compose.ui.graphics.SolidColor(appPalette().primary),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+            cursorBrush = SolidColor(appPalette().primary),
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = AppSizing.IconXl + AppSpacing.Md, max = 120.dp)
@@ -113,7 +195,7 @@ fun AppComposer(
             decorationBox = { inner ->
                 if (value.isEmpty()) {
                     Text(
-                        "给 Agent 下指令…",
+                        "给 Agent 下指令，输入 / 查看命令…",
                         style = MaterialTheme.typography.bodyLarge,
                         color = appPalette().labelTertiary,
                     )
@@ -122,31 +204,49 @@ fun AppComposer(
             },
         )
 
-        Spacer(Modifier.width(AppSpacing.Xs))
+        Spacer(Modifier.size(AppSpacing.Xs))
 
-        // 工具行：左侧操作，右侧模型 + 发送/停止。
+        // 工具行。
         Row(verticalAlignment = Alignment.CenterVertically) {
-            CircleIconBtn(icon = Icons.Rounded.Add, contentDescription = "更多", onClick = onMention)
+            CircleIconBtn(icon = Icons.Rounded.Add, contentDescription = "附件", onClick = { showAttachmentSheet = !showAttachmentSheet })
             Spacer(Modifier.width(AppSpacing.Xs))
-            CircleIconBtn(icon = Icons.Rounded.AttachFile, contentDescription = "附件", onClick = onAddAttachment)
+            CircleIconBtn(icon = Icons.Rounded.Build, contentDescription = "技能", onClick = onOpenSkills)
             Spacer(Modifier.width(AppSpacing.Sm))
-            ToggleChip(active = webSearch, label = "联网", onClick = onToggleWeb)
+            ModeChip(mode = mode, onClick = onCycleMode)
             Spacer(Modifier.width(AppSpacing.Xs))
-            ToggleChip(active = deepMode, label = "深度", onClick = onToggleDeep)
+            ReasoningChip(reasoning = reasoning, onClick = onCycleReasoning)
 
             Spacer(Modifier.weight(1f))
 
-            ModelChip(label = modelLabel, onClick = onPickModel)
-            Spacer(Modifier.width(AppSpacing.Xs))
-            SendOrStopButton(streaming = streaming, onClick = {
+            if (tokenProgress > 0f) {
+                TokenHint(progress = tokenProgress)
+                Spacer(Modifier.width(AppSpacing.Xs))
+            }
+            if (modelLabel.isNotBlank()) {
+                ModelChip(label = modelLabel, onClick = onPickModel)
+                Spacer(Modifier.width(AppSpacing.Xs))
+            }
+            SendOrStopButton(streaming = streaming, enabled = sendEnabled) {
                 if (streaming) onStop() else onSend()
-            }, enabled = streaming || value.isNotBlank())
+            }
+        }
+
+        // 附件面板展开。
+        AnimatedVisibility(visible = showAttachmentSheet) {
+            Column(Modifier.padding(top = AppSpacing.Sm)) {
+                AttachmentRow(icon = Icons.Rounded.Article, label = "选择文件") { showAttachmentSheet = false; onPickFile() }
+                AttachmentRow(icon = Icons.Rounded.Image, label = "选择图片") { showAttachmentSheet = false; onPickImage() }
+                AttachmentRow(icon = Icons.Rounded.CameraAlt, label = "拍照") { showAttachmentSheet = false; onTakePhoto() }
+            }
         }
     }
 }
 
+private enum class ChipTone { File, Queued }
+
 @Composable
-private fun AttachmentChip(name: String, onRemove: () -> Unit) {
+private fun RemoveChip(label: String, tone: ChipTone, onRemove: () -> Unit) {
+    val accent = if (tone == ChipTone.Queued) appPalette().primary else appPalette().labelSecondary
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -155,32 +255,32 @@ private fun AttachmentChip(name: String, onRemove: () -> Unit) {
             .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
     ) {
+        if (tone == ChipTone.Queued) {
+            Text("排队", style = MaterialTheme.typography.labelSmall, color = appPalette().primary, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.width(AppSpacing.Xs))
+        }
         Text(
-            name,
+            label,
             style = MaterialTheme.typography.labelSmall,
-            color = appPalette().labelSecondary,
+            color = accent,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.width(96.dp),
+            modifier = Modifier.widthIn(max = 120.dp),
         )
         Spacer(Modifier.width(AppSpacing.Xs))
-        Text("✕", color = appPalette().labelTertiary, style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.clickable { onRemove() })
+        Icon(
+            Icons.Rounded.Close,
+            contentDescription = "移除",
+            tint = appPalette().labelTertiary,
+            modifier = Modifier.size(12.dp).clickable { onRemove() },
+        )
     }
 }
 
 @Composable
-private fun CircleIconBtn(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit,
-) {
+private fun CircleIconBtn(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
     Box(
-        modifier = Modifier
-            .size(AppSizing.IconXl)
-            .clip(CircleShape)
-            .background(appPalette().surface)
-            .clickable { onClick() },
+        modifier = Modifier.size(AppSizing.IconXl).clip(CircleShape).background(appPalette().surface).clickable { onClick() },
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = contentDescription, tint = appPalette().labelSecondary, modifier = Modifier.size(AppSizing.IconM))
@@ -188,17 +288,12 @@ private fun CircleIconBtn(
 }
 
 @Composable
-private fun ToggleChip(active: Boolean, label: String, onClick: () -> Unit) {
-    val bg = if (active) appPalette().primary.copy(alpha = 0.15f) else appPalette().surface
-    val fg = if (active) appPalette().primary else appPalette().labelSecondary
-    Text(
-        label,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
-        color = fg,
-        modifier = Modifier
+private fun ModeChip(mode: AppComposerMode, onClick: () -> Unit) {
+    val active = mode != AppComposerMode.BUILD
+    Row(
+        Modifier
             .clip(RoundedCornerShape(AppRadius.Pill))
-            .background(bg)
+            .background(if (active) appPalette().primary.copy(alpha = 0.15f) else appPalette().surface)
             .border(
                 AppStroke.Thin,
                 if (active) appPalette().primary.copy(alpha = 0.35f) else appPalette().separator,
@@ -206,39 +301,71 @@ private fun ToggleChip(active: Boolean, label: String, onClick: () -> Unit) {
             )
             .clickable { onClick() }
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "模式·${mode.label}",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (active) appPalette().primary else appPalette().labelSecondary,
+            fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
+        )
+    }
+}
+
+@Composable
+private fun ReasoningChip(reasoning: AppComposerReasoning, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(AppRadius.Pill))
+            .background(appPalette().surface)
+            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
+            .clickable { onClick() }
+            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Rounded.Psychology, contentDescription = null, tint = appPalette().labelSecondary, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(AppSpacing.Xs))
+        Text("思考·${reasoning.label}", style = MaterialTheme.typography.labelMedium, color = appPalette().labelSecondary)
+    }
+}
+
+@Composable
+private fun TokenHint(progress: Float) {
+    val over = progress > 0.9f
+    Text(
+        if (over) "上下文快满" else "${(progress * 100).toInt()}%",
+        style = MaterialTheme.typography.labelSmall,
+        color = if (over) AppColor.StatusDanger else appPalette().labelTertiary,
     )
 }
 
 @Composable
 private fun ModelChip(label: String, onClick: () -> Unit) {
     Row(
+        Modifier.clip(RoundedCornerShape(AppRadius.Pill)).clickable { onClick() }.padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .clip(RoundedCornerShape(AppRadius.Pill))
-            .clickable { onClick() }
-            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = appPalette().labelSecondary)
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = appPalette().labelSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 90.dp),
+        )
     }
 }
 
 @Composable
-private fun SendOrStopButton(streaming: Boolean, onClick: () -> Unit, enabled: Boolean) {
+private fun SendOrStopButton(streaming: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val bg = when {
         !enabled -> appPalette().surface
         streaming -> AppColor.StatusDanger
         else -> appPalette().primary
     }
-    val fg = when {
-        !enabled -> appPalette().labelTertiary
-        else -> appPalette().onPrimary
-    }
+    val fg = if (enabled) appPalette().onPrimary else appPalette().labelTertiary
     Box(
-        modifier = Modifier
-            .size(AppSizing.IconXl)
-            .clip(CircleShape)
-            .background(bg)
-            .clickable(enabled = enabled) { onClick() },
+        Modifier.size(AppSizing.IconXl).clip(CircleShape).background(bg).clickable(enabled = enabled) { onClick() },
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -247,5 +374,17 @@ private fun SendOrStopButton(streaming: Boolean, onClick: () -> Unit, enabled: B
             tint = fg,
             modifier = Modifier.size(AppSizing.IconM),
         )
+    }
+}
+
+@Composable
+private fun AttachmentRow(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(AppRadius.Sm)).clickable { onClick() }.padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = appPalette().labelSecondary, modifier = Modifier.size(AppSizing.IconM))
+        Spacer(Modifier.width(AppSpacing.Sm))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = appPalette().ink)
     }
 }

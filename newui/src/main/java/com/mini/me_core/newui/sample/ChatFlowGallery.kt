@@ -176,18 +176,29 @@ private fun FlowPlayerBar(state: ChatFlowState) {
         ) {
             // 输入框演示：固定示例状态，按钮仅占位交互，不接真实 Agent。
             var input by remember { mutableStateOf("") }
-            var web by remember { mutableStateOf(false) }
-            var deep by remember { mutableStateOf(true) }
+            var mode by remember { mutableStateOf(AppComposerMode.BUILD) }
+            var reasoning by remember { mutableStateOf(AppComposerReasoning.MEDIUM) }
             var atts by remember { mutableStateOf(listOf("login.kt", "后端目录")) }
+            var queued by remember { mutableStateOf(listOf("解释 token 过期逻辑")) }
             AppComposer(
                 value = input,
                 onValueChange = { input = it },
                 attachments = atts,
                 onRemoveAttachment = { atts = atts.toMutableList().apply { removeAt(it) } },
-                webSearch = web,
-                onToggleWeb = { web = !web },
-                deepMode = deep,
-                onToggleDeep = { deep = !deep },
+                queued = queued,
+                onRemoveQueued = { queued = queued.toMutableList().apply { removeAt(it) } },
+                mode = mode,
+                onCycleMode = { mode = mode.next() },
+                reasoning = reasoning,
+                onCycleReasoning = { reasoning = reasoning.next() },
+                modelLabel = "Claude Sonnet",
+                tokenProgress = 0.62f,
+                slashCommands = listOf(
+                    AppComposerSlashCommand("/mode", "切换行为模式"),
+                    AppComposerSlashCommand("/compress", "压缩对话上下文"),
+                    AppComposerSlashCommand("/agent", "调整 Agent 配置"),
+                    AppComposerSlashCommand("/playbook", "启动剧本"),
+                ),
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
