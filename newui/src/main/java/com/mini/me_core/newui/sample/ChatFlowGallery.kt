@@ -48,6 +48,9 @@ import com.mini.me_core.newui.designsystem.component.AppChatMarkerKind
 import com.mini.me_core.newui.designsystem.component.AppChatMessageState
 import com.mini.me_core.newui.designsystem.component.AppAcceptChangesBar
 import com.mini.me_core.newui.designsystem.component.AppComposer
+import com.mini.me_core.newui.designsystem.component.AppComposerMode
+import com.mini.me_core.newui.designsystem.component.AppComposerReasoning
+import com.mini.me_core.newui.designsystem.component.AppComposerSlashCommand
 import com.mini.me_core.newui.designsystem.component.AppCitationCard
 import com.mini.me_core.newui.designsystem.component.AppCitationSource
 import com.mini.me_core.newui.designsystem.component.AppClarifyCard
