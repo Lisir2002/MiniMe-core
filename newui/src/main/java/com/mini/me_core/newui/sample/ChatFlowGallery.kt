@@ -931,16 +931,15 @@ private class ChatFlowState(val scope: CoroutineScope) {
                     histKey--,
                     "上次我们把 `feature/auth` 的路由骨架搭好了，今天接着补登录。",
                     AppChatMessageState.Complete,
-                    isUser = false,
+                    isUser = true,
                     ts = "昨天 18:20",
                 ),
                 FlowItem.Msg(
                     histKey--,
-                    "好，明天我把 token 鉴权也一起设计进去。",
+                    "好的，路由骨架已经在 `feature/auth` 上了。那我接着补登录接口和 token 鉴权，跑完测试再把结果给你。",
                     AppChatMessageState.Complete,
-                    isUser = true,
+                    isUser = false,
                     ts = "昨天 18:21",
-                    grouped = true,
                 ),
             )
             items.addAll(0, older)
