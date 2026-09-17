@@ -181,7 +181,7 @@ private fun FlowPlayerBar(state: ChatFlowState) {
             var input by remember { mutableStateOf("") }
             var mode by remember { mutableStateOf(AppComposerMode.BUILD) }
             var reasoning by remember { mutableStateOf(AppComposerReasoning.MEDIUM) }
-            var atts by remember { mutableStateOf(listOf("login.kt", "后端目录")) }
+            var atts by remember { mutableStateOf<List<String>>(emptyList()) }
             AppComposer(
                 value = input,
                 onValueChange = { input = it },

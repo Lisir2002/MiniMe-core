@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +33,6 @@ import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Stop
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberScrollState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -120,7 +121,7 @@ fun AppComposer(
 ) {
     val shape = RoundedCornerShape(AppRadius.Lg)
     var showAttachmentSheet by remember { mutableStateOf(false) }
-    var showToolsPanel by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
     val showSlashMenu = slashCommands.isNotEmpty() && value.startsWith("/") && !streaming
     val matchedSlash = slashCommands.filter { value.length == 1 || it.trigger.startsWith(value) }
     val sendEnabled = streaming || value.isNotBlank() || attachments.isNotEmpty()
@@ -133,20 +134,39 @@ fun AppComposer(
             .border(AppStroke.Thin, appPalette().separator, shape)
             .padding(AppSpacing.Sm),
     ) {
-        // 顶部：附件 chips + 排队请求 chips。
-        FlowRow(
+        // 第一行：功能按钮横滚行。常用功能常驻，折叠的功能由「更多」在行内展开/收起。
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
         ) {
-            attachments.forEachIndexed { i, name ->
-                RemoveChip(label = name, tone = ChipTone.File, onRemove = { onRemoveAttachment(i) })
+            ModeChip(mode = mode, onClick = onCycleMode)
+            ReasoningChip(reasoning = reasoning, onClick = onCycleReasoning)
+            SkillsChip(onClick = onOpenSkills)
+            if (expanded) {
+                // 预留：后续新功能按钮追加在这里，点「更多」后在行内出现。
+                PlaceholderChip("MCP")
+                PlaceholderChip("计划")
             }
-            queued.forEachIndexed { i, q ->
-                RemoveChip(label = q, tone = ChipTone.Queued, onRemove = { onRemoveQueued(i) })
-            }
+            MoreChip(expanded = expanded, onToggle = { expanded = !expanded })
         }
+        Spacer(Modifier.size(AppSpacing.Xs))
 
-        if (attachments.isNotEmpty() || queued.isNotEmpty()) Spacer(Modifier.size(AppSpacing.Xs))
+        // 附件 / 排队 chips（有内容时才出现在功能行下方）。
+        if (attachments.isNotEmpty() || queued.isNotEmpty()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
+                verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
+            ) {
+                attachments.forEachIndexed { i, name ->
+                    RemoveChip(label = name, tone = ChipTone.File, onRemove = { onRemoveAttachment(i) })
+                }
+                queued.forEachIndexed { i, q ->
+                    RemoveChip(label = q, tone = ChipTone.Queued, onRemove = { onRemoveQueued(i) })
+                }
+            }
+            Spacer(Modifier.size(AppSpacing.Xs))
+        }
 
         // 斜杠命令浮层：输入 "/" 时展开候选。
         AnimatedVisibility(visible = showSlashMenu && matchedSlash.isNotEmpty()) {
@@ -210,16 +230,7 @@ fun AppComposer(
 
         // 工具行。
         Row(verticalAlignment = Alignment.CenterVertically) {
-            CircleIconBtn(icon = Icons.Rounded.Add, contentDescription = "附件", onClick = { showAttachmentSheet = !showAttachmentSheet; showToolsPanel = false })
-            Spacer(Modifier.width(AppSpacing.Xs))
-            CircleIconBtn(
-                icon = Icons.Rounded.Tune,
-                contentDescription = "更多功能",
-                active = showToolsPanel,
-                onClick = { showToolsPanel = !showToolsPanel; showAttachmentSheet = false },
-            )
-            Spacer(Modifier.width(AppSpacing.Sm))
-            ModeChip(mode = mode, onClick = onCycleMode)
+            CircleIconBtn(icon = Icons.Rounded.Add, contentDescription = "附件", onClick = { showAttachmentSheet = !showAttachmentSheet })
 
             Spacer(Modifier.weight(1f))
 
@@ -242,27 +253,6 @@ fun AppComposer(
                 AttachmentRow(icon = Icons.Rounded.Article, label = "选择文件") { showAttachmentSheet = false; onPickFile() }
                 AttachmentRow(icon = Icons.Rounded.Image, label = "选择图片") { showAttachmentSheet = false; onPickImage() }
                 AttachmentRow(icon = Icons.Rounded.CameraAlt, label = "拍照") { showAttachmentSheet = false; onTakePhoto() }
-            }
-        }
-
-        // 更多功能面板：默认折叠，思考强度、技能等放这里，后续可继续加。
-        AnimatedVisibility(visible = showToolsPanel) {
-            Column(Modifier.padding(top = AppSpacing.Sm)) {
-                // 思考强度：三档分段选择。
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(AppRadius.Sm))
-                        .padding(vertical = AppSpacing.Xs),
-                ) {
-                    Icon(Icons.Rounded.Psychology, contentDescription = null, tint = appPalette().labelSecondary, modifier = Modifier.size(AppSizing.IconM))
-                    Spacer(Modifier.width(AppSpacing.Sm))
-                    Text("思考强度", style = MaterialTheme.typography.bodyMedium, color = appPalette().ink)
-                    Spacer(Modifier.weight(1f))
-                    ReasoningSegmented(current = reasoning, onCycle = onCycleReasoning)
-                }
-                AttachmentRow(icon = Icons.Rounded.Build, label = "技能 / Playbook") { showToolsPanel = false; onOpenSkills() }
             }
         }
     }
@@ -318,17 +308,73 @@ private fun CircleIconBtn(icon: ImageVector, contentDescription: String, onClick
 }
 
 @Composable
-private fun ReasoningSegmented(current: AppComposerReasoning, onCycle: () -> Unit) {
+private fun ReasoningChip(reasoning: AppComposerReasoning, onClick: () -> Unit) {
     Row(
         Modifier
             .clip(RoundedCornerShape(AppRadius.Pill))
             .background(appPalette().surface)
             .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
-            .clickable { onCycle() }
+            .clickable { onClick() }
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("当前·${current.label}", style = MaterialTheme.typography.labelMedium, color = appPalette().primary, fontWeight = FontWeight.Medium)
+        Icon(Icons.Rounded.Psychology, contentDescription = null, tint = appPalette().labelSecondary, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(AppSpacing.Xs))
+        Text("思考·${reasoning.label}", style = MaterialTheme.typography.labelMedium, color = appPalette().labelSecondary)
+    }
+}
+
+@Composable
+private fun SkillsChip(onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(AppRadius.Pill))
+            .background(appPalette().surface)
+            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
+            .clickable { onClick() }
+            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Rounded.Build, contentDescription = null, tint = appPalette().labelSecondary, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(AppSpacing.Xs))
+        Text("技能", style = MaterialTheme.typography.labelMedium, color = appPalette().labelSecondary)
+    }
+}
+
+@Composable
+private fun PlaceholderChip(label: String) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = appPalette().labelTertiary,
+        modifier = Modifier
+            .clip(RoundedCornerShape(AppRadius.Pill))
+            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
+            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
+    )
+}
+
+@Composable
+private fun MoreChip(expanded: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(AppRadius.Pill))
+            .background(if (expanded) appPalette().primary.copy(alpha = 0.15f) else appPalette().surface)
+            .border(
+                AppStroke.Thin,
+                if (expanded) appPalette().primary.copy(alpha = 0.35f) else appPalette().separator,
+                RoundedCornerShape(AppRadius.Pill),
+            )
+            .clickable { onToggle() }
+            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            if (expanded) "收起" else "更多",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (expanded) appPalette().primary else appPalette().labelSecondary,
+            fontWeight = if (expanded) FontWeight.Medium else FontWeight.Normal,
+        )
     }
 }
 
