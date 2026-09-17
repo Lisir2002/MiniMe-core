@@ -3,6 +3,7 @@ package com.mini.me_core.newui.designsystem.component
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,13 +27,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Tune
@@ -48,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -349,9 +351,9 @@ private fun SkillsChip(onClick: () -> Unit) {
 @Composable
 private fun ModeChip(mode: AppComposerMode, onClick: () -> Unit) {
     val (fg, bg, border) = when (mode) {
-        AppComposerMode.BUILD -> Triple(appPalette().labelSecondary, appPalette().surface, appPalette().separator)
+        AppComposerMode.BUILD -> Triple(Color(0xFF30B0C0), Color(0x2230B0C0), Color(0x6630B0C0))
         AppComposerMode.PLAN -> Triple(AppColor.StatusInfo, AppColor.StatusInfo.copy(alpha = 0.12f), AppColor.StatusInfo.copy(alpha = 0.35f))
-        AppComposerMode.AUTO -> Triple(AppColor.StatusDanger, AppColor.StatusDanger.copy(alpha = 0.12f), AppColor.StatusDanger.copy(alpha = 0.35f))
+        AppComposerMode.AUTO -> Triple(AppColor.StatusDanger, AppColor.StatusDanger.copy(alpha = 0.16f), AppColor.StatusDanger.copy(alpha = 0.45f))
     }
     Row(
         Modifier
@@ -370,22 +372,33 @@ private fun ModeChip(mode: AppComposerMode, onClick: () -> Unit) {
 private fun TokenProgressBar(progress: Float) {
     if (progress <= 0f) return
     val clamped = progress.coerceIn(0f, 1f)
+    val anim by animateFloatAsState(targetValue = clamped, label = "tokenProgress")
     val over = clamped > 0.9f
     val track = appPalette().separator
     val fill = if (over) AppColor.StatusDanger else appPalette().primary
+    val pct = (clamped * 100).toInt()
     Box(
         Modifier
             .fillMaxWidth()
-            .height(2.dp)
-            .clip(RoundedCornerShape(1.dp))
-            .background(track),
+            .height(14.dp)
+            .clip(RoundedCornerShape(AppRadius.Pill))
+            .background(track.copy(alpha = 0.5f)),
+        contentAlignment = Alignment.CenterStart,
     ) {
         Box(
             Modifier
-                .fillMaxWidth(clamped)
-                .height(2.dp)
-                .clip(RoundedCornerShape(1.dp))
-                .background(fill),
+                .fillMaxWidth(anim)
+                .height(14.dp)
+                .clip(RoundedCornerShape(AppRadius.Pill))
+                .background(fill.copy(alpha = if (over) 0.9f else 0.8f)),
+        )
+        // 中央百分比，叠在进度条上。
+        Text(
+            "$pct%",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            color = if (anim > 0.55f) Color.White else appPalette().labelSecondary,
+            modifier = Modifier.align(Alignment.Center),
         )
     }
 }
@@ -420,7 +433,7 @@ private fun SendOrStopButton(streaming: Boolean, enabled: Boolean, onClick: () -
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = if (streaming) Icons.Rounded.Stop else Icons.Rounded.KeyboardArrowUp,
+            imageVector = if (streaming) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward,
             contentDescription = if (streaming) "停止" else "发送",
             tint = fg,
             modifier = Modifier.size(AppSizing.IconM),
