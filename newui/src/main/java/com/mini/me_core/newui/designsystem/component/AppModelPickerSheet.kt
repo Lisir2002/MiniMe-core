@@ -75,7 +75,7 @@ fun AppModelPickerSheet(
             ) {
                 Text("选择模型", style = MaterialTheme.typography.titleMedium, color = appPalette().ink, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
-                providers.flatten().size.let { n ->
+                providers.sumOf { it.second.size }.let { n ->
                     Text("$n 个模型", style = MaterialTheme.typography.labelSmall, color = appPalette().labelTertiary)
                 }
             }

@@ -139,7 +139,7 @@ fun AppIconGalleryScreen(onBack: () -> Unit) {
     LazyColumn(
         Modifier
             .fillMaxSize()
-            .background(appPalette().background)
+            .background(appPalette().surface)
             .padding(AppSpacing.Lg),
     ) {
         item {
