@@ -51,6 +51,8 @@ import com.mini.me_core.newui.designsystem.component.AppComposer
 import com.mini.me_core.newui.designsystem.component.AppComposerMode
 import com.mini.me_core.newui.designsystem.component.AppComposerReasoning
 import com.mini.me_core.newui.designsystem.component.AppComposerSlashCommand
+import com.mini.me_core.newui.designsystem.component.AppModelOption
+import com.mini.me_core.newui.designsystem.component.AppModelPickerSheet
 import com.mini.me_core.newui.designsystem.component.AppCitationCard
 import com.mini.me_core.newui.designsystem.component.AppCitationSource
 import com.mini.me_core.newui.designsystem.component.AppClarifyCard
@@ -182,6 +184,8 @@ private fun FlowPlayerBar(state: ChatFlowState) {
             var mode by remember { mutableStateOf(AppComposerMode.BUILD) }
             var reasoning by remember { mutableStateOf(AppComposerReasoning.MEDIUM) }
             var atts by remember { mutableStateOf<List<String>>(emptyList()) }
+            var modelLabel by remember { mutableStateOf("Claude Sonnet") }
+            var showPicker by remember { mutableStateOf(false) }
             AppComposer(
                 value = input,
                 onValueChange = { input = it },
@@ -191,7 +195,8 @@ private fun FlowPlayerBar(state: ChatFlowState) {
                 onCycleMode = { mode = mode.next() },
                 reasoning = reasoning,
                 onCycleReasoning = { reasoning = reasoning.next() },
-                modelLabel = "Claude Sonnet",
+                modelLabel = modelLabel,
+                onPickModel = { showPicker = true },
                 tokenProgress = 0.62f,
                 slashCommands = listOf(
                     AppComposerSlashCommand("/mode", "切换行为模式"),
@@ -201,6 +206,23 @@ private fun FlowPlayerBar(state: ChatFlowState) {
                 ),
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (showPicker) {
+                AppModelPickerSheet(
+                    providers = listOf(
+                        "Anthropic" to listOf(
+                            AppModelOption("claude-sonnet", "Claude Sonnet", "Anthropic", caption = "平衡速度与质量，日常默认"),
+                            AppModelOption("claude-opus", "Claude Opus", "Anthropic", badge = "强推理", caption = "复杂任务优先"),
+                            AppModelOption("claude-haiku", "Claude Haiku", "Anthropic", caption = "快速响应"),
+                        ),
+                        "OpenAI" to listOf(
+                            AppModelOption("gpt", "GPT-4.1", "OpenAI", caption = "通用"),
+                        ),
+                    ),
+                    selectedId = "claude-sonnet",
+                    onSelect = { modelLabel = it.name; showPicker = false },
+                    onDismiss = { showPicker = false },
+                )
+            }
             Text(
                 text = state.statusText(),
                 style = MaterialTheme.typography.labelMedium,
