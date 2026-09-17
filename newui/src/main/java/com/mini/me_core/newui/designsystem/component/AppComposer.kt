@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -142,11 +143,8 @@ fun AppComposer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
             ) {
-                ModeChip(mode = mode, onClick = onCycleMode)
                 ReasoningChip(reasoning = reasoning, onClick = onCycleReasoning)
                 SkillsChip(onClick = onOpenSkills)
-                PlaceholderChip("MCP")
-                PlaceholderChip("计划")
             }
         }
         Spacer(Modifier.size(AppSpacing.Xs))
@@ -225,10 +223,15 @@ fun AppComposer(
             },
         )
 
+        // 上下文进度条：紧贴文本区下方，薄条形式，不额外增高。
+        TokenProgressBar(progress = tokenProgress)
+
         Spacer(Modifier.size(AppSpacing.Xs))
 
         // 工具行。
         Row(verticalAlignment = Alignment.CenterVertically) {
+            ModeChip(mode = mode, onClick = onCycleMode)
+            Spacer(Modifier.width(AppSpacing.Xs))
             CircleIconBtn(icon = Icons.Rounded.Add, contentDescription = "附件", onClick = { showAttachmentSheet = !showAttachmentSheet })
             Spacer(Modifier.width(AppSpacing.Xs))
             CircleIconBtn(
@@ -240,10 +243,6 @@ fun AppComposer(
 
             Spacer(Modifier.weight(1f))
 
-            if (tokenProgress > 0f) {
-                TokenHint(progress = tokenProgress)
-                Spacer(Modifier.width(AppSpacing.Xs))
-            }
             if (modelLabel.isNotBlank()) {
                 ModelChip(label = modelLabel, onClick = onPickModel)
                 Spacer(Modifier.width(AppSpacing.Xs))
@@ -348,51 +347,47 @@ private fun SkillsChip(onClick: () -> Unit) {
 }
 
 @Composable
-private fun PlaceholderChip(label: String) {
-    Text(
-        label,
-        style = MaterialTheme.typography.labelMedium,
-        color = appPalette().labelTertiary,
-        modifier = Modifier
-            .clip(RoundedCornerShape(AppRadius.Pill))
-            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
-            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
-    )
-}
-
-@Composable
 private fun ModeChip(mode: AppComposerMode, onClick: () -> Unit) {
-    val active = mode != AppComposerMode.BUILD
+    val (fg, bg, border) = when (mode) {
+        AppComposerMode.BUILD -> Triple(appPalette().labelSecondary, appPalette().surface, appPalette().separator)
+        AppComposerMode.PLAN -> Triple(AppColor.StatusInfo, AppColor.StatusInfo.copy(alpha = 0.12f), AppColor.StatusInfo.copy(alpha = 0.35f))
+        AppComposerMode.AUTO -> Triple(AppColor.StatusDanger, AppColor.StatusDanger.copy(alpha = 0.12f), AppColor.StatusDanger.copy(alpha = 0.35f))
+    }
     Row(
         Modifier
             .clip(RoundedCornerShape(AppRadius.Pill))
-            .background(if (active) appPalette().primary.copy(alpha = 0.15f) else appPalette().surface)
-            .border(
-                AppStroke.Thin,
-                if (active) appPalette().primary.copy(alpha = 0.35f) else appPalette().separator,
-                RoundedCornerShape(AppRadius.Pill),
-            )
+            .background(bg)
+            .border(AppStroke.Thin, border, RoundedCornerShape(AppRadius.Pill))
             .clickable { onClick() }
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            "模式·${mode.label}",
-            style = MaterialTheme.typography.labelMedium,
-            color = if (active) appPalette().primary else appPalette().labelSecondary,
-            fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
-        )
+        Text("模式·${mode.label}", style = MaterialTheme.typography.labelMedium, color = fg, fontWeight = FontWeight.Medium)
     }
 }
 
 @Composable
-private fun TokenHint(progress: Float) {
-    val over = progress > 0.9f
-    Text(
-        if (over) "上下文快满" else "${(progress * 100).toInt()}%",
-        style = MaterialTheme.typography.labelSmall,
-        color = if (over) AppColor.StatusDanger else appPalette().labelTertiary,
-    )
+private fun TokenProgressBar(progress: Float) {
+    if (progress <= 0f) return
+    val clamped = progress.coerceIn(0f, 1f)
+    val over = clamped > 0.9f
+    val track = appPalette().separator
+    val fill = if (over) AppColor.StatusDanger else appPalette().primary
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(2.dp)
+            .clip(RoundedCornerShape(1.dp))
+            .background(track),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(clamped)
+                .height(2.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(fill),
+        )
+    }
 }
 
 @Composable
