@@ -9,6 +9,11 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## v0.0.0.2-rc60 — 2026-09-17
+
+### 改进
+- **文件图标接入阿里 iconfont 彩色文件集**：HTML/CSS/JS/JSON/PHP/TXT/PDF/CSV/XLS/DOC/PPT/SQL/MP3/AVI/MOV/GIF/SVG/ISO/DLL/JAR/PSD/TTF 直接用官方彩色文件图形，不再单色铺底。
+
 ## v0.0.0.2-rc59 — 2026-09-17
 
 ### 改进
