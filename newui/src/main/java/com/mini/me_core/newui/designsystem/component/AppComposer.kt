@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -121,7 +122,7 @@ fun AppComposer(
 ) {
     val shape = RoundedCornerShape(AppRadius.Lg)
     var showAttachmentSheet by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(false) }
+    var toolsVisible by remember { mutableStateOf(false) }
     val showSlashMenu = slashCommands.isNotEmpty() && value.startsWith("/") && !streaming
     val matchedSlash = slashCommands.filter { value.length == 1 || it.trigger.startsWith(value) }
     val sendEnabled = streaming || value.isNotBlank() || attachments.isNotEmpty()
@@ -134,21 +135,19 @@ fun AppComposer(
             .border(AppStroke.Thin, appPalette().separator, shape)
             .padding(AppSpacing.Sm),
     ) {
-        // 第一行：功能按钮横滚行。常用功能常驻，折叠的功能由「更多」在行内展开/收起。
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
-        ) {
-            ModeChip(mode = mode, onClick = onCycleMode)
-            ReasoningChip(reasoning = reasoning, onClick = onCycleReasoning)
-            SkillsChip(onClick = onOpenSkills)
-            if (expanded) {
-                // 预留：后续新功能按钮追加在这里，点「更多」后在行内出现。
+        // 第一行：功能按钮横滚行。默认隐藏，由底部「更多设置」按钮控制显隐。
+        AnimatedVisibility(visible = toolsVisible) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
+            ) {
+                ModeChip(mode = mode, onClick = onCycleMode)
+                ReasoningChip(reasoning = reasoning, onClick = onCycleReasoning)
+                SkillsChip(onClick = onOpenSkills)
                 PlaceholderChip("MCP")
                 PlaceholderChip("计划")
             }
-            MoreChip(expanded = expanded, onToggle = { expanded = !expanded })
         }
         Spacer(Modifier.size(AppSpacing.Xs))
 
@@ -231,6 +230,13 @@ fun AppComposer(
         // 工具行。
         Row(verticalAlignment = Alignment.CenterVertically) {
             CircleIconBtn(icon = Icons.Rounded.Add, contentDescription = "附件", onClick = { showAttachmentSheet = !showAttachmentSheet })
+            Spacer(Modifier.width(AppSpacing.Xs))
+            CircleIconBtn(
+                icon = Icons.Rounded.Tune,
+                contentDescription = "更多设置",
+                active = toolsVisible,
+                onClick = { toolsVisible = !toolsVisible },
+            )
 
             Spacer(Modifier.weight(1f))
 
@@ -352,30 +358,6 @@ private fun PlaceholderChip(label: String) {
             .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Pill))
             .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
     )
-}
-
-@Composable
-private fun MoreChip(expanded: Boolean, onToggle: () -> Unit) {
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(AppRadius.Pill))
-            .background(if (expanded) appPalette().primary.copy(alpha = 0.15f) else appPalette().surface)
-            .border(
-                AppStroke.Thin,
-                if (expanded) appPalette().primary.copy(alpha = 0.35f) else appPalette().separator,
-                RoundedCornerShape(AppRadius.Pill),
-            )
-            .clickable { onToggle() }
-            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Tiny),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            if (expanded) "收起" else "更多",
-            style = MaterialTheme.typography.labelMedium,
-            color = if (expanded) appPalette().primary else appPalette().labelSecondary,
-            fontWeight = if (expanded) FontWeight.Medium else FontWeight.Normal,
-        )
-    }
 }
 
 @Composable
