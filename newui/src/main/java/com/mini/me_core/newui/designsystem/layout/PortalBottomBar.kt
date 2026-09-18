@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.theme.appPalette
 import com.mini.me_core.newui.designsystem.token.generated.AppLayout
 import com.mini.me_core.newui.designsystem.token.generated.AppMotion
@@ -72,7 +73,7 @@ fun PortalBottomBar(
     val barHeight = AppLayout.BottomBarHeight
     val fabDiameter = AppSizing.Fab
     // 仅当扇形展开时中央圆钮才向上探出底栏上沿；默认收起态与两侧槽位同高同槽，节省垂直高度。
-    val overhang = if (fanExpanded) fabDiameter / 2 else 0
+    val overhang = if (fanExpanded) fabDiameter / 2 else 0.dp
 
     Box(
         modifier = Modifier
