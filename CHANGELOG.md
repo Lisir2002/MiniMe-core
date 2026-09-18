@@ -9,7 +9,11 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
-## v0.0.0.2-rc64 — 2026-09-18
+## v0.0.0.2-rc65 — 2026-09-18
+
+### 新功能
+- **对话流 UI 全面替换为 newui 组件体系**：聊天页消息列表由旧手风琴（TaskAccordion）整体改为 newui 扁平节点时间线——`AppMessageScroller`（reverseLayout，最新消息锚定底部、流式自动贴底、新消息一键回底浮钮）+ `AppMessageRow`/`AppChatBubble`（用户右 / AI 左分子层气泡）+ `AppThinkingBlock`（思考块同列可折叠、流式脉动）+ `AppToolCallCard`/`AppToolChainTimeline`（工具调用六面卡）+ `AppComposer`（模式 / 模型 / 推理 / 附件 / 排队 / 斜杠命令 / token 用量进度一体化输入栏）。正文 Markdown 走 `AppMarkdownText`，搜索命中走 `AppWebSearchCard`、任务清单走 `AppTodoCard`、系统/压缩提示走 `AppChatMarker`。
+- **业务逻辑零改动**：消息列表数据、流式输出、发送 / 重试 / 停止 / 排队、附件上传、编辑重写、会话抽屉均保持原样，仅替换 UI 层；删除旧输入栏集群（ChatInputBar/Field/Toolbar/Attachments）与旧手风琴 TaskAccordion 共约 2300 行死代码。
 
 ### 改进
 - **门户底栏视觉/交互精修**：总高紧凑收为 56dp，背景改半透明 surface 毛玻璃风格（targetSdk 28 无 RenderEffect，以 0.92 透明 surface 模拟），顶部加 1dp 分割线（palette.separator）；三槽等宽均分，图标统一 24dp、标签改新增的 caption 令牌（11sp）；选中态 = 主色 + SemiBold、未选中 = labelSecondary + Normal，颜色 + 字重双通道区分。
