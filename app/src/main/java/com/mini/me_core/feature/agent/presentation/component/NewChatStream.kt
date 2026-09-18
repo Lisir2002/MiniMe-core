@@ -44,12 +44,16 @@ import com.mini.me_core.newui.designsystem.component.AppTodoItem
 import com.mini.me_core.newui.designsystem.component.AppTodoStatus
 import com.mini.me_core.newui.designsystem.component.AppToolCallCard
 import com.mini.me_core.newui.designsystem.component.AppToolCallState
+import com.mini.me_core.newui.designsystem.component.AppTerminalLog
+import com.mini.me_core.newui.designsystem.component.LogLevel
+import com.mini.me_core.newui.designsystem.component.TerminalLogLine
 import com.mini.me_core.newui.designsystem.component.AppWebHit
 import com.mini.me_core.newui.designsystem.component.AppWebSearchCard
 import com.mini.me_core.newui.designsystem.theme.appPalette
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppLayout
 import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -162,16 +166,42 @@ private fun ToolMessageNode(msg: AgentUIMessage, modifier: Modifier = Modifier) 
     val argHint = remember(msg.toolName, msg.toolArgs) { toolArgHint(msg.toolArgs) }
     val argsFull = remember(msg.toolArgs) { formatToolArgs(msg.toolArgs) }
     val resultText = remember(msg.content) { formatToolResult(msg.content) }
+    // bash/shell 类执行命令工具：改走 AppTerminalLog 终端卡（黑底等宽 + $ 前缀 + stderr 标红）。
+    val isBashTool = msg.toolName?.let {
+        it == "bash" || it == "shell" || it == "run_command" ||
+            it == "execute_command" || it == "Bash" || it.contains("bash", true) || it.contains("shell", true)
+    } == true
 
     Column(modifier = modifier) {
-        AppToolCallCard(
-            title = msg.toolName?.replaceFirst("mcp__", "").orEmpty().ifBlank { stringResource(R.string.common_tool_call_fallback) },
-            summary = argHint,
-            state = state,
-            command = command,
-            input = if (isBash) null else argsFull,
-            output = resultText,
-        )
+        if (isBashTool) {
+            val termLines = remember(msg.toolName, msg.toolArgs, msg.content) {
+                val cmd = bashCommandFromArgs(msg.toolArgs).orEmpty()
+                buildList {
+                    if (cmd.isNotBlank()) add(TerminalLogLine("$ $cmd", LogLevel.Info, ""))
+                    resultText.lineSequence().forEach { l ->
+                        val lower = l.lowercase()
+                        val danger = msg.isError || lower.startsWith("error") || lower.startsWith("stderr") || lower.contains("fatal") || lower.contains("exception")
+                        add(TerminalLogLine(l, if (danger) LogLevel.Danger else LogLevel.Info, ""))
+                    }
+                }
+            }
+            AppTerminalLog(
+                title = msg.toolName?.replaceFirst("mcp__", "").orEmpty(),
+                lines = termLines,
+                running = false,
+                onRerun = { /* 重跑占位：接现有重试入口暂 no-op */ },
+                modifier = Modifier.padding(horizontal = AppLayout.PageHorizontal),
+            )
+        } else {
+            AppToolCallCard(
+                title = msg.toolName?.replaceFirst("mcp__", "").orEmpty().ifBlank { stringResource(R.string.common_tool_call_fallback) },
+                summary = argHint,
+                state = state,
+                command = command,
+                input = if (isBash) null else argsFull,
+                output = resultText,
+            )
+        }
 
         // todo 工具不再在消息流里重复插卡：实时列表由吸附输入框上方的常驻任务条（TodoDockBar）承载，
         // 避免同一任务两处重复展示。此处仅保留普通工具卡渲染。

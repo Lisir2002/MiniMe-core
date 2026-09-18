@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -83,9 +84,21 @@ fun AppTerminalLog(
     title: String = "终端日志",
     height: Dp = 148.dp,
     maxLines: Int = 12,
+    // 传入真实日志行时进入静态模式（不跑 demo 循环）；null 保留原有 demo 演示。
+    lines: List<TerminalLogLine>? = null,
+    // 是否仍在运行（控制"运行中"胶囊与光标）。
+    running: Boolean = true,
+    // 失败时卡片右下角的"重跑"按钮；null 不渲染。
+    onRerun: (() -> Unit)? = null,
 ) {
     val osc = rememberScrollState()
-    var lines by remember { mutableStateOf(initialScript()) }
+    // 静态输出超过此行数默认折叠（复用工具卡 >10 行折叠交互）。
+    val collapseThreshold = 10
+    var expanded by remember(lines) { mutableStateOf((lines?.size ?: 0) <= collapseThreshold) }
+    val shownLines = remember(lines, expanded) {
+        if (lines == null) null else if (expanded) lines else lines.take(collapseThreshold)
+    }
+    var demoLines by remember { mutableStateOf(initialScript()) }
     val cursor = rememberInfiniteTransition(label = "terminalCursor")
     val blink by cursor.animateFloat(
         initialValue = 1f,
@@ -100,19 +113,20 @@ fun AppTerminalLog(
         label = "statusPulse",
     )
 
-    // 循环投递一条模拟命令回显，超出 maxLines 收尾滚动
-    LaunchedEffect(Unit) {
+    // 循环投递一条模拟命令回显，超出 maxLines 收尾滚动（仅 demo 模式）
+    LaunchedEffect(lines) {
+        if (lines != null) return@LaunchedEffect
         val stream = logStream()
         var i = 0
         while (true) {
             val (entry, wait) = stream[i % stream.size]
-            lines = (lines + entry).takeLast(maxLines)
+            demoLines = (demoLines + entry).takeLast(maxLines)
             i++
             delay(wait)
         }
     }
     // 新日志出现自动滚到底部
-    LaunchedEffect(lines.size) {
+    LaunchedEffect(shownLines?.size) {
         if (osc.canScrollForward) osc.animateScrollTo(osc.maxValue)
     }
 
@@ -150,12 +164,14 @@ fun AppTerminalLog(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.weight(1f))
-                Text(
-                    text = "● 运行中",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = appPalette().labelSecondary,
-                    fontFamily = FontFamily.Monospace,
-                )
+                if (running) {
+                    Text(
+                        text = "● 运行中",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = appPalette().labelSecondary,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
             }
 
             // 正文：等宽字体日志，自动滚动；底部预留 scrim 等高内边距，
@@ -173,7 +189,7 @@ fun AppTerminalLog(
                     ),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
             ) {
-                lines.forEach { line ->
+                (shownLines ?: demoLines).forEach { line ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = line.at,
@@ -191,15 +207,42 @@ fun AppTerminalLog(
                         )
                     }
                 }
-                // 闪烁光标
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier
-                            .padding(bottom = AppSpacing.Xs)
-                            .size(AppSpacing.Sm)
-                            .alpha(blink)
-                            .background(AppColor.StatusSuccess),
+                // 静态输出超阈值：折叠展开切换
+                if (lines != null && lines.size > collapseThreshold) {
+                    Text(
+                        text = if (expanded) "收起" else "展开（共 ${lines.size} 行）",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = appPalette().primary,
+                        modifier = Modifier.clip(RoundedCornerShape(AppRadius.Sm))
+                            .clickable { expanded = !expanded }
+                            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
                     )
+                }
+                // 失败时"重跑"按钮占位
+                if (onRerun != null && lines?.any { it.level == LogLevel.Danger } == true) {
+                    Spacer(Modifier.size(AppSpacing.Xs))
+                    Text(
+                        text = "重跑",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = appPalette().onPrimary,
+                        modifier = Modifier.clip(RoundedCornerShape(AppRadius.Sm))
+                            .background(appPalette().primary)
+                            .clickable { onRerun() }
+                            .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Xs),
+                    )
+                }
+                // 闪烁光标（仅运行中）
+                if (running) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier
+                                .padding(bottom = AppSpacing.Xs)
+                                .size(AppSpacing.Sm)
+                                .alpha(blink)
+                                .background(AppColor.StatusSuccess),
+                        )
+                    }
                 }
             }
         }
