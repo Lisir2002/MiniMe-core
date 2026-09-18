@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
 import com.mini.me_core.feature.agent.presentation.MessageRole
 import com.mini.me_core.feature.agent.presentation.AgentAttachment
@@ -172,6 +173,20 @@ private fun AssistantMessageNode(
 /** 工具调用卡：已完成工具渲染为 Success/Error；文件 diff / 文件状态 / 引用来源走结构化新卡。 */
 @Composable
 private fun ToolMessageNode(msg: AgentUIMessage, modifier: Modifier = Modifier) {
+    // 用量行：回合统计不再用卡片，直接渲染一行 12sp 灰字（无底/边框/箭头/折叠），
+    // 落在工具链卡下方、与其它行水平对齐，垂直留白极小。
+    if (msg.toolName == "usage") {
+        Text(
+            text = msg.content,
+            style = MaterialTheme.typography.bodySmall,
+            fontSize = 12.sp,
+            color = appPalette().labelSecondary,
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppLayout.PageHorizontal, vertical = AppSpacing.Xs),
+        )
+        return
+    }
     val state = if (msg.isError) AppToolCallState.Error else AppToolCallState.Success
     val command = remember(msg.toolArgs) { bashCommandFromArgs(msg.toolArgs) }
     val isBash = command != null
@@ -392,7 +407,12 @@ internal fun List<AgentUIMessage>.toChatBlocks(): List<ChatBlock> {
         }
     }
     for (m in this) {
-        if (m.role == MessageRole.TOOL) {
+        // 用量行（toolName=="usage"）不并入工具链折叠组：先 flush 当前组，再单独成一行，
+        // 使其落在工具链卡下方、且不被收进展开列表里。
+        if (m.role == MessageRole.TOOL && m.toolName == "usage") {
+            flush()
+            result.add(ChatBlock.Single(m))
+        } else if (m.role == MessageRole.TOOL) {
             group.add(m)
         } else {
             flush()

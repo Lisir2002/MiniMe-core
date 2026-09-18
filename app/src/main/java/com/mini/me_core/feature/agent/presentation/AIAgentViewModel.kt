@@ -1067,24 +1067,16 @@ class AIAgentViewModel @Inject constructor(
                         // 本分支仅作穷举兜底（workflow 不产出该事件）。
                     }
                     is AgentEvent.TurnUsage -> {
-                        // 用量卡片（D2-4）：回合结束展示本回合增量 + 会话累计，仅 token 不估成本。
-                        // 落库为轻量工具卡片（toolName=usage），Room Flow 自动驱动 UI 渲染。
+                        // 用量行（D2-4）：回合结束在工具链卡下方渲染一行 12sp 灰字，不再用卡片。
+                        // 文案固定：本回合 · 调用 N 个工具 · 用时 Xs · Xk tokens。
                         setStreamingText(sessionId, null)
                         setStreamingReasoning(sessionId, null)
                         val msgId = "usage_${event.taskId}_${System.nanoTime()}"
-                        val turnText = context.getString(
-                            R.string.agent_usage_turn,
-                            event.turn.tokensIn,
-                            event.turn.tokensOut,
-                            event.turn.totalTokens,
-                            event.turn.toolCalls,
-                            event.turn.durationMs
-                        )
-                        val sessionText = context.getString(
-                            R.string.agent_usage_session,
-                            event.session.tokensIn + event.session.tokensOut,
-                            event.session.count
-                        )
+                        val seconds = event.turn.durationMs / 1000.0
+                        val secText = if (seconds >= 1.0) "%.0fs".format(seconds) else "%.1fs".format(seconds)
+                        val total = event.turn.totalTokens
+                        val tokText = if (total >= 1000) "%.1fk".format(total / 1000.0) else "$total"
+                        val turnText = "本回合 · 调用 ${event.turn.toolCalls} 个工具 · 用时 $secText · $tokText tokens"
                         messagePersistenceUseCase.persist(
                             sessionId,
                             MessageRole.TOOL,
@@ -1092,7 +1084,6 @@ class AIAgentViewModel @Inject constructor(
                             id = msgId,
                             taskId = taskId,
                             toolName = "usage",
-                            toolArgs = sessionText,
                             isError = false
                         )
                     }
