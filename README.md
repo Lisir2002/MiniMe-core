@@ -51,6 +51,7 @@ MiniMe-core 是一款在 Android 手机上运行的 AI 编程工具，将大语�
 ## 功能特性
 
 - **AI Agent** — 支持 Anthropic（Claude）、OpenAI（GPT）、Gemini 等多家提供商，通过 **20+ 个内置工具**（文件读写/编辑、Shell 执行、终端管理、网页搜索/抓取、图片生成、MCP 管理等）与开发环境深度交互；支持流式输出、上下文压缩、多会话管理、PLAN/BUILD/AUTO 三种执行模式
+- **新版 UI 层** — 独立 `:newui` 模块，iOS 简约设计语言 + Design Token 四层体系（token / 组件覆盖 / Modifier / 日夜接入口）；对话流组件（气泡/思考块/工具卡/终端卡/Markdown/LaTeX）、门户底栏三 tab（对话/办公/设置）、办公扇形轮盘（浏览器/终端/Git）
 - **权限与安全** — 七层权限评估引擎：灾难性命令拦截、PLAN 模式只读约束、Shell 静态分析、内置只读白名单、用户审批与规则记忆，确保 AI 操作可控
 - **检查点与回滚** — 文件修改前自动创建检查点快照，支持随时回滚到任意检查点
 - **内置终端** — 基于 Termux 组件 + PRoot Alpine Linux 容器，提供完整 Linux 命令行环境，支持后台常驻、多标签管理、**7 个内置功能包**（Python/Node/Git/Bash/rg/网络工具/QEMU x86 转译）
@@ -175,6 +176,7 @@ app/src/main/java/com/mini/me_core/
 │   ├── t2i/             # 文生图（Provider 抽象、SYNC/ASYNC/AUTO 端点）
 │   ├── terminal/        # 终端模拟与会话管理（本地 PRoot + 远程 SSH，7 个内置 Bundle）
 │   └── workspace/       # 工作区与文档管理（本地 + 远程 SFTP/FTP 同步）
+├── newui/               # 新版 UI 层：Design Token + 90+ 组件 + 对话流演示页 + 图标样板
 ├── AIEditorApp.kt       # Application 入口（BC 注册、凭据桥、MCP、保活服务初始化）
 └── MainActivity.kt      # 主 Activity（NavHost + Drawer + 全局凭据弹窗）
 ```
