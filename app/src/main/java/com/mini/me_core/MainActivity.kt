@@ -33,6 +33,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -277,11 +279,11 @@ class MainActivity : ComponentActivity() {
  *
  * ViewModel 提升到这一层创建，以便 Drawer 内容和 AIChatPanel 共享同一实例。
  */
-@Composable
 /** 门户办公工具上次选择的持久化命名空间与键（沿用 KVStore）。 */
 private const val PORTAL_NS = "portal"
 private const val PORTAL_LAST_TOOL_KEY = "portal_last_office_tool"
 
+@Composable
 fun AppNavigation(
     browserController: com.mini.me_core.feature.browser.domain.BrowserController,
     browserLoginPromptManager: com.mini.me_core.feature.browser.domain.BrowserLoginPromptManager,
@@ -480,7 +482,7 @@ fun AppNavigation(
                                 centerIcon = if (portalTab == PortalTab.Work) {
                                     workTool.icon
                                 } else {
-                                    androidx.compose.material.icons.Icons.Rounded.Build
+                                    Icons.Rounded.Build
                                 },
                                 fanExpanded = fanExpanded,
                                 onChat = {

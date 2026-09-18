@@ -144,7 +144,7 @@ private fun AssistantMessageNode(
         state = if (msg.isError) AppChatMessageState.Error else AppChatMessageState.Complete,
         modifier = modifier,
         leadingContent = if (hasReasoning) {
-            { AppThinkingBlock(text = msg.reasoning.orEmpty(), initiallyExpanded = false) }
+            { AppThinkingBlock(text = msg.reasoning.orEmpty(), initiallyExpanded = true) }
         } else null,
         // 长按助手消息提供「编辑此条重写」「从这里新开对话」。
         onRegenerate = { onEditMessage(msg) },

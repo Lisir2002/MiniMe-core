@@ -66,7 +66,8 @@ fun AppThinkingBlock(
     label: String = "思考过程",
     initiallyExpanded: Boolean = true,
     isStreaming: Boolean = false,
-    collapseLineLimit: Int = 8,
+    // 思考块默认显示；正文超过 2 行才自动折叠（折叠态显示前 2 行 + 展开入口）。
+    collapseLineLimit: Int = 2,
 ) {
     var userToggled by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(initiallyExpanded) }
@@ -137,20 +138,44 @@ fun AppThinkingBlock(
                     .rotate(rotation),
             )
         }
-        AnimatedVisibility(
-            visible = effectiveExpanded,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut(),
-        ) {
-            AppMarkdownText(
+        if (effectiveExpanded) {
+            AnimatedVisibility(
+                visible = true,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                AppMarkdownText(
+                    text = text,
+                    style = MaterialTheme.typography.bodySmall,
+                    colors = AppMarkdownColors(text = appPalette().labelSecondary),
+                    modifier = Modifier.padding(
+                        start = AppSpacing.Md,
+                        end = AppSpacing.Md,
+                        bottom = AppSpacing.Md,
+                    ),
+                )
+            }
+        } else {
+            // 自动折叠态：仅显示前 2 行预览 + 「展开」入口（点击展开全部）。
+            Text(
                 text = text,
                 style = MaterialTheme.typography.bodySmall,
-                colors = AppMarkdownColors(text = appPalette().labelSecondary),
-                modifier = Modifier.padding(
-                    start = AppSpacing.Md,
-                    end = AppSpacing.Md,
-                    bottom = AppSpacing.Md,
-                ),
+                color = appPalette().labelSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(start = AppSpacing.Md, end = AppSpacing.Md, top = AppSpacing.Xs)
+                    .clickable { userToggled = true; expanded = true },
+            )
+            Text(
+                text = "展开",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = appPalette().accent,
+                modifier = Modifier
+                    .align(Alignment.Start)
+                    .padding(start = AppSpacing.Md, bottom = AppSpacing.Md)
+                    .clickable { userToggled = true; expanded = true },
             )
         }
     }
