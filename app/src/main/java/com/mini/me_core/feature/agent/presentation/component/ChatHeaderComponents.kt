@@ -35,12 +35,9 @@ import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.settings.presentation.component.ModelLogoIcon
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.Public
-import androidx.compose.material.icons.rounded.Terminal
 
 /**
  * 紧凑型聊天顶部栏。
@@ -61,9 +58,6 @@ internal fun ChatHeader(
     outputTokens: Int,
     onOpenDrawer: () -> Unit,
     onNewChat: () -> Unit,
-    onNavigateToTerminal: () -> Unit,
-    onNavigateToGit: () -> Unit,
-    onNavigateToBrowser: () -> Unit = {},
     connectionState: com.mini.me_core.feature.agent.domain.container.ConnectionState? = null
 ) {
     Surface(
@@ -122,36 +116,6 @@ internal fun ChatHeader(
                         Icons.Rounded.Add,
                         contentDescription = stringResource(R.string.chat_new_session),
                         tint = headerIconTint(light = Color(0xFF4C8DFF), dark = Color(0xFF7C9FFF)),
-                        modifier = Modifier.size(20.dp))
-                }
-                IconButton(
-                    onClick = onNavigateToGit,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        Icons.Rounded.AccountTree,
-                        contentDescription = stringResource(R.string.chat_open_git),
-                        tint = headerIconTint(light = Color(0xFFF59E0B), dark = Color(0xFFFBBF24)),
-                        modifier = Modifier.size(20.dp))
-                }
-                IconButton(
-                    onClick = onNavigateToTerminal,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        Icons.Rounded.Terminal,
-                        contentDescription = stringResource(R.string.chat_open_terminal),
-                        tint = headerIconTint(light = Color(0xFF22C55E), dark = Color(0xFF4ADE80)),
-                        modifier = Modifier.size(20.dp))
-                }
-                IconButton(
-                    onClick = onNavigateToBrowser,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        Icons.Rounded.Public,
-                        contentDescription = stringResource(R.string.chat_open_browser),
-                        tint = headerIconTint(light = Color(0xFF00B4A8), dark = Color(0xFF2DD4BF)),
                         modifier = Modifier.size(20.dp))
                 }
             }

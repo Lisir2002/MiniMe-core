@@ -305,9 +305,6 @@ fun AIChatPanel(
                     scope.launch { drawerState.open() }
                 },
                 onNewChat = { viewModel.newSession() },
-                onNavigateToTerminal = onNavigateToTerminal,
-                onNavigateToGit = onNavigateToGit,
-                onNavigateToBrowser = onNavigateToBrowser,
                 connectionState = connectionState?.takeIf { isRemote }
             )
         }
