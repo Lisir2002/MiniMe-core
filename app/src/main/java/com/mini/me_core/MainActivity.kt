@@ -292,6 +292,13 @@ fun AppNavigation(
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
+    // Activity 级别的 ViewModel——Drawer 和 AIChatPanel 共享同一个实例。
+    val agentViewModel: AIAgentViewModel = hiltViewModel()
+    val settingsViewModel: SettingsViewModel = hiltViewModel()
+    val workspaceViewModel: WorkspaceViewModel = hiltViewModel()
+    // 侧边栏「工作目录 → 当前工作台」文件浏览数据源（Activity 级，切换工作区时自动复位到根目录）。
+    val workspaceFileViewModel: WorkspaceFileViewModel = hiltViewModel()
+
     // ── 新 UI 门户状态：底栏三 tab（对话 / 办公 / 设置）原地切换，不进 NavHost 新路由 ──
     var portalTab by remember { mutableStateOf(PortalTab.Chat) }
     // 办公扇形选中的工具（浏览器 / 终端）；中央按钮文字随此与 tab 联动。
@@ -307,13 +314,6 @@ fun AppNavigation(
         fanExpanded = false
         portalTab = PortalTab.Settings
     }
-
-    // Activity 级别的 ViewModel——Drawer 和 AIChatPanel 共享同一个实例。
-    val agentViewModel: AIAgentViewModel = hiltViewModel()
-    val settingsViewModel: SettingsViewModel = hiltViewModel()
-    val workspaceViewModel: WorkspaceViewModel = hiltViewModel()
-    // 侧边栏「工作目录 → 当前工作台」文件浏览数据源（Activity 级，切换工作区时自动复位到根目录）。
-    val workspaceFileViewModel: WorkspaceFileViewModel = hiltViewModel()
 
     // 侧边栏打开时，系统返回键先收起侧边栏。
     BackHandler(enabled = drawerState.isOpen) {
