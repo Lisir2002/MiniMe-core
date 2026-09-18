@@ -454,19 +454,7 @@ fun AIChatPanel(
             // 工具审批不再以浮层卡片形式出现在消息流里，改为吸附到输入框上方常驻条（见下方审批 DockBar），
             // 未处理审批始终有可见入口；点批准/拒绝后自动消失。
 
-            AnimatedVisibility(
-                visible = pendingQuestion != null,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                pendingQuestion?.let { question ->
-                    AskUserQuestionPanel(
-                        question = question,
-                        onConfirm = { answer -> viewModel.resolveUserQuestion(question.id, answer) },
-                        onSkip = { viewModel.resolveUserQuestion(question.id, UserQuestionAnswer(emptyList())) }
-                    )
-                }
-            }
+            // 澄清/提问改为吸附输入框上方的紧凑单题条（见下方 ClarifyDockBar），层级：提问条→审批条→任务条→输入框。
 
             AnimatedVisibility(
                 visible = planApproval != null,
@@ -492,7 +480,15 @@ fun AIChatPanel(
                 }
             }
 
-            // 常驻条垂直顺序（从上到下）：审批条 → 任务清单条 → 输入框。均紧凑单行。
+            // 常驻条垂直顺序（从上到下）：提问条 → 审批条 → 任务清单条 → 输入框。均紧凑单行/两行。
+            pendingQuestion?.let { question ->
+                ClarifyDockBar(
+                    question = question,
+                    onSubmit = { answer -> viewModel.resolveUserQuestion(question.id, answer) },
+                    onSkip = { viewModel.resolveUserQuestion(question.id, UserQuestionAnswer(emptyList())) },
+                )
+            }
+
             // 审批吸附条：未处理审批始终常驻可见，紧凑单行；批准/拒绝后自动消失。
             pendingPermission?.let { request ->
                 Row(
