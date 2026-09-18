@@ -3,6 +3,7 @@ package com.mini.me_core.newui.designsystem.layout
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -64,9 +65,11 @@ private const val FAB_PRESSED_SCALE = 0.92f
 fun PortalBottomBar(
     selected: PortalTab,
     centerLabel: String,
+    centerIcon: ImageVector,
     fanExpanded: Boolean,
     onChat: () -> Unit,
-    onWork: () -> Unit,
+    onCenterTap: () -> Unit,
+    onCenterLongPress: () -> Unit,
     onSettings: () -> Unit,
 ) {
     val palette = appPalette()
@@ -116,10 +119,11 @@ fun PortalBottomBar(
                 Spacer(Modifier.weight(1f))
             } else {
                 CenterTabItem(
-                    icon = Icons.Rounded.Build,
+                    icon = centerIcon,
                     label = centerLabel,
                     selected = selected == PortalTab.Work,
-                    onClick = onWork,
+                    onClick = onCenterTap,
+                    onLongClick = onCenterLongPress,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -154,15 +158,16 @@ fun PortalBottomBar(
                         .size(fabDiameter)
                         .clip(CircleShape)
                         .background(palette.primary)
-                        .clickable(
-                            interactionSource = interactionSource,
-                            indication = null,
-                            onClick = onWork,
-                        ),
+                        .pointerInput(onCenterTap, onCenterLongPress) {
+                            detectTapGestures(
+                                onTap = { onCenterTap() },
+                                onLongPress = { onCenterLongPress() },
+                            )
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Build,
+                        imageVector = centerIcon,
                         contentDescription = centerLabel,
                         tint = palette.onPrimary,
                         modifier = Modifier.size(AppSizing.IconL),
@@ -189,17 +194,19 @@ private fun CenterTabItem(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val palette = appPalette()
     val tint = if (selected) palette.primary else palette.labelSecondary
     Column(
         modifier = modifier
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            )
+            .pointerInput(onClick, onLongClick) {
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onLongPress = { onLongClick() },
+                )
+            }
             .padding(vertical = AppSpacing.Xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

@@ -31,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -130,6 +131,10 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var dataSafetyNotifier: com.mini.me_core.feature.backup.data.DataSafetyNotifier
 
+    /** 门户办公工具上次选择的持久化（沿用项目 KVStore，不引入新框架）。 */
+    @Inject
+    lateinit var kvStore: com.mini.me_core.datalayer.store.KVStore
+
     private val storagePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
@@ -209,6 +214,7 @@ class MainActivity : ComponentActivity() {
                             browserTakeoverManager = browserTakeoverManager,
                             browserCredentialStore = browserCredentialStore,
                             dataSafetyNotifier = dataSafetyNotifier,
+                            kvStore = kvStore,
                             currentThemeMode = themeMode,
                             onCycleTheme = cycleTheme
                         )
@@ -272,12 +278,17 @@ class MainActivity : ComponentActivity() {
  * ViewModel 提升到这一层创建，以便 Drawer 内容和 AIChatPanel 共享同一实例。
  */
 @Composable
+/** 门户办公工具上次选择的持久化命名空间与键（沿用 KVStore）。 */
+private const val PORTAL_NS = "portal"
+private const val PORTAL_LAST_TOOL_KEY = "portal_last_office_tool"
+
 fun AppNavigation(
     browserController: com.mini.me_core.feature.browser.domain.BrowserController,
     browserLoginPromptManager: com.mini.me_core.feature.browser.domain.BrowserLoginPromptManager,
     browserTakeoverManager: com.mini.me_core.feature.browser.domain.BrowserTakeoverManager,
     browserCredentialStore: com.mini.me_core.feature.browser.domain.BrowserCredentialStore,
     dataSafetyNotifier: com.mini.me_core.feature.backup.data.DataSafetyNotifier,
+    kvStore: com.mini.me_core.datalayer.store.KVStore,
     currentThemeMode: AppThemeMode,
     onCycleTheme: () -> Unit
 ) {
@@ -300,8 +311,18 @@ fun AppNavigation(
 
     // ── 新 UI 门户状态：底栏三 tab（对话 / 办公 / 设置）原地切换，不进 NavHost 新路由 ──
     var portalTab by remember { mutableStateOf(PortalTab.Chat) }
-    // 办公扇形选中的工具（浏览器 / 终端）；中央按钮文字随此与 tab 联动。
-    var workTool by remember { mutableStateOf(WorkFanItem.Browser) }
+    // 办公扇形选中的工具（浏览器 / 终端 / Git）；中央按钮文字随此与 tab 联动。
+    // 持久化：退出重进恢复上次选择（key 语义命名 portal_last_office_tool，沿用项目 KVStore）。
+    var workTool by remember {
+        mutableStateOf(
+            kvStore.getString(PORTAL_NS, PORTAL_LAST_TOOL_KEY)
+                ?.let { n -> WorkFanItem.entries.firstOrNull { it.name == n && it.enabled } }
+                ?: WorkFanItem.Browser
+        )
+    }
+    LaunchedEffect(workTool) {
+        kvStore.putString(PORTAL_NS, PORTAL_LAST_TOOL_KEY, workTool.name)
+    }
     var fanExpanded by remember { mutableStateOf(false) }
 
     /** 从二级路由（terminal_settings / 数据保全告警）回到门户并直跳设置指定分区。 */
@@ -455,12 +476,26 @@ fun AppNavigation(
                                     portalTab == PortalTab.Work && workTool == WorkFanItem.Git -> "Git"
                                     else -> "办公"
                                 },
+                                // 图标随当前页同步：办公页 = 对应工具图标，对话/设置页 = 默认办公图标。
+                                centerIcon = if (portalTab == PortalTab.Work) {
+                                    workTool.icon
+                                } else {
+                                    androidx.compose.material.icons.Icons.Rounded.Build
+                                },
                                 fanExpanded = fanExpanded,
                                 onChat = {
                                     fanExpanded = false
                                     portalTab = PortalTab.Chat
                                 },
-                                onWork = { fanExpanded = !fanExpanded },
+                                // 单击：直接切到上次选中的办公页（不再弹扇形）；扇形展开时单击收起。
+                                onCenterTap = {
+                                    if (fanExpanded) fanExpanded = false
+                                    else portalTab = PortalTab.Work
+                                },
+                                // 长按：才唤起扇形菜单（带 LongPress 触觉反馈）。
+                                onCenterLongPress = com.mini.me_core.newui.designsystem.component.AppHaptics.click {
+                                    fanExpanded = !fanExpanded
+                                },
                                 onSettings = {
                                     fanExpanded = false
                                     portalTab = PortalTab.Settings
@@ -526,6 +561,8 @@ fun AppNavigation(
                     // 办公扇形轮盘浮层：覆盖底栏上方，点空白收起。
                     WorkFanMenu(
                         expanded = fanExpanded,
+                        // 扇形里高亮当前正在看的工具项。
+                        selected = if (portalTab == PortalTab.Work) workTool else null,
                         onDismiss = { fanExpanded = false },
                         onSelect = { item ->
                             if (item.enabled) {

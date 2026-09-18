@@ -4,7 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -82,6 +84,7 @@ private val FAN_LABEL_LAG_MS: Long = AppMotion.Fast / 6
 @Composable
 fun WorkFanMenu(
     expanded: Boolean,
+    selected: WorkFanItem? = null,
     onDismiss: () -> Unit,
     onSelect: (WorkFanItem) -> Unit,
 ) {
@@ -90,12 +93,13 @@ fun WorkFanMenu(
         enter = fadeIn(animationSpec = AppMotion.standardTween<Float>()),
         exit = fadeOut(animationSpec = AppMotion.standardTween<Float>()),
     ) {
-        FanOverlay(onDismiss = onDismiss, onSelect = onSelect)
+        FanOverlay(selected = selected, onDismiss = onDismiss, onSelect = onSelect)
     }
 }
 
 @Composable
 private fun FanOverlay(
+    selected: WorkFanItem?,
     onDismiss: () -> Unit,
     onSelect: (WorkFanItem) -> Unit,
 ) {
@@ -141,6 +145,7 @@ private fun FanOverlay(
             ) {
                 FanItemColumn(
                     item = item,
+                    selected = item == selected,
                     iconProgress = iconProgress,
                     labelProgress = labelProgress,
                     onSelect = { if (item.enabled) onSelect(item) },
@@ -167,15 +172,27 @@ private fun rememberFanItemProgress(index: Int, extraDelay: Long): Float {
 @Composable
 private fun FanItemColumn(
     item: WorkFanItem,
+    selected: Boolean,
     iconProgress: Float,
     labelProgress: Float,
     onSelect: () -> Unit,
 ) {
     val palette = appPalette()
+    // 选中项 = 主色描边环 + 底纹填充 + 主色图标（与其余主色填充项区分）；不可用项仍灰显。
+    val bgColor = when {
+        !item.enabled -> palette.surfaceDim
+        selected -> palette.surface
+        else -> palette.primary
+    }
+    val iconTint = when {
+        !item.enabled -> palette.labelTertiary
+        selected -> palette.primary
+        else -> palette.onPrimary
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Surface(
             shape = CircleShape,
-            color = if (item.enabled) palette.primary else palette.surfaceDim,
+            color = bgColor,
             modifier = Modifier
                 .size(AppSizing.Fab)
                 .graphicsLayer {
@@ -185,6 +202,12 @@ private fun FanItemColumn(
                 }
                 .clip(CircleShape)
                 .then(
+                    if (selected) Modifier.border(
+                        BorderStroke(AppLayout.DividerThickness, palette.primary),
+                        CircleShape,
+                    ) else Modifier
+                )
+                .then(
                     if (item.enabled) Modifier.clickable(onClick = onSelect)
                     else Modifier
                 ),
@@ -193,7 +216,7 @@ private fun FanItemColumn(
                 Icon(
                     imageVector = item.icon,
                     contentDescription = item.label,
-                    tint = if (item.enabled) palette.onPrimary else palette.labelTertiary,
+                    tint = iconTint,
                     modifier = Modifier.size(AppSizing.IconL),
                 )
             }
@@ -203,7 +226,7 @@ private fun FanItemColumn(
             text = item.label,
             style = MaterialTheme.typography.labelMedium.copy(fontSize = AppType.Caption),
             fontWeight = if (item.enabled) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (item.enabled) palette.ink else palette.labelTertiary,
+            color = if (selected) palette.primary else if (item.enabled) palette.ink else palette.labelTertiary,
             maxLines = 1,
             modifier = Modifier.graphicsLayer { alpha = labelProgress },
         )

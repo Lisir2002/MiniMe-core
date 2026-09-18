@@ -287,6 +287,8 @@ fun AIChatPanel(
     // 流式尾巴是否有任何可见内容：首条消息模型必然先输出 thinking，
     // 此时历史 messages 仍为空，但流式思考块必须照常渲染（与后续消息一致），不能退回欢迎页。
     val showStreamingTail = showReasoning || showStreaming || showThinking || isCompacting || showRetrying
+    // 历史消息块（相邻 TOOL 折叠为工具链）：在 @Composable 外层算好，再喂给非 composable 的 LazyListScope content。
+    val historyBlocks = remember(messages) { messages.toChatBlocks().asReversed() }
 
     val planApproval by viewModel.pendingPlanApproval.collectAsStateWithLifecycle()
     val changes by viewModel.changes.collectAsStateWithLifecycle()
@@ -384,7 +386,6 @@ fun AIChatPanel(
                         }
                         // 历史消息按时间倒序传入（reverseLayout 下最新持久消息紧贴流式尾巴上方）。
                         // 相邻 TOOL 消息折叠成一条工具链块（ChatBlock.ToolGroup），其余单条渲染。
-                        val historyBlocks = remember(messages) { messages.toChatBlocks().asReversed() }
                         items(
                             items = historyBlocks,
                             key = { block ->
