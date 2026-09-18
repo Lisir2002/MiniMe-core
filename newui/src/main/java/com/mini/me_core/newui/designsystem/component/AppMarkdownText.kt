@@ -125,6 +125,9 @@ fun AppMarkdownText(
                     url = segment.url,
                     color = color,
                 )
+                is MdSegment.MathBlock -> MathBlockView(
+                    formula = segment.formula,
+                )
             }
         }
     }
@@ -147,6 +150,9 @@ internal sealed interface MdSegment {
 
     /** 图片占位：暂不下载，仅以 [alt] + “图片”标记渲染。 */
     data class Image(val alt: String, val url: String) : MdSegment
+
+    /** 块级数学公式 $$...$$，二期接 KaTeX，先按灰底等宽渲染。 */
+    data class MathBlock(val formula: String) : MdSegment
 }
 
 internal fun parseSegments(text: String): List<MdSegment> {
@@ -156,6 +162,20 @@ internal fun parseSegments(text: String): List<MdSegment> {
     while (i < lines.size) {
         val trimmedStart = lines[i].trimStart()
         when {
+            trimmedStart.startsWith("$$") -> {
+                val first = trimmedStart.removePrefix("$$").trim()
+                val buf = StringBuilder(first)
+                i++
+                var closed = first.endsWith("$$")
+                while (i < lines.size && !closed) {
+                    val l = lines[i]
+                    buf.append('\n').append(l)
+                    if (l.trim().endsWith("$$")) closed = true
+                    i++
+                }
+                val f = buf.toString().trim().removeSuffix("$$").trim()
+                if (f.isNotEmpty()) result += MdSegment.MathBlock(f)
+            }
             trimmedStart.startsWith("```") -> {
                 val buf = StringBuilder()
                 i++
@@ -546,8 +566,24 @@ private fun ImagePlaceholderView(alt: String, url: String, color: Color) {
 }
 
 @Composable
-private fun CodeBlockView(code: String, background: Color) {
+private fun MathBlockView(formula: String) {
     Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AppRadius.Sm))
+            .background(appPalette().surfaceDim)
+            .padding(AppSpacing.Md),
+    ) {
+        Text(
+            text = formula,
+            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+            color = appPalette().primary,
+        )
+    }
+}
+
+@Composable
+private fun CodeBlockView(code: String, background: Color) {    Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(background, RoundedCornerShape(AppRadius.Sm))
