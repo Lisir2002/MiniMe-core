@@ -1729,6 +1729,13 @@
     <string name="skill_conversation_entry">技能</string>
     <string name="skill_conversation_disabled">本对话已禁用（可恢复）</string>
 
+    <!-- 技能选择底部弹窗（newui 层） -->
+    <string name="skill_picker_title">技能选择</string>
+    <string name="skill_picker_search_hint">搜索技能…</string>
+    <string name="skill_picker_section_enabled">已启用</string>
+    <string name="skill_picker_section_disabled">未启用</string>
+    <string name="skill_picker_empty">没有匹配的技能</string>
+
     <string name="common_compaction_marker">已压缩历史上下文</string>
     <string name="common_attachment_fallback">附件</string>
     <string name="common_tool_call_fallback">工具调用</string>
