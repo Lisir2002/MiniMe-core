@@ -1729,4 +1729,7 @@
     <string name="skill_conversation_entry">技能</string>
     <string name="skill_conversation_disabled">本对话已禁用（可恢复）</string>
 
+    <string name="common_compaction_marker">已压缩历史上下文</string>
+    <string name="common_attachment_fallback">附件</string>
+    <string name="common_tool_call_fallback">工具调用</string>
 </resources>

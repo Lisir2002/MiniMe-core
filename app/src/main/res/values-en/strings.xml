@@ -1729,4 +1729,7 @@
     <string name="skill_conversation_entry">Skills</string>
     <string name="skill_conversation_disabled">Disabled in this conversation (can be restored)</string>
 
+    <string name="common_compaction_marker">Conversation history compacted</string>
+    <string name="common_attachment_fallback">Attachment</string>
+    <string name="common_tool_call_fallback">Tool call</string>
 </resources>
