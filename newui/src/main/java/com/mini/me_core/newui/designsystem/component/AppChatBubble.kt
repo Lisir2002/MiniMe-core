@@ -49,6 +49,17 @@ import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 enum class AppChatMessageState { Pending, Streaming, Complete, Error }
 
 /**
+ * 气泡颜色组覆盖：全字段可空，默认 null 走主题。
+ * [background] 气泡底色（用户侧默认 = accent，AI 侧默认 = card）；
+ * [text] 正文色；[secondary] 次级强调（行内代码字色 / 光标 / 打字点）。
+ */
+data class AppChatBubbleColors(
+    val background: Color? = null,
+    val text: Color? = null,
+    val secondary: Color? = null,
+)
+
+/**
  * 聊天气泡（分子组 · AppChatBubble）：用户侧品牌色胶囊 / AI 侧表面卡片奶白描边，
  * 支撑 AI 对话 / Agent 审批等高信息密度会话流。
  *
@@ -64,6 +75,7 @@ fun AppChatBubble(
     state: AppChatMessageState = AppChatMessageState.Complete,
     isUser: Boolean = false,
     accent: Color = appPalette().primary,
+    colors: AppChatBubbleColors? = null,
     onRetry: (() -> Unit)? = null,
 ) {
     var entered by remember { mutableStateOf(false) }
@@ -80,13 +92,15 @@ fun AppChatBubble(
         bottomStart = AppRadius.Lg,
         bottomEnd = AppRadius.Lg,
     )
-    val bg = if (isUser) accent else appPalette().card
+    val bg = colors?.background ?: if (isUser) accent else appPalette().card
     val borderColor = when {
         state == AppChatMessageState.Error -> AppColor.StatusDanger
         !isUser -> appPalette().separator
         else -> Color.Transparent
     }
-    val contentColor = if (isUser) appPalette().onPrimary else appPalette().ink
+    val contentColor = colors?.text ?: if (isUser) appPalette().onPrimary else appPalette().ink
+    val secondaryColor = colors?.secondary ?: if (isUser) appPalette().onPrimary else appPalette().primary
+    val codeBackground = if (isUser) appPalette().onPrimary.copy(alpha = 0.14f) else appPalette().surfaceDim
 
     Box(
         modifier = modifier
@@ -112,21 +126,25 @@ fun AppChatBubble(
                 AppMarkdownText(
                     text = text,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = contentColor,
-                    codeBlockBackground = if (isUser) appPalette().onPrimary.copy(alpha = 0.14f) else appPalette().surfaceDim,
-                    inlineCodeColor = if (isUser) appPalette().onPrimary else appPalette().primary,
-                    inlineCodeBackground = if (isUser) appPalette().onPrimary.copy(alpha = 0.14f) else appPalette().surfaceDim,
+                    colors = AppMarkdownColors(
+                        text = contentColor,
+                        codeFg = secondaryColor,
+                        codeBg = codeBackground,
+                        blockBg = codeBackground,
+                    ),
                 )
-                StreamingCaret(color = if (isUser) appPalette().onPrimary else appPalette().primary)
+                StreamingCaret(color = secondaryColor)
             }
             AppChatMessageState.Error -> Column {
                 AppMarkdownText(
                     text = text,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = contentColor,
-                    codeBlockBackground = if (isUser) appPalette().onPrimary.copy(alpha = 0.14f) else appPalette().surfaceDim,
-                    inlineCodeColor = if (isUser) appPalette().onPrimary else appPalette().primary,
-                    inlineCodeBackground = if (isUser) appPalette().onPrimary.copy(alpha = 0.14f) else appPalette().surfaceDim,
+                    colors = AppMarkdownColors(
+                        text = contentColor,
+                        codeFg = secondaryColor,
+                        codeBg = codeBackground,
+                        blockBg = codeBackground,
+                    ),
                 )
                 if (onRetry != null) {
                     Row(
@@ -143,11 +161,13 @@ fun AppChatBubble(
             AppChatMessageState.Complete -> AppMarkdownText(
                 text = text,
                 style = MaterialTheme.typography.bodyMedium,
-                color = contentColor,
                 fontWeight = if (isUser) FontWeight.Medium else FontWeight.Normal,
-                codeBlockBackground = if (isUser) appPalette().onPrimary.copy(alpha = 0.14f) else appPalette().surfaceDim,
-                inlineCodeColor = if (isUser) appPalette().onPrimary else appPalette().primary,
-                inlineCodeBackground = if (isUser) appPalette().onPrimary.copy(alpha = 0.14f) else appPalette().surfaceDim,
+                colors = AppMarkdownColors(
+                    text = contentColor,
+                    codeFg = secondaryColor,
+                    codeBg = codeBackground,
+                    blockBg = codeBackground,
+                ),
             )
         }
     }

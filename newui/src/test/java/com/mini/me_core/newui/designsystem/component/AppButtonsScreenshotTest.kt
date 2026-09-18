@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.mini.me_core.newui.designsystem.theme.AppTheme
+import com.mini.me_core.newui.designsystem.theme.AppUiMode
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,7 +35,7 @@ class AppButtonsScreenshotTest {
     @Test
     fun buttonVariants_light() {
         rule.setContent {
-            AppTheme(darkTheme = false) {
+            AppTheme(uiMode = AppUiMode.Light) {
                 Surface {
                     Column(
                         modifier = Modifier.padding(16.dp),

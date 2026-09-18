@@ -51,7 +51,7 @@ val DarkPalette = AppPalette(
     labelSecondary = AppColor.OnDarkSecondaryLabel,
     labelTertiary = AppColor.OnDarkSecondaryLabel,
     separator = AppColor.SeparatorOnDark,
-    accent = Color(0xFF64D2FF),
+    accent = AppColor.OnDarkAccent,
     primaryOverlay12 = AppColor.PrimaryOverlay12Dark,
     primaryOverlay14 = AppColor.PrimaryOverlay14Dark,
 )

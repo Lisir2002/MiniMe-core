@@ -49,6 +49,18 @@ import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 
 /**
+ * 消息行颜色组覆盖：全字段可空，默认 null 走主题。
+ * 气泡三色组（透传给 [AppChatBubble]）+ 头部 [name] 角色名 / [timestamp] 时间文字色。
+ */
+data class AppMessageRowColors(
+    val bubbleBackground: Color? = null,
+    val bubbleText: Color? = null,
+    val bubbleSecondary: Color? = null,
+    val name: Color? = null,
+    val timestamp: Color? = null,
+)
+
+/**
  * 消息行（分子组 · AppMessageRow）：头像 + 角色头部（姓名/时间）+ [AppChatBubble] + 操作区。
  *
  * - 双侧头像：AI 左、用户右，首字母品牌渐变圆（[AppAvatar]）。
@@ -70,6 +82,7 @@ fun AppMessageRow(
     timestamp: String? = null,
     grouped: Boolean = false,
     accent: Color = appPalette().primary,
+    colors: AppMessageRowColors? = null,
     leadingContent: @Composable (ColumnScope.() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
     onCopy: (() -> Unit)? = null,
@@ -84,6 +97,8 @@ fun AppMessageRow(
 ) {
     val label = name ?: if (isUser) "你" else "AI"
     val avatarText = (avatarLabel ?: label).take(1)
+    val nameColor = colors?.name ?: appPalette().labelSecondary
+    val timestampColor = colors?.timestamp ?: appPalette().labelTertiary
     var actionsVisible by remember { mutableStateOf(false) }
     val hasActions = onCopy != null || onRetry != null || onDelete != null || onRegenerate != null
 
@@ -101,7 +116,7 @@ fun AppMessageRow(
                 horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
             ) {
                 if (!grouped) {
-                    HeaderRow(label = label, timestamp = timestamp, isUser = isUser)
+                    HeaderRow(label = label, timestamp = timestamp, isUser = isUser, nameColor = nameColor, timestampColor = timestampColor)
                     Spacer(Modifier.height(AppSpacing.Tiny))
                 }
                 // 头像下方、气泡上方的引导内容（如思考过程块），与气泡同列对齐。
@@ -119,6 +134,11 @@ fun AppMessageRow(
                         state = state,
                         isUser = isUser,
                         accent = accent,
+                        colors = AppChatBubbleColors(
+                            background = colors?.bubbleBackground,
+                            text = colors?.bubbleText,
+                            secondary = colors?.bubbleSecondary,
+                        ),
                         onRetry = onRetry,
                         modifier = if (hasActions) {
                             Modifier.combinedClickable(
@@ -208,19 +228,19 @@ fun AppMessageRow(
 
 /** 消息头部：角色名（SemiBold 次级文字）+ 时间（三级文字）。 */
 @Composable
-private fun HeaderRow(label: String, timestamp: String?, isUser: Boolean) {
+private fun HeaderRow(label: String, timestamp: String?, isUser: Boolean, nameColor: Color, timestampColor: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
-            color = appPalette().labelSecondary,
+            color = nameColor,
         )
         if (timestamp != null) {
             Text(
                 text = timestamp,
                 style = MaterialTheme.typography.labelSmall,
-                color = appPalette().labelTertiary,
+                color = timestampColor,
                 modifier = Modifier.padding(start = AppSpacing.Xs),
             )
         }

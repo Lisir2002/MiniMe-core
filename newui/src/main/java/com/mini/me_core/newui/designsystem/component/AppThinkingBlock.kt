@@ -145,7 +145,7 @@ fun AppThinkingBlock(
             AppMarkdownText(
                 text = text,
                 style = MaterialTheme.typography.bodySmall,
-                color = appPalette().labelSecondary,
+                colors = AppMarkdownColors(text = appPalette().labelSecondary),
                 modifier = Modifier.padding(
                     start = AppSpacing.Md,
                     end = AppSpacing.Md,

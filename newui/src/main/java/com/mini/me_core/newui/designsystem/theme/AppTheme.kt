@@ -65,12 +65,21 @@ val AppTypography: Typography = AppType.Material
 
 @Composable
 fun AppTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    uiMode: AppUiMode = AppUiMode.Auto,
     content: @Composable () -> Unit,
 ) {
+    // 仅 Auto 模式才跟随系统；Light/Dark 由宿主/演示页强制，彻底不接旧 app 主题。
+    val darkTheme = when (uiMode) {
+        AppUiMode.Light -> false
+        AppUiMode.Dark -> true
+        AppUiMode.Auto -> isSystemInDarkTheme()
+    }
     val colorScheme = if (darkTheme) AppDarkScheme else AppLightScheme
     val palette = if (darkTheme) DarkPalette else LightPalette
-    CompositionLocalProvider(LocalAppPalette provides palette) {
+    CompositionLocalProvider(
+        LocalAppPalette provides palette,
+        LocalAppUiMode provides uiMode,
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = AppTypography,

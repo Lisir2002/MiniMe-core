@@ -38,6 +38,19 @@ object AppColor {
     val PrimaryOverlay14 = Color(0x240A84FF) // primary 14% 覆盖层（浅）
     val PrimaryOverlay12Dark = Color(0x1F3D9BFF) // primary 12% 覆盖层（深）
     val PrimaryOverlay14Dark = Color(0x243D9BFF) // primary 14% 覆盖层（深）
+    // 能力标签组
+    val CapVision = Color(0xFF0A84FF) // 能力标签·识图（iOS 系统蓝）
+    val CapTools = Color(0xFF34C759) // 能力标签·工具调用（iOS 系统绿）
+    val CapReasoning = Color(0xFFBF5AF2) // 能力标签·推理（iOS 系统紫）
+    val CapWarm = Color(0xFFFF9F0A) // 能力标签·通用暖金（badge 标签）
+    // 对话模式组
+    val ModeBuild = Color(0xFFB8860B) // 对话模式·构建（金棕）
+    val ModePlan = Color(0xFF0A84FF) // 对话模式·计划（iOS 系统蓝）
+    val ModeAuto = Color(0xFFFF3B30) // 对话模式·自动（iOS 系统红）
+    // 数学/公式
+    val MathInline = Color(0xFFBF5AF2) // 行内数学公式 $...$（紫）
+    // 暗色点缀
+    val OnDarkAccent = Color(0xFF64D2FF) // 暗色点缀蓝（DarkPalette accent 收编）
 }
 
 object AppSpacing {

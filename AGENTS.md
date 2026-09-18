@@ -217,6 +217,7 @@ AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。�
   - `composite/`（与 designsystem 平级，根包 `com.mini.me_core.newui.composite`）：**本 App 业务复合组件**（AppChatBubble/AppToolCallCard/AppMcpAppCard/AppPlanCard/AppTerminalLog 等），依赖 app 领域模型，不属于可发布设计系统。
   - **归位纪律**：新建组件先问"换个 App 还用得上吗？"——用得上且无业务含义→`component/`；只服务本产品业务→`composite/`；定义页面结构→`layout/`。**禁止把业务卡片塞回 `component/`，禁止跨层反向依赖。**
 - **令牌单一事实源**：`token/generated/AppTokens.kt`（由 Style Dictionary 从 DTCG JSON 自动生成，**勿手改 generated 文件**）。颜色经 `AppColor`（原始令牌）→ `AppPalette`（语义令牌，`appPalette()` 取值）；间距 `AppSpacing`、圆角 `AppRadius`、尺寸 `AppSizing`、动效 `AppMotion`、层级 `AppLayout`。**组件内禁止硬编码 `Color.White/Black`、`.dp`/`.sp` 表外数值、裸 `Spring.DampingRatio*` 常量**——一律走令牌。
+- **newui 设计参数强制令牌化（review/编译硬门禁）**：newui 新增/修改组件**禁止**裸 `Color(0xFF…)`、裸 `Color(0xAARRGGBB…)`、裸 `.dp`/`.sp` 表外数值、裸圆角值。任何颜色 / 间距 / 圆角 / 字号设计参数，必须**先**以 DTCG 令牌落进 `newui/tokens/*.json` 并镜像到 `AppTokens.kt`（`color.json` ↔ `AppColor` 两处同步），**再**在组件中引用；淡色罩层一律 `基色.copy(alpha = …)` 派生，不另建裸 alpha 令牌。拒绝手写魔法数，违反者 review 与编译阶段直接退回。
 - **统一骨架**：`layout/AppShell.kt` 是唯一页面壳（五槽位：title/onNavigateBack/topBarActions/topTabs/bottomBar/sideRail/content），`topBarStyle` 支持 `Compact`(44dp,默认)/`Standard`(64dp)。旧 `SlotSet`（`layout/Slot.kt`）已 `@Deprecated`，禁止新页面使用。
 - **三态收口**：`layout/AppState.kt` 的 `AppUiState<T>` 密封接口（Loading/Empty/Error/Content）+ `AppLoadingState`/`AppEmptyState`/`AppErrorState`；页面级状态用 `when` 强穷尽，**禁止各页自造三态**。
 - **布局卫生**：`layout/AppPage.kt` 提供 `pageContentPadding()` / `pageMaxWidth()` 修饰符与 `AppPage.horizontalPadding` 门面；页面根布局统一用令牌留白，禁止散落表外边距。

@@ -48,19 +48,32 @@ import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
  *
  * @since 0.1.0-experimental
  */
+/**
+ * Markdown 颜色组覆盖：全字段可空，默认 null 走主题（`appPalette()`）。
+ * [text] 正文 / [codeFg] 行内代码字色 / [codeBg] 行内代码底 / [blockBg] 代码块底 / [link] 链接色。
+ */
+data class AppMarkdownColors(
+    val text: Color? = null,
+    val codeFg: Color? = null,
+    val codeBg: Color? = null,
+    val blockBg: Color? = null,
+    val link: Color? = null,
+)
+
 @Composable
 fun AppMarkdownText(
     text: String,
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.bodyMedium,
-    color: Color = appPalette().ink,
     fontWeight: FontWeight? = null,
-    codeBlockBackground: Color = appPalette().surfaceDim,
-    inlineCodeColor: Color = appPalette().primary,
-    inlineCodeBackground: Color = appPalette().surfaceDim,
-    linkColor: Color = appPalette().primary,
+    colors: AppMarkdownColors? = null,
     onLinkClick: ((String) -> Unit)? = null,
 ) {
+    val color = colors?.text ?: appPalette().ink
+    val inlineCodeColor = colors?.codeFg ?: appPalette().primary
+    val inlineCodeBackground = colors?.codeBg ?: appPalette().surfaceDim
+    val codeBlockBackground = colors?.blockBg ?: appPalette().surfaceDim
+    val linkColor = colors?.link ?: appPalette().primary
     val segments = remember(text) { parseSegments(text) }
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -685,8 +698,8 @@ private fun buildInline(
                     withStyle(
                         SpanStyle(
                             fontFamily = FontFamily.Monospace,
-                            color = Color(0xFFBF5AF2),
-                            background = Color(0x22BF5AF2),
+                            color = AppColor.MathInline,
+                            background = AppColor.MathInline.copy(alpha = 0.13f),
                         ),
                     ) {
                         append(raw.substring(i + 1, end))

@@ -84,6 +84,19 @@ enum class AppComposerReasoning(val label: String) {
 data class AppComposerSlashCommand(val trigger: String, val description: String)
 
 /**
+ * 输入框颜色组覆盖：全字段可空，默认 null 走主题。
+ * [modeFg]/[modeBg]/[modeBorder] 模式 Chip 三色组（跨模式统一覆盖）；
+ * [sendBackground] 发送/停止键底色；[containerBackground] 输入框容器底色。
+ */
+data class AppComposerColors(
+    val modeFg: Color? = null,
+    val modeBg: Color? = null,
+    val modeBorder: Color? = null,
+    val sendBackground: Color? = null,
+    val containerBackground: Color? = null,
+)
+
+/**
  * 对话输入框（composer）—— newui iOS 简约风。
  *
  * 与生产 ChatInputBar 同构契约：只持有输入文本与开关状态，附件/模式/模型/发送等全部以回调上抛，
@@ -122,6 +135,8 @@ fun AppComposer(
     streaming: Boolean = false,
     onSend: () -> Unit = {},
     onStop: () -> Unit = {},
+    // 颜色组覆盖（默认 null 走主题）
+    colors: AppComposerColors? = null,
 ) {
     val shape = RoundedCornerShape(AppRadius.Lg)
     var showAttachmentSheet by remember { mutableStateOf(false) }
@@ -130,14 +145,14 @@ fun AppComposer(
     val matchedSlash = slashCommands.filter { value.length == 1 || it.trigger.startsWith(value) }
     val sendEnabled = streaming || value.isNotBlank() || attachments.isNotEmpty()
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(appPalette().card)
-            .border(AppStroke.Thin, appPalette().separator, shape)
-            .padding(AppSpacing.Sm),
-    ) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(colors?.containerBackground ?: appPalette().card)
+                .border(AppStroke.Thin, appPalette().separator, shape)
+                .padding(AppSpacing.Sm),
+        ) {
         // 第一行：功能按钮横滚行。默认隐藏，由底部「更多设置」按钮控制显隐。
         AnimatedVisibility(visible = toolsVisible) {
             Row(
@@ -232,7 +247,7 @@ fun AppComposer(
 
         // 工具行。
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ModeChip(mode = mode, onClick = onCycleMode)
+            ModeChip(mode = mode, onClick = onCycleMode, colors = colors)
             Spacer(Modifier.width(AppSpacing.Xs))
             CircleIconBtn(icon = Icons.Rounded.Add, contentDescription = "附件", onClick = { showAttachmentSheet = !showAttachmentSheet })
             Spacer(Modifier.width(AppSpacing.Xs))
@@ -249,7 +264,7 @@ fun AppComposer(
                 ModelChip(label = modelLabel, onClick = onPickModel)
                 Spacer(Modifier.width(AppSpacing.Xs))
             }
-            SendOrStopButton(streaming = streaming, enabled = sendEnabled) {
+            SendOrStopButton(streaming = streaming, enabled = sendEnabled, backgroundOverride = colors?.sendBackground) {
                 if (streaming) onStop() else onSend()
             }
         }
@@ -349,12 +364,15 @@ private fun SkillsChip(onClick: () -> Unit) {
 }
 
 @Composable
-private fun ModeChip(mode: AppComposerMode, onClick: () -> Unit) {
-    val (fg, bg, border) = when (mode) {
-        AppComposerMode.BUILD -> Triple(Color(0xFFB8860B), Color(0x22B8860B), Color(0x66B8860B))
+private fun ModeChip(mode: AppComposerMode, onClick: () -> Unit, colors: AppComposerColors?) {
+    val (baseFg, baseBg, baseBorder) = when (mode) {
+        AppComposerMode.BUILD -> Triple(AppColor.ModeBuild, AppColor.ModeBuild.copy(alpha = 0.13f), AppColor.ModeBuild.copy(alpha = 0.40f))
         AppComposerMode.PLAN -> Triple(AppColor.StatusInfo, AppColor.StatusInfo.copy(alpha = 0.12f), AppColor.StatusInfo.copy(alpha = 0.35f))
         AppComposerMode.AUTO -> Triple(AppColor.StatusDanger, AppColor.StatusDanger.copy(alpha = 0.16f), AppColor.StatusDanger.copy(alpha = 0.45f))
     }
+    val fg = colors?.modeFg ?: baseFg
+    val bg = colors?.modeBg ?: baseBg
+    val border = colors?.modeBorder ?: baseBorder
     Row(
         Modifier
             .clip(RoundedCornerShape(AppRadius.Pill))
@@ -421,8 +439,8 @@ private fun ModelChip(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SendOrStopButton(streaming: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val bg = when {
+private fun SendOrStopButton(streaming: Boolean, enabled: Boolean, backgroundOverride: Color?, onClick: () -> Unit) {
+    val bg = backgroundOverride ?: when {
         !enabled -> appPalette().surface
         streaming -> AppColor.StatusDanger
         else -> appPalette().primary

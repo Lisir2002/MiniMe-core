@@ -11,8 +11,14 @@
 
 ## v0.0.0.2-rc62 — 2026-09-18
 
-### 改进
+### 新功能
+- **newui 设计令牌化收口**：令牌层补齐能力标签（识图/工具/推理/暖金）、对话模式（构建/计划/自动）、行内数学公式与暗色点缀语义色；组件内裸 `Color(0xFF…)` 魔法色值全部收编为令牌或 `令牌.copy(alpha=…)`。
+- **对话流组件颜色组覆盖**：AppChatBubble / AppMessageRow / AppMarkdownText / AppComposer / AppModelPickerSheet 各新增全字段可空颜色组参数（默认 null 走主题），支持宿主按场景局部换肤而不破坏既有调用。
+- **newui 自立明暗模式接入口**：新增 `AppUiMode`（Light/Dark/Auto）+ `LocalAppUiMode` + `appUiMode()`，`AppTheme` 改用 `uiMode` 入参（仅 Auto 才读系统深色），与旧 app 主题（`AIEditorTheme`/`LocalAppDarkMode`）彻底解耦。
 - **Markdown 行内补删除线 / 斜体**：行内解析补齐 `~~删除线~~` 与 `*斜体*` 样式。
+
+### 改进
+- **新增 newui 设计参数强制令牌化规范**：禁止裸色值/表外 dp/sp/圆角，设计参数必须先落 DTCG 令牌并镜像 `AppTokens.kt` 方可在组件引用，写入 AGENTS.md。
 - **转义扩充**：Markdown 转义字符集扩充，覆盖更多需要反斜杠转义的符号。
 - **HTML 过滤**：未知 / 不允许的 HTML 标签在渲染前被过滤，避免 XSS 与非预期标签穿透。
 

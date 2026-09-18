@@ -18,6 +18,20 @@
       "danger":  { "$value": "#FF3B30", "$type": "color", "$description": "iOS 系统红" },
       "info":    { "$value": "#0A84FF", "$type": "color", "$description": "iOS 系统蓝" }
     },
+    "cap": {
+      "vision":    { "$value": "#0A84FF", "$type": "color", "$description": "能力标签·识图（iOS 系统蓝）" },
+      "tools":     { "$value": "#34C759", "$type": "color", "$description": "能力标签·工具调用（iOS 系统绿）" },
+      "reasoning": { "$value": "#BF5AF2", "$type": "color", "$description": "能力标签·推理（iOS 系统紫）" },
+      "warm":      { "$value": "#FF9F0A", "$type": "color", "$description": "能力标签·通用暖金（badge 标签）" }
+    },
+    "mode": {
+      "build": { "$value": "#B8860B", "$type": "color", "$description": "对话模式·构建（金棕）" },
+      "plan":  { "$value": "#0A84FF", "$type": "color", "$description": "对话模式·计划（iOS 系统蓝）" },
+      "auto":  { "$value": "#FF3B30", "$type": "color", "$description": "对话模式·自动（iOS 系统红）" }
+    },
+    "math": {
+      "inline": { "$value": "#BF5AF2", "$type": "color", "$description": "行内数学公式 $...$（紫）" }
+    },
     "separator": {
       "onLight": { "$value": "#DCDCE0", "$type": "color", "$description": "分割线（浅）" },
       "onDark":  { "$value": "#38383A", "$type": "color", "$description": "分割线（深）" }
@@ -28,7 +42,8 @@
       "surfaceDim":     { "$value": "#2C2C2E", "$type": "color", "$description": "三级层次面（深）iOS tertiarySystemBackground，与 card(#1C1C1E) 区分" },
       "surfaceRaised":  { "$value": "#1C1C1E", "$type": "color", "$description": "分组卡片（深）iOS secondarySystemGroupedBackground" },
       "ink":            { "$value": "#FFFFFF", "$type": "color", "$description": "一级文字（深）" },
-      "secondaryLabel": { "$value": "#98989D", "$type": "color", "$description": "二级文字（深）" }
+      "secondaryLabel": { "$value": "#98989D", "$type": "color", "$description": "二级文字（深）" },
+      "accent":         { "$value": "#64D2FF", "$type": "color", "$description": "暗色点缀蓝（DarkPalette accent 收编）" }
     },
     "semantic": {
       "onPrimary":         { "$value": "#FFFFFF", "$type": "color", "$description": "primary 上的内容色（浅=白，深=黑）" },

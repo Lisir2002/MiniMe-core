@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.theme.appPalette
+import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
@@ -55,6 +56,17 @@ data class AppModelOption(
     val supportsReasoning: Boolean = false,
 )
 
+/**
+ * 模型选择弹层颜色组覆盖：全字段可空，默认 null 走主题（令牌）。
+ * 提供能力标签基色后，淡色罩层自动以 `base.copy(alpha = 0.13f)` 派生，不另建裸 alpha 令牌。
+ */
+data class AppModelPickerColors(
+    val warm: Color? = null,
+    val vision: Color? = null,
+    val tools: Color? = null,
+    val reasoning: Color? = null,
+)
+
 /** 模型选择底部弹层：按 provider 分组，紧凑列表，单选高亮 + 选中对勾弹跳。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +75,8 @@ fun AppModelPickerSheet(
     selectedId: String?,
     onSelect: (AppModelOption) -> Unit,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    colors: AppModelPickerColors? = null,
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -70,7 +84,7 @@ fun AppModelPickerSheet(
         containerColor = appPalette().card,
         dragHandle = null,
     ) {
-        Column(Modifier.padding(horizontal = AppSpacing.Lg)) {
+        Column(modifier.padding(horizontal = AppSpacing.Lg)) {
             Row(
                 Modifier.fillMaxWidth().padding(top = AppSpacing.Md, bottom = AppSpacing.Xs),
                 verticalAlignment = Alignment.CenterVertically,
@@ -93,6 +107,7 @@ fun AppModelPickerSheet(
                         model = m,
                         selected = m.id == selectedId,
                         onClick = { onSelect(m) },
+                        colors = colors,
                     )
                 }
             }
@@ -102,7 +117,7 @@ fun AppModelPickerSheet(
 }
 
 @Composable
-private fun ModelRow(model: AppModelOption, selected: Boolean, onClick: () -> Unit) {
+private fun ModelRow(model: AppModelOption, selected: Boolean, onClick: () -> Unit, colors: AppModelPickerColors?) {
     val bg by animateColorAsState(
         if (selected) appPalette().primary.copy(alpha = 0.10f) else appPalette().surface,
         label = "bg",
@@ -129,11 +144,24 @@ private fun ModelRow(model: AppModelOption, selected: Boolean, onClick: () -> Un
                 Text(model.name, style = MaterialTheme.typography.bodyLarge, color = appPalette().ink, fontWeight = FontWeight.Medium)
                 if (!model.badge.isNullOrBlank()) {
                     Spacer(Modifier.width(AppSpacing.Xs))
-                    CapTag(model.badge!!, Color(0xFFFF9F0A), Color(0x22FF9F0A))
+                    val warm = colors?.warm ?: AppColor.CapWarm
+                    CapTag(model.badge!!, warm, warm.copy(alpha = 0.13f))
                 }
-                if (model.supportsVision) { Spacer(Modifier.width(AppSpacing.Tiny)); CapTag("识图", Color(0xFF0A84FF), Color(0x220A84FF)) }
-                if (model.supportsTools) { Spacer(Modifier.width(AppSpacing.Tiny)); CapTag("工具", Color(0xFF34C759), Color(0x2234C759)) }
-                if (model.supportsReasoning) { Spacer(Modifier.width(AppSpacing.Tiny)); CapTag("推理", Color(0xFFBF5AF2), Color(0x22BF5AF2)) }
+                if (model.supportsVision) {
+                    Spacer(Modifier.width(AppSpacing.Tiny))
+                    val vision = colors?.vision ?: AppColor.CapVision
+                    CapTag("识图", vision, vision.copy(alpha = 0.13f))
+                }
+                if (model.supportsTools) {
+                    Spacer(Modifier.width(AppSpacing.Tiny))
+                    val tools = colors?.tools ?: AppColor.CapTools
+                    CapTag("工具", tools, tools.copy(alpha = 0.13f))
+                }
+                if (model.supportsReasoning) {
+                    Spacer(Modifier.width(AppSpacing.Tiny))
+                    val reasoning = colors?.reasoning ?: AppColor.CapReasoning
+                    CapTag("推理", reasoning, reasoning.copy(alpha = 0.13f))
+                }
             }
             if (!model.caption.isNullOrBlank()) {
                 Spacer(Modifier.padding(1.dp))
