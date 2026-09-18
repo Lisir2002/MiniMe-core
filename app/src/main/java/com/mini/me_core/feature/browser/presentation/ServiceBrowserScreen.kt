@@ -6,37 +6,31 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.Close
@@ -48,32 +42,24 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PrivacyTip
-import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.ZoomIn
 import androidx.compose.material.icons.rounded.ZoomOut
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -85,25 +71,26 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
-import com.mini.me_core.core.theme.AppTopAppBar
-import com.mini.me_core.core.theme.LocalAppDarkMode
-import com.mini.me_core.core.theme.Radius
-import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.browser.domain.BrowserBookmark
 import com.mini.me_core.feature.browser.domain.BrowserController
 import com.mini.me_core.feature.browser.domain.BrowserCredentialStore
@@ -114,15 +101,36 @@ import com.mini.me_core.feature.browser.domain.BrowserTabInfo
 import com.mini.me_core.feature.browser.domain.BrowserTakeoverManager
 import com.mini.me_core.feature.browser.domain.LoginPromptAnswer
 import com.mini.me_core.feature.browser.domain.TakeoverAnswer
+import com.mini.me_core.newui.designsystem.component.AppBottomSheetList
+import com.mini.me_core.newui.designsystem.component.AppButton
+import com.mini.me_core.newui.designsystem.component.AppButtonVariant
+import com.mini.me_core.newui.designsystem.component.AppDialog
+import com.mini.me_core.newui.designsystem.component.AppFilledTextField
+import com.mini.me_core.newui.designsystem.component.AppMenu
+import com.mini.me_core.newui.designsystem.component.AppMenuDivider
+import com.mini.me_core.newui.designsystem.component.AppMenuItem
+import com.mini.me_core.newui.designsystem.component.AppMenuRow
+import com.mini.me_core.newui.designsystem.component.AppPasswordField
+import com.mini.me_core.newui.designsystem.component.AppProgressBar
+import com.mini.me_core.newui.designsystem.component.AppSearchBar
+import com.mini.me_core.newui.designsystem.component.AppSwitch
+import com.mini.me_core.newui.designsystem.layout.AppShell
+import com.mini.me_core.newui.designsystem.primitive.AppIcon
+import com.mini.me_core.newui.designsystem.primitive.AppIconButton
+import com.mini.me_core.newui.designsystem.theme.appPalette
+import com.mini.me_core.newui.designsystem.token.generated.AppLayout
+import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSizing
+import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * 内置服务浏览器页。
+ * 内置服务浏览器页（iOS Safari 风格 UI，收敛到 newui 组件体系）。
  *
- * 用户侧：地址栏 + 前进/后退/刷新 + 「更多」菜单（历史/收藏/下载/凭据/无痕/桌面版/缩放/
- * 页内查找/分享/复制链接）+ 新标签页主页 + WebView 容器；模型侧：[BrowserController.agentStatus]
- * 实时展示模型正在进行的操作。用户与模型共享同一个 WebView 会话（同一份 Cookie/登录态）。
+ * 用户侧：顶部圆角 pill 地址栏（安全锁/URL/刷新/更多）+ 细进度条 + 底部五键工具栏
+ * （后退/前进/书签/标签/更多）+ 新标签页主页 + WebView 容器；模型侧：
+ * [BrowserController.agentStatus] 实时展示模型正在进行的操作。用户与模型共享同一个 WebView 会话。
  *
  * 同时承载三类异步交互弹窗：
  *  - 页面 alert/confirm（[BrowserController.pendingDialog]）——模型或页面发起，用户确认；
@@ -152,7 +160,7 @@ fun ServiceBrowserScreen(
     val clipboard = LocalClipboardManager.current
     var addressText by remember { mutableStateOf(uiState.currentUrl) }
 
-    // 「更多」菜单与各功能面板开关
+    // 「更多」菜单、各功能面板与地址栏编辑态开关
     var showMore by remember { mutableStateOf(false) }
     var findVisible by remember { mutableStateOf(false) }
     var findText by remember { mutableStateOf("") }
@@ -161,6 +169,9 @@ fun ServiceBrowserScreen(
     var showDownloads by remember { mutableStateOf(false) }
     var showCredentials by remember { mutableStateOf(false) }
     var showZoom by remember { mutableStateOf(false) }
+    var showTabs by remember { mutableStateOf(false) }
+    var addressEditing by remember { mutableStateOf(false) }
+    val addressFocus = remember { FocusRequester() }
 
     // 页面 URL 变化时同步地址栏
     LaunchedEffect(uiState.currentUrl) {
@@ -178,6 +189,11 @@ fun ServiceBrowserScreen(
     // 卸载时解除绑定（保留 WebView 与登录态）
     DisposableEffect(Unit) {
         onDispose { browserController.unbind() }
+    }
+
+    // 进入编辑态时拉取地址栏焦点
+    LaunchedEffect(addressEditing) {
+        if (addressEditing) addressFocus.requestFocus()
     }
 
     fun navigate() {
@@ -238,80 +254,93 @@ fun ServiceBrowserScreen(
         scope.launch { browserController.retryDownload(info) }
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
+    val currentBookmarked = uiState.currentUrl.isNotBlank() && browserController.isBookmarked(uiState.currentUrl)
+
+    AppShell(
+        showTopBar = false,
+        bottomBar = {
             Column {
-                AppTopAppBar(
-                    title = stringResource(R.string.browser_title),
-                    onNavigateBack = onNavigateBack,
-                    navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
-                    navigationContentDescription = stringResource(R.string.common_back)
-                )
-                // 地址栏 + 导航按钮 + 「更多」菜单
+                // 模型操作状态条
+                AnimatedVisibility(
+                    visible = agentStatus.active,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(appPalette().primaryOverlay12)
+                            .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(AppSizing.IconS),
+                            color = appPalette().primary,
+                            strokeWidth = AppSpacing.Tiny
+                        )
+                        Text(
+                            text = agentStatus.text.ifBlank { stringResource(R.string.browser_agent_working) },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = appPalette().ink,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                // iOS Safari 风格工具栏：一行五枚等分图标按钮
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                        .height(AppLayout.BottomBarHeight),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { browserController.goBack() }, enabled = uiState.canGoBack, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
-                            contentDescription = stringResource(R.string.browser_back),
-                            tint = if (uiState.canGoBack) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outlineVariant
-                        )
-                    }
-                    IconButton(onClick = { browserController.goForward() }, enabled = uiState.canGoForward, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                            contentDescription = stringResource(R.string.browser_forward),
-                            tint = if (uiState.canGoForward) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outlineVariant
-                        )
-                    }
-                    OutlinedTextField(
-                        value = addressText,
-                        onValueChange = { addressText = it },
+                    AppIconButton(
+                        onClick = { browserController.goBack() },
+                        icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
                         modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        placeholder = { Text(stringResource(R.string.browser_address_hint)) },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Uri,
-                            imeAction = ImeAction.Go
-                        ),
-                        keyboardActions = KeyboardActions(onGo = { navigate() }),
-                        shape = RoundedCornerShape(Radius.md),
-                        textStyle = MaterialTheme.typography.bodySmall
+                        contentDescription = stringResource(R.string.browser_back),
+                        enabled = uiState.canGoBack
                     )
-                    IconButton(onClick = { browserController.reload() }, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            Icons.Rounded.Refresh,
-                            contentDescription = stringResource(R.string.browser_refresh),
-                            tint = if (LocalAppDarkMode.current) Color(0xFF4ADE80) else Color(0xFF22C55E)
+                    AppIconButton(
+                        onClick = { browserController.goForward() },
+                        icon = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        modifier = Modifier.weight(1f),
+                        contentDescription = stringResource(R.string.browser_forward),
+                        enabled = uiState.canGoForward
+                    )
+                    AppIconButton(
+                        onClick = {
+                            if (uiState.currentUrl.isNotBlank()) {
+                                if (browserController.isBookmarked(uiState.currentUrl)) {
+                                    browserController.removeBookmark(uiState.currentUrl)
+                                } else {
+                                    browserController.addBookmark()
+                                }
+                            }
+                        },
+                        icon = if (currentBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                        modifier = Modifier.weight(1f),
+                        contentDescription = stringResource(
+                            if (currentBookmarked) R.string.browser_remove_bookmark else R.string.browser_add_bookmark
                         )
-                    }
-                    IconButton(onClick = { navigate() }, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowForward,
-                            contentDescription = stringResource(R.string.browser_go),
-                            tint = if (LocalAppDarkMode.current) Color(0xFF7C9FFF) else Color(0xFF4C8DFF)
+                    )
+                    AppIconButton(
+                        onClick = { showTabs = true },
+                        icon = Icons.Rounded.Layers,
+                        modifier = Modifier.weight(1f),
+                        contentDescription = stringResource(R.string.browser_more)
+                    )
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        AppIconButton(
+                            onClick = { showMore = true },
+                            icon = Icons.Rounded.MoreVert,
+                            contentDescription = stringResource(R.string.browser_more)
                         )
-                    }
-                    // 「更多」菜单入口
-                    Box {
-                        IconButton(onClick = { showMore = true }, modifier = Modifier.size(36.dp)) {
-                            Icon(
-                                Icons.Rounded.MoreVert,
-                                contentDescription = stringResource(R.string.browser_more),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                         BrowserMoreMenu(
                             expanded = showMore,
                             onDismiss = { showMore = false },
-                            bookmarked = uiState.currentUrl.isNotBlank() && browserController.isBookmarked(uiState.currentUrl),
+                            bookmarked = currentBookmarked,
                             incognito = uiState.incognito,
                             desktopMode = uiState.desktopMode,
                             onFind = { showMore = false; findVisible = true; findText = "" },
@@ -337,121 +366,179 @@ fun ServiceBrowserScreen(
                         )
                     }
                 }
-                // 页内查找条
-                AnimatedVisibility(visible = findVisible, enter = fadeIn(), exit = fadeOut()) {
-                    FindOnPageBar(
-                        text = findText,
-                        onTextChange = { findText = it; browserController.findOnPage(it) },
-                        onPrev = { browserController.findNextOnPage(false) },
-                        onNext = { browserController.findNextOnPage(true) },
-                        onClose = {
-                            findVisible = false
-                            findText = ""
-                            browserController.clearFindOnPage()
-                        }
-                    )
-                }
-                // 标签栏：多标签切换 / 新建 / 关闭
-                BrowserTabBar(
-                    tabs = tabs,
-                    activeTabId = uiState.activeTabId,
-                    onSelect = { switchTab(it) },
-                    onClose = { closeTab(it) },
-                    onNewTab = { newTab() }
-                )
-                if (uiState.isLoading) {
-                    LinearProgressIndicator(
-                        progress = { (uiState.progress.coerceIn(0, 100)) / 100f },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
             }
-        },
-        bottomBar = {
-            Column {
-                // 模型操作状态条
-                AnimatedVisibility(
-                    visible = agentStatus.active,
-                    enter = fadeIn(),
-                    exit = fadeOut()
+        }
+    ) { _ ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+        ) {
+            // 自定义顶部：iOS 浏览器无标题栏，自绘并自己消费状态栏 inset
+            Column(Modifier.statusBarsPadding()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AppSpacing.Xs, vertical = AppSpacing.Xs),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                        modifier = Modifier.fillMaxWidth()
+                    // 左上角紧凑返回箭头（Android 无系统侧滑手势入口，需可见）
+                    AppIconButton(
+                        onClick = onNavigateBack,
+                        icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = stringResource(R.string.common_back)
+                    )
+                    // iOS 风格圆角 pill 地址栏
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(AppSizing.TouchTarget)
+                            .clip(RoundedCornerShape(AppRadius.Pill))
+                            .background(appPalette().surfaceDim)
+                            .clickable { addressEditing = true }
+                            .padding(horizontal = AppSpacing.Lg),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp
+                        val secure = uiState.currentUrl.startsWith("https://", ignoreCase = true)
+                        AppIcon(
+                            icon = if (secure) Icons.Rounded.Lock else Icons.Rounded.Public,
+                            contentDescription = null,
+                            tint = appPalette().labelTertiary,
+                            size = AppSizing.IconS
+                        )
+                        Spacer(Modifier.width(AppSpacing.Sm))
+                        if (addressEditing) {
+                            BasicTextField(
+                                value = addressText,
+                                onValueChange = { addressText = it },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .focusRequester(addressFocus),
+                                singleLine = true,
+                                textStyle = TextStyle(color = appPalette().ink),
+                                cursorBrush = SolidColor(appPalette().primary),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Uri,
+                                    imeAction = ImeAction.Go
+                                ),
+                                keyboardActions = KeyboardActions(onGo = {
+                                    navigate()
+                                    addressEditing = false
+                                })
                             )
+                        } else {
                             Text(
-                                text = agentStatus.text.ifBlank { stringResource(R.string.browser_agent_working) },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                text = addressText.ifBlank { stringResource(R.string.browser_address_hint) },
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = appPalette().labelSecondary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
+                        Spacer(Modifier.width(AppSpacing.Sm))
+                        AppIcon(
+                            icon = Icons.Rounded.Refresh,
+                            contentDescription = stringResource(R.string.browser_refresh),
+                            tint = appPalette().primary,
+                            size = AppSizing.IconL,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(AppRadius.Pill))
+                                .clickable { browserController.reload() }
+                                .padding(AppSpacing.Xs)
+                        )
+                    }
+                }
+                // 细进度条：仅加载中显示
+                if (uiState.isLoading) {
+                    AppProgressBar(progress = (uiState.progress.coerceIn(0, 100)) / 100f)
+                }
+                // 页内查找条
+                AnimatedVisibility(visible = findVisible, enter = fadeIn(), exit = fadeOut()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.Xs)
+                    ) {
+                        AppSearchBar(
+                            value = findText,
+                            onValueChange = { findText = it; browserController.findOnPage(it) },
+                            modifier = Modifier.weight(1f),
+                            placeholder = stringResource(R.string.browser_find_hint),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { }),
+                            onClear = { findText = ""; browserController.clearFindOnPage() }
+                        )
+                        AppIconButton(
+                            onClick = { browserController.findNextOnPage(false) },
+                            icon = Icons.Rounded.KeyboardArrowUp,
+                            contentDescription = stringResource(R.string.browser_find_prev)
+                        )
+                        AppIconButton(
+                            onClick = { browserController.findNextOnPage(true) },
+                            icon = Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.browser_find_next)
+                        )
+                        AppIconButton(
+                            onClick = {
+                                findVisible = false
+                                findText = ""
+                                browserController.clearFindOnPage()
+                            },
+                            icon = Icons.Rounded.Close,
+                            contentDescription = stringResource(R.string.browser_find_close)
+                        )
                     }
                 }
             }
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .imePadding()
-        ) {
+
             // WebView 容器：按激活标签 key 切换，每个标签独占一个 WebView 实例。
             // 首个标签尚未创建（activeTabId 为空）时先渲染占位，避免在组合期间创建标签引发 key 跳变导致崩溃。
-            if (uiState.activeTabId.isBlank()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.White)
-                )
-            } else {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    key(uiState.activeTabId) {
-                        val webView = remember { browserController.bind() }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.White)
-                        ) {
-                            AndroidView(
-                                factory = { webView },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            if (uiState.isLoading) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator()
+            Box(modifier = Modifier.weight(1f).fillMaxSize()) {
+                if (uiState.activeTabId.isBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surface)
+                    )
+                } else {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        key(uiState.activeTabId) {
+                            val webView = remember { browserController.bind() }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surface)
+                            ) {
+                                AndroidView(
+                                    factory = { webView },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                if (uiState.isLoading) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.15f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(color = appPalette().primary)
+                                    }
                                 }
                             }
                         }
-                    }
-                    // 新标签页主页（R1.1）：当前标签尚无 URL 时展示搜索/收藏/最近访问快捷入口
-                    if (uiState.currentUrl.isBlank()) {
-                        BrowserHomePage(
-                            addressText = addressText,
-                            onAddressChange = { addressText = it },
-                            onNavigate = { navigate() },
-                            bookmarks = remember { browserController.bookmarks() },
-                            recentVisits = remember { browserController.history().take(6) },
-                            onOpen = { openUrl(it) }
-                        )
+                        // 新标签页主页：当前标签尚无 URL 时展示搜索/收藏/最近访问快捷入口
+                        if (uiState.currentUrl.isBlank()) {
+                            BrowserHomePage(
+                                addressText = addressText,
+                                onAddressChange = { addressText = it },
+                                onNavigate = { navigate() },
+                                bookmarks = remember { browserController.bookmarks() },
+                                recentVisits = remember { browserController.history().take(6) },
+                                onOpen = { openUrl(it) }
+                            )
+                        }
                     }
                 }
             }
@@ -460,21 +547,17 @@ fun ServiceBrowserScreen(
 
     // ── 页面 alert/confirm 对话框 ──
     pendingDialog?.let { d ->
-        AlertDialog(
-            onDismissRequest = { },
-            title = { Text(if (d.type == "alert") stringResource(R.string.browser_dialog_alert) else stringResource(R.string.browser_dialog_confirm_title)) },
-            text = { Text(d.message) },
-            confirmButton = {
-                TextButton(onClick = { scope.launch { browserController.handleDialog(true) } }) {
-                    Text(stringResource(R.string.workspace_confirm))
-                }
-            },
-            dismissButton = {
-                if (d.type != "alert") {
-                    TextButton(onClick = { scope.launch { browserController.handleDialog(false) } }) {
-                        Text(stringResource(R.string.common_cancel))
-                    }
-                }
+        val isAlert = d.type == "alert"
+        AppDialog(
+            title = stringResource(
+                if (isAlert) R.string.browser_dialog_alert else R.string.browser_dialog_confirm_title
+            ),
+            text = d.message,
+            confirmText = stringResource(R.string.workspace_confirm),
+            dismissText = if (isAlert) null else stringResource(R.string.common_cancel),
+            onConfirm = { scope.launch { browserController.handleDialog(true) } },
+            onDismiss = {
+                if (!isAlert) scope.launch { browserController.handleDialog(false) }
             }
         )
     }
@@ -495,26 +578,31 @@ fun ServiceBrowserScreen(
 
     // ── 用户接管提示对话框（模型请求用户亲自完成验证码/支付/二次认证等） ──
     pendingTakeover?.let { p ->
-        AlertDialog(
-            onDismissRequest = { takeoverManager.cancel(p.requestId) },
-            title = { Text(p.title) },
-            text = { Text(p.message) },
-            confirmButton = {
-                TextButton(onClick = { takeoverManager.resolve(p.requestId, TakeoverAnswer(confirmed = true)) }) {
-                    Text(stringResource(R.string.browser_takeover_done))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { takeoverManager.cancel(p.requestId) }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            }
+        AppDialog(
+            title = p.title,
+            text = p.message,
+            confirmText = stringResource(R.string.browser_takeover_done),
+            dismissText = stringResource(R.string.common_cancel),
+            onConfirm = { takeoverManager.resolve(p.requestId, TakeoverAnswer(confirmed = true)) },
+            onDismiss = { takeoverManager.cancel(p.requestId) }
         )
     }
 
-    // ── 历史记录面板（R1.1） ──
+    // ── 多标签列表（底部抽屉） ──
+    if (showTabs) {
+        TabsBottomSheet(
+            tabs = tabs,
+            activeTabId = uiState.activeTabId,
+            onSelect = { showTabs = false; switchTab(it) },
+            onClose = { closeTab(it) },
+            onNewTab = { newTab() },
+            onDismiss = { showTabs = false }
+        )
+    }
+
+    // ── 历史记录面板 ──
     if (showHistory) {
-        HistoryDialog(
+        HistorySheet(
             entries = remember { browserController.history() },
             onOpen = { url -> showHistory = false; openUrl(url) },
             onClear = {
@@ -525,9 +613,9 @@ fun ServiceBrowserScreen(
         )
     }
 
-    // ── 收藏夹面板（R1.1） ──
+    // ── 收藏夹面板 ──
     if (showBookmarks) {
-        BookmarksDialog(
+        BookmarksSheet(
             bookmarks = remember { browserController.bookmarks() },
             onOpen = { url -> showBookmarks = false; openUrl(url) },
             onRemove = { browserController.removeBookmark(it) },
@@ -535,9 +623,9 @@ fun ServiceBrowserScreen(
         )
     }
 
-    // ── 下载管理面板（R1.2） ──
+    // ── 下载管理面板 ──
     if (showDownloads) {
-        DownloadsDialog(
+        DownloadsSheet(
             downloads = downloads,
             onOpen = { openDownload(it) },
             onRetry = { retryDownload(it) },
@@ -546,17 +634,17 @@ fun ServiceBrowserScreen(
         )
     }
 
-    // ── 凭据管理面板（R1.2） ──
+    // ── 凭据管理面板 ──
     if (showCredentials) {
-        CredentialsDialog(
+        CredentialsSheet(
             credentialStore = credentialStore,
             onDismiss = { showCredentials = false }
         )
     }
 
-    // ── 页面缩放面板（R1.3） ──
+    // ── 页面缩放面板 ──
     if (showZoom) {
-        ZoomDialog(
+        ZoomSheet(
             percent = uiState.textZoom,
             onLess = { browserController.setTextZoom(uiState.textZoom - 10) },
             onMore = { browserController.setTextZoom(uiState.textZoom + 10) },
@@ -566,7 +654,7 @@ fun ServiceBrowserScreen(
     }
 }
 
-/** 地址栏「更多」下拉菜单：用户侧功能统一入口。 */
+/** 地址栏「更多」下拉菜单：newui AppMenu 封装，用户侧功能统一入口。 */
 @Composable
 private fun BrowserMoreMenu(
     expanded: Boolean,
@@ -586,131 +674,103 @@ private fun BrowserMoreMenu(
     onDesktopMode: () -> Unit,
     onZoom: () -> Unit
 ) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_find)) },
+    AppMenu(expanded = expanded, onDismiss = onDismiss) {
+        AppMenuItem(
+            label = stringResource(R.string.browser_find),
             onClick = onFind,
-            leadingIcon = { Icon(Icons.Rounded.Search, null) }
+            leadingIcon = Icons.Rounded.Search
         )
-        DropdownMenuItem(
-            text = {
-                Text(
-                    if (bookmarked) stringResource(R.string.browser_remove_bookmark)
-                    else stringResource(R.string.browser_add_bookmark)
-                )
-            },
+        AppMenuItem(
+            label = stringResource(
+                if (bookmarked) R.string.browser_remove_bookmark else R.string.browser_add_bookmark
+            ),
             onClick = onToggleBookmark,
-            leadingIcon = {
-                Icon(
-                    if (bookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                    null
-                )
-            }
+            leadingIcon = if (bookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder
         )
-        HorizontalDivider()
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_history)) },
+        AppMenuDivider()
+        AppMenuItem(
+            label = stringResource(R.string.browser_history),
             onClick = onHistory,
-            leadingIcon = { Icon(Icons.Rounded.History, null) }
+            leadingIcon = Icons.Rounded.History
         )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_bookmarks)) },
+        AppMenuItem(
+            label = stringResource(R.string.browser_bookmarks),
             onClick = onBookmarks,
-            leadingIcon = { Icon(Icons.Rounded.Bookmark, null) }
+            leadingIcon = Icons.Rounded.Bookmark
         )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_downloads)) },
+        AppMenuItem(
+            label = stringResource(R.string.browser_downloads),
             onClick = onDownloads,
-            leadingIcon = { Icon(Icons.Rounded.Download, null) }
+            leadingIcon = Icons.Rounded.Download
         )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_credentials)) },
+        AppMenuItem(
+            label = stringResource(R.string.browser_credentials),
             onClick = onCredentials,
-            leadingIcon = { Icon(Icons.Rounded.Key, null) }
+            leadingIcon = Icons.Rounded.Key
         )
-        HorizontalDivider()
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_share)) },
+        AppMenuDivider()
+        AppMenuItem(
+            label = stringResource(R.string.browser_share),
             onClick = onShare,
-            leadingIcon = { Icon(Icons.Rounded.Share, null) }
+            leadingIcon = Icons.Rounded.Share
         )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_copy_link)) },
+        AppMenuItem(
+            label = stringResource(R.string.browser_copy_link),
             onClick = onCopyLink,
-            leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) }
+            leadingIcon = Icons.Rounded.ContentCopy
         )
-        HorizontalDivider()
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_incognito)) },
-            onClick = onIncognito,
-            leadingIcon = { Icon(Icons.Rounded.PrivacyTip, null) },
-            trailingIcon = {
-                Switch(checked = incognito, onCheckedChange = { onIncognito() }, modifier = Modifier.size(32.dp))
-            }
+        AppMenuDivider()
+        MenuSwitchRow(
+            label = stringResource(R.string.browser_incognito),
+            checked = incognito,
+            onToggle = onIncognito,
+            leadingIcon = Icons.Rounded.PrivacyTip
         )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_desktop_mode)) },
-            onClick = onDesktopMode,
-            leadingIcon = { Icon(Icons.Rounded.DesktopWindows, null) },
-            trailingIcon = {
-                Switch(checked = desktopMode, onCheckedChange = { onDesktopMode() }, modifier = Modifier.size(32.dp))
-            }
+        MenuSwitchRow(
+            label = stringResource(R.string.browser_desktop_mode),
+            checked = desktopMode,
+            onToggle = onDesktopMode,
+            leadingIcon = Icons.Rounded.DesktopWindows
         )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_zoom)) },
+        AppMenuItem(
+            label = stringResource(R.string.browser_zoom),
             onClick = onZoom,
-            leadingIcon = { Icon(Icons.Rounded.ZoomIn, null) }
+            leadingIcon = Icons.Rounded.ZoomIn
         )
     }
 }
 
-/** 页内查找条（R1.1）：输入框 + 上/下一个 + 关闭。 */
+/** 菜单内带尾接开关的行（无痕 / 桌面版）。 */
 @Composable
-private fun FindOnPageBar(
-    text: String,
-    onTextChange: (String) -> Unit,
-    onPrev: () -> Unit,
-    onNext: () -> Unit,
-    onClose: () -> Unit
+private fun MenuSwitchRow(
+    label: String,
+    checked: Boolean,
+    onToggle: () -> Unit,
+    leadingIcon: ImageVector
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+            .clickable { onToggle() }
+            .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        OutlinedTextField(
-            value = text,
-            onValueChange = onTextChange,
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            placeholder = { Text(stringResource(R.string.browser_find_hint)) },
-            shape = RoundedCornerShape(Radius.md),
-            textStyle = MaterialTheme.typography.bodySmall
+        AppIcon(
+            icon = leadingIcon,
+            size = AppSizing.IconM,
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(end = AppSpacing.Md)
         )
-        IconButton(onClick = onPrev, modifier = Modifier.size(36.dp)) {
-            Icon(
-                Icons.Rounded.KeyboardArrowUp,
-                contentDescription = stringResource(R.string.browser_find_prev)
-            )
-        }
-        IconButton(onClick = onNext, modifier = Modifier.size(36.dp)) {
-            Icon(
-                Icons.Rounded.KeyboardArrowDown,
-                contentDescription = stringResource(R.string.browser_find_next)
-            )
-        }
-        IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
-            Icon(
-                Icons.Rounded.Close,
-                contentDescription = stringResource(R.string.browser_find_close)
-            )
-        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
+        AppSwitch(checked = checked, onCheckedChange = { onToggle() })
     }
 }
 
-/** 新标签页主页（R1.1）：搜索框 + 最近访问 + 收藏夹快捷入口。 */
+/** 新标签页主页：newui AppSearchBar + AppMenuRow 快捷入口。 */
 @Composable
 private fun BrowserHomePage(
     addressText: String,
@@ -724,50 +784,48 @@ private fun BrowserHomePage(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = Spacing.lg, vertical = Spacing.md)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Md)
     ) {
-        Spacer(Modifier.height(Spacing.md))
-        OutlinedTextField(
+        Spacer(Modifier.height(AppSpacing.Md))
+        AppSearchBar(
             value = addressText,
             onValueChange = onAddressChange,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = { Text(stringResource(R.string.browser_home_search_hint)) },
+            placeholder = stringResource(R.string.browser_home_search_hint),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
             keyboardActions = KeyboardActions(onGo = { onNavigate() }),
-            shape = RoundedCornerShape(Radius.md),
-            leadingIcon = { Icon(Icons.Rounded.Search, null) }
+            onClear = { onAddressChange("") }
         )
-        Spacer(Modifier.height(Spacing.md))
         if (recentVisits.isNotEmpty()) {
+            Spacer(Modifier.height(AppSpacing.Lg))
             Text(
                 text = stringResource(R.string.browser_recent_visits),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Medium
             )
-            Spacer(Modifier.height(Spacing.xs))
             recentVisits.forEach { entry ->
-                HomeLinkRow(
+                AppMenuRow(
                     title = entry.title.ifBlank { entry.url },
                     subtitle = entry.url,
+                    icon = Icons.Rounded.History,
                     onClick = { onOpen(entry.url) }
                 )
             }
-            Spacer(Modifier.height(Spacing.md))
         }
         if (bookmarks.isNotEmpty()) {
+            Spacer(Modifier.height(AppSpacing.Lg))
             Text(
                 text = stringResource(R.string.browser_bookmarks),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Medium
             )
-            Spacer(Modifier.height(Spacing.xs))
             bookmarks.take(8).forEach { bm ->
-                HomeLinkRow(
+                AppMenuRow(
                     title = bm.title.ifBlank { bm.url },
                     subtitle = bm.url,
+                    icon = Icons.Rounded.BookmarkBorder,
                     onClick = { onOpen(bm.url) }
                 )
             }
@@ -775,290 +833,229 @@ private fun BrowserHomePage(
     }
 }
 
-/** 主页单条快捷入口。 */
+/** 多标签底部抽屉：标题 + 新建钮 + 标签列表（可切换/关闭）。 */
 @Composable
-private fun HomeLinkRow(title: String, subtitle: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            Icons.Rounded.History,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(Modifier.width(Spacing.sm))
-        Column(modifier = Modifier.weight(1f)) {
+private fun TabsBottomSheet(
+    tabs: List<BrowserTabInfo>,
+    activeTabId: String,
+    onSelect: (String) -> Unit,
+    onClose: (String) -> Unit,
+    onNewTab: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AppBottomSheetList(onDismiss = onDismiss, title = stringResource(R.string.browser_title)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = AppSpacing.Sm),
+            horizontalArrangement = Arrangement.End
+        ) {
+            AppButton(
+                text = stringResource(R.string.browser_new_tab),
+                variant = AppButtonVariant.Text,
+                onClick = onNewTab
+            )
+        }
+        if (tabs.isEmpty()) {
             Text(
-                text = title,
+                text = stringResource(R.string.browser_tab_empty),
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                color = appPalette().labelSecondary
             )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+        } else {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                tabs.forEach { tab ->
+                    AppMenuRow(
+                        title = tab.title.ifBlank { tab.url.ifBlank { stringResource(R.string.browser_tab_empty) } },
+                        subtitle = tab.url,
+                        trailing = {
+                            AppIconButton(
+                                onClick = { onClose(tab.id) },
+                                icon = Icons.Rounded.Close,
+                                contentDescription = stringResource(R.string.browser_close_tab)
+                            )
+                        },
+                        onClick = { onSelect(tab.id) }
+                    )
+                }
+            }
         }
     }
 }
 
-/** 历史记录面板（R1.1）：列表 + 回跳 + 清空。 */
+/** 历史记录底部抽屉：列表 + 回跳 + 清空（确认走 AppDialog）。 */
 @Composable
-private fun HistoryDialog(
+private fun HistorySheet(
     entries: List<BrowserHistoryEntry>,
     onOpen: (String) -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var confirmClear by remember { mutableStateOf(false) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.browser_history), modifier = Modifier.weight(1f))
-                if (entries.isNotEmpty()) {
-                    TextButton(onClick = { confirmClear = true }) {
-                        Text(stringResource(R.string.browser_clear_history))
-                    }
-                }
-            }
-        },
-        text = {
-            if (entries.isEmpty()) {
-                Text(stringResource(R.string.browser_history_empty))
-            } else {
-                LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
-                    items(entries, key = { it.id }) { entry ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onOpen(entry.url) }
-                                .padding(vertical = Spacing.sm),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = entry.title.ifBlank { entry.url },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = entry.url,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.common_close))
+    AppBottomSheetList(onDismiss = onDismiss, title = stringResource(R.string.browser_history)) {
+        if (entries.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = AppSpacing.Sm),
+                horizontalArrangement = Arrangement.End
+            ) {
+                AppButton(
+                    text = stringResource(R.string.browser_clear_history),
+                    variant = AppButtonVariant.Text,
+                    onClick = { confirmClear = true }
+                )
             }
         }
-    )
-
-    if (confirmClear) {
-        AlertDialog(
-            onDismissRequest = { confirmClear = false },
-            title = { Text(stringResource(R.string.browser_clear_history)) },
-            text = { Text(stringResource(R.string.browser_clear_history_confirm)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmClear = false
-                    onClear()
-                }) {
-                    Text(stringResource(R.string.workspace_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmClear = false }) {
-                    Text(stringResource(R.string.common_cancel))
+        if (entries.isEmpty()) {
+            Text(
+                text = stringResource(R.string.browser_history_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = appPalette().labelSecondary
+            )
+        } else {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                entries.forEach { entry ->
+                    AppMenuRow(
+                        title = entry.title.ifBlank { entry.url },
+                        subtitle = entry.url,
+                        onClick = { onOpen(entry.url) }
+                    )
                 }
             }
+        }
+    }
+
+    if (confirmClear) {
+        AppDialog(
+            title = stringResource(R.string.browser_clear_history),
+            text = stringResource(R.string.browser_clear_history_confirm),
+            confirmText = stringResource(R.string.workspace_confirm),
+            dismissText = stringResource(R.string.common_cancel),
+            onConfirm = {
+                confirmClear = false
+                onClear()
+            },
+            onDismiss = { confirmClear = false }
         )
     }
 }
 
-/** 收藏夹面板（R1.1）：列表 + 回跳 + 删除。 */
+/** 收藏夹底部抽屉：列表 + 回跳 + 删除（确认走 AppDialog）。 */
 @Composable
-private fun BookmarksDialog(
+private fun BookmarksSheet(
     bookmarks: List<BrowserBookmark>,
     onOpen: (String) -> Unit,
     onRemove: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var removeTarget by remember { mutableStateOf<String?>(null) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.browser_bookmarks)) },
-        text = {
-            if (bookmarks.isEmpty()) {
-                Text(stringResource(R.string.browser_bookmarks_empty))
-            } else {
-                LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
-                    items(bookmarks, key = { it.id }) { bm ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onOpen(bm.url) }
-                                .padding(vertical = Spacing.sm),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = bm.title.ifBlank { bm.url },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = bm.url,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            IconButton(onClick = { removeTarget = bm.url }) {
-                                Icon(
-                                    Icons.Rounded.Delete,
-                                    contentDescription = stringResource(R.string.common_delete),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
+    AppBottomSheetList(onDismiss = onDismiss, title = stringResource(R.string.browser_bookmarks)) {
+        if (bookmarks.isEmpty()) {
+            Text(
+                text = stringResource(R.string.browser_bookmarks_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = appPalette().labelSecondary
+            )
+        } else {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                bookmarks.forEach { bm ->
+                    AppMenuRow(
+                        title = bm.title.ifBlank { bm.url },
+                        subtitle = bm.url,
+                        trailing = {
+                            AppIconButton(
+                                onClick = { removeTarget = bm.url },
+                                icon = Icons.Rounded.Delete,
+                                contentDescription = stringResource(R.string.common_delete)
+                            )
+                        },
+                        onClick = { onOpen(bm.url) }
+                    )
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.common_close))
             }
         }
-    )
+    }
 
     if (removeTarget != null) {
-        AlertDialog(
-            onDismissRequest = { removeTarget = null },
-            title = { Text(stringResource(R.string.browser_remove_bookmark)) },
-            text = { Text(removeTarget!!) },
-            confirmButton = {
-                TextButton(onClick = {
-                    onRemove(removeTarget!!)
-                    removeTarget = null
-                }) {
-                    Text(stringResource(R.string.workspace_confirm))
-                }
+        AppDialog(
+            title = stringResource(R.string.browser_remove_bookmark),
+            text = removeTarget,
+            confirmText = stringResource(R.string.workspace_confirm),
+            dismissText = stringResource(R.string.common_cancel),
+            onConfirm = {
+                onRemove(removeTarget!!)
+                removeTarget = null
             },
-            dismissButton = {
-                TextButton(onClick = { removeTarget = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            }
+            onDismiss = { removeTarget = null }
         )
     }
 }
 
-/** 下载管理面板（R1.2）：列表 / 打开 / 重试 / 清除。 */
+/** 下载管理底部抽屉：列表 / 打开 / 重试 / 清除。 */
 @Composable
-private fun DownloadsDialog(
+private fun DownloadsSheet(
     downloads: List<BrowserDownloadInfo>,
     onOpen: (BrowserDownloadInfo) -> Unit,
     onRetry: (BrowserDownloadInfo) -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.browser_downloads), modifier = Modifier.weight(1f))
-                if (downloads.isNotEmpty()) {
-                    TextButton(onClick = onClear) {
-                        Text(stringResource(R.string.browser_downloads_clear))
-                    }
-                }
-            }
-        },
-        text = {
-            if (downloads.isEmpty()) {
-                Text(stringResource(R.string.browser_downloads_empty))
-            } else {
-                LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
-                    items(downloads, key = { it.id }) { info ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = Spacing.sm),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = info.fileName.ifBlank { info.url },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = when (info.status) {
-                                        "done" -> info.path
-                                        "error" -> info.error.ifBlank { info.url }
-                                        else -> info.url
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = when (info.status) {
-                                        "error" -> MaterialTheme.colorScheme.error
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            if (info.status == "done") {
-                                TextButton(onClick = { onOpen(info) }) {
-                                    Text(stringResource(R.string.browser_open))
-                                }
-                            } else if (info.status == "error") {
-                                IconButton(onClick = { onRetry(info) }) {
-                                    Icon(
-                                        Icons.Rounded.Replay,
-                                        contentDescription = stringResource(R.string.browser_retry)
-                                    )
-                                }
-                            } else {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.common_close))
+    AppBottomSheetList(onDismiss = onDismiss, title = stringResource(R.string.browser_downloads)) {
+        if (downloads.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = AppSpacing.Sm),
+                horizontalArrangement = Arrangement.End
+            ) {
+                AppButton(
+                    text = stringResource(R.string.browser_downloads_clear),
+                    variant = AppButtonVariant.Text,
+                    onClick = onClear
+                )
             }
         }
-    )
+        if (downloads.isEmpty()) {
+            Text(
+                text = stringResource(R.string.browser_downloads_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = appPalette().labelSecondary
+            )
+        } else {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                downloads.forEach { info ->
+                    AppMenuRow(
+                        title = info.fileName.ifBlank { info.url },
+                        subtitle = when (info.status) {
+                            "done" -> info.path
+                            "error" -> info.error.ifBlank { info.url }
+                            else -> info.url
+                        },
+                        trailing = {
+                            when (info.status) {
+                                "done" -> AppButton(
+                                    text = stringResource(R.string.browser_open),
+                                    variant = AppButtonVariant.Text,
+                                    onClick = { onOpen(info) }
+                                )
+                                "error" -> AppIconButton(
+                                    onClick = { onRetry(info) },
+                                    icon = Icons.Rounded.Replay,
+                                    contentDescription = stringResource(R.string.browser_retry)
+                                )
+                                else -> CircularProgressIndicator(
+                                    modifier = Modifier.size(AppSizing.IconM),
+                                    color = appPalette().primary,
+                                    strokeWidth = AppSpacing.Tiny
+                                )
+                            }
+                        },
+                        onClick = { }
+                    )
+                }
+            }
+        }
+    }
 }
 
-/** 凭据管理面板（R1.2）：已存登录凭据列表（明文查看受保护）+ 删除。 */
+/** 凭据管理底部抽屉：已存登录凭据列表（明文查看受保护）+ 删除。 */
 @Composable
-private fun CredentialsDialog(
+private fun CredentialsSheet(
     credentialStore: BrowserCredentialStore,
     onDismiss: () -> Unit
 ) {
@@ -1066,137 +1063,106 @@ private fun CredentialsDialog(
     val revealed = remember { mutableStateOf<String?>(null) }
     var deleteHost by remember { mutableStateOf<String?>(null) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.browser_credentials)) },
-        text = {
-            if (hosts.isEmpty()) {
-                Text(stringResource(R.string.browser_credentials_empty))
-            } else {
-                LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
-                    items(hosts, key = { it }) { host ->
-                        val cred = credentialStore.find(host)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = Spacing.sm),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = host,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+    AppBottomSheetList(onDismiss = onDismiss, title = stringResource(R.string.browser_credentials)) {
+        if (hosts.isEmpty()) {
+            Text(
+                text = stringResource(R.string.browser_credentials_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = appPalette().labelSecondary
+            )
+        } else {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                hosts.forEach { host ->
+                    val cred = credentialStore.find(host)
+                    val subtitle = if (revealed.value == host && cred != null) {
+                        stringResource(R.string.browser_credential_detail, cred.username, cred.password)
+                    } else {
+                        stringResource(R.string.browser_credential_username, cred?.username.orEmpty())
+                    }
+                    AppMenuRow(
+                        title = host,
+                        subtitle = subtitle,
+                        trailing = {
+                            Row {
+                                AppIconButton(
+                                    onClick = { revealed.value = if (revealed.value == host) null else host },
+                                    icon = if (revealed.value == host) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                    contentDescription = null
                                 )
-                                Text(
-                                    text = if (revealed.value == host && cred != null) {
-                                        stringResource(R.string.browser_credential_detail, cred.username, cred.password)
-                                    } else {
-                                        stringResource(R.string.browser_credential_username, cred?.username.orEmpty())
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            IconButton(onClick = { revealed.value = if (revealed.value == host) null else host }) {
-                                Icon(
-                                    if (revealed.value == host) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            IconButton(onClick = { deleteHost = host }) {
-                                Icon(
-                                    Icons.Rounded.Delete,
-                                    contentDescription = stringResource(R.string.browser_credentials_delete),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                AppIconButton(
+                                    onClick = { deleteHost = host },
+                                    icon = Icons.Rounded.Delete,
+                                    contentDescription = stringResource(R.string.browser_credentials_delete)
                                 )
                             }
                         }
-                    }
+                    )
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.common_close))
             }
         }
-    )
+    }
 
     if (deleteHost != null) {
-        AlertDialog(
-            onDismissRequest = { deleteHost = null },
-            title = { Text(stringResource(R.string.browser_credentials_delete)) },
-            text = { Text(stringResource(R.string.browser_credentials_delete_confirm, deleteHost!!)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    credentialStore.delete(deleteHost!!)
-                    deleteHost = null
-                }) {
-                    Text(stringResource(R.string.workspace_confirm))
-                }
+        AppDialog(
+            title = stringResource(R.string.browser_credentials_delete),
+            text = stringResource(R.string.browser_credentials_delete_confirm, deleteHost!!),
+            confirmText = stringResource(R.string.workspace_confirm),
+            dismissText = stringResource(R.string.common_cancel),
+            onConfirm = {
+                credentialStore.delete(deleteHost!!)
+                deleteHost = null
             },
-            dismissButton = {
-                TextButton(onClick = { deleteHost = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            }
+            onDismiss = { deleteHost = null }
         )
     }
 }
 
-/** 页面缩放面板（R1.3）：textZoom 百分比调整（50–200）。 */
+/** 页面缩放底部抽屉：textZoom 百分比调整（50–200）。 */
 @Composable
-private fun ZoomDialog(
+private fun ZoomSheet(
     percent: Int,
     onLess: () -> Unit,
     onMore: () -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.browser_zoom)) },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+    AppBottomSheetList(onDismiss = onDismiss, title = stringResource(R.string.browser_zoom)) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.Md)
+        ) {
+            Text(
+                text = "$percent%",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Medium,
+                color = appPalette().ink
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.Md)
             ) {
-                Text(
-                    text = "$percent%",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Medium
+                AppIconButton(
+                    onClick = onLess,
+                    icon = Icons.Rounded.ZoomOut,
+                    contentDescription = stringResource(R.string.browser_zoom_less)
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.md)
-                ) {
-                    IconButton(onClick = onLess) {
-                        Icon(Icons.Rounded.ZoomOut, contentDescription = stringResource(R.string.browser_zoom_less))
-                    }
-                    TextButton(onClick = onReset) {
-                        Text(stringResource(R.string.browser_zoom_reset))
-                    }
-                    IconButton(onClick = onMore) {
-                        Icon(Icons.Rounded.ZoomIn, contentDescription = stringResource(R.string.browser_zoom_more))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.common_close))
+                AppButton(
+                    text = stringResource(R.string.browser_zoom_reset),
+                    variant = AppButtonVariant.Text,
+                    onClick = onReset
+                )
+                AppIconButton(
+                    onClick = onMore,
+                    icon = Icons.Rounded.ZoomIn,
+                    contentDescription = stringResource(R.string.browser_zoom_more)
+                )
             }
         }
-    )
+    }
 }
 
-/** 登录凭据输入对话框。 */
+/** 登录凭据输入对话框：newui Dialog 容器，body 输入框/按钮全部走 newui 组件。 */
 @Composable
 private fun LoginCredentialDialog(
     host: String,
@@ -1206,109 +1172,52 @@ private fun LoginCredentialDialog(
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    AlertDialog(
-        onDismissRequest = onCancel,
-        title = { Text(stringResource(R.string.browser_login_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+    Dialog(onDismissRequest = onCancel, properties = DialogProperties()) {
+        Surface(
+            shape = RoundedCornerShape(AppRadius.Lg),
+            color = appPalette().card
+        ) {
+            Column(modifier = Modifier.padding(AppSpacing.Lg)) {
+                Text(
+                    text = stringResource(R.string.browser_login_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = appPalette().ink
+                )
+                Spacer(Modifier.height(AppSpacing.Sm))
                 Text(
                     text = stringResource(R.string.browser_login_hint, host),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = appPalette().labelSecondary
                 )
-                OutlinedTextField(
+                Spacer(Modifier.height(AppSpacing.Md))
+                AppFilledTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text(stringResource(R.string.common_username)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = stringResource(R.string.common_username)
                 )
-                OutlinedTextField(
+                Spacer(Modifier.height(AppSpacing.Sm))
+                AppPasswordField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text(stringResource(R.string.browser_login_password)) },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                    modifier = Modifier.fillMaxWidth()
+                    label = stringResource(R.string.browser_login_password)
                 )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(username.trim(), password) },
-                enabled = username.isNotBlank() && password.isNotBlank()
-            ) {
-                Text(stringResource(R.string.browser_login_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onCancel) {
-                Text(stringResource(R.string.common_cancel))
-            }
-        }
-    )
-}
-
-/** 浏览器标签栏：横向滚动，可切换 / 关闭 / 新建标签。 */
-@Composable
-private fun BrowserTabBar(
-    tabs: List<BrowserTabInfo>,
-    activeTabId: String,
-    onSelect: (String) -> Unit,
-    onClose: (String) -> Unit,
-    onNewTab: () -> Unit
-) {
-    LazyRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-        contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = Spacing.xs),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        items(tabs, key = { it.id }) { tab ->
-            val active = tab.id == activeTabId
-            Surface(
-                shape = RoundedCornerShape(Radius.sm),
-                color = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                border = if (active) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
-                modifier = Modifier
-                    .widthIn(max = 200.dp)
-                    .clickable { onSelect(tab.id) }
-            ) {
+                Spacer(Modifier.height(AppSpacing.Lg))
                 Row(
-                    modifier = Modifier.padding(start = Spacing.sm, end = Spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text(
-                        text = tab.title.ifBlank { tab.url.ifBlank { stringResource(R.string.browser_tab_empty) } },
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 140.dp)
+                    AppButton(
+                        text = stringResource(R.string.common_cancel),
+                        variant = AppButtonVariant.Text,
+                        onClick = onCancel
                     )
-                    IconButton(
-                        onClick = { onClose(tab.id) },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            Icons.Rounded.Close,
-                            contentDescription = stringResource(R.string.browser_close_tab),
-                            modifier = Modifier.size(12.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Spacer(Modifier.width(AppSpacing.Sm))
+                    AppButton(
+                        text = stringResource(R.string.browser_login_confirm),
+                        onClick = { onConfirm(username.trim(), password) },
+                        enabled = username.isNotBlank() && password.isNotBlank()
+                    )
                 }
-            }
-        }
-        item {
-            IconButton(onClick = onNewTab, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    Icons.Rounded.Add,
-                    contentDescription = stringResource(R.string.browser_new_tab),
-                    tint = if (LocalAppDarkMode.current) Color(0xFF7C9FFF) else Color(0xFF4C8DFF)
-                )
             }
         }
     }
