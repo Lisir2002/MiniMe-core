@@ -158,8 +158,10 @@ private fun AssistantMessageNode(
         isUser = false,
         state = if (msg.isError) AppChatMessageState.Error else AppChatMessageState.Complete,
         modifier = modifier,
+        // 持久化历史里的思考块默认折叠（显示「思考过程」可展开头），不再整条展开；
+        // 流式进行中的思考块在 AIChatPanel 的 __reasoning__ 项里，仍 isStreaming=true 且展开实时滚动。
         leadingContent = if (hasReasoning) {
-            { AppThinkingBlock(text = msg.reasoning.orEmpty(), initiallyExpanded = true) }
+            { AppThinkingBlock(text = msg.reasoning.orEmpty(), initiallyExpanded = false) }
         } else null,
         // 长按助手消息提供「编辑此条重写」「从这里新开对话」。
         onRegenerate = { onEditMessage(msg) },
