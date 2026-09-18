@@ -63,6 +63,7 @@ private const val FAB_PRESSED_SCALE = 0.92f
 fun PortalBottomBar(
     selected: PortalTab,
     centerLabel: String,
+    fanExpanded: Boolean,
     onChat: () -> Unit,
     onWork: () -> Unit,
     onSettings: () -> Unit,
@@ -70,8 +71,8 @@ fun PortalBottomBar(
     val palette = appPalette()
     val barHeight = AppLayout.BottomBarHeight
     val fabDiameter = AppSizing.Fab
-    // 圆钮向上探出底栏上沿的量 = 半径；外层 Box 需为此留白，避免被父裁剪。
-    val overhang = fabDiameter / 2
+    // 仅当扇形展开时中央圆钮才向上探出底栏上沿；默认收起态与两侧槽位同高同槽，节省垂直高度。
+    val overhang = if (fanExpanded) fabDiameter / 2 else 0
 
     Box(
         modifier = Modifier
@@ -95,7 +96,7 @@ fun PortalBottomBar(
             )
         }
 
-        // 两侧 tab：等宽均分，在底栏条内垂直居中。中央槽位留白，圆钮与标签由上层浮层叠加。
+        // 两侧 tab + 中央槽位：收起态中央是与两侧同高同槽的普通 tab；展开态中央让位给上层凸起圆钮。
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -110,7 +111,17 @@ fun PortalBottomBar(
                 onClick = onChat,
                 modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.weight(1f))
+            if (fanExpanded) {
+                Spacer(Modifier.weight(1f))
+            } else {
+                CenterTabItem(
+                    icon = Icons.Rounded.Build,
+                    label = centerLabel,
+                    selected = selected == PortalTab.Work,
+                    onClick = onWork,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             BottomTabItem(
                 icon = Icons.Rounded.Settings,
                 label = "设置",
@@ -120,51 +131,93 @@ fun PortalBottomBar(
             )
         }
 
-        // 中央凸起主色圆钮 + 下方标签：探出底栏上沿，按压走 emphasizedSpring 弹性缩放。
-        Column(
-            modifier = Modifier.align(Alignment.TopCenter),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            val interactionSource = remember { MutableInteractionSource() }
-            val pressed by interactionSource.collectIsPressedAsState()
-            val fabScale by animateFloatAsState(
-                targetValue = if (pressed) FAB_PRESSED_SCALE else 1f,
-                animationSpec = AppMotion.emphasizedSpring(),
-                label = "fabScale",
-            )
-            Box(
-                modifier = Modifier
-                    .graphicsLayer {
-                        scaleX = fabScale
-                        scaleY = fabScale
-                    }
-                    .size(fabDiameter)
-                    .clip(CircleShape)
-                    .background(palette.primary)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = onWork,
-                    ),
-                contentAlignment = Alignment.Center,
+        // 仅扇形展开时：中央凸起主色圆钮 + 下方标签，探出底栏上沿，按压走 emphasizedSpring 弹性缩放。
+        if (fanExpanded) {
+            Column(
+                modifier = Modifier.align(Alignment.TopCenter),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.Build,
-                    contentDescription = centerLabel,
-                    tint = palette.onPrimary,
-                    modifier = Modifier.size(AppSizing.IconL),
+                val interactionSource = remember { MutableInteractionSource() }
+                val pressed by interactionSource.collectIsPressedAsState()
+                val fabScale by animateFloatAsState(
+                    targetValue = if (pressed) FAB_PRESSED_SCALE else 1f,
+                    animationSpec = AppMotion.emphasizedSpring(),
+                    label = "fabScale",
+                )
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer {
+                            scaleX = fabScale
+                            scaleY = fabScale
+                        }
+                        .size(fabDiameter)
+                        .clip(CircleShape)
+                        .background(palette.primary)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = onWork,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Build,
+                        contentDescription = centerLabel,
+                        tint = palette.onPrimary,
+                        modifier = Modifier.size(AppSizing.IconL),
+                    )
+                }
+                Spacer(Modifier.height(AppSpacing.Xs))
+                Text(
+                    text = centerLabel,
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = AppType.Caption),
+                    fontWeight = FontWeight.SemiBold,
+                    color = palette.onPrimary,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
                 )
             }
-            Spacer(Modifier.height(AppSpacing.Xs))
-            Text(
-                text = centerLabel,
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = AppType.Caption),
-                fontWeight = if (selected == PortalTab.Work) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (selected == PortalTab.Work) palette.primary else palette.labelSecondary,
-                maxLines = 1,
-                textAlign = TextAlign.Center,
-            )
         }
+    }
+}
+
+/** 收起态中央槽位：与两侧对话/设置 tab 同高同槽（图标 + 极小号标签），不凸起。 */
+@Composable
+private fun CenterTabItem(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val palette = appPalette()
+    val tint = if (selected) palette.primary else palette.labelSecondary
+    Column(
+        modifier = modifier
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(vertical = AppSpacing.Xs),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(AppSizing.IconL),
+        )
+        Spacer(Modifier.height(AppSpacing.Tiny))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = AppType.Caption),
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = tint,
+            maxLines = 1,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

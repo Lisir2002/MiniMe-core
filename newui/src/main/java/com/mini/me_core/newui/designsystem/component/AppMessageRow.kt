@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
+import com.mini.me_core.newui.designsystem.token.generated.AppLayout
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
@@ -110,13 +111,19 @@ fun AppMessageRow(
         ) {
             if (!isUser) {
                 AvatarSlot(avatarText, showAvatar = showAvatar && !grouped)
-                Spacer(Modifier.width(AppSpacing.Sm))
+                Spacer(Modifier.width(AppSpacing.Xs))
             }
             Column(
                 horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
             ) {
                 if (!grouped) {
-                    HeaderRow(label = label, timestamp = timestamp, isUser = isUser, nameColor = nameColor, timestampColor = timestampColor)
+                    // 头部标签条与头像同高（IconXl=28dp）并垂直居中，使「你/AI」标签中线对齐头像中线。
+                    Box(
+                        modifier = Modifier.height(AppSizing.IconXl),
+                        contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart,
+                    ) {
+                        HeaderRow(label = label, timestamp = timestamp, isUser = isUser, nameColor = nameColor, timestampColor = timestampColor)
+                    }
                     Spacer(Modifier.height(AppSpacing.Tiny))
                 }
                 // 头像下方、气泡上方的引导内容（如思考过程块），与气泡同列对齐。
@@ -124,10 +131,10 @@ fun AppMessageRow(
                     leadingContent()
                     Spacer(Modifier.height(AppSpacing.Sm))
                 }
-                // 气泡包裹内容：用户消息靠右收窄到约 7 成，AI 消息最多 8 成。
+                // 气泡包裹内容：用户消息靠右收窄到 chatUserBubbleMaxWidth(260dp)，AI 消息 chatAssistantBubbleMaxWidth(300dp)。
                 Column(
                     horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
-                    modifier = Modifier.widthIn(max = if (isUser) 260.dp else 300.dp),
+                    modifier = Modifier.widthIn(max = if (isUser) AppLayout.ChatUserBubbleMaxWidth else AppLayout.ChatAssistantBubbleMaxWidth),
                 ) {
                     AppChatBubble(
                         text = text,
@@ -177,7 +184,7 @@ fun AppMessageRow(
                 }
             }
             if (isUser) {
-                Spacer(Modifier.width(AppSpacing.Sm))
+                Spacer(Modifier.width(AppSpacing.Xs))
                 AvatarSlot(avatarText, showAvatar = showAvatar && !grouped)
             }
         }

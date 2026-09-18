@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CallSplit
 import androidx.compose.material.icons.rounded.Construction
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Terminal
@@ -43,7 +44,8 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * 办公扇形轮盘项：浏览器 / 终端可用，「待开发」灰显不可点。
+ * 办公扇形轮盘项：浏览器 / 终端 / Git 可用，「待开发」灰显不可点。
+ * 顺序固定：浏览器（左）→ 终端 → Git → 待开发（右，灰显）。
  */
 enum class WorkFanItem(
     val label: String,
@@ -52,6 +54,7 @@ enum class WorkFanItem(
 ) {
     Browser("浏览器", Icons.Rounded.Public, true),
     Terminal("终端", Icons.Rounded.Terminal, true),
+    Git("Git", Icons.Rounded.CallSplit, true),
     Todo("待开发", Icons.Rounded.Construction, false),
 }
 
@@ -68,8 +71,8 @@ private val FAN_STAGGER_MS: Long = AppMotion.Fast / 6
 private val FAN_LABEL_LAG_MS: Long = AppMotion.Fast / 6
 
 /**
- * 底部半圆扇形轮盘浮层：在底栏上方弹出，沿上半圆弧从左到右排列
- * [WorkFanItem.Browser]（左）/ [WorkFanItem.Terminal]（顶）/ [WorkFanItem.Todo]（右，灰显）。
+ * 底部半圆扇形轮盘浮层：在底栏上方弹出，沿上半圆弧从左到右等角排列
+ * [WorkFanItem.Browser]（左）/ [WorkFanItem.Terminal] / [WorkFanItem.Git] / [WorkFanItem.Todo]（右，灰显）。
  *
  * - 半透明罩层点空白处或再次点中央按钮均收起（[onDismiss]）。
  * - 错峰弹出：图标先缩放淡入、下方文字晚一拍淡入；进入时长走 [AppMotion.emphasizedTween]。
@@ -113,7 +116,13 @@ private fun FanOverlay(
         val baselineY = maxHeight - AppLayout.BottomBarHeight
 
         val items = WorkFanItem.entries
-        val angles = listOf(150f, 90f, 30f)
+        // 半圆弧等角：沿上半弧从 150°（左）到 30°（右）均分，n 项共 (n-1) 段。
+        // n=3 → 150/90/30；n=4 → 150/110/70/30。错峰动画不变。
+        val fanStartAngle = 150f
+        val fanEndAngle = 30f
+        val angles = List(items.size) { i ->
+            fanStartAngle + (fanEndAngle - fanStartAngle) * i / (items.size - 1)
+        }
         items.forEachIndexed { index, item ->
             val rad = Math.toRadians(angles[index].toDouble())
             // Dp 乘 Float 得 Dp，消灭裸 .dp 表外数值。

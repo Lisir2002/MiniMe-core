@@ -105,6 +105,8 @@ object AppLayout {
     val ContentMaxWidth = 720.dp
     val DividerThickness = 1.dp // 分割线统一厚度
     val BottomBarHeight = 56.dp // 门户底栏总高（不含系统导航/手势 inset）
+    val ChatUserBubbleMaxWidth = 260.dp // 用户气泡最大宽度（右对齐紧凑小气泡）
+    val ChatAssistantBubbleMaxWidth = 300.dp // AI 气泡最大宽度（左对齐，头像右侧）
 }
 
 /** 字号令牌（sp）：组件统一用 [MaterialTheme.typography.*].copy(fontSize = AppType.*) 引用。 */

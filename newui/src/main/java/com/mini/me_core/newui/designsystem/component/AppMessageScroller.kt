@@ -82,7 +82,8 @@ fun AppMessageScroller(
             modifier = Modifier.fillMaxSize(),
             reverseLayout = true,
             contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.Sm),
+            // 消息/工具卡/思考块之间的垂直行间距：Md(12dp)，避免工具卡与上下气泡贴太近。
+            verticalArrangement = Arrangement.spacedBy(AppSpacing.Md),
         ) {
             content()
             if (onLoadHistory != null) {

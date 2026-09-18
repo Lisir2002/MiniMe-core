@@ -77,7 +77,6 @@ import com.mini.me_core.newui.designsystem.layout.PortalTab
 import com.mini.me_core.newui.designsystem.layout.WorkFanItem
 import com.mini.me_core.newui.designsystem.layout.WorkFanMenu
 import com.mini.me_core.newui.portal.BrowserPlaceholderScreen
-import com.mini.me_core.newui.portal.TerminalPlaceholderScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -453,8 +452,10 @@ fun AppNavigation(
                                 centerLabel = when {
                                     portalTab == PortalTab.Work && workTool == WorkFanItem.Browser -> "浏览器"
                                     portalTab == PortalTab.Work && workTool == WorkFanItem.Terminal -> "终端"
+                                    portalTab == PortalTab.Work && workTool == WorkFanItem.Git -> "Git"
                                     else -> "办公"
                                 },
+                                fanExpanded = fanExpanded,
                                 onChat = {
                                     fanExpanded = false
                                     portalTab = PortalTab.Chat
@@ -492,9 +493,32 @@ fun AppNavigation(
                                 onNavigateToCapabilityCenter = { navController.navigate("capability_center") }
                             )
                             PortalTab.Work -> when (workTool) {
-                                WorkFanItem.Browser -> BrowserPlaceholderScreen()
-                                WorkFanItem.Terminal -> TerminalPlaceholderScreen()
-                                // 「待开发」不可选，不会落到此分支。
+                                // 浏览器 / 终端 / Git 直接迁入 newui 门户内容区（原地切换，不进 NavHost 新路由），
+                                // 各页自带 Scaffold 顶栏；其返回钮即退回对话 tab。
+                                WorkFanItem.Browser -> com.mini.me_core.feature.browser.presentation.ServiceBrowserScreen(
+                                    browserController = browserController,
+                                    loginPromptManager = browserLoginPromptManager,
+                                    takeoverManager = browserTakeoverManager,
+                                    credentialStore = browserCredentialStore,
+                                    onNavigateBack = { portalTab = PortalTab.Chat },
+                                )
+                                WorkFanItem.Terminal -> {
+                                    val terminalViewModel: TerminalViewModel = hiltViewModel()
+                                    TerminalScreen(
+                                        viewModel = terminalViewModel,
+                                        onNavigateBack = { portalTab = PortalTab.Chat },
+                                    )
+                                }
+                                WorkFanItem.Git -> {
+                                    val gitViewModel: GitViewModel = hiltViewModel()
+                                    val credentialViewModel: com.mini.me_core.feature.credentials.presentation.CredentialViewModel = hiltViewModel()
+                                    GitScreen(
+                                        viewModel = gitViewModel,
+                                        credentialViewModel = credentialViewModel,
+                                        onNavigateBack = { portalTab = PortalTab.Chat },
+                                    )
+                                }
+                                // 「待开发」灰显不可选，不会落到此分支。
                                 WorkFanItem.Todo -> BrowserPlaceholderScreen()
                             }
                         }

@@ -151,7 +151,7 @@ fun AppToolCallCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+                .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // 图标块：状态色浅底 + 状态色图标
@@ -250,7 +250,7 @@ fun AppToolCallCard(
                 approvalRemembered -> Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+                        .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
                     verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -272,7 +272,7 @@ fun AppToolCallCard(
                 approvalExpired -> Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+                        .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
                     verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -302,7 +302,7 @@ fun AppToolCallCard(
                 else -> Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+                        .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
                     verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
@@ -431,7 +431,7 @@ private fun ExpandableSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onToggle)
-                .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Xs),
+                .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -471,30 +471,22 @@ private fun ExpandableSection(
     }
 }
 
-/** 入参 / 结果内容块：等宽字体 + 浅底代码区。 */
+/** 入参 / 结果内容块：等宽字体，单层卡内纯文本（不再叠独立浅底子块，视觉合成一张卡）。 */
 @Composable
 private fun JsonBlock(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
         color = appPalette().ink,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(AppRadius.Sm))
-            .background(appPalette().surfaceDim)
-            .padding(AppSpacing.Sm),
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 
-/** 命令块：Bash/terminal 命令的等宽命令行呈现，品牌色前置 `$`。 */
+/** 命令块：Bash/terminal 命令的等宽命令行呈现，品牌色前置 `$`（单层卡内纯文本，不叠子块底）。 */
 @Composable
 private fun CommandBlock(text: String) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(AppRadius.Sm))
-            .background(appPalette().surfaceDim)
-            .padding(AppSpacing.Sm),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
             text = "$ ",
@@ -532,14 +524,12 @@ private fun StreamBlock(text: String, maxLines: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+            .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(
             modifier = Modifier
                 .weight(1f, fill = false)
-                .clip(RoundedCornerShape(AppRadius.Sm))
-                .background(appPalette().primary.copy(alpha = 0.06f))
                 .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs)
                 .then(
                     if (folded) Modifier.clickable { expanded = !expanded } else Modifier,

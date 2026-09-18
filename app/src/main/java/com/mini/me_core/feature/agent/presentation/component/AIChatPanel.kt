@@ -66,6 +66,7 @@ import com.mini.me_core.newui.designsystem.component.AppMessageRow
 import com.mini.me_core.newui.designsystem.component.AppMessageScroller
 import com.mini.me_core.newui.designsystem.component.AppThinkingBlock
 import com.mini.me_core.newui.designsystem.component.AppTypingIndicator
+import com.mini.me_core.newui.designsystem.token.generated.AppLayout
 import java.io.File
 import kotlinx.coroutines.launch
 
@@ -283,6 +284,9 @@ fun AIChatPanel(
     val showThinking = !showReasoning && !showStreaming && !isCompacting && isBusy &&
         pendingPermission == null && pendingQuestion == null
     val showRetrying = retryState != null && isBusy && !isCompacting && !showStreaming && !showReasoning
+    // 流式尾巴是否有任何可见内容：首条消息模型必然先输出 thinking，
+    // 此时历史 messages 仍为空，但流式思考块必须照常渲染（与后续消息一致），不能退回欢迎页。
+    val showStreamingTail = showReasoning || showStreaming || showThinking || isCompacting || showRetrying
 
     val planApproval by viewModel.pendingPlanApproval.collectAsStateWithLifecycle()
     val changes by viewModel.changes.collectAsStateWithLifecycle()
@@ -318,11 +322,12 @@ fun AIChatPanel(
                     if (isRemote && connectionState != null && connectionState != com.mini.me_core.feature.agent.domain.container.ConnectionState.CONNECTED) {
                         RemoteConnectingPlaceholder(state = connectionState)
                     }
-                } else if (messages.isEmpty()) {
+                } else if (messages.isEmpty() && !showStreamingTail) {
                     WelcomeState(modifier = Modifier.fillMaxSize())
                 } else {
                     // 新版对话流：AppMessageScroller（reverseLayout）+ 扁平节点 ChatMessageNode。
                     // reverseLayout 把最新内容锚定视觉底部，流式增长自动贴底；新落库消息靠 newMessageKey 回底。
+                    // 消息行统一左右外边距 AppLayout.PageHorizontal(16dp)，思考块/气泡/工具卡同一水平带，不顶屏幕边缘。
                     AppMessageScroller(
                         modifier = Modifier.fillMaxSize(),
                         newMessageKey = "$currentSessionId:${messages.size}",
@@ -340,6 +345,7 @@ fun AIChatPanel(
                                     text = reasoning.orEmpty(),
                                     initiallyExpanded = true,
                                     isStreaming = true,
+                                    modifier = Modifier.padding(horizontal = AppLayout.PageHorizontal),
                                 )
                             }
                         }
@@ -350,18 +356,23 @@ fun AIChatPanel(
                                     isUser = false,
                                     state = AppChatMessageState.Streaming,
                                     onStop = { viewModel.stopAgent() },
+                                    modifier = Modifier.padding(horizontal = AppLayout.PageHorizontal),
                                 )
                             }
                         } else if (showThinking) {
                             item(key = "__thinking__") {
                                 Box(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.sm),
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = AppLayout.PageHorizontal, vertical = Spacing.sm),
                                     contentAlignment = Alignment.CenterStart,
                                 ) { AppTypingIndicator() }
                             }
                         } else if (isCompacting) {
                             item(key = "__compacting__") {
-                                AppChatMarker(text = "正在压缩上下文…", kind = AppChatMarkerKind.System)
+                                AppChatMarker(
+                                    text = "正在压缩上下文…",
+                                    kind = AppChatMarkerKind.System,
+                                    modifier = Modifier.padding(horizontal = AppLayout.PageHorizontal),
+                                )
                             }
                         } else if (showRetrying) {
                             val rs = retryState
@@ -370,6 +381,7 @@ fun AIChatPanel(
                                     text = "重试中（第 ${rs?.attempt ?: 0}/${rs?.maxRetries ?: 0} 次）…",
                                     kind = AppChatMarkerKind.Tool,
                                     running = true,
+                                    modifier = Modifier.padding(horizontal = AppLayout.PageHorizontal),
                                 )
                             }
                         }
@@ -383,6 +395,7 @@ fun AIChatPanel(
                                 onOpenAttachment = { att -> openAttachment(context, att) },
                                 onEditMessage = { startEditMessage(it) },
                                 onNewChatFromMessage = { viewModel.newChatAndSend(it.content) },
+                                modifier = Modifier.padding(horizontal = AppLayout.PageHorizontal),
                             )
                         }
                     }
