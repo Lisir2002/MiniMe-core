@@ -298,13 +298,10 @@ private fun leadingSpaces(s: String): Int {
     return n
 }
 
-/** 行内可转义字符：\* \_ \[ \]。 */
-private val INLINE_ESCAPABLE = charArrayOf('*', '_', '[', ']')
+/** 行内可转义字符：\* \_ \[ \] \` \$ \~ \#。 */
+private val INLINE_ESCAPABLE = charArrayOf('*', '_', '[', ']', '`', '$', '~', '#')
 
-/**
- * 行内转义处理：`\*` `\_` `\[` `\]` 还原为字面字符。
- * 抽为 internal 纯函数便于单测，渲染期在 [buildInline] 逐字符同步使用同一规则。
- */
+/** 行内转义处理：`\*` `\_` `\[` `\]` 还原为字面字符。 */
 internal fun unescapeInline(text: String): String {
     val sb = StringBuilder(text.length)
     var i = 0
@@ -319,6 +316,16 @@ internal fun unescapeInline(text: String): String {
         }
     }
     return sb.toString()
+}
+
+/** 过滤未在白名单的 HTML 标签，避免裸 `<br>` `<sub>` 漏出。 */
+internal fun stripUnknownHtml(text: String): String {
+    val whitelist = setOf("<br>", "<br/>", "<br />", "<sub>", "</sub>", "<sup>", "</sup>")
+    var s = text
+    Regex("<[^>]+>").findAll(s).forEach { m ->
+        if (m.value !in whitelist) s = s.replace(m.value, "")
+    }
+    return s
 }
 
 // ===== 渲染层 =====
@@ -624,6 +631,31 @@ private fun buildInline(
                         append(raw.substring(i + 2, end))
                     }
                     i = end + 2
+                } else {
+                    append(raw[i])
+                    i++
+                }
+            }
+            raw.startsWith("~~", i) -> {
+                val end = raw.indexOf("~~", i + 2)
+                if (end > i + 2) {
+                    withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough, color = baseColor)) {
+                        append(raw.substring(i + 2, end))
+                    }
+                    i = end + 2
+                } else {
+                    append(raw[i])
+                    i++
+                }
+            }
+            (raw[i] == '*' || raw[i] == '_') && i + 1 < raw.length && raw[i + 1] != ' ' && raw[i + 1] != raw[i] -> {
+                val ch = raw[i]
+                val end = raw.indexOf(ch, i + 1)
+                if (end > i + 1) {
+                    withStyle(SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, color = baseColor)) {
+                        append(raw.substring(i + 1, end))
+                    }
+                    i = end + 1
                 } else {
                     append(raw[i])
                     i++
