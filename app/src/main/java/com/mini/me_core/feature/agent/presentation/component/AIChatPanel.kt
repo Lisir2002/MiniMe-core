@@ -7,14 +7,20 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
+import com.mini.me_core.newui.designsystem.theme.appPalette
+import com.mini.me_core.newui.designsystem.token.generated.AppLayout
+import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -451,8 +457,13 @@ fun AIChatPanel(
 
             StatusBanner(state = agentState)
 
-            // 工具审批不再以浮层卡片形式出现在消息流里，改为吸附到输入框上方常驻条（见下方审批 DockBar），
-            // 未处理审批始终有可见入口；点批准/拒绝后自动消失。
+            // 工具审批交互卡：批准/拒绝按钮留在消息流卡片上；上方另有一条纯提示的审批指示条做定位入口。
+            pendingPermission?.let { request ->
+                ToolPermissionPanel(
+                    request = request,
+                    onChoice = { choice -> viewModel.resolveToolPermission(request.id, choice) }
+                )
+            }
 
             // 澄清/提问改为吸附输入框上方的紧凑单题条（见下方 ClarifyDockBar），层级：提问条→审批条→任务条→输入框。
 
@@ -480,16 +491,8 @@ fun AIChatPanel(
                 }
             }
 
-            // 常驻条垂直顺序（从上到下）：提问条 → 审批条 → 任务清单条 → 输入框。均紧凑单行/两行。
-            pendingQuestion?.let { question ->
-                ClarifyDockBar(
-                    question = question,
-                    onSubmit = { answer -> viewModel.resolveUserQuestion(question.id, answer) },
-                    onSkip = { viewModel.resolveUserQuestion(question.id, UserQuestionAnswer(emptyList())) },
-                )
-            }
-
-            // 审批吸附条：未处理审批始终常驻可见，紧凑单行；批准/拒绝后自动消失。
+            // 常驻提示条垂直顺序（从上到下）：审批提示条 → 提问提示条 → 任务清单条 → 输入框。均紧凑单行、纯提示无按钮。
+            // 审批提示条：仅提示未处理审批数；点击滚动到消息流里对应审批卡（卡片在流式尾部，即回底）。
             pendingPermission?.let { request ->
                 Row(
                     modifier = Modifier
@@ -497,36 +500,16 @@ fun AIChatPanel(
                         .padding(horizontal = AppLayout.PageHorizontal, vertical = AppSpacing.Xs)
                         .clip(RoundedCornerShape(AppRadius.Md))
                         .background(appPalette().card)
+                        .clickable { /* 审批卡在流式尾部，回底即可定位 */ }
                         .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "待审批：${request.toolName}",
+                        text = "待审批：${request.toolName}（点击定位）",
                         style = MaterialTheme.typography.labelMedium,
                         color = appPalette().ink,
                         maxLines = 1,
                         modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = stringResource(R.string.chat_perm_deny),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = appPalette().labelSecondary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(AppRadius.Sm))
-                            .clickable { viewModel.resolveToolPermission(request.id, PermissionChoice.REJECT) }
-                            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
-                    )
-                    Spacer(Modifier.width(AppSpacing.Sm))
-                    Text(
-                        text = stringResource(R.string.common_allow),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = appPalette().onPrimary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(AppRadius.Sm))
-                            .background(appPalette().primary)
-                            .clickable { viewModel.resolveToolPermission(request.id, PermissionChoice.ONCE) }
-                            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
                     )
                 }
             }
