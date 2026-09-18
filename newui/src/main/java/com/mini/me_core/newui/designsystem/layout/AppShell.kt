@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppSizing
@@ -117,6 +120,13 @@ private fun ShellContent(
     showTopBar: Boolean,
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    // ADJUST_NOTHING 下键盘不重排窗口，直接覆盖在底栏之上。若键盘弹起时仍为内容预留底栏高度，
+    // 内容区会停在被键盘遮住的底栏上方，再叠加各页 rememberImeBottomInset() 的整键高 inset，
+    // 就在输入框与键盘之间留出一截约「底栏高 + 导航栏」的白空。键盘可见时不渲染底栏，让内容区
+    // 一直延伸到屏幕底，由各页自己的 rememberImeBottomInset() 单独把输入栏顶到键盘上沿。
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+
     Column(Modifier.fillMaxSize()) {
         // 顶栏：背景逼近状态栏，insets 内移内容
         if (showTopBar) {
@@ -133,7 +143,7 @@ private fun ShellContent(
         Column(Modifier.weight(1f).fillMaxWidth()) {
             content(PaddingValues(0.dp))
         }
-        if (bottomBar != null) {
+        if (bottomBar != null && !imeVisible) {
             Surface(
                 color = MaterialTheme.colorScheme.surface,
                 modifier = Modifier.fillMaxWidth(),
