@@ -38,6 +38,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import com.mini.me_core.newui.designsystem.theme.appPalette
+import com.mini.me_core.newui.designsystem.token.generated.AppRadius
+import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,17 +75,16 @@ internal fun ToolPermissionPanel(
     request: PendingToolPermission,
     onChoice: (PermissionChoice) -> Unit
 ) {
-    Surface(
+    // 审批/权限卡片：改为 newui 对话流卡片样式（参考 AppAcceptChangesBar），走令牌，不用 Material3 Surface。
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(Radius.md),
-        tonalElevation = Elevation.z2,
-        shadowElevation = Elevation.z2,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Xs)
+            .clip(RoundedCornerShape(AppRadius.Md))
+            .background(appPalette().card)
+            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Md)),
     ) {
-        Column(modifier = Modifier.padding(Spacing.md)) {
+        Column(modifier = Modifier.padding(AppSpacing.Md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier

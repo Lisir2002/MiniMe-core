@@ -173,30 +173,8 @@ private fun ToolMessageNode(msg: AgentUIMessage, modifier: Modifier = Modifier) 
             output = resultText,
         )
 
-        // todo 工具：解析成 AppTodoCard 叠加在工具卡下方。
-        // 工具刚发起时结果为空（content 仍是执行中标记），但入参 toolArgs 已带 todos 数组，
-        // 故优先用结果解析，解析不到则回退入参——使卡片在工具调用一开始就出现（pending/in_progress），
-        // 随后结果落库时同一消息 id 上增量刷新为最终状态。
-        val todo = remember(msg.toolName, msg.content, msg.toolArgs) {
-            if (msg.toolName == "todo" || msg.toolName == "todowrite" || msg.toolName == "todo_list") {
-                parseTodoResult(msg.content) ?: parseTodoArgs(msg.toolArgs)
-            } else null
-        }
-        if (todo != null) {
-            Spacer(Modifier.height(AppSpacing.Sm))
-            AppTodoCard(
-                items = todo.items.map { item ->
-                    AppTodoItem(
-                        text = item.subject,
-                        status = when (item.status) {
-                            "completed" -> AppTodoStatus.Done
-                            "in_progress" -> AppTodoStatus.Running
-                            else -> AppTodoStatus.Pending
-                        },
-                    )
-                },
-            )
-        }
+        // todo 工具不再在消息流里重复插卡：实时列表由吸附输入框上方的常驻任务条（TodoDockBar）承载，
+        // 避免同一任务两处重复展示。此处仅保留普通工具卡渲染。
 
         // 联网搜索工具：解析命中并叠加 AppWebSearchCard。
         val web = remember(msg.toolName, msg.content) {

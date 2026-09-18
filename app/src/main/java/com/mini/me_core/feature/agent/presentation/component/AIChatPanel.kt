@@ -7,9 +7,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -290,6 +295,25 @@ fun AIChatPanel(
     // 历史消息块（相邻 TOOL 折叠为工具链）：在 @Composable 外层算好，再喂给非 composable 的 LazyListScope content。
     val historyBlocks = remember(messages) { messages.toChatBlocks().asReversed() }
 
+    // 常驻任务条：取消息流里最新一条 todo 快照（结果优先，回退入参）。
+    val todoItems = remember(messages) {
+        messages.lastOrNull {
+            it.toolName == "todo" || it.toolName == "todowrite" || it.toolName == "todo_list"
+        }?.let { m -> parseTodoResult(m.content) ?: parseTodoArgs(m.toolArgs) }?.items.orEmpty()
+    }
+    val todoAllDone = todoItems.isNotEmpty() && todoItems.all { it.status == "completed" }
+    // 全部完成后横条停留 2 秒自动收起；新任务到来时复位。
+    var todoBarDismissed by remember { mutableStateOf(false) }
+    var showTodoSheet by remember { mutableStateOf(false) }
+    LaunchedEffect(todoItems) { todoBarDismissed = false }
+    LaunchedEffect(todoAllDone) {
+        if (todoAllDone) {
+            kotlinx.coroutines.delay(2000)
+            todoBarDismissed = true
+        }
+    }
+    val showTodoBar = todoItems.isNotEmpty() && !todoBarDismissed
+
     val planApproval by viewModel.pendingPlanApproval.collectAsStateWithLifecycle()
     val changes by viewModel.changes.collectAsStateWithLifecycle()
 
@@ -427,18 +451,8 @@ fun AIChatPanel(
 
             StatusBanner(state = agentState)
 
-            AnimatedVisibility(
-                visible = pendingPermission != null,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                pendingPermission?.let { request ->
-                    ToolPermissionPanel(
-                        request = request,
-                        onChoice = { choice -> viewModel.resolveToolPermission(request.id, choice) }
-                    )
-                }
-            }
+            // 工具审批不再以浮层卡片形式出现在消息流里，改为吸附到输入框上方常驻条（见下方审批 DockBar），
+            // 未处理审批始终有可见入口；点批准/拒绝后自动消失。
 
             AnimatedVisibility(
                 visible = pendingQuestion != null,
@@ -476,6 +490,61 @@ fun AIChatPanel(
                         onCancel = { cancelEditMessage() }
                     )
                 }
+            }
+
+            // 常驻条垂直顺序（从上到下）：审批条 → 任务清单条 → 输入框。均紧凑单行。
+            // 审批吸附条：未处理审批始终常驻可见，紧凑单行；批准/拒绝后自动消失。
+            pendingPermission?.let { request ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AppLayout.PageHorizontal, vertical = AppSpacing.Xs)
+                        .clip(RoundedCornerShape(AppRadius.Md))
+                        .background(appPalette().card)
+                        .padding(horizontal = AppSpacing.Md, vertical = AppSpacing.Sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "待审批：${request.toolName}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = appPalette().ink,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = stringResource(R.string.chat_perm_deny),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = appPalette().labelSecondary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(AppRadius.Sm))
+                            .clickable { viewModel.resolveToolPermission(request.id, PermissionChoice.REJECT) }
+                            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
+                    )
+                    Spacer(Modifier.width(AppSpacing.Sm))
+                    Text(
+                        text = stringResource(R.string.common_allow),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = appPalette().onPrimary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(AppRadius.Sm))
+                            .background(appPalette().primary)
+                            .clickable { viewModel.resolveToolPermission(request.id, PermissionChoice.ONCE) }
+                            .padding(horizontal = AppSpacing.Sm, vertical = AppSpacing.Xs),
+                    )
+                }
+            }
+
+            // 常驻任务条：吸附在输入框上方，随 todo 流实时更新；无任务/自动收起时不渲染。
+            if (showTodoBar) {
+                TodoDockBar(
+                    items = todoItems,
+                    allDone = todoAllDone,
+                    onClick = { showTodoSheet = true },
+                )
+            }
+            if (showTodoSheet) {
+                TodoReadonlySheet(items = todoItems, onDismiss = { showTodoSheet = false })
             }
 
             // 新版输入栏：AppComposer 接管模式/思考/模型/技能/附件/斜杠/排队/发送。
