@@ -65,6 +65,9 @@ import java.util.Locale
  */
 enum class AppToolCallState { Streaming, Running, AwaitingApproval, Success, Error }
 
+/** 入参 / 结果文本块超过此行数即默认折叠为前若干行 + 展开入口。 */
+private const val JSON_FOLD_LINES = 10
+
 /**
  * 工具权限审批三档选择（对齐真实权限引擎 [PermissionChoice 的 REJECT / ONCE / ALWAYS]）：
  * [Reject] 拒绝、[Once] 本次放行、[Always] 始终允许。
@@ -227,17 +230,26 @@ fun AppToolCallCard(
                 expanded = inputExpanded,
                 onToggle = { inputExpanded = !inputExpanded },
             ) {
-                JsonBlock(text = input)
+                FoldingJsonText(text = input)
             }
         }
-        if (output != null) {
+        if (output.isNullOrBlank()) {
+            // 空结果占位：统一文案，避免结果区空着。
+            CardDivider()
+            Text(
+                text = "［无结果］",
+                style = MaterialTheme.typography.bodySmall,
+                color = appPalette().labelTertiary,
+                modifier = Modifier.padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Xs),
+            )
+        } else {
             CardDivider()
             ExpandableSection(
                 label = "结果",
                 expanded = outputExpanded,
                 onToggle = { outputExpanded = !outputExpanded },
             ) {
-                JsonBlock(text = output)
+                FoldingJsonText(text = output)
             }
         }
         // Intervention：待人工审批 → 三档 / 二档操作行；超时降级 / 记忆放行 仅展示态
@@ -471,15 +483,34 @@ private fun ExpandableSection(
     }
 }
 
-/** 入参 / 结果内容块：等宽字体，单层卡内纯文本（不再叠独立浅底子块，视觉合成一张卡）。 */
+/** 入参 / 结果内容块：等宽字体，单层卡内纯文本；超过 [JSON_FOLD_LINES] 行默认折叠为前若干行 + 展开入口。 */
 @Composable
-private fun JsonBlock(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-        color = appPalette().ink,
-        modifier = Modifier.fillMaxWidth(),
-    )
+private fun FoldingJsonText(text: String) {
+    val lines = text.lines()
+    val folded = lines.size > JSON_FOLD_LINES
+    var expanded by remember(text) { mutableStateOf(false) }
+    val shown = if (folded && !expanded) lines.take(JSON_FOLD_LINES) else lines
+    Column(Modifier.fillMaxWidth()) {
+        shown.forEachIndexed { index, line ->
+            Text(
+                text = line,
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                color = appPalette().ink,
+            )
+            if (index != shown.lastIndex) {
+                Spacer(Modifier.height(AppSpacing.Tiny))
+            }
+        }
+        if (folded) {
+            Spacer(Modifier.height(AppSpacing.Tiny))
+            Text(
+                text = if (expanded) "收起 · ${lines.size} 行" else "展开全部 · ${lines.size} 行",
+                style = MaterialTheme.typography.labelSmall,
+                color = appPalette().labelSecondary,
+                modifier = Modifier.clickable { expanded = !expanded },
+            )
+        }
+    }
 }
 
 /** 命令块：Bash/terminal 命令的等宽命令行呈现，品牌色前置 `$`（单层卡内纯文本，不叠子块底）。 */

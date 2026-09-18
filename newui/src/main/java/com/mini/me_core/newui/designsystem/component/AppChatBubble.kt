@@ -48,6 +48,9 @@ import com.mini.me_core.newui.designsystem.token.generated.AppStroke
  */
 enum class AppChatMessageState { Pending, Streaming, Complete, Error }
 
+/** 流式过程中正文超过此行数即自动折叠（定型后完整展开）。 */
+private const val STREAM_COLLAPSE_LINES = 3
+
 /**
  * 气泡颜色组覆盖：全字段可空，默认 null 走主题。
  * [background] 气泡底色（用户侧默认 = accent，AI 侧默认 = card）；
@@ -122,18 +125,37 @@ fun AppChatBubble(
                     dotSize = 6.dp,
                 )
             }
-            AppChatMessageState.Streaming -> Row(verticalAlignment = Alignment.Bottom) {
-                AppMarkdownText(
-                    text = text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    colors = AppMarkdownColors(
-                        text = contentColor,
-                        codeFg = secondaryColor,
-                        codeBg = codeBackground,
-                        blockBg = codeBackground,
-                    ),
-                )
-                StreamingCaret(color = secondaryColor)
+            AppChatMessageState.Streaming -> {
+                // 流式过程中正文超 3 行自动折叠（只显示前 3 行 + 展开入口）；定型后由 Complete 分支完整展开。
+                val lineCount = text.count { it == '\n' } + 1
+                var streamingExpanded by remember(text) { mutableStateOf(false) }
+                val collapsed = lineCount > STREAM_COLLAPSE_LINES && !streamingExpanded
+                Column {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        AppMarkdownText(
+                            text = if (collapsed) text.lineSequence().take(STREAM_COLLAPSE_LINES).joinToString("\n") else text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            colors = AppMarkdownColors(
+                                text = contentColor,
+                                codeFg = secondaryColor,
+                                codeBg = codeBackground,
+                                blockBg = codeBackground,
+                            ),
+                        )
+                        StreamingCaret(color = secondaryColor)
+                    }
+                    if (collapsed) {
+                        Text(
+                            text = "展开",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = secondaryColor,
+                            modifier = Modifier
+                                .padding(top = AppSpacing.Tiny)
+                                .clip(RoundedCornerShape(AppRadius.Pill))
+                                .clickable { streamingExpanded = true },
+                        )
+                    }
+                }
             }
             AppChatMessageState.Error -> Column {
                 AppMarkdownText(

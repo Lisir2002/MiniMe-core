@@ -2,11 +2,31 @@ package com.mini.me_core.feature.agent.presentation.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
@@ -26,7 +46,11 @@ import com.mini.me_core.newui.designsystem.component.AppToolCallCard
 import com.mini.me_core.newui.designsystem.component.AppToolCallState
 import com.mini.me_core.newui.designsystem.component.AppWebHit
 import com.mini.me_core.newui.designsystem.component.AppWebSearchCard
+import com.mini.me_core.newui.designsystem.theme.appPalette
+import com.mini.me_core.newui.designsystem.token.generated.AppColor
+import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
+import com.mini.me_core.newui.designsystem.token.generated.AppStroke
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 
@@ -112,8 +136,10 @@ private fun AssistantMessageNode(
     modifier: Modifier = Modifier,
 ) {
     val hasReasoning = !msg.reasoning.isNullOrBlank()
+    // 空正文兜底：模型只出了思考没落正文时，给一句明确提示，避免空白气泡。
+    val bodyText = msg.content.ifBlank { "无正文回复［请查阅思考过程］" }
     AppMessageRow(
-        text = msg.content,
+        text = bodyText,
         isUser = false,
         state = if (msg.isError) AppChatMessageState.Error else AppChatMessageState.Complete,
         modifier = modifier,
@@ -210,3 +236,107 @@ private fun bashCommandFromArgs(argsJson: String?): String? {
         cmd?.takeIf { it.isNotBlank() }
     }.getOrNull()
 }
+
+/**
+ * 对话流渲染块：单条消息 / 连续工具调用折叠链。
+ *
+ * [Single] 单条普通消息；[ToolGroup] 同一轮里相邻的 N 条 TOOL 消息合并成一条折叠链，
+ * 折叠态只显示一行摘要「调用 N 个工具 · 用时」，展开后逐条列出；组内任一失败则默认展开并标红。
+ */
+internal sealed interface ChatBlock {
+    data class Single(val msg: AgentUIMessage) : ChatBlock
+    data class ToolGroup(val msgs: List<AgentUIMessage>) : ChatBlock {
+        val anyError: Boolean get() = msgs.any { it.isError }
+        /** 组内总耗时 = 末条时间戳 - 首条时间戳（AgentUIMessage 无 per-tool duration 字段，用时间戳差近似）。 */
+        val totalMs: Long
+            get() = if (msgs.size > 1) (msgs.last().timestamp - msgs.first().timestamp).coerceAtLeast(0L) else 0L
+    }
+}
+
+/** 把时序消息流折叠成渲染块：相邻 TOOL 消息合并为 [ChatBlock.ToolGroup]，其余单条成块。 */
+internal fun List<AgentUIMessage>.toChatBlocks(): List<ChatBlock> {
+    val result = ArrayList<ChatBlock>()
+    var group = ArrayList<AgentUIMessage>()
+    fun flush() {
+        if (group.isNotEmpty()) {
+            result.add(
+                if (group.size == 1) ChatBlock.Single(group[0]) else ChatBlock.ToolGroup(group.toList())
+            )
+            group = ArrayList()
+        }
+    }
+    for (m in this) {
+        if (m.role == MessageRole.TOOL) {
+            group.add(m)
+        } else {
+            flush()
+            result.add(ChatBlock.Single(m))
+        }
+    }
+    flush()
+    return result
+}
+
+/**
+ * 连续工具调用折叠链：默认折叠态单行摘要「调用 N 个工具 · 用时」，点按展开逐条列出；
+ * 组内任一工具失败时默认展开并以错误色描边/文字标注。折叠交互风格对齐 [AppThinkingBlock]。
+ */
+@Composable
+internal fun ToolCallGroupBlock(group: ChatBlock.ToolGroup, modifier: Modifier = Modifier) {
+    var expanded by remember(group) { mutableStateOf(group.anyError) }
+    val shape = RoundedCornerShape(AppRadius.Md)
+    val palette = appPalette()
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(palette.card)
+                .border(
+                    AppStroke.Thin,
+                    if (group.anyError) AppColor.StatusDanger.copy(alpha = 0.45f) else palette.separator,
+                    shape,
+                )
+                .clickable { expanded = !expanded }
+                .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Build,
+                contentDescription = null,
+                tint = if (group.anyError) AppColor.StatusDanger else palette.labelSecondary,
+                modifier = Modifier.size(AppSizingForGroup),
+            )
+            Spacer(Modifier.size(AppSpacing.Sm))
+            Text(
+                text = "调用 ${group.msgs.size} 个工具" +
+                    if (group.totalMs > 0) " · %.1fs".format(group.totalMs / 1000.0) else "",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (group.anyError) AppColor.StatusDanger else palette.ink,
+                modifier = Modifier.weight(1f),
+            )
+            val rotation by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (expanded) 180f else 0f,
+                label = "toolGroupChevron",
+            )
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowDown,
+                contentDescription = if (expanded) "收起工具链" else "展开工具链",
+                tint = palette.labelSecondary,
+                modifier = Modifier
+                    .size(AppSizingForGroup)
+                    .rotate(rotation),
+            )
+        }
+        if (expanded) {
+            Spacer(Modifier.height(AppSpacing.Sm))
+            group.msgs.forEachIndexed { index, m ->
+                ToolMessageNode(msg = m)
+                if (index != group.msgs.lastIndex) Spacer(Modifier.height(AppSpacing.Sm))
+            }
+        }
+    }
+}
+
+/** 折叠链摘要行图标尺寸（复用 IconXl 刻度，避免表外裸 dp）。 */
+private val AppSizingForGroup = com.mini.me_core.newui.designsystem.token.generated.AppSizing.IconXs

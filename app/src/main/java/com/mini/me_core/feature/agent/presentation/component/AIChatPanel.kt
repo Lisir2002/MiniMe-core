@@ -386,17 +386,30 @@ fun AIChatPanel(
                             }
                         }
                         // 历史消息按时间倒序传入（reverseLayout 下最新持久消息紧贴流式尾巴上方）。
+                        // 相邻 TOOL 消息折叠成一条工具链块（ChatBlock.ToolGroup），其余单条渲染。
+                        val historyBlocks = remember(messages) { messages.toChatBlocks().asReversed() }
                         items(
-                            items = messages.asReversed(),
-                            key = { it.id },
-                        ) { msg ->
-                            ChatMessageNode(
-                                msg = msg,
-                                onOpenAttachment = { att -> openAttachment(context, att) },
-                                onEditMessage = { startEditMessage(it) },
-                                onNewChatFromMessage = { viewModel.newChatAndSend(it.content) },
-                                modifier = Modifier.padding(horizontal = AppLayout.PageHorizontal),
-                            )
+                            items = historyBlocks,
+                            key = { block ->
+                                when (block) {
+                                    is ChatBlock.Single -> block.msg.id
+                                    is ChatBlock.ToolGroup -> "toolchain:${block.msgs.first().id}..${block.msgs.last().id}"
+                                }
+                            },
+                        ) { block ->
+                            when (block) {
+                                is ChatBlock.Single -> ChatMessageNode(
+                                    msg = block.msg,
+                                    onOpenAttachment = { att -> openAttachment(context, att) },
+                                    onEditMessage = { startEditMessage(it) },
+                                    onNewChatFromMessage = { viewModel.newChatAndSend(it.content) },
+                                    modifier = Modifier.padding(horizontal = AppLayout.PageHorizontal),
+                                )
+                                is ChatBlock.ToolGroup -> ToolCallGroupBlock(
+                                    group = block,
+                                    modifier = Modifier.padding(horizontal = AppLayout.PageHorizontal),
+                                )
+                            }
                         }
                     }
                 }
