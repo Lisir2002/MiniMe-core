@@ -38,3 +38,4 @@ build-dist/
 # Local dev tool config
 mise.toml
 .tool-versions
+newui/node_modules/
