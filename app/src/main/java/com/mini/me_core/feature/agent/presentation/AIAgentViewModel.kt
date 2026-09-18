@@ -612,7 +612,7 @@ class AIAgentViewModel @Inject constructor(
             // 这些工具不可能还在跑，统一回填为「已中断」。放在设置会话之前完成，使首帧不再闪转圈。
             sessionUseCase.initColdStartCleanup()
 
-            combine(_currentWorkspace, _currentWorkspaceId).collectLatest { (path, id) ->
+            combine(_currentWorkspace, _currentWorkspaceId) { path, id -> path to id }.collectLatest { (path, id) ->
                 if (path.isBlank() || id.isBlank()) return@collectLatest
                 // 切到某工作台：优先选中其最近会话（按 workspace_id 稳定身份）；否则选中最近一条未绑定工作台的会话；
                 // 都没有则置空（进入欢迎页），等用户新建/首条消息时再绑定，避免空会话堆积。

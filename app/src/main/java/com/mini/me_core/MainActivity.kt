@@ -363,9 +363,8 @@ fun AppNavigation(
     val currentWorkspace by workspaceViewModel.current.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(currentWorkspace) {
         // 远程模式连接未就绪时 currentWorkspace 为 null，不触发 setWorkspace，避免空路径点燃 session 加载
-        val path = currentWorkspace?.path ?: return@LaunchedEffect
-        val name = currentWorkspace.name
-        agentViewModel.setWorkspace(path, name)
+        val ws = currentWorkspace ?: return@LaunchedEffect
+        agentViewModel.setWorkspace(ws.path, ws.name)
     }
 
     val sessions by agentViewModel.sessions.collectAsStateWithLifecycle()
