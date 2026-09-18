@@ -313,6 +313,8 @@ fun AppNavigation(
 
     // ── 新 UI 门户状态：底栏三 tab（对话 / 办公 / 设置）原地切换，不进 NavHost 新路由 ──
     var portalTab by remember { mutableStateOf(PortalTab.Chat) }
+    // 是否有过办公选择历史（与"最近工具"分开存：无历史时中央按钮显示"长按待选"）。
+    val hasWorkHistory = remember { kvStore.getString(PORTAL_NS, PORTAL_LAST_TOOL_KEY) != null }
     // 办公扇形选中的工具（浏览器 / 终端 / Git）；中央按钮文字随此与 tab 联动。
     // 持久化：退出重进恢复上次选择（key 语义命名 portal_last_office_tool，沿用项目 KVStore）。
     var workTool by remember {
@@ -340,6 +342,21 @@ fun AppNavigation(
     // 侧边栏打开时，系统返回键先收起侧边栏。
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
+    }
+
+    // 办公一级页（浏览器/终端/Git）二次返回确认：第一次提示"再按一次退出"，第二次退出 App 并清除办公历史。
+    // 对话/设置页不拦截，系统默认直接退 App 且保留办公历史。
+    val navContext = androidx.compose.ui.platform.LocalContext.current
+    var officeBackOnce by remember { mutableStateOf(false) }
+    BackHandler(enabled = portalTab == PortalTab.Work) {
+        if (officeBackOnce) {
+            kvStore.delete(PORTAL_NS, PORTAL_LAST_TOOL_KEY)
+            (navContext as? android.app.Activity)?.finish()
+        } else {
+            officeBackOnce = true
+            android.widget.Toast.makeText(navContext, "再按一次退出办公", android.widget.Toast.LENGTH_SHORT).show()
+            scope.launch { kotlinx.coroutines.delay(2000); officeBackOnce = false }
+        }
     }
 
     // 侧边栏需要的数据。
@@ -473,6 +490,7 @@ fun AppNavigation(
                             PortalBottomBar(
                                 selected = portalTab,
                                 centerLabel = when {
+                                    !hasWorkHistory -> "长按待选"
                                     portalTab == PortalTab.Work && workTool == WorkFanItem.Browser -> "浏览器"
                                     portalTab == PortalTab.Work && workTool == WorkFanItem.Terminal -> "终端"
                                     portalTab == PortalTab.Work && workTool == WorkFanItem.Git -> "Git"
