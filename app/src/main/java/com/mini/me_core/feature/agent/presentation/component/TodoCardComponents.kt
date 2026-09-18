@@ -63,8 +63,7 @@ internal data class ParsedTodoItem(
 )
 
 /** 从工具结果的 JSON 文本中解析出待办列表 */
-internal fun parseTodoResult(content: String): ParsedTodoResult? {
-    return try {
+internal fun parseTodoResult(content: String): ParsedTodoResult? {    return try {
         // 先剥掉 Success(data=...) / Error(...) 外壳
         val s = content.withoutToolStatusPrefix()
         val jsonStr = when {
@@ -104,6 +103,42 @@ internal fun parseTodoResult(content: String): ParsedTodoResult? {
         ParsedTodoResult(total = total, completed = completed, items = items)
     } catch (_: Exception) {
         // 解析失败时静默返回 null，UI 会 fallback 到普通文本
+        null
+    }
+}
+
+/**
+ * 从 todo 工具**入参**（argsPreview）中解析待办列表。
+ *
+ * 工具调用一经发起（ToolCallStarted），入参里就带着完整 todos 数组，此时结果尚未返回。
+ * 借此让卡片在工具刚调用时就立即出现（初始 pending/in_progress），随后续结果事件增量刷新。
+ * 入参形状对齐 Anthropic todo_write：`{ "todos": [ {content, status, activeForm} ] }`。
+ */
+internal fun parseTodoArgs(argsJson: String?): ParsedTodoResult? {
+    if (argsJson.isNullOrBlank()) return null
+    return try {
+        val obj = Json.parseToJsonElement(argsJson).jsonObject
+        val todos = obj["todos"]?.jsonArray ?: return null
+        val items = todos.mapIndexedNotNull { index, el ->
+            val o = el.jsonObject
+            val content = o["content"]?.jsonPrimitive?.contentOrNull ?: return@mapIndexedNotNull null
+            val status = o["status"]?.jsonPrimitive?.contentOrNull ?: "pending"
+            ParsedTodoItem(
+                id = o["id"]?.jsonPrimitive?.contentOrNull ?: "t$index",
+                subject = content,
+                description = o["activeForm"]?.jsonPrimitive?.contentOrNull ?: "",
+                status = status,
+                priority = 0,
+                order = index,
+            )
+        }
+        if (items.isEmpty()) null
+        else ParsedTodoResult(
+            total = items.size,
+            completed = items.count { it.status == "completed" },
+            items = items,
+        )
+    } catch (_: Exception) {
         null
     }
 }
