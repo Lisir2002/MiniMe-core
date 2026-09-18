@@ -1,6 +1,8 @@
 package com.mini.me_core.newui.designsystem.component
 
 import com.mini.me_core.newui.designsystem.theme.appPalette
+import androidx.compose.ui.viewinterop.AndroidView
+import android.webkit.WebView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -587,19 +590,62 @@ private fun ImagePlaceholderView(alt: String, url: String, color: Color) {
 
 @Composable
 private fun MathBlockView(formula: String) {
-    Box(
+    val bg = appPalette().surfaceDim
+    val fg = appPalette().ink
+    val escaped = remember(formula) {
+        org.json.JSONObject.quote(formula)
+    }
+    AndroidView(
         modifier = Modifier
             .fillMaxWidth()
+            .wrapContentHeight()
             .clip(RoundedCornerShape(AppRadius.Sm))
-            .background(appPalette().surfaceDim)
+            .background(bg)
             .padding(AppSpacing.Md),
-    ) {
-        Text(
-            text = formula,
-            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-            color = appPalette().primary,
-        )
-    }
+        factory = { ctx ->
+            WebView(ctx).apply {
+                settings.javaScriptEnabled = true
+                loadDataWithBaseURL(
+                    "file:///android_asset/katex/",
+                    katexHtml(escaped, bg, fg),
+                    "text/html",
+                    "utf-8",
+                    null,
+                )
+            }
+        },
+        update = { wv ->
+            wv.loadDataWithBaseURL(
+                "file:///android_asset/katex/",
+                katexHtml(escaped, bg, fg),
+                "text/html",
+                "utf-8",
+                null,
+            )
+        },
+    )
+}
+
+private fun katexHtml(formulaJs: String, bg: Color, fg: Color): String {
+    val bgHex = String.format("#%06X", 0xFFFFFF and bg.value.toInt())
+    val fgHex = String.format("#%06X", 0xFFFFFF and fg.value.toInt())
+    return """
+        <!doctype html><html><head><meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <link rel="stylesheet" href="katex.min.css">
+        <style>
+          html,body{margin:0;padding:0;background:$bgHex;}
+          .katex{color:$fgHex;font-size:15px;}
+        </style></head>
+        <body><span id="root"></span>
+        <script defer src="katex.min.js"></script>
+        <script>
+          addEventListener('DOMContentLoaded',()=>{
+            try{ katex.render($formulaJs, document.getElementById('root'),
+              {displayMode:true, throwOnError:false, output:'html'}); }catch(e){}
+          });
+        </script></body></html>
+    """.trimIndent()
 }
 
 @Composable
