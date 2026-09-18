@@ -90,6 +90,9 @@ fun AppTerminalLog(
     running: Boolean = true,
     // 失败时卡片右下角的"重跑"按钮；null 不渲染。
     onRerun: (() -> Unit)? = null,
+    // 可空颜色槽位：终端卡本次固定浅色（LightPalette surface/ink），留槽位后续接 newui AppUiMode 日夜。
+    surfaceColor: Color = com.mini.me_core.newui.designsystem.theme.LightPalette.surface,
+    inkColor: Color = com.mini.me_core.newui.designsystem.theme.LightPalette.ink,
 ) {
     val osc = rememberScrollState()
     // 静态输出超过此行数默认折叠（复用工具卡 >10 行折叠交互）。
@@ -135,14 +138,14 @@ fun AppTerminalLog(
             .fillMaxWidth()
             .height(height)
             .clip(RoundedCornerShape(AppRadius.Md))
-            .background(appPalette().surface),
+            .background(surfaceColor),
     ) {
         Column(Modifier.fillMaxSize()) {
             // 标题栏：呼吸状态点 + 标题 + 右缘"运行中"胶囊
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(appPalette().surfaceDim)
+                    .background(com.mini.me_core.newui.designsystem.theme.LightPalette.surfaceDim)
                     .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -160,7 +163,7 @@ fun AppTerminalLog(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = appPalette().ink,
+                    color = inkColor,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.weight(1f))
