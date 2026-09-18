@@ -99,6 +99,7 @@ internal class AboutStatsViewModel @Inject constructor(
         createdAtMs = created_at,
         updatedAtMs = updated_at,
         workspacePath = workspace_path,
+        workspaceId = workspace_id,
         mode = mode,
         reasoningEffort = reasoning_effort,
         providerId = provider_id,

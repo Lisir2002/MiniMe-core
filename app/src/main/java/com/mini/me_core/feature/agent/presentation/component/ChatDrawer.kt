@@ -138,8 +138,8 @@ fun ChatDrawerContent(
     boundSessionsForWorkspace: suspend (String) -> List<ChatSession> = { emptyList() },
     /** 当前会话（供「更多配置 → 工作台绑定」展示绑定状态）。 */
     currentSession: ChatSession? = null,
-    /** 手动绑定当前会话到指定工作台（「更多配置 → 工作台绑定」）。 */
-    onBindWorkspace: (String) -> Unit = {},
+    /** 手动绑定当前会话到指定工作台（「更多配置 → 工作台绑定」）：参数为工作台名(workspaceId)与绝对路径。 */
+    onBindWorkspace: (workspaceName: String, workspacePath: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var pendingDelete by remember { mutableStateOf<ChatSession?>(null) }
@@ -772,8 +772,11 @@ private fun WorkspaceDirPanel(
     var subTab by rememberSaveable { mutableStateOf(0) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Workspace?>(null) }
-    var pendingSwitch by remember { mutableStateOf<Workspace?>(null) }
     var pendingRename by remember { mutableStateOf<Workspace?>(null) }
+    // 当前工作台存在运行中会话时，切换请求被锁定，仅展示不可继续的提示弹窗。
+    var pendingSwitchBlocked by remember { mutableStateOf<Workspace?>(null) }
+    // 删除工作台前异步拉取其绑定会话数，>0 时在确认弹窗里提示「删除将一并丢失 N 个会话」。
+    var pendingDeleteBoundCount by remember { mutableStateOf<Int?>(null) }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -854,14 +857,17 @@ private fun WorkspaceDirPanel(
                     workspaces = workspaces,
                     currentName = current?.name,
                     onSwitchRequest = { ws ->
+                        // 运行中会话锁定工作台：当前工作台有运行中会话时直接拦截，不再自动停止放行。
                         if (hasRunningSessions()) {
-                            pendingSwitch = ws
+                            pendingSwitchBlocked = ws
                         } else {
-                            onSwitchConfirmed()
                             viewModel.selectWorkspace(ws.name)
                         }
                     },
-                    onDeleteRequest = { pendingDelete = it },
+                    onDeleteRequest = {
+                        pendingDeleteBoundCount = null
+                        pendingDelete = it
+                    },
                     onRenameRequest = { pendingRename = it },
                     boundSessionsForWorkspace = boundSessionsForWorkspace,
                     modifier = Modifier.fillMaxSize()
@@ -871,38 +877,48 @@ private fun WorkspaceDirPanel(
     }
 
     // 切换确认：当前工作区存在运行中的 AI 会话/终端时需用户确认
-    pendingSwitch?.let { ws ->
+    // 切换锁定：当前工作台存在运行中会话时，切换被拦截，仅给出不可继续的提示（不再自动停止放行）。
+    pendingSwitchBlocked?.let { ws ->
         AlertDialog(
-            onDismissRequest = { pendingSwitch = null },
+            onDismissRequest = { pendingSwitchBlocked = null },
             title = { Text(stringResource(R.string.workspace_switch)) },
-            text = { Text(stringResource(R.string.workspace_switch_confirm)) },
+            text = { Text(stringResource(R.string.workspace_switch_blocked)) },
             confirmButton = {
-                TextButton(onClick = {
-                    onSwitchConfirmed()
-                    viewModel.selectWorkspace(ws.name)
-                    pendingSwitch = null
-                }) { Text(stringResource(R.string.workspace_confirm)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingSwitch = null }) { Text(stringResource(R.string.common_cancel)) }
+                TextButton(onClick = { pendingSwitchBlocked = null }) {
+                    Text(stringResource(R.string.workspace_confirm))
+                }
             }
         )
     }
 
-    // 删除确认
+    // 删除确认：先异步拉取该工作台绑定会话数，>0 时明确提示「删除将一并丢失 N 个会话」。
     pendingDelete?.let { ws ->
+        LaunchedEffect(ws.name) {
+            pendingDeleteBoundCount = runCatching { boundSessionsForWorkspace(ws.name).size }.getOrDefault(0)
+        }
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = { Text(stringResource(R.string.workspace_delete)) },
-            text = { Text(stringResource(R.string.workspace_delete_confirm, ws.name)) },
+            text = {
+                val count = pendingDeleteBoundCount
+                if (count != null && count > 0) {
+                    Text(stringResource(R.string.workspace_delete_confirm_with_sessions, ws.name, count))
+                } else {
+                    Text(stringResource(R.string.workspace_delete_confirm, ws.name))
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteWorkspace(ws.name)
                     pendingDelete = null
+                    pendingDeleteBoundCount = null
                 }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.common_cancel)) }
+                TextButton(onClick = {
+                    pendingDelete = null
+                    pendingDeleteBoundCount = null
+                }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -1169,7 +1185,7 @@ private fun AllWorkspacesPanel(
                         onSwitch = { onSwitchRequest(ws) },
                         onRename = { onRenameRequest(ws) },
                         onDelete = { onDeleteRequest(ws) },
-                        boundSessions = { boundSessionsForWorkspace(ws.path) }
+                        boundSessions = { boundSessionsForWorkspace(ws.name) }
                     )
                 }
             }
@@ -1347,7 +1363,7 @@ private fun WorkspaceDirRow(
                 onClick = { bindingsExpanded = !bindingsExpanded }
             )
             if (bindingsExpanded) {
-                LaunchedEffect(workspace.path) {
+                LaunchedEffect(workspace.name) {
                     boundSessionsState = boundSessions()
                 }
                 val sessions = boundSessionsState
@@ -1418,7 +1434,7 @@ private fun MoreConfigPlaceholder(modifier: Modifier = Modifier) {
 private fun MoreConfigPanel(
     workspaceViewModel: WorkspaceViewModel?,
     currentSession: ChatSession?,
-    onBindWorkspace: (String) -> Unit,
+    onBindWorkspace: (workspaceName: String, workspacePath: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val workspaces = workspaceViewModel?.workspaces?.collectAsStateWithLifecycle()?.value ?: emptyList()
@@ -1516,7 +1532,7 @@ private fun MoreConfigPanel(
                             WorkspaceBindRow(
                                 workspace = ws,
                                 isCurrent = ws.path == currentWorkspacePath,
-                                onClick = { onBindWorkspace(ws.path) }
+                                onClick = { onBindWorkspace(ws.name, ws.path) }
                             )
                         }
                     }

@@ -71,7 +71,7 @@ object SchemaSelfHealer {
 
     private val AGENT_SESSION_COLUMNS = listOf(
         "id", "title", "mode", "model", "status", "created_at", "updated_at",
-        "workspace_path", "reasoning_effort", "provider_id",
+        "workspace_path", "workspace_id", "reasoning_effort", "provider_id",
         "total_input_tokens", "total_output_tokens", "last_input_tokens"
     )
 
@@ -85,6 +85,7 @@ object SchemaSelfHealer {
           created_at          INTEGER NOT NULL,
           updated_at          INTEGER NOT NULL,
           workspace_path      TEXT    NOT NULL DEFAULT '',
+          workspace_id        TEXT    NOT NULL DEFAULT '',
           reasoning_effort    TEXT    NOT NULL DEFAULT 'MEDIUM',
           provider_id         TEXT,
           total_input_tokens  INTEGER NOT NULL DEFAULT 0,

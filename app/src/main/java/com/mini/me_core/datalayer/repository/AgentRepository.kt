@@ -27,16 +27,16 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
 
     suspend fun upsertSession(
         id: String, title: String?, mode: String, model: String?, status: String,
-        createdAtMs: Long, updatedAtMs: Long, workspacePath: String, reasoningEffort: String,
+        createdAtMs: Long, updatedAtMs: Long, workspacePath: String, workspaceId: String, reasoningEffort: String,
         providerId: String?, totalInputTokens: Long, totalOutputTokens: Long, lastInputTokens: Long,
     ) = withContext(Dispatchers.IO) {
-        q.upsertSession(id, title, mode, model, status, createdAtMs, updatedAtMs, workspacePath, reasoningEffort, providerId, totalInputTokens, totalOutputTokens, lastInputTokens)
+        q.upsertSession(id, title, mode, model, status, createdAtMs, updatedAtMs, workspacePath, workspaceId, reasoningEffort, providerId, totalInputTokens, totalOutputTokens, lastInputTokens)
     }
 
     suspend fun createSession(
         id: String, title: String?, mode: String, model: String?, now: Long = System.currentTimeMillis(),
     ) = withContext(Dispatchers.IO) {
-        q.insertSession(id, title, mode, model, "active", now, now, "", "MEDIUM", null, 0L, 0L, 0L)
+        q.insertSession(id, title, mode, model, "active", now, now, "", "", "MEDIUM", null, 0L, 0L, 0L)
     }
 
     suspend fun listSessions(): List<Agent_session> =
@@ -55,6 +55,14 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
 
     fun observeAllSessionsByWorkspace(workspacePath: String): Flow<List<Agent_session>> =
         q.selectSessionsByWorkspace(workspacePath).asFlow().mapToList(Dispatchers.IO)
+
+    /** 按工作台稳定身份（目录名）查询其绑定的全部会话（按更新时间倒序）。 */
+    suspend fun getAllSessionsByWorkspaceIdOnce(workspaceId: String): List<Agent_session> =
+        withContext(Dispatchers.IO) { q.selectSessionsByWorkspaceId(workspaceId).executeAsList() }
+
+    /** 按工作台稳定身份统计绑定会话数（删除工作台前提示用）。 */
+    suspend fun countSessionsByWorkspaceId(workspaceId: String): Long =
+        withContext(Dispatchers.IO) { q.countSessionsByWorkspaceId(workspaceId).executeAsOne() }
 
     fun observeAllSessionsWithCount(): Flow<List<SelectAllSessionsWithCount>> =
         q.selectAllSessionsWithCount().asFlow().mapToList(Dispatchers.IO)
@@ -76,7 +84,7 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
 
     suspend fun upsertAllSessions(sessions: List<Agent_session>) = withContext(Dispatchers.IO) {
         sessions.forEach { s ->
-            q.upsertSession(s.id, s.title, s.mode, s.model, s.status, s.created_at, s.updated_at, s.workspace_path, s.reasoning_effort, s.provider_id, s.total_input_tokens, s.total_output_tokens, s.last_input_tokens)
+            q.upsertSession(s.id, s.title, s.mode, s.model, s.status, s.created_at, s.updated_at, s.workspace_path, s.workspace_id, s.reasoning_effort, s.provider_id, s.total_input_tokens, s.total_output_tokens, s.last_input_tokens)
         }
     }
 
@@ -89,8 +97,16 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
     suspend fun updateWorkspacePath(oldPath: String, newPath: String) =
         withContext(Dispatchers.IO) { q.updateSessionWorkspacePath(newPath, oldPath) }
 
+    /** 工作台重命名：把该工作台下所有会话的 workspace_id 从旧名改为新名。 */
+    suspend fun updateWorkspaceId(oldId: String, newId: String) =
+        withContext(Dispatchers.IO) { q.updateSessionWorkspaceId(newId, oldId) }
+
     suspend fun setWorkspacePath(id: String, path: String) =
         withContext(Dispatchers.IO) { q.setSessionWorkspacePath(path, id) }
+
+    /** 一次性写入会话绑定的工作台 id 与路径（首条消息/手动绑定）。 */
+    suspend fun setSessionWorkspaceBinding(id: String, workspaceId: String, path: String) =
+        withContext(Dispatchers.IO) { q.setSessionWorkspaceBinding(workspaceId, path, id) }
 
     suspend fun touch(id: String, updatedAtMs: Long) =
         withContext(Dispatchers.IO) { q.touchSession(updatedAtMs, id) }

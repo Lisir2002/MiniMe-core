@@ -838,13 +838,13 @@ class BackupManagerImpl @Inject constructor(
     private fun ChatSessionEntity.toDto() = ChatSessionDto(
         id = id, title = title,
         createdAt = createdAtMs, updatedAt = updatedAtMs,
-        workspacePath = workspacePath, mode = mode, reasoningEffort = reasoningEffort,
+        workspacePath = workspacePath, workspaceId = workspaceId, mode = mode, reasoningEffort = reasoningEffort,
         providerId = providerId, model = model
     )
     private fun ChatSessionDto.toEntity() = ChatSessionEntity(
         id = id, title = title,
         createdAtMs = createdAt, updatedAtMs = updatedAt,
-        workspacePath = workspacePath, mode = mode, reasoningEffort = reasoningEffort,
+        workspacePath = workspacePath, workspaceId = workspaceId, mode = mode, reasoningEffort = reasoningEffort,
         providerId = providerId, model = model
     )
 
@@ -865,7 +865,7 @@ class BackupManagerImpl @Inject constructor(
     private fun V2AgentSession.toEntity() = ChatSessionEntity(
         id = id, title = title ?: "",
         createdAtMs = created_at, updatedAtMs = updated_at,
-        workspacePath = workspace_path, mode = mode, reasoningEffort = reasoning_effort,
+        workspacePath = workspace_path, workspaceId = workspace_id, mode = mode, reasoningEffort = reasoning_effort,
         providerId = provider_id, model = model,
         totalInputTokens = total_input_tokens.toInt(),
         totalOutputTokens = total_output_tokens.toInt(),
@@ -875,7 +875,7 @@ class BackupManagerImpl @Inject constructor(
     private fun ChatSessionEntity.toV2() = V2AgentSession(
         id = id, title = title, mode = mode, model = model, status = "active",
         created_at = createdAtMs, updated_at = updatedAtMs,
-        workspace_path = workspacePath, reasoning_effort = reasoningEffort,
+        workspace_path = workspacePath, workspace_id = workspaceId, reasoning_effort = reasoningEffort,
         provider_id = providerId,
         total_input_tokens = totalInputTokens.toLong(),
         total_output_tokens = totalOutputTokens.toLong(),

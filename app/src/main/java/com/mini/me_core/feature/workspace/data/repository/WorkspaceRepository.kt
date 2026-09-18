@@ -209,6 +209,10 @@ class WorkspaceRepository @Inject constructor(
         if (oldPath != null && newPath != null && oldPath != newPath) {
             v2Agent.updateWorkspacePath(oldPath, newPath)
         }
+        // 按 workspace_id（目录名）绑定：重命名须同步把该工作台下会话的 id 从旧名改为新名，否则重命名后会话脱钩。
+        if (oldName != name) {
+            v2Agent.updateWorkspaceId(oldName, name)
+        }
         if (_current.value?.name == oldName) {
             _current.value = _workspaces.value.firstOrNull { it.name == name }
             kv.putString(WORKSPACE_NS, CURRENT_WORKSPACE_KEY, name)

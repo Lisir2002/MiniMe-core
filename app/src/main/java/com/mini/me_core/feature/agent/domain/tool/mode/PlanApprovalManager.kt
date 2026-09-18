@@ -36,7 +36,7 @@ class PlanApprovalManager @Inject constructor(
         v2Agent.upsertSession(
             id = entity.id, title = entity.title, mode = mode, model = entity.model, status = "active",
             createdAtMs = entity.createdAtMs, updatedAtMs = entity.updatedAtMs,
-            workspacePath = entity.workspacePath, reasoningEffort = entity.reasoningEffort,
+            workspacePath = entity.workspacePath, workspaceId = entity.workspaceId, reasoningEffort = entity.reasoningEffort,
             providerId = entity.providerId, totalInputTokens = entity.totalInputTokens.toLong(),
             totalOutputTokens = entity.totalOutputTokens.toLong(), lastInputTokens = entity.lastInputTokens.toLong(),
         )
@@ -86,6 +86,7 @@ class PlanApprovalManager @Inject constructor(
         createdAtMs = created_at,
         updatedAtMs = updated_at,
         workspacePath = workspace_path,
+        workspaceId = workspace_id,
         mode = mode,
         reasoningEffort = reasoning_effort,
         providerId = provider_id,

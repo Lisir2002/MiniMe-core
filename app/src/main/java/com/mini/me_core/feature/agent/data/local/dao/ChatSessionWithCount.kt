@@ -17,6 +17,7 @@ data class ChatSessionWithCount(
     val createdAtMs: Long,
     val updatedAtMs: Long,
     val workspacePath: String,
+    val workspaceId: String,
     val mode: String,
     /** 该会话消息条数（LEFT JOIN COUNT，空会话为 0）。 */
     val messageCount: Int
@@ -28,6 +29,7 @@ data class ChatSessionWithCount(
         createdAt = createdAtMs,
         updatedAt = updatedAtMs,
         workspacePath = workspacePath,
+        workspaceId = workspaceId,
         mode = EnumSafe.valueOf(mode, AgentMode.BUILD, tag = "ChatSessionWithCount.mode")
     )
 }

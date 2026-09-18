@@ -1,0 +1,5 @@
+-- v3 → v4 迁移：agent_session 增加工作台稳定身份列 workspace_id（= 工作台目录名）。
+-- 保留原 workspace_path（工具执行仍以绝对路径为文件根）；新建会话同时写两列。
+-- 历史行全部回填为默认工作台名 'default'（旧数据统一归到 default 工作台下）。
+ALTER TABLE agent_session ADD COLUMN workspace_id TEXT NOT NULL DEFAULT '';
+UPDATE agent_session SET workspace_id = 'default' WHERE workspace_id = '';

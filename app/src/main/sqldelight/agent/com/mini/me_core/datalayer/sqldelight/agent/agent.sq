@@ -11,6 +11,7 @@ CREATE TABLE agent_session (
   created_at          INTEGER NOT NULL,
   updated_at          INTEGER NOT NULL,
   workspace_path      TEXT    NOT NULL DEFAULT '',
+  workspace_id        TEXT    NOT NULL DEFAULT '',
   reasoning_effort    TEXT    NOT NULL DEFAULT 'MEDIUM',
   provider_id         TEXT,
   total_input_tokens  INTEGER NOT NULL DEFAULT 0,
@@ -84,12 +85,12 @@ CREATE INDEX agent_checkpoint_session_idx ON agent_checkpoint (session_id, creat
 -- P2-3：会话/消息查询全部改为全列（对齐 Room 实体），新列按 ALTER 追加顺序。
 
 upsertSession:
-INSERT OR REPLACE INTO agent_session (id, title, mode, model, status, created_at, updated_at, workspace_path, reasoning_effort, provider_id, total_input_tokens, total_output_tokens, last_input_tokens)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO agent_session (id, title, mode, model, status, created_at, updated_at, workspace_path, workspace_id, reasoning_effort, provider_id, total_input_tokens, total_output_tokens, last_input_tokens)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 insertSession:
-INSERT OR REPLACE INTO agent_session (id, title, mode, model, status, created_at, updated_at, workspace_path, reasoning_effort, provider_id, total_input_tokens, total_output_tokens, last_input_tokens)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO agent_session (id, title, mode, model, status, created_at, updated_at, workspace_path, workspace_id, reasoning_effort, provider_id, total_input_tokens, total_output_tokens, last_input_tokens)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateSessionTitle:
 UPDATE agent_session SET title = ?, updated_at = ? WHERE id = ?;
@@ -106,8 +107,14 @@ SELECT * FROM agent_session ORDER BY updated_at DESC;
 selectSessionsByWorkspace:
 SELECT * FROM agent_session WHERE workspace_path = ? ORDER BY updated_at DESC;
 
+selectSessionsByWorkspaceId:
+SELECT * FROM agent_session WHERE workspace_id = ? ORDER BY updated_at DESC;
+
+countSessionsByWorkspaceId:
+SELECT COUNT(*) AS cnt FROM agent_session WHERE workspace_id = ?;
+
 selectAllSessionsWithCount:
-SELECT s.id, s.title, s.created_at, s.updated_at, s.workspace_path, s.mode, COUNT(m.id) AS message_count
+SELECT s.id, s.title, s.created_at, s.updated_at, s.workspace_path, s.workspace_id, s.mode, COUNT(m.id) AS message_count
 FROM agent_session s LEFT JOIN agent_message m ON m.session_id = s.id
 GROUP BY s.id
 ORDER BY s.updated_at DESC;
@@ -116,7 +123,7 @@ selectMostRecentSession:
 SELECT * FROM agent_session ORDER BY updated_at DESC LIMIT 1;
 
 selectUnboundSessions:
-SELECT * FROM agent_session WHERE workspace_path = '' ORDER BY updated_at DESC;
+SELECT * FROM agent_session WHERE workspace_id = '' ORDER BY updated_at DESC;
 
 countSessions:
 SELECT COUNT(*) AS cnt FROM agent_session;
@@ -129,8 +136,14 @@ ORDER BY updated_at ASC, id ASC LIMIT ?;
 updateSessionWorkspacePath:
 UPDATE agent_session SET workspace_path = ? WHERE workspace_path = ?;
 
+updateSessionWorkspaceId:
+UPDATE agent_session SET workspace_id = ? WHERE workspace_id = ?;
+
 setSessionWorkspacePath:
 UPDATE agent_session SET workspace_path = ? WHERE id = ?;
+
+setSessionWorkspaceBinding:
+UPDATE agent_session SET workspace_id = ?, workspace_path = ? WHERE id = ?;
 
 touchSession:
 UPDATE agent_session SET updated_at = ? WHERE id = ?;

@@ -18,6 +18,8 @@ data class ChatSession(
     val createdAt: Long,
     val updatedAt: Long,
     val workspacePath: String = "",
+    /** 工作台稳定身份（= 工作台目录名 name）；会话列表/删除/重命名均按此绑定。 */
+    val workspaceId: String = "",
     val mode: AgentMode = AgentMode.BUILD,
     val reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
     val providerId: String? = null,

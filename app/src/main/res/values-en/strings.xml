@@ -1011,12 +1011,14 @@
     <string name="workspace_select">Select Workspace</string>
     <string name="workspace_switch">Switch Workspace</string>
     <string name="workspace_switch_confirm">Switching workspaces stops all running AI sessions in the current workspace and closes terminal tabs. Switch now?</string>
+    <string name="workspace_switch_blocked">This workspace has running sessions. Stop them before switching.</string>
     <string name="workspace_confirm">OK</string>
     <string name="workspace_open">Open Workspace</string>
     <string name="workspace_new">New</string>
     <string name="workspace_empty_hint">No workspaces yet. Tap \"New\" to create one.</string>
     <string name="workspace_delete">Delete Workspace</string>
     <string name="workspace_delete_confirm">Delete \"%1$s\"? All files in this directory will be deleted and cannot be recovered.</string>
+    <string name="workspace_delete_confirm_with_sessions">Delete \"%1$s\"? This workspace has %2$d session(s) bound to it, which will be lost too. All files in this directory will also be deleted and cannot be recovered.</string>
     <string name="workspace_new_workspace">New Workspace</string>
     <string name="workspace_name_hint">e.g. my-project</string>
     <string name="workspace_name_exists">A workspace with this name already exists</string>

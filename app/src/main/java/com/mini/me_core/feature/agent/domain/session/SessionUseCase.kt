@@ -39,12 +39,13 @@ class SessionUseCase @Inject constructor(
         }.onFailure { FileLogger.e(TAG, "回收残留执行中工具行失败", it) }
     }
 
-    fun newSessionEntity(workspacePath: String): ChatSessionEntity {
+    fun newSessionEntity(workspacePath: String, workspaceId: String): ChatSessionEntity {
         val now = System.currentTimeMillis()
         return ChatSessionEntity(
             id = UUID.randomUUID().toString(),
             title = "新会话",
             workspacePath = workspacePath,
+            workspaceId = workspaceId,
             createdAtMs = now,
             updatedAtMs = now
         )
@@ -83,8 +84,8 @@ class SessionUseCase @Inject constructor(
         return id
     }
 
-    suspend fun getFirstSessionOfWorkspace(workspacePath: String): ChatSessionEntity? {
-        return v2Agent.getAllSessionsByWorkspaceOnce(workspacePath).firstOrNull()?.toEntity()
+    suspend fun getFirstSessionOfWorkspace(workspaceId: String): ChatSessionEntity? {
+        return v2Agent.getAllSessionsByWorkspaceIdOnce(workspaceId).firstOrNull()?.toEntity()
     }
 
     /** 最近一条「未绑定工作台」的会话（按更新时间降序，工作台绑定在首条消息时自动发生，此前会话处于未绑定态）。 */
@@ -97,19 +98,19 @@ class SessionUseCase @Inject constructor(
         return v2Agent.getMostRecentOnce()?.toEntity()
     }
 
-    /** 绑定/解绑会话工作台路径。绑定即一次性的（会话中途不可切换工作台）：仅未绑定会话可绑定，已绑定则忽略。 */
-    suspend fun bindWorkspace(sessionId: String, workspacePath: String) {
-        if (workspacePath.isBlank()) return
-        val current = v2Agent.getSessionById(sessionId)?.workspace_path ?: ""
+    /** 绑定/解绑会话工作台。绑定即一次性的（会话中途不可切换工作台）：仅未绑定会话可绑定，已绑定则忽略。 */
+    suspend fun bindWorkspace(sessionId: String, workspaceId: String, workspacePath: String) {
+        if (workspaceId.isBlank()) return
+        val current = v2Agent.getSessionById(sessionId)?.workspace_id ?: ""
         if (current.isNotBlank()) return
-        v2Agent.setWorkspacePath(sessionId, workspacePath)
+        v2Agent.setSessionWorkspaceBinding(sessionId, workspaceId, workspacePath)
     }
 
     suspend fun upsertSession(entity: ChatSessionEntity) {
         v2Agent.upsertSession(
             id = entity.id, title = entity.title, mode = entity.mode, model = entity.model, status = "active",
             createdAtMs = entity.createdAtMs, updatedAtMs = entity.updatedAtMs,
-            workspacePath = entity.workspacePath, reasoningEffort = entity.reasoningEffort,
+            workspacePath = entity.workspacePath, workspaceId = entity.workspaceId, reasoningEffort = entity.reasoningEffort,
             providerId = entity.providerId, totalInputTokens = entity.totalInputTokens.toLong(),
             totalOutputTokens = entity.totalOutputTokens.toLong(), lastInputTokens = entity.lastInputTokens.toLong(),
         )
@@ -133,7 +134,7 @@ class SessionUseCase @Inject constructor(
         v2Agent.upsertSession(
             id = s.id, title = s.title, mode = mode, model = s.model, status = "active",
             createdAtMs = s.createdAtMs, updatedAtMs = s.updatedAtMs,
-            workspacePath = s.workspacePath, reasoningEffort = s.reasoningEffort,
+            workspacePath = s.workspacePath, workspaceId = s.workspaceId, reasoningEffort = s.reasoningEffort,
             providerId = s.providerId, totalInputTokens = s.totalInputTokens.toLong(),
             totalOutputTokens = s.totalOutputTokens.toLong(), lastInputTokens = s.lastInputTokens.toLong(),
         )
@@ -159,6 +160,7 @@ class SessionUseCase @Inject constructor(
         createdAtMs = created_at,
         updatedAtMs = updated_at,
         workspacePath = workspace_path,
+        workspaceId = workspace_id,
         mode = mode,
         reasoningEffort = reasoning_effort,
         providerId = provider_id,

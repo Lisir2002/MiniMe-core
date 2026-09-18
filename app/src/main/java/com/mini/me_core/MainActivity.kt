@@ -364,7 +364,8 @@ fun AppNavigation(
     androidx.compose.runtime.LaunchedEffect(currentWorkspace) {
         // 远程模式连接未就绪时 currentWorkspace 为 null，不触发 setWorkspace，避免空路径点燃 session 加载
         val path = currentWorkspace?.path ?: return@LaunchedEffect
-        agentViewModel.setWorkspace(path)
+        val name = currentWorkspace.name
+        agentViewModel.setWorkspace(path, name)
     }
 
     val sessions by agentViewModel.sessions.collectAsStateWithLifecycle()
@@ -436,6 +437,10 @@ fun AppNavigation(
                     workspaceFileViewModel = workspaceFileViewModel,
                     hasRunningSessions = { agentViewModel.hasRunningSessionsInCurrentWorkspace() },
                     onSwitchWorkspaceConfirmed = { agentViewModel.stopAllAndCloseTerminal() },
+                    // 按工作台名（workspace_id）查询其绑定会话，供「查看对话绑定」与删除前会话数提示。
+                    boundSessionsForWorkspace = { workspaceName ->
+                        agentViewModel.sessionsBoundToWorkspace(workspaceName)
+                    },
                     // 点击文件 → 关闭侧边栏并跳转独立文件阅读页（路径 URI 编码传入）。
                     // 记录「从侧边栏打开」，退出阅读页时自动重开侧边栏并保留所在 tab（工作目录），
                     // 满足「阅读文件退出后要有记忆、不直接关闭侧边栏」。
@@ -444,9 +449,9 @@ fun AppNavigation(
                         scope.launch { drawerState.close() }
                         navController.navigate("file_reader/" + Uri.encode(path))
                     },
-                    // 「更多配置 → 工作台绑定」：当前会话 + 手动绑定回调
+                    // 「更多配置 → 工作台绑定」：当前会话 + 手动绑定回调（传工作台名 id 与路径）
                     currentSession = currentSession,
-                    onBindWorkspace = { path -> agentViewModel.bindSessionWorkspace(path) }
+                    onBindWorkspace = { name, path -> agentViewModel.bindSessionWorkspace(name, path) }
                 )
             }
         }

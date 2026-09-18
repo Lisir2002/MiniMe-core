@@ -14,7 +14,9 @@ data class ChatSessionEntity(
     val updatedAtMs: Long,
     
     val workspacePath: String = "",
-    
+    /** 工作台稳定身份（= 工作台目录名 name），工具执行仍用 [workspacePath]。 */
+    val workspaceId: String = "",
+
     val mode: String = AgentMode.BUILD.name,
     
     val reasoningEffort: String = ReasoningEffort.MEDIUM.name,
@@ -33,6 +35,7 @@ data class ChatSessionEntity(
         createdAt = createdAtMs,
         updatedAt = updatedAtMs,
         workspacePath = workspacePath,
+        workspaceId = workspaceId,
         mode = EnumSafe.valueOf(mode, AgentMode.BUILD, tag = "ChatSessionEntity.mode"),
         reasoningEffort = EnumSafe.valueOf(reasoningEffort, ReasoningEffort.MEDIUM, tag = "ChatSessionEntity.reasoningEffort"),
         providerId = providerId,
@@ -49,6 +52,7 @@ data class ChatSessionEntity(
             createdAtMs = session.createdAt,
             updatedAtMs = session.updatedAt,
             workspacePath = session.workspacePath,
+            workspaceId = session.workspaceId,
             mode = session.mode.name,
             reasoningEffort = session.reasoningEffort.name,
             providerId = session.providerId,
