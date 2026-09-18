@@ -67,6 +67,7 @@ dependencies {
     // 自适应导航（AppAdaptiveNav）：NavigationSuiteScaffold / 五断点
     implementation("androidx.compose.material3:material3-window-size-class")
     implementation("androidx.compose.material3:material3-adaptive-navigation-suite")
+    implementation("androidx.activity:activity-compose")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 
