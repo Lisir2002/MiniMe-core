@@ -49,9 +49,12 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.newui.designsystem.token.generated.AppColor
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
@@ -125,9 +128,16 @@ fun AppToolCallCard(
     approvalExpired: Boolean = false,
     approvalRemembered: Boolean = false,
     leadingIcon: ImageVector = Icons.Rounded.Terminal,
+    defaultCollapsed: Boolean = true,
 ) {
-    var inputExpanded by remember { mutableStateOf(false) }
-    var outputExpanded by remember { mutableStateOf(false) }
+    // 整卡折叠收纳：默认只留头部一行；点按头部展开 命令/入参/结果。
+    // 仅 Success / Error 两个终态可折叠；审批 / 流式 / 运行中强制展开（要看输出与交互）。
+    // 失败默认展开（对齐 ToolCallGroupBlock：组内失败即展开标红），成功默认折叠。
+    var cardExpanded by remember(defaultCollapsed, state) {
+        mutableStateOf(!defaultCollapsed || state == AppToolCallState.Error)
+    }
+    val collapsible = state == AppToolCallState.Success || state == AppToolCallState.Error
+    val cardOpen = cardExpanded || !collapsible
     val statusColor = when (state) {
         AppToolCallState.Streaming, AppToolCallState.Running -> appPalette().primary
         AppToolCallState.AwaitingApproval -> AppColor.StatusWarning
@@ -136,6 +146,10 @@ fun AppToolCallCard(
     }
     val cardShape = RoundedCornerShape(AppRadius.Md)
     val isError = state == AppToolCallState.Error
+    val cardChevronRotation by animateFloatAsState(
+        targetValue = if (cardOpen) 180f else 0f,
+        label = "cardChevron",
+    )
 
     Column(
         modifier = modifier
@@ -154,6 +168,7 @@ fun AppToolCallCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(if (collapsible) Modifier.clickable { cardExpanded = !cardExpanded } else Modifier)
                 .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -207,7 +222,25 @@ fun AppToolCallCard(
             }
             Spacer(Modifier.width(AppSpacing.Sm))
             ToolCallStatusBadge(state = state, color = statusColor)
+            if (collapsible) {
+                Spacer(Modifier.width(AppSpacing.Xs))
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = if (cardOpen) "收起详情" else "展开详情",
+                    tint = appPalette().labelSecondary,
+                    modifier = Modifier
+                        .size(AppSizing.IconXs)
+                        .rotate(cardChevronRotation),
+                )
+            }
         }
+        // 展开态：命令 / 入参 / 结果 / 无结果 / 审批 各区块整体收纳在一层垂直展开动画里。
+        AnimatedVisibility(
+            visible = cardOpen,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            Column(Modifier.fillMaxWidth()) {
         // Streaming：执行中实时输出，无需展开，直接"看着它跑"（多行截断可展开）
         if (state == AppToolCallState.Running && streamOutput != null) {
             CardDivider()
@@ -217,8 +250,9 @@ fun AppToolCallCard(
             CardDivider()
             ExpandableSection(
                 label = "命令",
-                expanded = inputExpanded,
-                onToggle = { inputExpanded = !inputExpanded },
+                expanded = cardOpen,
+                onToggle = {},
+                interactive = false,
             ) {
                 CommandBlock(text = command)
             }
@@ -227,8 +261,9 @@ fun AppToolCallCard(
             CardDivider()
             ExpandableSection(
                 label = "入参",
-                expanded = inputExpanded,
-                onToggle = { inputExpanded = !inputExpanded },
+                expanded = cardOpen,
+                onToggle = {},
+                interactive = false,
             ) {
                 FoldingJsonText(text = input)
             }
@@ -246,8 +281,9 @@ fun AppToolCallCard(
             CardDivider()
             ExpandableSection(
                 label = "结果",
-                expanded = outputExpanded,
-                onToggle = { outputExpanded = !outputExpanded },
+                expanded = cardOpen,
+                onToggle = {},
+                interactive = false,
             ) {
                 FoldingJsonText(text = output)
             }
@@ -366,6 +402,8 @@ fun AppToolCallCard(
                 }
             }
         }
+            }
+        }
     }
 }
 
@@ -430,19 +468,20 @@ private fun ErrorCodeChip(code: String) {
     )
 }
 
-/** 可展开区：label 行 + 旋转箭头 + 垂直展开动画内容。 */
+/** 可展开区：label 行 + 旋转箭头 + 垂直展开动画内容。[interactive]=false 时仅作静态标签（无箭头、不可点）。 */
 @Composable
 private fun ExpandableSection(
     label: String,
     expanded: Boolean,
     onToggle: () -> Unit,
+    interactive: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onToggle)
+                .then(if (interactive) Modifier.clickable(onClick = onToggle) else Modifier)
                 .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -452,18 +491,20 @@ private fun ExpandableSection(
                 color = appPalette().labelSecondary,
                 modifier = Modifier.weight(1f),
             )
-            val rotation by animateFloatAsState(
-                targetValue = if (expanded) 180f else 0f,
-                label = "expandChevron",
-            )
-            Icon(
-                imageVector = Icons.Rounded.KeyboardArrowDown,
-                contentDescription = if (expanded) "收起$label" else "展开$label",
-                tint = appPalette().labelSecondary,
-                modifier = Modifier
-                    .size(AppSizing.IconXs)
-                    .rotate(rotation),
-            )
+            if (interactive) {
+                val rotation by animateFloatAsState(
+                    targetValue = if (expanded) 180f else 0f,
+                    label = "expandChevron",
+                )
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = if (expanded) "收起$label" else "展开$label",
+                    tint = appPalette().labelSecondary,
+                    modifier = Modifier
+                        .size(AppSizing.IconXs)
+                        .rotate(rotation),
+                )
+            }
         }
         AnimatedVisibility(
             visible = expanded,
@@ -513,23 +554,25 @@ private fun FoldingJsonText(text: String) {
     }
 }
 
-/** 命令块：Bash/terminal 命令的等宽命令行呈现，品牌色前置 `$`（单层卡内纯文本，不叠子块底）。 */
+/**
+ * 命令块：Bash/terminal 命令的等宽命令行呈现（单层卡内纯文本，不叠子块底）。
+ * 精度高亮：`$ ` 提示符主色；首个 token（命令名）主色加粗，与后续参数做主次区分；
+ * 参数 / 续行走次要色，降低视觉噪声。
+ */
 @Composable
 private fun CommandBlock(text: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(
-            text = "$ ",
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            color = appPalette().primary,
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            color = appPalette().ink,
-        )
+    val mono = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+    val palette = appPalette()
+    val firstSpace = text.indexOfFirst { it.isWhitespace() }
+    val (cmd, args) = if (firstSpace == -1) text to "" else text.substring(0, firstSpace) to text.substring(firstSpace)
+    val annotated = buildAnnotatedString {
+        withStyle(SpanStyle(color = palette.primary)) { append("$ ") }
+        withStyle(SpanStyle(color = palette.primary, fontWeight = FontWeight.SemiBold)) { append(cmd) }
+        if (args.isNotEmpty()) {
+            withStyle(SpanStyle(color = palette.labelSecondary)) { append(args) }
+        }
     }
+    Text(text = annotated, style = mono)
 }
 
 /**
@@ -567,12 +610,21 @@ private fun StreamBlock(text: String, maxLines: Int) {
                 ),
         ) {
             shown.forEachIndexed { index, line ->
+                val isErr = isErrorLine(line)
                 Text(
                     text = line,
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    color = appPalette().primary,
+                    color = if (isErr) AppColor.StatusDanger else appPalette().primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = if (isErr) {
+                        Modifier
+                            .clip(RoundedCornerShape(AppRadius.Sm))
+                            .background(AppColor.StatusDanger.copy(alpha = 0.10f))
+                            .padding(horizontal = AppSpacing.Xs)
+                    } else {
+                        Modifier
+                    },
                 )
                 if (index != shown.lastIndex) {
                     Spacer(Modifier.height(AppSpacing.Tiny))
@@ -606,6 +658,15 @@ private fun CardDivider() {
             .background(appPalette().separator),
     )
 }
+
+/** 实时输出中识别 stderr / 错误行的启发式：编译错误前缀、异常 / 失败关键字等。 */
+private val ERROR_LINE_REGEX = Regex(
+    "(?i)^.*(\\be:\\s|error|exception|fatal|failure|failed|traceback|panic|stderr|" +
+        "no such (file|command)|not found|permission denied|cannot |undefined symbol|stack trace).*",
+)
+
+/** 是否为 stderr / 错误行（用于红色 + 浅红高亮）。 */
+private fun isErrorLine(line: String): Boolean = ERROR_LINE_REGEX.matches(line)
 
 /** 耗时格式化："850ms" / "1.6s"。 */
 private fun formatDuration(ms: Long): String {

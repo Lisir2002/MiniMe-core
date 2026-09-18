@@ -1,7 +1,6 @@
 package com.mini.me_core.newui.designsystem.component
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -47,21 +46,39 @@ import com.mini.me_core.newui.designsystem.token.generated.AppRadius
 import com.mini.me_core.newui.designsystem.token.generated.AppSpacing
 import kotlinx.coroutines.delay
 
-/** 日志等级：决定终端的渲染颜色与左侧状态点。 */
+/** 日志等级：保留以兼容历史 [TerminalLogLine] 构造与 demo 脚本；新代码请用 [TerminalLineKind]。 */
 enum class LogLevel { Info, Success, Warning, Danger }
 
-/** 一条终端日志：时间戳 + 等级 + 正文。 */
+/**
+ * 一行终端日志的语义类型：
+ * - [Command]：被执行的命令行（`$` 前缀 + 命令名主色 + 参数次要色三级高亮）；
+ * - [Stdout]：普通标准输出（ink 正文）；
+ * - [Stderr]：错误输出（StatusDanger 文字 + 错误色浅底高亮整行）；
+ * - [Warning]：告警（StatusWarning 文字）。
+ */
+enum class TerminalLineKind { Command, Stdout, Stderr, Warning }
+
+/** 一条终端日志：时间戳 + 类型/等级 + 正文。 */
 data class TerminalLogLine(
     val text: String,
     val level: LogLevel = LogLevel.Info,
     val at: String,
-)
+    // 行类型，默认 [TerminalLineKind.Stdout]，保证历史 demo 脚本不传新参数也能编译。
+    val kind: TerminalLineKind = TerminalLineKind.Stdout,
+) {
+    companion object {
+        /** 便捷构造一条命令行：[command] 为不含 `$` 前缀的命令本体，渲染时自动加 `$` 高亮前缀。 */
+        fun command(command: String, at: String): TerminalLogLine =
+            TerminalLogLine(text = command, kind = TerminalLineKind.Command, at = at)
+    }
+}
 
-private fun logLevelTint(level: LogLevel, secondary: Color): Color = when (level) {
-    LogLevel.Info -> secondary
-    LogLevel.Success -> AppColor.StatusSuccess
-    LogLevel.Warning -> AppColor.StatusWarning
-    LogLevel.Danger -> AppColor.StatusDanger
+/** 历史 [LogLevel] 与新 [TerminalLineKind] 的归一：未显式标 kind 的旧行按 level 上色。 */
+private fun effectiveKind(line: TerminalLogLine): TerminalLineKind = when {
+    line.kind != TerminalLineKind.Stdout -> line.kind
+    line.level == LogLevel.Danger -> TerminalLineKind.Stderr
+    line.level == LogLevel.Warning -> TerminalLineKind.Warning
+    else -> TerminalLineKind.Stdout
 }
 
 /**
@@ -88,6 +105,8 @@ fun AppTerminalLog(
     lines: List<TerminalLogLine>? = null,
     // 是否仍在运行（控制"运行中"胶囊与光标）。
     running: Boolean = true,
+    // 本次命令是否成功：null=运行中呼吸绿（默认）；true=稳态绿点；false=稳态红点（不呼吸）。
+    succeeded: Boolean? = null,
     // 失败时卡片右下角的"重跑"按钮；null 不渲染。
     onRerun: (() -> Unit)? = null,
     // 可空颜色槽位：终端卡本次固定浅色（LightPalette surface/ink），留槽位后续接 newui AppUiMode 日夜。
@@ -149,15 +168,18 @@ fun AppTerminalLog(
                     .padding(horizontal = AppSpacing.Lg, vertical = AppSpacing.Sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val pulseColor by animateColorAsState(
-                    targetValue = AppColor.StatusSuccess.copy(alpha = pulse.coerceIn(0.3f, 1f)),
-                    label = "statusPulseColor",
-                )
+                // 状态点：succeeded=null 时呼吸绿（运行中）；true 稳态绿；false 稳态红（不呼吸）。
+                val dotBase = when (succeeded) {
+                    true -> AppColor.StatusSuccess
+                    false -> AppColor.StatusDanger
+                    null -> AppColor.StatusSuccess
+                }
+                val dotAlpha = if (succeeded == null) pulse else 1f
                 Box(
                     Modifier
                         .size(AppSpacing.Sm)
                         .clip(CircleShape)
-                        .background(pulseColor),
+                        .background(dotBase.copy(alpha = dotAlpha.coerceIn(0.3f, 1f))),
                 )
                 Spacer(Modifier.size(AppSpacing.Sm))
                 Text(
@@ -193,21 +215,76 @@ fun AppTerminalLog(
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.Xs),
             ) {
                 (shownLines ?: demoLines).forEach { line ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = line.at,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = appPalette().labelSecondary.copy(alpha = 0.72f),
-                            fontFamily = FontFamily.Monospace,
-                        )
-                        Spacer(Modifier.size(AppSpacing.Sm))
-                        Text(
-                            text = line.text,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = logLevelTint(line.level, appPalette().labelSecondary),
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = if (line.level == LogLevel.Danger) FontWeight.SemiBold else FontWeight.Normal,
-                        )
+                    val kind = effectiveKind(line)
+                    // stderr 整行错误色浅底高亮 + 小圆角；其余行透明背景。
+                    val rowMod = if (kind == TerminalLineKind.Stderr) {
+                        Modifier
+                            .clip(RoundedCornerShape(AppRadius.Sm))
+                            .background(AppColor.StatusDanger.copy(alpha = 0.08f))
+                            .padding(horizontal = AppSpacing.Xs)
+                    } else {
+                        Modifier
+                    }
+                    Row(
+                        modifier = rowMod,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // 空时间戳（真实流 at=""）时跳过时间戳列与 Spacer，避免命令行整体右缩进错位。
+                        if (line.at.isNotBlank()) {
+                            Text(
+                                text = line.at,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = appPalette().labelSecondary.copy(alpha = 0.72f),
+                                fontFamily = FontFamily.Monospace,
+                            )
+                            Spacer(Modifier.size(AppSpacing.Sm))
+                        }
+                        when (kind) {
+                            // 命令行：$ 主色前缀 + 命令名 ink SemiBold 等宽 + 参数 labelSecondary 等宽。
+                            TerminalLineKind.Command -> {
+                                Text(
+                                    text = "$ ",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = appPalette().primary,
+                                    fontFamily = FontFamily.Monospace,
+                                )
+                                val tokens = line.text.split(Regex("\\s+"), limit = 2)
+                                Text(
+                                    text = tokens.firstOrNull().orEmpty(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = inkColor,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                if (tokens.size > 1 && tokens[1].isNotBlank()) {
+                                    Text(
+                                        text = " " + tokens[1],
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = appPalette().labelSecondary,
+                                        fontFamily = FontFamily.Monospace,
+                                    )
+                                }
+                            }
+                            TerminalLineKind.Stdout -> Text(
+                                text = line.text,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = inkColor,
+                                fontFamily = FontFamily.Monospace,
+                            )
+                            TerminalLineKind.Stderr -> Text(
+                                text = line.text,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppColor.StatusDanger,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            TerminalLineKind.Warning -> Text(
+                                text = line.text,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppColor.StatusWarning,
+                                fontFamily = FontFamily.Monospace,
+                            )
+                        }
                     }
                 }
                 // 静态输出超阈值：折叠展开切换
@@ -222,7 +299,7 @@ fun AppTerminalLog(
                     )
                 }
                 // 失败时"重跑"按钮占位
-                if (onRerun != null && lines?.any { it.level == LogLevel.Danger } == true) {
+                if (onRerun != null && lines?.any { effectiveKind(it) == TerminalLineKind.Stderr } == true) {
                     Spacer(Modifier.size(AppSpacing.Xs))
                     Text(
                         text = "重跑",
@@ -275,16 +352,16 @@ private fun initialScript(): List<TerminalLogLine> = listOf(
     TerminalLogLine("SSH 会话握手成功", LogLevel.Success, "[00:00:02]"),
 )
 
-/** 循环回显脚本：日志 + 下一条间隔(millis)。 */
+/** 循环回显脚本：日志 + 下一条间隔(millis)。命令行走 [TerminalLogLine.command] 展示三级高亮。 */
 private fun logStream(): List<Pair<TerminalLogLine, Long>> = listOf(
-    TerminalLogLine("$  gradle :app:assembleDebug", LogLevel.Info, "[00:00:03]") to 900,
+    TerminalLogLine.command("gradle :app:assembleDebug", "[00:00:03]") to 900,
     TerminalLogLine("> task compileDebugKotlin", LogLevel.Info, "[00:00:04]") to 1100,
-    TerminalLogLine("> build 成功，1200ms", LogLevel.Success, "[00:00:05]") to 1600,
-    TerminalLogLine("$  ./mcp_server --port 8899", LogLevel.Info, "[00:00:06]") to 900,
+    TerminalLogLine("build 成功，1200ms", LogLevel.Success, "[00:00:05]") to 1600,
+    TerminalLogLine.command("./mcp_server --port 8899", "[00:00:06]") to 900,
     TerminalLogLine("MCP Server 已就绪 · Bearer 鉴权开启", LogLevel.Success, "[00:00:07]") to 1800,
-    TerminalLogLine("$  ssh agent@host quick-test", LogLevel.Info, "[00:00:08]") to 1000,
+    TerminalLogLine.command("ssh agent@host quick-test", "[00:00:08]") to 1000,
     TerminalLogLine("warning: 远程端口 backlog 偏大", LogLevel.Warning, "[00:00:09]") to 1500,
-    TerminalLogLine("$  git push origin main", LogLevel.Info, "[00:00:10]") to 1200,
+    TerminalLogLine.command("git push origin main", "[00:00:10]") to 1200,
     TerminalLogLine("error: 提交信息不符合规范", LogLevel.Danger, "[00:00:11]") to 2000,
     TerminalLogLine("→ 已终止，待重写提交信息…", LogLevel.Info, "[00:00:12]") to 1800,
 )

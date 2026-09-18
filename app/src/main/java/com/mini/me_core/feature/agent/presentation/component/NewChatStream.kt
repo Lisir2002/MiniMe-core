@@ -45,7 +45,7 @@ import com.mini.me_core.newui.designsystem.component.AppTodoStatus
 import com.mini.me_core.newui.designsystem.component.AppToolCallCard
 import com.mini.me_core.newui.designsystem.component.AppToolCallState
 import com.mini.me_core.newui.designsystem.component.AppTerminalLog
-import com.mini.me_core.newui.designsystem.component.LogLevel
+import com.mini.me_core.newui.designsystem.component.TerminalLineKind
 import com.mini.me_core.newui.designsystem.component.TerminalLogLine
 import com.mini.me_core.newui.designsystem.component.AppWebHit
 import com.mini.me_core.newui.designsystem.component.AppWebSearchCard
@@ -177,11 +177,16 @@ private fun ToolMessageNode(msg: AgentUIMessage, modifier: Modifier = Modifier) 
             val termLines = remember(msg.toolName, msg.toolArgs, msg.content) {
                 val cmd = bashCommandFromArgs(msg.toolArgs).orEmpty()
                 buildList {
-                    if (cmd.isNotBlank()) add(TerminalLogLine("$ $cmd", LogLevel.Info, ""))
+                    if (cmd.isNotBlank()) add(TerminalLogLine.command(cmd, at = ""))
                     resultText.lineSequence().forEach { l ->
                         val lower = l.lowercase()
-                        val danger = msg.isError || lower.startsWith("error") || lower.startsWith("stderr") || lower.contains("fatal") || lower.contains("exception")
-                        add(TerminalLogLine(l, if (danger) LogLevel.Danger else LogLevel.Info, ""))
+                        val kind = when {
+                            msg.isError || lower.startsWith("error") || lower.startsWith("stderr") ||
+                                lower.contains("fatal") || lower.contains("exception") -> TerminalLineKind.Stderr
+                            lower.contains("warning") || lower.startsWith("warn:") -> TerminalLineKind.Warning
+                            else -> TerminalLineKind.Stdout
+                        }
+                        add(TerminalLogLine(text = l, kind = kind, at = ""))
                     }
                 }
             }
@@ -189,6 +194,7 @@ private fun ToolMessageNode(msg: AgentUIMessage, modifier: Modifier = Modifier) 
                 title = msg.toolName?.replaceFirst("mcp__", "").orEmpty(),
                 lines = termLines,
                 running = false,
+                succeeded = !msg.isError,
                 onRerun = { /* 重跑占位：接现有重试入口暂 no-op */ },
                 modifier = Modifier.padding(horizontal = AppLayout.PageHorizontal),
             )
