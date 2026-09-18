@@ -30,14 +30,19 @@
     "iconS":       { "$value": "18", "$type": "dimension" },
     "iconM":       { "$value": "20", "$type": "dimension" },
     "iconL":       { "$value": "24", "$type": "dimension" },
-    "iconBlock":   { "$value": "40", "$type": "dimension", "$description": "图标块规格" }
+    "iconBlock":   { "$value": "40", "$type": "dimension", "$description": "图标块规格" },
+    "fab":         { "$value": "56", "$type": "dimension", "$description": "中央主操作圆钮直径（与扇形项圆形图标块同规格）" }
   },
   "layout": {
     "pageHorizontal": { "$value": "16", "$type": "dimension" },
     "blockGap":       { "$value": "16", "$type": "dimension" },
     "rowGap":         { "$value": "8",  "$type": "dimension" },
     "contentMaxWidth":{ "$value": "720", "$type": "dimension" },
-    "dividerThickness":{ "$value": "1", "$type": "dimension", "$description": "分割线统一厚度" }
+    "dividerThickness":{ "$value": "1", "$type": "dimension", "$description": "分割线统一厚度" },
+    "bottomBarHeight": { "$value": "56", "$type": "dimension", "$description": "门户底栏总高（不含系统导航/手势 inset）" }
+  },
+  "typography": {
+    "caption": { "$value": "11", "$type": "dimension", "$description": "极小号标签（底栏 tab / 扇形项文字）" }
   },
   "motion": {
     "fast": { "$value": "150", "$type": "dimension" },

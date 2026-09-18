@@ -10,6 +10,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 object AppColor {
     val BrandPrimary = Color(0xFF0A84FF) // 强调色 · iOS 系统蓝（主色调定板）
@@ -94,6 +95,7 @@ object AppSizing {
     val IconL = 24.dp
     val IconXl = 28.dp // 卡片操作图标钮 / 中号头像
     val IconBlock = 40.dp // 图标块规格
+    val Fab = 56.dp // 中央主操作圆钮直径（与扇形项圆形图标块同规格）
 }
 
 object AppLayout {
@@ -102,6 +104,12 @@ object AppLayout {
     val RowGap = 8.dp
     val ContentMaxWidth = 720.dp
     val DividerThickness = 1.dp // 分割线统一厚度
+    val BottomBarHeight = 56.dp // 门户底栏总高（不含系统导航/手势 inset）
+}
+
+/** 字号令牌（sp）：组件统一用 [MaterialTheme.typography.*].copy(fontSize = AppType.*) 引用。 */
+object AppType {
+    val Caption = 11.sp // 极小号标签（底栏 tab / 扇形项文字）
 }
 
 object AppMotion {

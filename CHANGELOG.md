@@ -9,6 +9,14 @@
 - 条目按「效果」而非「实现」撰写；内部噪音（纯格式、纯测试、非行为 refactor）不收录。
 - **Breaking Change 必须用 ⚠️ 显著标注并附迁移说明。**
 
+## v0.0.0.2-rc64 — 2026-09-18
+
+### 改进
+- **门户底栏视觉/交互精修**：总高紧凑收为 56dp，背景改半透明 surface 毛玻璃风格（targetSdk 28 无 RenderEffect，以 0.92 透明 surface 模拟），顶部加 1dp 分割线（palette.separator）；三槽等宽均分，图标统一 24dp、标签改新增的 caption 令牌（11sp）；选中态 = 主色 + SemiBold、未选中 = labelSecondary + Normal，颜色 + 字重双通道区分。
+- **中央办公按钮改圆形主色圆钮**：直径 56dp（新增 fab 令牌），向上探出底栏上沿之外；按压时以 emphasizedSpring 弹性缩放反馈，圆内图标、圆下方标签（办公 / 浏览器 / 终端仍由宿主 centerLabel 下发）。
+- **办公扇形轮盘错峰「绽放」动画**：三项沿半圆弧等角弹出，每项按索引错峰约 25ms 依次入场（图标先到、下方文字晚一拍淡入），进入走 emphasizedTween；蒙层维持 ink 32% scrim，点蒙层关闭、选中可用项自动收回。WorkFanMenu 内裸 `.dp` 表外数值全部消灭，坐标改由 Dp 乘三角值得出。
+- **设计令牌新增**：`sizing.fab`（中央圆钮直径 56dp）、`layout.bottomBarHeight`（门户底栏总高 56dp）、`typography.caption`（标签字号 11sp），DTCG 源 dimensions.json 与生成物 AppTokens.kt 同步镜像。
+
 ## v0.0.0.2-rc63 — 2026-09-18
 
 ### 新功能
