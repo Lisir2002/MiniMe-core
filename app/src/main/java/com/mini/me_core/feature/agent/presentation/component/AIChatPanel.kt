@@ -13,11 +13,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import com.mini.me_core.newui.designsystem.layout.AppShell
 import com.mini.me_core.newui.designsystem.theme.appPalette
 import com.mini.me_core.newui.designsystem.token.generated.AppLayout
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
@@ -32,7 +32,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -323,10 +322,15 @@ fun AIChatPanel(
     val planApproval by viewModel.pendingPlanApproval.collectAsStateWithLifecycle()
     val changes by viewModel.changes.collectAsStateWithLifecycle()
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
+    // 对话页外层壳迁 newui：门户 MainActivity 已用 AppShell 统一 insets/底栏，此处 showTopBar=false，
+    // 内容区自绘 ChatHeader 顶栏（自带 statusBarsPadding）。背景走 newui 语义色 surface，去掉 Material3 Scaffold。
+    AppShell(showTopBar = false) { innerPadding ->
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(appPalette().surface)
+                .padding(innerPadding)
+        ) {
             ChatHeader(
                 sessionTitle = sessionTitle,
                 modelName = activeProvider?.effectiveModel,
@@ -339,13 +343,6 @@ fun AIChatPanel(
                 onNewChat = { viewModel.newSession() },
                 connectionState = connectionState?.takeIf { isRemote }
             )
-        }
-    ) { padding ->
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
             Box(modifier = Modifier.weight(1f)) {
                 if (!messagesReady) {
                     if (isRemote && connectionState != null && connectionState != com.mini.me_core.feature.agent.domain.container.ConnectionState.CONNECTED) {
