@@ -20,6 +20,7 @@ import com.mini.me_core.core.theme.pagePopExitTransition
 import com.mini.me_core.core.theme.terminalEnterTransition
 import com.mini.me_core.core.theme.terminalExitTransition
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DrawerValue
@@ -59,6 +60,7 @@ import com.mini.me_core.feature.settings.data.repository.AppThemeMode
 import com.mini.me_core.feature.settings.data.repository.ThemeSettingsRepository
 import com.mini.me_core.feature.settings.presentation.SettingsViewModel
 import com.mini.me_core.feature.settings.presentation.component.SettingsScreen
+import com.mini.me_core.feature.settings.presentation.component.SettingsSection
 import com.mini.me_core.feature.terminal.domain.TerminalKeepaliveService
 import com.mini.me_core.feature.terminal.presentation.TerminalSettingsViewModel
 import com.mini.me_core.feature.terminal.presentation.TerminalViewModel
@@ -69,6 +71,13 @@ import com.mini.me_core.feature.workspace.presentation.FileReaderViewModel
 import com.mini.me_core.feature.workspace.presentation.WorkspaceFileViewModel
 import com.mini.me_core.feature.workspace.presentation.WorkspaceViewModel
 import com.mini.me_core.feature.workspace.presentation.component.FileReaderScreen
+import com.mini.me_core.newui.designsystem.layout.AppShell
+import com.mini.me_core.newui.designsystem.layout.PortalBottomBar
+import com.mini.me_core.newui.designsystem.layout.PortalTab
+import com.mini.me_core.newui.designsystem.layout.WorkFanItem
+import com.mini.me_core.newui.designsystem.layout.WorkFanMenu
+import com.mini.me_core.newui.portal.BrowserPlaceholderScreen
+import com.mini.me_core.newui.portal.TerminalPlaceholderScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -184,7 +193,12 @@ class MainActivity : ComponentActivity() {
                 // 子树里的终端内容配色、跟随程序开关都读这同一个值，
                 // 保证 APP 切到"强制白/强制黑"时，终端颜色不会还停留在系统主题。
                 androidx.compose.runtime.CompositionLocalProvider(
-                    com.mini.me_core.core.theme.LocalAppDarkMode provides darkTheme
+                    com.mini.me_core.core.theme.LocalAppDarkMode provides darkTheme,
+                    // 新 UI 门户（AppShell/底栏/扇形）走 newui 令牌调色板：按 APP 实际暗模式下发，
+                    // 使 appPalette() 在旧 AIEditorTheme 宿主下也能取到正确的明暗色值。
+                    com.mini.me_core.newui.designsystem.theme.LocalAppPalette provides
+                        if (darkTheme) com.mini.me_core.newui.designsystem.theme.DarkPalette
+                        else com.mini.me_core.newui.designsystem.theme.LightPalette,
                 ) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
@@ -274,9 +288,25 @@ fun AppNavigation(
     // 从侧边栏「工作目录」打开文件阅读页时置位；退出阅读页后自动重开侧边栏（保留所在 tab）。
     var reopenDrawerAfterFileReader by remember { mutableStateOf(false) }
 
-    // 用于判断当前路由：仅在聊天页允许 Drawer 手势。
+    // 用于判断当前路由：仅在对话 tab 允许 Drawer 手势。
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+
+    // ── 新 UI 门户状态：底栏三 tab（对话 / 办公 / 设置）原地切换，不进 NavHost 新路由 ──
+    var portalTab by remember { mutableStateOf(PortalTab.Chat) }
+    // 办公扇形选中的工具（浏览器 / 终端）；中央按钮文字随此与 tab 联动。
+    var workTool by remember { mutableStateOf(WorkFanItem.Browser) }
+    var fanExpanded by remember { mutableStateOf(false) }
+
+    /** 从二级路由（terminal_settings / 数据保全告警）回到门户并直跳设置指定分区。 */
+    fun showSettingsSection(section: SettingsSection) {
+        settingsViewModel.openSection(section)
+        if (currentRoute != "portal") {
+            navController.popBackStack("portal", inclusive = false)
+        }
+        fanExpanded = false
+        portalTab = PortalTab.Settings
+    }
 
     // Activity 级别的 ViewModel——Drawer 和 AIChatPanel 共享同一个实例。
     val agentViewModel: AIAgentViewModel = hiltViewModel()
@@ -334,8 +364,8 @@ fun AppNavigation(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        // 仅在聊天页启用手势滑出；其他页面禁止（但已打开时始终可关闭）。
-        gesturesEnabled = currentRoute == "chat" || drawerState.isOpen,
+        // 仅在门户对话 tab 启用手势滑出；其他页面 / 其他 tab 禁止（但已打开时始终可关闭）。
+        gesturesEnabled = (currentRoute == "portal" && portalTab == PortalTab.Chat) || drawerState.isOpen,
         drawerContent = {
             ModalDrawerSheet(
                 drawerShape = RectangleShape,
@@ -359,10 +389,6 @@ fun AppNavigation(
                         sessionExportLauncher.launch("minime-session-$safeTitle-${System.currentTimeMillis()}.tar.gz")
                     },
                     onUndoDelete = { agentViewModel.undoDeleteSession() },
-                    onNavigateToSettings = {
-                        scope.launch { drawerState.close() }
-                        navController.navigate("settings")
-                    },
                     currentThemeMode = currentThemeMode,
                     onCycleTheme = onCycleTheme,
                     // 侧边栏「工作目录」tab：复用工作区 ViewModel，切换时若有运行会话则确认
@@ -388,7 +414,7 @@ fun AppNavigation(
     ) {
         NavHost(
             navController = navController,
-            startDestination = "chat",
+            startDestination = "portal",
             enterTransition = {
                 when (targetState.destination.route) {
                     "terminal" -> terminalEnterTransition
@@ -414,44 +440,78 @@ fun AppNavigation(
                 }
             }
         ) {
-            composable("chat") {
-                AIChatPanel(
-                    viewModel = agentViewModel,
-                    settingsViewModel = settingsViewModel,
-                    workspaceViewModel = workspaceViewModel,
-                    drawerState = drawerState,
-                    onNavigateToSettings = { navController.navigate("settings") },
-                    onNavigateToTerminal = { navController.navigate("terminal") },
-                    onNavigateToGit = { navController.navigate("git") },
-                    onNavigateToBrowser = { navController.navigate("browser") }
-                )
-            }
-            composable("settings") {
-                // 复用 Activity 级 settingsViewModel（MainActivity 顶部已创建并 init），
-                // 避免进入设置页时再建一个 NavBackStackEntry 级实例、重复跑 init 与 9 路 flow 订阅，
-                // 这是侧边栏点设置「卡一下」的主因。
-                SettingsScreen(
-                    viewModel = settingsViewModel,
-                    onNavigateBack = { 
-                        navController.popBackStack() 
-                        scope.launch { drawerState.open() }
-                    },
-                    onNavigateToTerminalSettings = { navController.navigate("terminal_settings") },
-                    // 用户点「管理 SSH 主机配置」不再是占位。
-                    // 从 SettingsScreen（本路由内部）点 → 直接让 SettingsScreen 的 section 切换 RemoteServers。
-                    // 实现方式：利用 SettingsScreen 内部已经消费的 SettingsViewModel.openSection() 机制，
-                    //   它内部 section 是 remember mutableState，但 LaunchedEffect(pendingTick) 会在 next frame
-                    //   把它赋值成 RemoteServers。
-                    onNavigateToSshHosts = {
-                        settingsViewModel.openSection(
-                            com.mini.me_core.feature.settings.presentation.component.SettingsSection.RemoteServers
-                        )
-                    },
-                    onStopAllAndCloseTerminal = { agentViewModel.stopAllAndCloseTerminal() },
-                    onNavigateToNetProxy = { navController.navigate("proxy_config") },
-                    // 能力中心入口（自侧边栏移入设置）：设置页点击直接跳转能力中心。
-                    onNavigateToCapabilityCenter = { navController.navigate("capability_center") }
-                )
+            composable("portal") {
+                // 新 UI 门户：AppShell 统一装配，底栏三 tab（对话 / 办公凸起按钮 / 设置）原地切换。
+                // 内容区不进 NavHost 新路由：对话 = AIChatPanel（保留会话抽屉），办公 = 浏览器/终端占位，设置 = SettingsScreen。
+                // AppShell 自带顶栏对 chat/settings 关闭（二者自带顶栏），避免双顶栏；扇形轮盘为上层浮层。
+                Box(Modifier.fillMaxSize()) {
+                    AppShell(
+                        showTopBar = false,
+                        bottomBar = {
+                            PortalBottomBar(
+                                selected = portalTab,
+                                centerLabel = when {
+                                    portalTab == PortalTab.Work && workTool == WorkFanItem.Browser -> "浏览器"
+                                    portalTab == PortalTab.Work && workTool == WorkFanItem.Terminal -> "终端"
+                                    else -> "办公"
+                                },
+                                onChat = {
+                                    fanExpanded = false
+                                    portalTab = PortalTab.Chat
+                                },
+                                onWork = { fanExpanded = !fanExpanded },
+                                onSettings = {
+                                    fanExpanded = false
+                                    portalTab = PortalTab.Settings
+                                },
+                            )
+                        },
+                    ) {
+                        when (portalTab) {
+                            PortalTab.Chat -> AIChatPanel(
+                                viewModel = agentViewModel,
+                                settingsViewModel = settingsViewModel,
+                                workspaceViewModel = workspaceViewModel,
+                                drawerState = drawerState,
+                                onNavigateToSettings = {
+                                    fanExpanded = false
+                                    portalTab = PortalTab.Settings
+                                },
+                                onNavigateToTerminal = { navController.navigate("terminal") },
+                                onNavigateToGit = { navController.navigate("git") },
+                                onNavigateToBrowser = { navController.navigate("browser") }
+                            )
+                            PortalTab.Settings -> SettingsScreen(
+                                viewModel = settingsViewModel,
+                                // 设置为门户第三 tab：根分区返回即切回对话 tab（不再 popBackStack）。
+                                onNavigateBack = { portalTab = PortalTab.Chat },
+                                onNavigateToTerminalSettings = { navController.navigate("terminal_settings") },
+                                onNavigateToSshHosts = { showSettingsSection(SettingsSection.RemoteServers) },
+                                onStopAllAndCloseTerminal = { agentViewModel.stopAllAndCloseTerminal() },
+                                onNavigateToNetProxy = { navController.navigate("proxy_config") },
+                                onNavigateToCapabilityCenter = { navController.navigate("capability_center") }
+                            )
+                            PortalTab.Work -> when (workTool) {
+                                WorkFanItem.Browser -> BrowserPlaceholderScreen()
+                                WorkFanItem.Terminal -> TerminalPlaceholderScreen()
+                                // 「待开发」不可选，不会落到此分支。
+                                WorkFanItem.Todo -> BrowserPlaceholderScreen()
+                            }
+                        }
+                    }
+                    // 办公扇形轮盘浮层：覆盖底栏上方，点空白收起。
+                    WorkFanMenu(
+                        expanded = fanExpanded,
+                        onDismiss = { fanExpanded = false },
+                        onSelect = { item ->
+                            if (item.enabled) {
+                                workTool = item
+                                portalTab = PortalTab.Work
+                                fanExpanded = false
+                            }
+                        },
+                    )
+                }
             }
             composable("capability_center") {
                 val capabilityViewModel: com.mini.me_core.feature.capability.presentation.CapabilityCenterViewModel = hiltViewModel()
@@ -520,21 +580,10 @@ fun AppNavigation(
                 TerminalSettingsScreen(
                     viewModel = terminalSettingsVM,
                     onNavigateBack = { navController.popBackStack() },
-                    // TerminalSettings 里点「管理 SSH 主机配置」→ 跨路由栈切到 Settings 的 RemoteServers 分区。
-                    // 顺序必须是「先发 openSection（写入 SettingsViewModel 单例，CONFLATED Channel 只保留最新）
-                    // 再 pop 回 settings 路由」，因为 SettingsScreen 在 composable 首帧就会 consume pendingTick：
-                    //   tick(1) > consumed(-1) → 读 lastRequestedSection=RemoteServers → section=RemoteServers。
-                    onNavigateToSshHosts = {
-                        settingsViewModel.openSection(
-                            com.mini.me_core.feature.settings.presentation.component.SettingsSection.RemoteServers
-                        )
-                        val popped = navController.popBackStack("settings", inclusive = false)
-                        if (!popped) {
-                            // 理论上不会发生，因为 terminal_settings 一定是从 settings 导航过来的；
-                            // 兜底直接 go settings，路由创建时 LaunchedEffect(pendingTick) 也会消费。
-                            navController.navigate("settings")
-                        }
-                    },
+                    // TerminalSettings 里点「管理 SSH 主机配置」→ 回到门户设置 tab 并切到 RemoteServers 分区。
+                    // 由 showSettingsSection 统一：openSection(写入 pendingTick) → pop 回 portal → 切设置 tab，
+                    // SettingsScreen 恢复时 LaunchedEffect(pendingTick) 消费并切 section。
+                    onNavigateToSshHosts = { showSettingsSection(SettingsSection.RemoteServers) },
                     onNavigateToBundleManager = { navController.navigate("terminal_bundle_manager") }
                 )
             }
@@ -586,12 +635,7 @@ fun AppNavigation(
         // 冷启动后用户打开 App 第一眼就能看到「历史数据异常」提示，可一键跳转备份与还原页恢复。
         DataSafetyStartupAlert(
             notifier = dataSafetyNotifier,
-            onGoToBackup = {
-                settingsViewModel.openSection(
-                    com.mini.me_core.feature.settings.presentation.component.SettingsSection.Backup
-                )
-                navController.navigate("settings")
-            }
+            onGoToBackup = { showSettingsSection(SettingsSection.Backup) }
         )
     }
 }

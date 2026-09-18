@@ -58,6 +58,11 @@ fun AppShell(
     bottomBar: (@Composable () -> Unit)? = null,
     sideRail: (@Composable () -> Unit)? = null,
     topBarStyle: AppTopBarStyle = AppTopBarStyle.Compact,
+    /**
+     * 是否渲染内置顶栏。门户宿主（chat / settings 自带顶栏）传 false，由内容自绘顶栏与
+     * 状态栏 inset；默认 true 时本壳渲染紧凑顶栏并消费状态栏 inset。
+     */
+    showTopBar: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     // 内容区固定占主位；侧栏仅存在时左排（compact 移动端几乎不用，保留槽位契约）。
@@ -75,6 +80,7 @@ fun AppShell(
                     topTabs = topTabs,
                     bottomBar = bottomBar,
                     topBarStyle = topBarStyle,
+                    showTopBar = showTopBar,
                     content = content,
                 )
             }
@@ -88,6 +94,7 @@ fun AppShell(
             topTabs = topTabs,
             bottomBar = bottomBar,
             topBarStyle = topBarStyle,
+            showTopBar = showTopBar,
             content = content,
         )
     }
@@ -102,17 +109,20 @@ private fun ShellContent(
     topTabs: (@Composable () -> Unit)?,
     bottomBar: (@Composable () -> Unit)?,
     topBarStyle: AppTopBarStyle,
+    showTopBar: Boolean,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         // 顶栏：背景逼近状态栏，insets 内移内容
-        ShellTopBar(
-            title = title,
-            onNavigateBack = onNavigateBack,
-            navigationIcon = navigationIcon,
-            actions = topBarActions,
-            topBarStyle = topBarStyle,
-        )
+        if (showTopBar) {
+            ShellTopBar(
+                title = title,
+                onNavigateBack = onNavigateBack,
+                navigationIcon = navigationIcon,
+                actions = topBarActions,
+                topBarStyle = topBarStyle,
+            )
+        }
         if (topTabs != null) topTabs()
         // 内容区占剩余空间；bottomBar 在内容下方挤压布局，不再覆盖内容。
         Column(Modifier.weight(1f).fillMaxWidth()) {

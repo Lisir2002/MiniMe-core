@@ -46,7 +46,6 @@ import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.PictureAsPdf
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.TableChart
@@ -128,7 +127,6 @@ fun ChatDrawerContent(
     onRename: (ChatSession, String) -> Unit,
     onExport: (ChatSession) -> Unit,
     onUndoDelete: () -> Unit = {},
-    onNavigateToSettings: () -> Unit,
     currentThemeMode: AppThemeMode,
     onCycleTheme: () -> Unit,
     workspaceViewModel: WorkspaceViewModel? = null,
@@ -223,19 +221,15 @@ fun ChatDrawerContent(
             color = MaterialTheme.colorScheme.outlineVariant,
             modifier = Modifier.padding(vertical = Spacing.sm)
         )
-        // 底部导航：左侧「设置」（图标 + 文字），右侧「主题切换」纯图标按钮。
-        // 两侧各留 Spacing.md 边距，与侧边栏内容左右对齐，视觉更舒适。
+        // 底部导航：仅保留右侧「主题切换」纯图标按钮（设置入口已迁至底部门户第三 tab）。
+        // 右对齐与侧边栏内容右缘对齐，视觉更舒适。
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.md),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            DrawerSettingsButton(
-                contentDescription = stringResource(R.string.chat_settings),
-                onClick = onNavigateToSettings
-            )
             DrawerBottomIconButton(
                 icon = when (currentThemeMode) {
                     AppThemeMode.DARK -> Icons.Rounded.DarkMode
@@ -410,37 +404,6 @@ private fun DrawerBottomIconButton(
             icon = icon,
             iconBgLight = iconBgLight,
             iconBgDark = iconBgDark
-        )
-    }
-}
-
-/**
- * 侧边栏底部「设置」按钮：图标 + 文字 的整块可点击区域（位于底部左侧）。
- */
-@Composable
-private fun DrawerSettingsButton(
-    contentDescription: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(Radius.sm))
-            .clickable(onClick = onClick)
-            .semantics { this.contentDescription = contentDescription }
-            .padding(vertical = Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        DrawerNavIcon(
-            icon = Icons.Rounded.Settings,
-            iconBgLight = Color(0xFF0EA5E9),
-            iconBgDark = Color(0xFF0369A1)
-        )
-        Spacer(Modifier.width(Spacing.md))
-        Text(
-            text = stringResource(R.string.chat_settings),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.Medium
         )
     }
 }
