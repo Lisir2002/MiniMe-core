@@ -1,5 +1,6 @@
 package com.mini.me_core.newui.designsystem.layout
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -65,6 +66,10 @@ fun AppShell(
     showTopBar: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    // 统一返回：物理/手势返回键与顶栏返回箭头走同一 onNavigateBack 回调，返回上一页而非直接关应用。
+    if (onNavigateBack != null) {
+        BackHandler { onNavigateBack() }
+    }
     // 内容区固定占主位；侧栏仅存在时左排（compact 移动端几乎不用，保留槽位契约）。
     if (sideRail != null) {
         Row(Modifier.fillMaxSize()) {
