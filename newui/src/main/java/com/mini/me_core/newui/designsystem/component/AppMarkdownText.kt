@@ -647,6 +647,24 @@ private fun buildInline(
                     i++
                 }
             }
+            raw.startsWith("\$", i) && i + 1 < raw.length && raw[i + 1] != '\n' -> {
+                val end = raw.indexOf("\$", i + 1)
+                if (end > i + 1) {
+                    withStyle(
+                        SpanStyle(
+                            fontFamily = FontFamily.Monospace,
+                            color = Color(0xFFBF5AF2),
+                            background = Color(0x22BF5AF2),
+                        ),
+                    ) {
+                        append(raw.substring(i + 1, end))
+                    }
+                    i = end + 1
+                } else {
+                    append(raw[i])
+                    i++
+                }
+            }
             raw.startsWith("[", i) -> {
                 val close = raw.indexOf("]", i)
                 if (close > i + 1) {

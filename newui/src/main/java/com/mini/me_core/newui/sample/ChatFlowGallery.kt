@@ -1492,6 +1492,45 @@ post("/auth/login") {
         delay(900)
         put(FlowItem.Commit(key = nextKey(), hash = "a1b2c3d"))
         delay(900)
+        // Markdown / LaTeX 全功能样例
+        delay(600)
+        val mdKey = nextKey()
+        put(FlowItem.Msg(mdKey, "", AppChatMessageState.Streaming, isUser = false, ts = "10:05"))
+        val md = """
+### 设计说明
+
+这是一段 **Markdown** + 行内代码 `File("Main.kt")` 的混合样例。支持 [链接](https://example.com)、
+行内公式 $E = mc^2$、删除线~~旧方案~~、**粗体** 与 *斜体*。
+
+- 列表项一
+  - 嵌套项 A
+  - 嵌套项 B
+- 列表项二
+
+| 步骤 | 状态 | 耗时 |
+| --- | --- | --- |
+| 路由 | ✅ | 120ms |
+| 中间件 | ✅ | 45ms |
+| 测试 | ⏳ | - |
+
+块级公式：
+
+$$
+\frac{1}{\sqrt{1 - v^2/c^2}}
+$$
+
+```kotlin
+fun login(req: LoginRequest): Token {
+    val user = repo.find(req.name)
+    return jwt.sign(user.id)
+}
+```
+
+> 备注：token 有效期 2h，刷新走 refresh token。
+""".trimIndent()
+        typewrite(md, chunk = 6, perMs = 8L) { s -> patch<FlowItem.Msg>(mdKey) { it.copy(text = s) } }
+        patch<FlowItem.Msg>(mdKey) { it.copy(state = AppChatMessageState.Complete) }
+        delay(900)
         put(
             FlowItem.FollowUps(
                 key = nextKey(),
