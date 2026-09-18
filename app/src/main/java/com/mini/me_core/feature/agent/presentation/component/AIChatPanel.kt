@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import com.mini.me_core.newui.designsystem.theme.appPalette
 import com.mini.me_core.newui.designsystem.token.generated.AppLayout
@@ -77,7 +78,6 @@ import com.mini.me_core.newui.designsystem.component.AppMessageRow
 import com.mini.me_core.newui.designsystem.component.AppMessageScroller
 import com.mini.me_core.newui.designsystem.component.AppThinkingBlock
 import com.mini.me_core.newui.designsystem.component.AppTypingIndicator
-import com.mini.me_core.newui.designsystem.token.generated.AppLayout
 import java.io.File
 import kotlinx.coroutines.launch
 
