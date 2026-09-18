@@ -90,7 +90,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.mini.me_core.newui.designsystem.component.FileTypeIcon
 import com.mini.me_core.newui.designsystem.layout.AppShell
 import com.mini.me_core.newui.designsystem.theme.appPalette
 import com.mini.me_core.newui.designsystem.token.generated.AppRadius
@@ -197,12 +196,6 @@ private val sections = listOf(
     ),
 )
 
-private val fileTypes = listOf(
-    "kt", "java", "py", "js", "ts", "go", "rs", "c", "cpp", "swift",
-    "html", "css", "json", "yaml", "sh", "md", "txt", "pdf", "png", "mp3",
-    "mp4", "zip", "db", "gradle", "dockerfile",
-)
-
 /** 新版 UI 图标样板页：必须走统一 AppShell 容器，禁止自绘顶栏/边距。 */
 @Composable
 fun AppIconGalleryScreen(onBack: () -> Unit) {
@@ -244,23 +237,6 @@ fun AppIconGalleryScreen(onBack: () -> Unit) {
                     }
                 }
             }
-            item {
-                Text(
-                    "文件类型",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = appPalette().labelSecondary,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(top = AppSpacing.Md, bottom = AppSpacing.Sm),
-                )
-            }
-            fileTypes.chunked(4).forEach { row ->
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.Sm)) {
-                        row.forEach { ext -> FileTypeTile(ext, Modifier.weight(1f)) }
-                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
-                    }
-                }
-            }
             item { Spacer(Modifier.height(AppSpacing.Xl)) }
         }
     }
@@ -290,22 +266,5 @@ private fun IconTile(e: IconEntry, modifier: Modifier = Modifier) {
         Text(e.name, style = MaterialTheme.typography.bodyMedium, color = appPalette().ink)
         Spacer(Modifier.height(1.dp))
         Text(e.old, style = MaterialTheme.typography.labelSmall, color = appPalette().labelTertiary)
-    }
-}
-
-@Composable
-private fun FileTypeTile(ext: String, modifier: Modifier = Modifier) {
-    Column(
-        modifier
-            .padding(vertical = AppSpacing.Xs)
-            .clip(RoundedCornerShape(AppRadius.Md))
-            .background(appPalette().card)
-            .border(AppStroke.Thin, appPalette().separator, RoundedCornerShape(AppRadius.Md))
-            .padding(AppSpacing.Sm),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        FileTypeIcon(ext = ext)
-        Spacer(Modifier.height(AppSpacing.Sm))
-        Text(".$ext", style = MaterialTheme.typography.labelSmall, color = appPalette().labelTertiary)
     }
 }
