@@ -1,5 +1,11 @@
 package com.mini.me_core.feature.terminal.presentation.component
 
+import com.mini.me_core.feature.agent.domain.container.installBundle
+import com.mini.me_core.feature.agent.domain.container.installBundlesOrdered
+import com.mini.me_core.feature.agent.domain.container.uninstallBundle
+import com.mini.me_core.feature.agent.domain.container.installCustomPackages
+import com.mini.me_core.feature.agent.domain.container.uninstallCustomPackage
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
