@@ -1,5 +1,8 @@
 package com.mini.me_core.feature.agent.presentation.component
 
+import com.mini.me_core.ui.markdown.formatTokenCount
+import com.mini.me_core.ui.markdown.MarkdownRenderCache
+import com.mini.me_core.ui.markdown.MarkdownContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -59,8 +62,8 @@ import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.container.progress.InstallProgress
-import com.mini.me_core.feature.agent.domain.container.progress.InstallProgressParsers
+import com.mini.me_core.core.container.InstallProgress
+import com.mini.me_core.core.container.InstallProgressParsers
 import com.mini.me_core.feature.agent.domain.session.SessionUseCase
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.EnvironmentSnapshot

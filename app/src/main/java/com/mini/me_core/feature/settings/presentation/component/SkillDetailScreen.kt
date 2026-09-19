@@ -74,7 +74,7 @@ import com.mini.me_core.feature.agent.domain.skill.Skill
 import com.mini.me_core.feature.agent.domain.skill.SkillScope
 import com.mini.me_core.feature.agent.domain.skill.SkillSourceType
 import com.mini.me_core.feature.agent.domain.skill.SkillType
-import com.mini.me_core.feature.agent.presentation.component.MarkdownContent
+import com.mini.me_core.ui.markdown.MarkdownContent
 import com.mini.me_core.feature.git.presentation.component.highlightCode
 import com.mini.me_core.feature.git.presentation.component.inferSyntaxLanguage
 import com.mini.me_core.feature.settings.presentation.SkillDetailViewModel

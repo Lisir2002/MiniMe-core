@@ -2,7 +2,7 @@ package com.mini.me_core.feature.agent.domain.zth
 
 import com.mini.me_core.core.security.ZthSensitiveColumnCrypto
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.datalayer.repository.AgentRepository
+import com.mini.me_core.feature.agent.domain.zth.FusePort
 import com.mini.me_core.feature.agent.domain.permission.FailureSubClass
 import com.mini.me_core.feature.agent.domain.permission.FuseState
 import com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalChoice
@@ -34,7 +34,7 @@ import java.util.UUID
  */
 @Singleton
 class ZthConfirmationCardManager @Inject constructor(
-    private val agentRepo: AgentRepository,
+    private val fusePort: FusePort,
     private val planApprovalManager: PlanApprovalManager,
     private val crypto: ZthSensitiveColumnCrypto
 ) {
@@ -98,25 +98,25 @@ class ZthConfirmationCardManager @Inject constructor(
             val sessionFuseId = composeSessionId(req.sessionId)
             val nowMs = System.currentTimeMillis()
             // Step 1：LINK-INV CAS 会话级 fuse linkageVersion + 1（确保整个 4 写只有一个赢家）
-            val version = agentRepo.getFuseVersion(sessionFuseId) ?: run {
+            val version = fusePort.getVersion(sessionFuseId) ?: run {
                 // Session 级 fuse 还没创建 → 先插（linkageVersion=0）
-                agentRepo.upsertFuse(
+                fusePort.upsert(com.mini.me_core.feature.agent.data.local.entity.HallucinationFuseEntity(
                     id = sessionFuseId,
                     scope = "SESSION",
                     scopeId = req.sessionId,
                     state = FuseState.CLOSED.name,
                     linkageVersion = 0L,
-                    failureCount = 0L,
+                    failureCount = 0,
                     openSinceMs = 0L,
                     lastProbeAtMs = 0L,
-                    killSwitch1Triggered = 0L,
-                    killSwitch2SoftDisabled = 0L,
+                    killSwitch1Triggered = false,
+                    killSwitch2SoftDisabled = false,
                     lastTripSubclass = null,
                     updatedAtMs = nowMs
-                )
+                ))
                 0L
             }
-            val rows = agentRepo.casUpdateFuseState(
+            val rows = fusePort.casUpdateState(
                 id = sessionFuseId,
                 expectedVersion = version,
                 newState = FuseState.CLOSED.name,
@@ -139,7 +139,7 @@ class ZthConfirmationCardManager @Inject constructor(
                 UserCardChoice.REJECT -> "REJECT"
                 UserCardChoice.CANCEL_TIER1_OR_LOWER -> "CANCEL"
             }
-            agentRepo.insertSentinel(
+            fusePort.insertSentinel(
                 id = sentinelId,
                 sessionId = req.sessionId,
                 linkageVersion = version + 1,
@@ -165,7 +165,7 @@ class ZthConfirmationCardManager @Inject constructor(
                 val s_reason = req.rejectionReasonPlaintext?.let { crypto.encrypt(it) }
                 crypto.assertSensitiveColumnName("s_rejectedPlanSnapshotCiphertext")
                 val s_snapshot = s_mod ?: crypto.encrypt(req.planPayloadPlaintext) // 没修改则存原
-                agentRepo.insertRejectionAudit(
+                fusePort.insertRejectionAudit(
                     id = "AUD:${UUID.randomUUID()}",
                     sentinelId = sentinelId,
                     rejectionType = userChoiceStr,

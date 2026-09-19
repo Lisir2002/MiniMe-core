@@ -2,7 +2,7 @@ package com.mini.me_core.datalayer.store
 
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
-import com.mini.mecore.datalayer.sqldelight.InfraDb
+import com.mini.mecore.datalayer.sqldelight.AuxDb
 
 /**
  * 一等 DocumentStore（设计 §6.2）：JSON 文档存储，首版即上 FTS5 全文检索。
@@ -20,7 +20,7 @@ data class DocEntry(
     val updatedAt: Long,
 )
 
-class DocumentStore(private val db: InfraDb, private val driver: SqlDriver) {
+class DocumentStore(private val db: AuxDb, private val driver: SqlDriver) {
 
     private val queries get() = db.docQueries
 
@@ -95,7 +95,7 @@ class DocumentStore(private val db: InfraDb, private val driver: SqlDriver) {
         }, 1) { bindString(0, match) }.value
     }
 
-    private fun com.mini.mecore.datalayer.sqldelight.infra.Doc_store.toEntry() = DocEntry(
+    private fun com.mini.mecore.datalayer.sqldelight.Doc_store.toEntry() = DocEntry(
         id = id,
         collection = collection,
         key = key,

@@ -212,6 +212,7 @@ fun TerminalBundleManagerScreen(
                         viewModel.bundles().forEach { b ->
                             val bState = bundleStates[b.id] ?: BundleInstallState.NotInstalled
                             val inProgress = isBundleInProgress(b.id)
+                            val updates by viewModel.bundleUpdateAvailable.collectAsStateWithLifecycle()
                             BundleInstallCard(
                                 bundle = b.toUi(),
                                 bundleState = bState,
@@ -220,6 +221,7 @@ fun TerminalBundleManagerScreen(
                                 onUninstallClick = { viewModel.uninstallBundle(b.id) },
                                 onOpenLogDialog = { openDialogFor = b.id },
                                 onCopyError = onCopyError,
+                                showUpdate = updates.contains(b.id),
                                 modifier = Modifier.padding(horizontal = Spacing.md),
                             )
                             val dialogBundle = openDialogFor
@@ -243,7 +245,7 @@ fun TerminalBundleManagerScreen(
 
                 1 -> {
                     // ── Tab 2：自定义功能包（原自定义 APK 包页内容整合） ─────
-                    AppSectionHeader(text = "常用快捷包")
+                    AppSectionHeader(text = stringResource(R.string.ui_quick_packs))
                     QuickPacksChipRow(
                         containerReady = containerInstalled,
                         customInstallState = customInstallState,
@@ -253,7 +255,7 @@ fun TerminalBundleManagerScreen(
                         }
                     )
 
-                    AppSectionHeader(text = "自定义包名安装")
+                    AppSectionHeader(text = stringResource(R.string.ui_custom_pkg_install))
                     CustomInstallCard(
                         customInstallInput = customInstallInput,
                         onInputChange = { customInstallInput = it },
@@ -266,7 +268,7 @@ fun TerminalBundleManagerScreen(
                         customInstallState = customInstallState
                     )
 
-                    AppSectionHeader(text = "已安装自定义包")
+                    AppSectionHeader(text = stringResource(R.string.ui_installed_custom_pkgs))
                     run {
                         val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = TerminalCardsSpec.BorderAlpha)
                         Card(
@@ -288,27 +290,27 @@ fun TerminalBundleManagerScreen(
                                     )
                                     Spacer(modifier = Modifier.width(Spacing.sm))
                                     Text(
-                                        text = if (customPkgs.isEmpty()) "暂无自定义包" else "共 ${customPkgs.size} 个",
+                                        text = if (customPkgs.isEmpty()) stringResource(R.string.ui_no_custom_pkgs) else stringResource(R.string.ui_custom_pkgs_count, customPkgs.size),
                                         style = MaterialTheme.typography.bodyMedium,
                                         modifier = Modifier.weight(1f)
                                     )
                                     NeutralTextButton(
                                         onClick = viewModel::refreshCustom,
                                         icon = Icons.Rounded.Refresh,
-                                        text = "刷新"
+                                        text = stringResource(R.string.ui_refresh)
                                     )
                                 }
                                 when {
                                     !containerInstalled -> {
                                         Text(
-                                            "容器未初始化，无法查询自定义包",
+                                            stringResource(R.string.ui_container_not_ready_query),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                     customPkgs.isEmpty() -> {
                                         Text(
-                                            "可以从上面的快捷包一键安装，或自己输入 apk 包名。常用：htop / neofetch / tmux / fzf / rsync / lf / openssh",
+                                            stringResource(R.string.ui_custom_pkg_hint),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -336,7 +338,7 @@ fun TerminalBundleManagerScreen(
                                                         onClick = { viewModel.uninstallCustom(pkg) },
                                                         enabled = customInstallState == null,
                                                         icon = Icons.Rounded.Delete,
-                                                        text = "卸载"
+                                                        text = stringResource(R.string.ui_uninstall)
                                                     )
                                                 }
                                             }
@@ -396,14 +398,14 @@ private fun CustomInstallCard(
             if (customInstallState is BundleInstallState.Installing) {
                 SharedLinearProgress()
                 Text(
-                    text = "正在安装：${customInstallState.line?.take(40) ?: "准备中…"}",
+                    text = stringResource(R.string.ui_installing, customInstallState.line?.take(40) ?: stringResource(R.string.ui_preparing)),
                     style = MaterialTheme.typography.bodySmall,
                     color = SemanticColors.InProgress,
                     fontFamily = FontFamily.Monospace
                 )
             } else if (customInstallState is BundleInstallState.Failed) {
                 Text(
-                    text = "安装失败：${customInstallState.reason}",
+                    text = stringResource(R.string.ui_install_failed, customInstallState.reason),
                     style = MaterialTheme.typography.bodySmall,
                     color = SemanticColors.Error
                 )
@@ -430,7 +432,7 @@ private fun QuickPacksChipRow(
         listOf(
             "htop" to listOf("htop"),
             "neofetch" to listOf("neofetch"),
-            "openssh" to listOf("openssh", "openssh-client", "openssh-server"),
+            "openssh" to listOf("openssh", "openssh-client"),
             "rsync" to listOf("rsync"),
             "fzf" to listOf("fzf"),
             "tmux" to listOf("tmux"),

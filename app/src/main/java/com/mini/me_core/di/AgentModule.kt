@@ -405,9 +405,8 @@ object AgentModule {
         planApprovalManager: com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalManager,
         toolOutputStore: ToolOutputStore,
         modelMetadataService: ModelMetadataService,
-        visionModelSettingsRepository: com.mini.me_core.feature.settings.data.repository.VisionModelSettingsRepository,
-        compactionModelSettingsRepository: com.mini.me_core.feature.settings.data.repository.CompactionModelSettingsRepository,
-        compatibilityPolicyRepository: com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepository,
+        // settings 层反向端口（架构规则 #2）：由 WorkflowSettingsModule 注入适配实现。
+        workflowSettings: com.mini.me_core.core.agentworkflow.WorkflowSettingsPort,
         sessionUseCase: com.mini.me_core.feature.agent.domain.session.SessionUseCase,
         messagePersistenceUseCase: com.mini.me_core.feature.agent.domain.session.MessagePersistenceUseCase,
         checkpointManager: com.mini.me_core.feature.agent.domain.checkpoint.CheckpointManager,
@@ -424,7 +423,6 @@ object AgentModule {
         planService: com.mini.me_core.feature.agent.domain.plan.PlanService,
         toolGuards: Set<@JvmSuppressWildcards com.mini.me_core.feature.agent.domain.guard.ToolGuard>,
         fileObservationGuard: com.mini.me_core.feature.agent.domain.guard.FileObservationGuard,
-        normFlowSettingsRepository: com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository,
         trajectoryService: com.mini.me_core.feature.agent.domain.trajectory.TrajectoryService,
         playbookExecutor: com.mini.me_core.feature.agent.domain.playbook.PlaybookExecutor
     ): AgentWorkflow {
@@ -441,9 +439,7 @@ object AgentModule {
             planApprovalManager,
             toolOutputStore,
             modelMetadataService,
-            visionModelSettingsRepository,
-            compactionModelSettingsRepository,
-            compatibilityPolicyRepository,
+            workflowSettings,
             sessionUseCase,
             messagePersistenceUseCase,
             checkpointManager,
@@ -460,7 +456,6 @@ object AgentModule {
             planService,
             toolGuards,
             fileObservationGuard,
-            normFlowSettingsRepository,
             trajectoryService,
             playbookExecutor
         )

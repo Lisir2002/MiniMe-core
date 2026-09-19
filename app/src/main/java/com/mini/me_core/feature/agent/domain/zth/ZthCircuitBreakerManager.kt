@@ -1,7 +1,6 @@
 package com.mini.me_core.feature.agent.domain.zth
 
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.me_core.feature.agent.data.local.entity.HallucinationFuseEntity
 import com.mini.me_core.feature.agent.domain.permission.FailureClassification
 import com.mini.me_core.feature.agent.domain.permission.FuseState
@@ -31,7 +30,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class ZthCircuitBreakerManager @Inject constructor(
-    private val v2Agent: V2AgentRepository,
+    private val fusePort: FusePort,
 ) {
     private companion object {
         const val TAG = "ZthCircuitBreakerMgr"
@@ -175,13 +174,13 @@ class ZthCircuitBreakerManager @Inject constructor(
         var attempts = 0
         while (attempts < MAX_CAS_ATTEMPTS) {
             attempts++
-            val current = v2Agent.getFuseVersion(entity.id)
+            val current = fusePort.getVersion(entity.id)
             if (current == null) {
                 // 不存在 → 先插初始
                 upsertFuse(createInitial(entity.id, entity.scope, entity.scopeId))
                 continue
             }
-            val rows = v2Agent.casUpdateFuseState(entity.id, expectedVersion = current, target.name, nowMs)
+            val rows = fusePort.casUpdateState(entity.id, current, target.name, nowMs)
             if (rows == 1L) {
                 // CAS 成功：再把附加字段（clearFailures/killSwitch 不用）写一次
                 val e = loadEntityById(entity.id) ?: return true
@@ -200,7 +199,7 @@ class ZthCircuitBreakerManager @Inject constructor(
         }
         FileLogger.e(TAG, "CAS 迁移失败 ${MAX_CAS_ATTEMPTS} 次 id=${entity.id}：LINK-INV 版本冲突，回滚 OPEN + kill-switch-1 置位")
         // 迁移失败 → 不变性 LINK-INV-FAIL：回滚 OPEN + kill-switch-1 单向置位
-        v2Agent.triggerFuseKillSwitch1(entity.id, nowMs)
+        fusePort.triggerKillSwitch1(entity.id, nowMs)
         return false
     }
 
@@ -231,15 +230,15 @@ class ZthCircuitBreakerManager @Inject constructor(
     // ── 懒创建初始实体（scope=GLOBAL/SESSION scopeId 锁死 composeGlobalId/composeSessionId）
 
     private suspend fun loadOrCreateGlobal(): HallucinationFuseEntity =
-        v2Agent.getFuse("GLOBAL", HallucinationFuseEntity.GLOBAL_SCOPE_ID)?.toEntity()
+        fusePort.get("GLOBAL", HallucinationFuseEntity.GLOBAL_SCOPE_ID)
             ?: createInitial(HallucinationFuseEntity.composeGlobalId(), "GLOBAL", HallucinationFuseEntity.GLOBAL_SCOPE_ID).also { upsertFuse(it) }
 
     private suspend fun loadOrCreateSession(sessionId: String): HallucinationFuseEntity =
-        v2Agent.getFuse("SESSION", sessionId)?.toEntity()
+        fusePort.get("SESSION", sessionId)
             ?: createInitial(HallucinationFuseEntity.composeSessionId(sessionId), "SESSION", sessionId).also { upsertFuse(it) }
 
     private suspend fun loadEntityById(id: String): HallucinationFuseEntity? =
-        v2Agent.listAllFuses().firstOrNull { it.id == id }?.toEntity()
+        fusePort.listAll().firstOrNull { it.id == id }
 
     private fun createInitial(id: String, scope: String, scopeId: String) = HallucinationFuseEntity(
         id = id,
@@ -253,33 +252,8 @@ class ZthCircuitBreakerManager @Inject constructor(
     // ── V2 写入 / 映射 ────────────────────────────────────────────────
 
     private suspend fun upsertFuse(e: HallucinationFuseEntity) {
-        v2Agent.upsertFuse(
-            id = e.id, scope = e.scope, scopeId = e.scopeId,
-            state = e.state, linkageVersion = e.linkageVersion,
-            failureCount = e.failureCount.toLong(),
-            openSinceMs = e.openSinceMs,
-            lastProbeAtMs = e.lastProbeAtMs,
-            killSwitch1Triggered = if (e.killSwitch1Triggered) 1L else 0L,
-            killSwitch2SoftDisabled = if (e.killSwitch2SoftDisabled) 1L else 0L,
-            lastTripSubclass = e.lastTripSubclass,
-            updatedAtMs = e.updatedAtMs
-        )
+        fusePort.upsert(e)
     }
-
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Zth_hallucination_fuses.toEntity() = HallucinationFuseEntity(
-        id = id,
-        scope = scope,
-        scopeId = scope_id,
-        state = state,
-        linkageVersion = linkage_version,
-        failureCount = failure_count.toInt(),
-        openSinceMs = open_since_ms,
-        lastProbeAtMs = last_probe_at_ms,
-        killSwitch1Triggered = kill_switch1_triggered != 0L,
-        killSwitch2SoftDisabled = kill_switch2_soft_disabled != 0L,
-        lastTripSubclass = last_trip_subclass,
-        updatedAtMs = updated_at_ms
-    )
 }
 
 /**

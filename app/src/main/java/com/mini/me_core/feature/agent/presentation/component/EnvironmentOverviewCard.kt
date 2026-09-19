@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.agent.presentation.component
 
+import com.mini.me_core.core.container.InstallPhaseType
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,8 +32,7 @@ import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.container.progress.InstallPhaseType
-import com.mini.me_core.feature.agent.domain.container.progress.InstallProgress
+import com.mini.me_core.core.container.InstallProgress
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.CheckCircle

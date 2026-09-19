@@ -92,7 +92,7 @@
     <string name="settings_norm_flow_step_inject">step 前注入</string>
     <string name="settings_norm_flow_step_inject_desc">每轮进入模型前的上下文注入纪律</string>
     <string name="settings_norm_flow_tool_guard">工具护栏</string>
-    <string name="settings_norm_flow_tool_guard_desc">工具执行护栏链与文件观察纪律</string>
+    <string name="settings_norm_flow_tool_guard_desc">文件观察纪律（命令安全/权限引擎始终生效，不受此开关关闭影响）</string>
     <string name="settings_norm_flow_reasoning_budget">推理预算</string>
     <string name="settings_norm_flow_reasoning_budget_desc">开启后透传每会话思考强度给模型，保持思维链连续</string>
     <string name="settings_norm_flow_usage_card">用量卡片</string>
@@ -1741,4 +1741,17 @@
     <string name="common_compaction_marker">已压缩历史上下文</string>
     <string name="common_attachment_fallback">附件</string>
     <string name="common_tool_call_fallback">工具调用</string>
-</resources>
+
+    <string name="ui_quick_packs">常用快捷包</string>
+    <string name="ui_custom_pkg_install">自定义包名安装</string>
+    <string name="ui_installed_custom_pkgs">已安装自定义包</string>
+    <string name="ui_no_custom_pkgs">暂无自定义包</string>
+    <string name="ui_custom_pkgs_count">共 %1$d 个</string>
+    <string name="ui_refresh">刷新</string>
+    <string name="ui_container_not_ready_query">容器未初始化，无法查询自定义包</string>
+    <string name="ui_custom_pkg_hint">可以从上面的快捷包一键安装，或自己输入 apk 包名。常用：htop / neofetch / tmux / fzf / rsync / lf / openssh</string>
+    <string name="ui_uninstall">卸载</string>
+    <string name="ui_installing">正在安装：%1$s</string>
+    <string name="ui_preparing">准备中…</string>
+    <string name="ui_install_failed">安装失败：%1$s</string>
+<string name="settings_storage">存储与数据库</string></resources>

@@ -284,7 +284,7 @@ fun AIChatPanel(
 
     val executionMode = settingsViewModel?.executionMode?.collectAsStateWithLifecycle()?.value
     val connectionState = settingsViewModel?.connectionState?.collectAsStateWithLifecycle()?.value
-    val isRemote = executionMode == com.mini.me_core.feature.settings.data.repository.ExecutionMode.REMOTE_SSH
+    val isRemote = executionMode?.name == "REMOTE_SSH"
 
     // 流式尾巴派生状态
     val reasoning = streamingReasoning

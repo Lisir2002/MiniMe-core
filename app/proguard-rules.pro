@@ -108,3 +108,6 @@
 # Android 运行时没有这些类；R8 fullMode 下缺失类会报错，该检测器在 Android 上无意义，忽略即可。
 -dontwarn java.lang.management.**
 -dontwarn io.ktor.util.debug.**
+
+# Tink 引用编译期-only 的 errorprone 注解，运行期不需要（R8 missing class 修复）
+-dontwarn com.google.errorprone.annotations.**

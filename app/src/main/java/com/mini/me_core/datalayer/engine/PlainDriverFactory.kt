@@ -5,10 +5,8 @@ import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import app.cash.sqldelight.db.SqlDriver
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import com.mini.mecore.datalayer.sqldelight.AgentDb
+import com.mini.mecore.datalayer.sqldelight.AuxDb
 import com.mini.mecore.datalayer.sqldelight.CredentialsDb
-import com.mini.mecore.datalayer.sqldelight.InfraDb
-import com.mini.mecore.datalayer.sqldelight.SettingsDb
-import com.mini.mecore.datalayer.sqldelight.T2iDb
 import com.mini.mecore.datalayer.sqldelight.WorkspaceDb
 
 /**
@@ -27,10 +25,8 @@ class PlainDriverFactory(
         return when (lib) {
             LibName.AGENT -> AndroidSqliteDriver(AgentDb.Schema, context, name, helperFactory)
             LibName.CREDENTIALS -> AndroidSqliteDriver(CredentialsDb.Schema, context, name, helperFactory)
-            LibName.SETTINGS -> AndroidSqliteDriver(SettingsDb.Schema, context, name, helperFactory)
             LibName.WORKSPACE -> AndroidSqliteDriver(WorkspaceDb.Schema, context, name, helperFactory)
-            LibName.T2I -> AndroidSqliteDriver(T2iDb.Schema, context, name, helperFactory)
-            LibName.INFRA -> AndroidSqliteDriver(InfraDb.Schema, context, name, helperFactory)
+            LibName.AUX -> AndroidSqliteDriver(AuxDb.Schema, context, name, helperFactory)
         }
     }
 }

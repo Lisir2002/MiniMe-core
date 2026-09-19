@@ -65,8 +65,9 @@ import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.util.LogLevel
 import com.mini.me_core.R
-import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
-import com.mini.me_core.feature.agent.domain.mcp.McpServerStatus
+import com.mini.me_core.feature.settings.domain.model.McpServerConfig
+import com.mini.me_core.feature.settings.domain.model.McpServerState
+import com.mini.me_core.feature.settings.domain.model.McpServerStatus
 import com.mini.me_core.feature.backup.presentation.BackupSection
 import com.mini.me_core.feature.settings.data.repository.AppThemeMode
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
@@ -116,6 +117,7 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     RemoteServers(R.string.settings_remote_servers),
     Backup(R.string.settings_backup),
     Security(R.string.settings_security),
+    Storage(R.string.settings_storage),
     RemoteAuditLogs(R.string.settings_remote_audit_logs),
     About(R.string.settings_about),
     DesignGallery(R.string.settings_design_gallery)
@@ -306,7 +308,7 @@ fun SettingsScreen(
                     compactionProviderName = providers.firstOrNull { it.id == compactionProviderId }?.name,
                     compactionModel = compactionModel,
                     mcpCount = mcpServers.size,
-                    mcpConnected = mcpStatuses.count { it.state == McpServerStatus.State.CONNECTED },
+                    mcpConnected = mcpStatuses.count { it.state == McpServerState.CONNECTED },
                     mcpServerRunning = mcpServerIsRunning,
                     logLevel = logLevel,
                     permissionRuleCount = projectRules.size + globalRules.size,
@@ -419,6 +421,8 @@ fun SettingsScreen(
                     sopSummaryEnabled = sopSummaryEnabled,
                     playbookAutoEnabled = playbookAutoEnabled,
                     idleConvergeEnabled = idleConvergeEnabled,
+                    stepInjectBudget = viewModel.stepInjectBudget.collectAsStateWithLifecycle().value,
+                    onSetStepInjectBudget = { viewModel.setStepInjectBudget(it) },
                     onToggleNormFlow = { viewModel.setNormFlowEnabled(it) },
                     onToggleStepInject = { viewModel.setStepInjectEnabled(it) },
                     onToggleToolGuard = { viewModel.setToolGuardEnabled(it) },
@@ -426,7 +430,9 @@ fun SettingsScreen(
                     onToggleUsageCard = { viewModel.setUsageCardEnabled(it) },
                     onToggleSopSummary = { viewModel.setSopSummaryEnabled(it) },
                     onTogglePlaybookAuto = { viewModel.setPlaybookAutoEnabled(it) },
-                    onToggleIdleConverge = { viewModel.setIdleConvergeEnabled(it) }
+                    onToggleIdleConverge = { viewModel.setIdleConvergeEnabled(it) },
+                    onExportJson = { viewModel.exportNormFlowJson() },
+                    onImportJson = { viewModel.importNormFlowJson(it) }
                 )
                 SettingsSection.Backup -> {
                     val backupViewModel: com.mini.me_core.feature.backup.presentation.BackupViewModel =
@@ -438,6 +444,10 @@ fun SettingsScreen(
                         androidx.hilt.navigation.compose.hiltViewModel()
                     SecuritySettingsScreen(viewModel = securityViewModel)
                 }
+                SettingsSection.Storage -> StorageSection(
+                    diagnostics = viewModel.storageDiagnostics.collectAsStateWithLifecycle().value,
+                    onRefresh = { viewModel.refreshStorageDiagnostics() },
+                )
                 SettingsSection.RemoteAuditLogs -> {
                     RemoteAuditLogsScreen(auditLogRepo = viewModel.auditLogRepository)
                 }
@@ -1120,6 +1130,29 @@ internal fun MenuRow(
                 imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+
+@androidx.compose.runtime.Composable
+private fun StorageSection(
+    diagnostics: List<com.mini.me_core.datalayer.engine.DbDiagnostic>,
+    onRefresh: () -> Unit,
+) {
+    androidx.compose.foundation.layout.Column(
+        modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(16.dp)
+    ) {
+        AppSectionHeader(text = "存储与数据库")
+        androidx.compose.material3.TextButton(onClick = onRefresh) { androidx.compose.material3.Text("刷新") }
+        diagnostics.forEach { d ->
+            androidx.compose.material3.Text(
+                text = d.fileName + "  加密=" + (if (d.encrypted) "是" else "否") + "  版本=" + d.userVersion + "  表=" + d.tableCount,
+                modifier = androidx.compose.ui.Modifier.padding(vertical = 4.dp)
+            )
+        }
+        if (diagnostics.isEmpty()) {
+            androidx.compose.material3.Text("暂无数据库文件", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

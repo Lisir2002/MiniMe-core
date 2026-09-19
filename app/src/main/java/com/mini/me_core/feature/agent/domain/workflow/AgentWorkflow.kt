@@ -96,6 +96,13 @@ sealed class AgentEvent {
         val turn: com.mini.me_core.feature.agent.domain.trajectory.TurnUsage,
         val session: com.mini.me_core.feature.agent.domain.trajectory.SessionUsage
     ) : AgentEvent()
+
+    /**
+     * E4 对话中切换规范流程提示：本轮 snapshot 与上一轮对比发现子开关/预算变化时推送。
+     * 与消息同日志（落库为 TOOL 角色系统提示行，对齐 GoalChanged/TurnUsage 渲染），
+     * 当前轮已 snapshot 不受影响，仅提示「规范流程已更新：…」。
+     */
+    data class NormFlowNotice(val text: String) : AgentEvent()
 }
 
 interface AgentWorkflow {

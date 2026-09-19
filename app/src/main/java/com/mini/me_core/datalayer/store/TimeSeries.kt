@@ -1,6 +1,6 @@
 package com.mini.me_core.datalayer.store
 
-import com.mini.mecore.datalayer.sqldelight.InfraDb
+import com.mini.mecore.datalayer.sqldelight.AuxDb
 
 /**
  * 一等 TimeSeries（设计 §6.5）：审计/用量/agent 轨迹时序。
@@ -14,7 +14,7 @@ data class TsEntry(
     val meta: String?,
 )
 
-class TimeSeries(private val db: InfraDb) {
+class TimeSeries(private val db: AuxDb) {
 
     private val q get() = db.tsQueries
 
@@ -37,6 +37,6 @@ class TimeSeries(private val db: InfraDb) {
         return q.countTsByType(type).executeAsOne().toInt()
     }
 
-    private fun com.mini.mecore.datalayer.sqldelight.infra.Ts_store.toEntry() =
+    private fun com.mini.mecore.datalayer.sqldelight.Ts_store.toEntry() =
         TsEntry(id, ts, type, payload_json, meta)
 }

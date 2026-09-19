@@ -1,8 +1,8 @@
 package com.mini.me_core.feature.agent.presentation.component
 
-import com.mini.me_core.feature.agent.presentation.component.richsegment.Inline
-import com.mini.me_core.feature.agent.presentation.component.richsegment.RichSegment
-import com.mini.me_core.feature.agent.presentation.component.richsegment.RichTextSegmenter
+import com.mini.me_core.ui.markdown.richsegment.Inline
+import com.mini.me_core.ui.markdown.richsegment.RichSegment
+import com.mini.me_core.ui.markdown.richsegment.RichTextSegmenter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue

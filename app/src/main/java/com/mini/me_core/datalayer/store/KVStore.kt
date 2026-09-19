@@ -1,7 +1,7 @@
 package com.mini.me_core.datalayer.store
 
 import app.cash.sqldelight.coroutines.asFlow
-import com.mini.mecore.datalayer.sqldelight.InfraDb
+import com.mini.mecore.datalayer.sqldelight.AuxDb
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -20,7 +20,7 @@ data class KvEntry(
     val updatedAt: Long,
 )
 
-class KVStore(private val db: InfraDb) {
+class KVStore(private val db: AuxDb) {
 
     private val queries get() = db.kvQueries
 
@@ -64,7 +64,7 @@ class KVStore(private val db: InfraDb) {
 
     private fun now() = System.currentTimeMillis()
 
-    private fun com.mini.mecore.datalayer.sqldelight.infra.Kv_store.toEntry() = KvEntry(
+    private fun com.mini.mecore.datalayer.sqldelight.Kv_store.toEntry() = KvEntry(
         namespace = namespace,
         key = key,
         type = type,

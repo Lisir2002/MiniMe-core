@@ -1,7 +1,5 @@
 package com.mini.me_core.feature.agent.domain.plan
 
-import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.mecore.datalayer.sqldelight.agent.Agent_plans as V2AgentPlan
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.data.local.entity.PlanEntity
 import com.mini.me_core.feature.agent.data.local.entity.PlanStatus
@@ -21,30 +19,21 @@ import javax.inject.Inject
  * 供 [plan 工具] 与 workflow（每轮 step 前注入 pendingSelection）共用。
  */
 class PlanService @Inject constructor(
-    private val v2Agent: V2AgentRepository,
+    private val planPort: PlanPort,
 ) {
 
     /** 读取会话最近一份计划；无则返回 null。 */
     suspend fun getLatest(sessionId: String): PlanEntity? =
-        v2Agent.getLatestPlanBySession(sessionId)?.toEntity()
+        planPort.getLatest(sessionId)
 
     /** 按 id 读取计划；无则返回 null。 */
     suspend fun getById(planId: String): PlanEntity? =
-        v2Agent.getPlanById(planId)?.toEntity()
+        planPort.getById(planId)
 
     /** 按 id 整行更新（供 plan 工具在非终态校验后落库）。目标不存在返回 null。 */
     suspend fun update(planId: String, plan: PlanEntity): PlanEntity? {
         if (getById(planId) == null) return null
-        v2Agent.upsertPlan(
-            planId = plan.planId,
-            sessionId = plan.sessionId,
-            title = plan.title,
-            steps = plan.steps,
-            status = plan.status,
-            pendingSelection = plan.pendingSelection,
-            createdAtMs = plan.createdAtMs,
-            updatedAtMs = plan.updatedAtMs
-        )
+        planPort.upsert(plan)
         return getById(planId)
     }
 
@@ -65,19 +54,16 @@ class PlanService @Inject constructor(
             createdAtMs = now,
             updatedAtMs = now
         )
-        v2Agent.runInTx { tx ->
-            tx.proposePlan(
-                sessionId = sessionId,
-                old = v2Agent.getLatestPlanBySessionBlocking(sessionId),
-                planId = entity.planId,
-                title = entity.title,
-                steps = entity.steps,
-                status = entity.status,
-                pendingSelection = entity.pendingSelection,
-                createdAtMs = entity.createdAtMs,
-                updatedAtMs = entity.updatedAtMs
-            )
-        }
+        planPort.propose(
+            sessionId = sessionId,
+            planId = entity.planId,
+            title = entity.title,
+            steps = entity.steps,
+            status = entity.status,
+            pendingSelection = entity.pendingSelection,
+            createdAtMs = entity.createdAtMs,
+            updatedAtMs = entity.updatedAtMs,
+        )
         FileLogger.d(TAG, "propose: session=$sessionId planId=${entity.planId} status=DRAFT")
         return entity
     }
@@ -85,12 +71,8 @@ class PlanService @Inject constructor(
     /** 更新待定选择（用户选中某方案后落库，供下轮注入）。 */
     suspend fun setPendingSelection(planId: String, pendingSelection: String): PlanEntity? {
         val existing = getById(planId) ?: return null
-        v2Agent.updatePlanContent(
-            planId = planId,
-            status = existing.status,
-            steps = existing.steps,
-            pendingSelection = pendingSelection,
-            updatedAtMs = System.currentTimeMillis()
+        planPort.updateContent(
+            planId, existing.status, existing.steps, pendingSelection, System.currentTimeMillis()
         )
         return getById(planId)
     }
@@ -99,12 +81,8 @@ class PlanService @Inject constructor(
     suspend fun setStatus(planId: String, status: PlanStatus): PlanEntity? {
         val existing = getById(planId) ?: return null
         val nextPending = if (status == PlanStatus.APPROVED) "" else existing.pendingSelection
-        v2Agent.updatePlanContent(
-            planId = planId,
-            status = status.name,
-            steps = existing.steps,
-            pendingSelection = nextPending,
-            updatedAtMs = System.currentTimeMillis()
+        planPort.updateContent(
+            planId, status.name, existing.steps, nextPending, System.currentTimeMillis()
         )
         return getById(planId)
     }
@@ -115,18 +93,6 @@ class PlanService @Inject constructor(
     /** 放弃计划（置 ABANDONED）。 */
     suspend fun abandon(planId: String): PlanEntity? = setStatus(planId, PlanStatus.ABANDONED)
 
-    // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
-
-    private fun V2AgentPlan.toEntity() = PlanEntity(
-        planId = plan_id,
-        sessionId = session_id,
-        title = title,
-        steps = steps,
-        status = status,
-        pendingSelection = pending_selection,
-        createdAtMs = created_at_ms,
-        updatedAtMs = updated_at_ms
-    )
 
     private companion object {
         const val TAG = "PlanService"

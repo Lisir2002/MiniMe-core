@@ -12,7 +12,7 @@ import com.mini.me_core.feature.agent.domain.tool.ToolCapability
 import com.mini.me_core.feature.agent.domain.tool.ToolParameter
 import com.mini.me_core.feature.agent.domain.tool.ToolPermissionPolicy
 import com.mini.me_core.feature.agent.domain.tool.ToolResult
-import com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository
+import com.mini.me_core.feature.agent.domain.normflow.NormFlowSettingsPort
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -67,7 +67,7 @@ internal fun stageJson(view: PlaybookStageView, message: String = ""): JsonObjec
  */
 class PlaybookStartTool @Inject constructor(
     private val playbookExecutor: PlaybookExecutor,
-    private val normFlowSettingsRepository: NormFlowSettingsRepository
+    private val normFlowSettingsRepository: NormFlowSettingsPort
 ) : AbstractContextualTool() {
 
     private companion object {

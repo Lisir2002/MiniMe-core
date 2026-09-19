@@ -1,6 +1,6 @@
 package com.mini.me_core.feature.agent.domain.container
 
-import com.mini.me_core.feature.settings.data.repository.ExecutionMode
+import com.mini.me_core.feature.agent.domain.container.AgentExecutionMode
 import kotlinx.serialization.Serializable
 
 /**
@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  * 用户自定义 profile 通过导入 tar.gz 提供 rootfs，只保证能起 shell 跑命令——不 provision、
  * 不接管镜像源与包管理，所需工具由用户自行在容器内安装。
  *
- * 远程 SSH profile（[mode] == [ExecutionMode.REMOTE_SSH]）不导入本地 rootfs，而是绑定一个
+ * 远程 SSH profile（[mode] == [AgentExecutionMode.REMOTE_SSH]）不导入本地 rootfs，而是绑定一个
  * 工作区已配置的 SSH 通道（[RootfsSource.RemoteSsh]），命令执行走 [RemoteSshEngine]。
  */
 /**
@@ -36,7 +36,7 @@ data class ContainerProfile(
     val extraArgs: List<String> = emptyList(),
     val isBuiltin: Boolean,
     /** 该 profile 的执行模式：本地 PRoot 容器 or 远程 SSH。选中时据此切全局 [ExecutionMode]。 */
-    val mode: ExecutionMode = ExecutionMode.LOCAL_PROOT,
+    val mode: AgentExecutionMode = AgentExecutionMode.LOCAL_PROOT,
     /** rootfs 架构。默认 [ContainerArch.ARM64]，兼容旧版反序列化（无此字段的存量 JSON 自动取默认）。 */
     val arch: ContainerArch = ContainerArch.ARM64
 ) {

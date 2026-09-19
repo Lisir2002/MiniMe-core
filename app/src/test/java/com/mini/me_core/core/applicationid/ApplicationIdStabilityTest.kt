@@ -23,9 +23,13 @@ class ApplicationIdStabilityTest {
 
     private val legacyPackages = setOf("com.aicodeeditor", "com.deep.rcode", "com.R.codecore")
 
+    // debug 变体带 .debug 后缀（com.mini.me_core.debug），release 恒为 com.mini.me_core。
+    // 去掉后缀后，本守卫在 debug/testDebugUnitTest 与 release/testReleaseUnitTest 下语义一致。
+    private val stableAppId: String = BuildConfig.APPLICATION_ID.removeSuffix(".debug")
+
     @Test
     fun `release_applicationId_恒为_com_mini_me_core`() {
-        assertEquals("com.mini.me_core", BuildConfig.APPLICATION_ID)
+        assertEquals("com.mini.me_core", stableAppId)
     }
 
     @Test
@@ -39,6 +43,6 @@ class ApplicationIdStabilityTest {
     @Test
     fun `release_applicationId_不应再引入新包名`() {
         // rc11 品牌迭代之后 applicationId 锁定；未来 rebrand 必须走「迁移对登记 + 数据保全评估」流程
-        assertEquals("com.mini.me_core", BuildConfig.APPLICATION_ID)
+        assertEquals("com.mini.me_core", stableAppId)
     }
 }

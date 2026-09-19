@@ -2,7 +2,6 @@ package com.mini.me_core.feature.agent.domain.tool.file
 
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.core.util.LineDiff
-import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.me_core.feature.agent.data.local.entity.FileEditHunkEntity
 import com.mini.me_core.feature.agent.domain.model.AgentContext
 import com.mini.me_core.feature.agent.domain.tool.AgentTool
@@ -33,7 +32,7 @@ private const val HUNK_SNAPSHOT_MAX_CHARS = 50_000
 
 class ReadFileTool @Inject constructor(
     private val fileAccess: FileAccessProvider,
-    private val v2Agent: V2AgentRepository,
+    private val fileEditHunkPort: com.mini.me_core.feature.agent.domain.tool.FileEditHunkPort,
 ) : AgentTool() {
     override val name = "readFile"
     override val description = "读取指定路径的文件内容。支持工作区文件或容器绝对路径的系统文件。单次读取受文件大小限制，超大文件可通过 start_line 分段读取。"
@@ -166,12 +165,7 @@ class ReadFileTool @Inject constructor(
                 newContent = newContent.take(HUNK_SNAPSHOT_MAX_CHARS),
                 createdAtMs = System.currentTimeMillis()
             )
-            v2Agent.insertFileEditHunk(
-                id = entity.id, sessionId = entity.sessionId, filePath = entity.filePath,
-                operation = entity.operation, hunk = entity.hunk,
-                oldContent = entity.oldContent, newContent = entity.newContent,
-                createdAtMs = entity.createdAtMs
-            )
+            fileEditHunkPort.insert(entity)
         } catch (e: Exception) {
             FileLogger.w(TAG, "记录文件 hunk 失败: $path", e)
         }
@@ -195,7 +189,7 @@ class ReadFileTool @Inject constructor(
  */
 class WriteFileTool @Inject constructor(
     private val fileAccess: FileAccessProvider,
-    private val v2Agent: V2AgentRepository,
+    private val fileEditHunkPort: com.mini.me_core.feature.agent.domain.tool.FileEditHunkPort,
 ) : AgentTool() {
     override val name = "writeFile"
     override val description = "向指定路径写入完整文件内容。若文件存在则根据 overwrite 决定是否覆盖。支持写入工作区文件或容器系统文件。局部修改推荐使用 editFile。"
@@ -294,12 +288,7 @@ class WriteFileTool @Inject constructor(
                         newContent = content.take(HUNK_SNAPSHOT_MAX_CHARS),
                         createdAtMs = System.currentTimeMillis()
                     )
-                    v2Agent.insertFileEditHunk(
-                            id = hunkEntity.id, sessionId = hunkEntity.sessionId, filePath = hunkEntity.filePath,
-                            operation = hunkEntity.operation, hunk = hunkEntity.hunk,
-                            oldContent = hunkEntity.oldContent, newContent = hunkEntity.newContent,
-                            createdAtMs = hunkEntity.createdAtMs
-                        )
+                    fileEditHunkPort.insert(hunkEntity)
                     } catch (e: Exception) {
                     FileLogger.w(TAG, "记录文件 hunk 失败: $path", e)
                 }

@@ -2,8 +2,8 @@ package com.mini.me_core.feature.settings.data.repository
 
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.store.KVStore
-import com.mini.me_core.feature.agent.domain.zth.ZthPerformanceClass
-import com.mini.me_core.feature.agent.domain.zth.ZthPresetTier
+import com.mini.me_core.feature.settings.domain.model.ZthPerformanceClass
+import com.mini.me_core.feature.settings.domain.model.ZthPresetTier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map

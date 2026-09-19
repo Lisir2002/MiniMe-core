@@ -129,7 +129,7 @@ class AIProviderRepositoryV2Impl @Inject constructor(
             .getOrDefault("")
     }
 
-    private suspend fun com.mini.mecore.datalayer.sqldelight.settings.Ai_providers.toDomainModel(): AIProviderConfig {
+    private suspend fun com.mini.mecore.datalayer.sqldelight.Ai_providers.toDomainModel(): AIProviderConfig {
         val modelList = models.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
         return AIProviderConfig(
             id = id,

@@ -548,8 +548,10 @@ class BrowserAgentTool @Inject constructor(
                     note = "用户未提供 $host 的登录凭据。请提示用户在浏览器页手动登录，或重新调用 login 让用户输入。"
                 )
             }
-            credentialStore.save(host, answer.username, answer.password)
-            cred = BrowserCredential(host = host, username = answer.username, password = answer.password)
+            val username = answer.username!!
+            val password = answer.password!!
+            credentialStore.save(host, username, password)
+            cred = BrowserCredential(host = host, username = username, password = password)
         }
 
         // 定位用户名/密码框并代填 + 提交

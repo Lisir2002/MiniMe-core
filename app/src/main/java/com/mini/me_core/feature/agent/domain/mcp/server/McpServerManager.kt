@@ -2,7 +2,7 @@ package com.mini.me_core.feature.agent.domain.mcp.server
 
 import android.content.Context
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.datalayer.store.KVStore
+import com.mini.me_core.feature.agent.domain.mcp.server.KvPort
 import com.mini.me_core.feature.agent.domain.tool.ToolPermissionManager
 import com.mini.me_core.feature.agent.domain.tool.ToolRegistry
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -33,7 +33,7 @@ class McpServerManager @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val toolRegistry: ToolRegistry,
     private val permissionManager: ToolPermissionManager,
-    private val kv: KVStore,
+    private val kv: KvPort,
 ) {
     private companion object {
         const val TAG = "McpServerManager"

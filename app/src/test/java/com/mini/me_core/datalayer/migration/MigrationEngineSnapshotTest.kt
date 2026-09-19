@@ -42,13 +42,13 @@ class MigrationEngineSnapshotTest {
     @Test
     fun `snapshot copies main db with wal and shm sidecars`() {
         val (engine, p) = engine()
-        val main = p.mainDb(LibName.SETTINGS).apply { writeText("GOOD") }
+        val main = p.mainDb(LibName.AUX).apply { writeText("GOOD") }
         main.resolveSibling("${main.name}-wal").writeText("WAL")
         main.resolveSibling("${main.name}-shm").writeText("SHM")
 
-        engine.snapshot(LibName.SETTINGS, heavy = false)
+        engine.snapshot(LibName.AUX, heavy = false)
 
-        val bak = p.snapshotFile(LibName.SETTINGS)
+        val bak = p.snapshotFile(LibName.AUX)
         assertEquals("GOOD", bak.readText())
         assertEquals("WAL", bak.resolveSibling("${bak.name}-wal").readText())
         assertEquals("SHM", bak.resolveSibling("${bak.name}-shm").readText())
@@ -57,26 +57,26 @@ class MigrationEngineSnapshotTest {
     @Test
     fun `restoreSnapshot restores main from snapshot and keeps snapshot intact`() {
         val (engine, p) = engine()
-        val main = p.mainDb(LibName.SETTINGS).apply { writeText("GOOD") }
+        val main = p.mainDb(LibName.AUX).apply { writeText("GOOD") }
         val wal = main.resolveSibling("${main.name}-wal").apply { writeText("WAL-GOOD") }
 
-        engine.snapshot(LibName.SETTINGS, heavy = false)
+        engine.snapshot(LibName.AUX, heavy = false)
 
         // 模拟迁移中途失败：主库与 -wal 已被写坏
         main.writeText("CORRUPTED")
         wal.writeText("WAL-BAD")
 
-        assertTrue(engine.restoreSnapshot(LibName.SETTINGS))
+        assertTrue(engine.restoreSnapshot(LibName.AUX))
 
         assertEquals("主库应回滚为快照内容", "GOOD", main.readText())
         assertEquals("wal 应回滚", "WAL-GOOD", wal.readText())
 
-        val bak = p.snapshotFile(LibName.SETTINGS)
+        val bak = p.snapshotFile(LibName.AUX)
         assertEquals("回滚绝不允许破坏快照", "GOOD", bak.readText())
 
         // 快照仍在 → 可重复回滚
         main.writeText("CORRUPTED-AGAIN")
-        assertTrue(engine.restoreSnapshot(LibName.SETTINGS))
+        assertTrue(engine.restoreSnapshot(LibName.AUX))
         assertEquals("GOOD", main.readText())
     }
 
@@ -92,14 +92,14 @@ class MigrationEngineSnapshotTest {
     @Test
     fun `restoreSnapshot drops stale wal when snapshot has no wal`() {
         val (engine, p) = engine()
-        val main = p.mainDb(LibName.T2I).apply { writeText("GOOD") }
+        val main = p.mainDb(LibName.AUX).apply { writeText("GOOD") }
         // 快照时没有 wal，回滚后主库却残留旧 wal —— 属于与新主库不一致的陈旧文件，必须清掉
 
-        engine.snapshot(LibName.T2I, heavy = false)
+        engine.snapshot(LibName.AUX, heavy = false)
         main.writeText("CORRUPTED")
         main.resolveSibling("${main.name}-wal").writeText("STALE-WAL")
 
-        assertTrue(engine.restoreSnapshot(LibName.T2I))
+        assertTrue(engine.restoreSnapshot(LibName.AUX))
         assertEquals("GOOD", main.readText())
         assertFalse("陈旧 wal 应被清除", main.resolveSibling("${main.name}-wal").exists())
     }
@@ -108,12 +108,12 @@ class MigrationEngineSnapshotTest {
     fun `snapshot then restore round trip is byte-identical`() {
         val (engine, p) = engine()
         val payload = ByteArray(4096) { (it % 251).toByte() }
-        p.mainDb(LibName.INFRA).writeBytes(payload)
+        p.mainDb(LibName.AUX).writeBytes(payload)
 
-        engine.snapshot(LibName.INFRA, heavy = false)
-        p.mainDb(LibName.INFRA).writeBytes(ByteArray(16))
+        engine.snapshot(LibName.AUX, heavy = false)
+        p.mainDb(LibName.AUX).writeBytes(ByteArray(16))
 
-        assertTrue(engine.restoreSnapshot(LibName.INFRA))
-        assertArrayEquals(payload, p.mainDb(LibName.INFRA).readBytes())
+        assertTrue(engine.restoreSnapshot(LibName.AUX))
+        assertArrayEquals(payload, p.mainDb(LibName.AUX).readBytes())
     }
 }

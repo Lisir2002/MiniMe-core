@@ -6,7 +6,7 @@ plugins {
     kotlin("android")
 
     kotlin("plugin.compose")
-    kotlin("plugin.serialization") version "2.2.21"
+    alias(libs.plugins.kotlin.serialization)
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
     id("app.cash.sqldelight")
@@ -343,7 +343,7 @@ val ALLOWED_APPLICATION_IDS = setOf("com.mini.me_core", "com.mini.me_core.debug"
 
 dependencies {
     // Compose BOM
-    val composeBom = platform("androidx.compose:compose-bom:2025.12.01")
+    val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
@@ -360,12 +360,18 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.9.0")
 
     // Hilt 依赖注入
-    implementation("com.google.dagger:hilt-android:2.56.1")
-    ksp("com.google.dagger:hilt-compiler:2.56.1")
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
 
     
+    // ── 数据层全盘加密（SQLCipher，设计 §8 / §12.2）──
+    // SQLCipher SupportFactory（实现 SupportSQLiteOpenHelper.Factory），与 androidx-sqlite 桥接。
+    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
+    // EncryptedSharedPreferences：DB 主密钥的 Keystore 包装存储。
+    implementation("androidx.security:security-crypto:1.1.0-alpha07")
+
     // 网络请求
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
@@ -376,11 +382,11 @@ dependencies {
     implementation("org.jsoup:jsoup:1.18.1")
 
     // 协程
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.core)
 
     // Kotlin 序列化
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+    implementation(libs.kotlinx.serialization.json)
 
     // 内置 MCP 服务器（Streamable HTTP）：Ktor CIO 起 HTTP 监听 + SSE，供外部 MCP 客户端连入。
     // 与项目协程/序列化栈同源（见 docs/plan-docs/builtin-mcp-server-design.md 决策记录）。
@@ -413,6 +419,21 @@ dependencies {
     // 新版设计系统库：设置页「UI 组件样板」入口展示 DesignGallery（独立主题，含高级分子组件族与槽位模型）
     implementation(project(":newui"))
 
+    // ── 增量重构抽出的 core 模块 ──
+    // 纯 Kotlin 共享层（领域模型 / 日志 facade / 审计常量）。
+    implementation(project(":core:model"))
+    // 凭据加密模块（CredentialEncryptor 等）。
+    implementation(project(":core:security"))
+    // 工作流内核（LoopGuard + settings 反向端口）。
+    implementation(project(":core:agent-workflow"))
+    // 容器生命周期进度解析 + 端口。
+    implementation(project(":core:container"))
+    // 数据层（SQLDelight 多库 + SQLCipher）下沉落点。
+    implementation(project(":core:database"))
+    // Feature 层（端口由 :app 装配）。
+    implementation(project(":feature:browser"))
+    implementation(project(":feature:agent"))
+
     // Material Icons
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material:material-icons-extended")
@@ -435,9 +456,9 @@ dependencies {
 
     // ── 新数据层（data-layer-redesign）─ SQLDelight（设计文档 §2/§12）──
     // Android 驱动（AndroidSqliteDriver，L0 引擎，可插拔加密 factory 的明文实现）
-    implementation("app.cash.sqldelight:android-driver:2.2.1")
+    implementation(libs.sqldelight.android.driver)
     // 响应式查询（KVStore.observe 等 asFlow 扩展）
-    implementation("app.cash.sqldelight:coroutines-extensions:2.2.1")
+    implementation(libs.sqldelight.coroutines.extensions)
     // JVM 驱动（迁移黄金测试 / 数据保护测试用 NativeSqliteDriver，设计 §5.5）
     testImplementation("app.cash.sqldelight:sqlite-driver:2.2.1")
     // androidx-sqlite 桥接（PlainDriverFactory 的 FrameworkSQLiteOpenHelperFactory）
@@ -468,24 +489,16 @@ sqldelight {
             srcDirs("src/main/sqldelight/credentials")
             dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
         }
-        create("SettingsDb") {
+        create("AuxDb") {
+            // 合并库：原 settings / t2i / infra 三库的全部 .sq 并入同一 srcDir、统一版本链。
+            // 运行时仅一个物理文件；旧三库首升经 ATTACH 拷入后删除（见 AuxDbMigration）。
             packageName.set("com.mini.mecore.datalayer.sqldelight")
-            srcDirs("src/main/sqldelight/settings")
+            srcDirs("src/main/sqldelight/aux")
             dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
         }
         create("WorkspaceDb") {
             packageName.set("com.mini.mecore.datalayer.sqldelight")
             srcDirs("src/main/sqldelight/workspace")
-            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
-        }
-        create("T2iDb") {
-            packageName.set("com.mini.mecore.datalayer.sqldelight")
-            srcDirs("src/main/sqldelight/t2i")
-            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
-        }
-        create("InfraDb") {
-            packageName.set("com.mini.mecore.datalayer.sqldelight")
-            srcDirs("src/main/sqldelight/infra")
             dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
         }
     }

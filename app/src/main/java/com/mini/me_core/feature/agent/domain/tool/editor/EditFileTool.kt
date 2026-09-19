@@ -11,7 +11,6 @@ import com.mini.me_core.feature.agent.domain.tool.ToolPermissionPolicy
 import com.mini.me_core.feature.agent.domain.tool.ToolResult
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.core.util.LineDiff
-import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.me_core.feature.agent.data.local.entity.FileEditHunkEntity
 import com.mini.me_core.feature.agent.domain.model.AgentContext
 import com.mini.me_core.feature.workspace.domain.FileAccessProvider
@@ -55,7 +54,7 @@ private const val MAX_LCS_CELLS = 4_000_000L
  */
 class EditFileTool @Inject constructor(
     private val fileAccess: FileAccessProvider,
-    private val v2Agent: V2AgentRepository,
+    private val fileEditHunkPort: com.mini.me_core.feature.agent.domain.tool.FileEditHunkPort,
 ) : AgentTool() {
     override val name = "editFile"
     override val description =
@@ -229,16 +228,7 @@ class EditFileTool @Inject constructor(
                         newContent = content.take(HUNK_SNAPSHOT_MAX_CHARS),
                         createdAtMs = System.currentTimeMillis()
                     )
-                    v2Agent.insertFileEditHunk(
-                            id = hunkEntity.id,
-                            sessionId = hunkEntity.sessionId,
-                            filePath = hunkEntity.filePath,
-                            operation = hunkEntity.operation,
-                            hunk = hunkEntity.hunk,
-                            oldContent = hunkEntity.oldContent,
-                            newContent = hunkEntity.newContent,
-                            createdAtMs = hunkEntity.createdAtMs
-                        )
+                    fileEditHunkPort.insert(hunkEntity)
                     } catch (e: Exception) {
                     FileLogger.w(TAG, "记录文件 hunk 失败: $path", e)
                 }

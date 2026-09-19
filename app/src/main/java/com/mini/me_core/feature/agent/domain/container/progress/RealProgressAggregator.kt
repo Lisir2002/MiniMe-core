@@ -4,6 +4,8 @@ import android.app.ActivityManager
 import android.content.Context
 import android.net.TrafficStats
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.core.container.ApkStdoutParser
+import com.mini.me_core.core.container.InstallPhaseType
 import com.mini.me_core.feature.agent.domain.container.GlobalInstallArchiveStore
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId
 import dagger.hilt.android.qualifiers.ApplicationContext

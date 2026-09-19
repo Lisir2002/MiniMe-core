@@ -99,7 +99,6 @@ import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.agent.data.local.dao.ChatSessionWithCount
 import com.mini.me_core.feature.agent.domain.model.ChatSession
 import com.mini.me_core.feature.agent.presentation.AgentUIState
-import com.mini.me_core.feature.settings.data.repository.AppThemeMode
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R

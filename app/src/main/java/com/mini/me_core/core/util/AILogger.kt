@@ -1,11 +1,7 @@
 package com.mini.me_core.core.util
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Environment
 import android.util.Log
-import androidx.core.content.ContextCompat
 import com.google.gson.GsonBuilder
 import java.io.File
 
@@ -37,9 +33,8 @@ object AILogger {
     private const val MAX_AGE_DAYS = 7
     private const val MAX_FILE_BYTES = 20 * 1024 * 1024 // 单会话文件上限 20MB（每轮重发完整历史，增长快）
 
-    // 公共外部存储目录（卸载后仍保留）：/storage/emulated/0/Documents/MiniMe-core/ai-logs
-    private const val PUBLIC_ROOT_DIR = "MiniMe-core"
-    private const val PUBLIC_LOG_SUBDIR = "ai-logs"
+    // 日志子目录名：公共外部存储 Documents/MiniMe-core/ai-logs 与私有兜底 ai-logs 共用（解析见 LogDirectoryResolver）
+    private const val LOG_SUBDIR = "ai-logs"
 
     private val ioExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "ai-logger").apply { isDaemon = true }
@@ -58,7 +53,7 @@ object AILogger {
     /** 初始化日志目录。重复调用安全。 */
     fun init(context: Context) {
         if (logDir != null) return
-        val dir = resolveLogDir(context)
+        val dir = LogDirectoryResolver.resolveLogDir(context, LOG_SUBDIR)
         logDir = dir
         ioExecutor.execute { cleanupOldLogs(dir) }
         FileLogger.i(TAG, "AILogger 初始化完成，AI 会话日志目录: ${dir.absolutePath}")
@@ -69,35 +64,11 @@ object AILogger {
      * [init] 通常发生在 Application.onCreate（早于权限授予），因此需要在此处重新解析目录。
      */
     fun onExternalStorageGranted(context: Context) {
-        val newDir = resolveLogDir(context)
-        val current = logDir
-        if (current == null || newDir.absolutePath != current.absolutePath) {
-            logDir = newDir
-            ioExecutor.execute { cleanupOldLogs(newDir) }
-            FileLogger.i(TAG, "外部存储权限已授予，AI 会话日志目录切换为: ${newDir.absolutePath}")
-        }
+        val newDir = LogDirectoryResolver.resolveAfterPermissionGrant(context, LOG_SUBDIR, logDir) ?: return
+        logDir = newDir
+        ioExecutor.execute { cleanupOldLogs(newDir) }
+        FileLogger.i(TAG, "外部存储权限已授予，AI 会话日志目录切换为: ${newDir.absolutePath}")
     }
-
-    /**
-     * 解析日志目录：优先公共外部存储 `Documents/MiniMe-core/ai-logs`（卸载后保留，需 WRITE_EXTERNAL_STORAGE
-     * 权限，targetSdk=28 下可写）；权限未授予时回退外部私有目录，再回退内部存储。
-     */
-    @Suppress("DEPRECATION") // targetSdk=28 下 getExternalStoragePublicDirectory 仍可用且不受分区存储限制
-    private fun resolveLogDir(context: Context): File {
-        if (hasExternalStorageWrite(context)) {
-            val base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val dir = File(File(base, PUBLIC_ROOT_DIR), PUBLIC_LOG_SUBDIR)
-            if (dir.exists() || dir.mkdirs()) return dir
-        }
-        // 回退：外部私有目录（卸载时清除，但无需权限）；再回退内部存储。
-        val base = context.getExternalFilesDir(null) ?: context.filesDir
-        return File(base, "ai-logs").apply { mkdirs() }
-    }
-
-    private fun hasExternalStorageWrite(context: Context): Boolean =
-        Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
-            PackageManager.PERMISSION_GRANTED
 
     /**
      * 记录一次请求的 URL 与请求体，并把本会话计数 +1（作为本次交互的序号）。
@@ -173,6 +144,8 @@ object AILogger {
                 val data = match.groupValues[2]
                 "\"$key\": \"[base64 omitted: ${data.length} chars]\""
             }
+            // (a) 大图/base64 剥离后再过统一脱敏管线（URL 密码/Authorization/API key/SSH key）。
+            .let { RedactionPipeline.redact(it) }
     }
 
     private fun write(sessionId: String?, text: String) {
@@ -182,8 +155,14 @@ object AILogger {
             runCatching {
                 val file = File(dir, "session-$safeId.log")
                 if (file.length() > MAX_FILE_BYTES) {
-                    // 超上限则截断重开，避免单文件无限增长。
-                    file.writeText("--- AI 会话日志超过 ${MAX_FILE_BYTES / 1024 / 1024}MB 已重置 ---\n")
+                    // (b) 轮转：.1/.2/.3 保留 3 个轮转，再新建空文件，不再清空。
+                    for (i in 2 downTo 1) {
+                        val src = File(dir, "session-$safeId.$i.log")
+                        val dst = File(dir, "session-$safeId.${i + 1}.log")
+                        if (dst.exists()) dst.delete()
+                        if (src.exists()) src.renameTo(dst)
+                    }
+                    file.renameTo(File(dir, "session-$safeId.1.log"))
                 }
                 file.appendText(text)
             }.onFailure { Log.e(TAG, "写入 AI 会话日志失败", it) }

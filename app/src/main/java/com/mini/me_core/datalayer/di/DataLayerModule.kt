@@ -5,10 +5,13 @@ import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.engine.AndroidDatabasePathProvider
 import com.mini.me_core.datalayer.engine.AndroidVersionProbe
 import com.mini.me_core.datalayer.engine.ConnectionPool
+import com.mini.me_core.datalayer.engine.CipherDriverFactory
 import com.mini.me_core.datalayer.engine.DatabaseDriverFactory
 import com.mini.me_core.datalayer.engine.DatabasePathProvider
 import com.mini.me_core.datalayer.engine.LibName
 import com.mini.me_core.datalayer.engine.PlainDriverFactory
+import com.mini.me_core.datalayer.engine.SqlCipherKeyManager
+import com.mini.me_core.datalayer.migration.DatabaseHealthGuard
 import com.mini.me_core.datalayer.migration.MigrationEngine
 import com.mini.me_core.datalayer.migration.SchemaSelfHealer
 import com.mini.me_core.datalayer.repository.AgentRepository
@@ -18,9 +21,7 @@ import com.mini.me_core.datalayer.repository.T2iRepository
 import com.mini.me_core.datalayer.repository.WorkspaceRepository
 import com.mini.mecore.datalayer.sqldelight.AgentDb
 import com.mini.mecore.datalayer.sqldelight.CredentialsDb
-import com.mini.mecore.datalayer.sqldelight.InfraDb
-import com.mini.mecore.datalayer.sqldelight.SettingsDb
-import com.mini.mecore.datalayer.sqldelight.T2iDb
+import com.mini.mecore.datalayer.sqldelight.AuxDb
 import com.mini.mecore.datalayer.sqldelight.WorkspaceDb
 import com.mini.me_core.datalayer.store.BlobStore
 import com.mini.me_core.datalayer.store.DocumentStore
@@ -64,10 +65,19 @@ object DataLayerModule {
 
     @Provides
     @Singleton
+    fun provideSqlCipherKeyManager(@ApplicationContext context: Context): SqlCipherKeyManager =
+        SqlCipherKeyManager(context)
+
+    @Provides
+    @Singleton
     fun provideDriverFactory(
         @ApplicationContext context: Context,
         pathProvider: DatabasePathProvider,
-    ): DatabaseDriverFactory = PlainDriverFactory(context, pathProvider)
+        keyManager: SqlCipherKeyManager,
+    ): DatabaseDriverFactory =
+        // 全盘加密接线（设计 §8 / §12.2）：由 PlainDriverFactory 切换为 CipherDriverFactory。
+        // 明文库 → 加密库的事务化迁移由 SqlCipherMigration 在 preOpen 阶段完成（快照/校验/回退）。
+        CipherDriverFactory(context, pathProvider, keyManager)
 
     /**
      * Schema 映射表：6 个库 → 各自的 SQLDelight Schema。
@@ -78,10 +88,8 @@ object DataLayerModule {
     private val SCHEMA_MAP = mapOf(
         LibName.AGENT to AgentDb.Schema,
         LibName.CREDENTIALS to CredentialsDb.Schema,
-        LibName.SETTINGS to SettingsDb.Schema,
         LibName.WORKSPACE to WorkspaceDb.Schema,
-        LibName.T2I to T2iDb.Schema,
-        LibName.INFRA to InfraDb.Schema,
+        LibName.AUX to AuxDb.Schema,
     )
 
     @Provides
@@ -123,22 +131,19 @@ object DataLayerModule {
                 FileLogger.e(TAG, "ensureSchema($lib) 失败（忽略，下次打开重试）", it)
             }
 
-            // 对 AGENT 库额外跑 SchemaSelfHealer 自愈 + 保证性复核：
-            // 历史设备可能因 MigrationEngine.ensureSchema 的「版本相等 no-op」分支
-            // 遇到 user_version 已对齐但 agent_message/agent_session 表缺关键列的旧表。
-            // 自愈幂等（结构完好则跳过），只在首次打开时跑一次。
+            // ARC-07：对全部 4 个库跑 PRAGMA quick_check；失败计数 + 泛化自愈，
+            // 连续 N 次失败自动 restoreSnapshot（不再 runCatching 静默忽略）。
+            runCatching { DatabaseHealthGuard.onOpened(lib, driver, engine) }
+                .onFailure { FileLogger.e(TAG, "$lib 健康守卫异常", it) }
+
+            // AGENT 库额外做关键列硬保证（agent_message.id / agent_session.id）。
             if (lib == LibName.AGENT) {
-                FileLogger.i(TAG, "开始 AGENT 库结构自愈（agent_session + agent_message）")
+                FileLogger.i(TAG, "开始 AGENT 库关键列硬保证")
                 runCatching {
-                    SchemaSelfHealer.healAgentSession(driver)
-                    SchemaSelfHealer.healAgentMessage(driver)
                     SchemaSelfHealer.ensureAgentMessageUsable(driver)
                     SchemaSelfHealer.ensureAgentSessionUsable(driver)
-                    FileLogger.i(TAG, "AGENT 库结构自愈完成，agent_message.id 列已确认存在")
                 }.onFailure {
-                    // 自愈失败是 FATAL：AGENT 库若 agent_message 缺 id，任何消息查询都会崩。
-                    // 让异常向上冒泡，进程以明确的错误崩溃（不再落回 confusing 的 no such column）。
-                    FileLogger.e(TAG, "AGENT 库结构自愈失败（FATAL，进程将崩溃）", it)
+                    FileLogger.e(TAG, "AGENT 库关键列硬保证失败（FATAL）", it)
                     throw it
                 }
             }
@@ -180,10 +185,10 @@ object DataLayerModule {
 
     @Provides
     @Singleton
-    fun provideSettingsDb(pool: ConnectionPool, engine: MigrationEngine): SettingsDb {
-        val driver = pool.driver(LibName.SETTINGS)
-        engine.ensureSchema(LibName.SETTINGS, driver, SettingsDb.Schema)
-        return SettingsDb(driver)
+    fun provideAuxDb(pool: ConnectionPool, engine: MigrationEngine): AuxDb {
+        val driver = pool.driver(LibName.AUX)
+        engine.ensureSchema(LibName.AUX, driver, AuxDb.Schema)
+        return AuxDb(driver)
     }
 
     @Provides
@@ -194,44 +199,28 @@ object DataLayerModule {
         return WorkspaceDb(driver)
     }
 
-    @Provides
-    @Singleton
-    fun provideT2iDb(pool: ConnectionPool, engine: MigrationEngine): T2iDb {
-        val driver = pool.driver(LibName.T2I)
-        engine.ensureSchema(LibName.T2I, driver, T2iDb.Schema)
-        return T2iDb(driver)
-    }
-
-    @Provides
-    @Singleton
-    fun provideInfraDb(pool: ConnectionPool, engine: MigrationEngine): InfraDb {
-        val driver = pool.driver(LibName.INFRA)
-        engine.ensureSchema(LibName.INFRA, driver, InfraDb.Schema)
-        return InfraDb(driver)
-    }
-
     // ── 5 个一等 Store（设计 §6）─────────────────────────────────────────
 
     @Provides
     @Singleton
-    fun provideKVStore(db: InfraDb): KVStore = KVStore(db)
+    fun provideKVStore(db: AuxDb): KVStore = KVStore(db)
 
     @Provides
     @Singleton
-    fun provideDocumentStore(db: InfraDb, pool: ConnectionPool): DocumentStore =
-        DocumentStore(db, pool.driver(LibName.INFRA))
+    fun provideDocumentStore(db: AuxDb, pool: ConnectionPool): DocumentStore =
+        DocumentStore(db, pool.driver(LibName.AUX))
 
     @Provides
     @Singleton
-    fun provideQueue(db: InfraDb): Queue = Queue(db)
+    fun provideQueue(db: AuxDb): Queue = Queue(db)
 
     @Provides
     @Singleton
-    fun provideBlobStore(db: InfraDb): BlobStore = BlobStore(db)
+    fun provideBlobStore(db: AuxDb): BlobStore = BlobStore(db)
 
     @Provides
     @Singleton
-    fun provideTimeSeries(db: InfraDb): TimeSeries = TimeSeries(db)
+    fun provideTimeSeries(db: AuxDb): TimeSeries = TimeSeries(db)
 
     // ── 5 个域 Repository（设计 §11 / L2 门面）────────────────────────────
 
@@ -249,7 +238,7 @@ object DataLayerModule {
 
     @Provides
     @Singleton
-    fun provideSettingsRepository(db: SettingsDb): SettingsRepository = SettingsRepository(db)
+    fun provideSettingsRepository(db: AuxDb): SettingsRepository = SettingsRepository(db)
 
     @Provides
     @Singleton
@@ -257,5 +246,5 @@ object DataLayerModule {
 
     @Provides
     @Singleton
-    fun provideT2iRepository(db: T2iDb): T2iRepository = T2iRepository(db)
+    fun provideT2iRepository(db: AuxDb): T2iRepository = T2iRepository(db)
 }

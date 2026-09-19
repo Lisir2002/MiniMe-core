@@ -2,6 +2,7 @@ package com.mini.me_core
 
 import android.app.ActivityManager
 import android.app.Application
+import java.io.File
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.ComponentCallbacks2
@@ -66,6 +67,19 @@ class AIEditorApp : Application() {
         // 启动早期（如 Hilt 注入链实例化 @Singleton 工具）的崩溃若发生在 FileLogger 初始化之前
         // 会不留任何痕迹，故把日志与全局崩溃处理器提到 attachBaseContext 最前。
         FileLogger.init(base)
+        // 把 :core:* 模块的纯 Kotlin 日志门面桥接回 FileLogger：
+        // 被搬离 :app 的 core 模块用 com.mini.me_core.core.model.MiniMeLog，这里统一落到原日志文件。
+        com.mini.me_core.core.model.MiniMeLog.sink = object : com.mini.me_core.core.model.LogSink {
+            override fun log(level: Int, tag: String, message: String, throwable: Throwable?) {
+                when (level) {
+                    com.mini.me_core.core.model.MiniMeLog.V -> FileLogger.v(tag, message)
+                    com.mini.me_core.core.model.MiniMeLog.D -> FileLogger.d(tag, message)
+                    com.mini.me_core.core.model.MiniMeLog.I -> FileLogger.i(tag, message)
+                    com.mini.me_core.core.model.MiniMeLog.W -> FileLogger.w(tag, message, throwable)
+                    com.mini.me_core.core.model.MiniMeLog.E -> FileLogger.e(tag, message, throwable)
+                }
+            }
+        }
         AILogger.init(base)
         installCrashHandler()
         super.attachBaseContext(base)
@@ -167,6 +181,16 @@ class AIEditorApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // (e) 首启标记位：无标记且公共目录有旧日志残留→删旧残留（卸载后仍保留的公共目录）。
+        runCatching {
+            val sp = getSharedPreferences("mini_me_log_marker", MODE_PRIVATE)
+            if (!sp.getBoolean("first_launch_done", false)) {
+                val docs = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS)
+                File(docs, "MiniMe-core/logs").listFiles()?.forEach { runCatching { it.delete() } }
+                File(docs, "MiniMe-core/ai-logs").listFiles()?.forEach { runCatching { it.delete() } }
+                sp.edit().putBoolean("first_launch_done", true).apply()
+            }
+        }
         // ============== 品牌迁移：DeepCore-Code → MiniMe-core ==============
         // 必须在任何数据库连接池 / 容器目录 / KeyStore 访问之前执行，
         // 确保旧用户的数据路径（数据库文件 / 容器持久化目录）先被迁移到新品牌名下。
@@ -227,7 +251,7 @@ class AIEditorApp : Application() {
             FileLogger.e(TAG, "【冒烟】selectMessagesBySessionPaged 启动期执行失败（生成 SQL 有问题，非表结构问题）", e)
         }
         // 数据层重构：前 DataStore（settings_prefs / workspace_prefs / terminal_prefs / proxy_prefs /
-        // mcp_server_prefs / app_run_meta / ftp_server_prefs）全部迁移到 SQLDelight InfraDb.kv_store，
+        // mcp_server_prefs / app_run_meta / ftp_server_prefs）全部迁移到 SQLDelight AuxDb.kv_store，
         // 启动期不再需要 DataStore 收敛搬迁器，首次打开 SQLite 自动走 KVStore observe。
         // 主线程启动凭据请求监听（FileObserver 必须主线程创建与 startWatching），
         // 监听容器内 credential helper 写来的 cred-req-* → 全局弹窗回填 → 回喂 git 续跑。

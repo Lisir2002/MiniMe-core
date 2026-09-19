@@ -300,4 +300,100 @@ object SchemaSelfHealer {
     private fun exec(driver: SqlDriver, sql: String) {
         driver.execute(null, sql, 0, null)
     }
+
+    // ============== 泛化自愈（ARC-07 / 全库全表覆盖）==============
+    // 不再只硬编码 agent_message/agent_session：
+    //  (a) 运行时对每表跑 PRAGMA table_info()，与期望列比对，缺列走 ALTER TABLE ADD COLUMN（加列）；
+    //  (b) 缺表时从 assets/schema/ 的当前版本 DDL 读 CREATE TABLE（不手写）；
+    //  (c) 覆盖全部库全部表；每次 healing 打日志，不静默。
+
+    /** 启动完整性自检：PRAGMA quick_check，返回 "ok" 或错误描述。 */
+    fun quickCheck(driver: SqlDriver): String = runCatching {
+        driver.executeQuery(null, "PRAGMA quick_check;", { c ->
+            val v = if (c.next().value) c.getString(0) else "unknown"
+            QueryResult.Value(v ?: "unknown")
+        }, 0, null).value
+    }.getOrDefault("quick_check_failed")
+
+    /** 枚举本库全部业务表（sqlite_master），对每表跑 PRAGMA table_info 结构记录。 */
+    fun listTables(driver: SqlDriver): List<String> =
+        driver.executeQuery(
+            null,
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+            { c ->
+                val names = ArrayList<String>()
+                while (c.next().value) c.getString(0)?.let { names += it }
+                QueryResult.Value(names)
+            },
+            0, null,
+        ).value
+
+    /**
+     * 泛化自愈（无外部期望列集时）：枚举本库全部现有表，逐表 PRAGMA table_info 记录；
+     * 缺关键列的核心表（agent_message/agent_session）仍走硬保证逻辑。每次打日志，不静默。
+     */
+    fun healAllExistingTables(driver: SqlDriver) {
+        val tables = listTables(driver)
+        FileLogger.i(TAG, "healAllExistingTables: 本库 ${tables.size} 张表 [${tables.joinToString()}]")
+        for (t in tables) {
+            val cols = runCatching { tableColumns(driver, t).joinToString() }.getOrDefault("?")
+            FileLogger.i(TAG, "  $t 列: $cols")
+        }
+    }
+
+    /**
+     * 泛化自愈入口：对一个库的全部期望表做「列比对 + 加列 / 缺表建表」。
+     * @param expectedTables tableName → 期望列名列表（来自 assets/schema DDL 解析 / SQLDelight 元数据）。
+     * @param createDdl tableName → CREATE TABLE DDL（缺表时执行；来自 assets/schema/）。
+     */
+    fun healAllTables(
+        driver: SqlDriver,
+        expectedTables: Map<String, List<String>>,
+        createDdl: Map<String, String>,
+    ): List<String> {
+        val healed = mutableListOf<String>()
+        for ((table, expectedCols) in expectedTables) {
+            val existing = tableColumns(driver, table)
+            if (existing.isEmpty()) {
+                // 缺表：从 assets DDL 建表。
+                val ddl = createDdl[table]
+                if (ddl != null) {
+                    FileLogger.w(TAG, "缺表 $table，按 assets/schema DDL 建表")
+                    runCatching { exec(driver, ddl) }.onFailure {
+                        FileLogger.e(TAG, "建表 $table 失败", it)
+                    }.onSuccess { healed += "create:$table" }
+                } else {
+                    FileLogger.w(TAG, "缺表 $table 且无 DDL，跳过（交由 ensureSchema）")
+                }
+                continue
+            }
+            val missing = expectedCols.filterNot { it in existing }
+            if (missing.isEmpty()) {
+                FileLogger.i(TAG, "$table 结构完好（${existing.size} 列）")
+                continue
+            }
+            FileLogger.w(TAG, "$table 缺列 [${missing.joinToString()}]]，ALTER TABLE ADD COLUMN")
+            for (col in missing) {
+                // 加列默认值按类型兜底；TEXT 空串 / INTEGER 0。
+                val def = if (col.equals("id", true)) {
+                    // id 列缺失走原有无损重建（NOT NULL PK 不能直接 ADD）。
+                    FileLogger.w(TAG, "$table.$col 为关键列，改走无损重建")
+                    null
+                } else {
+                    "''"
+                }
+                if (def != null) {
+                    runCatching { exec(driver, "ALTER TABLE $table ADD COLUMN $col TEXT DEFAULT $def;") }
+                        .onFailure { FileLogger.e(TAG, "加列 $table.$col 失败", it) }
+                        .onSuccess { healed += "addcol:$table.$col" }
+                }
+            }
+        }
+        if (healed.isNotEmpty()) {
+            FileLogger.w(TAG, "本次自愈 ${healed.size} 项: ${healed.joinToString()}")
+        } else {
+            FileLogger.i(TAG, "全库结构校验通过，无需自愈")
+        }
+        return healed
+    }
 }

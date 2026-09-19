@@ -1,6 +1,6 @@
 package com.mini.me_core.datalayer.store
 
-import com.mini.mecore.datalayer.sqldelight.InfraDb
+import com.mini.mecore.datalayer.sqldelight.AuxDb
 
 /**
  * 一等 Queue（设计 §6.3）：可靠队列，只管持久化数据面（触发/执行交现有 WorkManager/协程）。
@@ -17,7 +17,7 @@ data class QueueItem(
     val createdAt: Long,
 )
 
-class Queue(private val db: InfraDb) {
+class Queue(private val db: AuxDb) {
 
     private val q get() = db.queueQueries
 
@@ -37,7 +37,7 @@ class Queue(private val db: InfraDb) {
 
     fun get(id: Long): QueueItem? = q.selectById(id).executeAsOneOrNull()?.toItem()
 
-    private fun com.mini.mecore.datalayer.sqldelight.infra.Queue_store.toItem() = QueueItem(
+    private fun com.mini.mecore.datalayer.sqldelight.Queue_store.toItem() = QueueItem(
         id = id,
         topic = topic,
         payload = payload,

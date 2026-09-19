@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.agent.domain.workflow
 
+import com.mini.me_core.core.agentworkflow.LoopGuardTracker
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

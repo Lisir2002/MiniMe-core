@@ -1,4 +1,6 @@
 package com.mini.me_core.feature.agent.domain.workflow
+import com.mini.me_core.core.agentworkflow.LoopGuardTracker
+import com.mini.me_core.core.agentworkflow.NormFlowSnapshot
 
 import com.mini.me_core.core.network.DeltaAccumulator
 import com.mini.me_core.core.util.FileLogger
@@ -65,10 +67,6 @@ import com.mini.me_core.feature.agent.domain.hook.UserPromptSubmitContext
 import com.mini.me_core.feature.agent.domain.wake.WakeQueueManager
 import com.mini.me_core.feature.agent.presentation.AgentAttachment
 import com.mini.me_core.feature.settings.data.remote.ModelMetadataService
-import com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepository
-import com.mini.me_core.feature.settings.data.repository.ViewImageUnknownGuardPolicy
-import com.mini.me_core.feature.settings.data.repository.CompactionModelSettingsRepository
-import com.mini.me_core.feature.settings.data.repository.VisionModelSettingsRepository
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.agent.data.remote.anthropic.AnthropicApi
 import com.mini.me_core.feature.agent.data.remote.gemini.GeminiApi
@@ -106,7 +104,7 @@ import javax.inject.Inject
  */
 class StatefulAgentWorkflow @Inject constructor(
     private val toolRegistry: ToolRegistry,
-    private val aiProviderRepository: AIProviderRepository,
+    internal val aiProviderRepository: AIProviderRepository,
     private val openAIApi: OpenAIApi,
     private val anthropicApi: AnthropicApi,
     private val geminiApi: GeminiApi,
@@ -116,15 +114,13 @@ class StatefulAgentWorkflow @Inject constructor(
     private val contextCompactor: ContextCompactor,
     private val planApprovalManager: PlanApprovalManager,
     private val toolOutputStore: ToolOutputStore,
-    private val modelMetadataService: ModelMetadataService,
-    private val visionModelSettingsRepository: VisionModelSettingsRepository,
-    private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
+    internal val modelMetadataService: ModelMetadataService,
     /**
-     * 备选方案③兼容端点策略 & ②自动降级总开关。
-     * 读两个字段：(a) viewImage 未收录模型守卫策略（FALLBACK_VISION_MODEL vs FAIL_FAST）；
-     * (b) 备选方案②「发送失败自动降级」总开关（用户关掉则即使触发也不自动降级）。
+     * settings 层反向端口（架构规则 #2）：norm flow 开关 / 兼容降级 / 识图·压缩备用模型 /
+     * 模型元数据。原本直接依赖 6 个 settings 具体仓储，现收敛到 [WorkflowSettingsPort]，
+     * 由 :app 注入适配实现，使工作流内核不反向依赖 feature.settings。
      */
-    private val compatibilityPolicyRepository: CompatibilityPolicyRepository,
+    internal val workflowSettings: com.mini.me_core.core.agentworkflow.WorkflowSettingsPort,
     private val sessionUseCase: SessionUseCase,
     private val messagePersistenceUseCase: MessagePersistenceUseCase,
     private val checkpointManager: CheckpointManager,
@@ -153,8 +149,6 @@ class StatefulAgentWorkflow @Inject constructor(
     private val toolGuards: Set<@JvmSuppressWildcards ToolGuard>,
     /** D1-4 文件观察护栏：guard 链成员（拦截 editFile）+ post-execute 更新观察版本。 */
     private val fileObservationGuard: FileObservationGuard,
-    /** D1-7 规范流程统一开关：总开关 norm_flow_enabled + 子开关 step_inject / tool_guard（对齐 norm-chain §3.5）。 */
-    private val normFlowSettingsRepository: com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository,
     /** D2-3/5 运行轨迹服务：工具执行完成追加 tool 轨迹、turn 边界轻量标记；空转收敛/阶段总结/审计的数据源。 */
     private val trajectoryService: TrajectoryService,
     /** D5-8 Playbook 完成判定护栏：workflow 每轮按实质工具动作上报（recordSubstantiveAction / recordIdleRound）。 */
@@ -175,7 +169,7 @@ class StatefulAgentWorkflow @Inject constructor(
     }
 
     private companion object {
-        const val TAG = "StatefulAgentWorkflow"
+        internal const val TAG = "StatefulAgentWorkflow"
         const val LIVE_TAIL_CHARS = 4_000
         const val PROGRESS_INTERVAL_MS = 250L
         const val USER_REJECTED_CODE = "USER_REJECTED"
@@ -314,6 +308,20 @@ class StatefulAgentWorkflow @Inject constructor(
         data class CancelToolBatch(val toolCalls: List<ToolCall>) : AgentSideEffect
     }
 
+    /**
+     * F5：安全读取「规范流程」开关快照。每轮 CallLlm 前调用一次，后续消费点只读字段。
+     * 取消异常原样抛出；其它读取失败回退 [NormFlowSnapshot.DEFAULT]，业务语义不变
+     * （对齐原逐个 isXxxActive() 失败时按默认关闭/默认值处理的行为）。
+     */
+    private suspend fun loadNormFlowSnapshot(): NormFlowSnapshot = try {
+        workflowSettings.loadNormFlowSnapshot()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        FileLogger.w(TAG, "读取规范流程开关快照失败，按默认处理", e)
+        NormFlowSnapshot.DEFAULT
+    }
+
     private suspend fun getActiveProvider(sessionId: String?): AIProvider {
         val config = resolveProviderConfig(sessionId)
             ?: throw IllegalStateException("尚未配置 AI 提供商，请到设置中添加并选择一个")
@@ -326,7 +334,7 @@ class StatefulAgentWorkflow @Inject constructor(
      * 解析当前生效的 provider 配置：优先用 session 绑定的 providerId/model，回退全局 active provider。
      * session 绑定的 provider 不存在或已禁用时回退全局，保证老会话与异常数据不中断。
      */
-    private suspend fun resolveProviderConfig(sessionId: String?): AIProviderConfig? {
+    internal suspend fun resolveProviderConfig(sessionId: String?): AIProviderConfig? {
         if (sessionId != null) {
             val session = sessionUseCase.getSessionById(sessionId)
             val boundProviderId = session?.providerId
@@ -358,7 +366,7 @@ class StatefulAgentWorkflow @Inject constructor(
      * 根据 [config] 创建一个全新的、独立的 [AIProvider] 实例。
      * 用于识图回退和上下文压缩等独立请求场景，完全不占用或修改主对话所用的 Provider 单例。
      */
-    private fun createStandaloneProvider(config: AIProviderConfig, sessionId: String?): AIProvider {
+    internal fun createStandaloneProvider(config: AIProviderConfig, sessionId: String?): AIProvider {
         val provider: AIProvider = when (config.type) {
             ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi)
             ProviderType.GEMINI -> GeminiAdapter(geminiApi)
@@ -746,6 +754,9 @@ class StatefulAgentWorkflow @Inject constructor(
         // 避免上下文压缩阻塞下一轮 LLM 的首字节。null 表示无待消费的预压缩结果。
         var pendingCompaction: Deferred<List<AgentMessage>>? = null
         var pendingCompactionBaseCount = 0
+        // E4：上一轮 CallLlm 读到的规范流程快照，用于本轮首对比——对话进行中用户切换开关时，
+        // 下一轮推送一条系统提示「规范流程已更新：…」（当前轮已 snapshot 不受影响）。
+        var lastNormSnapshot: NormFlowSnapshot? = null
 
         // 主循环包进 try/finally：无论正常结束、协程被取消（用户点停止）还是异常退出，
         // 都兜底清理本会话残留的「未决工具权限请求」，避免对话结束后确认卡一直挂着。
@@ -764,14 +775,35 @@ class StatefulAgentWorkflow @Inject constructor(
                         // + 结束原因返回用户（对齐 norm-chain §3.7.1；区别于 LoopGuard 的 advisory）。
                         // 受「规范流程 → 空转收敛」开关控制（默认关）：关闭时即使累计达标也不强制收敛，
                         // 避免研究/浏览类请求（websearch/browser 不在实质产出集合）被误伤结束。
-                        val idleConvergeActive = try {
-                            normFlowSettingsRepository.isIdleConvergeActive()
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            FileLogger.w(TAG, "读取空转收敛开关失败，按默认关闭处理", e)
-                            false
+                        // F5：每轮 CallLlm 前一次性读取规范流程开关快照（替代逐个 isXxxActive() 查询）。
+                        val normSnapshot = loadNormFlowSnapshot()
+                        // E4：与上一轮 snapshot 对比，字段变化则下一轮对话流推送系统提示（当前轮不受影响）。
+                        val prevSnapshot = lastNormSnapshot
+                        if (prevSnapshot != null && prevSnapshot != normSnapshot) {
+                            val changes = buildList {
+                                if (prevSnapshot.stepInject != normSnapshot.stepInject)
+                                    add("step前注入 ${if (normSnapshot.stepInject) "开启" else "关闭"}")
+                                if (prevSnapshot.toolGuard != normSnapshot.toolGuard)
+                                    add("工具护栏 ${if (normSnapshot.toolGuard) "开启" else "关闭"}")
+                                if (prevSnapshot.reasoningBudget != normSnapshot.reasoningBudget)
+                                    add("推理预算 ${if (normSnapshot.reasoningBudget) "开启" else "关闭"}")
+                                if (prevSnapshot.usageCard != normSnapshot.usageCard)
+                                    add("用量卡片 ${if (normSnapshot.usageCard) "开启" else "关闭"}")
+                                if (prevSnapshot.playbookAuto != normSnapshot.playbookAuto)
+                                    add("Playbook自动 ${if (normSnapshot.playbookAuto) "开启" else "关闭"}")
+                                if (prevSnapshot.idleConverge != normSnapshot.idleConverge)
+                                    add("空转收敛 ${if (normSnapshot.idleConverge) "开启" else "关闭"}")
+                                if (prevSnapshot.sopSummary != normSnapshot.sopSummary)
+                                    add("SOP摘要 ${if (normSnapshot.sopSummary) "开启" else "关闭"}")
+                                if (prevSnapshot.stepInjectBudget != normSnapshot.stepInjectBudget)
+                                    add("step预算 ${normSnapshot.stepInjectBudget}")
+                            }
+                            if (changes.isNotEmpty()) {
+                                send(AgentEvent.NormFlowNotice("规范流程已更新：" + changes.joinToString("、")))
+                            }
                         }
+                        lastNormSnapshot = normSnapshot
+                        val idleConvergeActive = normSnapshot.idleConverge
                         if (idleConvergeActive && idleRounds >= IDLE_CONVERGE_ROUNDS) {
                             val actionSummary = try {
                                 trajectoryService.buildActionSummary(currentContext.sessionId)
@@ -845,7 +877,7 @@ class StatefulAgentWorkflow @Inject constructor(
                         // 追加到系统提示词末尾。
                         // D1-7 统一开关：总开关 norm_flow_enabled 或子开关 step_inject 关闭时跳过
                         // 注入块（对齐 norm-chain §3.5，默认开启；关闭即 step 前注入纪律不生效）。
-                        val stepInjection = if (normFlowSettingsRepository.isStepInjectActive()) {
+                        val stepInjection = if (normSnapshot.stepInject) {
                             promptProvider.buildStepInjections(currentContext)
                         } else {
                             null
@@ -853,7 +885,7 @@ class StatefulAgentWorkflow @Inject constructor(
                         // D2-2 推理预算：总开关 / reasoning_budget 子开关开启时，把每会话思考强度
                         // （reasoningEffort，默认 MEDIUM）透传给 provider；关闭则禁用推理参数
                         // （对齐 norm-chain §3.7.2「新增推理预算配置，开启后按 provider 能力传 reasoning 参数」）。
-                        val reasoningEffortForRound = if (normFlowSettingsRepository.isReasoningBudgetActive()) {
+                        val reasoningEffortForRound = if (normSnapshot.reasoningBudget) {
                             currentContext.reasoningEffort
                         } else {
                             null
@@ -982,7 +1014,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                     (lower.contains("not support") || lower.contains("unsupported") || lower.contains("invalid parameter") || lower.contains("not allowed") || lower.contains("invalid request"))
                             }
                             if (sendImages && !state.visionFallbackRetried && visionUnsupported &&
-                                compatibilityPolicyRepository.isAutoDowngradeOnSendFailure()
+                                workflowSettings.isAutoDowngradeOnSendFailure()
                             ) {
                                 // 先标记降级已尝试，避免死循环
                                 state = state.copy(visionFallbackRetried = true)
@@ -1378,7 +1410,8 @@ class StatefulAgentWorkflow @Inject constructor(
         // 「本回合增量 + 会话累计」（仅 token 不估成本，对齐 norm-chain §3.8.4）；
         // 开关关闭 / 无会话 / 聚合失败时静默跳过，不阻断主流程。
         try {
-            if (normFlowSettingsRepository.isUsageCardActive() && currentContext.sessionId != null) {
+            // F5：回合结束一次性读快照，用量卡片消费 snapshot.usageCard 字段。
+            if (loadNormFlowSnapshot().usageCard && currentContext.sessionId != null) {
                 val turnUsage = trajectoryService.turnUsage(currentContext.sessionId, taskId)
                 if (turnUsage.totalTokens > 0 || turnUsage.toolCalls > 0) {
                     val sessionUsage = trajectoryService.sessionUsage(currentContext.sessionId)
@@ -1678,9 +1711,9 @@ class StatefulAgentWorkflow @Inject constructor(
             }
             if (name == "viewImage" && !activeModelSupportsVision(context.sessionId)) {
                 // 备选方案③：viewImage 守卫策略（默认自动回退识图模型，FAIL_FAST 则直接报错提示用户）
-                val guardPolicy = compatibilityPolicyRepository.getViewImageUnknownGuardPolicy()
+                val guardPolicy = workflowSettings.getViewImageUnknownGuardPolicyRaw()
                 val fallbackReady = visionFallbackReady()
-                if (guardPolicy == ViewImageUnknownGuardPolicy.FAIL_FAST || !fallbackReady) {
+                if (guardPolicy == "FAIL_FAST" || !fallbackReady) {
                     val error = ToolResult.Error(
                         "当前聊天模型不支持「多模态识图（Vision）」能力，且未配置专用的「多模态识图（Vision）」兜底模型。请在【设置 → 默认模型 → 识图模型】中指定一个支持「多模态识图（Vision）」能力的模型后再查看图片。\n" +
                             "💡 你也可以在【设置 → AI 提供商 → 该模型 → 能力覆盖】中手动开启「多模态识图（Vision）」复选框，一步修复。",
@@ -1709,7 +1742,8 @@ class StatefulAgentWorkflow @Inject constructor(
             // （ExecuteCommandTool 工具层既有，保持原位，经本判定契约对齐）。
             // D1-7 统一开关：总开关 norm_flow_enabled 或子开关 tool_guard 关闭时跳过护栏链
             // （对齐 norm-chain §3.5，默认开启；关闭即 guard 链 + 文件观察不生效）。
-            if (normFlowSettingsRepository.isToolGuardActive()) {
+            // F5：消费 snapshot.toolGuard 字段（一次性读快照，不再逐个查询）。
+            if (loadNormFlowSnapshot().toolGuard) {
                 runToolGuards(name, toolCall, context)?.let { blocked ->
                     recordSessionOutput(context, toolCall.id, name, blocked)
                     recordIncrementalAction(name, blocked.toTransportString(), context)
@@ -1879,155 +1913,6 @@ class StatefulAgentWorkflow @Inject constructor(
      * 非多模态模型的 viewImage 回退：从工具结果中提取 base64 图片，
      * 同步发给识图专用模型理解内容，返回文本结果。
      */
-    private suspend fun runVisionFallback(result: ToolResult, sessionId: String?, customPrompt: String? = null): String {
-        val data = (result as? ToolResult.Success)?.data as? JsonObject
-            ?: return "无法解析图片数据"
-        val image = data["image"] as? JsonObject
-            ?: return "无法提取图片数据"
-        val mimeType = image["mime_type"]?.jsonPrimitive?.contentOrNull
-            ?: return "无法识别图片格式"
-        val base64Data = image["base64_data"]?.jsonPrimitive?.contentOrNull
-            ?: return "无法读取图片数据"
-        val path = image["path"]?.jsonPrimitive?.contentOrNull.orEmpty()
-
-        val agentImage = AgentImage(mimeType = mimeType, base64Data = base64Data, path = path)
-        val visionProvider = resolveVisionFallbackProvider(sessionId)
-            ?: return "「多模态识图（Vision）」兜底模型不可用，请先在设置中启用。"
-
-        val promptText = if (!customPrompt.isNullOrBlank()) {
-            "请针对用户/模型的如下关注重点，详细分析并描述这张图片：\n$customPrompt"
-        } else {
-            "请详细描述这张图片的内容，包括其中出现的文字、元素、布局、颜色等关键信息。"
-        }
-
-        try {
-            val messages = listOf(
-                AgentMessage.UserMessage(
-                    content = promptText,
-                    images = listOf(agentImage)
-                )
-            )
-            val response = visionProvider.complete("", messages, emptyList())
-            return response.content.ifBlank { "（识图模型未返回内容）" }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            FileLogger.e(TAG, "识图回退失败", e)
-            return "识图失败: ${e.message}"
-        }
-    }
-
-    /**
-     * 当前聊天模型是否「有原生能力支持多模态」。
-     *
-     * 影响两条关键链路：
-     *  (1) `runToolSync(name=="viewImage")` L586 的守卫：
-     *      if (!activeModelSupportsVision(...)) → 直接抛「当前聊天模型不支持图片输入」
-     *      这条就是用户接入 step-3.7-flash 时截图里看到的错误文案。
-     *
-     *  (2) `pendingVisionRound` 是否启用独立识图模型 fallback 的判定入口。
-     *
-     *  判定链优先级（从高到低）：
-     *  - ④ 单模型复选框手动覆盖（`ModelCapabilityOverrideDao`，在 resolve 内处理）；
-     *  - catalog 明确 supportsVision=true → 支持；
-     *  - catalog 明确 supportsVision=false（MODELS_DEV 收录的纯文本模型）→ 不支持；
-     *  - ③ 兼容端点默认策略 Repository（STRICT/HEURISTIC/LAX/MANUAL，resolve 内处理）；
-     *  - probablyVision 启发式（step- 家族白名单在 ModelMetadataService.default() 命中即为 true）。
-     *
-     *  关键决策（按用户要求「针对性修复独立出来」）：
-     *  - **撤销 的 `source==INFERRED → 一律 true` 全局放宽**；
-     *  - 这里只返回最终 `metadata.supportsVision` 布尔值；
-     *  - step-3.7-flash 修复仅由 probablyVision step- 家族白名单单独命中，
-     *    不影响其他未收录模型（它们恢复 之前的严格语义）。
-     */
-    private suspend fun activeModelSupportsVision(sessionId: String?): Boolean {
-        val config = resolveProviderConfig(sessionId) ?: return false
-        val metadata = modelMetadataService.resolve(config.type, config.effectiveModel)
-        return metadata.supportsVision
-    }
-
-    /**
-     * 发送前是否应该把图片带给模型。
-     * 判定链与 [activeModelSupportsVision] 严格一致；
-     * 2026-08-10 按用户要求**撤销 的 `source==INFERRED → 一律 true` 全局放宽**，
-     * 恢复 之前的严格语义。未收录兼容端点模型仅当 probablyVision 启发式
-     * （或③兼容端点策略 / ④单模型覆盖）命中时才会带图发送，避免全局放宽的副作用。
-     */
-    private suspend fun shouldSendImages(sessionId: String?): Boolean {
-        val config = resolveProviderConfig(sessionId) ?: return false
-        val metadata = modelMetadataService.resolve(config.type, config.effectiveModel)
-        return metadata.supportsVision
-    }
-
-    /**
-     * 发送前按模型视觉能力处理消息中的图片：
-     * - 支持 vision：原样返回。
-     * - 不支持：剥离所有图片（仅影响本次发送，不动持久化数据），历史/输入中的图片不会原样发给
-     *   非多模态模型导致请求失败；切回多模态模型后图片上下文仍可正常使用。
-     */
-    private fun sanitizeImagesForModel(
-        messages: List<AgentMessage>,
-        supportsVision: Boolean
-    ): List<AgentMessage> {
-        if (supportsVision) return messages
-        return messages.map { msg ->
-            when (msg) {
-                is AgentMessage.UserMessage ->
-                    if (msg.images.isEmpty()) msg
-                    else msg.copy(images = emptyList(), content = msg.content.ifBlank { "（图片已省略：当前模型不支持图片输入）" })
-                is AgentMessage.ToolResultMessage ->
-                    if (msg.images.isEmpty()) msg else msg.copy(images = emptyList())
-                is AgentMessage.AssistantMessage -> msg
-            }
-        }
-    }
-
-    /**
-     * 识图专用兜底模型是否可用：已配置 providerId 且指向的 provider/model 存在、有 apiKey、且其
-     * ModelMetadata.supportsVision 为真。识图轮仅当 [activeModelSupportsVision] 为 false 时才回退到它。
-     * 未配置（providerId 空）即视为「跟随聊天模型」，不构成兜底 → 返回 false。
-     */
-    private suspend fun visionFallbackReady(): Boolean {
-        val providerId = visionModelSettingsRepository.getVisionProviderId().trim()
-        if (providerId.isEmpty()) return false
-        val model = visionModelSettingsRepository.getVisionModel().trim()
-        if (model.isEmpty()) return false
-        val config = aiProviderRepository.getProviderById(providerId) ?: return false
-        if (!config.isEnabled) return false
-        if (config.apiKey.isBlank()) return false
-        val metadata = modelMetadataService.resolve(config.type, model)
-        return metadata.supportsVision
-    }
-
-    /**
-     * 识图轮专用 provider 解析。仅当当前聊天模型不支持 vision、且专用模型已配置且可用时返回
-     * 全新的独立 AIProvider 实例；否则返回 null（表示无需切换、沿用 aiProvider）。
-     */
-    private suspend fun resolveVisionFallbackProvider(sessionId: String?): AIProvider? {
-        if (activeModelSupportsVision(sessionId)) return null // 当前聊天模型就有原生能力，直接用之
-        if (!visionFallbackReady()) return null       // 无可用兜底，仍沿用 aiProvider（守卫已先行拦截并报错）
-        val providerId = visionModelSettingsRepository.getVisionProviderId().trim()
-        val model = visionModelSettingsRepository.getVisionModel().trim()
-        val config = aiProviderRepository.getProviderById(providerId)
-            ?: error("识图专用模型配置丢失")
-        if (config.apiKey.isBlank()) error("识图专用模型「${config.name}」未填写 API Key")
-        if (model.isBlank()) error("识图专用模型未指定模型")
-        return createStandaloneProvider(config.copy(selectedModel = model), sessionId)
-    }
-
-    /**
-     * 压缩轮专用 provider 解析。若用户配置了压缩专用模型且 provider 存在、已启用、有 apiKey，
-     * 则返回全新的独立 AIProvider 实例；否则返回 null（沿用当前聊天模型）。
-     */
-    private suspend fun resolveCompactionFallbackProvider(sessionId: String? = null): AIProvider? {
-        val providerId = compactionModelSettingsRepository.getCompactionProviderId().trim()
-        if (providerId.isEmpty()) return null
-        val model = compactionModelSettingsRepository.getCompactionModel().trim()
-        if (model.isEmpty()) return null
-        val config = aiProviderRepository.getProviderById(providerId) ?: return null
-        if (!config.isEnabled || config.apiKey.isBlank()) return null
-        return createStandaloneProvider(config.copy(selectedModel = model), sessionId)
-    }
 
     private suspend fun runToolStream(
         tool: StreamingAgentTool, 
@@ -2086,71 +1971,6 @@ class StatefulAgentWorkflow @Inject constructor(
         return currentContext to false
     }
 
-    private fun extractInlineImages(result: ToolResult): List<AgentImage> {
-        val data = (result as? ToolResult.Success)?.data as? JsonObject ?: return emptyList()
-        val image = data["image"] as? JsonObject ?: return emptyList()
-        val mimeType = image["mime_type"]?.jsonPrimitive?.contentOrNull ?: return emptyList()
-        val base64Data = image["base64_data"]?.jsonPrimitive?.contentOrNull ?: return emptyList()
-        val path = image["path"]?.jsonPrimitive?.contentOrNull.orEmpty()
-        if (!mimeType.startsWith("image/") || base64Data.isBlank()) return emptyList()
-        return listOf(AgentImage(mimeType = mimeType, base64Data = base64Data, path = path))
-    }
-
-    /**
-     * 从 sendFile 工具结果的 `files` 数组提取文件卡片元数据（含宿主本地路径，供 UI 打开文件用）。
-     * 任一文件缺关键字段则整体返回空（与 sendFile 的原子语义一致）。
-     */
-    private fun extractAttachments(result: ToolResult): List<AgentAttachment> {
-        val data = (result as? ToolResult.Success)?.data as? JsonObject ?: return emptyList()
-        val files = data["files"] as? JsonArray ?: return emptyList()
-        val attachments = files.mapNotNull { elem ->
-            val obj = elem as? JsonObject ?: return@mapNotNull null
-            val path = obj["path"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-            val localPath = obj["local_path"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-            val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: path.substringAfterLast('/')
-            val mimeType = obj["mime_type"]?.jsonPrimitive?.contentOrNull ?: "application/octet-stream"
-            AgentAttachment(
-                fileName = name,
-                containerPath = path,
-                localPath = localPath,
-                mimeType = mimeType,
-                sizeBytes = obj["size_bytes"]?.jsonPrimitive?.longOrNull ?: 0L,
-                isImage = obj["is_image"]?.jsonPrimitive?.booleanOrNull ?: mimeType.startsWith("image/")
-            )
-        }
-        return if (attachments.size == files.size) attachments else emptyList()
-    }
-
-    /** 从回传给模型的 sendFile 结果中剥离宿主本地路径（模型只应看到容器路径）。 */
-    private fun stripAttachments(result: ToolResult): ToolResult {
-        val success = result as? ToolResult.Success ?: return result
-        val data = success.data as? JsonObject ?: return result
-        val strippedFiles = (data["files"] as? JsonArray)?.map { elem ->
-            val obj = elem as? JsonObject ?: return@map elem
-            JsonObject(obj.toMutableMap().apply { remove("local_path") })
-        } ?: return result
-        val strippedData = data.toMutableMap().apply {
-            this["files"] = JsonArray(strippedFiles)
-            this["files_attached"] = JsonPrimitive(true)
-        }
-        return ToolResult.Success(JsonObject(strippedData))
-    }
-
-    private fun stripInlineImages(result: ToolResult): ToolResult {
-        val success = result as? ToolResult.Success ?: return result
-        val data = success.data as? JsonObject ?: return result
-        val image = data["image"] as? JsonObject ?: return result
-        val strippedImage = image.toMutableMap().apply {
-            remove("base64_data")
-            this["base64_omitted"] = JsonPrimitive(true)
-            this["note"] = JsonPrimitive("图片数据已作为视觉输入附加，未写入文本工具结果。")
-        }
-        val strippedData = data.toMutableMap().apply {
-            this["image"] = JsonObject(strippedImage)
-            this["image_attached"] = JsonPrimitive(true)
-        }
-        return ToolResult.Success(JsonObject(strippedData))
-    }
 
     private suspend fun requestPermissionIfNeeded(
         tool: AgentTool?,

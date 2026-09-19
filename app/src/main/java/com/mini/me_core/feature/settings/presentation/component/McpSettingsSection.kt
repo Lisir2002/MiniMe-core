@@ -55,8 +55,9 @@ import androidx.compose.ui.unit.sp
 import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
-import com.mini.me_core.feature.agent.domain.mcp.McpServerStatus
+import com.mini.me_core.feature.settings.domain.model.McpServerConfig
+import com.mini.me_core.feature.settings.domain.model.McpServerState
+import com.mini.me_core.feature.settings.domain.model.McpServerStatus
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
@@ -140,25 +141,25 @@ internal fun McpServerRow(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val isConnected = server.enabled && status?.state == McpServerStatus.State.CONNECTED
+    val isConnected = server.enabled && status?.state == McpServerState.CONNECTED
 
     val statusText = when {
         !server.enabled -> stringResource(R.string.mcp_disabled)
         status == null -> stringResource(R.string.mcp_not_connected)
         else -> when (status.state) {
-            McpServerStatus.State.CONNECTED -> stringResource(R.string.mcp_connected)
-            McpServerStatus.State.CONNECTING -> stringResource(R.string.mcp_connecting)
-            McpServerStatus.State.FAILED -> stringResource(R.string.mcp_connection_failed)
-            McpServerStatus.State.DISABLED -> stringResource(R.string.mcp_disabled)
+            McpServerState.CONNECTED -> stringResource(R.string.mcp_connected)
+            McpServerState.CONNECTING -> stringResource(R.string.mcp_connecting)
+            McpServerState.FAILED -> stringResource(R.string.mcp_connection_failed)
+            McpServerState.DISABLED -> stringResource(R.string.mcp_disabled)
         }
     }
 
     val statusColor = when {
-        !server.enabled || status == null || status.state == McpServerStatus.State.DISABLED ->
+        !server.enabled || status == null || status.state == McpServerState.DISABLED ->
             MaterialTheme.colorScheme.outline
-        status.state == McpServerStatus.State.CONNECTED ->
+        status.state == McpServerState.CONNECTED ->
             MaterialTheme.colorScheme.tertiary
-        status.state == McpServerStatus.State.CONNECTING ->
+        status.state == McpServerState.CONNECTING ->
             MaterialTheme.colorScheme.primary
         else ->
             MaterialTheme.colorScheme.error

@@ -8,7 +8,7 @@ import com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalChoice
 import com.mini.me_core.feature.agent.domain.permission.FailureClass
 import com.mini.me_core.feature.agent.domain.permission.FailureClassification
 import com.mini.me_core.feature.agent.domain.permission.FailureSubClass
-import com.mini.me_core.feature.settings.data.repository.ExecutionMode
+import com.mini.me_core.feature.agent.domain.container.AgentExecutionMode
 
 /**
  * Phase 2 纯域模型层：7 子系统之间的入参/出参统一在这里。
@@ -146,7 +146,7 @@ fun interface ZthToolOutputLlmReviewer {
 data class ZthClassifyContext(
     val sessionId: String?,
     val mode: AgentMode,
-    val executionMode: ExecutionMode,
+    val executionMode: AgentExecutionMode,
     val tier: ZthPresetTier,
     /** C.4.9 离线：ConnectivityWatcher.NET_CAP_VALIDATED=false（JUnit 构造简单传 Boolean）。 */
     val onlineValidated: Boolean,

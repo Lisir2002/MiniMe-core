@@ -147,7 +147,7 @@ Releases are tag-driven: push a `v*` tag on a `main` commit (e.g. `git push orig
 | Build | Android Gradle Plugin 8.9.3 + KSP |
 | UI | Jetpack Compose (BOM 2025.12.01) + Material 3 |
 | DI | Hilt 2.56.1 (Dagger) |
-| Database | Room 2.7.1 (split by domain into 5 DBs: agent v4 / settings / credentials / workspace / t2i; legacy single-DB file-driven SQL migration only for historical reads) |
+| Database | SQLDelight 2.2.1 (4 DBs: agent / credentials / workspace / aux) + SQLCipher full-disk encryption (Keystore key) + credential field-level AES-GCM; legacy Room fully removed |
 | Network | Retrofit 2.11.0 + OkHttp 4.12.0 + Gson |
 | Async | Kotlin Coroutines / Flow |
 | Terminal | Termux terminal-emulator + terminal-view (JNI libtermux.so) |

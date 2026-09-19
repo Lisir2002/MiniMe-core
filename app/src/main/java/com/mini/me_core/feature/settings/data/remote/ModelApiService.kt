@@ -1,6 +1,6 @@
 package com.mini.me_core.feature.settings.data.remote
 
-import com.mini.me_core.feature.agent.domain.provider.joinUrl
+import com.mini.me_core.core.util.joinUrl
 import com.mini.me_core.feature.settings.domain.model.ProviderType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

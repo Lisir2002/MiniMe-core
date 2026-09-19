@@ -6,8 +6,8 @@ import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
 import com.mini.me_core.feature.agent.domain.permission.PermissionChoice
 import com.mini.me_core.feature.agent.domain.tool.PendingToolPermission
 import com.mini.me_core.feature.agent.domain.tool.ToolPermissionManager
-import com.mini.me_core.feature.workspace.domain.RemoteAuditAction
-import com.mini.me_core.feature.workspace.domain.RemoteAuditCategory
+import com.mini.me_core.core.model.RemoteAuditAction
+import com.mini.me_core.core.model.RemoteAuditCategory
 import com.mini.me_core.feature.workspace.domain.repository.RemoteAuditLogRepository
 import javax.inject.Inject
 import javax.inject.Singleton

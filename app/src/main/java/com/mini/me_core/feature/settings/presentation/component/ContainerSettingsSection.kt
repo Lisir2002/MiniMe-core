@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.settings.presentation.component
 
+import com.mini.me_core.feature.agent.domain.container.AgentExecutionMode
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -175,7 +176,7 @@ internal fun ContainerSection(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = Spacing.xs)
                         )
-                        if (profile.mode == ExecutionMode.LOCAL_PROOT && profile.extraBindings.isNotEmpty()) {
+                        if (profile.mode == AgentExecutionMode.LOCAL_PROOT && profile.extraBindings.isNotEmpty()) {
                             Text(
                                 text = stringResource(R.string.container_bindings, profile.extraBindings.joinToString(" ")),
                                 style = MaterialTheme.typography.bodySmall,
@@ -223,7 +224,7 @@ internal fun ContainerSection(
             onConfirm = { profile ->
                 val id = "custom-${System.currentTimeMillis()}"
                 onSaveCustom(
-                    if (profile.mode == ExecutionMode.REMOTE_SSH) {
+                    if (profile.mode == AgentExecutionMode.REMOTE_SSH) {
                         profile.copy(id = id, name = profile.name.ifBlank { context.getString(R.string.container_remote_ssh) })
                     } else {
                         profile.copy(id = id, name = profile.name.ifBlank { context.getString(R.string.container_custom_image) })
@@ -251,7 +252,7 @@ internal fun ContainerSection(
         AlertDialog(
             onDismissRequest = { deletingProfile = null },
             title = { Text(stringResource(R.string.container_delete_config)) },
-            text = { Text(stringResource(R.string.container_delete_confirm, deleting.name, if (deleting.mode == ExecutionMode.LOCAL_PROOT && !deleting.isBuiltin) stringResource(R.string.container_rootfs_will_be_cleared) else "")) },
+            text = { Text(stringResource(R.string.container_delete_confirm, deleting.name, if (deleting.mode == AgentExecutionMode.LOCAL_PROOT && !deleting.isBuiltin) stringResource(R.string.container_rootfs_will_be_cleared) else "")) },
             confirmButton = {
                 TextButton(onClick = {
                     onDeleteCustom(deleting)
@@ -300,7 +301,7 @@ private fun profileSubtitle(context: Context, profile: ContainerProfile, connect
         profile.isBuiltin && profile.arch == ContainerArch.X86_64 ->
             context.getString(R.string.container_builtin_x86)
         profile.isBuiltin -> context.getString(R.string.container_builtin_auto)
-        profile.mode == ExecutionMode.REMOTE_SSH -> {
+        profile.mode == AgentExecutionMode.REMOTE_SSH -> {
             val ssh = profile.rootfsSource as? RootfsSource.RemoteSsh
             val connName = ssh?.connectionId?.let { cid -> connections.firstOrNull { it.id == cid }?.name }
             context.getString(R.string.container_remote_ssh_desc, connName ?: context.getString(R.string.container_channel_deleted), ssh?.remoteWorkspacePath ?: "")
@@ -329,7 +330,7 @@ private fun ProfileEditSheet(
     // SFTP 通道才适合 SSH exec（FTP/LOCAL 不走 sshj）
     val sshConnections = remoteConnections.filter { it.protocol == RemoteProtocol.SFTP }
 
-    var mode by remember { mutableStateOf(initial?.mode ?: ExecutionMode.LOCAL_PROOT) }
+    var mode by remember { mutableStateOf(initial?.mode ?: AgentExecutionMode.LOCAL_PROOT) }
     var name by remember { mutableStateOf(initial?.name ?: "") }
     // 本地镜像字段
     var shellPath by remember { mutableStateOf(initial?.shellPath ?: "/bin/sh") }
@@ -367,13 +368,13 @@ private fun ProfileEditSheet(
 
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(
-                    selected = mode == ExecutionMode.LOCAL_PROOT,
-                    onClick = { mode = ExecutionMode.LOCAL_PROOT },
+                    selected = mode == AgentExecutionMode.LOCAL_PROOT,
+                    onClick = { mode = AgentExecutionMode.LOCAL_PROOT },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                 ) { Text(stringResource(R.string.container_local_image)) }
                 SegmentedButton(
-                    selected = mode == ExecutionMode.REMOTE_SSH,
-                    onClick = { mode = ExecutionMode.REMOTE_SSH },
+                    selected = mode == AgentExecutionMode.REMOTE_SSH,
+                    onClick = { mode = AgentExecutionMode.REMOTE_SSH },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                 ) { Text(stringResource(R.string.container_remote_ssh)) }
             }
@@ -386,7 +387,7 @@ private fun ProfileEditSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            if (mode == ExecutionMode.LOCAL_PROOT) {
+            if (mode == AgentExecutionMode.LOCAL_PROOT) {
                 OutlinedTextField(
                     value = shellPath,
                     onValueChange = { shellPath = it },
@@ -507,7 +508,7 @@ private fun ProfileEditSheet(
 
 /** 据表单状态构造 ContainerProfile；校验不通过返回 null（按钮已 disabled，此处再兜底）。 */
 private fun buildProfile(
-    mode: ExecutionMode,
+    mode: AgentExecutionMode,
     name: String,
     shellPath: String,
     bindingsText: String,
@@ -517,7 +518,7 @@ private fun buildProfile(
     remotePath: String
 ): ContainerProfile? {
     return when (mode) {
-        ExecutionMode.LOCAL_PROOT -> {
+        AgentExecutionMode.LOCAL_PROOT -> {
             if (pickedUri == null) return null
             val bindings = bindingsText.split(' ').map { it.trim() }.filter { it.isNotEmpty() }
             val args = argsText.split(' ').map { it.trim() }.filter { it.isNotEmpty() }
@@ -529,11 +530,11 @@ private fun buildProfile(
                 extraBindings = bindings,
                 extraArgs = args,
                 isBuiltin = false,
-                mode = ExecutionMode.LOCAL_PROOT
+                mode = AgentExecutionMode.LOCAL_PROOT
             )
         }
 
-        ExecutionMode.REMOTE_SSH -> {
+        AgentExecutionMode.REMOTE_SSH -> {
             if (selectedConnId.isBlank()) return null
             ContainerProfile(
                 id = "", // 由调用方覆写
@@ -541,7 +542,7 @@ private fun buildProfile(
                 rootfsSource = RootfsSource.RemoteSsh(selectedConnId, remotePath),
                 shellPath = null,
                 isBuiltin = false,
-                mode = ExecutionMode.REMOTE_SSH
+                mode = AgentExecutionMode.REMOTE_SSH
             )
         }
     }
@@ -549,11 +550,11 @@ private fun buildProfile(
 
 /** 保存按钮可用条件：本地镜像需选了文件，远程 SSH 需选了通道。 */
 private fun canConfirm(
-    mode: ExecutionMode,
+    mode: AgentExecutionMode,
     pickedUri: String?,
     selectedConnId: String,
     sshConnections: List<RemoteConnection>
 ): Boolean = when (mode) {
-    ExecutionMode.LOCAL_PROOT -> pickedUri != null
-    ExecutionMode.REMOTE_SSH -> sshConnections.isNotEmpty() && selectedConnId.isNotBlank()
+    AgentExecutionMode.LOCAL_PROOT -> pickedUri != null
+    AgentExecutionMode.REMOTE_SSH -> sshConnections.isNotEmpty() && selectedConnId.isNotBlank()
 }

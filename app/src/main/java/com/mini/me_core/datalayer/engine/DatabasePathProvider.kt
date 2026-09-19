@@ -32,10 +32,10 @@ import java.io.File
 enum class LibName(val fileName: String) {
     AGENT("minime_agent_v3.db"),
     CREDENTIALS("minime_credentials_v2.db"),
-    SETTINGS("minime_settings_v2.db"),
     WORKSPACE("minime_workspace_v2.db"),
-    T2I("minime_t2i_v2.db"),
-    INFRA("minime_infra_v2.db"),
+    // 合并库：原 settings / t2i / infra 三库并入此单文件。
+    // 旧文件 minime_settings_v2.db / minime_t2i_v2.db / minime_infra_v2.db 首升经 ATTACH 拷入后删除。
+    AUX("minime_aux_v1.db"),
 }
 
 interface DatabasePathProvider {

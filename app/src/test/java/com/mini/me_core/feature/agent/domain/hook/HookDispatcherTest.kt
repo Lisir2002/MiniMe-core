@@ -1,10 +1,9 @@
 package com.mini.me_core.feature.agent.domain.hook
 
-import com.mini.me_core.datalayer.repository.WakeQueueStore
-import com.mini.mecore.datalayer.sqldelight.agent.Wake_queue as V2WakeItem
 import com.mini.me_core.feature.agent.data.local.entity.WakeItemEntity
 import com.mini.me_core.feature.agent.domain.model.AgentMode
 import com.mini.me_core.feature.agent.domain.tool.ToolCall
+import com.mini.me_core.feature.agent.domain.wake.WakePort
 import com.mini.me_core.feature.agent.domain.wake.WakeQueueManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonPrimitive
@@ -18,25 +17,22 @@ class HookDispatcherTest {
 
     // ---------- 构造辅助 ----------
 
-    /** 内存版 WakeQueueStore（测试用 fake，行为对齐真实 V2 语义）。 */
-    private class FakeWakeQueueStore : WakeQueueStore {
-        val store = mutableListOf<V2WakeItem>()
-        override suspend fun upsertWakeItem(
-            wakeId: String, sessionId: String, source: String, type: String, content: String,
-            status: String, createdAtMs: Long,
-        ) { store += V2WakeItem(wakeId, sessionId, source, type, content, status, createdAtMs) }
-        override suspend fun listWakeBySessionAndStatus(sessionId: String, status: String): List<V2WakeItem> =
-            store.filter { it.session_id == sessionId && it.status == status }.sortedBy { it.created_at_ms }
-        override suspend fun markWakeItemsConsumedBatch(ids: List<String>, status: String) {
+    /** 内存版 WakePort（测试用 fake，行为对齐真实实现语义）。 */
+    private class FakeWakeQueueStore : WakePort {
+        val store = mutableListOf<WakeItemEntity>()
+        override suspend fun upsert(item: WakeItemEntity) { store += item }
+        override suspend fun listBySessionAndStatus(sessionId: String, status: String): List<WakeItemEntity> =
+            store.filter { it.sessionId == sessionId && it.status == status }.sortedBy { it.createdAtMs }
+        override suspend fun listPending(): List<WakeItemEntity> =
+            store.filter { it.status == WakeItemEntity.STATUS_PENDING }.sortedBy { it.createdAtMs }
+        override suspend fun markConsumed(ids: List<String>, status: String) {
             store.indices.forEach { i ->
-                if (store[i].wake_id in ids) store[i] = store[i].copy(status = status)
+                if (store[i].wakeId in ids) store[i] = store[i].copy(status = status)
             }
         }
-        override suspend fun listPendingWakeItems(): List<V2WakeItem> =
-            store.filter { it.status == WakeItemEntity.STATUS_PENDING }.sortedBy { it.created_at_ms }
     }
 
-    private fun commitDisciplineHook(store: WakeQueueStore = FakeWakeQueueStore()): CommitDisciplineHook =
+    private fun commitDisciplineHook(store: WakePort = FakeWakeQueueStore()): CommitDisciplineHook =
         CommitDisciplineHook(WakeQueueManager(store))
 
     private fun bashCall(command: String = "git commit -m \"feat(agent): add hook\"") = ToolCall(

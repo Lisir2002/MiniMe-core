@@ -67,6 +67,10 @@ class TerminalBundleRepository @Inject constructor(
     private val _customPackages = MutableStateFlow<List<String>>(loadCustomPackages())
     val customPackages: StateFlow<List<String>> = _customPackages.asStateFlow()
 
+    /** E4：磁盘标记为旧版本（v<N>）而 bundle 定义已 +1（v<N+1>），提示用户重装。 */
+    private val _updateAvailable = MutableStateFlow<Set<TerminalBundleId>>(emptySet())
+    val updateAvailable: StateFlow<Set<TerminalBundleId>> = _updateAvailable.asStateFlow()
+
     // ── 公共：读取 ────────────────────────────────────────────────────────
 
     /** 便捷：某个 bundle 的状态 Flow。UI 订阅单个卡片时用。 */
@@ -84,8 +88,8 @@ class TerminalBundleRepository @Inject constructor(
 
     // ── 公共：Engine 调用的状态机驱动 API ──────────────────────────────────
 
-    fun emitInstalling(id: TerminalBundleId, line: String? = null) {
-        _states.update { it + (id to BundleInstallState.Installing(line)) }
+    fun emitInstalling(id: TerminalBundleId, line: String? = null, progress: Float? = null) {
+        _states.update { it + (id to BundleInstallState.Installing(line, progress)) }
     }
 
     fun emitUninstalling(id: TerminalBundleId) {
@@ -108,12 +112,20 @@ class TerminalBundleRepository @Inject constructor(
     }
 
     fun markUninstalled(id: TerminalBundleId) {
-        // 清掉所有该 bundle 历史版本的标记
-        for (v in 1..64) {
-            val f = markerFileFor(id, v)
-            if (f.exists()) runCatching { f.delete() }
-        }
+        // F8：扫 .bundles/ 下该 stableKey 的全部历史版本标记（<key>-v*.done），不再用魔数 1..64。
+        val dir = File(rootfsDir, ".bundles")
+        val prefix = "${id.stableKey}-v"
+        runCatching {
+            dir.listFiles()
+                ?.filter { it.name.startsWith(prefix) && it.name.endsWith(".done") }
+                ?.forEach { runCatching { it.delete() } }
+        }.onFailure { FileLogger.w(TAG, "清理 bundle 标记失败 ${dir.name}", it) }
         _states.update { it + (id to BundleInstallState.NotInstalled) }
+    }
+
+    /** F2：部分安装——本应全部安装但仍有缺失包。 */
+    fun markPartialInstalled(id: TerminalBundleId, missing: List<String>) {
+        _states.update { it + (id to BundleInstallState.PartialInstalled(missing)) }
     }
 
     /** 卸载自定义包（UI「高级选项」里点卸载时调用）。之后 UI 端再刷新一次 [refreshCustomPackagesFromApk]。 */
@@ -185,14 +197,24 @@ class TerminalBundleRepository @Inject constructor(
             return TerminalBundleId.entries.associateWith { BundleInstallState.NotInstalled }
         }
         val out = LinkedHashMap<TerminalBundleId, BundleInstallState>(TerminalBundleId.entries.size)
+        val updates = mutableSetOf<TerminalBundleId>()
         for (b in TerminalBundles.ALL) {
             val marker = markerFileFor(b.id, b.version)
             out[b.id] = if (marker.exists()) {
                 BundleInstallState.Installed(b.version)
             } else {
-                BundleInstallState.NotInstalled
+                // E4：当前版本标记不存在，但磁盘上有旧版本标记（<key>-v<N>.done，N < 定义版本）→ 提示更新。
+                val oldMarker = File(rootfsDir, ".bundles").listFiles()
+                    ?.firstOrNull { it.name.startsWith("${b.id.stableKey}-v") && it.name.endsWith(".done") }
+                if (oldMarker != null) {
+                    updates.add(b.id)
+                    BundleInstallState.Installed(b.version)
+                } else {
+                    BundleInstallState.NotInstalled
+                }
             }
         }
+        _updateAvailable.value = updates
         return out
     }
 

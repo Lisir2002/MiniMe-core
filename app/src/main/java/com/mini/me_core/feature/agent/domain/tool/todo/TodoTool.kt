@@ -1,7 +1,5 @@
 package com.mini.me_core.feature.agent.domain.tool.todo
 
-import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.mecore.datalayer.sqldelight.agent.Todo_items as V2TodoItem
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.data.local.entity.TodoItemEntity
 import com.mini.me_core.feature.agent.domain.model.AgentContext
@@ -33,7 +31,7 @@ import javax.inject.Inject
  * AI 不需要查询或记忆 todo_id，也不需要区分创建、更新、删除动作。
  */
 class TodoTool @Inject constructor(
-    private val v2Agent: V2AgentRepository,
+    private val todoPort: TodoPort,
 ) : AbstractContextualTool() {
 
     private companion object {
@@ -118,7 +116,7 @@ class TodoTool @Inject constructor(
 
     /** 刷新 [AgentContext.sessionState] 的待办快照（L2 共享会话状态）。 */
     private suspend fun refreshSnapshot(context: AgentContext, sessionId: String) {
-        val items = v2Agent.listTodos(sessionId).map { it.toEntity() }
+        val items = todoPort.listBySession(sessionId)
         context.sessionState?.todoSnapshot = items.map { entity ->
             TodoItem(
                 id = entity.id,
@@ -137,7 +135,7 @@ class TodoTool @Inject constructor(
     private suspend fun replaceTodos(args: Map<String, JsonElement>, sessionId: String): ToolResult {
         val itemElements = args["items"] as? JsonArray
             ?: return ToolResult.Error("需要 items 数组", "MISSING_ITEMS")
-        val existingBySubject = v2Agent.listTodos(sessionId).map { it.toEntity() }
+        val existingBySubject = todoPort.listBySession(sessionId)
             .groupBy { normalizeSubject(it.subject) }
             .mapValues { (_, items) -> items.toMutableList() }
         val now = System.currentTimeMillis()
@@ -175,14 +173,14 @@ class TodoTool @Inject constructor(
         }
 
         // D-1：delete + upsert 包事务，避免中间失败丢全部待办（AgentTx 同线程事务）
-        v2Agent.runInTx { tx -> tx.replaceTodos(sessionId, entities.map { it.toV2() }) }
+        todoPort.replaceAll(sessionId, entities)
         FileLogger.d(TAG, "todo replace: 同步了 ${entities.size} 项待办")
 
         return listTodos(sessionId)
     }
 
     private suspend fun listTodos(sessionId: String): ToolResult {
-        val items = v2Agent.listTodos(sessionId).map { it.toEntity() }
+        val items = todoPort.listBySession(sessionId)
         val total = items.size
         val completed = items.count { it.status == "COMPLETED" }
 
@@ -241,20 +239,6 @@ class TodoTool @Inject constructor(
     private fun normalizeSubject(subject: String): String {
         return subject.trim().lowercase()
     }
-
-    // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
-
-    private fun V2TodoItem.toEntity() = TodoItemEntity(
-        id = id, sessionId = session_id, subject = subject, description = description,
-        status = status, priority = priority.toInt(), order = sort_order.toInt(),
-        createdAtMs = created_at_ms, updatedAtMs = updated_at_ms
-    )
-
-    private fun TodoItemEntity.toV2() = V2TodoItem(
-        id = id, session_id = sessionId, subject = subject, description = description,
-        status = status, priority = priority.toLong(), sort_order = order.toLong(),
-        created_at_ms = createdAtMs, updated_at_ms = updatedAtMs
-    )
 }
 
 private data class TodoDraft(

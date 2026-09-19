@@ -1,9 +1,9 @@
 plugins {
-    id("com.android.application") version "8.9.3" apply false
-    id("org.jetbrains.kotlin.android") version "2.2.21" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.2.21" apply false
-    id("com.google.dagger.hilt.android") version "2.56.1" apply false
-    id("com.google.devtools.ksp") version "2.2.21-2.0.5" apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.hilt.android) apply false
+    alias(libs.plugins.ksp) apply false
     // 新数据层（data-layer-redesign）：SQLDelight 类型安全 SQL 生成
-    id("app.cash.sqldelight") version "2.2.1" apply false
+    alias(libs.plugins.sqldelight) apply false
 }

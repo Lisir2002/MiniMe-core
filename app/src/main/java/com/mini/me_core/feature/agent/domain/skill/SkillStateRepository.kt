@@ -1,7 +1,6 @@
 package com.mini.me_core.feature.agent.domain.skill
 
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.me_core.feature.agent.data.local.entity.SkillConversationStateEntity
 import com.mini.me_core.feature.agent.data.local.entity.SkillStateEntity
 import kotlinx.coroutines.Dispatchers
@@ -42,7 +41,7 @@ data class SkillResolution(
 @Singleton
 class SkillStateRepository @Inject constructor(
     private val localDirectorySkillSource: LocalDirectorySkillSource,
-    private val v2Agent: V2AgentRepository,
+    private val skillPort: SkillPort,
 ) {
     private companion object {
         const val TAG = "SkillStateRepository"
@@ -52,16 +51,16 @@ class SkillStateRepository @Inject constructor(
     
 
     private suspend fun getSkillStates(): List<SkillStateEntity> =
-        v2Agent.listSkillStates().map { it.toEntity() }
+        skillPort.list()
 
     private fun getSkillStatesSync(): List<SkillStateEntity> =
-        runBlocking(Dispatchers.IO) { v2Agent.listSkillStates().map { it.toEntity() } }
+        runBlocking(Dispatchers.IO) { skillPort.list() }
 
     private suspend fun getConvStates(sessionId: String): List<SkillConversationStateEntity> =
-        v2Agent.listSkillConversationStates(sessionId).map { it.toEntity() }
+        skillPort.listConversation(sessionId)
 
     private fun getConvStatesSync(sessionId: String): List<SkillConversationStateEntity> =
-        runBlocking(Dispatchers.IO) { v2Agent.listSkillConversationStates(sessionId).map { it.toEntity() } }
+        runBlocking(Dispatchers.IO) { skillPort.listConversation(sessionId) }
 
     /** 磁盘技能变更刷新触发器（UI 在安装/卸载/更新后自增以触发重扫）。 */
     private val refreshTrigger = MutableStateFlow(0)
@@ -70,7 +69,7 @@ class SkillStateRepository @Inject constructor(
     val skillsFlow: Flow<List<Skill>> =
         combine(
             refreshTrigger,
-            v2Agent.observeAllSkillStates().map { list -> list.map { it.toEntity() } }
+            skillPort.observeAll()
         ) { _, states ->
             mergeWithState(localDirectorySkillSource.listSkills(), states)
         }
@@ -116,7 +115,7 @@ class SkillStateRepository @Inject constructor(
     /** 启用/禁用技能（即时生效，写 Room）。 */
     suspend fun setEnabled(id: String, enabled: Boolean) {
         runCatching {
-            v2Agent.setSkillStateEnabled(id, if (enabled) 1L else 0L)
+            skillPort.setEnabled(id, enabled)
         }
             .onFailure { FileLogger.e(TAG, "更新技能启用状态失败: $id", it) }
         refreshTrigger.value++
@@ -125,11 +124,7 @@ class SkillStateRepository @Inject constructor(
     /** 安装技能：复制到技能目录 + 写 Room 状态。 */
     suspend fun install(sourceDir: java.io.File): Skill? {
         val installed = localDirectorySkillSource.install(sourceDir) ?: return null
-        v2Agent.upsertSkillState(
-            id = installed.id, enabled = 1L, version = installed.version,
-            source = SkillSourceType.LOCAL.name,
-            installedAtMs = System.currentTimeMillis(), scopeOverride = null, agentTypeOverride = null,
-        )
+        skillPort.upsert(com.mini.me_core.feature.agent.data.local.entity.SkillStateEntity(installed.id, true, installed.version, SkillSourceType.LOCAL.name, System.currentTimeMillis(), null, null))
         refreshTrigger.value++
         return installed
     }
@@ -139,8 +134,8 @@ class SkillStateRepository @Inject constructor(
         val ok = localDirectorySkillSource.uninstall(id)
         if (ok) {
             runCatching {
-                v2Agent.deleteSkillStateById(id)
-                v2Agent.deleteSkillConversationStatesBySkill(id)
+                skillPort.delete(id)
+                // delete folded into skillPort.delete
             }
                 .onFailure { FileLogger.e(TAG, "删除技能状态失败: $id", it) }
             refreshTrigger.value++
@@ -151,16 +146,8 @@ class SkillStateRepository @Inject constructor(
     /** 更新技能：覆盖目录 + 更新 Room 版本。 */
     suspend fun update(id: String, sourceDir: java.io.File): Skill? {
         val updated = localDirectorySkillSource.update(id, sourceDir) ?: return null
-        val existing = v2Agent.getSkillState(id)?.toEntity()
-        v2Agent.upsertSkillState(
-            id = updated.id,
-            enabled = if (existing?.enabled ?: true) 1L else 0L,
-            version = updated.version,
-            source = existing?.source ?: SkillSourceType.LOCAL.name,
-            installedAtMs = existing?.installedAtMs ?: System.currentTimeMillis(),
-            scopeOverride = existing?.scopeOverride,
-            agentTypeOverride = existing?.agentTypeOverride,
-        )
+        val existing = skillPort.get(id)
+        skillPort.upsert(com.mini.me_core.feature.agent.data.local.entity.SkillStateEntity(updated.id, existing?.enabled ?: true, updated.version, existing?.source ?: SkillSourceType.LOCAL.name, existing?.installedAtMs ?: System.currentTimeMillis(), existing?.scopeOverride, existing?.agentTypeOverride))
         refreshTrigger.value++
         return updated
     }
@@ -168,7 +155,7 @@ class SkillStateRepository @Inject constructor(
     /** 设置作用域用户覆盖（NULL=清除覆盖，跟随 frontmatter 声明）。AGENT 级可同时设置绑定的 agentType。 */
     suspend fun setScopeOverride(id: String, scope: SkillScope?, agentType: String? = null) {
         runCatching {
-            v2Agent.setSkillStateScopeOverride(id, scope?.name, if (scope == SkillScope.AGENT) agentType else null)
+            skillPort.setScopeOverride(id, scope?.name, if (scope == SkillScope.AGENT) agentType else null)
         }.onFailure { FileLogger.e(TAG, "更新技能作用域覆盖失败: $id", it) }
         refreshTrigger.value++
     }
@@ -176,7 +163,7 @@ class SkillStateRepository @Inject constructor(
     /** 对话级双向控制：设置技能在某对话内的生效状态（true=添加/启用，false=本对话临时禁用）。 */
     suspend fun setConversationEnabled(skillId: String, sessionId: String, enabled: Boolean) {
         runCatching {
-            v2Agent.upsertSkillConversationState(skillId, sessionId, if (enabled) 1L else 0L)
+            skillPort.upsertConversation(skillId, sessionId, enabled)
         }.onFailure { FileLogger.e(TAG, "更新技能对话状态失败: $skillId / $sessionId", it) }
         refreshTrigger.value++
     }
@@ -184,7 +171,7 @@ class SkillStateRepository @Inject constructor(
     /** 移除技能在某对话的绑定记录（恢复跟随声明）。 */
     suspend fun removeConversationBinding(skillId: String, sessionId: String) {
         runCatching {
-            v2Agent.deleteSkillConversationState(skillId, sessionId)
+            skillPort.deleteConversation(skillId, sessionId)
         }
             .onFailure { FileLogger.e(TAG, "移除技能对话绑定失败: $skillId / $sessionId", it) }
         refreshTrigger.value++
@@ -196,7 +183,7 @@ class SkillStateRepository @Inject constructor(
 
     /** 某对话内某技能的绑定状态（无绑定返回 null = 跟随声明）。 */
     suspend fun getConversationState(skillId: String, sessionId: String): SkillConversationStateEntity? =
-        v2Agent.getSkillConversationState(skillId, sessionId)?.toEntity()
+        skillPort.getConversation(skillId, sessionId)
 
     /**
      * 作用域严格隐藏过滤：返回在「当前 agent + 当前会话」下可见的技能。
@@ -303,22 +290,4 @@ class SkillStateRepository @Inject constructor(
             disabledDependencies = disabled.distinct()
         )
     }
-
-    // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Skill_state.toEntity() = SkillStateEntity(
-        id = id,
-        enabled = enabled == 1L,
-        version = version,
-        source = source,
-        installedAtMs = installed_at_ms,
-        scopeOverride = scope_override,
-        agentTypeOverride = agent_type_override,
-    )
-
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Skill_conversation_state.toEntity() = SkillConversationStateEntity(
-        skillId = skill_id,
-        sessionId = session_id,
-        enabled = enabled == 1L,
-    )
 }

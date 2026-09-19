@@ -339,6 +339,8 @@ internal fun SharedBundleCard(
             Status(stringResource(R.string.ui_____69827c2b), SemanticColors.InProgress, true)
         is BundleInstallState.Failed ->
             Status("失败：${state.reason.take(16)}", SemanticColors.Error, false)
+        is BundleInstallState.PartialInstalled ->
+            Status("部分安装：缺少 ${state.missing.joinToString(", ").take(16)}", SemanticColors.InProgress, false)
         is BundleInstallState.Installed ->
             Status(stringResource(R.string.ui_____9d5bf2a1), SemanticColors.Success, false)
     }

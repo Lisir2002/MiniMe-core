@@ -3,7 +3,7 @@ package com.mini.me_core.feature.agent.domain.zth
 import com.mini.me_core.feature.agent.domain.model.AgentMode
 import com.mini.me_core.feature.agent.domain.tool.ToolCall
 import com.mini.me_core.feature.agent.domain.tool.ToolCapability
-import com.mini.me_core.feature.settings.data.repository.ExecutionMode
+import com.mini.me_core.feature.agent.domain.container.AgentExecutionMode
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -48,7 +48,7 @@ class ZthWorkflowHooks @Inject constructor(
         affectedFiles: List<String>,
         estimatedToolCalls: Int,
         mode: AgentMode = AgentMode.PLAN,
-        executionMode: ExecutionMode = ExecutionMode.LOCAL_PROOT,
+        executionMode: AgentExecutionMode = AgentExecutionMode.LOCAL_PROOT,
         onlineValidated: Boolean = true
     ): Pair<com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalChoice, StructuredPlanBundle> {
         val structured = facade.structuredPlan(
@@ -68,7 +68,7 @@ class ZthWorkflowHooks @Inject constructor(
         toolCalls: List<ToolCall>,
         capabilityResolver: (ToolCall) -> Set<ToolCapability>,
         mode: AgentMode = AgentMode.BUILD,
-        executionMode: ExecutionMode = ExecutionMode.LOCAL_PROOT,
+        executionMode: AgentExecutionMode = AgentExecutionMode.LOCAL_PROOT,
         onlineValidated: Boolean = true,
         perf: ZthPerformanceClass = ZthPerformanceClass.HIGH_END
     ): ZthPreToolAuditBundle {
@@ -95,7 +95,7 @@ class ZthWorkflowHooks @Inject constructor(
         callId: String, toolName: String, outputText: String,
         modifiedFilesHint: List<String> = emptyList(),
         mode: AgentMode = AgentMode.BUILD,
-        executionMode: ExecutionMode = ExecutionMode.LOCAL_PROOT,
+        executionMode: AgentExecutionMode = AgentExecutionMode.LOCAL_PROOT,
         onlineValidated: Boolean = true
     ): ZthPostToolAuditBundle = facade.postToolCompletedAudit(
         sessionId = sessionId, toolName = toolName, callId = callId,
@@ -108,7 +108,7 @@ class ZthWorkflowHooks @Inject constructor(
         sessionId: String?,
         throwable: Throwable?,
         mode: AgentMode = AgentMode.BUILD,
-        executionMode: ExecutionMode = ExecutionMode.LOCAL_PROOT,
+        executionMode: AgentExecutionMode = AgentExecutionMode.LOCAL_PROOT,
         onlineValidated: Boolean = true,
         currentCommandPrefix: String? = null,
         httpStatusCode: Int? = null,

@@ -1,8 +1,10 @@
 package com.mini.me_core.feature.settings.presentation
 
+import com.mini.me_core.feature.agent.domain.container.AgentExecutionMode
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.core.util.FileWatcher
 import com.mini.me_core.core.util.LogLevel
 import com.mini.me_core.feature.agent.domain.container.ConnectionState
 import com.mini.me_core.feature.agent.domain.container.ContainerArch
@@ -122,10 +124,14 @@ class SettingsViewModel @Inject constructor(
     private val remoteRepository: RemoteRepository,
     val auditLogRepository: RemoteAuditLogRepository,
     /** 备选方案③：兼容端点全局策略（STRICT/HEURISTIC/LAX/MANUAL + 自动降级 + viewImage 守卫）。 */
-    private val compatibilityPolicyRepository: CompatibilityPolicyRepository
+    private val compatibilityPolicyRepository: CompatibilityPolicyRepository,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
+        // (k) 实时尾随：轮询间隔与原始行缓存上限（避免长时间 tail -f 导致 OOM）
+        const val LIVE_TAIL_POLL_MS = 1000L
+        const val MAX_RAW_CACHE_LINES = 5000
     }
 
     // 跨屏幕设置页跳转的「待打开分区」信号。
@@ -145,6 +151,25 @@ class SettingsViewModel @Inject constructor(
     val lastRequestedSection: StateFlow<SettingsSection?> = _lastRequestedSection.asStateFlow()
     val pendingOpenSectionTick: StateFlow<Long> = _pendingOpenSectionTick.asStateFlow()
     val lastConsumedSectionTick: StateFlow<Long> = _lastConsumedSectionTick.asStateFlow()
+
+    /** P2："存储与数据库"诊断快照（各库文件/是否加密）。 */
+    private val _storageDiagnostics = MutableStateFlow<List<com.mini.me_core.datalayer.engine.DbDiagnostic>>(emptyList())
+    val storageDiagnostics: StateFlow<List<com.mini.me_core.datalayer.engine.DbDiagnostic>> = _storageDiagnostics.asStateFlow()
+
+    fun refreshStorageDiagnostics() {
+        runCatching {
+            val files = appContext.filesDir.listFiles()?.filter { it.name.endsWith(".db") } ?: emptyList()
+            _storageDiagnostics.value = files.map { f ->
+                val plain = runCatching {
+                    f.inputStream().use { i -> val h = ByteArray(16); i.read(h) == 16 && h.copyOf(15).contentEquals("SQLite format 3".toByteArray()) }
+                }.getOrDefault(false)
+                com.mini.me_core.datalayer.engine.DbDiagnostic(
+                    name = f.name, fileName = f.name,
+                    userVersion = -1, tableCount = -1, encrypted = !plain,
+                )
+            }
+        }
+    }
 
     /**
      * 请求 SettingsScreen 切到指定二级分区。
@@ -167,8 +192,8 @@ class SettingsViewModel @Inject constructor(
     // ── 筛选防抖触发器：每次筛选变化递增，外层 debounce 300ms 后消费 ──
     private val _filterTrigger = MutableStateFlow(0L)
 
-    // ── 实时尾随文件观察器 ──
-    private var _liveTailFileObserver: android.os.FileObserver? = null
+    // ── 实时尾随文件观察器（轮询式，类似 tail -f；页面退出/onCleared 时停止） ──
+    private var _liveTailWatcher: FileWatcher? = null
 
     private val _providers = MutableStateFlow<List<AIProviderConfig>>(emptyList())
     val providers: StateFlow<List<AIProviderConfig>> = _providers.asStateFlow()
@@ -219,6 +244,10 @@ class SettingsViewModel @Inject constructor(
     // D4-3 SOP 清单摘要常驻注入子开关（默认开）。
     private val _sopSummaryEnabled = MutableStateFlow(true)
     val sopSummaryEnabled: StateFlow<Boolean> = _sopSummaryEnabled.asStateFlow()
+
+    // (F6) step 注入预算（紧凑400/标准800/宽松1200）。
+    private val _stepInjectBudget = MutableStateFlow(800)
+    val stepInjectBudget: StateFlow<Int> = _stepInjectBudget.asStateFlow()
 
     // D5-pa Playbook 自动触发子开关（默认开，对齐 §3.5）。
     private val _playbookAutoEnabled = MutableStateFlow(true)
@@ -452,6 +481,12 @@ class SettingsViewModel @Inject constructor(
             launch {
                 normFlowSettingsRepository.sopSummaryEnabledFlow.collectLatest {
                     _sopSummaryEnabled.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.stepInjectBudgetFlow.collectLatest {
+                    _stepInjectBudget.value = it
                 }
             }
 
@@ -695,23 +730,46 @@ class SettingsViewModel @Inject constructor(
 
     private fun startLiveTail() {
         _logViewerState.update { it.copy(liveTailEnabled = true, hasNewLogs = false) }
-        // 启动 FileObserver 监听日志目录变化
-        val logDir = FileLogger.getLogDir() ?: return
-        _liveTailFileObserver = object : android.os.FileObserver(logDir, android.os.FileObserver.CLOSE_WRITE) {
-            override fun onEvent(event: Int, path: String?) {
-                if (path != null && path.startsWith("log-")) {
-                    _logViewerState.update { it.copy(hasNewLogs = true) }
-                }
-            }
-        }.apply { startWatching() }
-        // 立即刷新一次
+        // 立即加载一次尾部内容作为基线
         refreshLogs()
+        // 启动轮询式文件观察器：实时把新增行追加进视图（tail -f），不再只置角标
+        val logDir = FileLogger.getLogDir() ?: return
+        val targetFile = resolveTailTargetFile(logDir) ?: return
+        _liveTailWatcher = FileWatcher(
+            file = targetFile,
+            pollIntervalMs = LIVE_TAIL_POLL_MS,
+            onNewLines = { newLines ->
+                // FileWatcher 回调在 IO 线程，切到 viewModelScope 主线程更新状态
+                viewModelScope.launch { appendLiveTailLines(newLines) }
+            }
+        ).also { it.start(viewModelScope) }
     }
 
     private fun stopLiveTail() {
-        _liveTailFileObserver?.stopWatching()
-        _liveTailFileObserver = null
+        _liveTailWatcher?.stop()
+        _liveTailWatcher = null
         _logViewerState.update { it.copy(liveTailEnabled = false, hasNewLogs = false) }
+    }
+
+    /**
+     * 解析当前要尾随的日志文件：优先用户选中的文件，否则取最新日期的 `log-*.txt`。
+     * 日志目录经 [FileLogger.getLogDir]（内部走 LogDirectoryResolver 解析）。
+     */
+    private fun resolveTailTargetFile(logDir: java.io.File): java.io.File? {
+        val candidates = logDir.listFiles { f -> f.isFile && f.name.startsWith("log-") }?.toList().orEmpty()
+        if (candidates.isEmpty()) return null
+        val selected = _logViewerState.value.selectedFileName
+        if (!selected.isNullOrBlank()) {
+            candidates.firstOrNull { it.name == selected }?.let { return it }
+        }
+        return candidates.maxByOrNull { it.name }
+    }
+
+    /** 把尾随到的新行并入原始缓存并重跑本地过滤，实时刷新视图（与手动筛选同一管线）。 */
+    private fun appendLiveTailLines(newLines: List<String>) {
+        if (newLines.isEmpty()) return
+        _cachedRawLines = (_cachedRawLines + newLines).takeLast(MAX_RAW_CACHE_LINES)
+        applyLocalFilters()
     }
 
     fun dismissNewLogs() {
@@ -985,6 +1043,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setStepInjectBudget(value: Int) {
+        viewModelScope.launch {
+            normFlowSettingsRepository.setStepInjectBudget(value)
+        }
+    }
+
     fun setPlaybookAutoEnabled(enabled: Boolean) {
         viewModelScope.launch {
             normFlowSettingsRepository.setPlaybookAutoEnabled(enabled)
@@ -994,6 +1058,19 @@ class SettingsViewModel @Inject constructor(
     fun setIdleConvergeEnabled(enabled: Boolean) {
         viewModelScope.launch {
             normFlowSettingsRepository.setIdleConvergeEnabled(enabled)
+        }
+    }
+
+    // E3 配置导入导出：导出为 JSON 字符串（调用方负责写 Downloads）；导入解析后批量写 KVStore。
+    /** 导出当前规范流程配置为 JSON；失败返回 null。 */
+    suspend fun exportNormFlowJson(): String? =
+        runCatching { normFlowSettingsRepository.exportToJson() }.getOrNull()
+
+    /** 从 JSON 字符串导入配置；返回是否成功解析写入。 */
+    fun importNormFlowJson(json: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val ok = runCatching { normFlowSettingsRepository.importFromJson(json) }.getOrDefault(false)
+            onResult(ok)
         }
     }
 
@@ -1020,12 +1097,12 @@ class SettingsViewModel @Inject constructor(
                 } ?: return@launch
             containerSettingsRepository.setActiveProfile(id)
             when (profile.mode) {
-                ExecutionMode.LOCAL_PROOT -> {
+                AgentExecutionMode.LOCAL_PROOT -> {
                     executionModeRepository.setExecutionMode(ExecutionMode.LOCAL_PROOT)
                     executionModeHolder.setMode(ExecutionMode.LOCAL_PROOT)
                 }
 
-                ExecutionMode.REMOTE_SSH -> {
+                AgentExecutionMode.REMOTE_SSH -> {
                     val ssh = profile.rootfsSource as? RootfsSource.RemoteSsh ?: return@launch
                     val conn = remoteConnections.value.firstOrNull { it.id == ssh.connectionId }
                         ?: return@launch
@@ -1106,7 +1183,7 @@ class SettingsViewModel @Inject constructor(
             if (_activeProfileId.value == profile.id) {
                 containerSettingsRepository.setActiveProfile(ContainerProfile.BUILTIN_ID)
                 // 删的是当前激活的远程镜像：回退到内置本地镜像，同步切回本地模式
-                if (profile.mode == ExecutionMode.REMOTE_SSH) {
+                if (profile.mode == AgentExecutionMode.REMOTE_SSH) {
                     executionModeRepository.setExecutionMode(ExecutionMode.LOCAL_PROOT)
                     executionModeHolder.setMode(ExecutionMode.LOCAL_PROOT)
                 }

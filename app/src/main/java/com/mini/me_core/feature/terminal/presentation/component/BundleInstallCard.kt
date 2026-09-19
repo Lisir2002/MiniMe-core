@@ -135,6 +135,7 @@ fun BundleInstallCard(
     onOpenLogDialog: () -> Unit,
     modifier: Modifier = Modifier,
     onCopyError: ((String) -> Unit)? = null,
+    showUpdate: Boolean = false,
 ) {
     // F：卡片背景 phase tint（DOWNLOAD=蓝5% / INSTALL=绿5% / FAILED=红10% / DONE=绿8%）
     val baseBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
@@ -184,6 +185,7 @@ fun BundleInstallCard(
                 onInstallClick = onInstallClick,
                 onUninstallClick = onUninstallClick,
                 onOpenLogDialog = onOpenLogDialog,
+                showUpdate = showUpdate,
             )
         }
     }
@@ -199,8 +201,17 @@ private fun InstallingProgressLayout(
     onInstallClick: () -> Unit,
     onUninstallClick: () -> Unit,
     onOpenLogDialog: () -> Unit,
+    showUpdate: Boolean = false,
 ) {
     Column(modifier = Modifier.padding(Spacing.lg)) {
+        // E4：有更新版本徽标，一键重新安装。
+        if (showUpdate && bundleState is BundleInstallState.Installed) {
+            androidx.compose.material3.AssistChip(
+                onClick = onInstallClick,
+                label = { Text("有更新版本，点击重新安装") },
+                modifier = Modifier.padding(bottom = Spacing.sm),
+            )
+        }
         // ── L1：标题 + 分段进度条 + 尾部百分比 ──
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -336,6 +347,30 @@ private fun DoneSummaryBoard(
     installedChip: Boolean,
 ) {
     Column(modifier = Modifier.padding(Spacing.lg)) {
+        // E2：非轻量 bundle（Python/Node/QEMU）卸载前二次确认；轻量（rg/net）直接卸。
+        var showUninstallConfirm by remember { mutableStateOf(false) }
+        val isHeavy = bundle.id == com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId.PYTHON ||
+            bundle.id == com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId.NODE ||
+            bundle.id == com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId.QEMU_X86_TRANSLATOR
+        val requestUninstall = {
+            if (isHeavy) showUninstallConfirm = true else onUninstallClick()
+        }
+        if (showUninstallConfirm) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showUninstallConfirm = false },
+                title = { Text("确认卸载 ${bundle.title}？") },
+                text = { Text("将释放约 ${bundle.sizeEstimateMb} MB。hook 配置（git 凭据/shell 切换/qemu wrapper）不会自动恢复，需手动重装。") },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        showUninstallConfirm = false
+                        onUninstallClick()
+                    }) { Text("确认卸载") }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { showUninstallConfirm = false }) { Text("取消") }
+                }
+            )
+        }
         // ── 标题行 ──
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
@@ -399,7 +434,7 @@ private fun DoneSummaryBoard(
         ) {
             if (installedChip) {
                 ElevatedAssistChip(
-                    onClick = onUninstallClick,
+                    onClick = requestUninstall,
                     leadingIcon = { Icon(Icons.Rounded.Delete, null, modifier = Modifier.size(14.dp)) },
                     label = { Text(stringResource(R.string.ui____81824cff_2), style = MaterialTheme.typography.labelMedium) },
                     colors = AssistChipDefaults.elevatedAssistChipColors(
@@ -566,6 +601,11 @@ private fun InstallActionsChip(
             onClick = onInstall,
             icon = Icons.Rounded.Add,
             text = stringResource(R.string.ui____132c5cdc),
+        )
+        is BundleInstallState.PartialInstalled -> PrimaryButton(
+            onClick = onInstall,
+            icon = Icons.Rounded.Refresh,
+            text = "部分安装：缺少 ${state.missing.joinToString(", ")}",
         )
         BundleInstallState.NotInstalled -> PrimaryButton(
             onClick = onInstall,
@@ -1135,6 +1175,10 @@ private fun TokenizedStatusLine(
                         is BundleInstallState.Failed -> Triple(
                             Color(0xFFC62828), Icons.Rounded.Warning,
                             state.reason.take(40),
+                        )
+                        is BundleInstallState.PartialInstalled -> Triple(
+                            Color(0xFFF57C00), Icons.Rounded.Refresh,
+                            "部分安装：缺少 ${state.missing.joinToString(", ")}",
                         )
                         BundleInstallState.NotInstalled -> Triple(
                             MaterialTheme.colorScheme.onSurfaceVariant, Icons.Rounded.Inventory2,

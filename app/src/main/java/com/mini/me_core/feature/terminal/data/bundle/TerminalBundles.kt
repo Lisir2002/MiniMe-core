@@ -35,14 +35,17 @@ sealed interface BundleInstallState {
     /** 未安装，且没有正在进行的操作。 */
     data object NotInstalled : BundleInstallState
 
-    /** 正在安装。[line] 为 apk 输出行（可为 null，UI 此时只显示进度条转圈）。 */
-    data class Installing(val line: String? = null) : BundleInstallState
+    /** 正在安装。[line] 为 apk 输出行（可为 null）；[progress] 为 0f..1f 估算进度，null=未知（Indeterminate）。 */
+    data class Installing(val line: String? = null, val progress: Float? = null) : BundleInstallState
 
     /** 安装失败。[reason] 为错误信息。 */
     data class Failed(val reason: String) : BundleInstallState
 
     /** 已安装，[installedVersion] 为当前 bundle 定义版本号（用于升级时触发重装）。 */
     data class Installed(val installedVersion: Int) : BundleInstallState
+
+    /** 部分安装：[missing] 为本应安装但仍不在 world 的 apk 包名。 */
+    data class PartialInstalled(val missing: List<String>) : BundleInstallState
 
     /** 正在卸载。 */
     data object Uninstalling : BundleInstallState
@@ -68,8 +71,8 @@ data class TerminalBundle(
     val version: Int,
     /** AI 推荐组合一键安装是否勾选该 bundle。 */
     val includedInAiRecommended: Boolean,
-    /** 安装后需执行的一次性 hook shell（例如切默认 shell、写 git 配置）。可 null。 */
-    val postInstallHook: String? = null
+    /** F4：安装后一次性 hook 脚本文件名（assets/bundle-hooks/<hookFileName>）。可 null=无 hook。 */
+    val hookFileName: String? = null
 )
 
 /**
@@ -107,84 +110,7 @@ object TerminalBundles {
             packages = "python3 py3-pip",
             version = 2,
             includedInAiRecommended = true,
-            postInstallHook = """
-            # ============================================================
-            # S2 Fix: Python pip 安装的三链路兜底
-            # ============================================================
-            set +e
-            pip_ok=0
-            if command -v apk >/dev/null 2>&1; then
-              if apk info -e py3-pip >/dev/null 2>&1; then
-                echo "[pip] 链路1 命中：py3-pip 已安装，OK"
-                pip_ok=1
-              else
-                echo "[pip] 链路2：尝试 apk add py3-pip（依赖 community 仓库）"
-                apk add --no-cache py3-pip >/tmp/py3_pip_apk.log 2>&1
-                if [ ${'$'}? -eq 0 ] && apk info -e py3-pip >/dev/null 2>&1; then
-                  echo "[pip] 链路2 成功"
-                  pip_ok=1
-                else
-                  echo "[pip] 链路2 失败，apk 日志末 3 行："
-                  tail -n 3 /tmp/py3_pip_apk.log 2>/dev/null || true
-                fi
-              fi
-            fi
-            if [ "${'$'}pip_ok" -eq 0 ]; then
-              echo "[pip] 链路3：python3 -m ensurepip --upgrade（不依赖 Alpine 仓库）"
-              python3 -m ensurepip --upgrade >/tmp/py3_ensurepip.log 2>&1
-              rc=${'$'}?
-              if command -v pip3 >/dev/null 2>&1 || python3 -m pip --version >/dev/null 2>&1; then
-                echo "[pip] 链路3 成功 (ensurepip rc=${'$'}rc)"
-                pip_ok=1
-              else
-                echo "[pip] 链路3 失败，ensurepip 日志末 3 行："
-                tail -n 3 /tmp/py3_ensurepip.log 2>/dev/null || true
-              fi
-            fi
-            if [ "${'$'}pip_ok" -eq 0 ]; then
-              echo "[pip] 链路4：下载 PyPA get-pip.py 终极安装（失败 3 次停止不占网）"
-              GP_URL="https://bootstrap.pypa.io/get-pip.py"
-              GP_TMP="/tmp/get-pip.py"
-              got=0
-              for i in 1 2 3; do
-                rm -f "${'$'}GP_TMP"
-                if command -v curl >/dev/null 2>&1; then
-                  curl -fsSL "${'$'}GP_URL" -o "${'$'}GP_TMP" >/dev/null 2>&1
-                elif command -v wget >/dev/null 2>&1; then
-                  wget -q "${'$'}GP_URL" -O "${'$'}GP_TMP" >/dev/null 2>&1
-                else
-                  echo "[pip] 链路4 中止：容器内无 curl/wget"
-                  break
-                fi
-                if [ -s "${'$'}GP_TMP" ] && [ "${'$'}(wc -c < "${'$'}GP_TMP")" -gt 4096 ]; then
-                  got=1
-                  break
-                fi
-                sleep 1
-              done
-              if [ "${'$'}got" -eq 1 ]; then
-                python3 "${'$'}GP_TMP" >/tmp/py3_getpip.log 2>&1
-                if command -v pip3 >/dev/null 2>&1 || python3 -m pip --version >/dev/null 2>&1; then
-                  echo "[pip] 链路4 成功"
-                  pip_ok=1
-                else
-                  echo "[pip] 链路4 失败，get-pip 日志末 3 行："
-                  tail -n 3 /tmp/py3_getpip.log 2>/dev/null || true
-                fi
-              fi
-              rm -f "${'$'}GP_TMP"
-            fi
-            if [ "${'$'}pip_ok" -eq 1 ]; then
-              echo "[pip] 三链路兜底成功。pip 版本："
-              python3 -m pip --version 2>&1 || pip3 --version 2>&1 || true
-              python3 -m pip install --upgrade 'pip<25' >/dev/null 2>&1 || true
-              exit 0
-            else
-              echo "[pip] 三链路全部失败（可能容器网络未就绪），本次 Python bundle 仍算装成"
-              echo "[pip] （后续用户手动运行：apk add py3-pip 或 python3 -m ensurepip）"
-              exit 0
-            fi
-            """.trimIndent()
+            hookFileName = "python.sh"
         ),
         TerminalBundle(
             id = TerminalBundleId.NODE,
@@ -215,13 +141,7 @@ object TerminalBundles {
             packages = "git",
             version = 2,
             includedInAiRecommended = true,
-            postInstallHook =
-            """
-            # 配置 credential.helper=store：把 ~/.git-credentials 放在宿主共享目录
-            # /data/data/<pkg>/files/git/ 下（由 ContainerEngine 参数 -H /root/.git-credentials -> 该路径映射），
-            # 跨 rootfs 升级不丢。
-            git config --global credential.helper store 2>/dev/null || true
-            """.trimIndent()
+            hookFileName = "git.sh"
         ),
         TerminalBundle(
             id = TerminalBundleId.BASH,
@@ -232,44 +152,7 @@ object TerminalBundles {
             packages = "bash less ncurses",
             version = 1,
             includedInAiRecommended = true,
-            postInstallHook =
-            """
-            # 把 /etc/passwd 中 root 的 shell 从 /bin/sh 改成 /bin/bash
-            # （busybox adduser 的默认 sh；sed 一次到位）。
-            if grep -q '^root:' /etc/passwd 2>/dev/null; then
-              sed -i 's|^root:\([^:]*\):\([^:]*\):\([^:]*\):\([^:]*\):\([^:]*\):\([^:]*\):/bin/sh$|root:\1:\2:\3:\4:\5:\6:/bin/bash|' /etc/passwd 2>/dev/null || true
-            fi
-            # 新用户默认 shell / 兜底环境变量
-            [ -f /etc/default/useradd ] || echo 'SHELL=/bin/bash' > /etc/default/useradd 2>/dev/null || true
-            # PS1 前缀钩子：无论 .bashrc 里原先 PS1 如何设定，都在最前面加上 "> "
-            # 用 PROMPT_COMMAND 确保渲染前补前缀；去重函数防止嵌套补两次
-            mkdir -p /root
-            cat >> /root/.bashrc <<'BASHRC_EOF'
-            __apply_prompt_prefix() {
-              case "${'$'}PS1" in
-                '> '*) : ;;
-                *) PS1='> '${'$'}PS1 ;;
-              esac
-            }
-            case ";${'$'}{PROMPT_COMMAND:-};" in
-              *";__apply_prompt_prefix;"*) : ;;
-              *) PROMPT_COMMAND="__apply_prompt_prefix${'$'}{PROMPT_COMMAND:+;${'$'}PROMPT_COMMAND}" ;;
-            esac
-            BASHRC_EOF
-            # 系统级兜底（其他用户 / 非交互登录）
-            cat >> /etc/profile <<'PROFILE_EOF'
-            __apply_prompt_prefix() {
-              case "${'$'}PS1" in
-                '> '*) : ;;
-                *) PS1='> '${'$'}PS1 ;;
-              esac
-            }
-            case ";${'$'}{PROMPT_COMMAND:-};" in
-              *";__apply_prompt_prefix;"*) : ;;
-              *) PROMPT_COMMAND="__apply_prompt_prefix${'$'}{PROMPT_COMMAND:+;${'$'}PROMPT_COMMAND}" ;;
-            esac
-            PROFILE_EOF
-            """.trimIndent()
+            hookFileName = "bash.sh"
         ),
         TerminalBundle(
             id = TerminalBundleId.NET,
@@ -290,107 +173,7 @@ object TerminalBundles {
             packages = "qemu-user-static file",
             version = 1,
             includedInAiRecommended = false,
-            postInstallHook =
-            """
-            # —— QEMU x86 translator 安装后的一次性部署：
-            #   1. 提供 /usr/local/bin/qemu-x86_64 稳定入口（Alpine 包装到 /usr/bin/qemu-aarch64 族，
-            #      /usr/bin/qemu-x86_64 存在则直接软链；不在则尝试查找带版本号的同名二进制）。
-            #   2. 安装 /usr/local/bin/minime-wrap-android-buildtools：扫描 ANDROID_HOME/build-tools
-            #      下所有 x86/x86_64 ELF，生成 qemu-x86_64 调用的 shell wrapper，解决 PRoot 无 binfmt
-            #      导致「Exec format error」的根本问题。脚本幂等：已是 wrapper 或已是 aarch64 ELF 不处理。
-            set +e
-            QEMU_TARGET="/usr/local/bin/qemu-x86_64"
-            mkdir -p /usr/local/bin
-            if [ -x /usr/bin/qemu-x86_64 ]; then
-              ln -sf /usr/bin/qemu-x86_64 "${'$'}QEMU_TARGET"
-            else
-              ALT="${'$'}(command -v qemu-x86_64 2>/dev/null || true)"
-              if [ -n "${'$'}ALT" ] && [ -x "${'$'}ALT" ]; then
-                ln -sf "${'$'}ALT" "${'$'}QEMU_TARGET"
-              else
-                FOUND="${'$'}(find /usr /opt -maxdepth 5 -type f -name 'qemu-x86_64*' -executable 2>/dev/null | head -1)"
-                if [ -n "${'$'}FOUND" ]; then
-                  ln -sf "${'$'}FOUND" "${'$'}QEMU_TARGET"
-                fi
-              fi
-            fi
-
-            cat > /usr/local/bin/minime-wrap-android-buildtools <<'WRAPPER_SH_EOF'
-            #!/bin/sh
-            # 扫描 ANDROID_HOME/build-tools 下所有版本目录，把 x86/x86_64 静态/动态 ELF 改成同名 qemu wrapper。
-            # 原二进制改名 <name>.x86bin（若已存在则跳过），新同名脚本 exec /usr/local/bin/qemu-x86_64 <原二进制> "${'$'}@"。
-            set +e
-            QEMU="${'$'}{MINIME_QEMU_X86:-/usr/local/bin/qemu-x86_64}"
-            if [ ! -x "${'$'}QEMU" ]; then
-              echo "[ERROR] qemu-x86_64 未找到：${'$'}QEMU。请确认「x86 构建转译器」bundle 已安装。"
-              exit 2
-            fi
-            SDK="${'$'}{ANDROID_HOME:-${'$'}ANDROID_SDK_ROOT}"
-            if [ -z "${'$'}SDK" ] || [ ! -d "${'$'}SDK/build-tools" ]; then
-              echo "[WARN] 未发现 ANDROID_HOME/build-tools：SDK=${'$'}SDK。未安装或未导出环境变量，跳过 wrapper。"
-              exit 0
-            fi
-            wrap_one() {
-              local f="${'$'}1"
-              [ -f "${'$'}f" ] || return 0
-              [ -x "${'$'}f" ] || return 0
-              [ -L "${'$'}f" ] && return 0
-              # 已经是 wrapper（第一行含 qemu-x86_64）则跳过
-              if head -n 3 "${'$'}f" 2>/dev/null | grep -q 'qemu-x86_64' ; then return 0; fi
-              local arch
-              arch="${'$'}(file -b --mime-type - < "${'$'}f" 2>/dev/null)"
-              case "${'$'}arch" in
-                application/x-executable|application/x-pie-executable|application/x-sharedlib) : ;;
-                *) return 0 ;;
-              esac
-              local elf_hdr
-              elf_hdr="${'$'}(head -c 20 "${'$'}f" 2>/dev/null | od -An -tx1 | tr -d ' \n')"
-              # ELF magic (7f454c46) + EI_CLASS=2(64位) + EI_DATA=1(LSB) + EI_MACHINE=003e(x86_64) / 0003(i386)
-              case "${'$'}elf_hdr" in
-                7f454c4602010100*3e00*) : ok x86_64 ;;
-                7f454c4601010100*0300*) : ok i386 ;;
-                *) return 0 ;;
-              esac
-              local bin="${'$'}f.x86bin"
-              if [ -e "${'$'}bin" ]; then
-                echo "[skip] 已存在备份，跳过：${'$'}f"
-                return 0
-              fi
-              mv "${'$'}f" "${'$'}bin" || { echo "[fail] mv ${'$'}f -> ${'$'}bin"; return 0; }
-              cat > "${'$'}f" <<WRAP_EOF
-            #!/bin/sh
-            exec "${'$'}QEMU" "${'$'}bin" "\$@"
-            WRAP_EOF
-              chmod +x "${'$'}f"
-              echo "[wrap] ${'$'}f -> qemu-x86_64 ${'$'}bin"
-            }
-            TOTAL=0
-            for d in "${'$'}SDK"/build-tools/*/; do
-              [ -d "${'$'}d" ] || continue
-              echo "[scan] ${'$'}d"
-              # cmdline-tools / build-tools 常见二进制（x86 版）：aapt2 aapt zipalign split-select aidl dexdump d8 apksigner libLTO.so etc.
-              for candidate in \
-                aapt2 aapt zipalign split-select aidl dexdump llvm-rs-cc \
-                d8 apkanalyzer avdmanager lint screenshot2 sdkmanager jobb \
-                libaapt2.so libbcc.so libLLVM.so libcutils.so; do
-                if [ -f "${'$'}d${'$'}candidate" ]; then wrap_one "${'$'}d${'$'}candidate"; TOTAL="${'$'}((${'$'}TOTAL + 1))"; fi
-              done
-              # lib/ 下 x86_64 子目录常见动态库（aapt2 加载用）：软链到上层同名可能被 qemu 需要；这里仅做 wrapper，保持路径不动
-              if [ -d "${'$'}dlib" ]; then
-                find "${'$'}dlib" -type f -not -name '*.x86bin' 2>/dev/null | while read -r so; do wrap_one "${'$'}so"; done
-              fi
-            done
-            echo "[done] 共扫描/尝试包装 ${'$'}TOTAL 个候选文件。"
-            WRAPPER_SH_EOF
-            chmod +x /usr/local/bin/minime-wrap-android-buildtools
-
-            if command -v /usr/local/bin/minime-wrap-android-buildtools >/dev/null 2>&1; then
-              echo "[hook OK] 已安装 minime-wrap-android-buildtools。"
-            else
-              echo "[hook FAIL] minime-wrap-android-buildtools 未写成功。"
-              exit 1
-            fi
-            """.trimIndent()
+            hookFileName = "qemu_x86_translator.sh"
         )
     )
 

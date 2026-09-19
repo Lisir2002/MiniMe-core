@@ -152,7 +152,14 @@ internal fun LogsSection(
                 .padding(top = Spacing.md, bottom = Spacing.lg)
         ) {
             when (selectedTab) {
-                0 -> LogLevelCard(current = currentLogLevel, onSelect = onSelectLogLevel)
+                0 -> {
+                    val ctx = androidx.compose.ui.platform.LocalContext.current
+                    LogLevelCard(
+                        current = currentLogLevel,
+                        onSelect = onSelectLogLevel,
+                        onClearAll = { com.mini.me_core.core.util.FileLogger.clearAllLogs(ctx) }
+                    )
+                }
                 1 -> LogViewerContent(
                     state = logViewerState,
                     onSelectFile = onSelectFile,
@@ -178,7 +185,8 @@ internal fun LogsSection(
 @Composable
 internal fun LogLevelCard(
     current: LogLevel,
-    onSelect: (LogLevel) -> Unit
+    onSelect: (LogLevel) -> Unit,
+    onClearAll: () -> Unit = {},
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -200,6 +208,70 @@ internal fun LogLevelCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.sm)
             )
+            // (d-UI) 清空所有日志按钮。
+            androidx.compose.material3.TextButton(onClick = onClearAll) {
+                Text("清空所有日志")
+            }
+            // (c-UI) 写入状态：连续失败≥10 黄条提示。
+            val errCount = com.mini.me_core.core.util.FileLogger.writeErrorCount
+            if (errCount >= 10) {
+                androidx.compose.material3.Surface(
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(Radius.sm),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs)
+                ) {
+                    Text(
+                        "日志写入异常：最近 $errCount 次连续失败，请检查存储权限/空间",
+                        modifier = Modifier.padding(Spacing.sm),
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            } else {
+                Text(
+                    "日志写入状态：正常",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = Spacing.xs)
+                )
+            }
+            // (g-UI) 隐私模式开关；(h-UI) JSON Lines 格式开关。
+            var privacy by remember { mutableStateOf(com.mini.me_core.core.util.FileLogger.privacyMode) }
+            androidx.compose.material3.Switch(
+                checked = privacy,
+                onCheckedChange = {
+                    privacy = it
+                    com.mini.me_core.core.util.FileLogger.setPrivacyMode(it)
+                }
+            )
+            Text("隐私模式（开启后不落盘，仅 logcat）", modifier = Modifier.padding(start = Spacing.sm))
+            var jsonFmt by remember { mutableStateOf(com.mini.me_core.core.util.FileLogger.jsonLines) }
+            androidx.compose.material3.Switch(
+                checked = jsonFmt,
+                onCheckedChange = {
+                    jsonFmt = it
+                    com.mini.me_core.core.util.FileLogger.setJsonLines(it)
+                }
+            )
+            Text("JSON Lines 格式", modifier = Modifier.padding(start = Spacing.sm))
+            // (j-UI) 自定义敏感词输入，回车/添加即调 setCustomTerms。
+            var termInput by remember { mutableStateOf("") }
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)
+            ) {
+                androidx.compose.material3.OutlinedTextField(
+                    value = termInput,
+                    onValueChange = { termInput = it },
+                    label = { Text("自定义敏感词") },
+                    modifier = Modifier.weight(1f)
+                )
+                androidx.compose.material3.TextButton(onClick = {
+                    val t = termInput.trim()
+                    if (t.isNotEmpty()) {
+                        com.mini.me_core.core.util.FileLogger.setCustomTerms(listOf(t))
+                        termInput = ""
+                    }
+                }) { Text("添加") }
+            }
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),

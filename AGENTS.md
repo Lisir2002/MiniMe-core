@@ -45,7 +45,7 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 | 构建 | Android Gradle Plugin 8.9.3 + KSP |
 | UI | Jetpack Compose（BOM 2025.12.01）+ Material 3 |
 | 依赖注入 | Hilt 2.56.1 (Dagger) |
-| 数据库 | SQLDelight 2.2.1（6 库拓扑，`datalayer/`；SQLCipher 加密读写）；旧 Room 数据层已完全移除 |
+| 数据库 | SQLDelight 2.2.1（4 库：agent/credentials/workspace/aux）+ SQLCipher 全盘加密（Keystore 密钥）+ 凭据字段级 AES-GCM；旧 Room 已完全移除 |
 | 网络 | Retrofit 2.11.0 + OkHttp 4.12.0 + Gson |
 | 终端 | Termux terminal-emulator + terminal-view（JNI libtermux.so） |
 | 容器 | PRoot + Alpine Linux 3.21 rootfs（arm64-v8a / x86_64 双架构，运行时按宿主选择） |
@@ -231,7 +231,7 @@ Hilt 被广泛使用。各 Feature 模块定义自己的 DI 模块（如 `AgentM
 
 ## 数据库与迁移
 
-数据层为 **SQLDelight V2 六库拓扑**（`datalayer/`），旧 Room 数据层（世代0 巨型单库 `LegacyAgentDatabase`、世代1 按域拆 5 库、全部 DAO/`@Entity` 注解/迁移基建/Room gradle 依赖）已从程序**完全剔除**。
+数据层为 **SQLDelight V2 四库拓扑**（agent/credentials/workspace/aux，`datalayer/`）+ SQLCipher 全盘加密（Keystore 独立随机密钥）+ 凭据字段级 AES-GCM，旧 Room 数据层（世代0 巨型单库 `LegacyAgentDatabase`、世代1 按域拆 5 库、全部 DAO/`@Entity` 注解/迁移基建/Room gradle 依赖）已从程序**完全剔除**。
 
 **V2 分层**：
 - L0 引擎 `datalayer/engine`：ConnectionPool + Plain/CipherDriverFactory（Cipher 即 SQLCipher 加密读写）。

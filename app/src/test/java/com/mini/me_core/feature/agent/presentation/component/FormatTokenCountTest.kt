@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.agent.presentation.component
 
+import com.mini.me_core.ui.markdown.formatTokenCount
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

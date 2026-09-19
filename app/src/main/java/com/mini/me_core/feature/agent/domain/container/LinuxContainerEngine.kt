@@ -1,11 +1,11 @@
 package com.mini.me_core.feature.agent.domain.container
 
 import com.mini.me_core.core.environment.EnvironmentDetector
-import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.progress.ApkStdoutParser
+import com.mini.me_core.core.model.MiniMeLog
+import com.mini.me_core.core.container.ApkStdoutParser
 import com.mini.me_core.feature.agent.domain.container.progress.InstallPhase
 import com.mini.me_core.feature.agent.domain.container.progress.ParallelPrefetchManager
-import com.mini.me_core.feature.agent.domain.container.progress.PrefetchConcurrencyPolicy
+import com.mini.me_core.core.container.PrefetchConcurrencyPolicy
 import com.mini.me_core.feature.agent.domain.container.progress.ProgressSource
 import com.mini.me_core.feature.agent.domain.container.progress.RealProgressAggregator
 import com.mini.me_core.feature.terminal.data.bundle.BundleInstallState
@@ -16,6 +16,7 @@ import com.mini.me_core.feature.terminal.data.repository.TerminalBundleRepositor
 import com.mini.me_core.feature.workspace.domain.WorkspacePathMapper
 import com.mini.me_core.R
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -246,7 +247,7 @@ class LinuxContainerEngine @Inject constructor(
         timeoutMs: Long
     ): Flow<CommandEvent> = flow {
         val effectiveTimeout = timeoutMs.coerceIn(1L, MAX_TIMEOUT_MS)
-        FileLogger.d(TAG, "执行命令(流式) cwd=$projectPath timeout=${effectiveTimeout}ms: $command")
+        MiniMeLog.d(TAG, "执行命令(流式) cwd=$projectPath timeout=${effectiveTimeout}ms: $command")
         val process = startContainerProcess(command, projectPath)
         val timedOut = AtomicBoolean(false)
         // 看门狗跑在独立 scope（独立 Job）上：若放进包裹 emit 的 coroutineScope 里，emit 的
@@ -255,7 +256,7 @@ class LinuxContainerEngine @Inject constructor(
         val watchdog = launchKillWatchdog(watchScope, process, effectiveTimeout, timedOut, command)
         val cancellationHook = currentCoroutineContext()[Job]?.invokeOnCompletion { cause ->
             if (cause is CancellationException && process.isAlive) {
-                FileLogger.i(TAG, "命令被取消，终止进程: $command")
+                MiniMeLog.i(TAG, "命令被取消，终止进程: $command")
                 runCatching { process.destroy() }
                 runCatching { process.destroyForcibly() }
             }
@@ -269,13 +270,13 @@ class LinuxContainerEngine @Inject constructor(
             val exitCode = process.waitFor()
             watchdog.cancel()
             if (timedOut.get()) {
-                FileLogger.w(TAG, "命令超时(${effectiveTimeout}ms)已终止: $command")
+                MiniMeLog.w(TAG, "命令超时(${effectiveTimeout}ms)已终止: $command")
                 emit(CommandEvent.TimedOut)
                 emit(CommandEvent.Line(timeoutNotice(effectiveTimeout)))
                 emit(CommandEvent.Exit(null))
             } else {
-                if (exitCode != 0) FileLogger.w(TAG, "命令退出码=$exitCode: $command")
-                else FileLogger.v(TAG, "命令完成(退出码 0): $command")
+                if (exitCode != 0) MiniMeLog.w(TAG, "命令退出码=$exitCode: $command")
+                else MiniMeLog.v(TAG, "命令完成(退出码 0): $command")
                 emit(CommandEvent.Exit(exitCode))
             }
         } catch (e: CancellationException) {
@@ -288,12 +289,12 @@ class LinuxContainerEngine @Inject constructor(
             // 非 IO 异常也转成一行提示 + Exit，避免 flow 异常终止丢掉已输出内容。
             watchdog.cancel()
             if (timedOut.get()) {
-                FileLogger.w(TAG, "命令超时(${effectiveTimeout}ms)已终止(readLine 异常): $command", e)
+                MiniMeLog.w(TAG, "命令超时(${effectiveTimeout}ms)已终止(readLine 异常): $command", e)
                 emit(CommandEvent.TimedOut)
                 emit(CommandEvent.Line(timeoutNotice(effectiveTimeout)))
                 emit(CommandEvent.Exit(null))
             } else {
-                FileLogger.e(TAG, "命令读输出异常(已保留此前输出): $command", e)
+                MiniMeLog.e(TAG, "命令读输出异常(已保留此前输出): $command", e)
                 emit(CommandEvent.Line("[命令执行异常：${e.message}]"))
                 emit(CommandEvent.Exit(null))
             }
@@ -372,12 +373,12 @@ class LinuxContainerEngine @Inject constructor(
     ): ExecResult = withContext(Dispatchers.IO) {
         try {
             val effectiveTimeout = timeoutMs.coerceIn(1L, MAX_TIMEOUT_MS)
-            FileLogger.d(TAG, "执行命令(同步) cwd=$projectPath timeout=${effectiveTimeout}ms: $command")
+            MiniMeLog.d(TAG, "执行命令(同步) cwd=$projectPath timeout=${effectiveTimeout}ms: $command")
             val process = startContainerProcess(command, projectPath)
             val timedOut = AtomicBoolean(false)
             val cancellationHook = currentCoroutineContext()[Job]?.invokeOnCompletion { cause ->
                 if (cause is CancellationException && process.isAlive) {
-                    FileLogger.i(TAG, "命令被取消，终止进程: $command")
+                    MiniMeLog.i(TAG, "命令被取消，终止进程: $command")
                     runCatching { process.destroy() }
                     runCatching { process.destroyForcibly() }
                 }
@@ -409,18 +410,18 @@ class LinuxContainerEngine @Inject constructor(
             }
 
             if (timedOut.get()) {
-                FileLogger.w(TAG, "命令超时(${effectiveTimeout}ms)已终止: $command")
+                MiniMeLog.w(TAG, "命令超时(${effectiveTimeout}ms)已终止: $command")
                 output.append(timeoutNotice(effectiveTimeout))
                 output.append("\n")
                 ExecResult(output.build(), null, timedOut.get())
             } else {
-                FileLogger.v(TAG, "命令完成(退出码 $exitCode，输出 ${output.totalChars} 字符): $command")
+                MiniMeLog.v(TAG, "命令完成(退出码 $exitCode，输出 ${output.totalChars} 字符): $command")
                 ExecResult(output.build(), exitCode)
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            FileLogger.e(TAG, "执行命令异常: $command", e)
+            MiniMeLog.e(TAG, "执行命令异常: $command", e)
             ExecResult("Error: ${e.message}", null)
         }
     }
@@ -429,6 +430,19 @@ class LinuxContainerEngine @Inject constructor(
 
     /** 串行化 bundle 级的 apk 操作，避免两个按钮同时点触发两次 apk add。 */
     private val bundleOpMutex = Mutex()
+
+    /** F3：当前正在跑的 bundle 操作 Job（用于取消）。 */
+    @Volatile
+    private var currentBundleOpJob: kotlinx.coroutines.Job? = null
+
+    /** F3：取消当前 bundle 操作（cancel Job + 杀容器内 apk 进程）。取消回退上次已知态，不标 Failed。 */
+    suspend fun cancelCurrentBundleOp() {
+        currentBundleOpJob?.cancel("用户取消 bundle 操作")
+        runCatching {
+            execCaptured("pkill -f apk 2>/dev/null; true", projectPath = null, timeoutMs = 3000)
+        }.onFailure { MiniMeLog.w(TAG, "取消 bundle 操作杀 apk 进程失败", it) }
+        MiniMeLog.i(TAG, "用户取消 bundle 操作")
+    }
 
     /**
      * 把 execCaptured 包一层 Pair<String, Int?> 给 ParallelPrefetchManager 用，避免内部暴露 ExecResult。
@@ -455,6 +469,8 @@ class LinuxContainerEngine @Inject constructor(
         val bundle = TerminalBundles.byId(id) ?: throw IllegalArgumentException("未知 bundle: $id")
         if (!containerInstaller.isInstalledFor(currentProfile)) throw IllegalStateException("容器未初始化，请先初始化 rootfs")
         bundleOpMutex.withLock {
+            // F3：记录当前 Job 供 cancelCurrentBundleOp() 取消。
+            currentBundleOpJob = coroutineContext[kotlinx.coroutines.Job]
             // 已装直接返回
             if (bundleRepository.isInstalledSnapshot(id)) return
             bundleRepository.emitInstalling(id, line = "准备中…")
@@ -493,16 +509,22 @@ class LinuxContainerEngine @Inject constructor(
                         if (fin is ParallelPrefetchManager.PrefetchEvent.Finished) {
                             runCatching {
                                 progressAggregator.flushPrefetchFailures(fin.failedPackages)
-                            }.onFailure { t -> FileLogger.w(TAG, "flush failures err", t) }
+                            }.onFailure { t -> MiniMeLog.w(TAG, "flush failures err", t) }
                         }
                     }
                     // 给预取 800ms 头启动时间（让 curl 先拿 Content-Length，slot 立刻从 WAITING→DLING，UI 首帧不空方块）
                     kotlinx.coroutines.delay(800)
                 }.onFailure { t ->
-                    FileLogger.w(TAG, "prefetch prepare 跳过：${t.message}")
+                    MiniMeLog.w(TAG, "prefetch prepare 跳过：${t.message}")
                 }
 
-                val hookLines = bundle.postInstallHook?.trimIndent()?.lineSequence()?.count() ?: 0
+                // F4：hook 内容从 assets/bundle-hooks/<hookFileName> 读，不再内联在 Kotlin。
+                val hookContent: String? = bundle.hookFileName?.let { fn ->
+                    runCatching { context.assets.open("bundle-hooks/$fn").bufferedReader().use { it.readText() } }
+                        .onFailure { MiniMeLog.w(TAG, "读取 hook 失败 $fn", it) }
+                        .getOrNull()
+                }
+                val hookLines = hookContent?.lineSequence()?.count() ?: 0
                 val script = buildString {
                     // D2 Fix：apk exit=2 自愈（Alpine apk exit=2 = 包名找不到/约束不满足，
                     // 常见于 APKINDEX 还没同步或裸名 <-> 带版本名的 world 冲突）。
@@ -519,10 +541,10 @@ class LinuxContainerEngine @Inject constructor(
                     append("  apk add --no-cache ${bundle.packages}\n")
                     append("  APK_EXIT=\$?\n")
                     append("fi\n")
-                    bundle.postInstallHook?.let { hook ->
+                    hookContent?.let { hook ->
                         append("if [ \$APK_EXIT -eq 0 ]; then\n")
                         append("# post-install hook for ").append(id.stableKey).append('\n')
-                        append(hook.trimIndent().prependIndent("  ")).append('\n')
+                        append(hook.prependIndent("  ")).append('\n')
                         append("  APK_EXIT=\$?\n")
                         append("fi\n")
                     }
@@ -535,14 +557,20 @@ class LinuxContainerEngine @Inject constructor(
                 streamExecNoInstall(script, projectPath = null, timeoutMs = APK_ONE_BUNDLE_TIMEOUT_MS).collect { event ->
                     when (event) {
                         is CommandEvent.Line -> {
-                            bundleRepository.emitInstalling(id, line = event.text)
+                            // E1：从 apk 输出粗估进度（Fetching=下载中 ~0.5，OK: N MiB=接近完成 ~0.9）。
+                            val estProgress = when {
+                                event.text.startsWith("OK:") -> 0.9f
+                                event.text.startsWith("Fetching") -> 0.5f
+                                else -> null
+                            }
+                            bundleRepository.emitInstalling(id, line = event.text, progress = estProgress)
                             _initProgress.value = ContainerInitState.BundleInstalling(bundleId = id, line = event.text)
                             progressAggregator.onApkLine(event.text)
                             // S4：shell 里只要出现 WARNING fetching ... IO ERROR 就立刻 cancel 预取（避免继续占网）
                             val t = event.text
                             val lower = t.lowercase()
                             if ((lower.contains("warning: fetching") || lower.contains("io error")) && prefetchJob?.isActive == true) {
-                                FileLogger.w(TAG, "apk 行内出现镜像 IO WARNING → 立刻 cancel prefetch")
+                                MiniMeLog.w(TAG, "apk 行内出现镜像 IO WARNING → 立刻 cancel prefetch")
                                 prefetchJob?.cancel("apk stdout saw IO WARNING fetching")
                                 runCatching { prefetch.shutdown("apk stdout IO WARNING") }
                             }
@@ -562,7 +590,7 @@ class LinuxContainerEngine @Inject constructor(
                             exitCode = event.code
                             // S3：exitCode≠0 立刻 cancel prefetch（用户截图 FAILED 后还 5K/s 占网）
                             if (event.code != null && event.code != 0) {
-                                FileLogger.w(TAG, "apk exit=${event.code} → 立刻 cancel prefetch + shutdown（回收并发槽/Socket）")
+                                MiniMeLog.w(TAG, "apk exit=${event.code} → 立刻 cancel prefetch + shutdown（回收并发槽/Socket）")
                                 prefetchJob?.cancel("apk exit=${event.code} != 0")
                                 runCatching { prefetch.shutdown("apk exit=${event.code}") }
                             }
@@ -574,14 +602,14 @@ class LinuxContainerEngine @Inject constructor(
                             }
                         }
                         is CommandEvent.TimedOut -> {
-                            FileLogger.w(TAG, "apk 命令超时，立刻 cancel prefetch + shutdown")
+                            MiniMeLog.w(TAG, "apk 命令超时，立刻 cancel prefetch + shutdown")
                             prefetchJob?.cancel("apk timeout")
                             runCatching { prefetch.shutdown("apk timeout") }
                         }
                     }
                 }
             } catch (e: Exception) {
-                FileLogger.w(TAG, "安装 bundle ${id.stableKey} 异常", e)
+                MiniMeLog.w(TAG, "安装 bundle ${id.stableKey} 异常", e)
                 failedReason = "安装 ${bundle.displayName} 失败：${e.message}"
                 // S3：异常分支（比如 apk 解析炸/取消/etc.）也立刻释放预取资源
                 prefetchJob?.cancel("installBundle exception: ${e.message}")
@@ -610,11 +638,13 @@ class LinuxContainerEngine @Inject constructor(
                 )
                 if (exitCode == 0 && failedReason == null) {
                     bundleRepository.markInstalled(id, bundle)
-                    FileLogger.i(TAG, "Bundle 安装成功：${bundle.displayName} (${bundle.packages})")
+                    MiniMeLog.i(TAG, "Bundle 安装成功：${bundle.displayName} (${bundle.packages})")
                 } else {
-                    val reason = failedReason
+                    val base = failedReason
                         ?: "安装 ${bundle.displayName} 失败（exit=$exitCode），请在终端设置中重试"
-                    FileLogger.w(TAG, reason)
+                    // E3：失败 reason 自动追加常见原因，便于用户自助排查。
+                    val reason = "$base\n常见原因：1)容器网络未就绪 2)镜像源不通 3)磁盘不足"
+                    MiniMeLog.w(TAG, reason)
                     bundleRepository.markFailed(id, reason)
                 }
                 // ⚠️ 无论成功/失败/异常，最后都复位 _initProgress 回 Ready。
@@ -629,6 +659,7 @@ class LinuxContainerEngine @Inject constructor(
                 }
             }
         }
+        currentBundleOpJob = null
     }
 
     /** 批量安装多个 Bundle（AI 推荐组合一键安装使用）。遇到任一失败即停并向上抛。 */
@@ -668,19 +699,40 @@ class LinuxContainerEngine @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                FileLogger.w(TAG, "卸载 bundle ${id.stableKey} 异常", e)
+                MiniMeLog.w(TAG, "卸载 bundle ${id.stableKey} 异常", e)
                 // 异常不回退 state：实际可能是网络断等，让用户下次再试 apk del / 或重置容器。
                 bundleRepository.markUninstalled(id)
                 return@withLock
             } finally {
-                // apk del 的退出码我们相信为 0 就 OK。非 0 也把状态置为 NotInstalled——
-                // 因为 apk del 报"该包未安装"也会 exit != 0，我们不希望 UI 永远停在 Installing/Installed。
-                // 真失败下次 installBundle 会重新 apk add。
-                bundleRepository.markUninstalled(id)
-                FileLogger.i(TAG, "Bundle 卸载：${bundle.displayName} (exit=$exitCode)")
+                // F1：apk del 后验真——跑 apk info 确认主包已不在 world，才 markUninstalled；
+                // 仍在则 markFailed 并恢复 Installed，避免 UI 假卸载。
+                val pkgs = bundle.packages.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+                var stillInstalled: List<String> = emptyList()
+                runCatching {
+                    val installedNow = mutableSetOf<String>()
+                    streamExecNoInstall(
+                        "apk info 2>/dev/null",
+                        projectPath = null,
+                        timeoutMs = APK_LIST_TIMEOUT_MS
+                    ).collect { event ->
+                        if (event is CommandEvent.Line) {
+                            val line = event.text.trim()
+                            if (line.isNotBlank()) installedNow.add(line)
+                        }
+                    }
+                    stillInstalled = pkgs.filter { p ->
+                        installedNow.any { it == p || it.startsWith("$p-") }
+                    }
+                }.onFailure { MiniMeLog.w(TAG, "卸载后验真 apk info 失败", it) }
+
+                if (stillInstalled.isEmpty()) {
+                    bundleRepository.markUninstalled(id)
+                } else {
+                    bundleRepository.markFailed(id, "卸载失败：包仍存在（${stillInstalled.joinToString(", ")}）")
+                    bundleRepository.markInstalled(id, bundle)
+                }
+                MiniMeLog.i(TAG, "Bundle 卸载：${bundle.displayName} (exit=$exitCode, stillInstalled=$stillInstalled)")
                 // 无论成功/异常退出 withLock 前都复位 Ready，避免 UI 永远停在 BundleUninstalling。
-                // 同 installBundle：不再依赖 isInstalledFor（currentProfile 异步更新可能导致假阴性），
-                // 只看当前状态是否还停在 BundleInstalling/BundleUninstalling。
                 val cur = _initProgress.value
                 if (cur is ContainerInitState.BundleInstalling || cur is ContainerInitState.BundleUninstalling) {
                     _initProgress.value = ContainerInitState.Ready(migratedFromLegacyProvisioned = false)
@@ -756,17 +808,17 @@ class LinuxContainerEngine @Inject constructor(
                     val okPkgs = pkgs - failed.toSet()
                     if (okPkgs.isNotEmpty()) {
                         bundleRepository.addCustomSnapshots(okPkgs)
-                        FileLogger.i(TAG, "自定义包部分成功（exit=$exitCode，部分失败）：已安装=$okPkgs，失败=$failed")
+                        MiniMeLog.i(TAG, "自定义包部分成功（exit=$exitCode，部分失败）：已安装=$okPkgs，失败=$failed")
                     }
                 }
             }
             if (failed.isEmpty()) {
                 // 全成功：加到自定义包快照（UI 列表/磁盘标记都更新）
                 bundleRepository.addCustomSnapshots(pkgs)
-                FileLogger.i(TAG, "自定义包安装成功：$argLine")
+                MiniMeLog.i(TAG, "自定义包安装成功：$argLine")
             } else if (failed.size == pkgs.size) {
                 // 全部失败，记录 warn（部分成功的 warn 已经在上面分支里打了）
-                FileLogger.w(TAG, "自定义包安装全部失败($lastLine)：$argLine")
+                MiniMeLog.w(TAG, "自定义包安装全部失败($lastLine)：$argLine")
             }
         } finally {
             // ⚠️ 无论成功/失败/异常，finally 都无条件复位 _initProgress 回 Ready。
@@ -805,7 +857,7 @@ class LinuxContainerEngine @Inject constructor(
                         if (event is CommandEvent.Exit) ok = (event.code == 0)
                     }
                 } catch (e: Exception) {
-                    FileLogger.w(TAG, "卸载自定义包异常: $pkg", e)
+                    MiniMeLog.w(TAG, "卸载自定义包异常: $pkg", e)
                 }
             }
         } finally {
@@ -882,17 +934,23 @@ class LinuxContainerEngine @Inject constructor(
             .toSet()
         for (b in TerminalBundles.ALL) {
             val pkgs = b.packages.trim().split(Regex("""\s+""")).filter { it.isNotBlank() }
-            val primary = pkgs.firstOrNull()
-            val present = primary != null && installed.contains(primary)
+            // F2：联动只查首包改为全量——全部命中才算 Installed，缺哪个算 PartialInstalled。
+            val present = pkgs.filter { p -> installed.any { it == p || it.startsWith("$p-") } }
+            val missing = pkgs - present.toSet()
             val current = bundleRepository.states.value[b.id]
-            if (present) {
+            if (missing.isEmpty()) {
                 if (current !is BundleInstallState.Installed) {
-                    FileLogger.i(TAG, "联动检测：${b.displayName} 已装（apk 世界命中 ${primary}），同步为已安装")
+                    MiniMeLog.i(TAG, "联动检测：${b.displayName} 已装（全 ${present.size}/${pkgs.size} 命中），同步为已安装")
                     bundleRepository.markInstalled(b.id, b)
                 }
+            } else if (present.isNotEmpty()) {
+                if (current !is BundleInstallState.PartialInstalled) {
+                    MiniMeLog.i(TAG, "联动检测：${b.displayName} 部分安装，缺少 ${missing.joinToString(", ")}")
+                    bundleRepository.markPartialInstalled(b.id, missing)
+                }
             } else {
-                if (current is BundleInstallState.Installed) {
-                    FileLogger.i(TAG, "联动检测：${b.displayName} 已卸载（apk 世界无 ${primary}），同步为未安装")
+                if (current is BundleInstallState.Installed || current is BundleInstallState.PartialInstalled) {
+                    MiniMeLog.i(TAG, "联动检测：${b.displayName} 已卸载（apk 世界无任何包），同步为未安装")
                     bundleRepository.markUninstalled(b.id)
                 }
             }
@@ -944,7 +1002,7 @@ class LinuxContainerEngine @Inject constructor(
                     if (event is CommandEvent.Exit) exitCode = event.code
                 }
             } catch (e: Exception) {
-                FileLogger.w(TAG, "切换镜像源异常", e)
+                MiniMeLog.w(TAG, "切换镜像源异常", e)
             }
         }
         return exitCode == 0
@@ -1006,13 +1064,13 @@ class LinuxContainerEngine @Inject constructor(
             val inflight = credentialPromptInFlight.get()
             if (inflight > 0 && totalWaited < MAX_TIMEOUT_MS) {
                 // 凭据弹窗在途：宽限 1min（不超过绝对上限），再回查。
-                FileLogger.i(TAG, "凭据弹窗在途(${inflight})，watchdog 暂缓，再等 60000ms: $command")
+                MiniMeLog.i(TAG, "凭据弹窗在途(${inflight})，watchdog 暂缓，再等 60000ms: $command")
                 remaining = minOf(60_000L, MAX_TIMEOUT_MS - totalWaited)
                 continue
             }
             // 不在途，或已达 30min 绝对上限：正常超时终止。
             timedOut.set(true)
-            FileLogger.w(TAG, "命令执行超过 ${timeoutMs}ms（累计等待 ${totalWaited}ms，inflight=${inflight}），终止进程: $command")
+            MiniMeLog.w(TAG, "命令执行超过 ${timeoutMs}ms（累计等待 ${totalWaited}ms，inflight=${inflight}），终止进程: $command")
             runCatching { process.destroy() }
             delay(TIMEOUT_KILL_GRACE_MS)
             if (process.isAlive) runCatching { process.destroyForcibly() }
@@ -1035,7 +1093,7 @@ class LinuxContainerEngine @Inject constructor(
         val processBuilder = if (useProot) {
             buildProcessBuilder(buildProotInvocation(command, projectPath))
         } else {
-            FileLogger.w(TAG, "PRoot 未安装，回退到原生 shell")
+            MiniMeLog.w(TAG, "PRoot 未安装，回退到原生 shell")
             buildNativeProcess(command, projectPath)
         }
 
@@ -1149,7 +1207,7 @@ class LinuxContainerEngine @Inject constructor(
     suspend fun switchToProfile(id: String): ContainerProfile {
         val target = resolveProfile(id)
         if (target.id == currentProfile.id) return target
-        FileLogger.i(TAG, "切换容器 profile: ${currentProfile.id} -> ${target.id} (arch=${target.arch})")
+        MiniMeLog.i(TAG, "切换容器 profile: ${currentProfile.id} -> ${target.id} (arch=${target.arch})")
         currentProfile = target
         containerSettingsRepository.setActiveProfile(target.id)
         // Bundle 标记目录立即跟随新 profile（不等 DataStore flow 异步刷新）。
@@ -1178,10 +1236,10 @@ class LinuxContainerEngine @Inject constructor(
         // 最后一英里"同步；copyAsset 内部有原子 rename + ETXTBSY 捕获，不会崩。
         if (profile.arch == ContainerArch.X86_64 && !EnvironmentDetector.hostIsX86_64) {
             runCatching { containerInstaller.deployQemuX86() }
-                .onFailure { t -> FileLogger.w(TAG, "doInit: deployQemuX86 失败 (不抛): ${t.message}") }
+                .onFailure { t -> MiniMeLog.w(TAG, "doInit: deployQemuX86 失败 (不抛): ${t.message}") }
             // 若 qemu 仍然缺失则打告警，buildBaseProotArgv 也会同步打，两边齐提醒用户。
             if (!containerInstaller.qemuX86Bin.exists()) {
-                FileLogger.w(TAG, "doInit: x86_64 profile 但 qemu 仍缺失（${containerInstaller.qemuX86Bin.absolutePath}），请再次点击初始化或重启 App")
+                MiniMeLog.w(TAG, "doInit: x86_64 profile 但 qemu 仍缺失（${containerInstaller.qemuX86Bin.absolutePath}），请再次点击初始化或重启 App")
             }
         }
 
@@ -1197,7 +1255,7 @@ class LinuxContainerEngine @Inject constructor(
                 },
             )
             garbageCleaner.cleanupLeftoversFromLastRun(timeoutMs = 2500)
-        }.onFailure { t -> FileLogger.d(TAG, "首次启动清理 .part 垃圾失败（不阻塞启动）：${t.message}") }
+        }.onFailure { t -> MiniMeLog.d(TAG, "首次启动清理 .part 垃圾失败（不阻塞启动）：${t.message}") }
     }
 
     /** 查容器内 $HOME 并缓存到 [WorkspacePathMapper]，供文件工具展开 ~。 */
@@ -1206,7 +1264,7 @@ class LinuxContainerEngine @Inject constructor(
             val result = execCaptured("echo \$HOME", projectPath = null, timeoutMs = 3000)
             val home = result.output.trim().ifEmpty { null }
             if (home != null) workspacePathMapper.containerHome = home
-        }.onFailure { FileLogger.w(TAG, "查容器 \$HOME 失败", it) }
+        }.onFailure { MiniMeLog.w(TAG, "查容器 \$HOME 失败", it) }
     }
 
     /**
@@ -1304,7 +1362,7 @@ class LinuxContainerEngine @Inject constructor(
                 argv.add("-q")
                 argv.add(qemu.absolutePath)
             } else {
-                FileLogger.w(TAG, "x86_64 profile 已选但 qemu 转译器缺失（${qemu.absolutePath}），按原生 aarch64 启动将失败，请重新初始化容器")
+                MiniMeLog.w(TAG, "x86_64 profile 已选但 qemu 转译器缺失（${qemu.absolutePath}），按原生 aarch64 启动将失败，请重新初始化容器")
             }
         }
 
@@ -1337,7 +1395,7 @@ class LinuxContainerEngine @Inject constructor(
                 argv.add("-b")
                 argv.add("${external.absolutePath}:/root/storage/shared")
             } else {
-                FileLogger.w(TAG, "存储共享已开启但外存路径不可用（${external?.absolutePath}），跳过绑定")
+                MiniMeLog.w(TAG, "存储共享已开启但外存路径不可用（${external?.absolutePath}），跳过绑定")
             }
         }
 

@@ -4,7 +4,7 @@ import android.content.Context
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides as V2ModelCapabilityOverride
-import com.mini.me_core.feature.agent.data.local.entity.ModelCapabilityOverrideEntity
+import com.mini.me_core.feature.settings.domain.model.ModelCapabilityOverrideEntity
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
 import com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepository
 import com.mini.me_core.feature.settings.data.repository.DefaultPolicy

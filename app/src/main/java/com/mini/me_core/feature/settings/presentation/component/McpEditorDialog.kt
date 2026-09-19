@@ -59,8 +59,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
-import com.mini.me_core.feature.agent.domain.mcp.McpToolDescriptor
+import com.mini.me_core.feature.settings.domain.model.McpServerConfig
+import com.mini.me_core.feature.settings.domain.model.McpToolDescriptor
 import kotlinx.serialization.json.JsonObject
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R

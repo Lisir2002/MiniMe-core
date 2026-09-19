@@ -1,15 +1,14 @@
 package com.mini.me_core.feature.agent.presentation
 
+import com.mini.me_core.ui.markdown.formatTokenCount
+import com.mini.me_core.ui.markdown.MarkdownRenderCache
+import com.mini.me_core.ui.markdown.MarkdownContent
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.R
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.core.util.toUserMessage
-import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.mecore.datalayer.sqldelight.agent.Agent_message as V2AgentMessage
-import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
-import com.mini.mecore.datalayer.sqldelight.agent.SelectAllSessionsWithCount as V2SessionWithCount
 import com.mini.me_core.feature.agent.domain.checkpoint.CheckpointManager
 import com.mini.me_core.feature.agent.data.local.dao.ChatSessionWithCount
 import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
@@ -56,7 +55,6 @@ import com.mini.me_core.feature.agent.domain.input.BehaviorModeManager
 import com.mini.me_core.feature.agent.domain.prompt.AgentAssetRegistry
 import com.mini.me_core.feature.agent.domain.rule.RuleRegistry
 import com.mini.me_core.feature.agent.presentation.AgentAttachment
-import com.mini.me_core.feature.agent.presentation.component.formatTokenCount
 import com.mini.me_core.feature.agent.presentation.component.parseEnvironmentComponents
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -91,7 +89,8 @@ class AIAgentViewModel @Inject constructor(
     private val agentWorkflow: AgentWorkflow,
     private val toolRegistry: ToolRegistry,
     private val codeChangeTracker: CodeChangeTracker,
-    private val v2Agent: V2AgentRepository,
+    private val sessionPort: com.mini.me_core.feature.agent.domain.session.AgentSessionPort,
+    private val messagePort: com.mini.me_core.feature.agent.domain.session.AgentMessagePort,
     private val aiProviderRepository: AIProviderRepository,
     private val defaultModelSettingsRepository: DefaultModelSettingsRepository,
     private val toolPermissionManager: ToolPermissionManager,
@@ -221,8 +220,8 @@ class AIAgentViewModel @Inject constructor(
     val sessions: StateFlow<List<ChatSession>> = combine(_currentWorkspace, _currentWorkspaceId) { path, id -> path to id }
         .flatMapLatest { (path, id) ->
             if (path.isBlank() || id.isBlank()) flowOf(emptyList())
-            else v2Agent.observeAllSessions().map { list ->
-                list.map { it.toEntity() }.filter { it.workspaceId == id }
+            else sessionPort.observeAll().map { list ->
+                list.filter { it.workspaceId == id }
                     .map { it.toDomain() }
             }
         }
@@ -232,8 +231,8 @@ class AIAgentViewModel @Inject constructor(
     val sessionsWithCount: StateFlow<List<ChatSessionWithCount>> = combine(_currentWorkspace, _currentWorkspaceId) { path, id -> path to id }
         .flatMapLatest { (path, id) ->
             if (path.isBlank() || id.isBlank()) flowOf(emptyList())
-            else v2Agent.observeAllSessionsWithCount().map { list ->
-                list.map { it.toEntity() }.filter { it.workspaceId == id }
+            else sessionPort.observeAllWithCount().map { list ->
+                list.filter { it.workspaceId == id }
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -271,9 +270,7 @@ class AIAgentViewModel @Inject constructor(
     ) { id, limitMap -> id to (limitMap[id] ?: defaultLimit) }
         .flatMapLatest { (id, limit) ->
             if (id == null) flowOf(ChatMessagesState(null, emptyList(), loaded = false))
-            else v2Agent.observeMessagesBySessionPaged(id, limit.toLong()).map { list ->
-                list.map { it.toEntity() }
-            }.map { list ->
+            else messagePort.observeBySessionPaged(id, limit.toLong()).map { list ->
                 ChatMessagesState(
                     sessionId = id,
                     // 先拼接分块消息（chunk 行按 chunk_index 序合并为单条完整消息），再走既有过滤/映射。
@@ -939,9 +936,9 @@ class AIAgentViewModel @Inject constructor(
                         if (event.inputTokens > 0 || event.outputTokens > 0) {
                             viewModelScope.launch {
                                 runCatching {
-                                    v2Agent.addTokenUsage(sessionId, event.inputTokens.toLong(), event.outputTokens.toLong())
+                                    sessionPort.addTokenUsage(sessionId, event.inputTokens.toLong(), event.outputTokens.toLong())
                                     if (event.inputTokens > 0) {
-                                        v2Agent.updateLastInputTokens(sessionId, event.inputTokens.toLong())
+                                        sessionPort.updateLastInputTokens(sessionId, event.inputTokens.toLong())
                                     }
                                 }
                             }
@@ -1088,6 +1085,22 @@ class AIAgentViewModel @Inject constructor(
                             id = msgId,
                             taskId = taskId,
                             toolName = "usage",
+                            isError = false
+                        )
+                    }
+                    is AgentEvent.NormFlowNotice -> {
+                        // E4 对话中切换规范流程：落库为 TOOL 角色系统提示行（对齐 GoalChanged/TurnUsage 渲染）。
+                        setStreamingText(sessionId, null)
+                        setStreamingReasoning(sessionId, null)
+                        val msgId = "norm_flow_${System.nanoTime()}"
+                        messagePersistenceUseCase.persist(
+                            sessionId,
+                            MessageRole.TOOL,
+                            event.text,
+                            id = msgId,
+                            taskId = taskId,
+                            toolName = "norm_flow",
+                            toolArgs = "[notice]",
                             isError = false
                         )
                     }
@@ -1662,7 +1675,7 @@ class AIAgentViewModel @Inject constructor(
         // 删除前缓存会话 + 消息，供 Snackbar「撤销」恢复（re-insert）
         val entity = sessionUseCase.getSessionById(id)
         val messages = if (entity != null) {
-            v2Agent.getMessagesBySessionOnce(id).map { it.toEntity() }
+            messagePort.listBySession(id)
         } else emptyList()
         lastDeletedSession = entity?.let { it to messages }
 
@@ -1702,7 +1715,7 @@ class AIAgentViewModel @Inject constructor(
         lastDeletedSession = null
         sessionUseCase.upsertSession(entity)
         if (messages.isNotEmpty()) {
-            v2Agent.insertAllMessages(messages.map { it.toV2() })
+            messagePort.insertAll(messages)
         }
         _currentSessionId.value = entity.id
     }
@@ -1728,11 +1741,11 @@ class AIAgentViewModel @Inject constructor(
      * 会话与工作台一对一绑定、不可中途切换；一个工作台可绑定多个会话。按 workspace_id（工作台名）查询。
      */
     suspend fun sessionsBoundToWorkspace(workspaceId: String): List<ChatSession> =
-        v2Agent.getAllSessionsByWorkspaceIdOnce(workspaceId).map { it.toEntity().toDomain() }
+        sessionPort.listByWorkspace(workspaceId).map { it.toDomain() }
 
     /** 统计某工作台绑定的会话数（删除工作台前提示用）。 */
     suspend fun countSessionsBoundToWorkspace(workspaceId: String): Int =
-        v2Agent.countSessionsByWorkspaceId(workspaceId).toInt()
+        sessionPort.countByWorkspace(workspaceId)
 
     /** 导出单个会话为无密码备份格式（tar.gz），流式写入 [output]（调用方打开，本方法负责关闭）。成功回调 true，失败回调 false。 */
     fun exportSession(sessionId: String, output: OutputStream, onResult: (Boolean) -> Unit) = viewModelScope.launch {
@@ -1864,11 +1877,11 @@ class AIAgentViewModel @Inject constructor(
      */
     fun editAndResend(messageId: String, newContent: String) = viewModelScope.launch {
         try {
-            val msg = v2Agent.getMessageById(messageId)?.toEntity() ?: return@launch
+            val msg = messagePort.getMessageById(messageId) ?: return@launch
             if (msg.role != MessageRole.USER.name) return@launch
             // 1) 保留原对话：把该消息及其之后的所有消息标记为已截断（isCompacted=1），
             //    不删除，UI 仍可见；仅不再参与新一轮上下文回放。
-            v2Agent.markMessagesCompactedInclusiveFromTimestamp(msg.sessionId, msg.timestamp)
+            messagePort.markCompactedInclusiveFromTimestamp(msg.sessionId, msg.timestamp)
             // 2) 以新内容作为新一轮对话重新执行（enqueueAgentRequest 会插入新的用户消息并开启新任务分组）
             enqueueAgentRequest(
                 request = newContent,
@@ -1915,81 +1928,4 @@ class AIAgentViewModel @Inject constructor(
         }
     }
 
-    // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun V2AgentSession.toEntity() = ChatSessionEntity(
-        id = id,
-        title = title ?: "",
-        createdAtMs = created_at,
-        updatedAtMs = updated_at,
-        workspacePath = workspace_path,
-        workspaceId = workspace_id,
-        mode = mode,
-        reasoningEffort = reasoning_effort,
-        providerId = provider_id,
-        model = model,
-        totalInputTokens = total_input_tokens.toInt(),
-        totalOutputTokens = total_output_tokens.toInt(),
-        lastInputTokens = last_input_tokens.toInt(),
-    )
-
-    private fun V2AgentMessage.toEntity() = AgentMessageEntity(
-        id = id,
-        sessionId = session_id,
-        taskId = task_id,
-        role = role,
-        content = content,
-        timestamp = seq,
-        toolCallsJson = tool_calls_json,
-        toolCallId = tool_call_id,
-        toolName = tool_name,
-        toolArgs = tool_args,
-        isError = is_error == 1L,
-        reasoning = reasoning,
-        signature = signature,
-        attachmentsJson = attachments_json,
-        isCompacted = is_compacted == 1L,
-        isContextSummary = is_context_summary == 1L,
-        isCompactionMarker = is_compaction_marker == 1L,
-        inputTokens = input_tokens.toInt(),
-        outputTokens = output_tokens.toInt(),
-        chunkGroupId = chunk_group_id,
-        chunkIndex = chunk_index.toInt(),
-    )
-
-    private fun AgentMessageEntity.toV2() = V2AgentMessage(
-        id = id,
-        session_id = sessionId,
-        role = role,
-        seq = timestamp,
-        created_at = timestamp,
-        task_id = taskId,
-        content = content,
-        tool_calls_json = toolCallsJson,
-        tool_call_id = toolCallId,
-        tool_name = toolName,
-        tool_args = toolArgs,
-        is_error = if (isError) 1L else 0L,
-        reasoning = reasoning,
-        signature = signature,
-        attachments_json = attachmentsJson,
-        is_compacted = if (isCompacted) 1L else 0L,
-        is_context_summary = if (isContextSummary) 1L else 0L,
-        is_compaction_marker = if (isCompactionMarker) 1L else 0L,
-        input_tokens = inputTokens.toLong(),
-        output_tokens = outputTokens.toLong(),
-        chunk_group_id = chunkGroupId,
-        chunk_index = chunkIndex.toLong(),
-    )
-
-    private fun V2SessionWithCount.toEntity() = ChatSessionWithCount(
-        id = id,
-        title = title ?: "",
-        createdAtMs = created_at,
-        updatedAtMs = updated_at,
-        workspacePath = workspace_path,
-        workspaceId = workspace_id,
-        mode = mode,
-        messageCount = message_count.toInt(),
-    )
 }

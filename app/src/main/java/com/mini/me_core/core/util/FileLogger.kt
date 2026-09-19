@@ -1,15 +1,12 @@
 package com.mini.me_core.core.util
 
-import android.Manifest
 import android.content.ContentValues
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
-import androidx.core.content.ContextCompat
 import java.io.File
 import java.io.FileOutputStream
 import java.io.PrintWriter
@@ -51,9 +48,8 @@ object FileLogger {
     private const val MAX_AGE_DAYS = 7
     private const val MAX_FILE_BYTES = 5 * 1024 * 1024 // 单个日志文件上限 5MB（VERBOSE 下增长较快）
 
-    // 公共外部存储目录（卸载后仍保留）：/storage/emulated/0/Documents/MiniMe-core/logs
-    private const val PUBLIC_ROOT_DIR = "MiniMe-core"
-    private const val PUBLIC_LOG_SUBDIR = "logs"
+    // 日志子目录名：公共外部存储 Documents/MiniMe-core/logs 与私有兜底 logs 共用（解析见 LogDirectoryResolver）
+    private const val LOG_SUBDIR = "logs"
 
     private val ioExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "file-logger").apply { isDaemon = true }
@@ -63,6 +59,15 @@ object FileLogger {
 
     @Volatile
     private var logDir: File? = null
+
+    /** (c) 写入失败计数；连续失败≥10 由设置页黄条提示。成功一次清零。 */
+    @Volatile
+    private var consecutiveErrorCount: Int = 0
+
+    val writeErrorCount: Int get() = consecutiveErrorCount
+
+    private fun recordWriteSuccess() { consecutiveErrorCount = 0 }
+    private fun recordWriteFailure() { consecutiveErrorCount++ }
 
     /** 当前最低记录等级；低于它的日志一律跳过。默认 VERBOSE（开发期全量）。 */
     @Volatile
@@ -80,11 +85,64 @@ object FileLogger {
 
     private fun shouldLog(level: LogLevel): Boolean = level.ordinal >= minLevel.ordinal
 
+    /** (g) 隐私模式：开启后 minLevel=NONE 直接不落盘（仍 logcat 镜像）；关闭恢复默认 VERBOSE。 */
+    @Volatile
+    var privacyMode: Boolean = false
+        private set
+
+    /** (g/h) 开关持久化（SharedPreferences），启动读回。 */
+    private var prefs: android.content.SharedPreferences? = null
+
+    fun setPrivacyMode(enabled: Boolean) {
+        privacyMode = enabled
+        minLevel = if (enabled) LogLevel.NONE else LogLevel.VERBOSE
+        prefs?.edit()?.putBoolean("privacy_mode", enabled)?.apply()
+        Log.i(TAG, "隐私模式 ${"开启".takeIf { enabled } ?: "关闭"}")
+    }
+
+    fun setJsonLines(enabled: Boolean) {
+        jsonLines = enabled
+        prefs?.edit()?.putBoolean("json_lines", enabled)?.apply()
+    }
+
+    /** (h) 日志格式：true=JSON Lines（每行 {ts,level,tag,message,thread}），false=人类可读。 */
+    @Volatile
+    var jsonLines: Boolean = false
+        private set
+
+    fun setCustomTerms(terms: List<String>) {
+        RedactionPipeline.setCustomTerms(terms)
+        // (j) 持久化敏感词列表（换行拼接）。
+        prefs?.edit()?.putString("custom_terms", terms.joinToString("\n"))?.apply()
+    }
+
+    /** (d) 清空所有日志：删私有目录 logs 与公共 Documents/MiniMe-core/logs、ai-logs。 */
+    fun clearAllLogs(context: Context) {
+        ioExecutor.execute {
+            runCatching {
+                logDir?.listFiles()?.forEach { runCatching { it.delete() } }
+                LogDirectoryResolver.resolveLogDir(context, LOG_SUBDIR).listFiles()?.forEach { runCatching { it.delete() } }
+                // 公共外部存储
+                val docs = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS)
+                File(docs, "MiniMe-core/logs").listFiles()?.forEach { runCatching { it.delete() } }
+                File(docs, "MiniMe-core/ai-logs").listFiles()?.forEach { runCatching { it.delete() } }
+            }
+        }
+    }
+
     /** 初始化日志目录。重复调用安全。 */
     fun init(context: Context) {
         if (logDir != null) return
-        val dir = resolveLogDir(context)
+        val dir = LogDirectoryResolver.resolveLogDir(context, LOG_SUBDIR)
         logDir = dir
+        // (g/h) 启动读回开关持久化。
+        prefs = context.getSharedPreferences("file_logger_prefs", Context.MODE_PRIVATE)
+        runCatching {
+            setPrivacyMode(prefs?.getBoolean("privacy_mode", false) ?: false)
+            setJsonLines(prefs?.getBoolean("json_lines", false) ?: false)
+            prefs?.getString("custom_terms", null)?.takeIf { it.isNotBlank() }
+                ?.let { RedactionPipeline.setCustomTerms(it.split("\n").filter(String::isNotBlank)) }
+        }
         ioExecutor.execute { cleanupOldLogs(dir) }
         i(TAG, "FileLogger 初始化完成，日志目录: ${dir.absolutePath}")
     }
@@ -94,35 +152,11 @@ object FileLogger {
      * [init] 通常发生在 Application.onCreate（早于权限授予），因此需要在此处重新解析目录。
      */
     fun onExternalStorageGranted(context: Context) {
-        val newDir = resolveLogDir(context)
-        val current = logDir
-        if (current == null || newDir.absolutePath != current.absolutePath) {
-            logDir = newDir
-            ioExecutor.execute { cleanupOldLogs(newDir) }
-            i(TAG, "外部存储权限已授予，日志目录切换为: ${newDir.absolutePath}")
-        }
+        val newDir = LogDirectoryResolver.resolveAfterPermissionGrant(context, LOG_SUBDIR, logDir) ?: return
+        logDir = newDir
+        ioExecutor.execute { cleanupOldLogs(newDir) }
+        i(TAG, "外部存储权限已授予，日志目录切换为: ${newDir.absolutePath}")
     }
-
-    /**
-     * 解析日志目录：优先公共外部存储 `Documents/MiniMe-core/logs`（卸载后保留，需 WRITE_EXTERNAL_STORAGE
-     * 权限，targetSdk=28 下可写）；权限未授予时回退外部私有目录，再回退内部存储。
-     */
-    @Suppress("DEPRECATION") // targetSdk=28 下 getExternalStoragePublicDirectory 仍可用且不受分区存储限制
-    private fun resolveLogDir(context: Context): File {
-        if (hasExternalStorageWrite(context)) {
-            val base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val dir = File(File(base, PUBLIC_ROOT_DIR), PUBLIC_LOG_SUBDIR)
-            if (dir.exists() || dir.mkdirs()) return dir
-        }
-        // 回退：外部私有目录（卸载时清除，但无需权限）；再回退内部存储。
-        val base = context.getExternalFilesDir(null) ?: context.filesDir
-        return File(base, "logs").apply { mkdirs() }
-    }
-
-    private fun hasExternalStorageWrite(context: Context): Boolean =
-        Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
-            PackageManager.PERMISSION_GRANTED
 
     fun v(tag: String, message: String) {
         if (!shouldLog(LogLevel.VERBOSE)) return
@@ -223,7 +257,7 @@ object FileLogger {
 
     @Suppress("DEPRECATION") // targetSdk=28 下 getExternalStoragePublicDirectory 仍可用
     private fun writeViaLegacyFile(context: Context, name: String, content: String) {
-        if (!hasExternalStorageWrite(context)) throw IllegalStateException("未授予存储权限")
+        if (!LogDirectoryResolver.hasExternalStorageWrite(context)) throw IllegalStateException("未授予存储权限")
         val base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         val dir = File(File(base, EXPORT_ROOT_DIR), EXPORT_LOG_SUBDIR)
         if (!dir.exists() && !dir.mkdirs()) throw IllegalStateException("无法创建导出目录")
@@ -251,9 +285,7 @@ object FileLogger {
         }
         runCatching {
             val file = File(dir, "log-${fileNameFormat.format(now)}.txt")
-            if (file.length() > MAX_FILE_BYTES) {
-                file.writeText("--- 日志文件超过 ${MAX_FILE_BYTES / 1024 / 1024}MB 已重置 ---\n")
-            }
+            rotateIfNeeded(file)
             file.appendText(line)
             // 再尝试 flush 到 OS（不保证 fsync，但对 Java IO 已尽力），
             // 避免后续立即杀进程导致缓冲行丢失。
@@ -261,6 +293,22 @@ object FileLogger {
         }.onFailure {
             // 紧急日志本身再失败，就只 logcat——此时 IO 基本挂了，也没法再兜
             android.util.Log.e(TAG, "紧急同步落盘失败", it)
+        }
+    }
+
+    /** (b) 超 5MB 轮转：当前文件改名 <name>.1，.1->.2，最多保留 .1/.2/.3 三个轮转，再新建空文件。 */
+    private fun rotateIfNeeded(file: File) {
+        if (file.length() <= MAX_FILE_BYTES) return
+        runCatching {
+            for (i in 3 downTo 2) {
+                val src = File(file.parentFile, file.nameWithoutExtension + ".$i.txt")
+                val dst = File(file.parentFile, file.nameWithoutExtension + ".${i + 1}.txt")
+                if (dst.exists()) dst.delete()
+                if (src.exists()) src.renameTo(dst)
+            }
+            val one = File(file.parentFile, file.nameWithoutExtension + ".1.txt")
+            if (one.exists()) one.delete()
+            file.renameTo(one)
         }
     }
 
@@ -275,25 +323,32 @@ object FileLogger {
     private fun write(level: String, tag: String, message: String, throwable: Throwable?) {
         val dir = logDir ?: return // 未初始化则只走 logcat，不落盘
         val now = java.time.Instant.now()
-        val line = buildString {
-            append(timestampFormat.format(now))
-            append(" ").append(level)
-            append(" [").append(tag).append("] ")
-            append(message)
-            if (throwable != null) {
-                append("\n").append(stackTraceToString(throwable))
+        // 落盘前统一过脱敏管线（F1）：消息与堆栈都脱敏，保留上下文。
+        val safeMessage = RedactionPipeline.redact(message)
+        val line = if (jsonLines) {
+            // (h) JSON Lines：每行 {ts,level,tag,message,thread}
+            val msg = if (throwable != null) safeMessage + "\n" + RedactionPipeline.redact(stackTraceToString(throwable)) else safeMessage
+            "{\"ts\":\"${timestampFormat.format(now)}\",\"level\":\"$level\",\"tag\":\"$tag\",\"message\":\"${msg.replace("\"", "\\\"")}\",\"thread\":\"${Thread.currentThread().name}\"}\n"
+        } else {
+            buildString {
+                append(timestampFormat.format(now))
+                append(" ").append(level)
+                append(" [").append(tag).append("] ")
+                append(safeMessage)
+                if (throwable != null) {
+                    append("\n").append(RedactionPipeline.redact(stackTraceToString(throwable)))
+                }
+                append("\n")
             }
-            append("\n")
         }
         ioExecutor.execute {
             runCatching {
                 val file = File(dir, "log-${fileNameFormat.format(now)}.txt")
-                if (file.length() > MAX_FILE_BYTES) {
-                    // 超过上限则截断重开，避免单文件无限增长
-                    file.writeText("--- 日志文件超过 ${MAX_FILE_BYTES / 1024 / 1024}MB 已重置 ---\n")
-                }
+                rotateIfNeeded(file)
                 file.appendText(line)
-            }.onFailure {
+            }.onSuccess { recordWriteSuccess() }
+            .onFailure {
+                recordWriteFailure()
                 Log.e(TAG, "写入日志失败", it)
             }
         }
@@ -305,12 +360,25 @@ object FileLogger {
         return sw.toString().trimEnd()
     }
 
-    /** 删除超过 [MAX_AGE_DAYS] 天的日志文件。 */
+    /** (i) 超 7 天 gzip 归档为 .gz；.gz 再留 14 天后物理删。 */
     private fun cleanupOldLogs(dir: File) {
-        val cutoff = System.currentTimeMillis() - MAX_AGE_DAYS * 24L * 60 * 60 * 1000
-        dir.listFiles { f -> f.isFile && f.name.startsWith("log-") }?.forEach { file ->
-            if (file.lastModified() < cutoff) {
-                runCatching { file.delete() }
+        val now = System.currentTimeMillis()
+        val archiveCutoff = now - MAX_AGE_DAYS * 24L * 60 * 60 * 1000
+        val deleteCutoff = now - (MAX_AGE_DAYS + 14L) * 24L * 60 * 60 * 1000
+        dir.listFiles { f -> f.isFile }?.forEach { file ->
+            runCatching {
+                when {
+                    // .gz 超 14 天物理删
+                    file.name.endsWith(".gz") && file.lastModified() < deleteCutoff -> file.delete()
+                    // 明文日志超 7 天 gzip 归档
+                    !file.name.endsWith(".gz") && file.name.startsWith("log-") && file.lastModified() < archiveCutoff -> {
+                        val gz = File(dir, file.name + ".gz")
+                        java.util.zip.GZIPOutputStream(java.io.FileOutputStream(gz)).use { out ->
+                            file.inputStream().use { it.copyTo(out) }
+                        }
+                        file.delete()
+                    }
+                }
             }
         }
     }

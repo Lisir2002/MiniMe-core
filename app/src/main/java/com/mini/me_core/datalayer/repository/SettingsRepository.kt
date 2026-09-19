@@ -3,10 +3,10 @@ package com.mini.me_core.datalayer.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
-import com.mini.mecore.datalayer.sqldelight.SettingsDb
-import com.mini.mecore.datalayer.sqldelight.settings.Ai_providers
-import com.mini.mecore.datalayer.sqldelight.settings.Settings_pref
-import com.mini.mecore.datalayer.sqldelight.settings.Settings_profile
+import com.mini.mecore.datalayer.sqldelight.AuxDb
+import com.mini.mecore.datalayer.sqldelight.Ai_providers
+import com.mini.mecore.datalayer.sqldelight.Settings_pref
+import com.mini.mecore.datalayer.sqldelight.Settings_profile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
  * v2-full-takeover P0-1/P0-2：补 ai_providers 的 Flow 响应式读与列级 setter，
  * 语义逐条对齐 Room `AIProviderDao`（含 active 互斥不变量的事务化）。
  */
-class SettingsRepository(private val db: SettingsDb) {
+class SettingsRepository(private val db: AuxDb) {
 
     private val q get() = db.settingsQueries
 

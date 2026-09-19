@@ -19,8 +19,8 @@ import com.mini.me_core.feature.agent.domain.rule.RuleRegistry
 import com.mini.me_core.feature.agent.domain.skill.SkillStateRepository
 import com.mini.me_core.feature.agent.domain.skill.SkillType
 import com.mini.me_core.feature.agent.domain.sop.SopRegistry
-import com.mini.me_core.feature.agent.domain.workflow.LoopGuardTracker
-import com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository
+import com.mini.me_core.core.agentworkflow.LoopGuardTracker
+import com.mini.me_core.feature.agent.domain.normflow.NormFlowSettingsPort
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -56,7 +56,7 @@ class SystemPromptProvider @Inject constructor(
     // D4-3：SOP 标准作业注册表（assets/sop/，摘要常驻注入 + loadSop 按需取正文）
     private val sopRegistry: SopRegistry,
     // D1-7/D4-3：规范流程统一开关（sop_summary 子开关控制 SOP 摘要常驻注入，逐项可关）
-    private val normFlowSettingsRepository: NormFlowSettingsRepository,
+    private val normFlowSettingsRepository: NormFlowSettingsPort,
     // D5-5：Playbook 执行器（step 前查询本会话最近 RUNNING 运行的当前阶段喂入 PlaybookStageSource，
     // 并在运行期间挂起 goal 维护双信号——GoalStale / GoalAdjustEvent 不注入）
     private val playbookExecutor: PlaybookExecutor

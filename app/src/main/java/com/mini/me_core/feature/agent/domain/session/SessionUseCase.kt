@@ -1,8 +1,6 @@
 package com.mini.me_core.feature.agent.domain.session
 
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
 import com.mini.me_core.feature.agent.data.local.entity.ChatSessionEntity
 import com.mini.me_core.feature.agent.presentation.MessageRole
 import java.util.UUID
@@ -11,7 +9,8 @@ import javax.inject.Singleton
 
 @Singleton
 class SessionUseCase @Inject constructor(
-    private val v2Agent: V2AgentRepository,
+    private val sessionPort: AgentSessionPort,
+    private val messagePort: AgentMessagePort,
 ) {
     companion object {
         private const val TAG = "SessionUseCase"
@@ -29,11 +28,7 @@ class SessionUseCase @Inject constructor(
     suspend fun initColdStartCleanup() {
         runCatching {
             val n = listOf(PENDING_TOOL_MARKER, LEGACY_PENDING_TOOL_MARKER).sumOf { marker ->
-                v2Agent.markPendingToolsInterrupted(
-                    toolRole = MessageRole.TOOL.name,
-                    pendingPrefix = "$marker%",
-                    interruptedContent = INTERRUPTED_TOOL_TEXT
-                )
+                sessionPort.markPendingToolsInterrupted(MessageRole.TOOL.name, "$marker%", INTERRUPTED_TOOL_TEXT)
             }
             if (n > 0) FileLogger.i(TAG, "冷启动收尾 $n 条残留「执行中」工具行为已中断")
         }.onFailure { FileLogger.e(TAG, "回收残留执行中工具行失败", it) }
@@ -67,106 +62,63 @@ class SessionUseCase @Inject constructor(
      * V2 分支：SQLDelight [V2Tx] 事务封装（单 driver 顺序执行，语义对齐 Room 事务）。
      */
     suspend fun deleteSession(id: String): String {
-        v2Agent.runInTx { tx ->
-            tx.deleteBySession(id)
-            tx.deleteTodosBySession(id)
-            tx.deleteFileEditHunksBySession(id)
-            tx.deleteModeSwitchesBySession(id)
-            tx.deleteSkillConversationStatesBySession(id)
-            tx.deleteWakeItemsBySession(id)
-            tx.deleteGoalsBySession(id)
-            tx.deletePlansBySession(id)
-            tx.deleteJobsBySession(id)
-            tx.deleteSchedulesBySession(id)
-            tx.deleteTrajectories(id)
-            tx.deleteSession(id)
-        }
+        sessionPort.deleteSessionCascade(id)
         return id
     }
 
     suspend fun getFirstSessionOfWorkspace(workspaceId: String): ChatSessionEntity? {
-        return v2Agent.getAllSessionsByWorkspaceIdOnce(workspaceId).firstOrNull()?.toEntity()
+        return sessionPort.listByWorkspace(workspaceId).firstOrNull()
     }
 
     /** 最近一条「未绑定工作台」的会话（按更新时间降序，工作台绑定在首条消息时自动发生，此前会话处于未绑定态）。 */
     suspend fun getFirstUnboundSession(): ChatSessionEntity? {
-        return v2Agent.getUnboundSessionsOnce().firstOrNull()?.toEntity()
+        return sessionPort.listUnbound().firstOrNull()
     }
 
     /** 全局最近一条会话（任意工作台，删当前会话后重选兜底）。 */
     suspend fun getMostRecentSession(): ChatSessionEntity? {
-        return v2Agent.getMostRecentOnce()?.toEntity()
+        return sessionPort.getMostRecent()
     }
 
     /** 绑定/解绑会话工作台。绑定即一次性的（会话中途不可切换工作台）：仅未绑定会话可绑定，已绑定则忽略。 */
     suspend fun bindWorkspace(sessionId: String, workspaceId: String, workspacePath: String) {
         if (workspaceId.isBlank()) return
-        val current = v2Agent.getSessionById(sessionId)?.workspace_id ?: ""
+        val current = sessionPort.getWorkspaceId(sessionId)
         if (current.isNotBlank()) return
-        v2Agent.setSessionWorkspaceBinding(sessionId, workspaceId, workspacePath)
+        sessionPort.setWorkspaceBinding(sessionId, workspaceId, workspacePath)
     }
 
     suspend fun upsertSession(entity: ChatSessionEntity) {
-        v2Agent.upsertSession(
-            id = entity.id, title = entity.title, mode = entity.mode, model = entity.model, status = "active",
-            createdAtMs = entity.createdAtMs, updatedAtMs = entity.updatedAtMs,
-            workspacePath = entity.workspacePath, workspaceId = entity.workspaceId, reasoningEffort = entity.reasoningEffort,
-            providerId = entity.providerId, totalInputTokens = entity.totalInputTokens.toLong(),
-            totalOutputTokens = entity.totalOutputTokens.toLong(), lastInputTokens = entity.lastInputTokens.toLong(),
-        )
+        sessionPort.upsert(entity)
     }
 
     /** 重命名会话标题。仅更新 title，不改 updatedAt，列表顺序保持不变。长度兜底截断对齐 TITLE_MAX。 */
     suspend fun updateTitle(sessionId: String, title: String) {
-        v2Agent.updateTitle(sessionId, title.trim().take(TITLE_MAX))
+        sessionPort.updateTitle(sessionId, title.trim().take(TITLE_MAX))
     }
 
     suspend fun touch(sessionId: String, timestamp: Long) {
-        v2Agent.touch(sessionId, timestamp)
+        sessionPort.touch(sessionId, timestamp)
     }
 
     suspend fun getSessionById(id: String): ChatSessionEntity? {
-        return v2Agent.getSessionById(id)?.toEntity()
+        return sessionPort.getSessionById(id)
     }
 
     suspend fun updateMode(sessionId: String, mode: String) {
         val s = getSessionById(sessionId) ?: return
-        v2Agent.upsertSession(
-            id = s.id, title = s.title, mode = mode, model = s.model, status = "active",
-            createdAtMs = s.createdAtMs, updatedAtMs = s.updatedAtMs,
-            workspacePath = s.workspacePath, workspaceId = s.workspaceId, reasoningEffort = s.reasoningEffort,
-            providerId = s.providerId, totalInputTokens = s.totalInputTokens.toLong(),
-            totalOutputTokens = s.totalOutputTokens.toLong(), lastInputTokens = s.lastInputTokens.toLong(),
-        )
+        sessionPort.upsert(s.copy(mode = mode))
     }
 
     suspend fun updateProviderModel(sessionId: String, providerId: String?, model: String?) {
-        v2Agent.updateProviderModel(sessionId, providerId, model)
+        sessionPort.updateProviderModel(sessionId, providerId, model)
     }
 
     suspend fun updateReasoningEffort(sessionId: String, effort: String) {
-        v2Agent.updateReasoningEffort(sessionId, effort)
+        sessionPort.updateReasoningEffort(sessionId, effort)
     }
 
     suspend fun isSessionEmpty(sessionId: String): Boolean {
-        return v2Agent.getMessagesBySessionOnce(sessionId).isEmpty()
+        return messagePort.listBySession(sessionId).isEmpty()
     }
-
-    // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun V2AgentSession.toEntity() = ChatSessionEntity(
-        id = id,
-        title = title ?: "",
-        createdAtMs = created_at,
-        updatedAtMs = updated_at,
-        workspacePath = workspace_path,
-        workspaceId = workspace_id,
-        mode = mode,
-        reasoningEffort = reasoning_effort,
-        providerId = provider_id,
-        model = model,
-        totalInputTokens = total_input_tokens.toInt(),
-        totalOutputTokens = total_output_tokens.toInt(),
-        lastInputTokens = last_input_tokens.toInt(),
-    )
 }

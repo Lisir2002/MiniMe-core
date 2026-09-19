@@ -2,9 +2,9 @@ package com.mini.me_core.datalayer.repository
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
-import com.mini.mecore.datalayer.sqldelight.T2iDb
-import com.mini.mecore.datalayer.sqldelight.t2i.T2i_result
-import com.mini.mecore.datalayer.sqldelight.t2i.T2i_task
+import com.mini.mecore.datalayer.sqldelight.AuxDb
+import com.mini.mecore.datalayer.sqldelight.T2i_result
+import com.mini.mecore.datalayer.sqldelight.T2i_task
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
  *
  * v2-full-takeover P0-1：补 Flow 响应式读，对齐 Room DAO 的 4 个 Flow 查询。
  */
-class T2iRepository(private val db: T2iDb) {
+class T2iRepository(private val db: AuxDb) {
 
     private val q get() = db.t2iQueries
 
@@ -129,13 +129,13 @@ class T2iRepository(private val db: T2iDb) {
         q.insertOrReplaceT2iProvider(id, name, type, baseUrl, encryptedApiKey, endpointMode, isActive, priority, isEnabled, extraHeadersJson, createdAtMs, updatedAtMs)
     }
 
-    suspend fun getT2iProvider(id: String): com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers? =
+    suspend fun getT2iProvider(id: String): com.mini.mecore.datalayer.sqldelight.T2i_providers? =
         withContext(Dispatchers.IO) { q.selectT2iProviderById(id).executeAsOneOrNull() }
 
-    suspend fun listT2iProviders(): List<com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers> =
+    suspend fun listT2iProviders(): List<com.mini.mecore.datalayer.sqldelight.T2i_providers> =
         withContext(Dispatchers.IO) { q.selectAllT2iProviders().executeAsList() }
 
-    suspend fun getActiveT2iProvider(): com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers? =
+    suspend fun getActiveT2iProvider(): com.mini.mecore.datalayer.sqldelight.T2i_providers? =
         withContext(Dispatchers.IO) { q.selectActiveT2iProvider().executeAsOneOrNull() }
 
     suspend fun deactivateAllT2iProviders() =
@@ -172,7 +172,7 @@ class T2iRepository(private val db: T2iDb) {
         q.insertOrReplaceT2iProviderModel(id, providerId, modelId, displayName, supportsHd, supportsInpaint, defaultWidth, defaultHeight, maxSteps, defaultSteps, costPerImageTokens, createdAtMs, updatedAtMs)
     }
 
-    suspend fun listT2iModels(providerId: String): List<com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models> =
+    suspend fun listT2iModels(providerId: String): List<com.mini.mecore.datalayer.sqldelight.T2i_provider_models> =
         withContext(Dispatchers.IO) { q.selectT2iModelsByProvider(providerId).executeAsList() }
 
     suspend fun deleteT2iProviderModels(providerId: String) =
@@ -186,9 +186,9 @@ class T2iRepository(private val db: T2iDb) {
     fun observeResultsByTask(taskId: String): Flow<List<T2i_result>> =
         q.selectResultsByTask(taskId).asFlow().mapToList(Dispatchers.IO)
 
-    fun observeAllT2iProviders(): Flow<List<com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers>> =
+    fun observeAllT2iProviders(): Flow<List<com.mini.mecore.datalayer.sqldelight.T2i_providers>> =
         q.selectAllT2iProviders().asFlow().mapToList(Dispatchers.IO)
 
-    fun observeT2iModelsByProvider(providerId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models>> =
+    fun observeT2iModelsByProvider(providerId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.T2i_provider_models>> =
         q.selectT2iModelsByProvider(providerId).asFlow().mapToList(Dispatchers.IO)
 }

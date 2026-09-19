@@ -51,8 +51,32 @@ import javax.inject.Inject
 class ExecuteCommandTool @Inject constructor(
     private val commandEngine: CommandEngine,
     private val workspaceRepository: WorkspaceRepository,
-    private val containerEngine: LinuxContainerEngine
+    private val containerEngine: LinuxContainerEngine,
+    private val fileObservationGuard: com.mini.me_core.feature.agent.domain.guard.FileObservationGuard,
 ) : AgentTool(), StreamingAgentTool {
+    /** (F3) shell 写文件命令正则：捕获目标路径（不含只读/管道）。 */
+    private val writeRedirects = listOf(
+        Regex("""(?:^|[\s;&|])(?:cat|tee)\s+.*?>>?\s+([^\s;&|]+)"""),
+        Regex("""(?:^|[\s;&|])tee\s+-a?\s+([^\s;&|]+)"""),
+        Regex("""(?:^|[\s;&|])>>?\s*([^\s;&|]+)"""),
+        Regex("""(?:^|[\s;&|])sed\s+-i.*?\s+([^\s;&|]+)"""),
+        Regex("""(?:^|[\s;&|])(?:cp|mv)\s+[^\s;&|]+\s+([^\s;&|]+)"""),
+    )
+
+    /** (F3) 命令成功后扫描写文件操作，命中调 markObserved（只记录不拦截）。 */
+    private fun observeShellWrites(command: String) {
+        runCatching {
+            writeRedirects.forEach { r ->
+                r.findAll(command).forEach { m ->
+                    val path = m.groupValues[1].trim().trim('\'', '"')
+                    if (path.isNotBlank() && !path.startsWith("/dev/") && !path.startsWith("|")) {
+                        fileObservationGuard.markObserved(path)
+                    }
+                }
+            }
+        }
+    }
+
     private companion object {
         const val TAG = "ExecuteCommandTool"
 
@@ -256,6 +280,8 @@ class ExecuteCommandTool @Inject constructor(
             }
             FileLogger.v(TAG, "execute_command 完成，输出 ${result.output.length} 字符，exit=${result.exitCode}")
             maybeSyncBundleStates(command)
+            // (F3) 命令成功后扫描写文件操作，记录到文件观察护栏（避免后续 editFile 误判 FS_STALE）。
+            if (result.exitCode == 0) observeShellWrites(command)
             // 结构化超时：区别于普通失败，返回 TOOL_TIMEOUT 让模型可据此重试/换策略。
             if (result.timedOut) {
                 FileLogger.w(TAG, "execute_command 超时(${timeoutMs}ms)已强制终止: $command")

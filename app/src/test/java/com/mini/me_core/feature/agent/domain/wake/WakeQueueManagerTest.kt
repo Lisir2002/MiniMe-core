@@ -1,7 +1,5 @@
 package com.mini.me_core.feature.agent.domain.wake
 
-import com.mini.me_core.datalayer.repository.WakeQueueStore
-import com.mini.mecore.datalayer.sqldelight.agent.Wake_queue as V2WakeItem
 import com.mini.me_core.feature.agent.data.local.entity.WakeItemEntity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -16,25 +14,22 @@ class WakeQueueManagerTest {
 
     private class FakeWakeQueueStore(
         private val failOnUpdate: Boolean = false
-    ) : WakeQueueStore {
-        val store = mutableListOf<V2WakeItem>()
-        override suspend fun upsertWakeItem(
-            wakeId: String, sessionId: String, source: String, type: String, content: String,
-            status: String, createdAtMs: Long,
-        ) { store += V2WakeItem(wakeId, sessionId, source, type, content, status, createdAtMs) }
+    ) : WakePort {
+        val store = mutableListOf<WakeItemEntity>()
+        override suspend fun upsert(item: WakeItemEntity) { store += item }
 
-        override suspend fun listWakeBySessionAndStatus(sessionId: String, status: String): List<V2WakeItem> =
-            store.filter { it.session_id == sessionId && it.status == status }.sortedBy { it.created_at_ms }
+        override suspend fun listBySessionAndStatus(sessionId: String, status: String): List<WakeItemEntity> =
+            store.filter { it.sessionId == sessionId && it.status == status }.sortedBy { it.createdAtMs }
 
-        override suspend fun markWakeItemsConsumedBatch(ids: List<String>, status: String) {
+        override suspend fun listPending(): List<WakeItemEntity> =
+            store.filter { it.status == WakeItemEntity.STATUS_PENDING }.sortedBy { it.createdAtMs }
+
+        override suspend fun markConsumed(ids: List<String>, status: String) {
             if (failOnUpdate) throw IllegalStateException("update failed")
             store.indices.forEach { i ->
-                if (store[i].wake_id in ids) store[i] = store[i].copy(status = status)
+                if (store[i].wakeId in ids) store[i] = store[i].copy(status = status)
             }
         }
-
-        override suspend fun listPendingWakeItems(): List<V2WakeItem> =
-            store.filter { it.status == WakeItemEntity.STATUS_PENDING }.sortedBy { it.created_at_ms }
     }
 
     // ---------- 写入 ----------

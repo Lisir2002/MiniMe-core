@@ -1,7 +1,5 @@
 package com.mini.me_core.feature.agent.domain.session
 
-import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.mecore.datalayer.sqldelight.agent.Agent_message as V2AgentMessage
 import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
 import com.mini.me_core.feature.agent.domain.model.AgentMessage
 import com.mini.me_core.feature.agent.domain.model.CONTEXT_COMPACTION_MARKER
@@ -18,7 +16,7 @@ import javax.inject.Singleton
 
 @Singleton
 class MessagePersistenceUseCase @Inject constructor(
-    private val v2Agent: V2AgentRepository,
+    private val messagePort: AgentMessagePort,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -81,7 +79,7 @@ class MessagePersistenceUseCase @Inject constructor(
                 outputTokens = outputTokens,
                 isCompacted = isCompacted
             )
-            v2Agent.insertMessage(entity.toV2())
+            messagePort.insert(entity)
         } else {
             // 超长内容分块落库：主行（chunk 0）携带全部元数据，续块行仅携带内容。
             // 全组共享同一 timestamp（块号递增），保证按时间序查询时块与块邻接、不被其它消息穿插，
@@ -112,7 +110,7 @@ class MessagePersistenceUseCase @Inject constructor(
                     isCompacted = isCompacted
                 )
             }
-            v2Agent.insertAllMessages(rows.map { it.toV2() })
+            messagePort.insertAll(rows)
         }
     }
 
@@ -159,7 +157,7 @@ class MessagePersistenceUseCase @Inject constructor(
     )
 
     suspend fun updateContent(messageId: String, newContent: String) {
-        v2Agent.updateMessageContent(messageId, newContent)
+        messagePort.updateContent(messageId, newContent)
     }
 
     companion object {
@@ -258,7 +256,7 @@ class MessagePersistenceUseCase @Inject constructor(
      */
     suspend fun buildHistory(sessionId: String, pendingToolMarker: String): List<AgentMessage> {
         // 先按 chunk_index 拼接分块消息（chunk 行共享 timestamp，压缩标记也是全组一致），再过滤已压缩行。
-        val raw = v2Agent.getMessagesBySessionOnce(sessionId).map { it.toEntity() }
+        val raw = messagePort.listBySession(sessionId)
         val entities = mergeChunks(raw).filter { !it.isCompacted }
 
         // 第一遍：求 assistant 声明的 toolCallId 与 tool 结果 toolCallId 的交集。
@@ -378,54 +376,4 @@ class MessagePersistenceUseCase @Inject constructor(
         }
     }
 
-    // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun AgentMessageEntity.toV2() = V2AgentMessage(
-        id = id,
-        session_id = sessionId,
-        role = role,
-        seq = timestamp,
-        created_at = timestamp,
-        task_id = taskId,
-        content = content,
-        tool_calls_json = toolCallsJson,
-        tool_call_id = toolCallId,
-        tool_name = toolName,
-        tool_args = toolArgs,
-        is_error = if (isError) 1L else 0L,
-        reasoning = reasoning,
-        signature = signature,
-        attachments_json = attachmentsJson,
-        is_compacted = if (isCompacted) 1L else 0L,
-        is_context_summary = if (isContextSummary) 1L else 0L,
-        is_compaction_marker = if (isCompactionMarker) 1L else 0L,
-        input_tokens = inputTokens.toLong(),
-        output_tokens = outputTokens.toLong(),
-        chunk_group_id = chunkGroupId,
-        chunk_index = chunkIndex.toLong(),
-    )
-
-    private fun V2AgentMessage.toEntity() = AgentMessageEntity(
-        id = id,
-        sessionId = session_id,
-        taskId = task_id,
-        role = role,
-        content = content,
-        timestamp = seq,
-        toolCallsJson = tool_calls_json,
-        toolCallId = tool_call_id,
-        toolName = tool_name,
-        toolArgs = tool_args,
-        isError = is_error == 1L,
-        reasoning = reasoning,
-        signature = signature,
-        attachmentsJson = attachments_json,
-        isCompacted = is_compacted == 1L,
-        isContextSummary = is_context_summary == 1L,
-        isCompactionMarker = is_compaction_marker == 1L,
-        inputTokens = input_tokens.toInt(),
-        outputTokens = output_tokens.toInt(),
-        chunkGroupId = chunk_group_id,
-        chunkIndex = chunk_index.toInt(),
-    )
 }

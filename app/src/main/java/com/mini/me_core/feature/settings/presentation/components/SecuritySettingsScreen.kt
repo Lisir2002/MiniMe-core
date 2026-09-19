@@ -37,8 +37,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.zth.ZthPerformanceClass
-import com.mini.me_core.feature.agent.domain.zth.ZthPresetTier
+import com.mini.me_core.feature.settings.domain.model.ZthPerformanceClass
+import com.mini.me_core.feature.settings.domain.model.ZthPresetTier
 import com.mini.me_core.feature.settings.presentation.SecuritySettingsViewModel
 
 /**

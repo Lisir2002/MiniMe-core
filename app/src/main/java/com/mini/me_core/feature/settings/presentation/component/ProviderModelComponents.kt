@@ -70,7 +70,7 @@ import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.data.local.entity.ModelCapabilityOverrideEntity
+import com.mini.me_core.feature.settings.domain.model.ModelCapabilityOverrideEntity
 import com.mini.me_core.feature.settings.data.remote.ModelTestResult
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.domain.model.ProviderType

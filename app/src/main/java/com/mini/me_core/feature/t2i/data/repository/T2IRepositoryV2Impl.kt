@@ -148,7 +148,7 @@ class T2IRepositoryV2Impl @Inject constructor(
 
     // ── 映射 ──
 
-    private fun com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers.toEntity() = T2IProviderEntity(
+    private fun com.mini.mecore.datalayer.sqldelight.T2i_providers.toEntity() = T2IProviderEntity(
         id = id,
         name = name,
         type = type,
@@ -163,7 +163,7 @@ class T2IRepositoryV2Impl @Inject constructor(
         updatedAtMs = updated_at_ms,
     )
 
-    private fun com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models.toEntity() = T2IProviderModelEntity(
+    private fun com.mini.mecore.datalayer.sqldelight.T2i_provider_models.toEntity() = T2IProviderModelEntity(
         id = id,
         providerId = provider_id,
         modelId = model_id,
@@ -179,7 +179,7 @@ class T2IRepositoryV2Impl @Inject constructor(
         updatedAtMs = updated_at_ms,
     )
 
-    private fun com.mini.mecore.datalayer.sqldelight.t2i.T2i_task.toEntity() = T2ITaskEntity(
+    private fun com.mini.mecore.datalayer.sqldelight.T2i_task.toEntity() = T2ITaskEntity(
         id = id,
         sessionId = session_id,
         messageId = message_id,

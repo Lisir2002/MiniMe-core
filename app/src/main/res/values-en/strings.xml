@@ -92,7 +92,7 @@
     <string name="settings_norm_flow_step_inject">Per-step Injection</string>
     <string name="settings_norm_flow_step_inject_desc">Context injection discipline before each model turn</string>
     <string name="settings_norm_flow_tool_guard">Tool Guards</string>
-    <string name="settings_norm_flow_tool_guard_desc">Tool execution guard chain and file observation discipline</string>
+    <string name="settings_norm_flow_tool_guard_desc">File observation discipline (command safety / permission engine always on)</string>
     <string name="settings_norm_flow_reasoning_budget">Reasoning Budget</string>
     <string name="settings_norm_flow_reasoning_budget_desc">Pass per-session thinking effort to the model to keep chain-of-thought continuity</string>
     <string name="settings_norm_flow_usage_card">Usage Card</string>
@@ -1734,4 +1734,17 @@
     <string name="common_compaction_marker">Conversation history compacted</string>
     <string name="common_attachment_fallback">Attachment</string>
     <string name="common_tool_call_fallback">Tool call</string>
-</resources>
+
+    <string name="ui_quick_packs">Quick packs</string>
+    <string name="ui_custom_pkg_install">Install custom package</string>
+    <string name="ui_installed_custom_pkgs">Installed custom packages</string>
+    <string name="ui_no_custom_pkgs">No custom packages</string>
+    <string name="ui_custom_pkgs_count">%1$d installed</string>
+    <string name="ui_refresh">Refresh</string>
+    <string name="ui_container_not_ready_query">Container not ready, cannot query custom packages</string>
+    <string name="ui_custom_pkg_hint">Install from quick packs above, or enter an apk name. Common: htop / neofetch / tmux / fzf / rsync / lf / openssh</string>
+    <string name="ui_uninstall">Uninstall</string>
+    <string name="ui_installing">Installing: %1$s</string>
+    <string name="ui_preparing">Preparing…</string>
+    <string name="ui_install_failed">Install failed: %1$s</string>
+<string name="settings_storage">Storage &amp; Database</string></resources>

@@ -1,8 +1,6 @@
 package com.mini.me_core.feature.agent.domain.wake
 
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.datalayer.repository.WakeQueueStore
-import com.mini.mecore.datalayer.sqldelight.agent.Wake_queue as V2WakeItem
 import com.mini.me_core.feature.agent.data.local.entity.WakeItemEntity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +27,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class WakeQueueManager @Inject constructor(
-    private val wakeQueueStore: WakeQueueStore,
+    private val wakePort: WakePort,
 ) {
     // 异步写入用独立 scope（SupervisorJob 隔离单个任务失败），风格对齐 FtpServerManager/SyncEngine。
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -46,15 +44,7 @@ class WakeQueueManager @Inject constructor(
             status = WakeItemEntity.STATUS_PENDING,
             createdAtMs = System.currentTimeMillis()
         )
-        wakeQueueStore.upsertWakeItem(
-            wakeId = item.wakeId,
-            sessionId = item.sessionId,
-            source = item.source,
-            type = item.type,
-            content = item.content,
-            status = item.status,
-            createdAtMs = item.createdAtMs
-        )
+wakePort.upsert(item)
     }
 
     /**
@@ -76,29 +66,20 @@ class WakeQueueManager @Inject constructor(
 
     /** 读取某会话的全部待注入唤醒（按入队时间升序）。sessionId 为 null/空串时仅匹配全局唤醒。 */
     suspend fun pendingForSession(sessionId: String?): List<WakeItemEntity> =
-        wakeQueueStore.listWakeBySessionAndStatus(sessionId.orEmpty(), WakeItemEntity.STATUS_PENDING).map { it.toEntity() }
+        wakePort.listBySessionAndStatus(sessionId.orEmpty(), WakeItemEntity.STATUS_PENDING)
 
     /** 消费确认：把已成功注入的唤醒标记为 CONSUMED（防重复注入）。空列表安全返回。 */
     suspend fun markConsumed(ids: List<String>) {
         if (ids.isEmpty()) return
-        wakeQueueStore.markWakeItemsConsumedBatch(ids, WakeItemEntity.STATUS_CONSUMED)
+        wakePort.markConsumed(ids, WakeItemEntity.STATUS_CONSUMED)
     }
 
     /** 全部待注入唤醒（启动重扫用）。 */
     suspend fun allPending(): List<WakeItemEntity> =
-        wakeQueueStore.listPendingWakeItems().map { it.toEntity() }
+        wakePort.listPending()
 
     // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
 
-    private fun V2WakeItem.toEntity() = WakeItemEntity(
-        wakeId = wake_id,
-        sessionId = session_id,
-        source = source,
-        type = type,
-        content = content,
-        status = status,
-        createdAtMs = created_at_ms
-    )
 
     private companion object {
         const val TAG = "WakeQueueManager"

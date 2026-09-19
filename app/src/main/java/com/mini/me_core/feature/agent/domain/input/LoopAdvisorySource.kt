@@ -2,7 +2,7 @@ package com.mini.me_core.feature.agent.domain.input
 
 import com.mini.me_core.feature.agent.domain.model.AgentContext
 import com.mini.me_core.feature.agent.domain.prompt.SystemPromptProvider
-import com.mini.me_core.feature.agent.domain.workflow.LoopGuardTracker
+import com.mini.me_core.core.agentworkflow.LoopGuardTracker
 import javax.inject.Inject
 import javax.inject.Singleton
 

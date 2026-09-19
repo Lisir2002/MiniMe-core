@@ -208,6 +208,9 @@ class TerminalSettingsViewModel @Inject constructor(
 
     val customPackages: StateFlow<List<String>> = bundleRepo.customPackages
 
+    /** E4：有新版本可装的 bundle 集合。 */
+    val bundleUpdateAvailable: StateFlow<Set<TerminalBundleId>> = bundleRepo.updateAvailable
+
     // AI 推荐组合是否已全部安装（按钮状态）：
     @OptIn(ExperimentalCoroutinesApi::class)
     val aiRecommendedAllInstalled: StateFlow<Boolean> = bundleStates
@@ -277,6 +280,13 @@ class TerminalSettingsViewModel @Inject constructor(
             runCatching { containerEngine.uninstallBundle(id) }
                 .onFailure { postError(it.message ?: "卸载失败") }
             refreshStorageUsed()
+        }
+    }
+
+    /** F3：取消当前正在进行的 bundle 安装/卸载。 */
+    fun cancelBundleOp() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { containerEngine.cancelCurrentBundleOp() }
         }
     }
 

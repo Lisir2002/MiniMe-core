@@ -1,6 +1,6 @@
 package com.mini.me_core.datalayer.store
 
-import com.mini.mecore.datalayer.sqldelight.InfraDb
+import com.mini.mecore.datalayer.sqldelight.AuxDb
 
 /**
  * 一等 BlobStore（设计 §6.4）：大二进制存储。
@@ -8,7 +8,7 @@ import com.mini.mecore.datalayer.sqldelight.InfraDb
  */
 data class BlobMeta(val id: Long, val mime: String?, val size: Long, val createdAt: Long)
 
-class BlobStore(private val db: InfraDb) {
+class BlobStore(private val db: AuxDb) {
 
     private val q get() = db.blobQueries
 

@@ -9,8 +9,8 @@ import com.mini.me_core.feature.agent.domain.permission.FailureClass
 import com.mini.me_core.feature.agent.domain.permission.FailureClassification
 import com.mini.me_core.feature.agent.domain.permission.FailureSubClass
 import com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalChoice
-import com.mini.me_core.feature.settings.data.repository.ExecutionMode
-import com.mini.me_core.feature.settings.data.repository.ZthTierRepository
+import com.mini.me_core.feature.agent.domain.container.AgentExecutionMode
+import com.mini.me_core.feature.agent.domain.zth.ZthTierPort
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -46,7 +46,7 @@ class ZthGuardAggregateFacade @Inject constructor(
     private val confirmationCardVmProvider: javax.inject.Provider<com.mini.me_core.feature.agent.presentation.ZthConfirmationCardViewModel>,
     private val capabilityGuard: ZthCapabilityGuard,
     private val failureClassifier: ZthFailureClassifier,
-    private val tierRepository: ZthTierRepository,
+    private val tierRepository: ZthTierPort,
     private val telemetry: ZthTelemetryRepository,
     private val capabilityAuditRepo: ZthCapabilityAuditRepository,
     private val checkpointRepo: ZthCheckpointRepository
@@ -63,7 +63,7 @@ class ZthGuardAggregateFacade @Inject constructor(
     private suspend fun prepareEnv(
         sessionId: String?,
         mode: AgentMode,
-        executionMode: ExecutionMode,
+        executionMode: AgentExecutionMode,
         onlineValidated: Boolean,
         currentCommandPrefix: String? = null,
         httpStatusCode: Int? = null,
@@ -78,7 +78,7 @@ class ZthGuardAggregateFacade @Inject constructor(
             forcedSubClassOverride = forcedSubClassOverride
         )
         // FACADE-INV-3：REMOTE_SSH → legacy 短路（只返回 tier/ctx 不做 fuse 校验）
-        if (executionMode == ExecutionMode.REMOTE_SSH) return tier to ctx
+        if (executionMode == AgentExecutionMode.REMOTE_SSH) return tier to ctx
         // FACADE-INV-1：熔断 BLOCK → 抛异常（上抛到 StatefulAgentWorkflow onFailure 处理）
         val allowance = circuitBreaker.isAllowed(sessionId, tier)
         check(allowance.allowed) {
@@ -129,13 +129,13 @@ class ZthGuardAggregateFacade @Inject constructor(
         originalPlanReason: String,
         structuredPlan: StructuredPlanBundle,
         mode: AgentMode,
-        executionMode: ExecutionMode,
+        executionMode: AgentExecutionMode,
         onlineValidated: Boolean,
         performanceClass: ZthPerformanceClass = ZthPerformanceClass.HIGH_END
     ): Pair<PlanApprovalChoice, StructuredPlanBundle> {
         // 0) 准备环境 + 熔断校验（REMOTE_SSH 直接走 legacy）
         val (tier, _) = prepareEnv(sessionId, mode, executionMode, onlineValidated)
-        if (executionMode == ExecutionMode.REMOTE_SSH) {
+        if (executionMode == AgentExecutionMode.REMOTE_SSH) {
             FileLogger.w(TAG, "REMOTE_SSH 模式：ZTH prePlan 走 legacy（不写 fuse/sentinel）")
             val choice = planApprovalWrapper.awaitZthApproval(
                 originalPlanReason, sessionId, ZthPresetTier.DISABLED, onlineValidated, null
@@ -201,7 +201,7 @@ class ZthGuardAggregateFacade @Inject constructor(
         sessionId: String?,
         items: List<ZthToolCallPlanItem>,
         mode: AgentMode,
-        executionMode: ExecutionMode,
+        executionMode: AgentExecutionMode,
         onlineValidated: Boolean,
         perf: ZthPerformanceClass = ZthPerformanceClass.HIGH_END
     ): ZthPreToolAuditBundle {
@@ -210,7 +210,7 @@ class ZthGuardAggregateFacade @Inject constructor(
             perItemResults = emptyList(), anyNeedUserConfirm = false,
             anyBlockedByGlobalDeny = false, tierEnforced = tier, offlineFallbackApplied = !onlineValidated
         )
-        if (executionMode == ExecutionMode.REMOTE_SSH) {
+        if (executionMode == AgentExecutionMode.REMOTE_SSH) {
             // REMOTE_SSH legacy：所有 item 直接 PASS_LOCAL_HEURISTIC
             return ZthPreToolAuditBundle(
                 perItemResults = items.map { ZthCapabilityAuditResult(it, ZthCapabilityVerdict.PASS_LOCAL_HEURISTIC,
@@ -269,14 +269,14 @@ class ZthGuardAggregateFacade @Inject constructor(
         toolName: String, callId: String,
         outputText: String,
         modifiedFilesHint: List<String>,
-        mode: AgentMode, executionMode: ExecutionMode, onlineValidated: Boolean
+        mode: AgentMode, executionMode: AgentExecutionMode, onlineValidated: Boolean
     ): ZthPostToolAuditBundle {
         val (tier, ctx) = prepareEnv(sessionId, mode, executionMode, onlineValidated)
         // 1) ToolOutputGuard 启发式（Phase 5 简化版：3 条正则）
         val audit = runToolOutputHeuristic(toolName, callId, outputText, tier, perf = ZthPerformanceClass.HIGH_END)
         val hallucinationFlag = audit.hallucinationConfidence >= tierHallucinationThreshold(tier)
         var cls: FailureClassification? = null
-        if (hallucinationFlag && executionMode != ExecutionMode.REMOTE_SSH) {
+        if (hallucinationFlag && executionMode != AgentExecutionMode.REMOTE_SSH) {
             // 2) FailureClassifier(E7：OUTPUT_HALLUCINATION_HIGH_CONF)
             cls = failureClassifier.classify(
                 throwable = null,
@@ -330,7 +330,7 @@ class ZthGuardAggregateFacade @Inject constructor(
     suspend fun onThrowableAudit(
         sessionId: String?,
         throwable: Throwable?,
-        mode: AgentMode, executionMode: ExecutionMode, onlineValidated: Boolean,
+        mode: AgentMode, executionMode: AgentExecutionMode, onlineValidated: Boolean,
         currentCommandPrefix: String? = null,
         httpStatusCode: Int? = null,
         bundleDownloadFailure: com.mini.me_core.feature.agent.domain.zth.BundleDownloadResult.Failure? = null
@@ -339,10 +339,10 @@ class ZthGuardAggregateFacade @Inject constructor(
             currentCommandPrefix, httpStatusCode, forcedSubClassOverride = bundleDownloadFailure?.subClass)
         val ctx = ctxBase.copy(bundleDownloadFailure = bundleDownloadFailure)
         val cls = failureClassifier.classify(throwable, ctx)
-        if (executionMode != ExecutionMode.REMOTE_SSH) {
+        if (executionMode != AgentExecutionMode.REMOTE_SSH) {
             circuitBreaker.recordFailure(sessionId, tier, cls)
         }
-        if (cls.requiresUserConfirmation && executionMode != ExecutionMode.REMOTE_SSH) {
+        if (cls.requiresUserConfirmation && executionMode != AgentExecutionMode.REMOTE_SSH) {
             val vm = confirmationCardVmProvider.get()
             triggerCardSuspend(
                 vm = vm, sessionId = sessionId ?: "global",

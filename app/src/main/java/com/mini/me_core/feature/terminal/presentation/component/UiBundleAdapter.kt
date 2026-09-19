@@ -32,21 +32,14 @@ fun TerminalBundle.toUi(): UiBundle = UiBundle(
     title = displayName,
     description = description,
     sizeEstimateMb = sizeEstimateMb,
-    icon = iconVector(),
+    icon = bundleIconVector(id),
 )
 
-/** 对应 TerminalBundle.iconName 字符串 / 或旧 SharedBundleCard 里的 sharedBundleIcon 映射逻辑。 */
-@Composable
-private fun TerminalBundle.iconVector(): ImageVector = when (id) {
-    TerminalBundleId.PYTHON -> Icons.Rounded.Memory
-    TerminalBundleId.NODE -> Icons.Rounded.Code
-    TerminalBundleId.RIPGREP -> Icons.Rounded.Search
-    TerminalBundleId.GIT -> Icons.Rounded.AccountTree
-    TerminalBundleId.BASH -> Icons.Rounded.Terminal
-    TerminalBundleId.NET -> Icons.Rounded.Public
-    TerminalBundleId.QEMU_X86_TRANSLATOR -> Icons.Rounded.Memory
-}
-
+/**
+ * F6：icon 映射唯一真源（非 @Composable）。
+ * 对应 TerminalBundle.iconName 字符串 / 旧 SharedBundleCard.sharedBundleIcon 映射逻辑。
+ * @Composable 薄包装见下。
+ */
 internal fun bundleIconVector(id: TerminalBundleId): ImageVector = when (id) {
     TerminalBundleId.PYTHON -> Icons.Rounded.Memory
     TerminalBundleId.NODE -> Icons.Rounded.Code
@@ -56,3 +49,7 @@ internal fun bundleIconVector(id: TerminalBundleId): ImageVector = when (id) {
     TerminalBundleId.NET -> Icons.Rounded.Public
     TerminalBundleId.QEMU_X86_TRANSLATOR -> Icons.Rounded.Memory
 }
+
+/** @Composable 薄包装，避免业务代码直接依赖无参 iconVector。 */
+@Composable
+private fun TerminalBundle.iconVector(): ImageVector = bundleIconVector(id)

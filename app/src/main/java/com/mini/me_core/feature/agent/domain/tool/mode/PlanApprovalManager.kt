@@ -1,8 +1,7 @@
 package com.mini.me_core.feature.agent.domain.tool.mode
 
-import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
 import com.mini.me_core.feature.agent.data.local.entity.ChatSessionEntity
+import com.mini.me_core.feature.agent.domain.session.AgentSessionPort
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CompletableDeferred
@@ -20,7 +19,7 @@ import kotlinx.coroutines.launch
  */
 @Singleton
 class PlanApprovalManager @Inject constructor(
-    private val v2Agent: V2AgentRepository,
+    private val sessionPort: AgentSessionPort,
 ) {
     private val _pendingApproval = MutableStateFlow<PlanApprovalRequest?>(null)
     val pendingApproval: StateFlow<PlanApprovalRequest?> = _pendingApproval.asStateFlow()
@@ -30,16 +29,10 @@ class PlanApprovalManager @Inject constructor(
     private var currentSessionId: String? = null
 
     private suspend fun getSessionEntity(sid: String): ChatSessionEntity? =
-        v2Agent.getSessionById(sid)?.toEntity()
+        sessionPort.getSessionById(sid)
 
     private suspend fun upsertMode(sid: String, entity: ChatSessionEntity, mode: String) {
-        v2Agent.upsertSession(
-            id = entity.id, title = entity.title, mode = mode, model = entity.model, status = "active",
-            createdAtMs = entity.createdAtMs, updatedAtMs = entity.updatedAtMs,
-            workspacePath = entity.workspacePath, workspaceId = entity.workspaceId, reasoningEffort = entity.reasoningEffort,
-            providerId = entity.providerId, totalInputTokens = entity.totalInputTokens.toLong(),
-            totalOutputTokens = entity.totalOutputTokens.toLong(), lastInputTokens = entity.lastInputTokens.toLong(),
-        )
+        sessionPort.upsert(entity.copy(mode = mode))
     }
 
     /** 挂起等待用户在计划审查面板中的决策。 */
@@ -77,24 +70,6 @@ class PlanApprovalManager @Inject constructor(
 
         currentDecision?.complete(choice)
     }
-
-    // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun V2AgentSession.toEntity() = ChatSessionEntity(
-        id = id,
-        title = title ?: "",
-        createdAtMs = created_at,
-        updatedAtMs = updated_at,
-        workspacePath = workspace_path,
-        workspaceId = workspace_id,
-        mode = mode,
-        reasoningEffort = reasoning_effort,
-        providerId = provider_id,
-        model = model,
-        totalInputTokens = total_input_tokens.toInt(),
-        totalOutputTokens = total_output_tokens.toInt(),
-        lastInputTokens = last_input_tokens.toInt(),
-    )
 }
 
 data class PlanApprovalRequest(val reason: String)

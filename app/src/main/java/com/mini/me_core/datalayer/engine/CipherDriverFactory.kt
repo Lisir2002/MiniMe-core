@@ -1,28 +1,44 @@
 package com.mini.me_core.datalayer.engine
 
 import android.content.Context
+import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import app.cash.sqldelight.db.SqlDriver
+import com.mini.mecore.datalayer.sqldelight.AgentDb
+import com.mini.mecore.datalayer.sqldelight.AuxDb
+import com.mini.mecore.datalayer.sqldelight.CredentialsDb
+import com.mini.mecore.datalayer.sqldelight.WorkspaceDb
+import net.sqlcipher.database.SupportFactory
 
 /**
- * SQLCipher 驱动工厂（设计 §8 / §12.2）—— 当前为「启用接缝」。
+ * SQLCipher 全盘加密驱动工厂（设计 §8 / §12.2）—— 已真实接线。
  *
- * 设计目标：自测期明文（[PlainDriverFactory] 生效）；未来一键开 SQLCipher 时，
- * 仅需在 DI 把绑定从 PlainDriverFactory 换成本类，并完成下方 create() 内的 SQLCipher 接线：
- *   1. 引入依赖 net.zetetic:android-database-sqlcipher:4.x；
- *   2. 用其 SupportSQLiteOpenHelper.Factory（基于 net.sqlcipher.database.SQLiteOpenHelper）
- *      构造 AndroidSqliteDriver(schema, context, name, cipherFactory)；
- *   3. 密钥经 Android Keystore 提供（与现有备份/订阅敏感字段加密一致）。
- * 切换只改 DI 绑定，业务/迁移/备份代码无感。
+ * 四个物理库（AgentDb / CredentialsDb / WorkspaceDb / AuxDb）全部走本驱动，无明文 driver。
+ *
+ * 密钥：[SqlCipherKeyManager] 提供独立 32 字节随机 DB passphrase（Android Keystore 包装），
+ *       首启生成、后续读取；不复用字段级 DEK、禁止硬编码、禁止用户密码派生。
+ *
+ * 存量迁移（明文库 → 加密库，事务化）：
+ *   由 [SqlCipherMigration] 在 driver 打开前执行——
+ *   「快照 → 开明文库导出 → 建加密库导入 → PRAGMA quick_check 校验 → 替换文件」；
+ *   任一步失败自动 [MigrationEngine.restoreSnapshot] 回退，不破坏 targetSdk=28 行为。
+ *
+ * 接线方式：DataLayerModule.provideDriverFactory 由 PlainDriverFactory 换成本类；
+ * 业务/迁移/备份代码只依赖 [DatabaseDriverFactory]，无感。
  */
 class CipherDriverFactory(
-    @Suppress("unused") private val context: Context,
+    private val context: Context,
     @Suppress("unused") private val pathProvider: DatabasePathProvider,
+    private val keyManager: SqlCipherKeyManager,
 ) : DatabaseDriverFactory {
 
     override fun create(lib: LibName): SqlDriver {
-        error(
-            "CipherDriverFactory 尚未启用：请先引入 net.zetetic:android-database-sqlcipher " +
-                "并按 DataLayerModule 注释完成 SQLCipher SupportSQLiteOpenHelper.Factory 接线，再切换 DI 绑定。",
-        )
+        val factory = SupportFactory(keyManager.getOrCreateKey())
+        val name = lib.fileName
+        return when (lib) {
+            LibName.AGENT -> AndroidSqliteDriver(AgentDb.Schema, context, name, factory)
+            LibName.CREDENTIALS -> AndroidSqliteDriver(CredentialsDb.Schema, context, name, factory)
+            LibName.WORKSPACE -> AndroidSqliteDriver(WorkspaceDb.Schema, context, name, factory)
+            LibName.AUX -> AndroidSqliteDriver(AuxDb.Schema, context, name, factory)
+        }
     }
 }

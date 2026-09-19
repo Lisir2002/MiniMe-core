@@ -5,11 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.mini.me_core.core.security.CredentialEncryptor
 import com.mini.me_core.core.security.OperationResult
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.zth.ZthPerformanceClass
-import com.mini.me_core.feature.agent.domain.zth.ZthPresetTier
+import com.mini.me_core.feature.settings.domain.model.ZthPerformanceClass
+import com.mini.me_core.feature.settings.domain.model.ZthPresetTier
 import com.mini.me_core.feature.settings.data.repository.ZthTierRepository
-import com.mini.me_core.feature.workspace.domain.RemoteAuditAction
-import com.mini.me_core.feature.workspace.domain.RemoteAuditCategory
+import com.mini.me_core.core.model.RemoteAuditAction
+import com.mini.me_core.core.model.RemoteAuditCategory
 import com.mini.me_core.feature.workspace.domain.repository.RemoteAuditLogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
