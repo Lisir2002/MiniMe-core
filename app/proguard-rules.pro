@@ -108,3 +108,11 @@
 # Android 运行时没有这些类；R8 fullMode 下缺失类会报错，该检测器在 Android 上无意义，忽略即可。
 -dontwarn java.lang.management.**
 -dontwarn io.ktor.util.debug.**
+
+# ---- SQLCipher for Android（数据库加密，P1 基础设施）----
+# net.sqlcipher 包通过 JNI 调用原生 libsqlcipher.so，核心类与方法不可被 R8 重命名/裁剪。
+# SupportFactory / SQLiteDatabase / SQLiteOpenHelper 等由 AndroidSqliteDriver 反射或直接调用，
+# 混淆后会导致 ClassNotFoundException / NoSuchMethodError。
+-keep class net.sqlcipher.** { *; }
+-keep class net.sqlcipher.database.** { *; }
+-dontwarn net.sqlcipher.**

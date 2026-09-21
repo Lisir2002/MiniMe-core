@@ -442,6 +442,12 @@ dependencies {
     testImplementation("app.cash.sqldelight:sqlite-driver:2.2.1")
     // androidx-sqlite 桥接（PlainDriverFactory 的 FrameworkSQLiteOpenHelperFactory）
     implementation("androidx.sqlite:sqlite-framework:2.4.0")
+    // ── 数据库加密（P1：基础设施 + 可选加密，设计文档 db-encryption-migration-design.md §5.3）──
+    // SQLCipher for Android：基于 SQLite 3.41.2 + OpenSSL，提供全库透明加密（AES-256-CBC + HMAC-SHA512）。
+    // CipherDriverFactory 使用其 SupportFactory(passphrase) 构造 AndroidSqliteDriver。
+    // P1 阶段默认仍为明文（DI 绑定 RoutingDriverFactory，未开启加密时走 PlainDriverFactory），
+    // 用户在设置页手动开启加密后，经 DbEncryptionMigrationEngine 迁移到加密库。
+    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(composeBom)
