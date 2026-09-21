@@ -2,13 +2,20 @@ package com.mini.me_core.datalayer.di
 
 import android.content.Context
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.datalayer.engine.AndroidDatabaseKeyProvider
 import com.mini.me_core.datalayer.engine.AndroidDatabasePathProvider
 import com.mini.me_core.datalayer.engine.AndroidVersionProbe
 import com.mini.me_core.datalayer.engine.ConnectionPool
+import com.mini.me_core.datalayer.engine.CrashRecovery
 import com.mini.me_core.datalayer.engine.DatabaseDriverFactory
+import com.mini.me_core.datalayer.engine.DatabaseKeyProvider
 import com.mini.me_core.datalayer.engine.DatabasePathProvider
+import com.mini.me_core.datalayer.engine.DbEncryptionMigrationEngine
+import com.mini.me_core.datalayer.engine.EncryptionStatus
 import com.mini.me_core.datalayer.engine.LibName
-import com.mini.me_core.datalayer.engine.PlainDriverFactory
+import com.mini.me_core.datalayer.engine.MigrationStateStore
+import com.mini.me_core.datalayer.engine.RoutingDriverFactory
+import com.mini.me_core.datalayer.engine.SharedPreferencesMigrationStateStore
 import com.mini.me_core.datalayer.migration.MigrationEngine
 import com.mini.me_core.datalayer.migration.SchemaSelfHealer
 import com.mini.me_core.datalayer.repository.AgentRepository
@@ -45,9 +52,12 @@ import javax.inject.Singleton
  * 这解决了「DataRegistryModule.provideDataProviders 先于 provideAgentDb 拿到 driver
  * → ensureSchema + 自愈未执行 → 业务查询遇到缺列的旧表 → 启动即崩」的竞态窗口。
  *
- * 加密插拔（设计 §8 / §12.2）：自测期绑定 [PlainDriverFactory]（明文）；
- * 未来启用 SQLCipher 只需把 [provideDriverFactory] 的返回换成 [CipherDriverFactory]，
- * 业务 / 迁移 / 备份零感知。
+ * 加密插拔（设计 §8 / §12.2）：P1 阶段绑定 [RoutingDriverFactory]，
+ * 根据每库 [EncryptionStatus] 动态选择明文/加密驱动。默认所有库为 PLAIN，
+ * 行为与 [com.mini.me_core.datalayer.engine.PlainDriverFactory] 完全一致。
+ * 用户在设置页开启加密后，[DbEncryptionMigrationEngine] 执行迁移并更新状态，
+ * RoutingDriverFactory 自动切换到 [com.mini.me_core.datalayer.engine.CipherDriverFactory]。
+ * 启动时 [CrashRecovery] 检测并回滚迁移中的崩溃状态。
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -64,10 +74,39 @@ object DataLayerModule {
 
     @Provides
     @Singleton
+    fun provideDatabaseKeyProvider(@ApplicationContext context: Context): DatabaseKeyProvider =
+        AndroidDatabaseKeyProvider(context)
+
+    @Provides
+    @Singleton
+    fun provideMigrationStateStore(@ApplicationContext context: Context): MigrationStateStore =
+        SharedPreferencesMigrationStateStore(context)
+
+    @Provides
+    @Singleton
+    fun provideDbEncryptionMigrationEngine(
+        @ApplicationContext context: Context,
+        pathProvider: DatabasePathProvider,
+        keyProvider: DatabaseKeyProvider,
+        stateStore: MigrationStateStore,
+    ): DbEncryptionMigrationEngine =
+        DbEncryptionMigrationEngine(context, pathProvider, keyProvider, stateStore)
+
+    @Provides
+    @Singleton
+    fun provideCrashRecovery(
+        pathProvider: DatabasePathProvider,
+        stateStore: MigrationStateStore,
+    ): CrashRecovery = CrashRecovery(pathProvider, stateStore)
+
+    @Provides
+    @Singleton
     fun provideDriverFactory(
         @ApplicationContext context: Context,
         pathProvider: DatabasePathProvider,
-    ): DatabaseDriverFactory = PlainDriverFactory(context, pathProvider)
+        keyProvider: DatabaseKeyProvider,
+        stateStore: MigrationStateStore,
+    ): DatabaseDriverFactory = RoutingDriverFactory(context, pathProvider, keyProvider, stateStore)
 
     /**
      * Schema 映射表：6 个库 → 各自的 SQLDelight Schema。
@@ -89,11 +128,20 @@ object DataLayerModule {
     fun provideConnectionPool(
         factory: DatabaseDriverFactory,
         engine: MigrationEngine,
+        stateStore: MigrationStateStore,
     ): ConnectionPool {
         // 迁移前钩子：在 factory.create（AndroidSqliteDriver 构造，会立即打开并迁移）之前，
         // 用原生只读连接探测真实 user_version，对旧版本库先快照保命。
         // 若漏调，driver 打开后 ensureSchema 仍有 codeMigrations 兜底，但快照安全网会失效——故必须此处先跑。
         val preOpenHook: (LibName) -> Unit = preOpenHook@{ lib ->
+            // 迁移状态检测：如果库处于迁移中状态，说明 CrashRecovery 未完全回滚
+            // （理论上 Application.onCreate 中已调用 CrashRecovery.recoverAll()）。
+            // P1 阶段记录警告，不阻断启动（RoutingDriverFactory 会回退到明文驱动）。
+            val migrationStatus = stateStore.getState(lib).encryptionStatus
+            if (migrationStatus != EncryptionStatus.PLAIN && migrationStatus != EncryptionStatus.ENCRYPTED) {
+                FileLogger.w(TAG, "preOpen($lib) 库处于迁移中状态 $migrationStatus，CrashRecovery 应已回滚")
+            }
+
             val schema = SCHEMA_MAP[lib]
             if (schema == null) {
                 FileLogger.w(TAG, "未知 LibName=$lib，跳过 preOpen")
