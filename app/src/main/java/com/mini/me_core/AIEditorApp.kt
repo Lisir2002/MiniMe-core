@@ -155,6 +155,12 @@ class AIEditorApp : Application() {
     @Inject
     lateinit var connectionPool: ConnectionPool
 
+    /** 数据库加密迁移崩溃恢复：启动时扫描 6 库状态，回滚迁移中的崩溃现场。
+     *  必须在任何数据库访问之前调用（见 [onCreate]），操作仅限文件系统 + SharedPreferences，
+     *  不打开数据库，主线程 < 100ms（设计文档 §7）。 */
+    @Inject
+    lateinit var crashRecovery: com.mini.me_core.datalayer.engine.CrashRecovery
+
     /** 长驻作用域：持续把持久化的日志等级同步到 FileLogger。
      * RC61b：附加 [CoroutineExceptionHandler]，任何子协程未捕获的异常都兜底记日志，
      * 避免 scope 内一个子协程崩把 scope.job 整个 cancel。 */
@@ -171,6 +177,15 @@ class AIEditorApp : Application() {
         // 必须在任何数据库连接池 / 容器目录 / KeyStore 访问之前执行，
         // 确保旧用户的数据路径（数据库文件 / 容器持久化目录）先被迁移到新品牌名下。
         BrandMigration.migrateIfNeeded(this)
+
+        // ============== 数据库加密迁移崩溃恢复（P1）==============
+        // 必须在任何数据库访问之前调用。扫描 6 库的迁移状态，对 PRE_SNAPSHOT/MIGRATING/
+        // VALIDATING/REPLACING 等非稳定状态执行回滚（删除临时文件、回到 PLAIN/ENCRYPTED）。
+        // 操作仅限文件系统 + SharedPreferences，不打开数据库，主线程 < 100ms（设计文档 §7）。
+        // P1 阶段默认所有库为 PLAIN，此调用为幂等空操作（仅清理可能残留的临时文件）。
+        FileLogger.i(TAG, "启动：数据库加密迁移崩溃恢复检查")
+        crashRecovery.recoverAll()
+        FileLogger.i(TAG, "启动：数据库加密迁移崩溃恢复检查完成")
 
         registerBouncyCastle()
         createNotificationChannels()
