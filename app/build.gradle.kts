@@ -430,6 +430,9 @@ dependencies {
     implementation("androidx.webkit:webkit:1.13.0")
     // Testing
     testImplementation("junit:junit:4.13.2")
+    // Robolectric（数据库加密模块单元测试：模拟 Android Keystore / SharedPreferences / Context）
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core:1.6.1")
     // JSON（SqlDelightDataProvider 通用表转储 Provider 使用；main sourceSet 需要）
     implementation("org.json:json:20240303")
 
