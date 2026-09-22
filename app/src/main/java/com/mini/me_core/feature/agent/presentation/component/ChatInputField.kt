@@ -46,28 +46,30 @@ internal fun ChatInputField(
             onRemoveAttachment = onRemoveAttachment
         )
 
-        // 混合模式：左侧 ❯ 符号 + 输入框（透明背景，外层容器已提供背景/边框）
+        // v2 混合模式：左侧 ❯ 符号 + 输入框同行，垂直居中对齐
         val isDark = LocalAppDarkMode.current
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
+            modifier = Modifier
+                .fillMaxWidth()
+                // v2 混合模式：输入框内部上下 padding 10dp，水平 0dp（由外层容器控制）
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 混合模式：左侧 ❯ 符号，蓝色 #3B82F6/#60A5FA，14sp 等宽加粗
+            // v2 混合模式：左侧 ❯ 符号，蓝色 #3B82F6/#60A5FA，14sp 等宽加粗，与光标同行垂直居中
             Text(
                 text = "❯",
                 color = if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(top = 12.dp)
+                fontFamily = FontFamily.Monospace
             )
             TextField(
                 value = value,
                 onValueChange = onValueChange,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 44.dp, max = 140.dp),
+                modifier = Modifier.weight(1f),
+                // v2 混合模式：单行输入
+                singleLine = true,
                 placeholder = {
                     Text(
                         stringResource(if (isBusy) R.string.chat_queue_hint else R.string.chat_input_placeholder),
