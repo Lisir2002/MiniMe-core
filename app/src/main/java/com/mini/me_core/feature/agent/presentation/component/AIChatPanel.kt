@@ -482,15 +482,15 @@ fun AIChatPanel(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        // v2 混合模式：contentPadding 左右 12dp，上下 8dp
+                        // 问题7b：收紧消息列表间距（上下 padding 8→4dp，item 间距 8→4dp）
                         contentPadding = PaddingValues(
                             start = 12.dp,
                             end = 12.dp,
-                            top = 8.dp,
-                            bottom = 8.dp
+                            top = 4.dp,
+                            bottom = 4.dp
                         ),
-                        // v2 混合模式：消息间间距 8dp（TaskAccordion 内部已控制组间距 16dp）
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        // 问题7b：消息间间距收紧为 4dp（连续消息分组内更紧凑）
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                     ) {
                         items(taskGroups, key = { it.taskId }, contentType = { "task" }) { group ->
                             if (AgentFirstFeatureFlags.isTaskCardEnabled()) {

@@ -133,6 +133,10 @@ object RichTextSegmenter {
                 }
             }
         }
+        // 问题7c修复：去掉开头的空行 segment（流式文本常以 \n 开头，导致首行永远空行）
+        while (result.isNotEmpty() && result.first() is RichSegment.Blank) {
+            result.removeAt(0)
+        }
         return result
     }
 
