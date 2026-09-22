@@ -42,14 +42,37 @@ jobs:
       # app/ 下的 minime.jks 与 keystore.properties 随 checkout 自带，Gradle signingConfigs.release 直接读取，
       # 缺少即构建失败（require 强制），不存在「静默回退 debug keystore 当正式签名」。
       # debug keystore（~/.android/debug.keystore）仅由 AGP 开发期自动生成用于 debug 构建，release 与它无关。
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          # android-actions/setup-android@v3 只接受 cmdline-tools-version + packages 两个参数：
-          #   cmdline-tools-version 对应 cmdline-tools zip 版本号（见 action.yml 默认 14742923 = 20.0）
-          #   packages 用 sdkmanager 语法传，多包空格分隔；platforms + build-tools 是构建必须
-          cmdline-tools-version: '14742923'
-          packages: 'tools platform-tools platforms;android-36 build-tools;36.0.0'
+      - name: Set up Android SDK (use pre-installed + manual install)
+        run: |
+          set -e
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "--- pre-installed SDK contents ---"
+          ls -la $ANDROID_HOME/ || true
+          echo "--- build-tools ---"
+          ls $ANDROID_HOME/build-tools/ 2>/dev/null || echo "no build-tools"
+          echo "--- platforms ---"
+          ls $ANDROID_HOME/platforms/ 2>/dev/null || echo "no platforms"
+          echo "--- cmdline-tools ---"
+          find $ANDROID_HOME -name sdkmanager -type f 2>/dev/null || echo "no sdkmanager"
+          SDKMANAGER=$(find $ANDROID_HOME -name sdkmanager -type f 2>/dev/null | head -1)
+          if [ -n "$SDKMANAGER" ]; then
+            echo "Using sdkmanager: $SDKMANAGER"
+            yes | "$SDKMANAGER" --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" || true
+          else
+            echo "sdkmanager not found, downloading cmdline-tools..."
+            curl -L https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdline-tools.zip
+            mkdir -p $ANDROID_HOME/cmdline-tools
+            unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools
+            mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+            yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+            rm -f /tmp/cmdline-tools.zip
+          fi
+          echo "--- verify installation ---"
+          ls $ANDROID_HOME/build-tools/
+          ls $ANDROID_HOME/platforms/
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
