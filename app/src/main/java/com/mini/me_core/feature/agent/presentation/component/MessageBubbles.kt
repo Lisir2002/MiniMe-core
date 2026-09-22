@@ -52,6 +52,7 @@ import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.LocalAppDarkMode
+import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.EnvironmentSnapshot
@@ -103,6 +104,7 @@ internal fun AgentMessageItem(
 
     val isUser = message.role == MessageRole.USER
     val isAssistant = message.role == MessageRole.ASSISTANT
+    val colors = LocalAppTheme.current.colors
     // Stage 4：连续同角色消息视觉分组。
     // sameAsPrev/sameAsNext 决定上下圆角收缩；startsNewGroup 在组间断开处补出更大纵向间距。
     val sameAsPrev = previousRole != null && previousRole == message.role
@@ -149,14 +151,14 @@ internal fun AgentMessageItem(
                                     .fillMaxHeight()
                                     .background(barColor)
                             )
-                            Spacer(Modifier.width(12.dp))
+                            Spacer(Modifier.width(Spacing.md))
                         }
                         Surface(
                             shape = when {
                                 // 混合模式：用户气泡圆角 16/16/4/16（右下小圆角指向用户）
                                 isUser -> RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
                                 // 混合模式：工具块圆角 10dp
-                                message.role == MessageRole.TOOL -> RoundedCornerShape(10.dp)
+                                message.role == MessageRole.TOOL -> RoundedCornerShape(Radius.md)
                                 else -> {
                                     // AI 回复透明背景，形状无视觉影响
                                     RoundedCornerShape(Radius.lg)
@@ -233,14 +235,14 @@ internal fun AgentMessageItem(
                                                 fontSize = 14.sp
                                             ),
                                             // 混合模式：用户气泡内边距 12dp 水平 / 8dp 垂直
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm)
                                         )
                                     } else {
                                         MarkdownContent(
                                             text = message.content,
                                             color = textColor,
                                             // 混合模式：AI 回复内边距（左侧竖线已有 12dp 间距，start=0；右侧 16dp；垂直 4dp）
-                                            modifier = Modifier.padding(start = 0.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
+                                            modifier = Modifier.padding(start = 0.dp, end = Spacing.lg, top = Spacing.xs, bottom = Spacing.xs),
                                             cache = markdownCache
                                         )
                                     }
@@ -296,9 +298,9 @@ internal fun AgentMessageItem(
                         if (message.role == MessageRole.ASSISTANT && (message.inputTokens > 0 || message.outputTokens > 0)) {
                             val inStr = formatTokenCount(message.inputTokens)
                             val outStr = formatTokenCount(message.outputTokens)
-                            // 混合模式：token 统计右对齐，10sp/14sp 弱化色（亮色 #94A3B8 / 暗色 #64748B）
+                            // 混合模式：token 统计右对齐，10sp/14sp 弱化色
                             Spacer(Modifier.weight(1f))
-                            val tokenColor = if (LocalAppDarkMode.current) Color(0xFF64748B) else Color(0xFF94A3B8)
+                            val tokenColor = colors.textTertiary
                             Text(
                                 text = "↑$inStr ↓$outStr",
                                 style = MaterialTheme.typography.labelSmall.copy(
@@ -309,7 +311,7 @@ internal fun AgentMessageItem(
                             )
                         }
                         // v2 混合模式：时间戳（HH:mm），10sp 弱化色，右对齐
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(Spacing.sm))
                         Text(
                             text = formatMessageTime(message.timestamp),
                             style = MaterialTheme.typography.labelSmall.copy(

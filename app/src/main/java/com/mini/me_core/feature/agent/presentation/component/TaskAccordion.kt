@@ -50,6 +50,7 @@ import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.EnvironmentSnapshot
@@ -227,7 +228,7 @@ internal fun TaskAccordion(
                         // v2 混合模式：去掉外层容器内边距，由 LazyColumn contentPadding 统一控制
                         .padding(0.dp),
                     // v2 混合模式：用户消息组与 AI 回复组之间间距 16dp
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg)
                 ) {
                     renderUnits.forEach { unit ->
                         SubAccordion(
@@ -267,9 +268,9 @@ private fun StreamingBadge(transition: InfiniteTransition) {
         color = Brand.Blue.copy(alpha = 0.12f)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
         ) {
             Box(
                 modifier = Modifier
@@ -298,7 +299,7 @@ private fun MessageCountBadge(count: Int) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp)
         )
     }
 }
@@ -571,7 +572,7 @@ private fun EnvironmentStatusBubble(snapshot: EnvironmentSnapshot) {
         Row(
             modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
         ) {
             if (running) {
                 CircularProgressIndicator(
@@ -925,7 +926,7 @@ private fun SubAccordion(
                     modifier = Modifier
                         .fillMaxWidth()
                         // v2 混合模式：去掉容器水平内边距，由 LazyColumn contentPadding 统一控制；垂直保留 4dp
-                        .padding(horizontal = 0.dp, vertical = 4.dp),
+                        .padding(horizontal = 0.dp, vertical = Spacing.xs),
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
                     // TOOL 片段（兜底独立单元）：折叠为一行摘要
@@ -1023,17 +1024,18 @@ private data class SubGroupVisual(
 @Composable
 private fun subGroupVisual(type: TaskSubGroupType): SubGroupVisual {
     val isDark = LocalAppDarkMode.current
+    val colors = LocalAppTheme.current.colors
     return when (type) {
         TaskSubGroupType.USER -> SubGroupVisual(
             icon = Icons.Rounded.Person,
-            accent = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
+            accent = colors.accentPlan,
             // 混合模式：去掉用户消息容器浅蓝背景，改为透明
             bg = Color.Transparent
         )
         TaskSubGroupType.REASONING -> SubGroupVisual(
             icon = Icons.Rounded.Star,
-            accent = if (isDark) Color(0xFFA78BFA) else Color(0xFF7C3AED),
-            bg = if (isDark) Color(0xFFA78BFA).copy(alpha = 0.14f) else Color(0xFF7C3AED).copy(alpha = 0.06f)
+            accent = colors.accentReasoning,
+            bg = colors.accentReasoning.copy(alpha = if (isDark) 0.14f else 0.06f)
         )
         TaskSubGroupType.REPLY -> SubGroupVisual(
             icon = Icons.Rounded.ChatBubble,

@@ -49,6 +49,7 @@ import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.LocalAppDarkMode
+import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
@@ -191,7 +192,7 @@ internal fun ReasoningBubble(
         val isDark = LocalAppDarkMode.current
         // 混合模式：思考条背景 surfaceVariant（#F1F5F9 / #1E293B），圆角 8dp
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(Radius.sm),
             color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -336,7 +337,7 @@ internal fun TypingDots(
                     .clip(CircleShape)
                     .background(color)
             )
-            if (index < 2) Spacer(Modifier.width(4.dp))
+            if (index < 2) Spacer(Modifier.width(Spacing.xs))
         }
     }
 }
