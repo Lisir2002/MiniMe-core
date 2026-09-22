@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.LocalAppDarkMode
+import com.mini.me_core.core.theme.tokens.LocalAppTheme
 
 /**
  * 输入区本体：附件预览 + 多行输入框。
@@ -48,6 +49,7 @@ internal fun ChatInputField(
 
         // v2 混合模式：左侧 ❯ 符号 + 输入框同行，垂直居中对齐
         val isDark = LocalAppDarkMode.current
+        val colors = LocalAppTheme.current.colors
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -73,16 +75,16 @@ internal fun ChatInputField(
                 placeholder = {
                     Text(
                         stringResource(if (isBusy) R.string.chat_queue_hint else R.string.chat_input_placeholder),
-                        // 混合模式：placeholder 弱化色 #94A3B8/#64748B
-                        color = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8),
+                        // 混合模式：placeholder 弱化色
+                        color = colors.textTertiary,
                         fontSize = 14.sp
                     )
                 },
-                // 混合模式：输入文字 14sp，行高 20sp，颜色 #0F172A/#E2E8F0
+                // 混合模式：输入文字 14sp，行高 20sp
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
-                    color = if (isDark) Color(0xFFE2E8F0) else Color(0xFF0F172A)
+                    color = colors.textPrimary
                 ),
                 enabled = true,
                 keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),

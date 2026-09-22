@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.EnvironmentSnapshot
@@ -186,11 +187,11 @@ private fun subGroupTypeLabel(type: TaskSubGroupType): String = when (type) {
  */
 @Composable
 private fun subGroupVisualColor(type: TaskSubGroupType): Color {
-    val isDark = LocalAppDarkMode.current
+    val colors = LocalAppTheme.current.colors
     return when (type) {
-        TaskSubGroupType.USER -> if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB)
-        TaskSubGroupType.REASONING -> if (isDark) Color(0xFFA78BFA) else Color(0xFF7C3AED)
-        TaskSubGroupType.REPLY -> if (isDark) Color(0xFF34D399) else Color(0xFF059669)
-        TaskSubGroupType.TOOL -> if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706)
+        TaskSubGroupType.USER -> colors.accentPlan
+        TaskSubGroupType.REASONING -> colors.accentReasoning
+        TaskSubGroupType.REPLY -> if (LocalAppDarkMode.current) Color(0xFF34D399) else Color(0xFF059669)
+        TaskSubGroupType.TOOL -> if (LocalAppDarkMode.current) Color(0xFFFBBF24) else Color(0xFFD97706)
     }
 }

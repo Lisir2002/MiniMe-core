@@ -60,6 +60,7 @@ import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.feature.agent.domain.container.progress.InstallProgress
 import com.mini.me_core.feature.agent.domain.container.progress.InstallProgressParsers
 import com.mini.me_core.feature.agent.domain.session.SessionUseCase
@@ -108,6 +109,7 @@ internal fun ToolMessageBody(
     initiallyExpanded: Boolean = true,
     environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap()
 ) {
+    val colors = LocalAppTheme.current.colors
     val streaming = liveOutput != null
     val running = streaming || message.content.startsWith(SessionUseCase.PENDING_TOOL_MARKER) ||
         message.content.startsWith(SessionUseCase.LEGACY_PENDING_TOOL_MARKER)
@@ -155,7 +157,7 @@ internal fun ToolMessageBody(
     } else null
 
     // 混合模式：工具块内边距 12dp
-    Column(modifier = Modifier.padding(12.dp)) {
+    Column(modifier = Modifier.padding(Spacing.md)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -228,7 +230,7 @@ internal fun ToolMessageBody(
                 Text(
                     text = truncated,
                     // 混合模式：工具输出 12sp 等宽，行高 18sp，灰色
-                    color = if (LocalAppDarkMode.current) Color(0xFF94A3B8) else Color(0xFF475569),
+                    color = colors.textSecondary,
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 12.sp,
@@ -308,7 +310,7 @@ internal fun ToolCallGroup(
     val successCount = messages.size - errorCount
 
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(Radius.md),
         // 混合模式：工具块背景 surfaceVariant（#F1F5F9 / #1E293B）
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -450,6 +452,7 @@ internal fun ToolStatusDot(running: Boolean, isError: Boolean) {
 /** 展开区的一段带小标题的内容块（如「指令」「结果」） */
 @Composable
 internal fun ToolSection(label: String, content: String) {
+    val colors = LocalAppTheme.current.colors
     Text(
         text = label,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
@@ -468,7 +471,7 @@ internal fun ToolSection(label: String, content: String) {
         Text(
             text = visibleLines.joinToString("\n"),
             // 混合模式：工具输出 12sp 等宽，行高 18sp，灰色
-            color = if (LocalAppDarkMode.current) Color(0xFF94A3B8) else Color(0xFF475569),
+            color = colors.textSecondary,
             style = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = FontFamily.Monospace,
                 fontSize = 12.sp,

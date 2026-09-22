@@ -31,6 +31,7 @@ import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.feature.agent.domain.container.progress.InstallPhaseType
 import com.mini.me_core.feature.agent.domain.container.progress.InstallProgress
 import androidx.compose.material.icons.Icons
@@ -96,6 +97,7 @@ internal fun parseEnvironmentComponents(content: String): List<EnvironmentCompon
 internal fun InstallProgressRow(progress: InstallProgress) {
     val percent = progress.percent
     val isDark = LocalAppDarkMode.current
+    val colors = LocalAppTheme.current.colors
     val accent = when (progress.phase) {
         InstallPhaseType.DONE -> Color(0xFF22C55E)
         InstallPhaseType.FAILED -> Color(0xFFEF4444)
@@ -161,13 +163,13 @@ internal fun InstallProgressRow(progress: InstallProgress) {
             LinearProgressIndicator(
                 progress = { percent.coerceIn(0f, 1f) },
                 color = accent,
-                trackColor = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0),
+                trackColor = colors.borderDefault,
                 modifier = Modifier.fillMaxWidth()
             )
         } else {
             LinearProgressIndicator(
                 color = accent,
-                trackColor = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0),
+                trackColor = colors.borderDefault,
                 modifier = Modifier.fillMaxWidth()
             )
         }

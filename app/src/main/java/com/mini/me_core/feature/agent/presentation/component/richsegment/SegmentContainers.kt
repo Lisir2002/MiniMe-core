@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.feature.git.presentation.component.highlightCode
 import com.mini.me_core.feature.git.presentation.component.inferSyntaxLanguage
 import androidx.compose.material.icons.Icons
@@ -270,6 +271,7 @@ private fun HeadingCard(level: Int, inlines: List<Inline>, color: Color) {
 @Composable
 private fun QuoteCard(lines: List<String>, color: Color) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val colors = LocalAppTheme.current.colors
     Row(Modifier.fillMaxWidth()) {
         // 混合模式：引用块左侧竖线 2dp，颜色 #3B82F6/#60A5FA
         Box(
@@ -281,8 +283,8 @@ private fun QuoteCard(lines: List<String>, color: Color) {
         )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            // 混合模式：引用文字弱化色 #475569/#94A3B8
-            val quoteColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)
+            // 混合模式：引用文字弱化色
+            val quoteColor = colors.textSecondary
             lines.forEach { line ->
                 Text(
                     text = line,
@@ -366,8 +368,9 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
     val shouldCollapse = lineCount > 30
 
     // 混合模式：代码块背景 #F1F5F9/#1E293B，文字 #0F172A/#E2E8F0
+    val colors = LocalAppTheme.current.colors
     val bg = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
-    val fg = if (isDark) Color(0xFFE2E8F0) else Color(0xFF0F172A)
+    val fg = colors.textPrimary
     val label = seg.language?.uppercase() ?: "CODE"
 
     Column(
