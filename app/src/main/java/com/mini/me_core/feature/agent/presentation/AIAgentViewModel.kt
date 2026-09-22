@@ -1915,6 +1915,31 @@ class AIAgentViewModel @Inject constructor(
     }
 
     /**
+     * Agent-First Stage 3：重试失败的任务。
+     *
+     * 从当前会话消息列表中查找 taskId 对应的第一条 USER 消息，将其内容作为新请求重新发送。
+     * 与 [editAndResend] 类似，但不截断旧对话——旧消息仍保留在上下文历史中。
+     *
+     * @param taskId 要重试的任务 ID
+     */
+    fun retryTask(taskId: String) = viewModelScope.launch {
+        try {
+            val sid = _currentSessionId.value ?: return@launch
+            val userMsg = messagesState.value.messages
+                .firstOrNull { it.taskId == taskId && it.role == MessageRole.USER }
+                ?: return@launch
+            enqueueAgentRequest(
+                request = userMsg.content,
+                modelRequest = userMsg.content,
+                projectRoot = _currentWorkspace.value,
+                targetSessionId = sid
+            )
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "重试任务失败", e)
+        }
+    }
+
+    /**
      * 创建新聊天并发送：新建一个会话，然后自动发送该消息内容。
      * 用于用户消息的「创建新聊天」快捷操作。
      */
