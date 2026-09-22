@@ -66,7 +66,7 @@ jobs:
       # 历史上 CipherDriverFactory.create() 直接 throw error("...尚未启用...")，
       # 导致所有 6 个数据库以明文 SQLite 落盘。此步骤防止该空实现被意外回退。
       # 检测方法：grep 空实现的标志性字符串，若存在则 CI 失败。
-      - name: Security gate: CipherDriverFactory not stub
+      - name: "Security gate: CipherDriverFactory not stub"
         run: |
           set -e
           CIPHER_FILE="app/src/main/java/com/mini/me_core/datalayer/engine/CipherDriverFactory.kt"
