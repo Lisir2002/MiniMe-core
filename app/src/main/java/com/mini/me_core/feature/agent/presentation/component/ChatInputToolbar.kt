@@ -184,7 +184,7 @@ private fun ModePill(
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "modePillScale")
 
-    // v2 混合模式：胶囊按钮（RoundedCornerShape 50），图标 20dp + 4dp 间距 + 文字 12sp 粗体
+    // v2 混合模式：胶囊按钮（RoundedCornerShape 50），图标 16dp + 3dp 间距 + 文字 11sp 粗体
     Row(
         modifier = Modifier
             .graphicsLayer { scaleX = scale; scaleY = scale }
@@ -202,20 +202,20 @@ private fun ModePill(
                 }
                 onToggleMode(nextMode)
             }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         Icon(
             modeIcon,
             contentDescription = currentMode.name,
             tint = accent.resolveOn(),
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(16.dp)
         )
         Text(
             text = currentMode.name,
             style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
             ),
             color = accent.resolveOn()

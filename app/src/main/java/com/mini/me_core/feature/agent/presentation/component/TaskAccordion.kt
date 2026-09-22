@@ -667,12 +667,13 @@ private data class RenderUnit(
 /**
  * 把任务内的二级片段归并为渲染单元，保持消息真实时间顺序：
  * - TOOL 片段 → 暂存，不独立渲染；
- * - REASONING 片段 → 不触发 flush 到最近回复，而是把暂存的工具调用作为独立
- *   EmbeddedToolAccordion 渲染单元放在 REASONING 之前，保持「工具调用 → 思考过程」
- *   的视觉顺序，同时统一工具卡片样式（避免 TOOL→REASONING→REPLY 时走兜底简洁样式）；
+ * - REASONING 片段 → 先 flush 暂存工具（嵌入最近回复或创建虚拟 REPLY），再渲染思考过程，
+ *   保持「工具调用 → 思考过程」的视觉顺序；
  * - REPLY 片段 → 携带暂存的工具调用（嵌入回复顶部），并成为「最近回复」；
- * - 其他片段（USER）→ 若暂存非空，嵌入最近回复；无最近回复则兜底独立 TOOL 单元；
- * - 任务结束 → 若暂存非空，同样嵌入最近回复或兜底。
+ * - 其他片段（USER）→ 先 flush 暂存工具，再渲染自身；
+ * - 任务结束 → flush 剩余暂存工具。
+ * 所有工具调用统一走 EmbeddedToolAccordion 带标题样式，不存在独立 TOOL 兜底单元，
+ * 从而避免 LazyColumn 滚动回收重建后卡片样式不一致。
  */
 private fun buildRenderUnits(subGroups: List<TaskSubGroup>): List<RenderUnit> {
     val units = mutableListOf<RenderUnit>()
@@ -684,19 +685,7 @@ private fun buildRenderUnits(subGroups: List<TaskSubGroup>): List<RenderUnit> {
                 pendingTools += subGroup.messages
             }
             TaskSubGroupType.REASONING -> {
-                // 暂存的工具调用作为独立 EmbeddedToolAccordion 单元（虚拟 REPLY，messages 为空），
-                // 放在 REASONING 之前，保持视觉顺序且样式与 REPLY.attachedTools 一致
-                if (pendingTools.isNotEmpty()) {
-                    units += RenderUnit(
-                        subGroup = TaskSubGroup(
-                            id = "attached-tools-before-reasoning-${pendingTools.first().id}",
-                            type = TaskSubGroupType.REPLY,
-                            messages = emptyList()
-                        ),
-                        attachedTools = pendingTools.toList()
-                    )
-                    pendingTools.clear()
-                }
+                lastReplyIndex = flushPendingTools(pendingTools, units, lastReplyIndex)
                 units += RenderUnit(subGroup)
             }
             TaskSubGroupType.REPLY -> {
@@ -705,7 +694,7 @@ private fun buildRenderUnits(subGroups: List<TaskSubGroup>): List<RenderUnit> {
                 lastReplyIndex = units.lastIndex
             }
             else -> {
-                flushPendingTools(pendingTools, units, lastReplyIndex)
+                lastReplyIndex = flushPendingTools(pendingTools, units, lastReplyIndex)
                 units += RenderUnit(subGroup)
             }
         }
@@ -714,26 +703,36 @@ private fun buildRenderUnits(subGroups: List<TaskSubGroup>): List<RenderUnit> {
     return units
 }
 
-/** 把暂存的工具调用嵌入最近回复；无最近回复时兜底为独立 TOOL 单元。 */
+/**
+ * 把暂存的工具调用嵌入最近回复；无最近回复时创建虚拟 REPLY 单元承载工具调用。
+ * 统一走 EmbeddedToolAccordion 带标题样式，避免兜底独立 TOOL 单元的简洁样式
+ * 导致 LazyColumn 滚动回收重建后卡片样式不一致。
+ * @return 更新后的 lastReplyIndex（创建虚拟 REPLY 时指向新单元）。
+ */
 private fun flushPendingTools(
     pendingTools: MutableList<AgentUIMessage>,
     units: MutableList<RenderUnit>,
     lastReplyIndex: Int
-) {
-    if (pendingTools.isEmpty()) return
+): Int {
+    if (pendingTools.isEmpty()) return lastReplyIndex
     if (lastReplyIndex >= 0) {
         val prev = units[lastReplyIndex]
         units[lastReplyIndex] = prev.copy(attachedTools = prev.attachedTools + pendingTools)
-    } else {
-        units += RenderUnit(
-            TaskSubGroup(
-                id = "orphan-tool-${pendingTools.first().id}",
-                type = TaskSubGroupType.TOOL,
-                messages = pendingTools.toList()
-            )
-        )
+        pendingTools.clear()
+        return lastReplyIndex
     }
+    // 无最近回复时，创建虚拟 REPLY 单元（messages 为空）承载工具调用，
+    // SubAccordion 中 REPLY 类型 + attachedTools 非空 → 渲染 EmbeddedToolAccordion。
+    units += RenderUnit(
+        TaskSubGroup(
+            id = "orphan-tool-reply-${pendingTools.first().id}",
+            type = TaskSubGroupType.REPLY,
+            messages = emptyList()
+        ),
+        attachedTools = pendingTools.toList()
+    )
     pendingTools.clear()
+    return units.lastIndex
 }
 
 /**
