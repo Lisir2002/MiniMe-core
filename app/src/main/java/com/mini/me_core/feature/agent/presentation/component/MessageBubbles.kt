@@ -46,10 +46,14 @@ import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.EnvironmentSnapshot
+import com.mini.me_core.feature.agent.presentation.RunningToolOutput
 import com.mini.me_core.feature.agent.presentation.hasVisibleContent
 import com.mini.me_core.feature.agent.presentation.MessageRole
+import com.mini.me_core.feature.agent.presentation.component.agentfirst.AgentFirstFeatureFlags
+import com.mini.me_core.feature.agent.presentation.component.agentfirst.ToolCallCard
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.Check
@@ -66,7 +70,8 @@ internal fun AgentMessageItem(
     onEditClick: ((AgentUIMessage) -> Unit)? = null,
     onNewChatClick: ((AgentUIMessage) -> Unit)? = null,
     initiallyExpanded: Boolean = true,
-    environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap()
+    environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap(),
+    agentState: AgentUIState = AgentUIState.Idle
 ) {
     if (message.isCompactionMarker) {
         CompactionDivider()
@@ -130,7 +135,25 @@ internal fun AgentMessageItem(
                             }
                         ) {
                         if (message.role == MessageRole.TOOL) {
-                            ToolMessageBody(message, liveOutput = liveOutput, initiallyExpanded = initiallyExpanded, environmentSnapshots = environmentSnapshots)
+                            // Agent-First ToolCallCard：feature flag 控制，默认 false 走旧 ToolMessageBody（行为完全不变）
+                            if (AgentFirstFeatureFlags.isToolCallCardEnabled()) {
+                                val live = liveOutput?.let {
+                                    RunningToolOutput(
+                                        messageId = message.id,
+                                        text = it,
+                                        toolName = message.toolName ?: "",
+                                        toolArgs = message.toolArgs ?: ""
+                                    )
+                                }
+                                ToolCallCard(
+                                    message = message,
+                                    liveOutput = live,
+                                    environmentSnapshot = environmentSnapshots[message.id],
+                                    agentState = agentState
+                                )
+                            } else {
+                                ToolMessageBody(message, liveOutput = liveOutput, initiallyExpanded = initiallyExpanded, environmentSnapshots = environmentSnapshots)
+                            }
                         } else {
                             val textColor = when (message.role) {
                                 MessageRole.USER -> MaterialTheme.colorScheme.onPrimary

@@ -51,6 +51,7 @@ import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
+import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.EnvironmentSnapshot
 import com.mini.me_core.feature.agent.presentation.MessageRole
 import com.mini.me_core.feature.agent.presentation.RunningToolOutput
@@ -97,6 +98,7 @@ internal fun TaskAccordion(
     onViewChanges: ((TaskChangesSheetData) -> Unit)?,
     runningTool: List<RunningToolOutput>,
     environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap(),
+    agentState: AgentUIState = AgentUIState.Idle,
     modifier: Modifier = Modifier
 ) {
     val totalCount = group.subGroups.sumOf { it.messages.size }
@@ -242,7 +244,8 @@ internal fun TaskAccordion(
                             onNewChatClick = onNewChatClick,
                             onViewChanges = onViewChanges,
                             runningTool = runningTool,
-                            environmentSnapshots = environmentSnapshots
+                            environmentSnapshots = environmentSnapshots,
+                            agentState = agentState
                         )
                     }
                 }
@@ -395,7 +398,8 @@ private fun EmbeddedToolAccordion(
     attachedTools: List<AgentUIMessage>,
     markdownCache: MarkdownRenderCache?,
     runningTool: List<RunningToolOutput>,
-    environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap()
+    environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap(),
+    agentState: AgentUIState = AgentUIState.Idle
 ) {
     if (attachedTools.isEmpty()) return
     val batchFileDiffs = remember(attachedTools) { collectBatchFileDiffs(attachedTools) }
@@ -447,7 +451,8 @@ private fun EmbeddedToolAccordion(
                             messages = msgs,
                             runningTool = runningTool,
                             markdownCache = markdownCache,
-                            environmentSnapshots = environmentSnapshots
+                            environmentSnapshots = environmentSnapshots,
+                            agentState = agentState
                         )
                     } else {
                         val message = msgs.first()
@@ -456,7 +461,8 @@ private fun EmbeddedToolAccordion(
                             message = message,
                             liveOutput = live,
                             markdownCache = markdownCache,
-                            environmentSnapshots = environmentSnapshots
+                            environmentSnapshots = environmentSnapshots,
+                            agentState = agentState
                         )
                     }
                 }
@@ -830,7 +836,8 @@ private fun SubAccordion(
     onNewChatClick: ((AgentUIMessage) -> Unit)?,
     onViewChanges: ((TaskChangesSheetData) -> Unit)?,
     runningTool: List<RunningToolOutput>,
-    environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap()
+    environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap(),
+    agentState: AgentUIState = AgentUIState.Idle
 ) {
     val label = stringResource(subGroup.type.labelRes())
     val visual = subGroupVisual(subGroup.type)
@@ -916,7 +923,8 @@ private fun SubAccordion(
                                         messages = msgs,
                                         runningTool = runningTool,
                                         markdownCache = markdownCache,
-                                        environmentSnapshots = environmentSnapshots
+                                        environmentSnapshots = environmentSnapshots,
+                                        agentState = agentState
                                     )
                                 } else {
                                     val message = msgs.first()
@@ -927,7 +935,8 @@ private fun SubAccordion(
                                         markdownCache = markdownCache,
                                         onEditClick = onEditClick,
                                         onNewChatClick = onNewChatClick,
-                                        environmentSnapshots = environmentSnapshots
+                                        environmentSnapshots = environmentSnapshots,
+                                        agentState = agentState
                                     )
                                 }
                             }
@@ -939,7 +948,8 @@ private fun SubAccordion(
                                 attachedTools = attachedTools,
                                 markdownCache = markdownCache,
                                 runningTool = runningTool,
-                                environmentSnapshots = environmentSnapshots
+                                environmentSnapshots = environmentSnapshots,
+                                agentState = agentState
                             )
                         }
                         // 消息正文
@@ -951,7 +961,8 @@ private fun SubAccordion(
                                 markdownCache = markdownCache,
                                 onEditClick = onEditClick,
                                 onNewChatClick = onNewChatClick,
-                                environmentSnapshots = environmentSnapshots
+                                environmentSnapshots = environmentSnapshots,
+                                agentState = agentState
                             )
                         }
                         // REPLY 片段底部：查看修改按钮（用批次数据）

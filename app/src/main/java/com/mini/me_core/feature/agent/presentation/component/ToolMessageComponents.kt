@@ -62,6 +62,7 @@ import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.agent.domain.container.progress.InstallProgress
 import com.mini.me_core.feature.agent.domain.container.progress.InstallProgressParsers
 import com.mini.me_core.feature.agent.domain.session.SessionUseCase
+import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.EnvironmentSnapshot
 import com.mini.me_core.feature.agent.presentation.RunningToolOutput
@@ -287,7 +288,8 @@ internal fun ToolCallGroup(
     messages: List<AgentUIMessage>,
     runningTool: List<RunningToolOutput>,
     markdownCache: MarkdownRenderCache?,
-    environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap()
+    environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap(),
+    agentState: AgentUIState = AgentUIState.Idle
 ) {
     val anyStreaming = messages.any { m ->
         runningTool.any { it.messageId == m.id }
@@ -382,7 +384,8 @@ internal fun ToolCallGroup(
                             liveOutput = live,
                             markdownCache = markdownCache,
                             initiallyExpanded = false,
-                            environmentSnapshots = environmentSnapshots
+                            environmentSnapshots = environmentSnapshots,
+                            agentState = agentState
                         )
                     }
                 }
