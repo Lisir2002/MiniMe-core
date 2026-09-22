@@ -2,6 +2,7 @@ package com.mini.me_core.feature.agent.presentation.component
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -88,8 +89,8 @@ internal fun ChatInputBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = rememberImeBottomInset())
-                // 混合模式：输入栏整体内边距 8dp 水平 / 8dp 垂直
-                .padding(horizontal = 8.dp, vertical = 8.dp)
+                // v2 混合模式：输入栏整体内边距 12dp 水平 / 8dp 垂直
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             // 斜杠命令菜单：胶囊上方独立浮层
             if (filteredCommands.isNotEmpty()) {
@@ -144,7 +145,7 @@ internal fun ChatInputBar(
                 )
             }
 
-            // 混合模式：输入框容器——背景 #FFFFFF/#1E293B，边框 1dp，圆角 20dp，无阴影
+            // v2 混合模式：输入框容器——背景 surface，边框 1dp，圆角 20dp，无阴影
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface,
@@ -155,8 +156,10 @@ internal fun ChatInputBar(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        // 混合模式：输入框容器内边距 14dp 水平 / 12dp 垂直
-                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                        // v2 混合模式：容器内边距 14dp 水平 / 0dp 垂直（字段和工具栏自带内部 padding）
+                        .padding(horizontal = 14.dp, vertical = 0.dp),
+                    // v2 混合模式：输入框与工具栏之间间距 4dp
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     ChatInputField(
                         value = value,
