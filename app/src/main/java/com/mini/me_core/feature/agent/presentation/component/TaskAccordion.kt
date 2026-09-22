@@ -156,7 +156,7 @@ internal fun TaskAccordion(
             //             .background(
             //                 brush = Brush.linearGradient(
             //                     colors = listOf(
-            //                         Brand.Blue,
+            //                         MaterialTheme.colorScheme.primary,
             //                         Brand.Sky
             //                     )
             //                 )
@@ -265,7 +265,7 @@ private fun StreamingBadge(transition: InfiniteTransition) {
     )
     Surface(
         shape = RoundedCornerShape(Radius.pill),
-        color = Brand.Blue.copy(alpha = 0.12f)
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp),
@@ -276,12 +276,12 @@ private fun StreamingBadge(transition: InfiniteTransition) {
                 modifier = Modifier
                     .size(6.dp)
                     .clip(CircleShape)
-                    .background(Brand.Blue.copy(alpha = dotAlpha))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = dotAlpha))
             )
             Text(
                 text = stringResource(R.string.chat_task_streaming),
                 style = MaterialTheme.typography.labelSmall,
-                color = Brand.Blue,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium
             )
         }
@@ -550,7 +550,7 @@ private fun EnvironmentStatusBubble(snapshot: EnvironmentSnapshot) {
     val missing = components.filter { it.status == EnvironmentStatus.MISSING }
     val ready = missing.isEmpty() && components.isNotEmpty()
     val statusColor = when {
-        running -> Brand.Blue
+        running -> MaterialTheme.colorScheme.primary
         ready -> Color(0xFF22C55E)
         else -> Color(0xFFEF4444)
     }
@@ -611,8 +611,8 @@ private fun ViewChangesButton(
     val totalRemoved = fileDiffs.sumOf { it.removed }
     Surface(
         shape = RoundedCornerShape(Radius.pill),
-        color = Brand.Blue.copy(alpha = 0.08f),
-        border = BorderStroke(1.dp, Brand.Blue.copy(alpha = 0.25f)),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -626,13 +626,13 @@ private fun ViewChangesButton(
             androidx.compose.material3.Icon(
                 imageVector = Icons.Rounded.Description,
                 contentDescription = null,
-                tint = Brand.Blue,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(16.dp)
             )
             Text(
                 text = stringResource(R.string.tool_view_changes, fileDiffs.size),
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                color = Brand.Blue,
+                color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
@@ -641,14 +641,14 @@ private fun ViewChangesButton(
                 Text(
                     text = "+$totalAdded -$totalRemoved",
                     style = MaterialTheme.typography.labelMedium,
-                    color = Brand.Blue.copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
                     fontWeight = FontWeight.Medium
                 )
             }
             androidx.compose.material3.Icon(
                 imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
-                tint = Brand.Blue,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(18.dp)
             )
         }

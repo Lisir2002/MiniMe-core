@@ -142,9 +142,9 @@ internal fun AgentMessageItem(
                         modifier = if (isAssistant) Modifier.height(IntrinsicSize.Min) else Modifier,
                         verticalAlignment = if (isAssistant) Alignment.Top else Alignment.CenterVertically
                     ) {
-                        // 混合模式：AI 回复左侧竖线标识（亮色 #3B82F6 / 暗色 #60A5FA）
+                        // 混合模式：AI 回复左侧竖线标识（读取主题 primary 色，跟随主题预设变化）
                         if (isAssistant) {
-                            val barColor = if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6)
+                            val barColor = MaterialTheme.colorScheme.primary
                             Box(
                                 modifier = Modifier
                                     .width(2.dp)
@@ -165,8 +165,8 @@ internal fun AgentMessageItem(
                                 }
                             },
                             color = when (message.role) {
-                                // 混合模式：用户气泡统一 #3B82F6（亮/暗相同）
-                                MessageRole.USER -> Color(0xFF3B82F6)
+                                // 混合模式：用户气泡背景使用主题 primary 色，跟随主题预设变化
+                                MessageRole.USER -> MaterialTheme.colorScheme.primary
                                 // 混合模式：AI 回复透明背景（无气泡），直接在页面背景上
                                 MessageRole.ASSISTANT -> Color.Transparent
                                 // 工具块背景 surfaceVariant（#F1F5F9 / #1E293B）

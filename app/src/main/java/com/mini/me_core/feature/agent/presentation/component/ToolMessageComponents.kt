@@ -842,7 +842,7 @@ internal fun EnvironmentStatusStrip(
 
     val ready = missing.isEmpty() && installing.isEmpty() && components.isNotEmpty()
     val statusColor = when {
-        running -> Brand.Blue
+        running -> MaterialTheme.colorScheme.primary
         ready -> Color(0xFF22C55E)
         else -> Color(0xFFEF4444)
     }

@@ -262,7 +262,7 @@ internal fun BrandMark(size: Dp, iconSize: Dp) {
         modifier = Modifier
             .size(size)
             .clip(RoundedCornerShape(Radius.lg))
-            .background(brandGradient),
+            .background(brandGradient()),
         contentAlignment = Alignment.Center
     ) {
         Icon(

@@ -49,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
-import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.agent.domain.tool.question.UserQuestionAnswer
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
@@ -69,7 +68,15 @@ import java.io.File
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-internal val brandGradient = Brush.linearGradient(listOf(Brand.Blue, Brand.Sky))
+/**
+ * 品牌渐变色 Brush。读取当前主题的 primary 色，构造 primary → primary(alpha=0.6f) 的渐变。
+ * 跟随主题预设变化，不再硬编码 Brand.Blue/Brand.Sky。
+ */
+@Composable
+internal fun brandGradient(): Brush {
+    val primary = MaterialTheme.colorScheme.primary
+    return Brush.linearGradient(listOf(primary, primary.copy(alpha = 0.6f)))
+}
 
 /**
  * 流式尾巴的三种状态，用于 [when] 分支分发。

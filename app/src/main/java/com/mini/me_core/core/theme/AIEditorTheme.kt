@@ -199,6 +199,12 @@ private fun buildColorSchemeFromSemantic(
         error = colors.error,
         onError = colors.onError,
         outline = colors.borderDefault,
+        // Phase 5 补全：映射遗漏的 Material3 ColorScheme 字段，使主题预设色完整覆盖
+        outlineVariant = colors.borderMuted,
+        tertiary = colors.success,
+        errorContainer = colors.errorContainer,
+        onErrorContainer = colors.onErrorContainer,
+        surfaceTint = colors.brandPrimary,
     )
 }
 
