@@ -100,11 +100,14 @@ private val DarkColorScheme = darkColorScheme(
     secondary = Color(0xFF7DD3FC),
     onSecondary = Color(0xFF082F49),
     tertiary = Color(0xFF22C55E),
-    background = Color(0xFF07111F),
+    // Stage 4：更深的蓝黑页面底，配合 surface 投影层次
+    background = Color(0xFF060D17),
     onBackground = Color(0xFFEAF2FF),
-    surface = Color(0xFF0D1B2E),
+    // Stage 4：AI 气泡 surface
+    surface = Color(0xFF0E1A2B),
     onSurface = Color(0xFFEAF2FF),
-    surfaceVariant = Color(0xFF13273F),
+    // Stage 4：工具气泡 surfaceVariant
+    surfaceVariant = Color(0xFF152438),
     onSurfaceVariant = Color(0xFFB8C7DA),
     surfaceTint = Color.Transparent,
     outline = Color(0xFF44617F),
@@ -123,11 +126,13 @@ private val LightColorScheme = lightColorScheme(
     secondary = Color(0xFF0284C7),
     onSecondary = Color(0xFFFFFFFF),
     tertiary = Color(0xFF16A34A),
-    background = Color(0xFFFFFFFF),
+    // Stage 4：页面底改为极浅灰白，AI 气泡保持纯白，用投影区分层次
+    background = Color(0xFFF8FAFC),
     onBackground = Color(0xFF0F172A),
     surface = Color(0xFFFFFFFF),
     onSurface = Color(0xFF0F172A),
-    surfaceVariant = Color(0xFFEAF4FF),
+    // Stage 4：工具气泡浅灰
+    surfaceVariant = Color(0xFFF1F5F9),
     onSurfaceVariant = Color(0xFF475569),
     surfaceTint = Color.White,
     outline = Color(0xFFBBD7F2),
