@@ -182,7 +182,7 @@ fun BundleLogDialog(
                 )
             },
             containerColor = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.fillMaxSize().padding(vertical = 24.dp, horizontal = 12.dp),
+            modifier = Modifier.fillMaxSize().padding(vertical = Spacing.xl, horizontal = Spacing.md),
         ) { paddingValues ->
             Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
                 // A主-4：E.2 「📚 历史档案 / 📡 实时会话」切换 Chip 行
@@ -618,7 +618,7 @@ private fun ProgressSummary(state: AggregateProgressState) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Spacing.sm))
                 Text(
                     text = "⏳ %s".format(state.etaMs?.let { "${it / 1000}s" } ?: "--"),
                     style = MaterialTheme.typography.labelSmall,
@@ -632,7 +632,7 @@ private fun ProgressSummary(state: AggregateProgressState) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(Radius.xs))
                 .background(
                     if (isFailed) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
                 ),
@@ -643,7 +643,7 @@ private fun ProgressSummary(state: AggregateProgressState) {
                         .fillMaxSize()
                         .background(
                             brush = brush,
-                            shape = RoundedCornerShape(4.dp),
+                            shape = RoundedCornerShape(Radius.xs),
                         ),
                 )
             } else {
@@ -660,7 +660,7 @@ private fun ProgressSummary(state: AggregateProgressState) {
                                     else -> listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)
                                 },
                             ),
-                            shape = RoundedCornerShape(4.dp),
+                            shape = RoundedCornerShape(Radius.xs),
                         ),
                 )
             }
@@ -731,7 +731,7 @@ private fun LogLineRow(
                             Modifier.background(Color(0xFFFFF176).copy(alpha = flashAlpha.value * 0.35f))
                         } else Modifier,
                     )
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                    .padding(horizontal = Spacing.md, vertical = Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -829,7 +829,7 @@ private fun ErrorRowCard(line: LogLine, fg: Color, ctx: Context, modifier: Modif
                 enter = fadeIn(tween(120)),
                 exit = fadeOut(tween(120)),
             ) {
-                Column(modifier = Modifier.padding(top = 4.dp)) {
+                Column(modifier = Modifier.padding(top = Spacing.xs)) {
                     Text(
                         text = line.text,
                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),

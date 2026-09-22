@@ -519,7 +519,7 @@ private fun TerminalFirstRunBanner(
                         modifier = Modifier
                             .height(ButtonSpec.Height)
                             .align(Alignment.CenterVertically),
-                        contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = Spacing.xs),
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         )

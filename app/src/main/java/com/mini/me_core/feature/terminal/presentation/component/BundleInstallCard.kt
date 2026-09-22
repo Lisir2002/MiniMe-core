@@ -233,7 +233,7 @@ private fun InstallingProgressLayout(
                             phase = aggregate.phase,
                             modifier = Modifier.weight(1f),
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(Spacing.sm))
                         Text(
                             text = "$pct%",
                             style = MaterialTheme.typography.labelMedium,
@@ -264,7 +264,7 @@ private fun InstallingProgressLayout(
                     }
                 }
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(Spacing.sm))
             InstallActionsChip(
                 state = bundleState,
                 onInstall = onInstallClick,
@@ -292,7 +292,7 @@ private fun InstallingProgressLayout(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(Spacing.sm))
             // F：Chevron 动画 —— Installing 中轻微 bounce（可点击提示），点击 Dialog 后变为 up
             val installing = aggregate?.phase?.isTerminal?.not() == true
             val chevronRot by animateFloatAsState(
@@ -319,7 +319,7 @@ private fun InstallingProgressLayout(
                     .then(if (installing) Modifier.scale(bounceScale) else Modifier),
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(Spacing.xs))
         // ── L3：彩色 Chip 组合聚合行（C 方向） ──
         TokenizedStatusLine(bundle, bundleState, aggregate)
     }
@@ -522,7 +522,7 @@ private fun StatMiniTile(
         Column(modifier = Modifier.padding(Spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(icon, null, tint = fg, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(Spacing.xs))
                 Text(text = label, style = MaterialTheme.typography.labelSmall.copy(color = fg.copy(alpha = 0.85f)))
             }
             Spacer(Modifier.height(2.dp))
@@ -608,13 +608,13 @@ private fun SegmentedProgressBar(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(Radius.xs))
                 .background(track)
                 .then(
                     if (estimated) Modifier.dashedBorder(
                         width = 1.dp,
                         color = Color(0xFF64B5F6),
-                        shape = RoundedCornerShape(4.dp),
+                        shape = RoundedCornerShape(Radius.xs),
                     ) else Modifier,
                 ),
         )
@@ -624,7 +624,7 @@ private fun SegmentedProgressBar(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(Radius.xs))
                     .background(Brush.horizontalGradient(COL_DONE_BG)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -649,7 +649,7 @@ private fun SegmentedProgressBar(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(RoundedCornerShape(Radius.xs))
                     .background(COL_FAILED.copy(alpha = blinkAlpha)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -665,7 +665,7 @@ private fun SegmentedProgressBar(
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(4.dp)),
+                    .clip(RoundedCornerShape(Radius.xs)),
             ) {
                 val w = size.width
                 val h = size.height
@@ -724,7 +724,7 @@ private fun SegmentedProgressBar(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(RoundedCornerShape(Radius.xs))
                         .shimmerOverlay(COL_DOWNLOAD.copy(alpha = 0.35f), COL_INSTALL.copy(alpha = 0.35f)),
                 )
             }
@@ -1302,7 +1302,7 @@ private fun SmallRoundedChip(
     ) {
         if (icon != null) {
             Icon(icon, null, tint = fg, modifier = Modifier.size(12.dp))
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(Spacing.xs))
         }
         Text(
             text = text,
