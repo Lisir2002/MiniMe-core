@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
@@ -126,8 +127,8 @@ internal fun ChatInputToolbar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 ModePill(currentMode = currentMode, onToggleMode = onToggleMode)
-                // 混合模式：图标间距 8dp
-                Spacer(Modifier.width(8.dp))
+                // v2 混合模式：模式按钮与其他图标间距 12dp
+                Spacer(Modifier.width(12.dp))
 
                 ModelIconButton(
                     provider = activeProvider,
@@ -162,7 +163,7 @@ internal fun ChatInputToolbar(
     }
 }
 
-/** 模式按钮：BUILD/PLAN/AUTO 循环切换。混合模式：28dp 圆形图标按钮，#3B82F6 背景。 */
+/** 模式按钮：BUILD/PLAN/AUTO 循环切换。v2 混合模式：胶囊形按钮，图标 + 文字标签，语义色填充。 */
 @Composable
 private fun ModePill(
     currentMode: AgentMode,
@@ -173,35 +174,51 @@ private fun ModePill(
         AgentMode.PLAN -> Icons.Rounded.Map
         AgentMode.AUTO -> Icons.Rounded.Rocket
     }
+    // v2 混合模式：复用 ChatAccent 语义色（BUILD=琥珀 / PLAN=蓝 / AUTO=青绿）
+    val accent = when (currentMode) {
+        AgentMode.BUILD -> ChatAccent.Build
+        AgentMode.PLAN -> ChatAccent.Plan
+        AgentMode.AUTO -> ChatAccent.Auto
+    }
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "modePillScale")
 
-    // 混合模式：28dp 圆形图标按钮，品牌蓝 #3B82F6 背景，白色 20dp 图标
-    Box(
+    // v2 混合模式：胶囊按钮（RoundedCornerShape 50），图标 20dp + 4dp 间距 + 文字 12sp 粗体
+    Row(
         modifier = Modifier
-            .size(28.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(CircleShape)
-            .background(Color(0xFF3B82F6))
+            .clip(RoundedCornerShape(50))
+            .background(accent.resolve())
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
             ) {
+                // v2 混合模式：切换逻辑完全保留（循环 BUILD→PLAN→AUTO→BUILD）
                 val nextMode = when (currentMode) {
                     AgentMode.BUILD -> AgentMode.PLAN
                     AgentMode.PLAN -> AgentMode.AUTO
                     AgentMode.AUTO -> AgentMode.BUILD
                 }
                 onToggleMode(nextMode)
-            },
-        contentAlignment = Alignment.Center
+            }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Icon(
             modeIcon,
             contentDescription = currentMode.name,
-            tint = Color.White,
+            tint = accent.resolveOn(),
             modifier = Modifier.size(20.dp)
+        )
+        Text(
+            text = currentMode.name,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            ),
+            color = accent.resolveOn()
         )
     }
 }
