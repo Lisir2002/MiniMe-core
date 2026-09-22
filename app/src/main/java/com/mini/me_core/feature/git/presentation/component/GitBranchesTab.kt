@@ -162,7 +162,7 @@ internal fun BranchesTab(
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg)
                     .padding(bottom = Spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 Text(
                     text = stringResource(R.string.git_new_branch),
@@ -257,7 +257,7 @@ internal fun BranchesTab(
             onDismissRequest = { pendingRename = null },
             title = { Text(stringResource(R.string.git_rename_branch)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Text(stringResource(R.string.git_rename_to, oldName))
                     OutlinedTextField(
                         value = newName,
@@ -299,7 +299,7 @@ internal fun BranchesTab(
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg)
                     .padding(bottom = Spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 Text(
                     text = stringResource(R.string.common_new_tab),
