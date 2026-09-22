@@ -149,7 +149,9 @@ private fun LinkAwareText(
     nav: SegmentationNavigationActions,
     modifier: Modifier = Modifier
 ) {
-    val codeBackground = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+    // 混合模式：行内代码背景 #F1F5F9/#1E293B
+    val isDarkInline = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val codeBackground = if (isDarkInline) Color(0xFF1E293B) else Color(0xFFF1F5F9)
     val annotated = androidx.compose.runtime.remember(inlines, baseStyle, codeBackground) {
         renderInlines(inlines, baseStyle, codeBackground)
     }
@@ -202,7 +204,8 @@ private fun renderInlines(
                 is Inline.Code -> {
                     pushStyle(SpanStyle(
                         fontFamily = FontFamily.Monospace,
-                        fontSize = (baseStyle.fontSize.value - 0.5f).sp,
+                        // 混合模式：行内代码 12sp 等宽
+                        fontSize = 12.sp,
                         background = codeBackground
                     ))
                     append(" ")
@@ -268,21 +271,23 @@ private fun HeadingCard(level: Int, inlines: List<Inline>, color: Color) {
 private fun QuoteCard(lines: List<String>, color: Color) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     Row(Modifier.fillMaxWidth()) {
+        // 混合模式：引用块左侧竖线 2dp，颜色 #3B82F6/#60A5FA
         Box(
             Modifier
-                .width(3.dp)
+                .width(2.dp)
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(2.dp))
-                .background(if (isDark) Color(0xFF3A506B) else Color(0xFF9CA3AF))
+                .clip(RoundedCornerShape(1.dp))
+                .background(if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6))
         )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
+            // 混合模式：引用文字弱化色 #475569/#94A3B8
+            val quoteColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)
             lines.forEach { line ->
                 Text(
                     text = line,
                     style = MaterialTheme.typography.bodyMedium.copy(
-                        color = color.copy(alpha = 0.75f),
-                        fontStyle = FontStyle.Italic
+                        color = quoteColor
                     )
                 )
             }
@@ -360,7 +365,8 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
     val lineCount = seg.code.count { it == '\n' } + 1
     val shouldCollapse = lineCount > 30
 
-    val bg = if (isDark) Color(0xFF101722) else Color(0xFFF1F5F9)
+    // 混合模式：代码块背景 #F1F5F9/#1E293B，文字 #0F172A/#E2E8F0
+    val bg = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
     val fg = if (isDark) Color(0xFFE2E8F0) else Color(0xFF0F172A)
     val label = seg.language?.uppercase() ?: "CODE"
 
@@ -436,12 +442,14 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
                         if (!expanded) Modifier.height(260.dp).verticalScroll(rememberScrollState())
                         else Modifier
                     )
-                    .padding(horizontal = 10.dp, vertical = 10.dp)
+                    // 混合模式：代码块内边距 12dp
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
             ) {
                 val rawStyle = TextStyle(
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 12.5.sp,
-                    lineHeight = 17.sp,
+                    // 混合模式：代码块 12sp 等宽，行高 18sp
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
                     color = fg
                 )
                 val highlighted = syntaxLang?.let { highlightCode(seg.code, it) }
