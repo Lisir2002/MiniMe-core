@@ -150,11 +150,13 @@ private fun LinkAwareText(
     nav: SegmentationNavigationActions,
     modifier: Modifier = Modifier
 ) {
-    // 混合模式：行内代码背景 #F1F5F9/#1E293B
-    val isDarkInline = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val codeBackground = if (isDarkInline) Color(0xFF1E293B) else Color(0xFFF1F5F9)
-    val annotated = androidx.compose.runtime.remember(inlines, baseStyle, codeBackground) {
-        renderInlines(inlines, baseStyle, codeBackground)
+    // 审计修复：行内代码背景、链接色、文件路径色全部跟随主题语义色
+    val colors = LocalAppTheme.current.colors
+    val codeBackground = colors.surfaceSunken
+    val linkColor = colors.brandPrimary
+    val filePathColor = colors.sky
+    val annotated = androidx.compose.runtime.remember(inlines, baseStyle, codeBackground, linkColor, filePathColor) {
+        renderInlines(inlines, baseStyle, codeBackground, linkColor, filePathColor)
     }
 
     ClickableText(
@@ -181,7 +183,9 @@ private fun LinkAwareText(
 private fun renderInlines(
     inlines: List<Inline>,
     baseStyle: TextStyle,
-    codeBackground: Color
+    codeBackground: Color,
+    linkColor: Color,
+    filePathColor: Color,
 ): AnnotatedString {
     return buildAnnotatedString {
         for (inline in inlines) {
@@ -219,7 +223,7 @@ private fun renderInlines(
                     val start = length
                     pushStringAnnotation(tag = "URL", annotation = inline.url)
                     pushStyle(SpanStyle(
-                        color = Color(0xFF0984E3),
+                        color = linkColor,
                         textDecoration = TextDecoration.Underline,
                         fontWeight = FontWeight.Medium
                     ))
@@ -235,7 +239,7 @@ private fun renderInlines(
                     pushStyle(SpanStyle(
                         fontFamily = FontFamily.Monospace,
                         fontSize = (baseStyle.fontSize.value - 0.5f).sp,
-                        color = Color(0xFF00B894)
+                        color = filePathColor
                     ))
                     append(inline.path)
                     pop()
@@ -273,13 +277,13 @@ private fun QuoteCard(lines: List<String>, color: Color) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val colors = LocalAppTheme.current.colors
     Row(Modifier.fillMaxWidth()) {
-        // 混合模式：引用块左侧竖线 2dp，颜色 #3B82F6/#60A5FA
+        // 混合模式：引用块左侧竖线 2dp，颜色跟随主题 brandPrimary
         Box(
             Modifier
                 .width(2.dp)
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(1.dp))
-                .background(if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6))
+                .background(colors.brandPrimary)
         )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
@@ -367,9 +371,9 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
     val lineCount = seg.code.count { it == '\n' } + 1
     val shouldCollapse = lineCount > 30
 
-    // 混合模式：代码块背景 #F1F5F9/#1E293B，文字 #0F172A/#E2E8F0
+    // 混合模式：代码块背景跟随 surfaceSunken，文字跟随 textPrimary
     val colors = LocalAppTheme.current.colors
-    val bg = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
+    val bg = colors.surfaceSunken
     val fg = colors.textPrimary
     val label = seg.language?.uppercase() ?: "CODE"
 
@@ -378,17 +382,17 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
             .fillMaxWidth()
             .clip(codeBlockCorner)
             .background(bg)
-            .border(BorderStroke(1.dp, Color(0xFFE4E7EC).copy(alpha = if (isDark) 0.12f else 0.5f)), codeBlockCorner)
+            .border(BorderStroke(1.dp, colors.borderDefault), codeBlockCorner)
             .animateContentSize(animationSpec = tween(160))
     ) {
-        // Header：语言角标 + 复制 + 展开/收起
+        // Header：语言角标 + 复制 + 展开/收起（渐变跟随品牌色）
         Row(
             Modifier
                 .fillMaxWidth()
                 .height(codeBlockHeaderHeight)
                 .background(
                     Brush.horizontalGradient(
-                        listOf(Color(0xFF0984E3), Color(0xFF00B894))
+                        listOf(colors.brandPrimary, colors.brandSecondary)
                     )
                 )
                 .padding(horizontal = 10.dp),
@@ -513,6 +517,7 @@ private fun inferByLabel(label: String): SyntaxLanguage? {
 @Composable
 private fun CommandCard(command: String, isDark: Boolean) {
     val clipboard = LocalClipboardManager.current
+    val colors = LocalAppTheme.current.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -521,25 +526,25 @@ private fun CommandCard(command: String, isDark: Boolean) {
             .border(
                 BorderStroke(
                     1.dp,
-                    Color(0xFF22C55E).copy(alpha = 0.6f)
+                    colors.success.copy(alpha = 0.6f)
                 ),
                 RoundedCornerShape(Radius.md)
             )
             .clickable { clipboard.setText(AnnotatedString(command)) },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 左侧绿色提示色条
+        // 左侧绿色提示色条（跟随主题 success 色）
         Box(
             Modifier
                 .width(3.dp)
                 .fillMaxHeight()
-                .background(Color(0xFF22C55E))
+                .background(colors.success)
         )
         Spacer(Modifier.width(10.dp))
         Icon(
             Icons.Rounded.Terminal,
             contentDescription = null,
-            tint = if (LocalAppDarkMode.current) Color(0xFF4ADE80) else Color(0xFF22C55E),
+            tint = colors.success,
             modifier = Modifier.size(16.dp)
         )
         Spacer(Modifier.width(8.dp))
@@ -552,7 +557,7 @@ private fun CommandCard(command: String, isDark: Boolean) {
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
                     Text(
                         text = "$ ",
-                        color = Color(0xFF22C55E),
+                        color = colors.success,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold
@@ -590,9 +595,10 @@ private fun TableCard(
 ) {
     val colCount = seg.header.size
     if (colCount <= 0) return
-    val headerBg = if (isDark) Color(0xFF152030) else Color(0xFF0984E3).copy(alpha = 0.1f)
-    val rowBgAlt = if (isDark) Color(0xFF111A27) else Color(0xFFF8FAFC)
-    val borderColor = if (isDark) Color(0xFF2A3F56) else Color(0xFFCBD5E1)
+    val colors = LocalAppTheme.current.colors
+    val headerBg = colors.surfaceAccent
+    val rowBgAlt = colors.surfaceSunken
+    val borderColor = colors.borderDefault
 
     Surface(
         color = Color.Transparent,

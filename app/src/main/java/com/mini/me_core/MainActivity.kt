@@ -192,6 +192,10 @@ class MainActivity : ComponentActivity() {
             val bgImageUri = themeSettingsState.backgroundImage
             val bgScrim = themeSettingsState.backgroundMask
             val cardAlpha = themeSettingsState.cardOpacity
+            // 问题3：提取显示偏好（圆角/字体/动效）传给 AIEditorTheme
+            val cornerStyle = themeSettingsState.cornerStyleEnum()
+            val fontScale = themeSettingsState.fontScale
+            val animationScale = themeSettingsState.animationScale
 
             AIEditorTheme(
                 darkTheme = darkTheme,
@@ -199,6 +203,9 @@ class MainActivity : ComponentActivity() {
                 backgroundImageUri = bgImageUri,
                 backgroundScrim = bgScrim,
                 cardAlpha = cardAlpha,
+                cornerStyle = cornerStyle,
+                fontScale = fontScale,
+                animationScale = animationScale,
             ) {
                 // 将 MainActivity 算好的"APP 实际暗模式"通过 CompositionLocal 下发，
                 // 子树里的终端内容配色、跟随程序开关都读这同一个值，

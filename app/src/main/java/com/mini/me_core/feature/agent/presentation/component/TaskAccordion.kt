@@ -254,11 +254,13 @@ internal fun TaskAccordion(
 
 @Composable
 private fun StreamingBadge(transition: InfiniteTransition) {
+    // 问题3：读取动效缩放，动画时长按比例缩放（0=立即完成）
+    val animScale = com.mini.me_core.core.theme.LocalAnimationScale.current
     val dotAlpha by transition.animateFloat(
         initialValue = 0.4f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800),
+            animation = tween((800 * animScale).toInt().coerceAtLeast(0)),
             repeatMode = RepeatMode.Reverse
         ),
         label = "dotAlpha"

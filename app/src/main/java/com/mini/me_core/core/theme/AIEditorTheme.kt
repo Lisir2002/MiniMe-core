@@ -94,6 +94,13 @@ fun ChatAccent.Tone.resolve(): Color = if (LocalAppDarkMode.current) dark else l
 @Composable
 fun ChatAccent.Tone.resolveOn(): Color = if (LocalAppDarkMode.current) onDark else onLight
 
+/**
+ * 动效缩放比例 CompositionLocal。
+ * 由 AIEditorTheme 根据用户设置提供（0.0=关闭动效，1.0=正常速度）。
+ * 组件读取后乘以 tween/durationMillis，实现动效全局缩放。
+ */
+val LocalAnimationScale = staticCompositionLocalOf { 1.0f }
+
 val LocalSpacing = staticCompositionLocalOf { Spacing }
 
 /**
@@ -173,6 +180,31 @@ private val AppTypography = Typography().run {
 }
 
 /**
+ * 问题3：将 Typography 中所有 TextStyle 的 fontSize 乘以 fontScale。
+ * lineHeight 同步缩放，保持排版比例。
+ */
+private fun Typography.scaleFontSize(scale: Float): Typography {
+    if (scale == 1.0f) return this
+    return copy(
+        displayLarge = displayLarge.copy(fontSize = displayLarge.fontSize * scale, lineHeight = displayLarge.lineHeight * scale),
+        displayMedium = displayMedium.copy(fontSize = displayMedium.fontSize * scale, lineHeight = displayMedium.lineHeight * scale),
+        displaySmall = displaySmall.copy(fontSize = displaySmall.fontSize * scale, lineHeight = displaySmall.lineHeight * scale),
+        headlineLarge = headlineLarge.copy(fontSize = headlineLarge.fontSize * scale, lineHeight = headlineLarge.lineHeight * scale),
+        headlineMedium = headlineMedium.copy(fontSize = headlineMedium.fontSize * scale, lineHeight = headlineMedium.lineHeight * scale),
+        headlineSmall = headlineSmall.copy(fontSize = headlineSmall.fontSize * scale, lineHeight = headlineSmall.lineHeight * scale),
+        titleLarge = titleLarge.copy(fontSize = titleLarge.fontSize * scale, lineHeight = titleLarge.lineHeight * scale),
+        titleMedium = titleMedium.copy(fontSize = titleMedium.fontSize * scale, lineHeight = titleMedium.lineHeight * scale),
+        titleSmall = titleSmall.copy(fontSize = titleSmall.fontSize * scale, lineHeight = titleSmall.lineHeight * scale),
+        bodyLarge = bodyLarge.copy(fontSize = bodyLarge.fontSize * scale, lineHeight = bodyLarge.lineHeight * scale),
+        bodyMedium = bodyMedium.copy(fontSize = bodyMedium.fontSize * scale, lineHeight = bodyMedium.lineHeight * scale),
+        bodySmall = bodySmall.copy(fontSize = bodySmall.fontSize * scale, lineHeight = bodySmall.lineHeight * scale),
+        labelLarge = labelLarge.copy(fontSize = labelLarge.fontSize * scale, lineHeight = labelLarge.lineHeight * scale),
+        labelMedium = labelMedium.copy(fontSize = labelMedium.fontSize * scale, lineHeight = labelMedium.lineHeight * scale),
+        labelSmall = labelSmall.copy(fontSize = labelSmall.fontSize * scale, lineHeight = labelSmall.lineHeight * scale),
+    )
+}
+
+/**
  * 从 SemanticColors 构建 Material3 ColorScheme（Phase 5）。
  *
  * 将自定义语义色映射到 Material3 ColorScheme 的关键字段，
@@ -205,6 +237,12 @@ private fun buildColorSchemeFromSemantic(
         errorContainer = colors.errorContainer,
         onErrorContainer = colors.onErrorContainer,
         surfaceTint = colors.brandPrimary,
+        // 审计补全：secondaryContainer / onSecondaryContainer / tertiaryContainer / onTertiaryContainer / onTertiary
+        secondaryContainer = colors.surfaceAccent,
+        onSecondaryContainer = colors.onBrandContainer,
+        tertiaryContainer = colors.successContainer,
+        onTertiaryContainer = colors.onSuccessContainer,
+        onTertiary = colors.onSuccess,
     )
 }
 
@@ -241,6 +279,12 @@ fun AIEditorTheme(
     backgroundScrim: Float = 0.4f,
     // Phase 5：卡片透明度（0.0-1.0）
     cardAlpha: Float = 1.0f,
+    // 问题3：显示偏好——圆角风格
+    cornerStyle: com.mini.me_core.core.theme.tokens.CornerStyle = com.mini.me_core.core.theme.tokens.CornerStyle.ROUNDED,
+    // 问题3：显示偏好——字体缩放（1.0=标准）
+    fontScale: Float = 1.0f,
+    // 问题3：显示偏好——动效缩放（1.0=正常，0.0=关闭）
+    animationScale: Float = 1.0f,
     content: @Composable () -> Unit
 ) {
     // Phase 5：如果有自定义颜色，构建动态 Material3 ColorScheme；否则用默认
@@ -251,6 +295,11 @@ fun AIEditorTheme(
     // 问题2修复：无背景图时，卡片不透明（cardAlpha=1.0）；有背景图时用用户设置的透明度
     val effectiveCardAlpha = if (backgroundImageUri != null) cardAlpha else 1.0f
 
+    // 问题3：根据 fontScale 缩放所有 TextStyle 的 fontSize
+    val scaledTypography = remember(AppTypography, fontScale) {
+        AppTypography.scaleFontSize(fontScale)
+    }
+
     val appThemeState = when {
         customColors != null -> com.mini.me_core.core.theme.tokens.AppThemeState(
             colors = customColors,
@@ -258,9 +307,20 @@ fun AIEditorTheme(
             backgroundImageUri = backgroundImageUri,
             backgroundScrim = backgroundScrim,
             cardAlpha = effectiveCardAlpha,
+            cornerStyle = cornerStyle,
+            fontScale = fontScale,
+            animationScale = animationScale,
         )
-        darkTheme -> com.mini.me_core.core.theme.tokens.AppThemeState.Dark
-        else -> com.mini.me_core.core.theme.tokens.AppThemeState.Light
+        darkTheme -> com.mini.me_core.core.theme.tokens.AppThemeState.Dark.copy(
+            cornerStyle = cornerStyle,
+            fontScale = fontScale,
+            animationScale = animationScale,
+        )
+        else -> com.mini.me_core.core.theme.tokens.AppThemeState.Light.copy(
+            cornerStyle = cornerStyle,
+            fontScale = fontScale,
+            animationScale = animationScale,
+        )
     }
 
     // Phase 5：加载背景图
@@ -269,10 +329,11 @@ fun AIEditorTheme(
     androidx.compose.runtime.CompositionLocalProvider(
         LocalAppDarkMode provides darkTheme,
         com.mini.me_core.core.theme.tokens.LocalAppTheme provides appThemeState,
+        LocalAnimationScale provides animationScale,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = AppTypography,
+            typography = scaledTypography,
         ) {
             // Phase 5：如果有背景图，在根布局添加图片层 + 遮罩层
             if (bgBitmap != null && backgroundImageUri != null) {

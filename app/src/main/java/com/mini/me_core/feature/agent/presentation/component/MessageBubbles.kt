@@ -107,6 +107,8 @@ internal fun AgentMessageItem(
     val colors = LocalAppTheme.current.colors
     // 问题2修复：读取卡片透明度，有背景图时卡片半透明透出背景
     val cardAlpha = LocalAppTheme.current.cardAlpha
+    // 问题3：读取圆角风格，动态调整气泡圆角
+    val cornerStyle = LocalAppTheme.current.cornerStyle
     // Stage 4：连续同角色消息视觉分组。
     // sameAsPrev/sameAsNext 决定上下圆角收缩；startsNewGroup 在组间断开处补出更大纵向间距。
     val sameAsPrev = previousRole != null && previousRole == message.role
@@ -158,9 +160,20 @@ internal fun AgentMessageItem(
                         Surface(
                             shape = when {
                                 // 混合模式：用户气泡圆角 16/16/4/16（右下小圆角指向用户）
-                                isUser -> RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
-                                // 混合模式：工具块圆角 10dp
-                                message.role == MessageRole.TOOL -> RoundedCornerShape(Radius.md)
+                                // 问题3：根据 cornerStyle 动态调整——Sharp 全直角，Pill 全胶囊
+                                isUser -> when (cornerStyle) {
+                                    com.mini.me_core.core.theme.tokens.CornerStyle.Sharp ->
+                                        RoundedCornerShape(0.dp, 0.dp, 0.dp, 0.dp)
+                                    com.mini.me_core.core.theme.tokens.CornerStyle.Pill ->
+                                        RoundedCornerShape(999.dp, 999.dp, 999.dp, 999.dp)
+                                    else -> RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
+                                }
+                                // 混合模式：工具块圆角 10dp（问题3：根据 cornerStyle 调整）
+                                message.role == MessageRole.TOOL -> when (cornerStyle) {
+                                    com.mini.me_core.core.theme.tokens.CornerStyle.Sharp -> RoundedCornerShape(0.dp)
+                                    com.mini.me_core.core.theme.tokens.CornerStyle.Pill -> RoundedCornerShape(999.dp)
+                                    else -> RoundedCornerShape(Radius.md)
+                                }
                                 else -> {
                                     // AI 回复透明背景，形状无视觉影响
                                     RoundedCornerShape(Radius.lg)

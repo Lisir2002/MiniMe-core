@@ -23,6 +23,10 @@ data class AppThemeState(
     val backgroundImageUri: String? = null,
     val backgroundScrim: Float = PrimitiveAlpha.Scrim,
     val cardAlpha: Float = PrimitiveAlpha.Card,
+    // ── 显示偏好（问题3：全链路消费）──
+    val cornerStyle: CornerStyle = CornerStyle.ROUNDED,
+    val fontScale: Float = 1.0f,
+    val animationScale: Float = 1.0f,
 ) {
     companion object {
         val Light = AppThemeState(colors = SemanticColors.Light, isDark = false)
