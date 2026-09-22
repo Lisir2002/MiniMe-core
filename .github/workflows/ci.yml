@@ -62,6 +62,29 @@ jobs:
           done
           echo "All skill scripts pass POSIX sh syntax check"
 
+      # 安全门禁：检测 CipherDriverFactory 是否仍为空实现（P0 级安全修复回归检测）。
+      # 历史上 CipherDriverFactory.create() 直接 throw error("...尚未启用...")，
+      # 导致所有 6 个数据库以明文 SQLite 落盘。此步骤防止该空实现被意外回退。
+      # 检测方法：grep 空实现的标志性字符串，若存在则 CI 失败。
+      - name: Security gate: CipherDriverFactory not stub
+        run: |
+          set -e
+          CIPHER_FILE="app/src/main/java/com/mini/me_core/datalayer/engine/CipherDriverFactory.kt"
+          if grep -q 'CipherDriverFactory 尚未启用' "$CIPHER_FILE"; then
+            echo "::error::Security gate FAILED: CipherDriverFactory is still a stub (empty implementation)."
+            echo "  File: $CIPHER_FILE"
+            echo "  The create() method must implement SQLCipher SupportFactory, not throw error()."
+            echo "  See P0-01 security finding: SQLCipher database encryption is empty implementation."
+            exit 1
+          fi
+          # 同时检测是否真的引用了 SQLCipher SupportFactory
+          if ! grep -q 'SupportFactory' "$CIPHER_FILE"; then
+            echo "::error::Security gate FAILED: CipherDriverFactory does not reference net.sqlcipher.database.SupportFactory."
+            echo "  File: $CIPHER_FILE"
+            exit 1
+          fi
+          echo "Security gate passed: CipherDriverFactory is fully implemented with SQLCipher SupportFactory."
+
       # CI 跑 Ubuntu runner：自动生成 debug keystore 供 signingConfigs.release/androidDebug 回退使用。
       # 必须放在 Set up JDK 之后（keytool 是 JDK bin 下的工具，JAVA_HOME 未注入前调不到）。
       # 若 ~/.android/debug.keystore 缺失，AGP 会报 Keystore file not found，本步骤零配置兜底。
