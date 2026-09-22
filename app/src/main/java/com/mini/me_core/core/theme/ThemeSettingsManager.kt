@@ -1,5 +1,9 @@
 package com.mini.me_core.core.theme
 
+import android.content.ContentResolver
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.graphics.Color
 import com.mini.me_core.datalayer.store.KVStore
@@ -11,6 +15,7 @@ import com.mini.me_core.core.theme.tokens.ThemePreset
 import com.mini.me_core.core.theme.tokens.ThemePresets
 import com.mini.me_core.core.theme.tokens.ThemeSettings
 import com.mini.me_core.core.theme.tokens.CornerStyle
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +36,8 @@ import javax.inject.Singleton
 @Singleton
 class ThemeSettingsManager @Inject constructor(
     private val kv: KVStore,
+    // 问题2修复：注入 ApplicationContext 用于背景图 URI 的持久化读授权
+    @ApplicationContext private val context: Context,
 ) {
     companion object {
         private const val TAG = "ThemeSettingsManager"
@@ -116,10 +123,24 @@ class ThemeSettingsManager @Inject constructor(
 
     /**
      * 设置背景图 URI。传 null 清除背景图。
+     * 问题2修复：持久化 URI 读授权，冷启动后仍可访问背景图。
      */
     suspend fun setBackgroundImage(uri: String?) {
+        // 问题2修复：对新 URI 做持久化读授权，冷启动后不丢失
+        if (uri != null) {
+            runCatching {
+                contentResolver.takePersistableUriPermission(
+                    Uri.parse(uri),
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }.onFailure { e ->
+                Log.w(TAG, "takePersistableUriPermission failed for $uri: ${e.message}")
+            }
+        }
         persist(_settings.value.copy(backgroundImage = uri))
     }
+
+    private val contentResolver: ContentResolver get() = context.contentResolver
 
     /**
      * 设置背景图遮罩浓度（0.0-1.0）。

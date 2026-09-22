@@ -248,13 +248,16 @@ fun AIEditorTheme(
         buildColorSchemeFromSemantic(customColors, darkTheme)
     } else if (darkTheme) DarkColorScheme else LightColorScheme
 
+    // 问题2修复：无背景图时，卡片不透明（cardAlpha=1.0）；有背景图时用用户设置的透明度
+    val effectiveCardAlpha = if (backgroundImageUri != null) cardAlpha else 1.0f
+
     val appThemeState = when {
         customColors != null -> com.mini.me_core.core.theme.tokens.AppThemeState(
             colors = customColors,
             isDark = darkTheme,
             backgroundImageUri = backgroundImageUri,
             backgroundScrim = backgroundScrim,
-            cardAlpha = cardAlpha,
+            cardAlpha = effectiveCardAlpha,
         )
         darkTheme -> com.mini.me_core.core.theme.tokens.AppThemeState.Dark
         else -> com.mini.me_core.core.theme.tokens.AppThemeState.Light

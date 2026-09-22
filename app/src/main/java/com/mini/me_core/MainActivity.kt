@@ -208,7 +208,10 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background
+                        // 问题2修复：根 Surface 改为透明，让 AIEditorTheme 内部的背景图层透出。
+                        // AIEditorTheme.kt:270 已有不透明底色层（.background(colorScheme.background)），
+                        // 透明 Surface 不会导致视觉问题。
+                        color = androidx.compose.ui.graphics.Color.Transparent
                     ) {
                         AppNavigation(
                             browserController = browserController,

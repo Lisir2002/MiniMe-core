@@ -105,6 +105,8 @@ internal fun AgentMessageItem(
     val isUser = message.role == MessageRole.USER
     val isAssistant = message.role == MessageRole.ASSISTANT
     val colors = LocalAppTheme.current.colors
+    // 问题2修复：读取卡片透明度，有背景图时卡片半透明透出背景
+    val cardAlpha = LocalAppTheme.current.cardAlpha
     // Stage 4：连续同角色消息视觉分组。
     // sameAsPrev/sameAsNext 决定上下圆角收缩；startsNewGroup 在组间断开处补出更大纵向间距。
     val sameAsPrev = previousRole != null && previousRole == message.role
@@ -169,8 +171,8 @@ internal fun AgentMessageItem(
                                 MessageRole.USER -> MaterialTheme.colorScheme.primary
                                 // 混合模式：AI 回复透明背景（无气泡），直接在页面背景上
                                 MessageRole.ASSISTANT -> Color.Transparent
-                                // 工具块背景 surfaceVariant（#F1F5F9 / #1E293B）
-                                MessageRole.TOOL -> MaterialTheme.colorScheme.surfaceVariant
+                                // 混合模式：工具块背景 surfaceVariant，有背景图时应用 cardAlpha 半透明
+                                MessageRole.TOOL -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = cardAlpha)
                             },
                             // 混合模式：工具块 1dp 边框（outlineVariant）
                             border = if (message.role == MessageRole.TOOL) {
