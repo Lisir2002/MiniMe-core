@@ -666,7 +666,10 @@ private data class RenderUnit(
 
 /**
  * 把任务内的二级片段归并为渲染单元，保持消息真实时间顺序：
- * - TOOL 片段 → 暂存，不独立渲染；check_environment 等工具以紧凑状态条形态内嵌于回复气泡顶部；
+ * - TOOL 片段 → 暂存，不独立渲染；
+ * - REASONING 片段 → 不触发 flush 到最近回复，而是把暂存的工具调用作为独立
+ *   EmbeddedToolAccordion 渲染单元放在 REASONING 之前，保持「工具调用 → 思考过程」
+ *   的视觉顺序，同时统一工具卡片样式（避免 TOOL→REASONING→REPLY 时走兜底简洁样式）；
  * - REPLY 片段 → 携带暂存的工具调用（嵌入回复顶部），并成为「最近回复」；
  * - 其他片段（USER）→ 若暂存非空，嵌入最近回复；无最近回复则兜底独立 TOOL 单元；
  * - 任务结束 → 若暂存非空，同样嵌入最近回复或兜底。
@@ -679,6 +682,22 @@ private fun buildRenderUnits(subGroups: List<TaskSubGroup>): List<RenderUnit> {
         when (subGroup.type) {
             TaskSubGroupType.TOOL -> {
                 pendingTools += subGroup.messages
+            }
+            TaskSubGroupType.REASONING -> {
+                // 暂存的工具调用作为独立 EmbeddedToolAccordion 单元（虚拟 REPLY，messages 为空），
+                // 放在 REASONING 之前，保持视觉顺序且样式与 REPLY.attachedTools 一致
+                if (pendingTools.isNotEmpty()) {
+                    units += RenderUnit(
+                        subGroup = TaskSubGroup(
+                            id = "attached-tools-before-reasoning-${pendingTools.first().id}",
+                            type = TaskSubGroupType.REPLY,
+                            messages = emptyList()
+                        ),
+                        attachedTools = pendingTools.toList()
+                    )
+                    pendingTools.clear()
+                }
+                units += RenderUnit(subGroup)
             }
             TaskSubGroupType.REPLY -> {
                 units += RenderUnit(subGroup, pendingTools.toList())
