@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.agent.domain.zth.ZthPerformanceClass
 import com.mini.me_core.feature.agent.domain.zth.ZthPresetTier
@@ -61,7 +62,7 @@ fun SecuritySettingsScreen(
         // ── 生物识别保护 ──
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(Radius.sm),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(Spacing.md)) {
@@ -100,7 +101,7 @@ fun SecuritySettingsScreen(
         // ── 数据库加密（SQLCipher，P1）──
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(Radius.sm),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(Spacing.md)) {
@@ -178,7 +179,7 @@ fun SecuritySettingsScreen(
         // ── 凭据密钥轮换 ──
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(Radius.sm),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(Spacing.md)) {
@@ -225,7 +226,7 @@ fun SecuritySettingsScreen(
         // ── ZTH 零幻觉容忍档位（C.4.2 4 档 + C.4.8 滑动确认；C.6.2 P14 纠正挂到设置安全卡片） ──
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(Radius.sm),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(Spacing.md)) {
@@ -253,13 +254,13 @@ fun SecuritySettingsScreen(
                     tiers.forEach { (tier, desc) ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs)
                         ) {
                             RadioButton(
                                 selected = uiState.zthTier == tier,
                                 onClick = { viewModel.setZthTier(tier) }
                             )
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(Spacing.sm))
                             Column {
                                 Text(
                                     text = "${tier.tier}. $tier · ${desc.substringBefore("——")}",
@@ -288,7 +289,7 @@ fun SecuritySettingsScreen(
                     perfs.forEach { (perf, desc) ->
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                             RadioButton(selected = uiState.zthPerfClass == perf, onClick = { viewModel.setZthPerf(perf) })
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(Spacing.sm))
                             Text(
                                 text = "${perf.name}: $desc",
                                 style = MaterialTheme.typography.bodySmall,

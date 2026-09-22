@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
+import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.agent.domain.skill.Skill
 import com.mini.me_core.feature.agent.domain.skill.SkillScope
@@ -431,7 +432,7 @@ private fun SkillCard(
                 Spacer(Modifier.width(Spacing.sm))
                 OutlinedButton(onClick = onOpen, modifier = Modifier.height(32.dp)) {
                     Icon(imageVector = Icons.Rounded.Visibility, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(Spacing.xs))
                     Text(stringResource(R.string.skill_view), style = MaterialTheme.typography.labelMedium)
                 }
                 if (skill.source == SkillSourceType.LOCAL) {
@@ -439,7 +440,7 @@ private fun SkillCard(
                         Spacer(Modifier.width(Spacing.xs))
                         OutlinedButton(onClick = onEdit, modifier = Modifier.height(32.dp)) {
                             Icon(imageVector = Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(Modifier.width(Spacing.xs))
                             Text(stringResource(R.string.skill_edit), style = MaterialTheme.typography.labelMedium)
                         }
                     }
@@ -578,7 +579,7 @@ private enum class ImportMode { SELECT, PASTE, URL }
 private fun ImportOption(label: String, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(Radius.md),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     ) {
         Row(

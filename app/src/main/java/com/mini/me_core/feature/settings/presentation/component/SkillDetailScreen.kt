@@ -415,7 +415,7 @@ private fun CurrentFileBar(path: String, onClick: () -> Unit) {
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -539,7 +539,7 @@ private fun DirectoryNodeRow(
                     modifier = Modifier.size(14.dp)
                 )
             } else {
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.width(Spacing.lg))
             }
             Icon(
                 imageVector = if (isDirectory) Icons.Rounded.Folder else Icons.Rounded.InsertDriveFile,

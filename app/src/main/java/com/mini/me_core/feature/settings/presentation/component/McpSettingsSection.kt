@@ -219,7 +219,7 @@ internal fun McpServerRow(
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(Spacing.sm))
                         Text(
                             text = stringResource(R.string.common_delete),
                             style = MaterialTheme.typography.bodyMedium.copy(
@@ -294,7 +294,7 @@ internal fun McpServerRow(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(Spacing.lg),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 左侧容器图标 + 状态圆点
@@ -325,7 +325,7 @@ internal fun McpServerRow(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(Spacing.lg))
 
                 // 中间标题和 Pill 标签
                 Column(modifier = Modifier.weight(1f)) {
@@ -340,17 +340,17 @@ internal fun McpServerRow(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(Spacing.sm))
 
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // 1. 状态 Pill
                         Box(
                             modifier = Modifier
                                 .background(statusBgColor, RoundedCornerShape(Radius.pill))
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                .padding(horizontal = Spacing.sm, vertical = 2.dp)
                         ) {
                             Text(
                                 text = statusText,
@@ -366,7 +366,7 @@ internal fun McpServerRow(
                                     MaterialTheme.colorScheme.surfaceVariant,
                                     RoundedCornerShape(Radius.pill)
                                 )
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                .padding(horizontal = Spacing.sm, vertical = 2.dp)
                         ) {
                             Text(
                                 text = if (server.isStdio) stringResource(R.string.mcp_builtin) else "HTTP",
@@ -387,7 +387,7 @@ internal fun McpServerRow(
                                     MaterialTheme.colorScheme.surfaceVariant,
                                     RoundedCornerShape(Radius.pill)
                                 )
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                .padding(horizontal = Spacing.sm, vertical = 2.dp)
                         ) {
                             Text(
                                 text = infoText,
@@ -400,7 +400,7 @@ internal fun McpServerRow(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(Spacing.sm))
 
                 // 右侧箭头
                 Icon(
