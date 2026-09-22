@@ -433,7 +433,7 @@ fun RemoteDirectoryBrowserDialog(
                                     currentPath = if (parent.isEmpty()) "/" else "$parent/"
                                 }) {
                                     Icon(Icons.Rounded.Folder, contentDescription = null)
-                                    Spacer(Modifier.width(8.dp))
+                                    Spacer(Modifier.width(Spacing.sm))
                                     Text(stringResource(R.string.remote_parent_dir))
                                 }
                             }
@@ -443,7 +443,7 @@ fun RemoteDirectoryBrowserDialog(
                                 currentPath = if (currentPath == "/") "/$dir/" else "$currentPath$dir/"
                             }) {
                                 Icon(Icons.Rounded.Folder, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
+                                Spacer(Modifier.width(Spacing.sm))
                                 Text(dir)
                             }
                         }

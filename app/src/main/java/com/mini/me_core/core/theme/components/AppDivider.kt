@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
+import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 
 /**
@@ -47,11 +48,11 @@ private fun AppDividerPreview() {
     com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text("Default divider")
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Spacing.sm))
             AppDivider()
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Spacing.lg))
             Text("Indented divider (68dp, like CyberMenuRow)")
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Spacing.sm))
             AppDivider(horizontalPadding = 68.dp)
         }
     }

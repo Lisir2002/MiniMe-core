@@ -29,7 +29,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
+import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.tokens.PrimitiveRadius
+import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 
 /**
@@ -142,15 +144,15 @@ private fun AppBadgePreview() {
     com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
         val colors = LocalAppTheme.current.colors
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Spacing.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AppBadge(text = "3", color = colors.error, textColor = colors.onError)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Spacing.sm))
             AppBadge(text = "NEW", color = colors.success, textColor = colors.onSuccess)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Spacing.sm))
             AppBadge(text = "128", color = colors.warning, textColor = colors.onWarning)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Spacing.sm))
             AppBadge(text = "INFO", color = colors.info, textColor = colors.onInfo)
         }
     }
@@ -162,19 +164,19 @@ private fun AppBadgePreview() {
 private fun AppStatusDotPreview() {
     com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Spacing.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AppStatusDot(color = AppStatusDotColor.Success)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(Spacing.md))
             AppStatusDot(color = AppStatusDotColor.Warning)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(Spacing.md))
             AppStatusDot(color = AppStatusDotColor.Error)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(Spacing.md))
             AppStatusDot(color = AppStatusDotColor.Info)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(Spacing.md))
             AppStatusDot(color = AppStatusDotColor.Neutral)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(Spacing.md))
             AppStatusDot(color = AppStatusDotColor.Info, pulse = true)
         }
     }

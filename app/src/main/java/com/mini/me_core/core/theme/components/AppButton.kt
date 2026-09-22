@@ -26,7 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
+import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.tokens.PrimitiveRadius
+import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 
 /**
@@ -223,7 +225,7 @@ enum class AppButtonSize {
 private fun AppButtonPreview() {
     com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
         androidx.compose.foundation.layout.Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text("Filled:")

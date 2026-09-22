@@ -23,7 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
+import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.tokens.PrimitiveRadius
+import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 
 /**
@@ -193,22 +195,22 @@ enum class AppChipColor {
 private fun AppChipPreview() {
     com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
         androidx.compose.foundation.layout.Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Spacing.lg),
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
         ) {
             Text("Default (tonal) variant:")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AppChip(text = "Primary", chipColor = AppChipColor.Primary)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Spacing.sm))
                 AppChip(text = "Success", chipColor = AppChipColor.Success)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Spacing.sm))
                 AppChip(text = "Warning", chipColor = AppChipColor.Warning)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AppChip(text = "Error", chipColor = AppChipColor.Error)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Spacing.sm))
                 AppChip(text = "Info", chipColor = AppChipColor.Info)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Spacing.sm))
                 AppChip(text = "Neutral", chipColor = AppChipColor.Neutral)
             }
 
@@ -216,9 +218,9 @@ private fun AppChipPreview() {
             Text("Outlined variant:")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AppChip(text = "Primary", variant = AppChipVariant.Outlined, chipColor = AppChipColor.Primary)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Spacing.sm))
                 AppChip(text = "Success", variant = AppChipVariant.Outlined, chipColor = AppChipColor.Success)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Spacing.sm))
                 AppChip(text = "Error", variant = AppChipVariant.Outlined, chipColor = AppChipColor.Error)
             }
 
@@ -226,9 +228,9 @@ private fun AppChipPreview() {
             Text("Filled variant:")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AppChip(text = "Primary", variant = AppChipVariant.Filled, chipColor = AppChipColor.Primary)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Spacing.sm))
                 AppChip(text = "Success", variant = AppChipVariant.Filled, chipColor = AppChipColor.Success)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Spacing.sm))
                 AppChip(text = "Error", variant = AppChipVariant.Filled, chipColor = AppChipColor.Error)
             }
 
@@ -240,7 +242,7 @@ private fun AppChipPreview() {
                     chipColor = AppChipColor.Primary,
                     icon = Icons.Rounded.Build,
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Spacing.sm))
                 AppChip(
                     text = "Filter",
                     variant = AppChipVariant.Filled,

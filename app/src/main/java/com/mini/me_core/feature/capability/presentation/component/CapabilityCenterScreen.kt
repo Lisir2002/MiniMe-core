@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.AppEmptyState
 import com.mini.me_core.core.theme.AppTopAppBar
+import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.agent.domain.model.AgentMode
 import com.mini.me_core.feature.agent.domain.tool.ToolCapability
@@ -301,7 +302,7 @@ private fun ParameterRow(param: ParameterUiModel) {
             modifier = Modifier
                 .background(
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                    RoundedCornerShape(4.dp)
+                    RoundedCornerShape(Radius.xs)
                 )
                 .padding(horizontal = 4.dp, vertical = 1.dp)
         )

@@ -89,7 +89,7 @@ internal fun CyberCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(Radius.lg)
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = cyberColor(CyberColors.CardBg, CyberColors.DarkCardBg),
@@ -227,7 +227,7 @@ internal fun CyberMenuRow(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(RoundedCornerShape(Radius.md))
                     .background(color = effectiveIconBg),
                 contentAlignment = Alignment.Center
             ) {
@@ -239,7 +239,7 @@ internal fun CyberMenuRow(
                 )
             }
 
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(Spacing.md))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -259,7 +259,7 @@ internal fun CyberMenuRow(
                 }
             }
 
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Spacing.sm))
             effectiveTrailing()
         }
 
@@ -308,7 +308,7 @@ internal fun CyberSearchBar(
                 tint = hintColor,
                 modifier = Modifier.size(18.dp)
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Spacing.sm))
             Box(modifier = Modifier.weight(1f)) {
                 if (!hasText) {
                     Text(
@@ -337,7 +337,7 @@ internal fun CyberSearchBar(
                 )
             }
             if (hasText && onClear != null) {
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(Spacing.xs))
                 IconButton(
                     onClick = onClear,
                     modifier = Modifier.size(24.dp)
@@ -418,7 +418,7 @@ internal fun CyberChip(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(Radius.sm)
     val gradientBrush = Brush.horizontalGradient(
         colors = listOf(CyberColors.Cyan, CyberColors.Blue)
     )
@@ -484,7 +484,7 @@ internal fun CyberProgressIndicator(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
+                .clip(RoundedCornerShape(Radius.xs))
                 .background(CyberColors.CardBg)
         ) {
             if (isIndeterminate) {
