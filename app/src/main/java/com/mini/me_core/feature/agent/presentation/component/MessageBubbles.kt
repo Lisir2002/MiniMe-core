@@ -65,6 +65,9 @@ import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Edit
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -305,6 +308,16 @@ internal fun AgentMessageItem(
                                 color = tokenColor
                             )
                         }
+                        // v2 混合模式：时间戳（HH:mm），10sp 弱化色，右对齐
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = formatMessageTime(message.timestamp),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
                     }
                     // 复制成功 1.5s 后恢复图标
                     if (copied) {
@@ -328,7 +341,8 @@ private fun MessageActionIconButton(
 ) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier.size(24.dp),
+        // v2 混合模式：按钮 20dp（16dp 图标 + 2dp 两侧 padding），图标间间距 4dp
+        modifier = Modifier.size(20.dp),
         colors = IconButtonDefaults.iconButtonColors(contentColor = tint),
     ) {
         // 混合模式：图标 16dp 弱化色
@@ -420,4 +434,12 @@ private fun CompactionDivider() {
             )
         }
     }
+}
+
+/** v2 混合模式：将消息时间戳格式化为 HH:mm 显示。 */
+private fun formatMessageTime(timestamp: Long): String {
+    if (timestamp <= 0) return ""
+    return runCatching {
+        SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
+    }.getOrDefault("")
 }
