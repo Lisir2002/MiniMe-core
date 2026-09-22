@@ -71,7 +71,8 @@ internal fun AgentMessageItem(
     onNewChatClick: ((AgentUIMessage) -> Unit)? = null,
     initiallyExpanded: Boolean = true,
     environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap(),
-    agentState: AgentUIState = AgentUIState.Idle
+    agentState: AgentUIState = AgentUIState.Idle,
+    onRetryTool: ((messageId: String) -> Unit)? = null
 ) {
     if (message.isCompactionMarker) {
         CompactionDivider()
@@ -149,7 +150,8 @@ internal fun AgentMessageItem(
                                     message = message,
                                     liveOutput = live,
                                     environmentSnapshot = environmentSnapshots[message.id],
-                                    agentState = agentState
+                                    agentState = agentState,
+                                    onRetry = onRetryTool
                                 )
                             } else {
                                 ToolMessageBody(message, liveOutput = liveOutput, initiallyExpanded = initiallyExpanded, environmentSnapshots = environmentSnapshots)

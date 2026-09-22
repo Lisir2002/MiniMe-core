@@ -60,6 +60,7 @@ import com.mini.me_core.feature.agent.presentation.component.AgentMessageItem
  * @param environmentSnapshots 旁路环境探测快照（key = tool messageId）
  * @param agentState 全局 Agent 状态
  * @param onToggleSubGroup 点击子分组头部切换展开/折叠回调 (taskId, subGroupId)
+ * @param onRetryTool 点击工具卡片「重试」回调（messageId）；null 时不显示重试按钮
  * @param modifier 外部修饰符
  */
 @Composable
@@ -70,6 +71,7 @@ internal fun TaskSubGroupRenderer(
     environmentSnapshots: Map<String, EnvironmentSnapshot>,
     agentState: AgentUIState,
     onToggleSubGroup: (String, String) -> Unit,
+    onRetryTool: ((messageId: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val visual = subGroupVisualColor(subGroup.type)
@@ -134,7 +136,8 @@ internal fun TaskSubGroupRenderer(
                                 message = message,
                                 liveOutput = live,
                                 environmentSnapshot = snapshot,
-                                agentState = agentState
+                                agentState = agentState,
+                                onRetry = onRetryTool
                             )
                         }
                     }

@@ -89,6 +89,7 @@ import com.mini.me_core.feature.agent.presentation.component.agentfirst.derivers
  * @param environmentSnapshot 旁路环境探测快照（构建/环境变更命令后自动探测）
  * @param agentState 全局 Agent 状态（用于冷启动取消判定）
  * @param initiallyExpanded 预览/测试用：强制初始展开态；null 时按状态自动决定
+ * @param onRetry 点击「重试」回调（messageId）；null 时不显示重试按钮
  * @param modifier 外部修饰符
  */
 @Composable
@@ -98,7 +99,8 @@ fun ToolCallCard(
     environmentSnapshot: EnvironmentSnapshot?,
     agentState: AgentUIState,
     modifier: Modifier = Modifier,
-    initiallyExpanded: Boolean? = null
+    initiallyExpanded: Boolean? = null,
+    onRetry: ((messageId: String) -> Unit)? = null
 ) {
     // 1. 状态推导（优先级 Running > Cancelled > TimedOut > Error > Success）
     val state = remember(message.id, liveOutput, agentState) {
@@ -212,12 +214,15 @@ fun ToolCallCard(
                 ToolCallCardOutput(content = outputContent, isStreaming = running)
             }
             Spacer(Modifier.height(Spacing.xs))
-            // 操作按钮：复制命令 / 复制输出
+            // 操作按钮：复制命令 / 复制输出 / 重试（仅 Error/TimedOut 且 onRetry 非空）
+            val showRetry = onRetry != null &&
+                (state == ToolCallState.ERROR || state == ToolCallState.TIMED_OUT)
             ToolCallCardActionButtons(
                 command = command,
                 output = outputForCopy,
                 onCopyCommand = {},
-                onCopyOutput = {}
+                onCopyOutput = {},
+                onRetry = if (showRetry) { { onRetry.invoke(message.id) } } else null
             )
             // 错误诊断提示条
             if ((state == ToolCallState.ERROR || state == ToolCallState.TIMED_OUT) && diagnosis != null) {

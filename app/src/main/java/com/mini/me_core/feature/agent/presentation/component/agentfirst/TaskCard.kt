@@ -94,6 +94,7 @@ import java.util.Locale
  * @param onToggleSubGroup 点击子分组头部切换展开/折叠回调 (taskId, subGroupId)
  * @param onStop 点击「停止执行」回调
  * @param onViewChanges 点击「查看日志/产物」回调
+ * @param onRetryTool 点击工具卡片「重试」回调（messageId）；null 时不显示重试按钮
  * @param modifier 外部修饰符
  */
 @Composable
@@ -108,6 +109,7 @@ internal fun TaskCard(
     onToggleSubGroup: (String, String) -> Unit,
     onStop: () -> Unit = {},
     onViewChanges: () -> Unit = {},
+    onRetryTool: ((messageId: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     // 1. 状态推导
@@ -175,7 +177,8 @@ internal fun TaskCard(
                             liveOutputs = runningTools,
                             environmentSnapshots = environmentSnapshots,
                             agentState = agentState,
-                            onToggleSubGroup = onToggleSubGroup
+                            onToggleSubGroup = onToggleSubGroup,
+                            onRetryTool = onRetryTool
                         )
                     }
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -33,17 +34,19 @@ import kotlinx.coroutines.launch
 /**
  * 工具卡片操作按钮行（Agent-First ToolCallCard 的子组件）。
  *
- * 渲染一行小按钮：[复制命令] [复制输出]。点击后把对应文本写入系统剪贴板
+ * 渲染一行小按钮：[复制命令] [复制输出] [重试（仅失败时）]。点击后把对应文本写入系统剪贴板
  * （复用 [LocalClipboard]），按钮文案短暂变为「已复制」2 秒后恢复。
  *
  * - [command] 为空时不渲染「复制命令」按钮；
  * - [output] 为空时不渲染「复制输出」按钮；
  * - [onCopyCommand] / [onCopyOutput] 在复制完成后回调，供外部埋点/通知等附加副作用使用。
+ * - [onRetry] 非空时额外渲染「重试」按钮，点击后回调；null 时不显示。
  *
  * @param command 待复制的命令文本（通常来自 toolArgs.command）
  * @param output 待复制的输出文本（清洗后的工具结果或实时输出）
  * @param onCopyCommand 复制命令完成后的回调
  * @param onCopyOutput 复制输出完成后的回调
+ * @param onRetry 点击「重试」回调；null 时不显示重试按钮
  * @param modifier 外部修饰符
  */
 @Composable
@@ -52,6 +55,7 @@ fun ToolCallCardActionButtons(
     output: String,
     onCopyCommand: () -> Unit,
     onCopyOutput: () -> Unit,
+    onRetry: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -74,6 +78,9 @@ fun ToolCallCardActionButtons(
                 payload = "tool_output",
                 onCopied = onCopyOutput
             )
+        }
+        if (onRetry != null) {
+            RetryChip(onRetry = onRetry)
         }
     }
 }
@@ -126,6 +133,36 @@ private fun CopyChip(
         if (copied) {
             delay(2000)
             copied = false
+        }
+    }
+}
+
+/**
+ * 重试小胶囊按钮：与 [CopyChip] 样式一致，点击触发 [onRetry] 回调。
+ */
+@Composable
+private fun RetryChip(onRetry: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(Radius.sm),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        onClick = onRetry
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Refresh,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(12.dp)
+            )
+            Text(
+                text = "重试",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall
+            )
         }
     }
 }
