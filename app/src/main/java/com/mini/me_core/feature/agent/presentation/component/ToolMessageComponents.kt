@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
@@ -153,7 +154,8 @@ internal fun ToolMessageBody(
         resolveBubbleInstallProgress(message, liveOutput)
     } else null
 
-    Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
+    // 混合模式：工具块内边距 12dp
+    Column(modifier = Modifier.padding(12.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -171,8 +173,12 @@ internal fun ToolMessageBody(
                 // 工具名（过长横向滚动，不再用省略号截断）
                 HorizontalScrollableText(
                     text = toolLabel,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                    // 混合模式：工具头部 12sp 弱化色
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 12.sp
+                    ),
                     modifier = Modifier.weight(1f, fill = false)
                 )
                 if (edit == null && !argHint.isNullOrBlank()) {
@@ -221,9 +227,12 @@ internal fun ToolMessageBody(
                 Spacer(Modifier.height(Spacing.xs))
                 Text(
                     text = truncated,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // 混合模式：工具输出 12sp 等宽，行高 18sp，灰色
+                    color = if (LocalAppDarkMode.current) Color(0xFF94A3B8) else Color(0xFF475569),
                     style = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
                     )
                 )
             }
@@ -299,9 +308,10 @@ internal fun ToolCallGroup(
     val successCount = messages.size - errorCount
 
     Surface(
-        shape = RoundedCornerShape(Radius.md),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(10.dp),
+        // 混合模式：工具块背景 surfaceVariant（#F1F5F9 / #1E293B）
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
@@ -457,9 +467,12 @@ internal fun ToolSection(label: String, content: String) {
     SelectionContainer {
         Text(
             text = visibleLines.joinToString("\n"),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // 混合模式：工具输出 12sp 等宽，行高 18sp，灰色
+            color = if (LocalAppDarkMode.current) Color(0xFF94A3B8) else Color(0xFF475569),
             style = MaterialTheme.typography.bodySmall.copy(
-                fontFamily = FontFamily.Monospace
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                lineHeight = 18.sp
             )
         )
     }

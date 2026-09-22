@@ -152,12 +152,11 @@ internal fun AgentMessageItem(
                             shape = when {
                                 // 混合模式：用户气泡圆角 16/16/4/16（右下小圆角指向用户）
                                 isUser -> RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
+                                // 混合模式：工具块圆角 10dp
+                                message.role == MessageRole.TOOL -> RoundedCornerShape(10.dp)
                                 else -> {
-                                    // 非用户气泡按连续同角色分组——
-                                    // 组首上圆角大/下小，组中上下均小，组末上小/下大；单条四角大圆角。
-                                    val topR = if (sameAsPrev) Radius.xs else Radius.lg
-                                    val bottomR = if (sameAsNext) Radius.xs else Radius.lg
-                                    RoundedCornerShape(topR, topR, bottomR, bottomR)
+                                    // AI 回复透明背景，形状无视觉影响
+                                    RoundedCornerShape(Radius.lg)
                                 }
                             },
                             color = when (message.role) {
@@ -165,9 +164,13 @@ internal fun AgentMessageItem(
                                 MessageRole.USER -> Color(0xFF3B82F6)
                                 // 混合模式：AI 回复透明背景（无气泡），直接在页面背景上
                                 MessageRole.ASSISTANT -> Color.Transparent
+                                // 工具块背景 surfaceVariant（#F1F5F9 / #1E293B）
                                 MessageRole.TOOL -> MaterialTheme.colorScheme.surfaceVariant
                             },
-                            border = null,
+                            // 混合模式：工具块 1dp 边框（outlineVariant）
+                            border = if (message.role == MessageRole.TOOL) {
+                                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            } else null,
                             // 混合模式：去掉 AI 回复投影（透明背景不需要阴影）
                             shadowElevation = 0.dp,
                             // 用户/AI 气泡按内容自适应宽度并限宽；工具气泡填满可用宽度，两侧外边距由 LazyColumn contentPadding 统一提供
