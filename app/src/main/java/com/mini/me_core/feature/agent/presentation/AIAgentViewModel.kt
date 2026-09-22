@@ -1880,6 +1880,41 @@ class AIAgentViewModel @Inject constructor(
     }
 
     /**
+     * Agent-First Stage 3：重试失败的工具调用。
+     *
+     * 通过让模型重新执行该工具调用来实现错误恢复。第一版用模型重试替代直接工具重跑
+     * （真正的工具重跑需要直接调用 ToolRegistry，复杂度高，后续迭代再考虑）。
+     *
+     * 从数据库查找 messageId 对应的 TOOL 消息，提取 toolName / toolArgs，
+     * 构造一条请求让模型重新执行该工具调用。
+     *
+     * @param messageId 失败的 TOOL 消息 ID
+     */
+    fun retryTool(messageId: String) = viewModelScope.launch {
+        try {
+            val msg = v2Agent.getMessageById(messageId)?.toEntity() ?: return@launch
+            if (msg.role != MessageRole.TOOL.name) return@launch
+            val toolName = msg.toolName ?: return@launch
+            val toolArgs = msg.toolArgs.orEmpty()
+            val prompt = buildString {
+                append("请重新执行以下工具调用：\n")
+                append("工具：$toolName\n")
+                if (toolArgs.isNotBlank()) {
+                    append("参数：$toolArgs\n")
+                }
+            }
+            enqueueAgentRequest(
+                request = prompt,
+                modelRequest = prompt,
+                projectRoot = _currentWorkspace.value,
+                targetSessionId = msg.sessionId
+            )
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "重试工具调用失败", e)
+        }
+    }
+
+    /**
      * 创建新聊天并发送：新建一个会话，然后自动发送该消息内容。
      * 用于用户消息的「创建新聊天」快捷操作。
      */
