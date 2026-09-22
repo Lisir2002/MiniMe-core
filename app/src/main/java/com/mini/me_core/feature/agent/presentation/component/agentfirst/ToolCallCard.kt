@@ -88,6 +88,7 @@ import com.mini.me_core.feature.agent.presentation.component.agentfirst.derivers
  * @param liveOutput 匹配该消息的实时输出；null 表示非运行中
  * @param environmentSnapshot 旁路环境探测快照（构建/环境变更命令后自动探测）
  * @param agentState 全局 Agent 状态（用于冷启动取消判定）
+ * @param initiallyExpanded 预览/测试用：强制初始展开态；null 时按状态自动决定
  * @param modifier 外部修饰符
  */
 @Composable
@@ -96,7 +97,8 @@ fun ToolCallCard(
     liveOutput: RunningToolOutput?,
     environmentSnapshot: EnvironmentSnapshot?,
     agentState: AgentUIState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    initiallyExpanded: Boolean? = null
 ) {
     // 1. 状态推导（优先级 Running > Cancelled > TimedOut > Error > Success）
     val state = remember(message.id, liveOutput, agentState) {
@@ -144,7 +146,7 @@ fun ToolCallCard(
     // 展开状态：Running/Error/TimedOut 自动展开；其余默认折叠
     val autoExpand = state == ToolCallState.RUNNING ||
         state == ToolCallState.ERROR || state == ToolCallState.TIMED_OUT
-    var expanded by remember(message.id) { mutableStateOf(autoExpand) }
+    var expanded by remember(message.id) { mutableStateOf(initiallyExpanded ?: autoExpand) }
 
     Column(
         modifier = modifier
