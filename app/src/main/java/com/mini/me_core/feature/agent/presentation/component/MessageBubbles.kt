@@ -7,9 +7,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.EnvironmentSnapshot
@@ -100,10 +106,10 @@ internal fun AgentMessageItem(
     val sameAsNext = nextRole != null && nextRole == message.role
     val startsNewGroup = previousRole != null && !sameAsPrev
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
-    // 紧凑优化：用户气泡放宽到 92% 屏宽，减少换行、降低整体纵向占用
-    val maxUserBubbleWidth = remember(screenWidthDp) { (screenWidthDp * 0.92).dp }
-    // Stage 4：AI 气泡轻量化，左对齐且限宽 90% 屏宽（不再全宽），提升阅读节奏
-    val maxAssistantBubbleWidth = remember(screenWidthDp) { (screenWidthDp * 0.90).dp }
+    // 混合模式：用户气泡限宽 82% 屏宽，右对齐
+    val maxUserBubbleWidth = remember(screenWidthDp) { (screenWidthDp * 0.82).dp }
+    // 混合模式：AI 回复左对齐限宽 95% 屏宽（无气泡，透明背景）
+    val maxAssistantBubbleWidth = remember(screenWidthDp) { (screenWidthDp * 0.95).dp }
     var copied by remember { mutableStateOf(false) }
     val clipboard = LocalClipboard.current
     val copyScope = rememberCoroutineScope()
@@ -125,14 +131,29 @@ internal fun AgentMessageItem(
                 horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
             ) {
                 if (hasContent || message.role == MessageRole.TOOL) {
+                    // 混合模式：AI 回复左侧 2dp 竖线，高度跟随内容
+                    val isDark = LocalAppDarkMode.current
                     Row(
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = if (isAssistant) Modifier.height(IntrinsicSize.Min) else Modifier,
+                        verticalAlignment = if (isAssistant) Alignment.Top else Alignment.CenterVertically
                     ) {
+                        // 混合模式：AI 回复左侧竖线标识（亮色 #3B82F6 / 暗色 #60A5FA）
+                        if (isAssistant) {
+                            val barColor = if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6)
+                            Box(
+                                modifier = Modifier
+                                    .width(2.dp)
+                                    .fillMaxHeight()
+                                    .background(barColor)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                        }
                         Surface(
                             shape = when {
-                                isUser -> RoundedCornerShape(Radius.md, Radius.md, Radius.xs, Radius.md)
+                                // 混合模式：用户气泡圆角 16/16/4/16（右下小圆角指向用户）
+                                isUser -> RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
                                 else -> {
-                                    // Stage 4：非用户气泡按连续同角色分组——
+                                    // 非用户气泡按连续同角色分组——
                                     // 组首上圆角大/下小，组中上下均小，组末上小/下大；单条四角大圆角。
                                     val topR = if (sameAsPrev) Radius.xs else Radius.lg
                                     val bottomR = if (sameAsNext) Radius.xs else Radius.lg
@@ -140,13 +161,15 @@ internal fun AgentMessageItem(
                                 }
                             },
                             color = when (message.role) {
-                                MessageRole.USER -> MaterialTheme.colorScheme.primary
-                                MessageRole.ASSISTANT -> MaterialTheme.colorScheme.surface
+                                // 混合模式：用户气泡统一 #3B82F6（亮/暗相同）
+                                MessageRole.USER -> Color(0xFF3B82F6)
+                                // 混合模式：AI 回复透明背景（无气泡），直接在页面背景上
+                                MessageRole.ASSISTANT -> Color.Transparent
                                 MessageRole.TOOL -> MaterialTheme.colorScheme.surfaceVariant
                             },
-                            // Stage 4：去掉 ASSISTANT 的 1dp 边框，改用轻投影区分层次
                             border = null,
-                            shadowElevation = if (isAssistant) 2.dp else 0.dp,
+                            // 混合模式：去掉 AI 回复投影（透明背景不需要阴影）
+                            shadowElevation = 0.dp,
                             // 用户/AI 气泡按内容自适应宽度并限宽；工具气泡填满可用宽度，两侧外边距由 LazyColumn contentPadding 统一提供
                             modifier = when {
                                 isUser -> Modifier.widthIn(max = maxUserBubbleWidth)
@@ -177,14 +200,15 @@ internal fun AgentMessageItem(
                             }
                         } else {
                             val textColor = when (message.role) {
-                                MessageRole.USER -> MaterialTheme.colorScheme.onPrimary
+                                // 混合模式：用户气泡文字统一白色
+                                MessageRole.USER -> Color.White
                                 else -> MaterialTheme.colorScheme.onSurface
                             }
                             SelectionContainer {
                                 val selectionColors = if (isUser) {
                                     TextSelectionColors(
-                                        handleColor = MaterialTheme.colorScheme.onPrimary,
-                                        backgroundColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.28f),
+                                        handleColor = Color.White,
+                                        backgroundColor = Color.White.copy(alpha = 0.28f),
                                     )
                                 } else {
                                     TextSelectionColors(
@@ -197,15 +221,20 @@ internal fun AgentMessageItem(
                                         Text(
                                             text = message.content,
                                             color = textColor,
-                                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
-                                            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)
+                                            // 混合模式：用户消息 14sp/行高20sp
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                lineHeight = 20.sp,
+                                                fontSize = 14.sp
+                                            ),
+                                            // 混合模式：用户气泡内边距 12dp 水平 / 8dp 垂直
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                                         )
                                     } else {
                                         MarkdownContent(
                                             text = message.content,
                                             color = textColor,
-                                            // Stage 4：AI 气泡内边距提升到 16/12，视觉更透气
-                                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                                            // 混合模式：AI 回复内边距（左侧竖线已有 12dp 间距，start=0；右侧 16dp；垂直 4dp）
+                                            modifier = Modifier.padding(start = 0.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
                                             cache = markdownCache
                                         )
                                     }
@@ -220,7 +249,11 @@ internal fun AgentMessageItem(
                 }
                 // 气泡下方操作按钮（工具消息不显示）
                 if (message.content.hasVisibleContent() && message.role != MessageRole.TOOL) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 混合模式：AI 回复操作行撑满宽度，使 token 统计可右对齐
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = if (isAssistant) Modifier.fillMaxWidth() else Modifier
+                    ) {
                         val iconTint = MaterialTheme.colorScheme.onSurfaceVariant
                         // 复制
                         MessageActionIconButton(
@@ -257,10 +290,16 @@ internal fun AgentMessageItem(
                         if (message.role == MessageRole.ASSISTANT && (message.inputTokens > 0 || message.outputTokens > 0)) {
                             val inStr = formatTokenCount(message.inputTokens)
                             val outStr = formatTokenCount(message.outputTokens)
+                            // 混合模式：token 统计右对齐，10sp/14sp 弱化色（亮色 #94A3B8 / 暗色 #64748B）
+                            Spacer(Modifier.weight(1f))
+                            val tokenColor = if (LocalAppDarkMode.current) Color(0xFF64748B) else Color(0xFF94A3B8)
                             Text(
                                 text = "↑$inStr ↓$outStr",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    lineHeight = 14.sp
+                                ),
+                                color = tokenColor
                             )
                         }
                     }
@@ -289,7 +328,8 @@ private fun MessageActionIconButton(
         modifier = Modifier.size(24.dp),
         colors = IconButtonDefaults.iconButtonColors(contentColor = tint),
     ) {
-        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(13.dp))
+        // 混合模式：图标 16dp 弱化色
+        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(16.dp))
     }
 }
 

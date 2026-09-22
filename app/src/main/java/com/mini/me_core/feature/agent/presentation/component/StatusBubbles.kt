@@ -43,10 +43,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.LocalAppDarkMode
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
@@ -186,12 +188,15 @@ internal fun ReasoningBubble(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start
     ) {
+        val isDark = LocalAppDarkMode.current
+        // 混合模式：思考条背景 surfaceVariant（#F1F5F9 / #1E293B），圆角 8dp
         Surface(
-            shape = RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
+            // 混合模式：思考条内边距 10dp 水平 / 6dp 垂直
+            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -204,21 +209,26 @@ internal fun ReasoningBubble(
                     Icon(
                         Icons.Rounded.Star,
                         contentDescription = null,
-                        tint = Brand.IconGray,
-                        modifier = Modifier.size(16.dp)
+                        // 混合模式：思考条弱化色（亮色 #64748B / 暗色 #94A3B8）
+                        tint = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                        modifier = Modifier.size(14.dp)
                     )
                     Spacer(Modifier.width(Spacing.sm))
                     Text(
                         text = stringResource(R.string.chat_thinking_process),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        // 混合模式：思考条 12sp/行高18sp
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp
+                        ),
+                        color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
                         modifier = Modifier.weight(1f)
                     )
                     Icon(
                         if (effectiveExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                         contentDescription = if (effectiveExpanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
-                        tint = Brand.IconGray,
-                        modifier = Modifier.size(18.dp)
+                        tint = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
                 if (effectiveExpanded) {
