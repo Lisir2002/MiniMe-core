@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.core.theme.AppTopAppBar
+import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.proxy.domain.ProxyGroupInfo
 import com.mini.me_core.feature.proxy.domain.ProxyNodeInfo
@@ -321,7 +322,7 @@ private fun NodesEntryCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = enabledClick, onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(Radius.lg),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
         ),
@@ -548,7 +549,7 @@ private fun PreviewPanel(preview: ProxyPreview) {
             .fillMaxWidth()
             .background(
                 (if (preview.ok) Color(0xFF2E7D32) else Color(0xFFC62828)).copy(alpha = 0.12f),
-                RoundedCornerShape(8.dp)
+                RoundedCornerShape(Radius.sm)
             )
             .padding(Spacing.sm)
     ) {
@@ -891,7 +892,7 @@ private fun GroupsTrafficView(
 private fun TrafficCard(traffic: ProxyTraffic?) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(Radius.md),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         )
@@ -926,7 +927,7 @@ private fun TrafficCard(traffic: ProxyTraffic?) {
 private fun GroupNodeCard(group: ProxyGroupInfo, onSelectGroupNode: (String, String) -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(Radius.md),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
         )

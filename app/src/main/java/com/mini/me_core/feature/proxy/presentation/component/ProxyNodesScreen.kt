@@ -56,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.core.theme.AppEmptyState
 import com.mini.me_core.core.theme.AppLoadingState
 import com.mini.me_core.core.theme.AppTopAppBar
+import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.proxy.domain.ProxyGroupInfo
 import com.mini.me_core.feature.proxy.domain.ProxyNodeInfo
@@ -323,7 +324,7 @@ private fun StatusHero(
                         text = "mode · $mode",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp)
                     )
                 }
             }
@@ -335,7 +336,7 @@ private fun StatusHero(
                     tint = Color.White.copy(alpha = 0.9f),
                     modifier = Modifier.size(14.dp)
                 )
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(Spacing.xs))
                 Text(
                     text = activeName,
                     style = MaterialTheme.typography.bodyMedium,
@@ -364,7 +365,7 @@ private fun StatusHero(
                     color = Color.White
                 )
             }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(Spacing.xs))
             Text(
                 text = when {
                     enabled && !reachable -> stringResource(R.string.ui_______950d8300)
@@ -382,7 +383,7 @@ private fun StatusHero(
                         containerColor = Color.White,
                         contentColor = Color(0xFF0984E3)
                     ),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(Radius.md)
                 ) {
                     Text(stringResource(R.string.ui______06fef6bd), fontWeight = FontWeight.Bold)
                 }
@@ -413,7 +414,7 @@ private fun ToolbarRow(
         Button(
             onClick = onTestAll,
             enabled = canTest && !testing,
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(Radius.md),
             contentPadding = PaddingValues(horizontal = Spacing.md, vertical = 8.dp)
         ) {
             if (testing) {
@@ -443,7 +444,7 @@ private fun SegmentedControl(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 RoundedCornerShape(12.dp)
             )
-            .padding(4.dp)
+            .padding(Spacing.xs)
     ) {
         listOf(stringResource(R.string.ui____829abe5a) to 0, stringResource(R.string.ui____3bf3c0a8) to 1).forEach { (label, idx) ->
             val selected = tab == idx
@@ -453,7 +454,7 @@ private fun SegmentedControl(
                     .clip(RoundedCornerShape(9.dp))
                     .then(if (selected) Modifier.background(AccentGradient) else Modifier)
                     .clickable { onTabChange(idx) }
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = Spacing.sm),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -605,7 +606,7 @@ private fun GroupCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(Radius.lg),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         ),
@@ -686,7 +687,7 @@ private fun GroupMemberRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(Radius.sm))
             .clickable(onClick = onClick)
             .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically
@@ -804,7 +805,7 @@ private fun NodeStatsBar(total: Int, latencies: Map<String, Long?>) {
 @Composable
 private fun StatChip(label: String, value: String) {
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(Radius.md),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     ) {
         Row(
