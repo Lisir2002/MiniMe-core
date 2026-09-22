@@ -5,6 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.mini.me_core.core.security.CredentialEncryptor
 import com.mini.me_core.core.security.OperationResult
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.datalayer.engine.DbEncryptionMigrationEngine
+import com.mini.me_core.datalayer.engine.EncryptionStatus
+import com.mini.me_core.datalayer.engine.LibName
+import com.mini.me_core.datalayer.engine.MigrationResult
+import com.mini.me_core.datalayer.engine.MigrationStateStore
 import com.mini.me_core.feature.agent.domain.zth.ZthPerformanceClass
 import com.mini.me_core.feature.agent.domain.zth.ZthPresetTier
 import com.mini.me_core.feature.settings.data.repository.ZthTierRepository
@@ -32,6 +37,12 @@ data class SecurityUiState(
     val resetting: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null,
+    // 数据库加密（P1）：SQLCipher 加密状态与迁移进度
+    val dbEncryptionEnabled: Boolean = false,
+    val dbEncryptionMigrating: Boolean = false,
+    val dbEncryptionProgress: Int = 0,
+    val dbEncryptionCurrentLib: String? = null,
+    val dbEncryptionError: String? = null,
     // ZTH 三字段（Phase 3.4）：默认值仅用于 UI 初始帧；真实值由 tierFlow 组合覆盖
     val zthTier: ZthPresetTier = ZthPresetTier.BALANCED,
     val zthPerfClass: ZthPerformanceClass = ZthPerformanceClass.HIGH_END,
@@ -42,7 +53,9 @@ data class SecurityUiState(
 class SecuritySettingsViewModel @Inject constructor(
     private val encryptor: CredentialEncryptor,
     private val auditLogRepo: RemoteAuditLogRepository,
-    private val zthTierRepository: ZthTierRepository
+    private val zthTierRepository: ZthTierRepository,
+    private val dbMigrationEngine: DbEncryptionMigrationEngine,
+    private val dbMigrationStateStore: MigrationStateStore,
 ) : ViewModel() {
 
     // BaseState（凭据/轮换部分）+ ZTH StateFlow 三字段 → 合成一个统一 SecurityUiState
@@ -65,6 +78,7 @@ class SecuritySettingsViewModel @Inject constructor(
 
     init {
         loadState()
+        refreshDbEncryptionStatus()
     }
 
     private fun loadState() {
@@ -159,6 +173,145 @@ class SecuritySettingsViewModel @Inject constructor(
 
     fun clearMessages() {
         _baseState.value = _baseState.value.copy(error = null, successMessage = null)
+    }
+
+    // ── 数据库加密（P1 / SQLCipher）────────────────────────────────────
+
+    /**
+     * 刷新所有库的加密状态。
+     * P1 阶段：所有库都为 ENCRYPTED 时 dbEncryptionEnabled=true，否则为 false。
+     */
+    fun refreshDbEncryptionStatus() {
+        viewModelScope.launch {
+            try {
+                val allEncrypted = LibName.entries.all { lib ->
+                    dbMigrationStateStore.getState(lib).encryptionStatus == EncryptionStatus.ENCRYPTED
+                }
+                _baseState.value = _baseState.value.copy(dbEncryptionEnabled = allEncrypted)
+            } catch (e: Exception) {
+                FileLogger.w("SecurityVM", "刷新数据库加密状态失败", e)
+            }
+        }
+    }
+
+    /**
+     * 开启数据库加密：依次对 6 个库执行明文→加密迁移。
+     * 迁移过程中更新进度（已完成库数 / 6 * 100）。
+     * 任何一个库迁移失败 → 停止后续迁移，保留已加密的库，显示错误。
+     */
+    fun enableDbEncryption() {
+        viewModelScope.launch {
+            _baseState.value = _baseState.value.copy(
+                dbEncryptionMigrating = true,
+                dbEncryptionProgress = 0,
+                dbEncryptionError = null,
+                dbEncryptionCurrentLib = null,
+            )
+
+            var completed = 0
+            var hasError = false
+            for (lib in LibName.entries) {
+                _baseState.value = _baseState.value.copy(dbEncryptionCurrentLib = lib.name)
+                try {
+                    val result = dbMigrationEngine.migrateToEncrypted(lib)
+                    when (result) {
+                        MigrationResult.SUCCESS, MigrationResult.ALREADY_ENCRYPTED -> {
+                            completed++
+                            _baseState.value = _baseState.value.copy(
+                                dbEncryptionProgress = (completed.toDouble() / LibName.entries.size * 100).toInt(),
+                            )
+                        }
+                        MigrationResult.FAILED_RETRYABLE -> {
+                            hasError = true
+                            _baseState.value = _baseState.value.copy(
+                                dbEncryptionError = "库 ${lib.name} 迁移失败（可重试）",
+                            )
+                            break
+                        }
+                        MigrationResult.ALREADY_PLAIN -> {
+                            // 正向迁移不会返回此值，忽略
+                        }
+                    }
+                } catch (e: Exception) {
+                    hasError = true
+                    _baseState.value = _baseState.value.copy(
+                        dbEncryptionError = "库 ${lib.name} 迁移异常: ${e.message}",
+                    )
+                    FileLogger.e("SecurityVM", "数据库加密迁移失败: ${lib.name}", e)
+                    break
+                }
+            }
+
+            _baseState.value = _baseState.value.copy(
+                dbEncryptionMigrating = false,
+                dbEncryptionCurrentLib = null,
+                dbEncryptionEnabled = !hasError && completed == LibName.entries.size,
+                successMessage = if (!hasError) "数据库加密已开启（${LibName.entries.size} 个库）" else null,
+            )
+        }
+    }
+
+    /**
+     * 关闭数据库加密：依次对 6 个库执行加密→明文反向迁移。
+     */
+    fun disableDbEncryption() {
+        viewModelScope.launch {
+            _baseState.value = _baseState.value.copy(
+                dbEncryptionMigrating = true,
+                dbEncryptionProgress = 0,
+                dbEncryptionError = null,
+                dbEncryptionCurrentLib = null,
+            )
+
+            var completed = 0
+            var hasError = false
+            for (lib in LibName.entries) {
+                _baseState.value = _baseState.value.copy(dbEncryptionCurrentLib = lib.name)
+                try {
+                    val result = dbMigrationEngine.migrateToPlain(lib)
+                    when (result) {
+                        MigrationResult.SUCCESS, MigrationResult.ALREADY_PLAIN -> {
+                            completed++
+                            _baseState.value = _baseState.value.copy(
+                                dbEncryptionProgress = (completed.toDouble() / LibName.entries.size * 100).toInt(),
+                            )
+                        }
+                        MigrationResult.FAILED_RETRYABLE -> {
+                            hasError = true
+                            _baseState.value = _baseState.value.copy(
+                                dbEncryptionError = "库 ${lib.name} 反向迁移失败（可重试）",
+                            )
+                            break
+                        }
+                        MigrationResult.ALREADY_ENCRYPTED -> {
+                            // 反向迁移不会返回此值，忽略
+                        }
+                    }
+                } catch (e: Exception) {
+                    hasError = true
+                    _baseState.value = _baseState.value.copy(
+                        dbEncryptionError = "库 ${lib.name} 反向迁移异常: ${e.message}",
+                    )
+                    FileLogger.e("SecurityVM", "数据库解密迁移失败: ${lib.name}", e)
+                    break
+                }
+            }
+
+            _baseState.value = _baseState.value.copy(
+                dbEncryptionMigrating = false,
+                dbEncryptionCurrentLib = null,
+                dbEncryptionEnabled = hasError, // 有错误时保持原状态
+                successMessage = if (!hasError) "数据库加密已关闭（所有库已回退到明文）" else null,
+            )
+        }
+    }
+
+    /**
+     * 切换数据库加密开关。
+     * @param enabled true=开启加密，false=关闭加密
+     */
+    fun toggleDbEncryption(enabled: Boolean) {
+        if (enabled) enableDbEncryption() else disableDbEncryption()
     }
 
     // ── ZTH 档位三 setter（Phase 3.4）──────────────────────────────────

@@ -97,6 +97,84 @@ fun SecuritySettingsScreen(
 
         Spacer(Modifier.height(Spacing.md))
 
+        // ── 数据库加密（SQLCipher，P1）──
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(Spacing.md)) {
+                Text(
+                    text = "数据库加密",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    text = "使用 SQLCipher 对本地 6 个数据库文件进行 AES-256 加密。" +
+                        "开启后，即使设备被 root 或备份提取，数据库内容也不可直接读取。\n" +
+                        "首次开启需执行数据迁移（每个库逐表拷贝 + 三重校验），耗时取决于数据量。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (uiState.dbEncryptionEnabled) "已加密" else "明文（未加密）",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = if (uiState.dbEncryptionEnabled)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.error
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Switch(
+                        checked = uiState.dbEncryptionEnabled,
+                        onCheckedChange = { newValue ->
+                            viewModel.toggleDbEncryption(newValue)
+                        },
+                        enabled = !uiState.dbEncryptionMigrating
+                    )
+                }
+
+                // 迁移进度
+                if (uiState.dbEncryptionMigrating) {
+                    Spacer(Modifier.height(Spacing.sm))
+                    Text(
+                        text = "正在迁移${uiState.dbEncryptionCurrentLib?.let { "（$it）" } ?: ""}...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(Spacing.xs))
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = { uiState.dbEncryptionProgress / 100f },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        text = "${uiState.dbEncryptionProgress}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // 迁移错误
+                uiState.dbEncryptionError?.let { error ->
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(Spacing.md))
+
         // ── 凭据密钥轮换 ──
         Card(
             modifier = Modifier.fillMaxWidth(),
