@@ -1,27 +1,34 @@
 package com.mini.me_core.feature.agent.presentation.component
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
+import com.mini.me_core.core.theme.LocalAppDarkMode
 
 /**
- * 输入区本体：附件预览 + 多行输入框，透明背景（胶囊容器由 ChatInputBar 提供）。
+ * 输入区本体：附件预览 + 多行输入框。
+ * 混合模式：透明背景（外层容器由 ChatInputBar 提供），左侧 ❯ 符号。
  */
 @Composable
 internal fun ChatInputField(
@@ -39,27 +46,44 @@ internal fun ChatInputField(
             onRemoveAttachment = onRemoveAttachment
         )
 
-        // Stage 4：输入框独立成 12dp 圆角容器 + 极淡 0.5dp 边框，与工具栏视觉分层
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.surfaceVariant),
-            modifier = Modifier.fillMaxWidth()
+        // 混合模式：左侧 ❯ 符号 + 输入框（透明背景，外层容器已提供背景/边框）
+        val isDark = LocalAppDarkMode.current
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // 混合模式：左侧 ❯ 符号，蓝色 #3B82F6/#60A5FA，14sp 等宽加粗
+            Text(
+                text = "❯",
+                color = if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(top = 12.dp)
+            )
             TextField(
                 value = value,
                 onValueChange = onValueChange,
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .weight(1f)
                     .heightIn(min = 44.dp, max = 140.dp),
                 placeholder = {
                     Text(
                         stringResource(if (isBusy) R.string.chat_queue_hint else R.string.chat_input_placeholder),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        // 混合模式：placeholder 弱化色 #94A3B8/#64748B
+                        color = if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8),
+                        fontSize = 14.sp
                     )
                 },
+                // 混合模式：输入文字 14sp，行高 20sp，颜色 #0F172A/#E2E8F0
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = if (isDark) Color(0xFFE2E8F0) else Color(0xFF0F172A)
+                ),
                 enabled = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { onSend() }),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -67,7 +91,8 @@ internal fun ChatInputField(
                     disabledContainerColor = Color.Transparent,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent
+                    disabledIndicatorColor = Color.Transparent,
+                    cursorColor = if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6)
                 )
             )
         }

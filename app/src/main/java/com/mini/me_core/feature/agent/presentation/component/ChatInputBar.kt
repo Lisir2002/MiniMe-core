@@ -88,7 +88,8 @@ internal fun ChatInputBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = rememberImeBottomInset())
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                // 混合模式：输入栏整体内边距 8dp 水平 / 8dp 垂直
+                .padding(horizontal = 8.dp, vertical = 8.dp)
         ) {
             // 斜杠命令菜单：胶囊上方独立浮层
             if (filteredCommands.isNotEmpty()) {
@@ -143,17 +144,19 @@ internal fun ChatInputBar(
                 )
             }
 
-            // 胶囊浮动条：输入框 + 工具栏（Stage 4：输入栏背景比页面底亮，暗色 #1A2D44 / 亮色 surface）
+            // 混合模式：输入框容器——背景 #FFFFFF/#1E293B，边框 1dp，圆角 20dp，无阴影
             Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = if (LocalAppDarkMode.current) Color(0xFF1A2D44) else MaterialTheme.colorScheme.surface,
-                shadowElevation = 4.dp,
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shadowElevation = 0.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = Spacing.sm, vertical = Spacing.xs)
+                        // 混合模式：输入框容器内边距 14dp 水平 / 12dp 垂直
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
                 ) {
                     ChatInputField(
                         value = value,

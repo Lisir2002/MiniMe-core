@@ -49,6 +49,7 @@ import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Stop
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.ChatAccent
+import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.resolve
 import com.mini.me_core.core.theme.resolveOn
@@ -125,7 +126,8 @@ internal fun ChatInputToolbar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 ModePill(currentMode = currentMode, onToggleMode = onToggleMode)
-                Spacer(Modifier.width(Spacing.xs))
+                // 混合模式：图标间距 8dp
+                Spacer(Modifier.width(8.dp))
 
                 ModelIconButton(
                     provider = activeProvider,
@@ -160,19 +162,12 @@ internal fun ChatInputToolbar(
     }
 }
 
-/** 模式 pill：BUILD/PLAN/AUTO 循环切换，带图标 + 按压缩放反馈。 */
+/** 模式按钮：BUILD/PLAN/AUTO 循环切换。混合模式：28dp 圆形图标按钮，#3B82F6 背景。 */
 @Composable
 private fun ModePill(
     currentMode: AgentMode,
     onToggleMode: (AgentMode) -> Unit
 ) {
-    val accent = when (currentMode) {
-        AgentMode.BUILD -> ChatAccent.Build
-        AgentMode.PLAN -> ChatAccent.Plan
-        AgentMode.AUTO -> ChatAccent.Auto
-    }
-    val modeColor = accent.resolve()
-    val modeTextColor = accent.resolveOn()
     val modeIcon = when (currentMode) {
         AgentMode.BUILD -> Icons.Rounded.Construction
         AgentMode.PLAN -> Icons.Rounded.Map
@@ -182,11 +177,13 @@ private fun ModePill(
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "modePillScale")
 
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = modeColor,
+    // 混合模式：28dp 圆形图标按钮，品牌蓝 #3B82F6 背景，白色 20dp 图标
+    Box(
         modifier = Modifier
+            .size(28.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(CircleShape)
+            .background(Color(0xFF3B82F6))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
@@ -197,27 +194,15 @@ private fun ModePill(
                     AgentMode.AUTO -> AgentMode.BUILD
                 }
                 onToggleMode(nextMode)
-            }
+            },
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                modeIcon,
-                contentDescription = null,
-                tint = modeTextColor,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = currentMode.name,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = modeTextColor
-                )
-            )
-        }
+        Icon(
+            modeIcon,
+            contentDescription = currentMode.name,
+            tint = Color.White,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
@@ -229,6 +214,8 @@ internal fun UploadIconButton(
     onClick: () -> Unit,
     tint: Color? = null
 ) {
+    // 混合模式：工具栏图标弱化色（亮色 #64748B / 暗色 #94A3B8）
+    val weakColor = if (LocalAppDarkMode.current) Color(0xFF94A3B8) else Color(0xFF64748B)
     IconButton(
         onClick = onClick,
         enabled = enabled,
@@ -237,7 +224,7 @@ internal fun UploadIconButton(
         Icon(
             icon,
             contentDescription = contentDescription,
-            tint = tint ?: if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+            tint = tint ?: if (enabled) weakColor else weakColor.copy(alpha = 0.38f),
             modifier = Modifier.size(20.dp)
         )
     }

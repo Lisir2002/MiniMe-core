@@ -475,9 +475,12 @@ fun AIChatPanel(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
+                        // 混合模式：contentPadding 底部 16dp（输入栏上方留白）
                         contentPadding = PaddingValues(
-                            horizontal = Spacing.lg,
-                            vertical = Spacing.xs
+                            start = Spacing.lg,
+                            end = Spacing.lg,
+                            top = Spacing.xs,
+                            bottom = 16.dp
                         ),
                         verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                     ) {
