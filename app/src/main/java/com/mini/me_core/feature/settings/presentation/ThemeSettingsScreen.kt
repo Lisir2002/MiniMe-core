@@ -1,5 +1,8 @@
 package com.mini.me_core.feature.settings.presentation
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,25 +22,36 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.RoundedCornerShape as RCS
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.BrightnessAuto
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +59,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.mini.me_core.core.theme.AppTopAppBar
 import com.mini.me_core.core.theme.components.AppButton
 import com.mini.me_core.core.theme.components.AppButtonVariant
+import com.mini.me_core.core.theme.components.AppButtonColor
 import com.mini.me_core.core.theme.components.AppCard
 import com.mini.me_core.core.theme.components.AppCardVariant
 import com.mini.me_core.core.theme.components.AppChip
@@ -55,17 +70,23 @@ import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.core.theme.tokens.ThemeMode
 import com.mini.me_core.core.theme.tokens.ThemePreset
 import com.mini.me_core.core.theme.tokens.ThemePresets
+import com.mini.me_core.core.theme.tokens.CustomColorFields
+import com.mini.me_core.core.theme.tokens.CornerStyle
+import com.mini.me_core.core.theme.tokens.SemanticColors
 
 /**
- * 主题设置页（Phase 4 第一期）。
+ * 主题设置页（Phase 4 + Phase 5）。
  *
- * 包含：
+ * Phase 4：
  * - 外观模式选择（跟随系统 / 浅色 / 深色）
  * - 6 套主题预设横向卡片选择
- * - 实时预览区（模拟聊天界面）
- * - 恢复默认按钮
+ * - 实时预览区
  *
- * 所有颜色通过 [LocalAppTheme] 获取，预设切换时全局主题自动重组。
+ * Phase 5 新增：
+ * - 颜色自定义（9 项可自定义颜色 + 对比度警告）
+ * - 背景图设置（图片选择 + 遮罩浓度 + 卡片透明度）
+ * - 显示偏好（圆角风格 + 字体大小 + 动效强度）
+ * - 恢复出厂主题（底部红色按钮 + 确认弹窗）
  */
 @Composable
 fun ThemeSettingsScreen(
@@ -77,6 +98,9 @@ fun ThemeSettingsScreen(
     val settings by viewModel.settings.collectAsState()
     val currentPreset = ThemePresets.byId(settings.presetId)
 
+    // 恢复出厂确认 Dialog 状态
+    var showResetConfirm by remember { mutableStateOf(false) }
+
     Scaffold(
         containerColor = colors.surfacePage,
         contentColor = colors.textPrimary,
@@ -85,15 +109,7 @@ fun ThemeSettingsScreen(
             AppTopAppBar(
                 title = "主题与外观",
                 onNavigateBack = onNavigateBack,
-            ) {
-                TextButton(onClick = { viewModel.resetToDefaults() }) {
-                    Text(
-                        text = "恢复默认",
-                        color = colors.brandPrimary,
-                        fontSize = 14.sp,
-                    )
-                }
-            }
+            )
         }
     ) { padding ->
         Column(
@@ -133,20 +149,89 @@ fun ThemeSettingsScreen(
                 onPresetSelected = { viewModel.setPreset(it) },
             )
 
+            Spacer(Modifier.height(24.dp))
+
+            // ── Section 4: 颜色自定义（Phase 5）──
+            AppSectionHeader(title = "颜色自定义", subtitle = "覆盖预设颜色，点击圆点选择")
+            ColorCustomizationSection(
+                settings = settings,
+                currentColors = colors,
+                onColorPick = { field, color -> viewModel.updateCustomColor(field, color) },
+                onResetColor = { field -> viewModel.updateCustomColor(field, null) },
+                calculateContrast = { c1, c2 -> viewModel.calculateContrastRatio(c1, c2) },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            // ── Section 5: 背景图（Phase 5）──
+            AppSectionHeader(title = "背景图", subtitle = "自定义全局背景图片")
+            BackgroundImageSection(
+                backgroundImage = settings.backgroundImage,
+                backgroundMask = settings.backgroundMask,
+                cardOpacity = settings.cardOpacity,
+                onPickImage = { uri -> viewModel.setBackgroundImage(uri) },
+                onClearImage = { viewModel.setBackgroundImage(null) },
+                onMaskChange = { v -> viewModel.setBackgroundMask(v) },
+                onCardOpacityChange = { v -> viewModel.setCardOpacity(v) },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            // ── Section 6: 显示偏好（Phase 5）──
+            AppSectionHeader(title = "显示偏好", subtitle = "圆角、字体大小和动效")
+            DisplayPreferencesSection(
+                cornerStyle = settings.cornerStyleEnum(),
+                fontScale = settings.fontScale,
+                animationScale = settings.animationScale,
+                onCornerStyleChange = { viewModel.setCornerStyle(it) },
+                onFontScaleChange = { viewModel.setFontScale(it) },
+                onAnimationScaleChange = { viewModel.setAnimationScale(it) },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+
             Spacer(Modifier.height(32.dp))
+
+            // ── Section 7: 恢复出厂主题（Phase 5）──
+            FactoryResetButton(
+                onClick = { showResetConfirm = true },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+
+            Spacer(Modifier.height(48.dp))
         }
+    }
+
+    // 恢复出厂确认 Dialog
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("恢复出厂主题？") },
+            text = { Text("将清除所有自定义颜色、背景图和显示偏好，恢复到默认预设和外观模式。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.resetToDefaults()
+                    showResetConfirm = false
+                }) {
+                    Text("确认恢复", color = colors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirm = false }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 }
 
 // ──────────────────────────────────────────────
-// 实时预览卡片
+// 实时预览卡片（Phase 4 保留）
 // ──────────────────────────────────────────────
 
 /**
  * 实时预览区：模拟聊天界面缩略图。
- *
- * 直接使用所选预设的颜色构建迷你聊天气泡 + 工具块，
- * 让用户在调整时立即看到效果。
  */
 @Composable
 private fun ThemePreviewCard(
@@ -166,7 +251,6 @@ private fun ThemePreviewCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // 顶部模拟 AppBar
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -188,7 +272,6 @@ private fun ThemePreviewCard(
 
             Spacer(Modifier.height(4.dp))
 
-            // 用户消息气泡（右对齐，品牌色）
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -208,7 +291,6 @@ private fun ThemePreviewCard(
                 }
             }
 
-            // AI 回复气泡（左对齐，卡片背景）
             Column(
                 modifier = Modifier
                     .width(220.dp)
@@ -222,7 +304,6 @@ private fun ThemePreviewCard(
                     fontSize = 12.sp,
                     color = previewColors.textPrimary,
                 )
-                // 工具块
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -241,7 +322,6 @@ private fun ThemePreviewCard(
                 }
             }
 
-            // 输入栏模拟
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -279,12 +359,9 @@ private fun ThemePreviewCard(
 }
 
 // ──────────────────────────────────────────────
-// 外观模式选择器
+// 外观模式选择器（Phase 4 保留）
 // ──────────────────────────────────────────────
 
-/**
- * 外观模式三选一（跟随系统 / 浅色 / 深色）。
- */
 @Composable
 private fun AppearanceModeSelector(
     selectedMode: ThemeMode,
@@ -345,13 +422,9 @@ private fun AppearanceModeSelector(
 }
 
 // ──────────────────────────────────────────────
-// 预设卡片横向滚动
+// 预设卡片横向滚动（Phase 4 保留）
 // ──────────────────────────────────────────────
 
-/**
- * 6 套主题预设横向滚动卡片。
- * 每个卡片显示预设名称 + 3 个迷你色块预览。
- */
 @Composable
 private fun PresetCarousel(
     presets: List<ThemePreset>,
@@ -380,28 +453,15 @@ private fun PresetCarousel(
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // 迷你配色预览（3 个色块）
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
                         .clip(RoundedCornerShape(8.dp)),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(preset.previewBackground),
-                    )
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(preset.previewSurface),
-                    )
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(preset.previewPrimary),
-                    )
+                    Box(modifier = Modifier.weight(1f).background(preset.previewBackground))
+                    Box(modifier = Modifier.weight(1f).background(preset.previewSurface))
+                    Box(modifier = Modifier.weight(1f).background(preset.previewPrimary))
                 }
 
                 Text(
@@ -426,5 +486,482 @@ private fun PresetCarousel(
                 }
             }
         }
+    }
+}
+
+// ──────────────────────────────────────────────
+// Phase 5: 颜色自定义区域
+// ──────────────────────────────────────────────
+
+/**
+ * 颜色自定义区域：9 项可自定义颜色列表。
+ * 每项显示颜色名 + 预览圆点 + 自定义/恢复按钮 + 对比度警告。
+ */
+@Composable
+private fun ColorCustomizationSection(
+    settings: com.mini.me_core.core.theme.tokens.ThemeSettings,
+    currentColors: SemanticColors,
+    onColorPick: (String, Color) -> Unit,
+    onResetColor: (String) -> Unit,
+    calculateContrast: (Color, Color) -> Double,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalAppTheme.current.colors
+    var pendingColorField by remember { mutableStateOf<String?>(null) }
+
+    AppCard(modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            CustomColorFields.ALL_KEYS.forEach { field ->
+                val displayName = CustomColorFields.DISPLAY_NAMES[field] ?: field
+                val isCustom = settings.customOverrides.containsKey(field)
+                val currentColor = CustomColorFields.getColorForField(field, currentColors)
+                val contrastBg = CustomColorFields.getContrastBackground(field, currentColors)
+                val ratio = calculateContrast(currentColor, contrastBg)
+                val lowContrast = ratio < 4.5
+
+                ColorRow(
+                    name = displayName,
+                    color = currentColor,
+                    isCustom = isCustom,
+                    lowContrast = lowContrast,
+                    contrastRatio = ratio,
+                    onPick = { pendingColorField = field },
+                    onReset = { onResetColor(field) },
+                )
+            }
+        }
+    }
+
+    // 颜色选择器 Dialog
+    pendingColorField?.let { field ->
+        ColorPickerDialog(
+            title = CustomColorFields.DISPLAY_NAMES[field] ?: field,
+            initialColor = CustomColorFields.getColorForField(field, currentColors),
+            onDismiss = { pendingColorField = null },
+            onConfirm = { color ->
+                onColorPick(field, color)
+                pendingColorField = null
+            },
+        )
+    }
+}
+
+/**
+ * 单个颜色行：名称 + 圆点 + 对比度警告 + 自定义/恢复按钮。
+ */
+@Composable
+private fun ColorRow(
+    name: String,
+    color: Color,
+    isCustom: Boolean,
+    lowContrast: Boolean,
+    contrastRatio: Double,
+    onPick: () -> Unit,
+    onReset: () -> Unit,
+) {
+    val colors = LocalAppTheme.current.colors
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                // 颜色预览圆点（点击弹出选择器）
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                        .border(1.dp, colors.borderDefault, CircleShape)
+                        .clickable { onPick() },
+                )
+                Text(
+                    text = name,
+                    fontSize = 13.sp,
+                    color = colors.textPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+                if (isCustom) {
+                    TextButton(onClick = onReset) {
+                        Text("恢复", fontSize = 11.sp, color = colors.textSecondary)
+                    }
+                }
+            }
+        }
+
+        // 对比度警告（WCAG AA: 4.5:1）
+        if (lowContrast) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(start = 38.dp, top = 2.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF59E0B)),
+                )
+                Text(
+                    text = "对比度不足（%.1f:1），可能影响可读性".format(contrastRatio),
+                    fontSize = 10.sp,
+                    color = Color(0xFFF59E0B),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 颜色选择器 Dialog：预设色板 + 常用色快速选择。
+ */
+@Composable
+private fun ColorPickerDialog(
+    title: String,
+    initialColor: Color,
+    onDismiss: () -> Unit,
+    onConfirm: (Color) -> Unit,
+) {
+    val colors = LocalAppTheme.current.colors
+    var selectedColor by remember { mutableStateOf(initialColor) }
+
+    // 预设色板（每行 5 个，共 4 行 = 20 色）
+    val presetSwatches = listOf(
+        // 红色系
+        Color(0xFFEF4444), Color(0xFFDC2626), Color(0xFFB91C1C), Color(0xFFF87171), Color(0xFFFECACA),
+        // 橙色系
+        Color(0xFFF97316), Color(0xFFEA580C), Color(0xFFD97706), Color(0xFFFB923C), Color(0xFFFED7AA),
+        // 黄色系
+        Color(0xFFEAB308), Color(0xFFCA8A04), Color(0xFFFACC15), Color(0xFFFEF08A), Color(0xFFFDE68A),
+        // 绿色系
+        Color(0xFF22C55E), Color(0xFF16A34A), Color(0xFF15803D), Color(0xFF4ADE80), Color(0xFFBBF7D0),
+        // 青色系
+        Color(0xFF06B6D4), Color(0xFF0891B2), Color(0xFF0E7490), Color(0xFF22D3EE), Color(0xFFA5F3FC),
+        // 蓝色系
+        Color(0xFF3B82F6), Color(0xFF2563EB), Color(0xFF1D4ED8), Color(0xFF60A5FA), Color(0xFFBFDBFE),
+        // 紫色系
+        Color(0xFF8B5CF6), Color(0xFF7C3AED), Color(0xFF6D28D9), Color(0xFFA78BFA), Color(0xFFDDD6FE),
+        // 粉色系
+        Color(0xFFEC4899), Color(0xFFDB2777), Color(0xFFBE185D), Color(0xFFF472B6), Color(0xFFFBCFE8),
+        // 灰阶
+        Color(0xFFFFFFFF), Color(0xFFE2E8F0), Color(0xFF94A3B8), Color(0xFF475569), Color(0xFF0F172A),
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择$title") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // 当前选中色预览
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(selectedColor)
+                        .border(1.dp, colors.borderDefault, RoundedCornerShape(8.dp)),
+                )
+
+                // 色板网格（5列）
+                presetSwatches.chunked(5).forEach { rowColors ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        rowColors.forEach { swatch ->
+                            val isSelected = selectedColor.toHexShort() == swatch.toHexShort()
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(swatch)
+                                    .border(
+                                        width = if (isSelected) 2.dp else 1.dp,
+                                        color = if (isSelected) colors.brandPrimary else colors.borderDefault,
+                                        shape = RoundedCornerShape(6.dp),
+                                    )
+                                    .clickable { selectedColor = swatch },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(selectedColor) }) {
+                Text("确定", color = colors.brandPrimary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        },
+    )
+}
+
+/** 颜色转短 hex（用于比较是否选中），忽略 alpha 差异。 */
+private fun Color.toHexShort(): String =
+    "#%02X%02X%02X".format(
+        (red * 255).toInt(),
+        (green * 255).toInt(),
+        (blue * 255).toInt(),
+    )
+
+// ──────────────────────────────────────────────
+// Phase 5: 背景图区域
+// ──────────────────────────────────────────────
+
+/**
+ * 背景图设置区域：选择图片 + 遮罩浓度滑块 + 卡片透明度滑块。
+ */
+@Composable
+private fun BackgroundImageSection(
+    backgroundImage: String?,
+    backgroundMask: Float,
+    cardOpacity: Float,
+    onPickImage: (String) -> Unit,
+    onClearImage: () -> Unit,
+    onMaskChange: (Float) -> Unit,
+    onCardOpacityChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalAppTheme.current.colors
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // 系统图片选择器（Photo Picker）
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri: Uri? ->
+        uri?.let { onPickImage(it.toString()) }
+    }
+
+    AppCard(modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // 选择背景图按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (backgroundImage != null) "已设置背景图" else "未设置背景图",
+                    fontSize = 13.sp,
+                    color = colors.textPrimary,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        imagePickerLauncher.launch(
+                            androidx.activity.result.PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
+                        )
+                    }) {
+                        Text("选择图片", color = colors.brandPrimary, fontSize = 12.sp)
+                    }
+                    if (backgroundImage != null) {
+                        TextButton(onClick = onClearImage) {
+                            Text("清除", color = colors.error, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            // 遮罩浓度滑块
+            SliderRow(
+                label = "遮罩浓度",
+                value = backgroundMask,
+                valueRange = 0f..1f,
+                onValueChange = onMaskChange,
+                valueLabel = "%.0f%%".format(backgroundMask * 100),
+            )
+
+            // 卡片透明度滑块
+            SliderRow(
+                label = "卡片透明度",
+                value = cardOpacity,
+                valueRange = 0.3f..1f,
+                onValueChange = onCardOpacityChange,
+                valueLabel = "%.0f%%".format(cardOpacity * 100),
+            )
+        }
+    }
+}
+
+// ──────────────────────────────────────────────
+// Phase 5: 显示偏好区域
+// ──────────────────────────────────────────────
+
+/**
+ * 显示偏好区域：圆角风格选择 + 字体大小滑块 + 动效强度滑块。
+ */
+@Composable
+private fun DisplayPreferencesSection(
+    cornerStyle: CornerStyle,
+    fontScale: Float,
+    animationScale: Float,
+    onCornerStyleChange: (CornerStyle) -> Unit,
+    onFontScaleChange: (Float) -> Unit,
+    onAnimationScaleChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalAppTheme.current.colors
+
+    AppCard(modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            // 圆角风格三选一
+            Text(
+                text = "圆角风格",
+                fontSize = 13.sp,
+                color = colors.textPrimary,
+                fontWeight = FontWeight.Medium,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val styles = listOf(
+                    Triple(CornerStyle.ROUNDED, "圆角", RoundedCornerShape(12.dp)),
+                    Triple(CornerStyle.Sharp, "直角", RoundedCornerShape(0.dp)),
+                    Triple(CornerStyle.Pill, "胶囊", RoundedCornerShape(999.dp)),
+                )
+                styles.forEach { (style, label, shape) ->
+                    val isSelected = style == cornerStyle
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSelected) colors.brandContainer else Color.Transparent)
+                            .clickable { onCornerStyleChange(style) }
+                            .padding(vertical = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        // 预览形状
+                        Box(
+                            modifier = Modifier
+                                .size(width = 40.dp, height = 24.dp)
+                                .clip(shape)
+                                .background(if (isSelected) colors.onBrandContainer else colors.surfaceSunken)
+                                .border(1.dp, colors.borderDefault, shape),
+                        )
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) colors.onBrandContainer else colors.textSecondary,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            // 字体大小滑块
+            SliderRow(
+                label = "字体大小",
+                value = fontScale,
+                valueRange = 0.8f..1.4f,
+                onValueChange = onFontScaleChange,
+                valueLabel = "%.1fx".format(fontScale),
+            )
+
+            // 动效强度滑块
+            SliderRow(
+                label = "动效强度",
+                value = animationScale,
+                valueRange = 0f..1f,
+                onValueChange = onAnimationScaleChange,
+                valueLabel = if (animationScale == 0f) "关闭" else "%.0f%%".format(animationScale * 100),
+            )
+        }
+    }
+}
+
+// ──────────────────────────────────────────────
+// Phase 5: 恢复出厂主题按钮
+// ──────────────────────────────────────────────
+
+/**
+ * 页面底部红色"恢复出厂主题"按钮。
+ */
+@Composable
+private fun FactoryResetButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalAppTheme.current.colors
+
+    Button(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = colors.error.copy(alpha = 0.1f),
+            contentColor = colors.error,
+        ),
+        shape = RoundedCornerShape(10.dp),
+    ) {
+        Text(
+            text = "恢复出厂主题",
+            fontWeight = FontWeight.Medium,
+            fontSize = 14.sp,
+        )
+    }
+}
+
+// ──────────────────────────────────────────────
+// 通用：滑块行
+// ──────────────────────────────────────────────
+
+/**
+ * 通用滑块行：标签 + 当前值 + Slider。
+ */
+@Composable
+private fun SliderRow(
+    label: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    onValueChange: (Float) -> Unit,
+    valueLabel: String,
+) {
+    val colors = LocalAppTheme.current.colors
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(text = label, fontSize = 13.sp, color = colors.textPrimary)
+            Text(text = valueLabel, fontSize = 12.sp, color = colors.textSecondary)
+        }
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            colors = SliderDefaults.colors(
+                thumbColor = colors.brandPrimary,
+                activeTrackColor = colors.brandPrimary,
+            ),
+        )
     }
 }
