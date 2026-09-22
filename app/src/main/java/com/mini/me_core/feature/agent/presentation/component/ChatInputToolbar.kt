@@ -207,7 +207,7 @@ private fun ModePill(
                 modeIcon,
                 contentDescription = null,
                 tint = modeTextColor,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(20.dp)
             )
             Spacer(Modifier.width(4.dp))
             Text(
@@ -289,14 +289,14 @@ internal fun SendButton(canSend: Boolean, isBusy: Boolean, tokenProgress: Float,
                     Icons.Rounded.Stop,
                     contentDescription = stringResource(R.string.chat_stop),
                     tint = iconTint,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             } else {
                 Icon(
                     Icons.AutoMirrored.Rounded.Send,
                     contentDescription = stringResource(R.string.chat_send),
                     tint = iconTint,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }

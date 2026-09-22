@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
+import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.ui.rememberImeBottomInset
@@ -142,10 +143,10 @@ internal fun ChatInputBar(
                 )
             }
 
-            // 胶囊浮动条：输入框 + 工具栏
+            // 胶囊浮动条：输入框 + 工具栏（Stage 4：输入栏背景比页面底亮，暗色 #1A2D44 / 亮色 surface）
             Surface(
                 shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface,
+                color = if (LocalAppDarkMode.current) Color(0xFF1A2D44) else MaterialTheme.colorScheme.surface,
                 shadowElevation = 4.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
