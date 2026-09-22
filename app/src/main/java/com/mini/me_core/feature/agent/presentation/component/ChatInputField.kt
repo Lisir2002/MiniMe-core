@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.LocalAppDarkMode
+import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
 
 /**
@@ -56,7 +57,7 @@ internal fun ChatInputField(
                 // v2 混合模式：输入框内部上下 padding 10dp，水平 0dp（由外层容器控制）
                 .padding(vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
             // v2 混合模式：左侧 ❯ 符号，蓝色 #3B82F6/#60A5FA，14sp 等宽加粗，与光标同行垂直居中
             Text(

@@ -129,7 +129,7 @@ internal fun InstallProgressRow(progress: InstallProgress) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = Spacing.xs),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),

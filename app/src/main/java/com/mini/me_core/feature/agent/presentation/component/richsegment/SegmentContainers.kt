@@ -78,7 +78,7 @@ data class SegmentationNavigationActions(
     val onOpenFilePath: (String) -> Unit,
 )
 
-private val codeBlockCorner = RoundedCornerShape(10.dp)
+private val codeBlockCorner = RoundedCornerShape(Radius.md)
 private val codeBlockHeaderHeight = 34.dp
 
 @Composable
@@ -446,7 +446,7 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
                         else Modifier
                     )
                     // 混合模式：代码块内边距 12dp
-                    .padding(horizontal = 12.dp, vertical = 12.dp)
+                    .padding(horizontal = Spacing.md, vertical = Spacing.md)
             ) {
                 val rawStyle = TextStyle(
                     fontFamily = FontFamily.Monospace,
@@ -516,14 +516,14 @@ private fun CommandCard(command: String, isDark: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(if (isDark) Color(0xFF0B1018) else Color(0xFF0F172A))
             .border(
                 BorderStroke(
                     1.dp,
                     Color(0xFF22C55E).copy(alpha = 0.6f)
                 ),
-                RoundedCornerShape(10.dp)
+                RoundedCornerShape(Radius.md)
             )
             .clickable { clipboard.setText(AnnotatedString(command)) },
         verticalAlignment = Alignment.CenterVertically
@@ -597,7 +597,7 @@ private fun TableCard(
     Surface(
         color = Color.Transparent,
         border = BorderStroke(0.8.dp, borderColor),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(Radius.sm),
         modifier = Modifier.fillMaxWidth()
     ) {
         // 外层横向滚动：表格宽度超屏宽时水平滚

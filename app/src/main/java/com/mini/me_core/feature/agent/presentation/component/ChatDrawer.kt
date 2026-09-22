@@ -373,7 +373,7 @@ private fun DrawerNavIcon(
     Box(
         modifier = Modifier
             .size(36.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(if (LocalAppDarkMode.current) iconBgDark else iconBgLight),
         contentAlignment = Alignment.Center
     ) {
@@ -534,7 +534,7 @@ private fun SheetActionRow(
             Box(
                 modifier = Modifier
                     .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(Radius.sm))
                     .background(if (LocalAppDarkMode.current) iconBgDark else iconBgLight),
                 contentAlignment = Alignment.Center
             ) {

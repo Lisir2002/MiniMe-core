@@ -90,7 +90,7 @@ internal fun ChatInputBar(
                 .fillMaxWidth()
                 .padding(bottom = rememberImeBottomInset())
                 // v2 混合模式：输入栏整体内边距 12dp 水平 / 8dp 垂直
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm)
         ) {
             // 斜杠命令菜单：胶囊上方独立浮层
             if (filteredCommands.isNotEmpty()) {
@@ -159,7 +159,7 @@ internal fun ChatInputBar(
                         // v2 混合模式：容器内边距 14dp 水平 / 0dp 垂直（字段和工具栏自带内部 padding）
                         .padding(horizontal = 14.dp, vertical = 0.dp),
                     // v2 混合模式：输入框与工具栏之间间距 4dp
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
                     ChatInputField(
                         value = value,

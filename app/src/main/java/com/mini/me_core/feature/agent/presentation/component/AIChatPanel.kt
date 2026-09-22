@@ -483,7 +483,7 @@ fun AIChatPanel(
                             bottom = 8.dp
                         ),
                         // v2 混合模式：消息间间距 8dp（TaskAccordion 内部已控制组间距 16dp）
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
                         items(taskGroups, key = { it.taskId }, contentType = { "task" }) { group ->
                             if (AgentFirstFeatureFlags.isTaskCardEnabled()) {
