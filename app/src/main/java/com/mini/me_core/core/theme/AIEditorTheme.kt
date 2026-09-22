@@ -100,18 +100,18 @@ private val DarkColorScheme = darkColorScheme(
     secondary = Color(0xFF7DD3FC),
     onSecondary = Color(0xFF082F49),
     tertiary = Color(0xFF22C55E),
-    // Stage 4：更深的蓝黑页面底，配合 surface 投影层次
-    background = Color(0xFF060D17),
-    onBackground = Color(0xFFEAF2FF),
-    // Stage 4：AI 气泡 surface
-    surface = Color(0xFF0E1A2B),
-    onSurface = Color(0xFFEAF2FF),
-    // Stage 4：工具气泡 surfaceVariant
-    surfaceVariant = Color(0xFF152438),
-    onSurfaceVariant = Color(0xFFB8C7DA),
+    // 混合模式：暗色页面底 #0F172A（slate-900）
+    background = Color(0xFF0F172A),
+    onBackground = Color(0xFFE2E8F0),
+    // 混合模式：AI 卡片 surface #1E293B（slate-800）
+    surface = Color(0xFF1E293B),
+    onSurface = Color(0xFFE2E8F0),
+    // 混合模式：工具块 surfaceVariant #1E293B
+    surfaceVariant = Color(0xFF1E293B),
+    onSurfaceVariant = Color(0xFF94A3B8),
     surfaceTint = Color.Transparent,
     outline = Color(0xFF44617F),
-    outlineVariant = Color(0xFF223B57),
+    outlineVariant = Color(0xFF334155),
     error = Color(0xFFF87171),
     onError = Color(0xFF450A0A),
     errorContainer = Color(0xFF7F1D1D),
@@ -136,7 +136,8 @@ private val LightColorScheme = lightColorScheme(
     onSurfaceVariant = Color(0xFF475569),
     surfaceTint = Color.White,
     outline = Color(0xFFBBD7F2),
-    outlineVariant = Color(0xFFDCEBFA),
+    // 混合模式：边框 outlineVariant #E2E8F0（slate-200）
+    outlineVariant = Color(0xFFE2E8F0),
     error = Color(0xFFDC2626),
 
     onError = Color(0xFFFFFFFF),
