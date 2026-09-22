@@ -494,7 +494,8 @@ fun AIChatPanel(
                                     onToggleSubGroup = { taskId, subGroupId -> viewModel.toggleSubGroup(taskId, subGroupId) },
                                     onStop = { viewModel.stopAgent() },
                                     onViewChanges = {},
-                                    onRetryTool = { messageId -> viewModel.retryTool(messageId) }
+                                    onRetryTool = { messageId -> viewModel.retryTool(messageId) },
+                                    onRetryTask = { taskId -> viewModel.retryTask(taskId) }
                                 )
                             } else {
                                 TaskAccordion(

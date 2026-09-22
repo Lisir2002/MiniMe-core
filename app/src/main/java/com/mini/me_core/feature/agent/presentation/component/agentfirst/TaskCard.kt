@@ -95,6 +95,7 @@ import java.util.Locale
  * @param onStop 点击「停止执行」回调
  * @param onViewChanges 点击「查看日志/产物」回调
  * @param onRetryTool 点击工具卡片「重试」回调（messageId）；null 时不显示重试按钮
+ * @param onRetryTask 点击「重试任务」回调（taskId）；null 时不显示重试按钮
  * @param modifier 外部修饰符
  */
 @Composable
@@ -110,6 +111,7 @@ internal fun TaskCard(
     onStop: () -> Unit = {},
     onViewChanges: () -> Unit = {},
     onRetryTool: ((messageId: String) -> Unit)? = null,
+    onRetryTask: ((taskId: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     // 1. 状态推导
@@ -192,7 +194,8 @@ internal fun TaskCard(
                     TaskBottomBar(
                         state = state,
                         onStop = onStop,
-                        onViewChanges = onViewChanges
+                        onViewChanges = onViewChanges,
+                        onRetry = onRetryTask?.let { retry -> { retry(group.taskId) } }
                     )
                 }
             }
