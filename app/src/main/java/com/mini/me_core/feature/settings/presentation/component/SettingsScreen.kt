@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,6 +35,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import com.mini.me_core.core.theme.AppTopAppBar
@@ -80,6 +83,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.Description
@@ -180,6 +184,9 @@ fun SettingsScreen(
     var editingMcp by remember { mutableStateOf<McpServerConfig?>(null) }
     var showContainerAddSheet by remember { mutableStateOf(false) }
     var showThemeSheet by remember { mutableStateOf(false) }
+    // 问题6：搜索模式状态（顶栏按钮触发，替代常驻搜索框）
+    var isSearchMode by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
 
     // RC62：跨屏跳转（terminal_settings → settings → RemoteServers）：接收来自 SettingsViewModel
     //   的 openSection 请求，切到 SettingsScreen 内部的 section。
@@ -235,22 +242,41 @@ fun SettingsScreen(
         contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            AppTopAppBar(
-                title = stringResource(section.titleRes),
-                onNavigateBack = {
-                    if (section == SettingsSection.Menu) {
-                        onNavigateBack()
-                    } else if (section == SettingsSection.Logs) {
-                        section = logReturnSection
-                    } else {
-                        section = SettingsSection.Menu
-                    }
-                },
-                navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
-                navigationContentDescription = stringResource(R.string.common_back)
-            ) {
-                when (section) {
-                    SettingsSection.Providers -> IconButton(
+            // 问题6：Menu 主页且搜索模式开启时，顶栏显示搜索输入框
+            if (section == SettingsSection.Menu && isSearchMode) {
+                SearchTopBar(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    onClose = {
+                        isSearchMode = false
+                        searchQuery = ""
+                    },
+                    placeholder = stringResource(R.string.settings_search_hint)
+                )
+            } else {
+                AppTopAppBar(
+                    title = stringResource(section.titleRes),
+                    onNavigateBack = {
+                        if (section == SettingsSection.Menu) {
+                            onNavigateBack()
+                        } else if (section == SettingsSection.Logs) {
+                            section = logReturnSection
+                        } else {
+                            section = SettingsSection.Menu
+                        }
+                    },
+                    navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                    navigationContentDescription = stringResource(R.string.common_back)
+                ) {
+                    when (section) {
+                        // 问题6：Menu 主页顶栏右侧显示搜索按钮
+                        SettingsSection.Menu -> IconButton(
+                            onClick = { isSearchMode = true },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.settings_search_hint), modifier = Modifier.size(20.dp))
+                        }
+                        SettingsSection.Providers -> IconButton(
                         onClick = { showAddProviderSheet = true },
                         modifier = Modifier.size(40.dp)
                     ) {
@@ -280,7 +306,8 @@ fun SettingsScreen(
                 }
             }
         }
-    ) { padding ->
+    }
+) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -314,7 +341,9 @@ fun SettingsScreen(
                     },
                     onNavigateToTerminalSettings = onNavigateToTerminalSettings,
                     onNavigateToNetProxy = onNavigateToNetProxy,
-                    onNavigateToCapabilityCenter = onNavigateToCapabilityCenter
+                    onNavigateToCapabilityCenter = onNavigateToCapabilityCenter,
+                    // 问题6：传入搜索状态（由顶栏搜索框驱动）
+                    searchQuery = searchQuery,
                 )
                 SettingsSection.Providers -> ProvidersSection(
                     providers = providers,
@@ -530,8 +559,9 @@ internal fun SettingsMenu(
     onNavigateToTerminalSettings: () -> Unit = {},
     onNavigateToNetProxy: () -> Unit = {},
     onNavigateToCapabilityCenter: () -> Unit = {},
+    // 问题6：搜索词由顶栏搜索框提供，不再内部管理
+    searchQuery: String = "",
 ) {
-    var searchQuery by remember { mutableStateOf("") }
     val themeLabel = stringResource(themeMode.labelRes)
 
     // 多语言分组名（全部走 strings.xml i18n）
@@ -823,16 +853,7 @@ internal fun SettingsMenu(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // 搜索栏固定在顶部（不随滚动消失）
-        CyberSearchBar(
-            query = searchQuery,
-            onQueryChange = { searchQuery = it },
-            placeholder = stringResource(R.string.settings_search_hint),
-            resultCount = searchResultCount,
-            onClear = { searchQuery = "" }
-        )
-
-        Spacer(Modifier.height(Spacing.sm))
+        // 问题6：移除常驻 CyberSearchBar，搜索改为顶栏按钮触发模式
 
         // 搜索结果区域（可滚动）
         // 问题5修复：添加水平 padding（Spacing.lg=16dp），让菜单卡片不贴屏幕边缘
@@ -878,6 +899,58 @@ internal fun SettingsMenu(
             }
 
             Spacer(Modifier.height(Spacing.md))
+        }
+    }
+}
+
+/**
+ * 问题6：顶栏搜索模式——替代标题栏，显示搜索输入框 + 关闭按钮。
+ * 自动聚焦输入框，实时过滤由父组件的 searchQuery 驱动。
+ */
+@Composable
+private fun SearchTopBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClose: () -> Unit,
+    placeholder: String,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(44.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onClose, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = stringResource(R.string.common_back),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = { Text(placeholder, style = MaterialTheme.typography.bodyMedium) },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.Rounded.Close,
+                        contentDescription = "清除",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.width(Spacing.sm))
         }
     }
 }
