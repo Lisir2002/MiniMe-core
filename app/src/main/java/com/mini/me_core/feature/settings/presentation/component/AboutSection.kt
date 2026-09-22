@@ -138,6 +138,8 @@ private data class AboutColors(
 @Composable
 private fun aboutColors(): AboutColors {
     val dark = LocalAppDarkMode.current
+    val theme = com.mini.me_core.core.theme.tokens.LocalAppTheme.current
+    val sem = theme.colors
     fun c(light: Color, darkV: Color) = if (dark) darkV else light
     return AboutColors(
         bg = c(Color.White, Color(0xFF0D1B2E)),
@@ -151,23 +153,23 @@ private fun aboutColors(): AboutColors {
         heroBgStart = c(Color(0xFFEFF4FF), Color(0xFF13273F)),
         heroBgEnd = c(Color(0xFFE3EDFF), Color(0xFF0F3A63)),
         heroBorder = c(Color(0xFFD6E4FF), Color(0xFF223B57)),
-        blueBg = c(Color(0xFFEFF6FF), Color(0xFF0F3A63)),
+        blueBg = sem.infoContainer,
         blueBorder = c(Color(0xFFBFDBFE), Color(0xFF1E4E8C)),
-        blueAccent = c(Color(0xFF2563EB), Color(0xFF60A5FA)),
+        blueAccent = sem.info,
         greenBg = c(Color(0xFFECFDF5), Color(0xFF0B3B2E)),
         greenAccent = c(Color(0xFF059669), Color(0xFF34D399)),
         greenText = c(Color(0xFF047857), Color(0xFF6EE7B7)),
         amberBg = c(Color(0xFFFFFBEB), Color(0xFF451A03)),
-        amberAccent = c(Color(0xFFD97706), Color(0xFFFBBF24)),
-        skyBg = c(Color(0xFFF0F9FF), Color(0xFF0C4A6E)),
-        skyAccent = c(Color(0xFF0284C7), Color(0xFF38BDF8)),
-        orangeBg = c(Color(0xFFFFF3E0), Color(0xFF7C2D12)),
+        amberAccent = sem.warning,
+        skyBg = sem.skyContainer,
+        skyAccent = sem.sky,
+        orangeBg = sem.orangeContainer,
         orangeBorder = c(Color(0xFFFFD6A5), Color(0xFF9A3412)),
-        orangeText = c(Color(0xFFB45309), Color(0xFFFDBA74)),
+        orangeText = sem.orange,
         selectedBg = c(Color(0xFFF0F6FF), Color(0xFF0F3A63)),
         selectedBorder = c(Color(0xFFBFDBFE), Color(0xFF1E4E8C)),
-        selectedText = c(Color(0xFF2563EB), Color(0xFF60A5FA)),
-        chipBg = c(Color(0xFFDBEAFE), Color(0xFF0F3A63)),
+        selectedText = sem.brandPrimary,
+        chipBg = sem.brandContainer,
         statGrayBg = c(Color(0xFFF2F3F5), Color(0xFF13273F))
     )
 }

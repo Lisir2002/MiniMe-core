@@ -162,10 +162,20 @@ fun AIEditorTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val appThemeState = if (darkTheme) {
+        com.mini.me_core.core.theme.tokens.AppThemeState.Dark
+    } else {
+        com.mini.me_core.core.theme.tokens.AppThemeState.Light
+    }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = AppTypography,
-        content = content
-    )
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalAppDarkMode provides darkTheme,
+        com.mini.me_core.core.theme.tokens.LocalAppTheme provides appThemeState,
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = AppTypography,
+            content = content
+        )
+    }
 }

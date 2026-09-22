@@ -44,5 +44,3 @@ rootProject.name = "app"
 include(":app")
 include(":terminal-emulator")
 include(":terminal-view")
-// 独立设计系统 / 全新 UI 层模块（被 :app 依赖，见 app/build.gradle.kts 的 dependencies）
-include(":newui")
