@@ -90,9 +90,12 @@ internal fun AgentMessageItem(
     if (message.role == MessageRole.ASSISTANT && !hasContent && !hasReasoning) return
 
     val isUser = message.role == MessageRole.USER
+    val isAssistant = message.role == MessageRole.ASSISTANT
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     // 紧凑优化：用户气泡放宽到 92% 屏宽，减少换行、降低整体纵向占用
     val maxUserBubbleWidth = remember(screenWidthDp) { (screenWidthDp * 0.92).dp }
+    // Stage 4：AI 气泡轻量化，左对齐且限宽 90% 屏宽（不再全宽），提升阅读节奏
+    val maxAssistantBubbleWidth = remember(screenWidthDp) { (screenWidthDp * 0.90).dp }
     var copied by remember { mutableStateOf(false) }
     val clipboard = LocalClipboard.current
     val copyScope = rememberCoroutineScope()
@@ -118,21 +121,22 @@ internal fun AgentMessageItem(
                             shape = if (isUser) {
                                 RoundedCornerShape(Radius.md, Radius.md, Radius.xs, Radius.md)
                             } else {
-                                RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs)
+                                // Stage 4：AI 气泡圆角统一提升到 14dp（Radius.lg）
+                                RoundedCornerShape(Radius.lg)
                             },
                             color = when (message.role) {
                                 MessageRole.USER -> MaterialTheme.colorScheme.primary
                                 MessageRole.ASSISTANT -> MaterialTheme.colorScheme.surface
                                 MessageRole.TOOL -> MaterialTheme.colorScheme.surfaceVariant
                             },
-                            border = if (message.role == MessageRole.ASSISTANT) {
-                                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                            } else null,
-                            // 用户气泡按内容自适应宽度；AI/工具气泡填满可用宽度，两侧外边距由 LazyColumn contentPadding 统一提供
-                            modifier = if (isUser) {
-                                Modifier.widthIn(max = maxUserBubbleWidth)
-                            } else {
-                                Modifier.fillMaxWidth()
+                            // Stage 4：去掉 ASSISTANT 的 1dp 边框，改用轻投影区分层次
+                            border = null,
+                            shadowElevation = if (isAssistant) 2.dp else 0.dp,
+                            // 用户/AI 气泡按内容自适应宽度并限宽；工具气泡填满可用宽度，两侧外边距由 LazyColumn contentPadding 统一提供
+                            modifier = when {
+                                isUser -> Modifier.widthIn(max = maxUserBubbleWidth)
+                                isAssistant -> Modifier.widthIn(max = maxAssistantBubbleWidth)
+                                else -> Modifier.fillMaxWidth()
                             }
                         ) {
                         if (message.role == MessageRole.TOOL) {
@@ -185,7 +189,8 @@ internal fun AgentMessageItem(
                                         MarkdownContent(
                                             text = message.content,
                                             color = textColor,
-                                            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                                            // Stage 4：AI 气泡内边距提升到 16/12，视觉更透气
+                                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
                                             cache = markdownCache
                                         )
                                     }
