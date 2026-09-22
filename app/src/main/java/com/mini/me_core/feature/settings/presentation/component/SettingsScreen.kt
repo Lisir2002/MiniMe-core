@@ -835,11 +835,12 @@ internal fun SettingsMenu(
         Spacer(Modifier.height(Spacing.sm))
 
         // 搜索结果区域（可滚动）
+        // 问题5修复：添加水平 padding（Spacing.lg=16dp），让菜单卡片不贴屏幕边缘
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(vertical = Spacing.md),
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
             if (hasSearchQuery && searchResultCount == 0) {
