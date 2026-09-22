@@ -101,25 +101,14 @@ fun ThemeSettingsScreen(
     // 恢复出厂确认 Dialog 状态
     var showResetConfirm by remember { mutableStateOf(false) }
 
-    Scaffold(
-        containerColor = colors.surfacePage,
-        contentColor = colors.textPrimary,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            AppTopAppBar(
-                title = "主题与外观",
-                onNavigateBack = onNavigateBack,
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(colors.surfacePage)
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            Spacer(Modifier.height(16.dp))
+    // 问题4修复：去掉自带 Scaffold + AppTopAppBar，复用外层 SettingsScreen 的顶栏
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.surfacePage)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        Spacer(Modifier.height(16.dp))
 
             // ── Section 1: 实时预览 ──
             AppSectionHeader(title = "实时预览")
@@ -200,7 +189,6 @@ fun ThemeSettingsScreen(
             )
 
             Spacer(Modifier.height(48.dp))
-        }
     }
 
     // 恢复出厂确认 Dialog
