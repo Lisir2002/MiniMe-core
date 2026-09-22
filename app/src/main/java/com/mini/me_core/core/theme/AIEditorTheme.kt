@@ -159,13 +159,18 @@ private val AppTypography = Typography().run {
 @Composable
 fun AIEditorTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    // Phase 4：可选自定义语义色（来自主题预设）。null 时使用默认 Light/Dark。
+    customColors: com.mini.me_core.core.theme.tokens.SemanticColors? = null,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-    val appThemeState = if (darkTheme) {
-        com.mini.me_core.core.theme.tokens.AppThemeState.Dark
-    } else {
-        com.mini.me_core.core.theme.tokens.AppThemeState.Light
+    val appThemeState = when {
+        customColors != null -> com.mini.me_core.core.theme.tokens.AppThemeState(
+            colors = customColors,
+            isDark = darkTheme,
+        )
+        darkTheme -> com.mini.me_core.core.theme.tokens.AppThemeState.Dark
+        else -> com.mini.me_core.core.theme.tokens.AppThemeState.Light
     }
 
     androidx.compose.runtime.CompositionLocalProvider(

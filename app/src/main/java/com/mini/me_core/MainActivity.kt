@@ -87,6 +87,10 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var themeSettings: ThemeSettingsRepository
 
+    /** Phase 4：主题预设管理器（6 套配色）。 */
+    @Inject
+    lateinit var themeSettingsManager: com.mini.me_core.core.theme.ThemeSettingsManager
+
     /** App 回到前台时，远程模式下若 SSH 断了触发重连。 */
     @Inject
     lateinit var remoteSshConnection: com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
@@ -156,6 +160,8 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val themeMode by themeSettings.themeModeFlow.collectAsStateWithLifecycle(initialValue = AppThemeMode.AUTO)
+            // Phase 4：收集主题预设设置，用于计算自定义 SemanticColors
+            val themeSettingsState by themeSettingsManager.settings.collectAsStateWithLifecycle()
             val uiScope = rememberCoroutineScope()
             // 侧边栏主题按钮：三态顺序切换（AUTO → DARK → LIGHT → AUTO），无需弹出选择弹窗。
             val cycleTheme: () -> Unit = {
@@ -179,7 +185,10 @@ class MainActivity : ComponentActivity() {
                 controller.isAppearanceLightNavigationBars = !darkTheme
             }
 
-            AIEditorTheme(darkTheme = darkTheme) {
+            // Phase 4：根据预设计算自定义语义色
+            val customColors = themeSettingsManager.resolveColors(darkTheme)
+
+            AIEditorTheme(darkTheme = darkTheme, customColors = customColors) {
                 // 将 MainActivity 算好的"APP 实际暗模式"通过 CompositionLocal 下发，
                 // 子树里的终端内容配色、跟随程序开关都读这同一个值，
                 // 保证 APP 切到"强制白/强制黑"时，终端颜色不会还停留在系统主题。

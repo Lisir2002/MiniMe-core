@@ -116,7 +116,8 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Backup(R.string.settings_backup),
     Security(R.string.settings_security),
     RemoteAuditLogs(R.string.settings_remote_audit_logs),
-    About(R.string.settings_about)
+    About(R.string.settings_about),
+    Theme(R.string.settings_theme_title),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -434,6 +435,11 @@ fun SettingsScreen(
                 SettingsSection.ProviderEditor -> {} // 已在上方 early return 处理
                 SettingsSection.RemoteServers -> {} // 已在上方 early return 处理
                 SettingsSection.About -> AboutSection()
+                SettingsSection.Theme -> {
+                    com.mini.me_core.feature.settings.presentation.ThemeSettingsScreen(
+                        onNavigateBack = { section = SettingsSection.Menu }
+                    )
+                }
             }
         }
     }
@@ -746,7 +752,7 @@ internal fun SettingsMenu(
             action = { onOpen(SettingsSection.Logs) }
         ),
         MenuItem(
-            section = null,
+            section = SettingsSection.Theme,
             group = groupSystem,
             title = stringResource(R.string.settings_theme_title),
             subtitle = stringResource(R.string.settings_log_current, themeLabel),
@@ -754,7 +760,7 @@ internal fun SettingsMenu(
             iconBgLight = Color(0xFF8B5CF6),
             iconBgDark = Color(0xFF4C1D95),
             keywords = listOf("theme", "appearance", stringResource(R.string.ui____afcde261), stringResource(R.string.ui____41e8e8b9), stringResource(R.string.ui____48d0a09b), stringResource(R.string.ui____f0789e79), stringResource(R.string.ui____9970ad07)),
-            action = onOpenThemeSheet
+            action = { onOpen(SettingsSection.Theme) }
         ),
         MenuItem(
             section = null,
