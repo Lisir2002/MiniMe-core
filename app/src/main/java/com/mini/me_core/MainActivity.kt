@@ -188,7 +188,18 @@ class MainActivity : ComponentActivity() {
             // Phase 4：根据预设计算自定义语义色
             val customColors = themeSettingsManager.resolveColors(darkTheme)
 
-            AIEditorTheme(darkTheme = darkTheme, customColors = customColors) {
+            // Phase 5：背景图和显示偏好参数
+            val bgImageUri = themeSettingsState.backgroundImage
+            val bgScrim = themeSettingsState.backgroundMask
+            val cardAlpha = themeSettingsState.cardOpacity
+
+            AIEditorTheme(
+                darkTheme = darkTheme,
+                customColors = customColors,
+                backgroundImageUri = bgImageUri,
+                backgroundScrim = bgScrim,
+                cardAlpha = cardAlpha,
+            ) {
                 // 将 MainActivity 算好的"APP 实际暗模式"通过 CompositionLocal 下发，
                 // 子树里的终端内容配色、跟随程序开关都读这同一个值，
                 // 保证 APP 切到"强制白/强制黑"时，终端颜色不会还停留在系统主题。

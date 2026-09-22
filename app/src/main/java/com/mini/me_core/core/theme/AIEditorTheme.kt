@@ -1,13 +1,29 @@
 package com.mini.me_core.core.theme
 
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -156,22 +172,90 @@ private val AppTypography = Typography().run {
     )
 }
 
+/**
+ * 从 SemanticColors 构建 Material3 ColorScheme（Phase 5）。
+ *
+ * 将自定义语义色映射到 Material3 ColorScheme 的关键字段，
+ * 这样使用 MaterialTheme.colorScheme 的组件也能跟随主题变化。
+ * 仅映射核心字段，其余字段使用默认值。
+ */
+private fun buildColorSchemeFromSemantic(
+    colors: com.mini.me_core.core.theme.tokens.SemanticColors,
+    isDark: Boolean,
+): androidx.compose.material3.ColorScheme {
+    val base = if (isDark) DarkColorScheme else LightColorScheme
+    return base.copy(
+        primary = colors.brandPrimary,
+        onPrimary = colors.onBrandPrimary,
+        primaryContainer = colors.brandContainer,
+        onPrimaryContainer = colors.onBrandContainer,
+        secondary = colors.brandSecondary,
+        background = colors.surfacePage,
+        onBackground = colors.textPrimary,
+        surface = colors.surfaceCard,
+        onSurface = colors.textPrimary,
+        surfaceVariant = colors.surfaceSunken,
+        onSurfaceVariant = colors.textSecondary,
+        error = colors.error,
+        onError = colors.onError,
+        outline = colors.borderDefault,
+    )
+}
+
+/**
+ * 从 URI 加载图片为 ImageBitmap（IO 线程异步加载）。
+ * 失败时返回 null。
+ */
+@Composable
+private fun rememberBitmapFromUri(uri: String?): ImageBitmap? {
+    val context = LocalContext.current
+    var bitmap by remember(uri) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(uri) {
+        bitmap = if (uri != null) {
+            runCatching {
+                context.contentResolver.openInputStream(Uri.parse(uri)).use { stream ->
+                    BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                }
+            }.getOrNull()
+        } else {
+            null
+        }
+    }
+    return bitmap
+}
+
 @Composable
 fun AIEditorTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Phase 4：可选自定义语义色（来自主题预设）。null 时使用默认 Light/Dark。
     customColors: com.mini.me_core.core.theme.tokens.SemanticColors? = null,
+    // Phase 5：背景图 URI（null=无背景图）
+    backgroundImageUri: String? = null,
+    // Phase 5：背景图遮罩浓度（0.0-1.0）
+    backgroundScrim: Float = 0.4f,
+    // Phase 5：卡片透明度（0.0-1.0）
+    cardAlpha: Float = 1.0f,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    // Phase 5：如果有自定义颜色，构建动态 Material3 ColorScheme；否则用默认
+    val colorScheme = if (customColors != null) {
+        buildColorSchemeFromSemantic(customColors, darkTheme)
+    } else if (darkTheme) DarkColorScheme else LightColorScheme
+
     val appThemeState = when {
         customColors != null -> com.mini.me_core.core.theme.tokens.AppThemeState(
             colors = customColors,
             isDark = darkTheme,
+            backgroundImageUri = backgroundImageUri,
+            backgroundScrim = backgroundScrim,
+            cardAlpha = cardAlpha,
         )
         darkTheme -> com.mini.me_core.core.theme.tokens.AppThemeState.Dark
         else -> com.mini.me_core.core.theme.tokens.AppThemeState.Light
     }
+
+    // Phase 5：加载背景图
+    val bgBitmap = rememberBitmapFromUri(backgroundImageUri)
 
     androidx.compose.runtime.CompositionLocalProvider(
         LocalAppDarkMode provides darkTheme,
@@ -180,7 +264,33 @@ fun AIEditorTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             typography = AppTypography,
-            content = content
-        )
+        ) {
+            // Phase 5：如果有背景图，在根布局添加图片层 + 遮罩层
+            if (bgBitmap != null && backgroundImageUri != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(colorScheme.background)
+                ) {
+                    // 背景图片
+                    Image(
+                        bitmap = bgBitmap,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    // 遮罩层
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(colorScheme.background.copy(alpha = backgroundScrim)),
+                    )
+                    // 内容层
+                    content()
+                }
+            } else {
+                content()
+            }
+        }
     }
 }
