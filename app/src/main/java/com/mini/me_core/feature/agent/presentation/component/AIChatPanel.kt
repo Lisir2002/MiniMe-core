@@ -58,6 +58,8 @@ import com.mini.me_core.feature.agent.presentation.AIAgentViewModel
 import com.mini.me_core.feature.agent.presentation.ConversationSkillsViewModel
 import com.mini.me_core.feature.agent.presentation.MessageRole
 import com.mini.me_core.feature.agent.presentation.hasVisibleContent
+import com.mini.me_core.feature.agent.presentation.component.agentfirst.AgentFirstFeatureFlags
+import com.mini.me_core.feature.agent.presentation.component.agentfirst.TaskCard
 import com.mini.me_core.feature.settings.presentation.SettingsViewModel
 import com.mini.me_core.feature.workspace.presentation.WorkspaceViewModel
 import androidx.compose.material.icons.Icons
@@ -480,18 +482,33 @@ fun AIChatPanel(
                         verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                     ) {
                         items(taskGroups, key = { it.taskId }, contentType = { "task" }) { group ->
-                            TaskAccordion(
-                                group = group,
-                                markdownCache = markdownCache,
-                                onToggleTask = { viewModel.toggleTask(it) },
-                                onToggleSubGroup = { taskId, subGroupId -> viewModel.toggleSubGroup(taskId, subGroupId) },
-                                onEditClick = { message -> startEditMessage(message) },
-                                onNewChatClick = { message -> viewModel.newChatAndSend(message.content) },
-                                onViewChanges = { fileDiffsForSheet = it },
-                                runningTool = runningTool,
-                                environmentSnapshots = environmentSnapshots,
-                                agentState = agentState
-                            )
+                            if (AgentFirstFeatureFlags.isTaskCardEnabled()) {
+                                TaskCard(
+                                    group = group,
+                                    agentState = agentState,
+                                    runningTools = runningTool,
+                                    environmentSnapshots = environmentSnapshots,
+                                    changes = changes,
+                                    pendingPermission = pendingPermission,
+                                    onToggleTask = { viewModel.toggleTask(it) },
+                                    onToggleSubGroup = { taskId, subGroupId -> viewModel.toggleSubGroup(taskId, subGroupId) },
+                                    onStop = { viewModel.stopAgent() },
+                                    onViewChanges = {}
+                                )
+                            } else {
+                                TaskAccordion(
+                                    group = group,
+                                    markdownCache = markdownCache,
+                                    onToggleTask = { viewModel.toggleTask(it) },
+                                    onToggleSubGroup = { taskId, subGroupId -> viewModel.toggleSubGroup(taskId, subGroupId) },
+                                    onEditClick = { message -> startEditMessage(message) },
+                                    onNewChatClick = { message -> viewModel.newChatAndSend(message.content) },
+                                    onViewChanges = { fileDiffsForSheet = it },
+                                    runningTool = runningTool,
+                                    environmentSnapshots = environmentSnapshots,
+                                    agentState = agentState
+                                )
+                            }
                         }
                         val reasoning = streamingReasoning
                         val showReasoning = reasoning != null && reasoning.isNotEmpty()
