@@ -59,6 +59,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
 import com.mini.me_core.feature.agent.domain.mcp.McpToolDescriptor
 import kotlinx.serialization.json.JsonObject
@@ -184,7 +185,7 @@ fun McpServerEditDialog(
                         .padding(horizontal = 20.dp)
                         .background(
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            RoundedCornerShape(14.dp)
+                            RoundedCornerShape(Radius.lg)
                         )
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -195,7 +196,7 @@ fun McpServerEditDialog(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(Radius.md))
                                 .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
                                 .clickable { selectedTab = index }
                                 .padding(vertical = 10.dp),
@@ -294,7 +295,7 @@ fun McpServerEditDialog(
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .clip(RoundedCornerShape(8.dp))
+                                                .clip(RoundedCornerShape(Radius.sm))
                                                 .background(if (selected) MaterialTheme.colorScheme.surface else Color.Transparent)
                                                 .clickable { isStdio = stdioFlag }
                                                 .padding(vertical = 10.dp),
