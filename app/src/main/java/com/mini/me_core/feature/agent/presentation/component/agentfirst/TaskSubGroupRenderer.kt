@@ -142,14 +142,16 @@ internal fun TaskSubGroupRenderer(
                         }
                     }
                     else -> {
-                        // USER / REPLY / REASONING：复用 AgentMessageItem
-                        subGroup.messages.forEach { message ->
+                        // USER / REPLY / REASONING：复用 AgentMessageItem（Stage 4：传入前后 role 分组）
+                        subGroup.messages.forEachIndexed { index, message ->
                             val live = liveOutputs.firstOrNull { it.messageId == message.id }?.text
                             AgentMessageItem(
                                 message = message,
                                 liveOutput = live,
                                 environmentSnapshots = environmentSnapshots,
-                                agentState = agentState
+                                agentState = agentState,
+                                previousRole = subGroup.messages.getOrNull(index - 1)?.role,
+                                nextRole = subGroup.messages.getOrNull(index + 1)?.role
                             )
                         }
                     }

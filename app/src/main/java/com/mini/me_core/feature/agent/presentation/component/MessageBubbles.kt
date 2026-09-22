@@ -72,7 +72,10 @@ internal fun AgentMessageItem(
     initiallyExpanded: Boolean = true,
     environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap(),
     agentState: AgentUIState = AgentUIState.Idle,
-    onRetryTool: ((messageId: String) -> Unit)? = null
+    onRetryTool: ((messageId: String) -> Unit)? = null,
+    // Stage 4：连续同角色消息视觉分组（默认 null 保持向后兼容：单条消息四角大圆角）
+    previousRole: MessageRole? = null,
+    nextRole: MessageRole? = null
 ) {
     if (message.isCompactionMarker) {
         CompactionDivider()
@@ -91,6 +94,11 @@ internal fun AgentMessageItem(
 
     val isUser = message.role == MessageRole.USER
     val isAssistant = message.role == MessageRole.ASSISTANT
+    // Stage 4：连续同角色消息视觉分组。
+    // sameAsPrev/sameAsNext 决定上下圆角收缩；startsNewGroup 在组间断开处补出更大纵向间距。
+    val sameAsPrev = previousRole != null && previousRole == message.role
+    val sameAsNext = nextRole != null && nextRole == message.role
+    val startsNewGroup = previousRole != null && !sameAsPrev
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     // 紧凑优化：用户气泡放宽到 92% 屏宽，减少换行、降低整体纵向占用
     val maxUserBubbleWidth = remember(screenWidthDp) { (screenWidthDp * 0.92).dp }
@@ -101,7 +109,10 @@ internal fun AgentMessageItem(
     val copyScope = rememberCoroutineScope()
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            // Stage 4：组间断点补 12dp 顶距（父列已有 4dp，合计约 16dp）；组内保持 4dp
+            .then(if (startsNewGroup) Modifier.padding(top = Spacing.md) else Modifier),
         verticalArrangement = Arrangement.spacedBy(Spacing.xs)
     ) {
         if (hasReasoning) {
@@ -118,11 +129,15 @@ internal fun AgentMessageItem(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
-                            shape = if (isUser) {
-                                RoundedCornerShape(Radius.md, Radius.md, Radius.xs, Radius.md)
-                            } else {
-                                // Stage 4：AI 气泡圆角统一提升到 14dp（Radius.lg）
-                                RoundedCornerShape(Radius.lg)
+                            shape = when {
+                                isUser -> RoundedCornerShape(Radius.md, Radius.md, Radius.xs, Radius.md)
+                                else -> {
+                                    // Stage 4：非用户气泡按连续同角色分组——
+                                    // 组首上圆角大/下小，组中上下均小，组末上小/下大；单条四角大圆角。
+                                    val topR = if (sameAsPrev) Radius.xs else Radius.lg
+                                    val bottomR = if (sameAsNext) Radius.xs else Radius.lg
+                                    RoundedCornerShape(topR, topR, bottomR, bottomR)
+                                }
                             },
                             color = when (message.role) {
                                 MessageRole.USER -> MaterialTheme.colorScheme.primary

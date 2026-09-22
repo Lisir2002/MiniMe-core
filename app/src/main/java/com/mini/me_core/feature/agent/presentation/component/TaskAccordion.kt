@@ -952,8 +952,8 @@ private fun SubAccordion(
                                 agentState = agentState
                             )
                         }
-                        // 消息正文
-                        subGroup.messages.forEach { message ->
+                        // 消息正文（Stage 4：传入前后 role 实现连续消息分组）
+                        subGroup.messages.forEachIndexed { index, message ->
                             val live = runningTool.firstOrNull { it.messageId == message.id }?.text
                             AgentMessageItem(
                                 message = message,
@@ -962,7 +962,9 @@ private fun SubAccordion(
                                 onEditClick = onEditClick,
                                 onNewChatClick = onNewChatClick,
                                 environmentSnapshots = environmentSnapshots,
-                                agentState = agentState
+                                agentState = agentState,
+                                previousRole = subGroup.messages.getOrNull(index - 1)?.role,
+                                nextRole = subGroup.messages.getOrNull(index + 1)?.role
                             )
                         }
                         // REPLY 片段底部：查看修改按钮（用批次数据）

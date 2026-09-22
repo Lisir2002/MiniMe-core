@@ -377,7 +377,7 @@ internal fun ToolCallGroup(
                         .padding(horizontal = Spacing.xs, vertical = Spacing.xs),
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
-                    messages.forEach { message ->
+                    messages.forEachIndexed { index, message ->
                         val live = runningTool.firstOrNull { it.messageId == message.id }?.text
                         AgentMessageItem(
                             message = message,
@@ -385,7 +385,9 @@ internal fun ToolCallGroup(
                             markdownCache = markdownCache,
                             initiallyExpanded = false,
                             environmentSnapshots = environmentSnapshots,
-                            agentState = agentState
+                            agentState = agentState,
+                            previousRole = messages.getOrNull(index - 1)?.role,
+                            nextRole = messages.getOrNull(index + 1)?.role
                         )
                     }
                 }
