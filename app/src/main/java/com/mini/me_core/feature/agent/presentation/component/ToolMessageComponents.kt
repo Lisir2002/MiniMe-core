@@ -802,7 +802,7 @@ private fun extractCommandFromArgs(argsPreview: String?): String {
  * - 旁路探测（构建/环境变更命令后）→ [snapshot] 直接携带组件状态。
  */
 @Composable
-private fun EnvironmentStatusStrip(
+internal fun EnvironmentStatusStrip(
     message: AgentUIMessage? = null,
     snapshot: EnvironmentSnapshot? = null
 ) {
