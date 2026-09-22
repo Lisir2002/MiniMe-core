@@ -847,7 +847,12 @@ private fun SubAccordion(
     Surface(
         shape = RoundedCornerShape(Radius.md),
         color = visual.bg,
-        border = BorderStroke(1.dp, visual.accent.copy(alpha = 0.15f)),
+        // 混合模式：REPLY/USER 容器透明，去掉边框（TOOL/REASONING 保留淡边框）
+        border = if (subGroup.type == TaskSubGroupType.REPLY || subGroup.type == TaskSubGroupType.USER) {
+            null
+        } else {
+            BorderStroke(1.dp, visual.accent.copy(alpha = 0.15f))
+        },
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
@@ -903,7 +908,8 @@ private fun SubAccordion(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = Spacing.xs, vertical = Spacing.xs),
+                        // 混合模式：容器内边距 16dp 水平 / 4dp 垂直
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
                     // TOOL 片段（兜底独立单元）：折叠为一行摘要
@@ -1005,7 +1011,8 @@ private fun subGroupVisual(type: TaskSubGroupType): SubGroupVisual {
         TaskSubGroupType.USER -> SubGroupVisual(
             icon = Icons.Rounded.Person,
             accent = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
-            bg = if (isDark) Color(0xFF60A5FA).copy(alpha = 0.14f) else Color(0xFF2563EB).copy(alpha = 0.06f)
+            // 混合模式：去掉用户消息容器浅蓝背景，改为透明
+            bg = Color.Transparent
         )
         TaskSubGroupType.REASONING -> SubGroupVisual(
             icon = Icons.Rounded.Star,
@@ -1015,7 +1022,8 @@ private fun subGroupVisual(type: TaskSubGroupType): SubGroupVisual {
         TaskSubGroupType.REPLY -> SubGroupVisual(
             icon = Icons.Rounded.ChatBubble,
             accent = if (isDark) Color(0xFF34D399) else Color(0xFF059669),
-            bg = if (isDark) Color(0xFF34D399).copy(alpha = 0.14f) else Color(0xFF059669).copy(alpha = 0.06f)
+            // 混合模式：去掉 AI 回复容器浅绿背景，改为透明
+            bg = Color.Transparent
         )
         TaskSubGroupType.TOOL -> SubGroupVisual(
             icon = Icons.Rounded.Construction,
