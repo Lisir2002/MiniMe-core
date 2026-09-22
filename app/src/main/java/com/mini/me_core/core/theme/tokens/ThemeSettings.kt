@@ -26,6 +26,24 @@ enum class ThemeMode {
 }
 
 /**
+ * 圆角风格枚举（Phase 5 显示偏好）。
+ *
+ * ROUNDED = 圆角（默认，12dp 圆角）
+ * Sharp = 直角（0dp）
+ * Pill = 胶囊（999dp，全圆角）
+ */
+enum class CornerStyle {
+    ROUNDED,
+    Sharp,
+    Pill;
+
+    companion object {
+        fun fromPersisted(value: String?): CornerStyle =
+            entries.firstOrNull { it.name == value } ?: ROUNDED
+    }
+}
+
+/**
  * 主题预设定义。
  *
  * 每套预设包含亮色和暗色两套 [SemanticColors]，
@@ -62,19 +80,35 @@ data class ThemePreset(
 /**
  * 用户主题设置（持久化存储）。
  *
- * 第一期只包含外观模式 + 预设选择，自定义颜色覆盖留到 Phase 5。
+ * Phase 4：外观模式 + 预设选择
+ * Phase 5：扩展自定义颜色覆盖、背景图、显示偏好（圆角/字体/动效）
  *
  * @property mode 外观模式
  * @property presetId 当前应用的预设 ID
- * @property customOverrides 自定义颜色覆盖（Phase 5 使用，第一期为空 Map）
+ * @property customOverrides 自定义颜色覆盖 Map（key=友好色名字, value=ARGB hex 字符串）。
+ *           Phase 5 复用此字段存储 9 项可自定义颜色，与 Phase 4 设计一致。
+ * @property backgroundImage 背景图 URI（null=无背景图）
+ * @property backgroundMask 背景图遮罩浓度（0.0-1.0，默认 0.5）
+ * @property cardOpacity 卡片透明度（0.0-1.0，默认 1.0）
+ * @property cornerStyle 圆角风格（默认 ROUNDED）
+ * @property fontScale 字体大小缩放（0.8-1.4，默认 1.0）
+ * @property animationScale 动效强度（0.0-1.0，默认 1.0，0.0=关闭动效）
  */
 @Serializable
 data class ThemeSettings(
     val mode: String = "AUTO",
     val presetId: String = "default",
     val customOverrides: Map<String, String> = emptyMap(),
+    val backgroundImage: String? = null,
+    val backgroundMask: Float = 0.5f,
+    val cardOpacity: Float = 1.0f,
+    val cornerStyle: String = "ROUNDED",
+    val fontScale: Float = 1.0f,
+    val animationScale: Float = 1.0f,
 ) {
     fun themeMode(): ThemeMode = ThemeMode.fromPersisted(mode)
+
+    fun cornerStyleEnum(): CornerStyle = CornerStyle.fromPersisted(cornerStyle)
 
     companion object {
         val DEFAULT = ThemeSettings(mode = "AUTO", presetId = "default")
@@ -90,6 +124,118 @@ data class ThemeSettings(
                 json.decodeFromString(ThemeSettings.serializer(), raw)
             }.getOrDefault(DEFAULT)
         }
+    }
+}
+
+/**
+ * 9 项可自定义颜色的友好名称到 SemanticColors 字段的映射（Phase 5）。
+ *
+ * key = 用户在 UI 上看到的友好名称，value = SemanticColors 对应字段的取值函数。
+ * 自定义颜色覆盖时，先从预设获取基础色，再用 customOverrides Map 覆盖指定字段。
+ */
+object CustomColorFields {
+
+    /** 品牌主色 → [SemanticColors.brandPrimary] */
+    const val PRIMARY = "primary"
+
+    /** 页面背景 → [SemanticColors.surfacePage] */
+    const val BACKGROUND = "background"
+
+    /** 卡片背景 → [SemanticColors.surfaceCard] */
+    const val SURFACE = "surface"
+
+    /** 工具块背景 → [SemanticColors.surfaceSunken] */
+    const val SURFACE_VARIANT = "surfaceVariant"
+
+    /** 主文字色 → [SemanticColors.textPrimary] */
+    const val TEXT_PRIMARY = "textPrimary"
+
+    /** 次文字色 → [SemanticColors.textSecondary] */
+    const val TEXT_SECONDARY = "textSecondary"
+
+    /** 默认边框 → [SemanticColors.borderDefault] */
+    const val BORDER_DEFAULT = "borderDefault"
+
+    /** 错误色 → [SemanticColors.error] */
+    const val ERROR = "error"
+
+    /** 成功色 → [SemanticColors.success] */
+    const val SUCCESS = "success"
+
+    /** 全部 9 项可自定义颜色 key 列表 */
+    val ALL_KEYS = listOf(
+        PRIMARY, BACKGROUND, SURFACE, SURFACE_VARIANT,
+        TEXT_PRIMARY, TEXT_SECONDARY, BORDER_DEFAULT,
+        ERROR, SUCCESS,
+    )
+
+    /** 友好名称到中文显示名的映射 */
+    val DISPLAY_NAMES = mapOf(
+        PRIMARY to "品牌主色",
+        BACKGROUND to "页面背景",
+        SURFACE to "卡片背景",
+        SURFACE_VARIANT to "工具块背景",
+        TEXT_PRIMARY to "主文字色",
+        TEXT_SECONDARY to "次文字色",
+        BORDER_DEFAULT to "默认边框",
+        ERROR to "错误色",
+        SUCCESS to "成功色",
+    )
+
+    /**
+     * 将自定义颜色 Map 应用到基础 SemanticColors 上，返回覆盖后的新 SemanticColors。
+     *
+     * @param base 预设提供的基础颜色
+     * @param overrides 自定义颜色覆盖 Map（key=友好色名, value=ARGB hex）
+     * @return 覆盖后的 SemanticColors（未覆盖的字段保持 base 值）
+     */
+    fun applyOverrides(base: SemanticColors, overrides: Map<String, String>): SemanticColors {
+        if (overrides.isEmpty()) return base
+        return base.copy(
+            brandPrimary = overrides[PRIMARY].toColor() ?: base.brandPrimary,
+            surfacePage = overrides[BACKGROUND].toColor() ?: base.surfacePage,
+            surfaceCard = overrides[SURFACE].toColor() ?: base.surfaceCard,
+            surfaceSunken = overrides[SURFACE_VARIANT].toColor() ?: base.surfaceSunken,
+            textPrimary = overrides[TEXT_PRIMARY].toColor() ?: base.textPrimary,
+            textSecondary = overrides[TEXT_SECONDARY].toColor() ?: base.textSecondary,
+            borderDefault = overrides[BORDER_DEFAULT].toColor() ?: base.borderDefault,
+            error = overrides[ERROR].toColor() ?: base.error,
+            success = overrides[SUCCESS].toColor() ?: base.success,
+        )
+    }
+
+    /**
+     * 获取指定颜色字段在当前配色中的实际 Color 值（用于对比度计算）。
+     */
+    fun getColorForField(field: String, colors: SemanticColors): Color = when (field) {
+        PRIMARY -> colors.brandPrimary
+        BACKGROUND -> colors.surfacePage
+        SURFACE -> colors.surfaceCard
+        SURFACE_VARIANT -> colors.surfaceSunken
+        TEXT_PRIMARY -> colors.textPrimary
+        TEXT_SECONDARY -> colors.textSecondary
+        BORDER_DEFAULT -> colors.borderDefault
+        ERROR -> colors.error
+        SUCCESS -> colors.success
+        else -> colors.brandPrimary
+    }
+
+    /**
+     * 获取指定颜色字段应该与之对比的背景色（用于对比度警告）。
+     * 文字类颜色对比页面背景，其他颜色对比卡片/页面背景。
+     */
+    fun getContrastBackground(field: String, colors: SemanticColors): Color = when (field) {
+        TEXT_PRIMARY, TEXT_SECONDARY -> colors.surfacePage
+        PRIMARY, SURFACE, SURFACE_VARIANT, BORDER_DEFAULT -> colors.surfacePage
+        ERROR, SUCCESS -> colors.surfaceCard
+        BACKGROUND -> colors.textPrimary
+        else -> colors.surfacePage
+    }
+
+    /** ARGB hex 字符串转 Color，解析失败返回 null */
+    private fun String?.toColor(): Color? {
+        if (this.isNullOrBlank()) return null
+        return runCatching { Color(android.graphics.Color.parseColor(this)) }.getOrNull()
     }
 }
 
