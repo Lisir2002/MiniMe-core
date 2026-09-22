@@ -127,92 +127,87 @@ internal fun TaskAccordion(
         label = "cardElevation"
     )
 
+    // v2 混合模式：去掉外层白色卡片，背景透明、无边框、无阴影
     Surface(
         shape = RoundedCornerShape(Radius.lg),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            width = if (group.isStreaming) 2.dp else 1.dp,
-            color = if (group.isStreaming) {
-                Brand.Blue.copy(alpha = borderAlpha)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = borderAlpha)
-            }
-        ),
+        color = Color.Transparent,
+        border = null,
         tonalElevation = 0.dp,
-        shadowElevation = elevation,
+        shadowElevation = 0.dp,
         modifier = modifier.fillMaxWidth()
     ) {
         Column {
-            // 一级手风琴头部：渐变图标徽章 + 标题 + 时间 + 计数 + 展开箭头
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onToggleTask(group.taskId) }
-                    .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-            ) {
-                // 渐变图标徽章：品牌蓝渐变底 + 白色图标，形成任务视觉锚点
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(RoundedCornerShape(Radius.sm))
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    Brand.Blue,
-                                    Brand.Sky
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    androidx.compose.material3.Icon(
-                        imageVector = Icons.Rounded.ChatBubble,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                // 任务标题：占据剩余空间（过长横向滚动，不再用省略号截断）
-                HorizontalScrollableText(
-                    text = group.title,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = if (group.isStreaming) FontWeight.SemiBold else FontWeight.Medium,
-                        lineHeight = 20.sp
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
-
-                // 流式生成状态徽章
-                if (group.isStreaming) {
-                    StreamingBadge(infiniteTransition)
-                }
-
-                // 消息计数徽章
-                MessageCountBadge(totalCount)
-
-                // 时间戳
-                if (group.timestamp > 0) {
-                    Text(
-                        text = formatTaskTime(group.timestamp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // 展开/折叠箭头
-                androidx.compose.material3.Icon(
-                    imageVector = if (group.isExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = stringResource(
-                        if (group.isExpanded) R.string.chat_task_collapse else R.string.chat_task_expand
-                    ),
-                    tint = Brand.IconGray,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            // v2 混合模式：去掉一级手风琴头部（渐变图标徽章 + 标题 + 时间 + 计数 + 展开箭头）
+            // 头部已注释，TaskGroup.isExpanded 默认 true，内容直接展开显示
+            // Row(
+            //     modifier = Modifier
+            //         .fillMaxWidth()
+            //         .clickable { onToggleTask(group.taskId) }
+            //         .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+            //     verticalAlignment = Alignment.CenterVertically,
+            //     horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            // ) {
+            //     // 渐变图标徽章：品牌蓝渐变底 + 白色图标，形成任务视觉锚点
+            //     Box(
+            //         modifier = Modifier
+            //             .size(30.dp)
+            //             .clip(RoundedCornerShape(Radius.sm))
+            //             .background(
+            //                 brush = Brush.linearGradient(
+            //                     colors = listOf(
+            //                         Brand.Blue,
+            //                         Brand.Sky
+            //                     )
+            //                 )
+            //             ),
+            //         contentAlignment = Alignment.Center
+            //     ) {
+            //         androidx.compose.material3.Icon(
+            //             imageVector = Icons.Rounded.ChatBubble,
+            //             contentDescription = null,
+            //             tint = Color.White,
+            //             modifier = Modifier.size(16.dp)
+            //         )
+            //     }
+            //
+            //     // 任务标题：占据剩余空间（过长横向滚动，不再用省略号截断）
+            //     HorizontalScrollableText(
+            //         text = group.title,
+            //         color = MaterialTheme.colorScheme.onSurface,
+            //         style = MaterialTheme.typography.bodyLarge.copy(
+            //             fontWeight = if (group.isStreaming) FontWeight.SemiBold else FontWeight.Medium,
+            //             lineHeight = 20.sp
+            //         ),
+            //         modifier = Modifier.weight(1f)
+            //     )
+            //
+            //     // 流式生成状态徽章
+            //     if (group.isStreaming) {
+            //         StreamingBadge(infiniteTransition)
+            //     }
+            //
+            //     // 消息计数徽章
+            //     MessageCountBadge(totalCount)
+            //
+            //     // 时间戳
+            //     if (group.timestamp > 0) {
+            //         Text(
+            //             text = formatTaskTime(group.timestamp),
+            //             style = MaterialTheme.typography.labelSmall,
+            //             color = MaterialTheme.colorScheme.onSurfaceVariant
+            //         )
+            //     }
+            //
+            //     // 展开/折叠箭头
+            //     androidx.compose.material3.Icon(
+            //         imageVector = if (group.isExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+            //         contentDescription = stringResource(
+            //             if (group.isExpanded) R.string.chat_task_collapse else R.string.chat_task_expand
+            //         ),
+            //         tint = Brand.IconGray,
+            //         modifier = Modifier.size(20.dp)
+            //     )
+            // }
 
             // 一级手风琴内容：二级子手风琴
             AnimatedVisibility(
@@ -229,8 +224,10 @@ internal fun TaskAccordion(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = Spacing.sm, end = Spacing.sm, bottom = Spacing.xs),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                        // v2 混合模式：去掉外层容器内边距，由 LazyColumn contentPadding 统一控制
+                        .padding(0.dp),
+                    // v2 混合模式：用户消息组与 AI 回复组之间间距 16dp
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     renderUnits.forEach { unit ->
                         SubAccordion(
@@ -856,43 +853,44 @@ private fun SubAccordion(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
-            // 二级片段头部
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onToggleSubGroup(group.taskId, subGroup.id) }
-                    .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-            ) {
-                // 子分类图标
-                androidx.compose.material3.Icon(
-                    imageVector = visual.icon,
-                    contentDescription = null,
-                    tint = visual.accent,
-                    modifier = Modifier.size(16.dp)
-                )
-                // 子分类标签
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = visual.accent,
-                    modifier = Modifier.weight(1f)
-                )
-                // 消息计数
-                Text(
-                    text = "${subGroup.messages.size}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = visual.accent.copy(alpha = 0.7f)
-                )
-                // 展开/折叠箭头
-                androidx.compose.material3.Icon(
-                    imageVector = if (subGroup.isExpanded) Icons.Rounded.KeyboardArrowDown else Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = visual.accent.copy(alpha = 0.5f),
-                    modifier = Modifier.size(16.dp)
-                )
-            }
+            // v2 混合模式：去掉二级片段头部（图标 + 标签 + 计数 + 展开箭头）
+            // SubAccordion.isExpanded 默认 true，内容直接展开显示
+            // Row(
+            //     modifier = Modifier
+            //         .fillMaxWidth()
+            //         .clickable { onToggleSubGroup(group.taskId, subGroup.id) }
+            //         .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+            //     verticalAlignment = Alignment.CenterVertically,
+            //     horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            // ) {
+            //     // 子分类图标
+            //     androidx.compose.material3.Icon(
+            //         imageVector = visual.icon,
+            //         contentDescription = null,
+            //         tint = visual.accent,
+            //         modifier = Modifier.size(16.dp)
+            //     )
+            //     // 子分类标签
+            //     Text(
+            //         text = label,
+            //         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            //         color = visual.accent,
+            //         modifier = Modifier.weight(1f)
+            //     )
+            //     // 消息计数
+            //     Text(
+            //         text = "${subGroup.messages.size}",
+            //         style = MaterialTheme.typography.labelSmall,
+            //         color = visual.accent.copy(alpha = 0.7f)
+            //     )
+            //     // 展开/折叠箭头
+            //     androidx.compose.material3.Icon(
+            //         imageVector = if (subGroup.isExpanded) Icons.Rounded.KeyboardArrowDown else Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            //         contentDescription = null,
+            //         tint = visual.accent.copy(alpha = 0.5f),
+            //         modifier = Modifier.size(16.dp)
+            //     )
+            // }
             // 二级片段内容：消息气泡（保持时间顺序）
             AnimatedVisibility(
                 visible = subGroup.isExpanded,
@@ -908,8 +906,8 @@ private fun SubAccordion(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        // 混合模式：容器内边距 16dp 水平 / 4dp 垂直
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                        // v2 混合模式：去掉容器水平内边距，由 LazyColumn contentPadding 统一控制；垂直保留 4dp
+                        .padding(horizontal = 0.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
                     // TOOL 片段（兜底独立单元）：折叠为一行摘要
