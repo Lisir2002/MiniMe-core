@@ -544,14 +544,17 @@ fun AIChatPanel(
                         }
                         val reasoning = streamingReasoning
                         val showReasoning = reasoning != null && reasoning.isNotEmpty()
+                        val streaming = streamingText
+                        val showStreaming = streaming != null && streaming.hasVisibleContent()
+                        // 问题23：思考动画连续性——思考阶段（有思考流、正文未开始）在思考气泡尾部打点；
+                        // 正文一开始流式，live 翻转为 false，点位移交 StreamingBubble，全程不中断。
+                        val reasoningLive = showReasoning && !showStreaming
                         if (showReasoning) {
                             item(key = "__reasoning__", contentType = "tail") {
                                 // 流式实时：短文本默认展开边想边看，过长（超 REASONING_COLLAPSE_LINE_LIMIT）时由气泡内部自动折叠，不刷屏
-                                ReasoningBubble(text = reasoning.orEmpty(), initiallyExpanded = true, cache = markdownCache)
+                                ReasoningBubble(text = reasoning.orEmpty(), initiallyExpanded = true, cache = markdownCache, live = reasoningLive)
                             }
                         }
-                        val streaming = streamingText
-                        val showStreaming = streaming != null && streaming.hasVisibleContent()
                         val showThinking = !showReasoning && !showStreaming && !isCompacting && isBusy && runningTool.isEmpty() && pendingPermission == null && pendingQuestion == null
                         val showRetrying = retryState != null && isBusy && !isCompacting && !showStreaming && !showReasoning
                         val tailKind = when {

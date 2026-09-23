@@ -179,7 +179,11 @@ internal const val REASONING_COLLAPSE_LINE_LIMIT = 8
 internal fun ReasoningBubble(
     text: String,
     initiallyExpanded: Boolean = true,
-    cache: MarkdownRenderCache? = null
+    cache: MarkdownRenderCache? = null,
+    // 问题23：是否处于「思考仍在进行」阶段（流式思考中且正文尚未开始）。
+    // 为 true 时在内容末尾显示跳动点，明确「思考仍在继续」；思考分块到达的间隙动画不消失。
+    // 一旦正文开始流式（live=false），动画移交给 StreamingBubble，此处不再重复打点。
+    live: Boolean = false
 ) {
     var userToggled by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(initiallyExpanded) }
@@ -256,10 +260,10 @@ internal fun ReasoningBubble(
                             )
                         }
                     )
-                    // 问题23：流式思考中（initiallyExpanded=true）在内容末尾显示跳动点，
+                    // 问题23：流式思考中（live=true）在内容末尾显示跳动点，
                     // 明确「思考仍在继续」；思考分块到达的间隙动画不消失，避免用户误判已结束。
-                    // 历史消息 initiallyExpanded=false，不显示。
-                    if (initiallyExpanded) {
+                    // 正文开始流式后 live=false，动画移交给 StreamingBubble；历史消息 live=false。
+                    if (live) {
                         Spacer(Modifier.height(Spacing.xs))
                         TypingDots(color = MaterialTheme.colorScheme.primary, dotSize = 5.dp)
                     }
