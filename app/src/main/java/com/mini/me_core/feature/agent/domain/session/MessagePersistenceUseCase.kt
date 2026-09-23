@@ -9,6 +9,9 @@ import com.mini.me_core.feature.agent.domain.model.CONTEXT_SUMMARY_LEGACY_PREFIX
 import com.mini.me_core.feature.agent.domain.tool.ToolCall
 import com.mini.me_core.feature.agent.presentation.AgentAttachment
 import com.mini.me_core.feature.agent.presentation.MessageRole
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -52,67 +55,69 @@ class MessagePersistenceUseCase @Inject constructor(
         outputTokens: Int = 0,
         isCompacted: Boolean = false
     ) {
-        // 先剥离内嵌 base64 图片（不截断），避免超大 data URL 直接进 content。
-        val clean = stripInlineImages(content)
-        val toolCallsJson = if (toolCalls.isNotEmpty()) json.encodeToString(toolCalls) else null
-        // reasoning 走单行兜底（分块优先级低于正文，且单行 200k 已安全）。
-        val cleanReasoning = reasoning?.let { sanitizeContent(it) }
-        val attachmentsJson = if (attachments.isNotEmpty()) json.encodeToString(attachments) else null
+        withContext(NonCancellable + Dispatchers.IO) {
+            // 先剥离内嵌 base64 图片（不截断），避免超大 data URL 直接进 content。
+            val clean = stripInlineImages(content)
+            val toolCallsJson = if (toolCalls.isNotEmpty()) json.encodeToString(toolCalls) else null
+            // reasoning 走单行兜底（分块优先级低于正文，且单行 200k 已安全）。
+            val cleanReasoning = reasoning?.let { sanitizeContent(it) }
+            val attachmentsJson = if (attachments.isNotEmpty()) json.encodeToString(attachments) else null
 
-        if (clean.length <= CHUNK_SIZE) {
-            val entity = buildEntity(
-                id = id,
-                sessionId = sessionId,
-                taskId = taskId,
-                role = role,
-                content = clean,
-                timestamp = nextTimestamp(),
-                chunkGroupId = "",
-                chunkIndex = 0,
-                toolCallsJson = toolCallsJson,
-                toolCallId = toolCallId,
-                toolName = toolName,
-                toolArgs = toolArgs,
-                isError = isError,
-                reasoning = cleanReasoning,
-                signature = signature,
-                attachmentsJson = attachmentsJson,
-                inputTokens = inputTokens,
-                outputTokens = outputTokens,
-                isCompacted = isCompacted
-            )
-            v2Agent.insertMessage(entity.toV2())
-        } else {
-            // 超长内容分块落库：主行（chunk 0）携带全部元数据，续块行仅携带内容。
-            // 全组共享同一 timestamp（块号递增），保证按时间序查询时块与块邻接、不被其它消息穿插，
-            // 且主行 id 字典序在续块行之前（`<id>` < `<id>#c1` < `<id>#c2` …），keyset 分页也稳定。
-            val chunks = clean.chunked(CHUNK_SIZE)
-            val ts = nextTimestamp()
-            val rows = chunks.mapIndexed { i, chunkText ->
-                buildEntity(
-                    id = if (i == 0) id else "$id$CHUNK_ID_SUFFIX_PREFIX$i",
+            if (clean.length <= CHUNK_SIZE) {
+                val entity = buildEntity(
+                    id = id,
                     sessionId = sessionId,
                     taskId = taskId,
                     role = role,
-                    content = chunkText,
-                    timestamp = ts,
-                    chunkGroupId = id,
-                    chunkIndex = i,
-                    // 元数据只写主行，续块行复用主行的会话/角色/timestamp 即可。
-                    toolCallsJson = if (i == 0) toolCallsJson else null,
-                    toolCallId = if (i == 0) toolCallId else null,
-                    toolName = if (i == 0) toolName else null,
-                    toolArgs = if (i == 0) toolArgs else null,
-                    isError = if (i == 0) isError else false,
-                    reasoning = if (i == 0) cleanReasoning else null,
-                    signature = if (i == 0) signature else null,
-                    attachmentsJson = if (i == 0) attachmentsJson else null,
-                    inputTokens = if (i == 0) inputTokens else 0,
-                    outputTokens = if (i == 0) outputTokens else 0,
+                    content = clean,
+                    timestamp = nextTimestamp(),
+                    chunkGroupId = "",
+                    chunkIndex = 0,
+                    toolCallsJson = toolCallsJson,
+                    toolCallId = toolCallId,
+                    toolName = toolName,
+                    toolArgs = toolArgs,
+                    isError = isError,
+                    reasoning = cleanReasoning,
+                    signature = signature,
+                    attachmentsJson = attachmentsJson,
+                    inputTokens = inputTokens,
+                    outputTokens = outputTokens,
                     isCompacted = isCompacted
                 )
+                v2Agent.insertMessage(entity.toV2())
+            } else {
+                // 超长内容分块落库：主行（chunk 0）携带全部元数据，续块行仅携带内容。
+                // 全组共享同一 timestamp（块号递增），保证按时间序查询时块与块邻接、不被其它消息穿插，
+                // 且主行 id 字典序在续块行之前（`<id>` < `<id>#c1` < `<id>#c2` …），keyset 分页也稳定。
+                val chunks = clean.chunked(CHUNK_SIZE)
+                val ts = nextTimestamp()
+                val rows = chunks.mapIndexed { i, chunkText ->
+                    buildEntity(
+                        id = if (i == 0) id else "$id$CHUNK_ID_SUFFIX_PREFIX$i",
+                        sessionId = sessionId,
+                        taskId = taskId,
+                        role = role,
+                        content = chunkText,
+                        timestamp = ts,
+                        chunkGroupId = id,
+                        chunkIndex = i,
+                        // 元数据只写主行，续块行复用主行的会话/角色/timestamp 即可。
+                        toolCallsJson = if (i == 0) toolCallsJson else null,
+                        toolCallId = if (i == 0) toolCallId else null,
+                        toolName = if (i == 0) toolName else null,
+                        toolArgs = if (i == 0) toolArgs else null,
+                        isError = if (i == 0) isError else false,
+                        reasoning = if (i == 0) cleanReasoning else null,
+                        signature = if (i == 0) signature else null,
+                        attachmentsJson = if (i == 0) attachmentsJson else null,
+                        inputTokens = if (i == 0) inputTokens else 0,
+                        outputTokens = if (i == 0) outputTokens else 0,
+                        isCompacted = isCompacted
+                    )
+                }
+                v2Agent.insertAllMessages(rows.map { it.toV2() })
             }
-            v2Agent.insertAllMessages(rows.map { it.toV2() })
         }
     }
 
@@ -159,7 +164,9 @@ class MessagePersistenceUseCase @Inject constructor(
     )
 
     suspend fun updateContent(messageId: String, newContent: String) {
-        v2Agent.updateMessageContent(messageId, newContent)
+        withContext(NonCancellable + Dispatchers.IO) {
+            v2Agent.updateMessageContent(messageId, newContent)
+        }
     }
 
     companion object {
