@@ -16,7 +16,10 @@ import java.io.RandomAccessFile
 /**
  * 日志文件仓库。负责列出日志文件、读取并解析日志行。
  *
- * 日志目录：/storage/emulated/0/Documents/MiniMe-core/logs/
+ * 主应用日志可能写入两个位置（按优先级）：
+ * 1. 公共外部存储：/storage/emulated/0/Documents/MiniMe-core/logs/（需 WRITE_EXTERNAL_STORAGE 权限）
+ * 2. 外部私有目录：/storage/emulated/0/Android/data/com.mini.me_core/files/logs/（权限未授予时回退）
+ *
  * 文件名格式：log-yyyy-MM-dd.txt（含滚动文件 .1/.2）
  * 文件头：# MiniMe Log Format vN（读取时跳过 # 开头的行）
  *
@@ -24,15 +27,37 @@ import java.io.RandomAccessFile
  */
 class LogRepository {
 
-    /** 日志目录路径。与主应用 FileLogger 写入路径一致。 */
-    val logDir: File = File("/storage/emulated/0/Documents/MiniMe-core/logs/")
+    /**
+     * 候选日志目录列表，按优先级排列。
+     * 第一个存在且有日志文件的目录为主目录，其余为补充。
+     */
+    private val candidateDirs: List<File> = listOf(
+        // 1. 公共外部存储（主应用有权限时写入这里）
+        File("/storage/emulated/0/Documents/MiniMe-core/logs/"),
+        // 2. 主应用外部私有目录（主应用无权限时回退到这里）
+        File("/storage/emulated/0/Android/data/com.mini.me_core/files/logs/"),
+    )
 
-    /** 列出所有日志文件，按文件名降序（最新的在前）。 */
+    /** 当前有效的日志目录（第一个存在且非空的），用于 FileObserver 监听。 */
+    val activeLogDir: File?
+        get() = candidateDirs.firstOrNull { it.exists() && it.isDirectory && it.listFiles()?.isNotEmpty() == true }
+            ?: candidateDirs.firstOrNull { it.exists() && it.isDirectory }
+
+    /** 列出所有候选目录中的日志文件，按文件名降序（最新的在前），去重。 */
     fun listLogFiles(): List<File> {
-        if (!logDir.exists() || !logDir.isDirectory) return emptyList()
-        return logDir.listFiles { f ->
-            f.isFile && f.name.startsWith("log-") && f.name.endsWith(".txt")
-        }?.sortedByDescending { it.name } ?: emptyList()
+        val allFiles = mutableListOf<File>()
+        val seenNames = mutableSetOf<String>()
+        for (dir in candidateDirs) {
+            if (!dir.exists() || !dir.isDirectory) continue
+            dir.listFiles { f ->
+                f.isFile && f.name.startsWith("log-") && f.name.endsWith(".txt")
+            }?.forEach { f ->
+                if (seenNames.add(f.name)) {
+                    allFiles.add(f)
+                }
+            }
+        }
+        return allFiles.sortedByDescending { it.name }
     }
 
     /**
@@ -220,17 +245,22 @@ class LogRepository {
 
     /**
      * 监听日志目录变化，文件变更时发出信号。
+     * 同时监听所有候选目录。
      */
     fun observeDirectoryChanges(): Flow<Unit> = callbackFlow {
-        val observer = object : FileObserver(logDir.absolutePath, CLOSE_WRITE or MODIFY or CREATE) {
-            override fun onEvent(event: Int, path: String?) {
-                if (path?.startsWith("log-") == true) {
-                    trySend(Unit)
+        val observers = candidateDirs
+            .filter { it.exists() && it.isDirectory }
+            .map { dir ->
+                object : FileObserver(dir.absolutePath, CLOSE_WRITE or MODIFY or CREATE) {
+                    override fun onEvent(event: Int, path: String?) {
+                        if (path?.startsWith("log-") == true) {
+                            trySend(Unit)
+                        }
+                    }
                 }
             }
-        }
-        observer.startWatching()
-        awaitClose { observer.stopWatching() }
+        observers.forEach { it.startWatching() }
+        awaitClose { observers.forEach { it.stopWatching() } }
     }.flowOn(Dispatchers.IO)
 
     /** 计算各等级数量。 */

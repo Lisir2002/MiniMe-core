@@ -80,6 +80,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 @Composable
 fun LogsScreen(
     viewModel: LogsViewModel = viewModel(),
+    storagePermissionGranted: Boolean? = null,
+    onRequestPermission: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val colors = LocalAppTheme.current.colors
@@ -336,11 +338,21 @@ fun LogsScreen(
             }
 
             // ── 日志列表 / 空状态 ──
-            if (logFiles.isEmpty() && !isLoading) {
+            if (storagePermissionGranted == false && logFiles.isEmpty()) {
+                // 权限被拒绝：显示权限引导
+                AppEmptyState(
+                    icon = Icons.Rounded.FolderOpen,
+                    title = "需要存储权限",
+                    subtitle = "附属应用需要读取存储权限才能查看主应用的日志文件\n请点击下方按钮授权",
+                    actionLabel = "授予权限",
+                    onAction = onRequestPermission,
+                    modifier = Modifier.weight(1f),
+                )
+            } else if (logFiles.isEmpty() && !isLoading) {
                 AppEmptyState(
                     icon = Icons.Rounded.FolderOpen,
                     title = "暂无日志文件",
-                    subtitle = "请先在主应用中使用日志功能\n日志目录：/storage/emulated/0/Documents/MiniMe-core/logs/",
+                    subtitle = "请先在主应用中使用产生日志\n日志目录：Documents/MiniMe-core/logs/\n（若主应用未授予存储权限，日志会写入私有目录）",
                     actionLabel = "刷新",
                     onAction = { viewModel.refreshFiles() },
                     modifier = Modifier.weight(1f),
