@@ -1,4 +1,5 @@
 package com.mini.me_core.core.theme.components
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -62,7 +63,7 @@ fun AppBadge(
         Text(
             text = text,
             color = textColor,
-            fontSize = 10.sp,
+            fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             modifier = Modifier.padding(

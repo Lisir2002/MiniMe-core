@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.ui.res.stringResource
@@ -558,6 +559,6 @@ internal fun NeutralTextButton(
             Icon(icon, null, modifier = Modifier.size(ButtonSpec.IconSize))
             Spacer(modifier = Modifier.width(ButtonSpec.IconTextSpacer))
         }
-        Text(text, fontSize = 12.sp)
+        Text(text, fontSize = LocalComponentTokens.current.text.bodySmallFontSize)
     }
 }

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -63,7 +64,7 @@ internal fun ChatInputField(
             Text(
                 text = "❯",
                 color = if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6),
-                fontSize = 14.sp,
+                fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
             )
@@ -78,12 +79,12 @@ internal fun ChatInputField(
                         stringResource(if (isBusy) R.string.chat_queue_hint else R.string.chat_input_placeholder),
                         // 混合模式：placeholder 弱化色
                         color = colors.textTertiary,
-                        fontSize = 14.sp
+                        fontSize = LocalComponentTokens.current.text.bodyMediumFontSize
                     )
                 },
                 // 混合模式：输入文字 14sp，行高 20sp
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    fontSize = 14.sp,
+                    fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
                     lineHeight = 20.sp,
                     color = colors.textPrimary
                 ),

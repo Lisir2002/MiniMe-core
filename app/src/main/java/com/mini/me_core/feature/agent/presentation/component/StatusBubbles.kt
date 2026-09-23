@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.core.RepeatMode
@@ -220,7 +221,7 @@ internal fun ReasoningBubble(
                         text = stringResource(R.string.chat_thinking_process),
                         // 混合模式：思考条 12sp/行高18sp
                         style = MaterialTheme.typography.labelMedium.copy(
-                            fontSize = 12.sp,
+                            fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                             lineHeight = 18.sp
                         ),
                         color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),

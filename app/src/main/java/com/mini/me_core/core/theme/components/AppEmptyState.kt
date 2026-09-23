@@ -1,4 +1,5 @@
 package com.mini.me_core.core.theme.components
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -64,7 +65,7 @@ fun AppEmptyState(
         }
         Text(
             text = title,
-            fontSize = 16.sp,
+            fontSize = LocalComponentTokens.current.text.bodyLargeFontSize,
             fontWeight = FontWeight.Bold,
             color = colors.textPrimary,
         )
@@ -72,7 +73,7 @@ fun AppEmptyState(
             Spacer(Modifier.height(PrimitiveSpacing.Sm))
             Text(
                 text = subtitle,
-                fontSize = 14.sp,
+                fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
                 color = colors.textSecondary,
             )
         }

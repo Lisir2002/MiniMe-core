@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
@@ -170,12 +171,12 @@ fun TerminalBundleManagerScreen(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text(stringResource(R.string.ui_________b6349a50), fontSize = 14.sp) }
+                        text = { Text(stringResource(R.string.ui_________b6349a50), fontSize = LocalComponentTokens.current.text.bodyMediumFontSize) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text(stringResource(R.string.ui________2d661dab), fontSize = 14.sp) }
+                        text = { Text(stringResource(R.string.ui________2d661dab), fontSize = LocalComponentTokens.current.text.bodyMediumFontSize) }
                     )
                 }
             }

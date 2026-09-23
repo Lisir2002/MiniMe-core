@@ -1,4 +1,5 @@
 package com.mini.me_core.core.theme.components
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -67,7 +68,7 @@ fun AppSectionHeader(
         ) {
             Text(
                 text = title,
-                fontSize = 14.sp,
+                fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary,
                 maxLines = 1,
@@ -76,7 +77,7 @@ fun AppSectionHeader(
                 Spacer(Modifier.height(PrimitiveSpacing.Xxs))
                 Text(
                     text = subtitle,
-                    fontSize = 12.sp,
+                    fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                     color = colors.textSecondary,
                     maxLines = 1,
                 )
@@ -113,7 +114,7 @@ private fun AppSectionHeaderPreview() {
                 trailing = {
                     Text(
                         text = "查看全部",
-                        fontSize = 12.sp,
+                        fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                         color = LocalAppTheme.current.colors.brandPrimary,
                     )
                 },
@@ -124,7 +125,7 @@ private fun AppSectionHeaderPreview() {
                 trailing = {
                     Text(
                         text = "编辑",
-                        fontSize = 12.sp,
+                        fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                         color = LocalAppTheme.current.colors.brandPrimary,
                     )
                 },

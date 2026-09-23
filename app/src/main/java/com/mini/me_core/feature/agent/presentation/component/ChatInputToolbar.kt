@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -215,7 +216,7 @@ private fun ModePill(
         Text(
             text = currentMode.name,
             style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = 11.sp,
+                fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                 fontWeight = FontWeight.Bold
             ),
             color = accent.resolveOn()

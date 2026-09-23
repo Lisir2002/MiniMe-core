@@ -157,7 +157,7 @@ private fun ModelTag(text: String? = null, icon: androidx.compose.ui.graphics.ve
             if (text != null) {
                 Text(
                     text = text,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.AnimatedVisibility
@@ -180,7 +181,7 @@ internal fun ToolMessageBody(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelLarge.copy(
                         fontWeight = FontWeight.Medium,
-                        fontSize = 12.sp
+                        fontSize = LocalComponentTokens.current.text.bodySmallFontSize
                     ),
                     modifier = Modifier.weight(1f, fill = false)
                 )
@@ -234,7 +235,7 @@ internal fun ToolMessageBody(
                     color = colors.textSecondary,
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
+                        fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                         lineHeight = 18.sp
                     )
                 )
@@ -475,7 +476,7 @@ internal fun ToolSection(label: String, content: String) {
             color = colors.textSecondary,
             style = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = FontFamily.Monospace,
-                fontSize = 12.sp,
+                fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                 lineHeight = 18.sp
             )
         )

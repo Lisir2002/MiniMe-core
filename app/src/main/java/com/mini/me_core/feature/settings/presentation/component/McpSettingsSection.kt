@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.core.Animatable
@@ -334,7 +335,7 @@ internal fun McpServerRow(
                         text = server.name,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
+                            fontSize = LocalComponentTokens.current.text.bodyLargeFontSize
                         ),
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
@@ -355,7 +356,7 @@ internal fun McpServerRow(
                         ) {
                             Text(
                                 text = statusText,
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                style = MaterialTheme.typography.bodySmall,
                                 color = statusColor
                             )
                         }
@@ -371,7 +372,7 @@ internal fun McpServerRow(
                         ) {
                             Text(
                                 text = if (server.isStdio) stringResource(R.string.mcp_builtin) else "HTTP",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -392,7 +393,7 @@ internal fun McpServerRow(
                         ) {
                             Text(
                                 text = infoText,
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
@@ -248,7 +249,7 @@ internal fun AgentMessageItem(
                                             // 混合模式：用户消息 14sp/行高20sp
                                             style = MaterialTheme.typography.bodyMedium.copy(
                                                 lineHeight = 20.sp,
-                                                fontSize = 14.sp
+                                                fontSize = LocalComponentTokens.current.text.bodyMediumFontSize
                                             ),
                                             // 混合模式：用户气泡内边距 12dp 水平 / 8dp 垂直
                                             modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm)
@@ -320,7 +321,7 @@ internal fun AgentMessageItem(
                             Text(
                                 text = "↑$inStr ↓$outStr",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 10.sp,
+                                    fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                                     lineHeight = 14.sp
                                 ),
                                 color = tokenColor
@@ -331,7 +332,7 @@ internal fun AgentMessageItem(
                         Text(
                             text = formatMessageTime(message.timestamp),
                             style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 10.sp,
+                                fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                                 lineHeight = 14.sp
                             ),
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)

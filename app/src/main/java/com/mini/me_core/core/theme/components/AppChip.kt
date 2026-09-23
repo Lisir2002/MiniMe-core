@@ -1,4 +1,5 @@
 package com.mini.me_core.core.theme.components
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Row
@@ -146,7 +147,7 @@ fun AppChip(
             Text(
                 text = text,
                 color = contentColor,
-                fontSize = 12.sp,
+                fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
             )

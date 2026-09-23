@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import com.mini.me_core.R
@@ -1308,7 +1309,7 @@ private fun SmallRoundedChip(
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = 11.sp,
+                fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                 fontWeight = FontWeight.SemiBold,
                 lineHeight = 12.sp,
             ),

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.richsegment
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
@@ -212,7 +213,7 @@ private fun renderInlines(
                 is Inline.Code -> {
                     pushStyle(SpanStyle(
                         fontFamily = FontFamily.Monospace,
-                        // 混合模式：行内代码 12sp 等宽
+                        // 混合模式：行内代码 12sp 等宽（非 Composable 上下文，使用静态值）
                         fontSize = 12.sp,
                         background = codeBackground
                     ))
@@ -458,7 +459,7 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
                 val rawStyle = TextStyle(
                     fontFamily = FontFamily.Monospace,
                     // 混合模式：代码块 12sp 等宽，行高 18sp
-                    fontSize = 12.sp,
+                    fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                     lineHeight = 18.sp,
                     color = fg
                 )

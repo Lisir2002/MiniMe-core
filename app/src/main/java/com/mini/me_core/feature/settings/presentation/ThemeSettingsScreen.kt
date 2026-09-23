@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.net.Uri
@@ -274,7 +275,7 @@ private fun ThemePreviewCard(
                 ) {
                     Text(
                         text = "帮我分析一下这个项目",
-                        fontSize = 12.sp,
+                        fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                         color = previewColors.onBrandPrimary,
                     )
                 }
@@ -290,7 +291,7 @@ private fun ThemePreviewCard(
             ) {
                 Text(
                     text = "好的，我来分析项目结构。",
-                    fontSize = 12.sp,
+                    fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                     color = previewColors.textPrimary,
                 )
                 Row(
@@ -305,7 +306,7 @@ private fun ThemePreviewCard(
                     )
                     Text(
                         text = "读取文件列表",
-                        fontSize = 10.sp,
+                        fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                         color = previewColors.textSecondary,
                     )
                 }
@@ -322,7 +323,7 @@ private fun ThemePreviewCard(
             ) {
                 Text(
                     text = "  输入消息...",
-                    fontSize = 12.sp,
+                    fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                     color = previewColors.textTertiary,
                     modifier = Modifier.padding(start = 12.dp),
                 )
@@ -337,7 +338,7 @@ private fun ThemePreviewCard(
                 ) {
                     Text(
                         text = "↑",
-                        fontSize = 12.sp,
+                        fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                         color = previewColors.onBrandPrimary,
                         fontWeight = FontWeight.Bold,
                     )
@@ -398,7 +399,7 @@ private fun AppearanceModeSelector(
                         )
                         Text(
                             text = label,
-                            fontSize = 12.sp,
+                            fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) colors.onBrandContainer
                             else colors.textSecondary,
@@ -461,7 +462,7 @@ private fun PresetCarousel(
                 )
                 Text(
                     text = preset.description,
-                    fontSize = 10.sp,
+                    fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                     color = colors.textSecondary,
                     maxLines = 2,
                 )
@@ -585,7 +586,7 @@ private fun ColorRow(
                 )
                 if (isCustom) {
                     TextButton(onClick = onReset) {
-                        Text("恢复", fontSize = 11.sp, color = colors.textSecondary)
+                        Text("恢复", fontSize = LocalComponentTokens.current.text.labelSmallFontSize, color = colors.textSecondary)
                     }
                 }
             }
@@ -606,7 +607,7 @@ private fun ColorRow(
                 )
                 Text(
                     text = "对比度不足（%.1f:1），可能影响可读性".format(contrastRatio),
-                    fontSize = 10.sp,
+                    fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                     color = Color(0xFFF59E0B),
                 )
             }
@@ -763,11 +764,11 @@ private fun BackgroundImageSection(
                             )
                         )
                     }) {
-                        Text("选择图片", color = colors.brandPrimary, fontSize = 12.sp)
+                        Text("选择图片", color = colors.brandPrimary, fontSize = LocalComponentTokens.current.text.bodySmallFontSize)
                     }
                     if (backgroundImage != null) {
                         TextButton(onClick = onClearImage) {
-                            Text("清除", color = colors.error, fontSize = 12.sp)
+                            Text("清除", color = colors.error, fontSize = LocalComponentTokens.current.text.bodySmallFontSize)
                         }
                     }
                 }
@@ -856,7 +857,7 @@ private fun DisplayPreferencesSection(
                         )
                         Text(
                             text = label,
-                            fontSize = 11.sp,
+                            fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) colors.onBrandContainer else colors.textSecondary,
                         )
@@ -913,7 +914,7 @@ private fun FactoryResetButton(
         Text(
             text = "恢复出厂主题",
             fontWeight = FontWeight.Medium,
-            fontSize = 14.sp,
+            fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
         )
     }
 }
@@ -941,7 +942,7 @@ private fun SliderRow(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(text = label, fontSize = 13.sp, color = colors.textPrimary)
-            Text(text = valueLabel, fontSize = 12.sp, color = colors.textSecondary)
+            Text(text = valueLabel, fontSize = LocalComponentTokens.current.text.bodySmallFontSize, color = colors.textSecondary)
         }
         Slider(
             value = value,

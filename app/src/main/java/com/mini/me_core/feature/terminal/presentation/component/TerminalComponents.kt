@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
@@ -241,7 +242,7 @@ private fun TabChip(
             if (tab.isPinned) {
                 Text(
                     text = "\uD83D\uDCCC",
-                    fontSize = 12.sp
+                    fontSize = LocalComponentTokens.current.text.bodySmallFontSize
                 )
             }
 
@@ -285,7 +286,7 @@ private fun TabChip(
                 Text(
                     text = "exit $exitCode",
                     color = skin.onSurfaceVariant,
-                    fontSize = 11.sp,
+                    fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                     fontFamily = FontFamily.Monospace
                 )
             }
@@ -635,7 +636,7 @@ private fun CompactFullSwitcher(full: Boolean, onClick: () -> Unit, skin: Termin
             )
             Text(
                 text = if (full) stringResource(R.string.ui____63c59813) else stringResource(R.string.ui____e7e07e58),
-                fontSize = 12.sp,
+                fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                 color = if (full) skin.keyGroupDFg else skin.onSurface
             )
         }
@@ -860,7 +861,7 @@ fun TabLongPressDialog(
                 )
                 Text("子进程数：${tab.childProcessCount}", fontSize = 13.sp)
                 if (tab.isBackground) {
-                    Text("后台命令：${tab.command ?: "(无)"}", fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    Text("后台命令：${tab.command ?: "(无)"}", fontFamily = FontFamily.Monospace, fontSize = LocalComponentTokens.current.text.bodySmallFontSize)
                 }
 
                 HorizontalDivider()
@@ -903,7 +904,7 @@ fun TabLongPressDialog(
                         onClick = { onSetColorMarker(TabColorMarker.NONE) },
                         enabled = tab.colorMarker != TabColorMarker.NONE
                     ) {
-                        Text(stringResource(R.string.ui____4403fca0), fontSize = 12.sp)
+                        Text(stringResource(R.string.ui____4403fca0), fontSize = LocalComponentTokens.current.text.bodySmallFontSize)
                     }
                 }
             }
