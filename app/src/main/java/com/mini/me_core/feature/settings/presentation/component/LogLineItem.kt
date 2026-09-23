@@ -58,6 +58,9 @@ sealed interface LogListItem {
     ) : LogListItem
 
     data class Loose(val line: String) : LogListItem
+
+    /** 某等级整组折叠后的汇总行（点击展开该等级所有日志）。 */
+    data class Collapsed(val level: LogLevel, val count: Int) : LogListItem
 }
 
 /**
@@ -97,6 +100,61 @@ fun buildLogEntries(lines: List<String>): List<LogListItem> {
     }
     flush()
     return items
+}
+
+/**
+ * 按折叠等级把连续同等级 Entry 折叠成汇总行。
+ *
+ * 被折叠等级的连续 Entry 合并为一条 [LogListItem.Collapsed]；Loose 行（堆栈）随其所属 Entry 一起消失。
+ * 点击折叠行由父组件调用 onToggleCollapse 展开。
+ */
+fun applyCollapse(items: List<LogListItem>, collapsedLevels: Set<LogLevel>): List<LogListItem> {
+    if (collapsedLevels.isEmpty()) return items
+    val result = mutableListOf<LogListItem>()
+    var i = 0
+    while (i < items.size) {
+        val item = items[i]
+        if (item is LogListItem.Entry && item.parsed.level in collapsedLevels) {
+            val level = item.parsed.level!!
+            var count = 0
+            // 跳过该等级的连续 Entry（及其后的 Loose 堆栈行）
+            while (i < items.size) {
+                val cur = items[i]
+                when (cur) {
+                    is LogListItem.Entry -> {
+                        if (cur.parsed.level == level) { count++; i++ } else break
+                    }
+                    is LogListItem.Loose -> i++ // 堆栈行随父 Entry 折叠
+                    is LogListItem.Collapsed -> i++
+                }
+            }
+            result.add(LogListItem.Collapsed(level, count))
+        } else {
+            result.add(item)
+            i++
+        }
+    }
+    return result
+}
+
+/** 折叠汇总行：居中显示「N 条 LEVEL 日志已折叠，点击展开」。 */
+@Composable
+fun CollapsedRow(
+    level: LogLevel,
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val accent = levelVisual(level).accent
+    Text(
+        text = "── $count 条 ${level.name} 日志已折叠，点击展开 ──",
+        style = MaterialTheme.typography.bodySmall,
+        color = accent,
+        modifier = modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick)
+            .padding(vertical = PrimitiveSpacing.Sm, horizontal = PrimitiveSpacing.Md),
+    )
 }
 
 /** 单个日志等级对应的视觉规范（颜色全部来自主题色板，见设计文档 §10.3）。 */
@@ -397,6 +455,7 @@ private fun LogLineItemPreview() {
             when (item) {
                 is LogListItem.Entry -> LogLineItem(entry = item, searchQuery = "retry")
                 is LogListItem.Loose -> LooseLogLine(line = item.line)
+                is LogListItem.Collapsed -> CollapsedRow(level = item.level, count = item.count, onClick = {})
             }
         }
     }

@@ -1,18 +1,25 @@
 package com.mini.me_core.feature.settings.presentation.component
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -20,10 +27,10 @@ import com.mini.me_core.R
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 
 /**
- * 底部状态栏：左侧显示行数、中间日期范围/文件数、右侧「跳至」菜单入口。
+ * 底部状态栏：左侧显示行数、中间日期范围/文件数、右侧「跳至」菜单。
  * 设计文档 §5.5。
  *
- * @param onJump 点击「跳至」（由父组件弹出跳转菜单，见 Stage 4）
+ * @param onNextError 点击「下一个 ERROR」（由父组件滚动定位）
  */
 @Composable
 fun LogBottomStatusBar(
@@ -32,9 +39,10 @@ fun LogBottomStatusBar(
     dateRangeLabel: String,
     fileCount: Int,
     liveTailEnabled: Boolean,
-    onJump: () -> Unit,
+    onNextError: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var jumpMenuExpanded by remember { mutableStateOf(false) }
     Column(modifier = modifier) {
         HorizontalDivider()
         Row(
@@ -62,9 +70,17 @@ fun LogBottomStatusBar(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
-                TextButton(onClick = onJump) {
-                    Text(stringResource(R.string.log_jump), style = MaterialTheme.typography.bodySmall)
-                    Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null)
+                Box {
+                    TextButton(onClick = { jumpMenuExpanded = true }) {
+                        Text(stringResource(R.string.log_jump), style = MaterialTheme.typography.bodySmall)
+                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null)
+                    }
+                    DropdownMenu(expanded = jumpMenuExpanded, onDismissRequest = { jumpMenuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.log_jump_next_error)) },
+                            onClick = { jumpMenuExpanded = false; onNextError() },
+                        )
+                    }
                 }
             }
         }
@@ -81,7 +97,7 @@ private fun LogBottomStatusBarPreview() {
             dateRangeLabel = "近 3 天",
             fileCount = 3,
             liveTailEnabled = true,
-            onJump = {},
+            onNextError = {},
         )
     }
 }

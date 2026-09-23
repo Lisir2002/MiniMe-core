@@ -919,15 +919,27 @@ class SettingsViewModel @Inject constructor(
         val visibleLines = filteredLines.takeLast(MAX_LOG_LINES)
 
         val allTags = LogLineParser.extractTags(allLines)
+
+        // 搜索匹配数：在可见行中统计命中搜索词的行数（大小写不敏感）
+        val query = snapshot.searchQuery.trim()
+        val totalMatches = if (query.isEmpty()) 0 else visibleLines.count { it.contains(query, ignoreCase = true) }
+
         _logViewerState.update {
             it.copy(
                 content = visibleLines.joinToString("\n"),
                 totalLines = filteredLines.size,
                 shownLines = visibleLines.size,
                 allAvailableTags = allTags,
-                loading = false
+                loading = false,
+                totalMatches = totalMatches,
+                currentMatchIndex = if (query.isEmpty()) 0 else 0,
             )
         }
+    }
+
+    /** 实时尾随是否自动贴底滚动（用户上滑置 false，点「返回最新」置 true）。 */
+    fun setAutoScrolling(autoScrolling: Boolean) {
+        _logViewerState.update { it.copy(isAutoScrolling = autoScrolling) }
     }
 
     // ── 核心加载逻辑 ──

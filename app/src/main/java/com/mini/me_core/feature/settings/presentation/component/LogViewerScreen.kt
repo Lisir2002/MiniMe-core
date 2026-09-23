@@ -11,20 +11,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -43,6 +50,9 @@ import com.mini.me_core.feature.settings.presentation.DateRangeMode
 import com.mini.me_core.feature.settings.presentation.LogViewerUiState
 import com.mini.me_core.feature.settings.presentation.SettingsViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -62,9 +72,28 @@ fun LogViewerScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var showFilterSheet by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
     val isExpanded = LocalConfiguration.current.screenWidthDp >= 600
-    val entries = remember(state.content) { buildLogEntries(state.content.split("\n")) }
+    val entries = remember(state.content, state.collapsedLevels) {
+        applyCollapse(buildLogEntries(state.content.split("\n")), state.collapsedLevels)
+    }
+
+    // ── 实时尾随：自动贴底滚动 ──
+    LaunchedEffect(state.liveTailEnabled, state.isAutoScrolling, entries.size) {
+        if (state.liveTailEnabled && state.isAutoScrolling && entries.isNotEmpty()) {
+            listState.animateScrollToItem(entries.size - 1)
+        }
+    }
+    // 用户上滑超过阈值 → 暂停尾随
+    LaunchedEffect(listState, state.liveTailEnabled, entries.size) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .collect { firstVisible ->
+                if (state.liveTailEnabled && entries.isNotEmpty() && firstVisible < entries.size - 3) {
+                    viewModel.setAutoScrolling(false)
+                }
+            }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -93,7 +122,6 @@ fun LogViewerScreen(
             )
 
             if (isExpanded) {
-                // 横屏分栏
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     ControlPanel(
                         state = state,
@@ -103,11 +131,12 @@ fun LogViewerScreen(
                     LogContent(
                         entries = entries,
                         state = state,
+                        listState = listState,
                         modifier = Modifier.weight(1f),
+                        onToggleCollapse = { viewModel.toggleLevelCollapse(it) },
                     )
                 }
             } else {
-                // 竖屏堆叠
                 ControlPanel(
                     state = state,
                     viewModel = viewModel,
@@ -116,7 +145,9 @@ fun LogViewerScreen(
                 LogContent(
                     entries = entries,
                     state = state,
+                    listState = listState,
                     modifier = Modifier.weight(1f),
+                    onToggleCollapse = { viewModel.toggleLevelCollapse(it) },
                 )
             }
 
@@ -126,8 +157,36 @@ fun LogViewerScreen(
                 dateRangeLabel = quickRangeLabel(state.dateRangeMode),
                 fileCount = state.files.size,
                 liveTailEnabled = state.liveTailEnabled,
-                onJump = { /* Stage 4: 跳转菜单 */ },
+                onNextError = {
+                    val current = listState.firstVisibleItemIndex
+                    val next = entries.indexOfFirst {
+                        it is LogListItem.Entry && it.parsed.level == LogLevel.ERROR
+                    }.let { idx ->
+                        // 从当前位置之后找下一个 ERROR；没有则回到第一个
+                        entries.indices.firstOrNull { i ->
+                            i > current && (entries[i] as? LogListItem.Entry)?.parsed?.level == LogLevel.ERROR
+                        } ?: idx.takeIf { it >= 0 }
+                    }
+                    if (next != null && next >= 0) {
+                        scope.launch { listState.animateScrollToItem(next) }
+                    }
+                },
             )
+        }
+
+        // ── 「返回最新」悬浮按钮：尾随开启但用户上滑时显示 ──
+        if (state.liveTailEnabled && !state.isAutoScrolling) {
+            TextButton(
+                onClick = {
+                    viewModel.setAutoScrolling(true)
+                    scope.launch { listState.animateScrollToItem(entries.size - 1) }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = PrimitiveSpacing.Xl),
+            ) {
+                Text(stringResource(R.string.log_back_to_latest))
+            }
         }
 
         SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
@@ -175,7 +234,7 @@ private fun ControlPanel(
                 selectedFileName = state.selectedFileName,
                 onQuickRange = { viewModel.setDateRangeMode(it) },
                 onSelectFile = { viewModel.selectSingleFile(it) },
-                onCustomRange = { /* 打开底部弹窗（父级控制） */ },
+                onCustomRange = { },
             )
             Spacer(Modifier.weight(1f))
             LiveTailToggle(enabled = state.liveTailEnabled, onToggle = { viewModel.toggleLiveTail() })
@@ -211,6 +270,8 @@ private fun LiveTailToggle(enabled: Boolean, onToggle: () -> Unit) {
 private fun LogContent(
     entries: List<LogListItem>,
     state: LogViewerUiState,
+    listState: LazyListState,
+    onToggleCollapse: (LogLevel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier) {
@@ -230,7 +291,7 @@ private fun LogContent(
                 modifier = Modifier.padding(PrimitiveSpacing.Lg),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+            else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                 items(entries) { item ->
                     when (item) {
                         is LogListItem.Entry -> LogLineItem(
@@ -238,6 +299,11 @@ private fun LogContent(
                             searchQuery = state.searchQuery,
                         )
                         is LogListItem.Loose -> LooseLogLine(line = item.line)
+                        is LogListItem.Collapsed -> CollapsedRow(
+                            level = item.level,
+                            count = item.count,
+                            onClick = { onToggleCollapse(item.level) },
+                        )
                     }
                 }
             }
@@ -253,8 +319,6 @@ private fun quickRangeLabel(mode: DateRangeMode): String = when (mode) {
     DateRangeMode.LAST_3_DAYS -> stringResource(R.string.log_quick_last3)
     DateRangeMode.LAST_7_DAYS -> stringResource(R.string.log_quick_last7)
     DateRangeMode.ALL -> stringResource(R.string.log_status_range_all)
-    DateRangeMode.SINGLE_FILE -> stateLabelFallback
+    DateRangeMode.SINGLE_FILE -> stringResource(R.string.log_status_range_all)
     DateRangeMode.CUSTOM -> "自定义"
 }
-
-private const val stateLabelFallback = ""
