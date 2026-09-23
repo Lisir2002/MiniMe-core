@@ -536,6 +536,50 @@ class AIAgentViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 方案A：流式期间定期持久化 assistant 消息，防止应用在 AI 回复刚结束时被杀导致消息丢失。
+     *
+     * 触发条件：累积文本变化且距上次落库超过阈值（PERIODIC_PERSIST_CHAR_THRESHOLD 字符增量
+     * 或 PERIODIC_PERSIST_TIME_MS 时间间隔，取先到者）。
+     *
+     * 首次定期落库用 INSERT（生成 UUID 作为 streamingMessageId），后续用 UPDATE。
+     * 最终 AssistantText 到达时用同一个 ID 做最终替换，确保内容完整。
+     */
+    private suspend fun maybePeriodicPersist(
+        sessionId: String,
+        taskId: String,
+        content: String,
+        reasoning: String?
+    ) {
+        if (content.isEmpty() && reasoning.isNullOrEmpty()) return
+        val now = System.currentTimeMillis()
+        val existingId = streamingMessageIds[sessionId]
+
+        if (existingId == null) {
+            // 首次定期落库：INSERT
+            val newId = UUID.randomUUID().toString()
+            streamingMessageIds[sessionId] = newId
+            messagePersistenceUseCase.persist(
+                sessionId = sessionId,
+                role = MessageRole.ASSISTANT,
+                content = content,
+                id = newId,
+                taskId = taskId,
+                reasoning = reasoning
+            )
+            periodicPersistStates[sessionId] = PeriodicPersistState(now, content.length)
+        } else {
+            // 后续定期落库：检查阈值
+            val state = periodicPersistStates[sessionId]
+            val charDelta = if (state != null) content.length - state.lastPersistContentLength else Int.MAX_VALUE
+            val timeDelta = if (state != null) now - state.lastPersistTimeMs else Long.MAX_VALUE
+            if (charDelta >= PERIODIC_PERSIST_CHAR_THRESHOLD || timeDelta >= PERIODIC_PERSIST_TIME_MS) {
+                v2Agent.updateMessageContentAndReasoning(existingId, content, reasoning)
+                periodicPersistStates[sessionId] = PeriodicPersistState(now, content.length)
+            }
+        }
+    }
+
     /** 按 sessionId 维护的重试状态；流式恢复或结束后置 null。 */
     private val _retryStates = MutableStateFlow<Map<String, RetryState?>>(emptyMap())
     val retryState: StateFlow<RetryState?> = _currentSessionId
@@ -580,6 +624,18 @@ class AIAgentViewModel @Inject constructor(
     // （用户消息 / 助手回复 / 工具调用 / 思考过程）都归入同一任务分组。
     private val currentTaskIdBySession = mutableMapOf<String, String>()
 
+    // 流式期间定期持久化跟踪（方案A）：每个会话当前正在流式的 assistant 消息 ID。
+    // AssistantDelta 首次到达时生成 UUID 并 INSERT，后续定期 UPDATE；AssistantText 到达时用同 ID 做最终替换。
+    private val streamingMessageIds = mutableMapOf<String, String>()
+
+    // 定期落库的节流状态：记录每个会话上次落库的时间戳和内容长度。
+    // 触发条件：新增 ≥ PERIODIC_PERSIST_CHAR_THRESHOLD 字符 或 距上次落库 ≥ PERIODIC_PERSIST_TIME_MS，取先到者。
+    private data class PeriodicPersistState(
+        val lastPersistTimeMs: Long,
+        val lastPersistContentLength: Int
+    )
+    private val periodicPersistStates = mutableMapOf<String, PeriodicPersistState>()
+
     /** 是否有正在运行、可被打断的 agent 任务。 */
     val isRunning: Boolean get() {
         val sid = _currentSessionId.value ?: return false
@@ -601,6 +657,12 @@ class AIAgentViewModel @Inject constructor(
 
         /** 流式思考单条显示上限（字符）。 */
         const val STREAMING_REASONING_MAX_CHARS = 100_000
+
+        /** 定期落库字符增量阈值（字符）：流式期间新增内容超过此数量即触发一次持久化。 */
+        const val PERIODIC_PERSIST_CHAR_THRESHOLD = 2000
+
+        /** 定期落库时间间隔阈值（毫秒）：距上次落库超过此时间即触发一次持久化。 */
+        const val PERIODIC_PERSIST_TIME_MS = 3000L
     }
 
     init {
@@ -858,6 +920,11 @@ class AIAgentViewModel @Inject constructor(
         coroutineContext[Job]?.let { sessionJobs[sessionId] = it }
         setAgentState(sessionId, AgentUIState.Streaming)
 
+        // 本轮流式的最新累积正文和思考（方案A：定期落库用 / 方案C：finally 兜底用）。
+        // 声明在 try 外以便 finally 块访问。
+        var latestStreamingContent = ""
+        var latestStreamingReasoning: String? = null
+
         try {
             var failed = false
             // 本轮请求的 taskId：该请求产出的所有消息归入同一任务分组（任务手风琴）。
@@ -904,11 +971,17 @@ class AIAgentViewModel @Inject constructor(
                 when (event) {
                     is AgentEvent.AssistantDelta -> {
                         setRetryState(sessionId, null)
+                        latestStreamingContent = event.accumulated
                         setStreamingText(sessionId, event.accumulated)
+                        // 方案A：流式期间定期持久化，防止应用被杀导致消息丢失
+                        maybePeriodicPersist(sessionId, taskId, latestStreamingContent, latestStreamingReasoning)
                     }
                     is AgentEvent.ReasoningDelta -> {
                         setRetryState(sessionId, null)
+                        latestStreamingReasoning = event.accumulated
                         setStreamingReasoning(sessionId, event.accumulated)
+                        // 方案A：思考内容也定期持久化
+                        maybePeriodicPersist(sessionId, taskId, latestStreamingContent, latestStreamingReasoning)
                     }
                     is AgentEvent.Retrying -> {
                         setRetryState(sessionId, RetryState(event.attempt, event.maxRetries))
@@ -917,6 +990,11 @@ class AIAgentViewModel @Inject constructor(
                         setRetryState(sessionId, null)
                         setStreamingText(sessionId, null)
                         setStreamingReasoning(sessionId, null)
+                        // 方案A：压缩打断流式，清理流式消息 ID
+                        streamingMessageIds.remove(sessionId)
+                        periodicPersistStates.remove(sessionId)
+                        latestStreamingContent = ""
+                        latestStreamingReasoning = null
                         setCompacting(sessionId, true)
                     }
                     AgentEvent.CompactionFinished -> {
@@ -925,10 +1003,17 @@ class AIAgentViewModel @Inject constructor(
                     is AgentEvent.AssistantText -> {
                         val normalized = if (event.content.hasVisibleContent()) event.content else ""
                         val reasoning = event.reasoning.takeIf { it.hasVisibleContent() }
+                        // 方案A：如果流式期间已定期落库，用同一个 ID 做最终替换（INSERT OR REPLACE）；
+                        // 否则正常 INSERT（随机 UUID）。
+                        val existingStreamingId = streamingMessageIds.remove(sessionId)
+                        periodicPersistStates.remove(sessionId)
+                        latestStreamingContent = ""
+                        latestStreamingReasoning = null
                         messagePersistenceUseCase.persist(
                             sessionId,
                             MessageRole.ASSISTANT,
                             normalized,
+                            id = existingStreamingId ?: UUID.randomUUID().toString(),
                             taskId = taskId,
                             toolCalls = event.toolCalls,
                             reasoning = reasoning,
@@ -952,6 +1037,11 @@ class AIAgentViewModel @Inject constructor(
                     is AgentEvent.ToolCallStarted -> {
                         val msgId = "tool_${event.id}"
                         setStreamingText(sessionId, null)
+                        // 方案A：助手文本回合结束，清理流式消息 ID 和定期落库状态
+                        streamingMessageIds.remove(sessionId)
+                        periodicPersistStates.remove(sessionId)
+                        latestStreamingContent = ""
+                        latestStreamingReasoning = null
                         toolArgsByMsgId[msgId] = event.argsPreview
                         messagePersistenceUseCase.persist(
                             sessionId,
@@ -1030,6 +1120,10 @@ class AIAgentViewModel @Inject constructor(
                         // 会话任务目标变更：与消息同日志，落库为工具卡片，让用户「看见」目标被设定/更新/完成。
                         setStreamingText(sessionId, null)
                         setStreamingReasoning(sessionId, null)
+                        streamingMessageIds.remove(sessionId)
+                        periodicPersistStates.remove(sessionId)
+                        latestStreamingContent = ""
+                        latestStreamingReasoning = null
                         val msgId = "goal_${event.goalId}_${System.nanoTime()}"
                         val statusLabel = when (event.status) {
                             "done" -> context.getString(R.string.agent_goal_status_done)
@@ -1054,6 +1148,10 @@ class AIAgentViewModel @Inject constructor(
                         // 技能输出已随首轮模型上下文以【系统·自动触发技能…】注入，这里仅用于 UI 渲染，不重复进模型上下文。
                         setStreamingText(sessionId, null)
                         setStreamingReasoning(sessionId, null)
+                        streamingMessageIds.remove(sessionId)
+                        periodicPersistStates.remove(sessionId)
+                        latestStreamingContent = ""
+                        latestStreamingReasoning = null
                         val msgId = "skill_auto_${System.nanoTime()}"
                         messagePersistenceUseCase.persist(
                             sessionId,
@@ -1116,6 +1214,14 @@ class AIAgentViewModel @Inject constructor(
              FileLogger.e(TAG, "executeAgentRequestStream 失败: request=$request", e)
              setAgentState(sessionId, AgentUIState.Error(e.toUserMessage()))
         } finally {
+            // 方案C：兜底落库——在清理状态前捕获流式内容，如果 AssistantText 未正常到达则补一次落库。
+            // 注意：正常完成时 streamingText 已被 AssistantText 清空，此处为空，不会重复落库。
+            // stopAgent() 也会先清空 streamingText 再 cancel，此处同样为空，不与 stopAgent 的部分结果落库冲突。
+            val fallbackStreamingText = latestStreamingContent
+            val fallbackStreamingReasoning = latestStreamingReasoning
+            val fallbackStreamingId = streamingMessageIds.remove(sessionId)
+            val fallbackTaskId = currentTaskIdBySession[sessionId] ?: ""
+
             if (sessionJobs[sessionId] == coroutineContext[Job]) {
                 sessionJobs.remove(sessionId)
             }
@@ -1125,6 +1231,24 @@ class AIAgentViewModel @Inject constructor(
             setStreamingReasoning(sessionId, null)
             setCompacting(sessionId, false)
             setRetryState(sessionId, null)
+            periodicPersistStates.remove(sessionId)
+            latestStreamingContent = ""
+            latestStreamingReasoning = null
+
+            // 兜底落库：如果流式内容非空，说明正常落库未完成，执行一次 persist。
+            // persist 内部已用 NonCancellable（方案B），即使协程已取消也能完成写入。
+            if (fallbackStreamingText.isNotEmpty() || !fallbackStreamingReasoning.isNullOrEmpty()) {
+                runCatching {
+                    messagePersistenceUseCase.persist(
+                        sessionId = sessionId,
+                        role = MessageRole.ASSISTANT,
+                        content = fallbackStreamingText,
+                        id = fallbackStreamingId ?: UUID.randomUUID().toString(),
+                        taskId = fallbackTaskId,
+                        reasoning = fallbackStreamingReasoning
+                    )
+                }
+            }
 
             // 忙碌期间缓存的后台任务完成通知：本轮结束且 job 已移除后，合并成一条发送
             flushMergedNotifications(sessionId)
@@ -1267,6 +1391,8 @@ class AIAgentViewModel @Inject constructor(
         _runningTools.value = emptyMap()
         _retryStates.value = emptyMap()
         currentTaskIdBySession.clear()
+        streamingMessageIds.clear()
+        periodicPersistStates.clear()
         // D5-8 中断/恢复：会话停止时把各会话 RUNNING playbook 运行置 INTERRUPTED（可 playbook_resume 继续）。
         viewModelScope.launch {
             stoppedSids.forEach { sid -> runCatching { playbookExecutor.interrupt(sid) } }
@@ -1283,6 +1409,9 @@ class AIAgentViewModel @Inject constructor(
         val stoppedText = context.getString(R.string.agent_stopped_by_user)
         // 同步捕获本轮 taskId：job.cancel() 后 finally 会清理 map，这里先取走避免竞态。
         val stoppedTaskId = currentTaskIdBySession[sessionId] ?: ""
+        // 方案A：同步捕获流式消息 ID，用于部分结果落库时复用同 ID，避免重复消息。
+        val stoppedStreamingId = streamingMessageIds.remove(sessionId)
+        periodicPersistStates.remove(sessionId)
         job.cancel()
         // 停止会话时清理其残留的权限确认请求，避免确认卡继续弹出。
         toolPermissionManager.cancelPending(sessionId)
@@ -1318,10 +1447,12 @@ class AIAgentViewModel @Inject constructor(
                 val partial = (streamingText ?: "").trimEnd()
                 val content = if (partial.isNotEmpty()) "$partial\n\n$stoppedText" else stoppedText
                 val reasoning = streamingReasoning?.takeIf { it.hasVisibleContent() }
+                // 方案A：如果流式期间已定期落库，复用同 ID 做最终替换，避免重复消息。
                 messagePersistenceUseCase.persist(
                     sessionId = sessionId,
                     role = MessageRole.ASSISTANT,
                     content = content,
+                    id = stoppedStreamingId ?: UUID.randomUUID().toString(),
                     taskId = stoppedTaskId,
                     reasoning = reasoning
                 )

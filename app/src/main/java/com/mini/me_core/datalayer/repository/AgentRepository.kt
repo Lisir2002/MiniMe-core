@@ -146,6 +146,9 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
     suspend fun updateMessageContent(id: String, content: String) =
         withContext(Dispatchers.IO) { q.updateMessageContent(content, id) }
 
+    suspend fun updateMessageContentAndReasoning(id: String, content: String, reasoning: String?) =
+        withContext(Dispatchers.IO) { q.updateMessageContentAndReasoning(content, reasoning, id) }
+
     suspend fun deleteMessageById(id: String) =
         withContext(Dispatchers.IO) { q.deleteMessageById(id) }
 

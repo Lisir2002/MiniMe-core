@@ -199,6 +199,9 @@ SELECT * FROM agent_message WHERE id = ? LIMIT 1;
 updateMessageContent:
 UPDATE agent_message SET content = ? WHERE id = ?;
 
+updateMessageContentAndReasoning:
+UPDATE agent_message SET content = ?, reasoning = ? WHERE id = ?;
+
 deleteMessageById:
 DELETE FROM agent_message WHERE id = ?;
 
