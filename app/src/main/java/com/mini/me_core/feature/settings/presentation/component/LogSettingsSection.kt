@@ -191,7 +191,6 @@ internal fun LogLevelCard(
             Text(
                 text = stringResource(R.string.settings_log_current, current.name),
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
@@ -259,7 +258,6 @@ private fun ColumnScope.LogViewerContent(
                         text = state.filterServerName?.let { stringResource(R.string.log_mcp_prefix, it) }
                             ?: stringResource(R.string.log_all),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(

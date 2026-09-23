@@ -57,7 +57,6 @@ internal fun GitUserIdentityCard(
             Text(
                 text = stringResource(R.string.git_identity_title),
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(

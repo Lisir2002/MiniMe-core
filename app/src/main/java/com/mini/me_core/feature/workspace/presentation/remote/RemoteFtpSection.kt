@@ -68,7 +68,6 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     Text(
                         text = stringResource(R.string.ftp_usage_title),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
@@ -105,7 +104,6 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                             Text(
                                 text = "FTP",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Normal,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
@@ -155,7 +153,6 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     Text(
                         text = stringResource(R.string.ftp_config_title),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }

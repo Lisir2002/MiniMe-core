@@ -68,7 +68,6 @@ fun SyncSettingsSection(
                     Text(
                         text = stringResource(R.string.sync_ignore_list),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -122,7 +121,6 @@ fun SyncSettingsSection(
                         Text(
                             text = stringResource(R.string.sync_follow_gitignore),
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
@@ -161,7 +159,6 @@ fun SyncSettingsSection(
                     Text(
                         text = stringResource(R.string.sync_max_batch_size),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -220,7 +217,7 @@ fun RemoteConnectionCard(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                        Text(text = conn.name, fontWeight = FontWeight.Normal, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(text = conn.name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                         Text(
                             text = if (isLocal) "LOCAL://${conn.host}" else "${conn.protocol}://${conn.username}@${conn.host}:${conn.port}",
                             style = MaterialTheme.typography.bodySmall,
@@ -276,7 +273,6 @@ fun RemoteMountCard(
                     Column {
                         Text(
                             text = stringResource(R.string.sync_via_connection, mount.connection?.name ?: stringResource(R.string.sync_unknown_connection)),
-                            fontWeight = FontWeight.Normal,
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )

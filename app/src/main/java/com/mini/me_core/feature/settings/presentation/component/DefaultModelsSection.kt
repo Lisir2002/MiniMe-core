@@ -270,7 +270,6 @@ private fun ModelSelectionSheet(
                                             Text(
                                                 text = followChatModelText,
                                                 style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Normal,
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
                                             Text(

@@ -121,7 +121,6 @@ fun ProviderItem(
             Text(
                 text = provider.name,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )

@@ -146,7 +146,6 @@ private fun CredentialItem(
                 Text(
                     text = credential.label.ifBlank { "${credential.host} · ${credential.username}" },
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

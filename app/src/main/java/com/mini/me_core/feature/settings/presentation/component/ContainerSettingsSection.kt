@@ -124,7 +124,6 @@ internal fun ContainerSection(
                         Text(
                             text = stringResource(R.string.container_share_storage),
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
@@ -167,7 +166,6 @@ internal fun ContainerSection(
                         Text(
                             text = profile.name,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
