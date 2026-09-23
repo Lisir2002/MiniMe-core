@@ -105,6 +105,8 @@ data class ThemeSettings(
     val cornerStyle: String = "ROUNDED",
     val fontScale: Float = 1.0f,
     val animationScale: Float = 1.0f,
+    /** Component Tokens：字体粗细缩放（0.8-1.2，默认 1.0） */
+    val fontWeightScale: Float = 1.0f,
 ) {
     fun themeMode(): ThemeMode = ThemeMode.fromPersisted(mode)
 

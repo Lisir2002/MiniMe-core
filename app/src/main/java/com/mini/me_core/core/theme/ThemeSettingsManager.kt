@@ -181,6 +181,14 @@ class ThemeSettingsManager @Inject constructor(
         persist(_settings.value.copy(animationScale = clamped))
     }
 
+    /**
+     * 设置字体粗细缩放（0.8-1.2，默认 1.0）。
+     */
+    suspend fun setFontWeightScale(scale: Float) {
+        val clamped = scale.coerceIn(0.8f, 1.2f)
+        persist(_settings.value.copy(fontWeightScale = clamped))
+    }
+
     // ── 对比度计算（WCAG 公式）──
 
     /**

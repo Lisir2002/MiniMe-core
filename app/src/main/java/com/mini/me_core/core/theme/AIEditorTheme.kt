@@ -285,6 +285,8 @@ fun AIEditorTheme(
     fontScale: Float = 1.0f,
     // 问题3：显示偏好——动效缩放（1.0=正常，0.0=关闭）
     animationScale: Float = 1.0f,
+    // Component Tokens：显示偏好——字体粗细缩放（1.0=标准）
+    fontWeightScale: Float = 1.0f,
     content: @Composable () -> Unit
 ) {
     // Phase 5：如果有自定义颜色，构建动态 Material3 ColorScheme；否则用默认
@@ -298,6 +300,20 @@ fun AIEditorTheme(
     // 问题3：根据 fontScale 缩放所有 TextStyle 的 fontSize
     val scaledTypography = remember(AppTypography, fontScale) {
         AppTypography.scaleFontSize(fontScale)
+    }
+
+    // Component Tokens：根据 cornerStyle + fontScale + fontWeightScale 动态构建
+    val cornerScale = com.mini.me_core.core.theme.tokens.CornerScale.from(cornerStyle)
+    val componentTokens = remember(darkTheme, cornerStyle, fontScale, fontWeightScale, customColors) {
+        val base = if (darkTheme) {
+            com.mini.me_core.core.theme.tokens.ComponentTokens.Dark
+        } else {
+            com.mini.me_core.core.theme.tokens.ComponentTokens.Light
+        }
+        base
+            .withCornerScale(cornerScale)
+            .withFontScale(fontScale)
+            .withFontWeightScale(fontWeightScale)
     }
 
     val appThemeState = when {
@@ -330,6 +346,12 @@ fun AIEditorTheme(
         LocalAppDarkMode provides darkTheme,
         com.mini.me_core.core.theme.tokens.LocalAppTheme provides appThemeState,
         LocalAnimationScale provides animationScale,
+        // Component Tokens：统一提供组件级样式令牌
+        com.mini.me_core.core.theme.tokens.LocalComponentTokens provides componentTokens,
+        // Component Tokens：圆角档位（由 cornerStyle 映射）
+        com.mini.me_core.core.theme.tokens.LocalCornerRadius provides cornerScale,
+        // Component Tokens：字体粗细缩放
+        com.mini.me_core.core.theme.tokens.LocalFontWeightScale provides fontWeightScale,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

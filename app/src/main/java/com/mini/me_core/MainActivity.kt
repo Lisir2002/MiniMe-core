@@ -196,6 +196,8 @@ class MainActivity : ComponentActivity() {
             val cornerStyle = themeSettingsState.cornerStyleEnum()
             val fontScale = themeSettingsState.fontScale
             val animationScale = themeSettingsState.animationScale
+            // Component Tokens：字体粗细缩放
+            val fontWeightScale = themeSettingsState.fontWeightScale
 
             AIEditorTheme(
                 darkTheme = darkTheme,
@@ -206,6 +208,7 @@ class MainActivity : ComponentActivity() {
                 cornerStyle = cornerStyle,
                 fontScale = fontScale,
                 animationScale = animationScale,
+                fontWeightScale = fontWeightScale,
             ) {
                 // 将 MainActivity 算好的"APP 实际暗模式"通过 CompositionLocal 下发，
                 // 子树里的终端内容配色、跟随程序开关都读这同一个值，
