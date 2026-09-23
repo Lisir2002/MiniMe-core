@@ -1730,4 +1730,45 @@
     <string name="skill_conversation_entry">Skills</string>
     <string name="skill_conversation_disabled">Disabled in this conversation (can be restored)</string>
 
+    <!-- Log viewer redesign -->
+    <string name="log_viewer_title">Runtime Logs</string>
+    <string name="log_record_title">Record</string>
+    <string name="log_record_desc_verbose">Verbose: everything, good for debugging</string>
+    <string name="log_record_desc_debug">Detailed debug info, good for troubleshooting</string>
+    <string name="log_record_desc_info">Important runtime info, recommended for daily use</string>
+    <string name="log_record_desc_warn">Warnings and errors only, most concise</string>
+    <string name="log_record_desc_error">Errors only, recommended for production</string>
+    <string name="log_record_desc_none">Disable all logging</string>
+    <string name="log_filter_all">All</string>
+    <string name="log_level_collapsed_row">%1$d %2$s logs collapsed, tap to expand</string>
+    <string name="log_quick_today">Today</string>
+    <string name="log_quick_yesterday">Yesterday</string>
+    <string name="log_quick_last3">Last 3 days</string>
+    <string name="log_quick_last7">Last 7 days</string>
+    <string name="log_quick_all">All</string>
+    <string name="log_quick_range_custom">Custom range…</string>
+    <string name="log_quick_section_range">Quick range</string>
+    <string name="log_quick_section_file">Single file</string>
+    <string name="log_quick_files_count">%1$d files</string>
+    <string name="log_live_tail">Live tail</string>
+    <string name="log_status_shown">Showing %1$s/%2$s lines</string>
+    <string name="log_status_files">%1$d files</string>
+    <string name="log_status_range_all">All</string>
+    <string name="log_jump">Jump</string>
+    <string name="log_jump_line">Go to line number</string>
+    <string name="log_jump_time">Go to time</string>
+    <string name="log_jump_next_error">Next ERROR</string>
+    <string name="log_back_to_latest">↓ Back to latest</string>
+    <string name="log_match_count">%1$d matches</string>
+    <string name="log_match_none">No matches</string>
+    <string name="log_match_prev">Prev</string>
+    <string name="log_match_next">Next</string>
+    <string name="log_search_expanded_hint">Search logs…</string>
+    <string name="log_filter_sheet_title">Advanced filter</string>
+    <string name="log_filter_reset_all">Reset all</string>
+    <string name="log_filter_apply">Apply</string>
+    <string name="log_level_switched">Log level switched to %1$s</string>
+    <string name="log_custom_range_label">Custom range</string>
+    <string name="log_custom_range_days">%1$d days, %2$d files</string>
+
 </resources>

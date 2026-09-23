@@ -1737,4 +1737,45 @@
     <string name="skill_conversation_entry">技能</string>
     <string name="skill_conversation_disabled">本对话已禁用（可恢复）</string>
 
+    <!-- 运行日志查看器 UI 重构 -->
+    <string name="log_viewer_title">运行日志</string>
+    <string name="log_record_title">记录</string>
+    <string name="log_record_desc_verbose">全量记录，适合开发调试</string>
+    <string name="log_record_desc_debug">详细调试信息，适合排查问题</string>
+    <string name="log_record_desc_info">重要运行信息，日常使用推荐</string>
+    <string name="log_record_desc_warn">仅警告和错误，最简洁</string>
+    <string name="log_record_desc_error">仅错误，生产环境推荐</string>
+    <string name="log_record_desc_none">关闭所有日志记录</string>
+    <string name="log_filter_all">全部</string>
+    <string name="log_level_collapsed_row">%1$d 条 %2$s 日志已折叠，点击展开</string>
+    <string name="log_quick_today">今天</string>
+    <string name="log_quick_yesterday">昨天</string>
+    <string name="log_quick_last3">近 3 天</string>
+    <string name="log_quick_last7">近 7 天</string>
+    <string name="log_quick_all">全部</string>
+    <string name="log_quick_range_custom">自定义范围…</string>
+    <string name="log_quick_section_range">快捷范围</string>
+    <string name="log_quick_section_file">单文件</string>
+    <string name="log_quick_files_count">%1$d个文件</string>
+    <string name="log_live_tail">实时尾随</string>
+    <string name="log_status_shown">显示 %1$s/%2$s 行</string>
+    <string name="log_status_files">%1$d 文件</string>
+    <string name="log_status_range_all">全部</string>
+    <string name="log_jump">跳至</string>
+    <string name="log_jump_line">跳转到行号</string>
+    <string name="log_jump_time">跳转到时间</string>
+    <string name="log_jump_next_error">下一个 ERROR</string>
+    <string name="log_back_to_latest">↓ 返回最新</string>
+    <string name="log_match_count">匹配 %1$d 处</string>
+    <string name="log_match_none">无匹配</string>
+    <string name="log_match_prev">上一处</string>
+    <string name="log_match_next">下一处</string>
+    <string name="log_search_expanded_hint">搜索日志…</string>
+    <string name="log_filter_sheet_title">高级筛选</string>
+    <string name="log_filter_reset_all">重置全部</string>
+    <string name="log_filter_apply">应用</string>
+    <string name="log_level_switched">日志等级已切换为 %1$s</string>
+    <string name="log_custom_range_label">自定义范围</string>
+    <string name="log_custom_range_days">共 %1$d 天，%2$d 个文件</string>
+
 </resources>
