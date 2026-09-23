@@ -615,7 +615,11 @@ class AIAgentViewModel @Inject constructor(
                 // 都没有则置空（进入欢迎页），等用户新建/首条消息时再绑定，避免空会话堆积。
                 val existing = sessionUseCase.getFirstSessionOfWorkspace(path)
                     ?: sessionUseCase.getFirstUnboundSession()
-                _currentSessionId.value = existing?.id
+                // 竞态保护：快速连续切换工作台时，旧查询结果可能滞后返回。
+                // 若当前工作台已不是本次 path，丢弃旧结果，不覆盖 sessionId。
+                if (_currentWorkspace.value == path) {
+                    _currentSessionId.value = existing?.id
+                }
             }
         }
 
