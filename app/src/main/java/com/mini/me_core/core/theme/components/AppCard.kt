@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.tokens.PrimitiveElevation
 import com.mini.me_core.core.theme.tokens.PrimitiveRadius
 
@@ -32,7 +33,7 @@ fun AppCard(
     content: @Composable () -> Unit,
 ) {
     val colors = LocalAppTheme.current.colors
-    val shape = RoundedCornerShape(PrimitiveRadius.Xl) // 12dp，与现有 CyberCard 14dp 接近
+    val shape = RoundedCornerShape(LocalCornerRadius.current.xl) // 跟随 cornerStyle 动态圆角
 
     val containerColor: Color
     val border: BorderStroke?

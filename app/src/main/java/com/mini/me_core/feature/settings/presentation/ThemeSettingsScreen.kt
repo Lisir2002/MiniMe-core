@@ -6,6 +6,8 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -248,7 +250,7 @@ private fun ThemePreviewCard(
             ) {
                 Text(
                     text = "MiniMe",
-                    fontSize = 13.sp,
+                    fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
                     fontWeight = FontWeight.Bold,
                     color = previewColors.textPrimary,
                 )
@@ -312,27 +314,45 @@ private fun ThemePreviewCard(
                 }
             }
 
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(LocalCornerRadius.current.map(18.dp)))
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.map(20.dp)))
                     .background(previewColors.surfaceSunken)
-                    .border(1.dp, previewColors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.map(18.dp))),
-                contentAlignment = Alignment.CenterStart,
+                    .border(1.dp, previewColors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.map(20.dp)))
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = "  输入消息...",
-                    fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
-                    color = previewColors.textTertiary,
-                    modifier = Modifier.padding(start = 12.dp),
-                )
+                // 左侧附件按钮占位
                 Box(
                     modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 6.dp)
-                        .size(26.dp)
-                        .clip(RoundedCornerShape(LocalCornerRadius.current.map(13.dp)))
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
+                        .background(previewColors.surfaceCard)
+                        .border(1.dp, previewColors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.sm)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "+",
+                        fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
+                        color = previewColors.textSecondary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                // 占位文字
+                Text(
+                    text = "输入消息...",
+                    fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
+                    color = previewColors.textTertiary,
+                    modifier = Modifier.weight(1f),
+                )
+                // 发送按钮
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
                         .background(previewColors.brandPrimary),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -429,7 +449,7 @@ private fun PresetCarousel(
     ) {
         items(presets) { preset ->
             val isSelected = preset.id == selectedPresetId
-            Column(
+            Box(
                 modifier = Modifier
                     .width(120.dp)
                     .clip(RoundedCornerShape(LocalCornerRadius.current.xl))
@@ -439,40 +459,71 @@ private fun PresetCarousel(
                         color = if (isSelected) colors.brandPrimary else colors.borderDefault,
                         shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                     )
-                    .clickable { onPresetSelected(preset.id) }
-                    .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Md),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                    .clickable { onPresetSelected(preset.id) },
             ) {
-                Row(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(LocalCornerRadius.current.md)),
+                        .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Md),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Box(modifier = Modifier.weight(1f).background(preset.previewBackground))
-                    Box(modifier = Modifier.weight(1f).background(preset.previewSurface))
-                    Box(modifier = Modifier.weight(1f).background(preset.previewPrimary))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+                            .background(preset.previewBackground),
+                    ) {
+                        // 模拟卡片色块
+                        Box(
+                            modifier = Modifier
+                                .padding(6.dp)
+                                .fillMaxWidth(0.65f)
+                                .height(18.dp)
+                                .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
+                                .background(preset.previewSurface),
+                        )
+                        // 模拟主色气泡
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 6.dp, bottom = 6.dp)
+                                .size(width = 28.dp, height = 12.dp)
+                                .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
+                                .background(preset.previewPrimary),
+                        )
+                    }
+
+                    Text(
+                        text = preset.displayName,
+                        fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary,
+                    )
+                    Text(
+                        text = preset.description,
+                        fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
+                        color = colors.textSecondary,
+                        maxLines = 2,
+                    )
                 }
 
-                Text(
-                    text = preset.displayName,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary,
-                )
-                Text(
-                    text = preset.description,
-                    fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
-                    color = colors.textSecondary,
-                    maxLines = 2,
-                )
-
+                // "使用中" 角标：右上角叠加，不改变卡片高度
                 if (isSelected) {
-                    AppChip(
-                        text = "使用中",
-                        variant = AppChipVariant.Filled,
-                        chipColor = AppChipColor.Primary,
-                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp)
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
+                            .background(colors.brandPrimary)
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            text = "使用中",
+                            fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.onBrandPrimary,
+                        )
+                    }
                 }
             }
         }
@@ -580,7 +631,7 @@ private fun ColorRow(
                 )
                 Text(
                     text = name,
-                    fontSize = 13.sp,
+                    fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
                     color = colors.textPrimary,
                     modifier = Modifier.weight(1f),
                 )
@@ -603,12 +654,12 @@ private fun ColorRow(
                     modifier = Modifier
                         .size(6.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFF59E0B)),
+                        .background(colors.warning),
                 )
                 Text(
                     text = "对比度不足（%.1f:1），可能影响可读性".format(contrastRatio),
                     fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
-                    color = Color(0xFFF59E0B),
+                    color = colors.warning,
                 )
             }
         }
@@ -753,7 +804,7 @@ private fun BackgroundImageSection(
             ) {
                 Text(
                     text = if (backgroundImage != null) "已设置背景图" else "未设置背景图",
-                    fontSize = 13.sp,
+                    fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
                     color = colors.textPrimary,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -822,7 +873,7 @@ private fun DisplayPreferencesSection(
             // 圆角风格三选一
             Text(
                 text = "圆角风格",
-                fontSize = 13.sp,
+                fontSize = LocalComponentTokens.current.text.titleSmallFontSize,
                 color = colors.textPrimary,
                 fontWeight = FontWeight.Medium,
             )
@@ -884,6 +935,65 @@ private fun DisplayPreferencesSection(
                 onValueChange = onAnimationScaleChange,
                 valueLabel = if (animationScale == 0f) "关闭" else "%.0f%%".format(animationScale * 100),
             )
+
+            // 动效预览：点击播放动画，时长跟随 animationScale
+            AnimationPreviewBox()
+        }
+    }
+}
+
+// ──────────────────────────────────────────────
+// Phase 5: 动效强度预览
+// ──────────────────────────────────────────────
+
+/**
+ * 动效强度预览：点击后播放一段横向滑动+渐隐动画，动画时长跟随 LocalAnimationScale。
+ * 0% 时直接跳变（无动画），100% 时最慢最丝滑。
+ */
+@Composable
+private fun AnimationPreviewBox() {
+    val colors = LocalAppTheme.current.colors
+    val animScale = com.mini.me_core.core.theme.LocalAnimationScale.current
+
+    var playTrigger by remember { mutableStateOf(false) }
+    val animDuration = (600L * animScale).toInt().coerceAtLeast(0)
+
+    val offsetX by animateFloatAsState(
+        targetValue = if (playTrigger) 180f else 0f,
+        animationSpec = tween(durationMillis = animDuration),
+        label = "previewOffset",
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (playTrigger) 0.3f else 1f,
+        animationSpec = tween(durationMillis = animDuration),
+        label = "previewAlpha",
+    )
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = "点击预览动效",
+            fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
+            color = colors.textTertiary,
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+                .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
+                .background(colors.surfaceSunken)
+                .border(1.dp, colors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.sm))
+                .clickable { playTrigger = !playTrigger },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(start = 8.dp + offsetX.dp)
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(colors.brandPrimary.copy(alpha = alpha)),
+            )
         }
     }
 }
@@ -941,7 +1051,7 @@ private fun SliderRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(text = label, fontSize = 13.sp, color = colors.textPrimary)
+            Text(text = label, fontSize = LocalComponentTokens.current.text.bodyMediumFontSize, color = colors.textPrimary)
             Text(text = valueLabel, fontSize = LocalComponentTokens.current.text.bodySmallFontSize, color = colors.textSecondary)
         }
         Slider(
