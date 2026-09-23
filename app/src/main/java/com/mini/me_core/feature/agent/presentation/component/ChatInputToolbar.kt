@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.agent.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
+import com.mini.me_core.core.theme.tokens.PrimitiveAlpha
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -232,8 +233,8 @@ internal fun UploadIconButton(
     onClick: () -> Unit,
     tint: Color? = null
 ) {
-    // 混合模式：工具栏图标弱化色（亮色 #64748B / 暗色 #94A3B8）
-    val weakColor = if (LocalAppDarkMode.current) Color(0xFF94A3B8) else Color(0xFF64748B)
+    // 工具栏图标弱化色：跟随语义色 onSurfaceVariant（= textSecondary）
+    val weakColor = MaterialTheme.colorScheme.onSurfaceVariant
     IconButton(
         onClick = onClick,
         enabled = enabled,
@@ -242,7 +243,7 @@ internal fun UploadIconButton(
         Icon(
             icon,
             contentDescription = contentDescription,
-            tint = tint ?: if (enabled) weakColor else weakColor.copy(alpha = 0.38f),
+            tint = tint ?: if (enabled) weakColor else weakColor.copy(alpha = PrimitiveAlpha.Disabled),
             modifier = Modifier.size(20.dp)
         )
     }

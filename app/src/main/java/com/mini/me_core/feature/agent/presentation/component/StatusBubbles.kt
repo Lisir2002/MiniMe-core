@@ -212,8 +212,8 @@ internal fun ReasoningBubble(
                     Icon(
                         Icons.Rounded.Star,
                         contentDescription = null,
-                        // 混合模式：思考条弱化色（亮色 #64748B / 暗色 #94A3B8）
-                        tint = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                        // 思考条弱化色：跟随语义色 onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(Modifier.width(Spacing.sm))
@@ -224,13 +224,13 @@ internal fun ReasoningBubble(
                             fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                             lineHeight = 18.sp
                         ),
-                        color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f)
                     )
                     Icon(
                         if (effectiveExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                         contentDescription = if (effectiveExpanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
-                        tint = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
                 }

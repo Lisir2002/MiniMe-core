@@ -355,7 +355,7 @@ private fun ToolSummaryRow(
                 Text(
                     text = stringResource(R.string.tool_summary_create, createCount),
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF22C55E),
+                    color = MaterialTheme.colorScheme.tertiary,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -363,7 +363,7 @@ private fun ToolSummaryRow(
                 Text(
                     text = stringResource(R.string.tool_summary_modify, modifyCount),
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF3B82F6),
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -371,7 +371,7 @@ private fun ToolSummaryRow(
                 Text(
                     text = stringResource(R.string.tool_summary_delete, deleteCount),
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFFEF4444),
+                    color = MaterialTheme.colorScheme.error,
                     fontWeight = FontWeight.SemiBold
                 )
             }

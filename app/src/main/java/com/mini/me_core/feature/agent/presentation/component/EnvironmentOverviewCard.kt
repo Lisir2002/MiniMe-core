@@ -100,8 +100,8 @@ internal fun InstallProgressRow(progress: InstallProgress) {
     val isDark = LocalAppDarkMode.current
     val colors = LocalAppTheme.current.colors
     val accent = when (progress.phase) {
-        InstallPhaseType.DONE -> Color(0xFF22C55E)
-        InstallPhaseType.FAILED -> Color(0xFFEF4444)
+        InstallPhaseType.DONE -> colors.success
+        InstallPhaseType.FAILED -> colors.error
         else -> Brand.Blue
     }
     // ETA 计算：跟踪安装起始时间，按「已用时间 / 进度」线性外推剩余时间。
@@ -194,20 +194,21 @@ private fun formatEta(seconds: Long): String {
 @Composable
 internal fun EnvironmentComponentRow(component: EnvironmentComponentState) {
     val isDark = LocalAppDarkMode.current
+    val colors = LocalAppTheme.current.colors
     val badge = when (component.status) {
         EnvironmentStatus.INSTALLED -> ComponentBadge(
             Icons.Rounded.CheckCircle,
-            Color(0xFF22C55E),
+            colors.success,
             stringResource(R.string.env_status_installed),
-            Color(0xFF22C55E),
-            Color(0xFF22C55E).copy(alpha = if (isDark) 0.16f else 0.1f)
+            colors.success,
+            colors.success.copy(alpha = if (isDark) 0.16f else 0.1f)
         )
         EnvironmentStatus.MISSING -> ComponentBadge(
             Icons.Rounded.Cancel,
-            Color(0xFFEF4444),
+            colors.error,
             stringResource(R.string.env_status_missing),
-            Color(0xFFEF4444),
-            Color(0xFFEF4444).copy(alpha = if (isDark) 0.16f else 0.1f)
+            colors.error,
+            colors.error.copy(alpha = if (isDark) 0.16f else 0.1f)
         )
         EnvironmentStatus.INSTALLING -> ComponentBadge(
             Icons.Rounded.Sync,

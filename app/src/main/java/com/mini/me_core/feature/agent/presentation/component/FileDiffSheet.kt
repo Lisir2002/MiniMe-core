@@ -51,10 +51,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Construction
 import androidx.compose.material.icons.rounded.Warning
 
-/** 文件变更类型对应的强调色：新增=绿、修改=蓝、删除=红。 */
-private val createColor = Color(0xFF22C55E)
-private val modifyColor = Color(0xFF3B82F6)
-private val deleteColor = Color(0xFFEF4444)
+/** 文件变更类型对应的强调色：新增=成功色、修改=主色、删除=错误色（跟随语义色）。 */
 
 /**
  * 任务变更底部弹窗：占屏约 8/10，双 Tab ——「文件修改」与「日志」。
@@ -221,10 +218,11 @@ private fun FileChangesTab(
             when (current.type) {
                 // 删除：无 diff，展示删除提示
                 FileChangeType.DELETE -> {
+                    val errorColor = MaterialTheme.colorScheme.error
                     Surface(
                         shape = RoundedCornerShape(LocalCornerRadius.current.lg),
-                        color = deleteColor.copy(alpha = 0.08f),
-                        border = BorderStroke(1.dp, deleteColor.copy(alpha = 0.3f)),
+                        color = errorColor.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, errorColor.copy(alpha = 0.3f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -235,7 +233,7 @@ private fun FileChangesTab(
                             Icon(
                                 imageVector = Icons.Rounded.Warning,
                                 contentDescription = null,
-                                tint = deleteColor,
+                                tint = errorColor,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
@@ -244,7 +242,7 @@ private fun FileChangesTab(
                                     else R.string.file_deleted_hint
                                 ),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = deleteColor
+                                color = errorColor
                             )
                         }
                     }
@@ -284,10 +282,11 @@ private fun ToolLogsTab(logs: List<ToolLogEntry>) {
 /** 单条工具日志：工具名 + 参数摘要 + 结果（等宽字体），失败态红色强调。 */
 @Composable
 private fun ToolLogRow(log: ToolLogEntry) {
-    val accent = if (log.isError) deleteColor else modifyColor
+    val errorColor = MaterialTheme.colorScheme.error
+    val accent = if (log.isError) errorColor else MaterialTheme.colorScheme.primary
     Surface(
         shape = RoundedCornerShape(LocalCornerRadius.current.lg),
-        color = if (log.isError) deleteColor.copy(alpha = 0.06f)
+        color = if (log.isError) errorColor.copy(alpha = 0.06f)
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.2f)),
         modifier = Modifier.fillMaxWidth()
@@ -307,7 +306,7 @@ private fun ToolLogRow(log: ToolLogEntry) {
                 Text(
                     text = log.toolName ?: stringResource(R.string.common_tool),
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = if (log.isError) deleteColor else MaterialTheme.colorScheme.onSurface,
+                    color = if (log.isError) errorColor else MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -332,7 +331,7 @@ private fun ToolLogRow(log: ToolLogEntry) {
                         fontFamily = FontFamily.Monospace,
                         lineHeight = 16.sp
                     ),
-                    color = if (log.isError) deleteColor.copy(alpha = 0.9f)
+                    color = if (log.isError) errorColor.copy(alpha = 0.9f)
                             else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -365,10 +364,11 @@ private fun EmptyHint(text: String) {
     }
 }
 
+@Composable
 private fun FileChangeType.changeColor(): Color = when (this) {
-    FileChangeType.CREATE -> createColor
-    FileChangeType.MODIFY -> modifyColor
-    FileChangeType.DELETE -> deleteColor
+    FileChangeType.CREATE -> MaterialTheme.colorScheme.tertiary
+    FileChangeType.MODIFY -> MaterialTheme.colorScheme.primary
+    FileChangeType.DELETE -> MaterialTheme.colorScheme.error
 }
 
 private fun FileChangeType.labelRes(): Int = when (this) {

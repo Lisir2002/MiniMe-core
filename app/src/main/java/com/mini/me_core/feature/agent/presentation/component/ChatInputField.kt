@@ -60,10 +60,10 @@ internal fun ChatInputField(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
-            // v2 混合模式：左侧 ❯ 符号，蓝色 #3B82F6/#60A5FA，14sp 等宽加粗，与光标同行垂直居中
+            // v2 混合模式：左侧 ❯ 符号，跟随主题主色 primary，14sp 等宽加粗，与光标同行垂直居中
             Text(
                 text = "❯",
-                color = if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6),
+                color = MaterialTheme.colorScheme.primary,
                 fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
@@ -98,7 +98,7 @@ internal fun ChatInputField(
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     disabledIndicatorColor = Color.Transparent,
-                    cursorColor = if (isDark) Color(0xFF60A5FA) else Color(0xFF3B82F6)
+                    cursorColor = MaterialTheme.colorScheme.primary
                 )
             )
         }

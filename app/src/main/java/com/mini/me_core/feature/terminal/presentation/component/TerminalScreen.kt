@@ -181,7 +181,7 @@ fun TerminalScreen(
                         Icon(
                             Icons.Rounded.MoreVert,
                             contentDescription = null,
-                            tint = if (LocalAppDarkMode.current) Color(0xFF94A3B8) else Color(0xFF64748B),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                     }
