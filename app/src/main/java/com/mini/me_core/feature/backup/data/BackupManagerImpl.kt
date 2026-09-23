@@ -390,7 +390,7 @@ class BackupManagerImpl @Inject constructor(
                         .getOrDefault("")
                     stats += RestoreStats(chatSessions = restoreJsonl(tar, ChatSessionDto.serializer(), "upsertSessions") { dtos ->
                         safeDaoSuspend("upsertSessions", 0) {
-                            val mapped = dtos.map { it.copy(workspacePath = currentWorkspacePath).toEntity() }
+                            val mapped = dtos.map { it.copy(workspacePath = it.workspacePath.ifBlank { currentWorkspacePath }).toEntity() }
                             v2Agent.upsertAllSessions(mapped.map { it.toV2() })
                             dtos.size
                         }
@@ -498,7 +498,7 @@ class BackupManagerImpl @Inject constructor(
                 .onFailure { FileLogger.w("BackupMgr", "读取 workspacePath 失败(legacy)", it) }
                 .getOrDefault("")
             safeDaoSuspend("legacyUpsertSessions", Unit) {
-                val mapped = snapshot.chatSessions.map { it.copy(workspacePath = currentWorkspacePath).toEntity() }
+                val mapped = snapshot.chatSessions.map { it.copy(workspacePath = it.workspacePath.ifBlank { currentWorkspacePath }).toEntity() }
                 v2Agent.upsertAllSessions(mapped.map { it.toV2() })
             }
         }
