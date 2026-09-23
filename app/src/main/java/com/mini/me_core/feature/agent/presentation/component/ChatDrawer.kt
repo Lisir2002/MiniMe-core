@@ -1,18 +1,27 @@
 package com.mini.me_core.feature.agent.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.splineBasedDecay
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -70,12 +79,9 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -89,12 +95,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.mini.me_core.core.theme.LocalAnimationScale
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
@@ -151,6 +161,7 @@ fun ChatDrawerContent(
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     Column(
         modifier = modifier
@@ -196,7 +207,22 @@ fun ChatDrawerContent(
                 agentStates = agentStates,
                 onSelect = onSelect,
                 onLongPress = { menuSession = it },
-                onSwipeDelete = { pendingDelete = it.toDomain() },
+                onDirectDelete = { swiped ->
+                    onDelete(swiped.toDomain())
+                    val deletedMsg = context.getString(R.string.chat_deleted_snackbar, swiped.title)
+                    val undoLabel = context.getString(R.string.chat_undo)
+                    scope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = deletedMsg,
+                            actionLabel = undoLabel,
+                            duration = SnackbarDuration.Short
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            onUndoDelete()
+                        }
+                    }
+                },
+                onSwipeRename = { pendingRename = it.toDomain() },
                 modifier = Modifier.weight(1f)
             )
             1 -> if (workspaceViewModel != null && workspaceFileViewModel != null) {
@@ -660,64 +686,160 @@ private fun SessionGroupHeader(bucket: SessionBucket, count: Int) {
     }
 }
 
+/** 左滑露出操作按钮的锚点状态：收起 / 展开。 */
+private enum class SwipeRevealState { Collapsed, Expanded }
+
 /**
- * 左滑删除的会话行（B1）：外包 SwipeToDismissBox，仅允许 EndToStart（左滑）。
- * 滑到阈值时只触发 [onSwipeDelete]（上抛确认框），本行始终回弹；确认删除后
- * 行随数据源移除而消失，避免 LazyColumn key 复用串态。
+ * 左滑露出操作按钮的会话行：基于 AnchoredDraggable 实现（standard swipe-to-reveal）。
+ *
+ * - 底层：右侧两个操作按钮（重命名=primary / 删除=error），固定不动。
+ * - 前景：[ChatSessionRow] 整体左移时露出底层按钮；前景带不透明 surface 背景，
+ *   收起时完全遮盖按钮（修复旧版 SwipeToDismissBox 背景透过透明行底泄露的 bug）。
+ *
+ * [expanded] 由父级通过 expandedSessionId 统一管理；展开新行时旧行自动收起。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeableSessionRow(
     session: ChatSessionWithCount,
     selected: Boolean,
     isExecuting: Boolean,
-    onSwipeDelete: () -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onDirectDelete: () -> Unit,
+    onSwipeRename: () -> Unit,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) {
-                onSwipeDelete()
-            }
-            false // 始终回弹；删除须经确认框，此处不真正移除
+    val density = LocalDensity.current
+    // 两个操作按钮各 72dp 宽
+    val actionWidthPx = with(density) { 72.dp.toPx() * 2 }
+    val velocityThresholdPx = with(density) { 100.dp.toPx() }
+
+    val animScale = LocalAnimationScale.current
+    val snapSpec: androidx.compose.animation.core.AnimationSpec<Float> = if (animScale <= 0f) {
+        tween(durationMillis = 0)
+    } else {
+        tween(durationMillis = (220 * animScale).toInt())
+    }
+
+    val dragState = remember(expanded, actionWidthPx, snapSpec, density) {
+        AnchoredDraggableState<SwipeRevealState>(
+            initialValue = if (expanded) SwipeRevealState.Expanded else SwipeRevealState.Collapsed,
+            anchors = DraggableAnchors {
+                SwipeRevealState.Collapsed at 0f
+                SwipeRevealState.Expanded at -actionWidthPx
+            },
+            positionalThreshold = { distance -> distance * 0.5f },
+            velocityThreshold = { velocityThresholdPx },
+            snapAnimationSpec = snapSpec,
+            decayAnimationSpec = splineBasedDecay(density),
+            confirmValueChange = { true }
+        )
+    }
+
+    // 父级外部状态变化（展开新行→本行收起；点击行区域→收起）时动画同步
+    LaunchedEffect(expanded) {
+        val target = if (expanded) SwipeRevealState.Expanded else SwipeRevealState.Collapsed
+        if (dragState.currentValue != target || dragState.settledValue != target) {
+            dragState.animateTo(target)
         }
-    )
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = false,
-        backgroundContent = {
+    }
+
+    // 手势松手吸附后通知父级更新 expandedSessionId
+    LaunchedEffect(dragState.settledValue) {
+        onExpandedChange(dragState.settledValue == SwipeRevealState.Expanded)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+    ) {
+        Box(modifier = Modifier.weight(1f)) {
+            // ── 底层操作按钮（右侧固定）──
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+            ) {
+                // 重命名按钮（primary/蓝）
+                Box(
+                    modifier = Modifier
+                        .width(72.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.primary)
+                        .clickable {
+                            onSwipeRename()
+                            onExpandedChange(false)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = stringResource(R.string.common_rename),
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                // 删除按钮（error/红，最右侧）
+                Box(
+                    modifier = Modifier
+                        .width(72.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.error)
+                        .clickable {
+                            onDirectDelete()
+                            onExpandedChange(false)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Delete,
+                        contentDescription = stringResource(R.string.common_delete),
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            // ── 前景行内容（整体左移滑动）──
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(LocalCornerRadius.current.md))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .padding(horizontal = Spacing.md),
-                contentAlignment = Alignment.CenterEnd
+                    .offset { IntOffset(dragState.requireOffset().toInt(), 0) }
+                    .anchoredDraggable(
+                        state = dragState,
+                        orientation = Orientation.Horizontal
+                    )
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.Delete,
-                    contentDescription = stringResource(R.string.common_delete),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(20.dp)
+                ChatSessionRow(
+                    session = session,
+                    selected = selected,
+                    isExecuting = isExecuting,
+                    onClick = {
+                        // 展开状态下点击行内容 → 收起，不触发选中
+                        if (dragState.settledValue == SwipeRevealState.Expanded) {
+                            onExpandedChange(false)
+                        } else {
+                            onClick()
+                        }
+                    },
+                    onLongClick = onLongClick
                 )
             }
         }
-    ) {
-        ChatSessionRow(
-            session = session,
-            selected = selected,
-            isExecuting = isExecuting,
-            onClick = onClick,
-            onLongClick = onLongClick
-        )
     }
 }
 
 /**
  * 侧边栏「对话列表」tab：中部历史记录列表（新建会话入口在聊天页顶栏）。
- * 四档日期分组（今天/昨天/7天内/更早）吸顶；列表项两行增强；支持左滑删除。
+ * 四档日期分组（今天/昨天/7天内/更早）吸顶；列表项两行增强；支持左滑露出操作按钮。
  * 每次进入该 tab 会自动滚动到当前会话（按分组后的全局下标换算）。
+ *
+ * [expandedSessionId] 统一管理哪一行处于展开状态（rememberSaveable 防回收错乱），
+ * 同一时刻仅一行展开；展开新行时旧行自动收起。
  */
 @Composable
 private fun ChatSessionListPanel(
@@ -726,11 +848,13 @@ private fun ChatSessionListPanel(
     agentStates: Map<String, AgentUIState>,
     onSelect: (ChatSession) -> Unit,
     onLongPress: (ChatSession) -> Unit,
-    onSwipeDelete: (ChatSessionWithCount) -> Unit,
+    onDirectDelete: (ChatSessionWithCount) -> Unit,
+    onSwipeRename: (ChatSessionWithCount) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
     val entries = remember(sessions) { buildSessionEntries(sessions, System.currentTimeMillis()) }
+    var expandedSessionId by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(currentSessionId, entries) {
         if (entries.isEmpty()) return@LaunchedEffect
@@ -775,7 +899,12 @@ private fun ChatSessionListPanel(
                                     session = entry.session,
                                     selected = entry.session.id == currentSessionId,
                                     isExecuting = isExecuting,
-                                    onSwipeDelete = { onSwipeDelete(entry.session) },
+                                    expanded = expandedSessionId == entry.session.id,
+                                    onExpandedChange = { expanded ->
+                                        expandedSessionId = if (expanded) entry.session.id else null
+                                    },
+                                    onDirectDelete = { onDirectDelete(entry.session) },
+                                    onSwipeRename = { onSwipeRename(entry.session) },
                                     onClick = { onSelect(entry.session.toDomain()) },
                                     onLongClick = { onLongPress(entry.session.toDomain()) }
                                 )
