@@ -7,6 +7,12 @@
     <string name="settings_search_hint">搜索设置项…</string>
     <string name="settings_search_empty_title">未找到匹配的设置项</string>
     <string name="settings_search_empty_subtitle">未找到包含「%s」的设置项，试试其他关键词</string>
+    <string name="settings_search_result_count">找到 %d 项</string>
+    <string name="settings_search_history_title">最近搜索</string>
+    <string name="settings_search_history_clear">清空</string>
+    <string name="settings_search_history_empty">暂无搜索历史</string>
+    <string name="settings_search_clear_content_desc">清空搜索</string>
+    <string name="settings_search_close_content_desc">关闭搜索</string>
     <string name="settings_providers">模型服务商</string>
     <string name="settings_provider_editor">提供商</string>
     <string name="settings_default_models">默认模型</string>

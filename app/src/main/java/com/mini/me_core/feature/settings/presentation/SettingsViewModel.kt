@@ -36,6 +36,7 @@ import com.mini.me_core.feature.settings.data.repository.NormFlowSettingsReposit
 import com.mini.me_core.core.util.LogLineParser
 import com.mini.me_core.feature.settings.data.repository.LogFilterSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.LogSettingsRepository
+import com.mini.me_core.feature.settings.data.repository.SettingsSearchHistoryManager
 import com.mini.me_core.feature.settings.data.repository.ThemeSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.VisionModelSettingsRepository
 import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
@@ -122,7 +123,9 @@ class SettingsViewModel @Inject constructor(
     private val remoteRepository: RemoteRepository,
     val auditLogRepository: RemoteAuditLogRepository,
     /** RC63 备选方案③：兼容端点全局策略（STRICT/HEURISTIC/LAX/MANUAL + 自动降级 + viewImage 守卫）。 */
-    private val compatibilityPolicyRepository: CompatibilityPolicyRepository
+    private val compatibilityPolicyRepository: CompatibilityPolicyRepository,
+    /** 设置页搜索历史（KVStore 持久化，最近 10 条）。 */
+    private val searchHistoryManager: SettingsSearchHistoryManager,
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
@@ -159,6 +162,19 @@ class SettingsViewModel @Inject constructor(
     /** 消费一次 openSection 请求（由 SettingsScreen 调），避免 LaunchedEffect 重入时反复跳同一个 section。 */
     fun markPendingSectionConsumed(tick: Long) {
         _lastConsumedSectionTick.value = tick
+    }
+
+    // ── 设置页搜索历史（KVStore 持久化，最近 10 条）──
+    val searchHistory: StateFlow<List<String>> = searchHistoryManager.history
+
+    /** 记录一次搜索词（在 IME Search / 点击结果时调用）。 */
+    fun recordSearch(query: String) {
+        viewModelScope.launch { searchHistoryManager.recordSearch(query) }
+    }
+
+    /** 清空搜索历史。 */
+    fun clearSearchHistory() {
+        viewModelScope.launch { searchHistoryManager.clearHistory() }
     }
 
     // ── 缓存：所有已读入的行（供局部过滤使用，避免重复读文件） ──

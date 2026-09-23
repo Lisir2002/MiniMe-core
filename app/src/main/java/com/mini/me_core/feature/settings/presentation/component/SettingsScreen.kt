@@ -1,8 +1,12 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -188,6 +192,8 @@ fun SettingsScreen(
     // 问题6：搜索模式状态（顶栏按钮触发，替代常驻搜索框）
     var isSearchMode by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    // 搜索历史（KVStore 持久化，由 ViewModel 暴露）
+    val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
 
     // RC62：跨屏跳转（terminal_settings → settings → RemoteServers）：接收来自 SettingsViewModel
     //   的 openSection 请求，切到 SettingsScreen 内部的 section。
@@ -243,71 +249,82 @@ fun SettingsScreen(
         contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // 问题6：Menu 主页且搜索模式开启时，顶栏显示搜索输入框
-            if (section == SettingsSection.Menu && isSearchMode) {
-                SearchTopBar(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                    onClose = {
-                        isSearchMode = false
-                        searchQuery = ""
-                    },
-                    placeholder = stringResource(R.string.settings_search_hint)
-                )
-            } else {
-                AppTopAppBar(
-                    title = stringResource(section.titleRes),
-                    onNavigateBack = {
-                        if (section == SettingsSection.Menu) {
-                            onNavigateBack()
-                        } else if (section == SettingsSection.Logs) {
-                            section = logReturnSection
-                        } else {
-                            section = SettingsSection.Menu
-                        }
-                    },
-                    navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
-                    navigationContentDescription = stringResource(R.string.common_back)
-                ) {
-                    when (section) {
-                        // 问题6：Menu 主页顶栏右侧显示搜索按钮
-                        SettingsSection.Menu -> IconButton(
-                            onClick = { isSearchMode = true },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.settings_search_hint), modifier = Modifier.size(20.dp))
-                        }
-                        SettingsSection.Providers -> IconButton(
-                        onClick = { showAddProviderSheet = true },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.settings_add_provider), modifier = Modifier.size(20.dp))
-                    }
-                    SettingsSection.Mcp -> {
-                        IconButton(onClick = { viewModel.reloadMcp() }, modifier = Modifier.size(40.dp)) {
-                            if (mcpReloading) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            // 问题6：Menu 主页且搜索模式开启时，顶栏显示搜索输入框；带 Crossfade 平滑切换
+            val animScale = com.mini.me_core.core.theme.LocalAnimationScale.current
+            val barAnimDuration = (220L * animScale).toInt().coerceAtLeast(0)
+            Crossfade(
+                targetState = section == SettingsSection.Menu && isSearchMode,
+                animationSpec = tween(barAnimDuration),
+                label = "searchTopBar",
+            ) { searchMode ->
+                if (searchMode) {
+                    SearchTopBar(
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        onClose = {
+                            isSearchMode = false
+                            searchQuery = ""
+                        },
+                        onSearch = { q ->
+                            if (q.isNotBlank()) viewModel.recordSearch(q)
+                        },
+                        placeholder = stringResource(R.string.settings_search_hint)
+                    )
+                } else {
+                    AppTopAppBar(
+                        title = stringResource(section.titleRes),
+                        onNavigateBack = {
+                            if (section == SettingsSection.Menu) {
+                                onNavigateBack()
+                            } else if (section == SettingsSection.Logs) {
+                                section = logReturnSection
                             } else {
-                                Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.settings_reconnect), modifier = Modifier.size(20.dp))
+                                section = SettingsSection.Menu
                             }
-                        }
-                        IconButton(onClick = { editingMcp = null; showMcpDialog = true }, modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.settings_add_mcp_server), modifier = Modifier.size(20.dp))
+                        },
+                        navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                        navigationContentDescription = stringResource(R.string.common_back)
+                    ) {
+                        when (section) {
+                            // 问题6：Menu 主页顶栏右侧显示搜索按钮
+                            SettingsSection.Menu -> IconButton(
+                                onClick = { isSearchMode = true },
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.settings_search_hint), modifier = Modifier.size(20.dp))
+                            }
+                            SettingsSection.Providers -> IconButton(
+                                onClick = { showAddProviderSheet = true },
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.settings_add_provider), modifier = Modifier.size(20.dp))
+                            }
+                            SettingsSection.Mcp -> {
+                                IconButton(onClick = { viewModel.reloadMcp() }, modifier = Modifier.size(40.dp)) {
+                                    if (mcpReloading) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.settings_reconnect), modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                                IconButton(onClick = { editingMcp = null; showMcpDialog = true }, modifier = Modifier.size(40.dp)) {
+                                    Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.settings_add_mcp_server), modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            SettingsSection.Container -> IconButton(onClick = { showContainerAddSheet = true }, modifier = Modifier.size(40.dp)) {
+                                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.container_add_image), modifier = Modifier.size(20.dp))
+                            }
+                            SettingsSection.Logs -> {
+                                IconButton(onClick = { viewModel.refreshLogs() }, modifier = Modifier.size(40.dp)) {
+                                    Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.settings_refresh_logs), modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            else -> {}
                         }
                     }
-                    SettingsSection.Container -> IconButton(onClick = { showContainerAddSheet = true }, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.container_add_image), modifier = Modifier.size(20.dp))
-                    }
-                    SettingsSection.Logs -> {
-                        IconButton(onClick = { viewModel.refreshLogs() }, modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.settings_refresh_logs), modifier = Modifier.size(20.dp))
-                        }
-                    }
-                    else -> {}
                 }
             }
         }
-    }
 ) { padding ->
         Box(
             modifier = Modifier
@@ -345,6 +362,17 @@ fun SettingsScreen(
                     onNavigateToCapabilityCenter = onNavigateToCapabilityCenter,
                     // 问题6：传入搜索状态（由顶栏搜索框驱动）
                     searchQuery = searchQuery,
+                    isSearchMode = isSearchMode,
+                    searchHistory = searchHistory,
+                    onHistoryClick = { word ->
+                        searchQuery = word
+                        viewModel.recordSearch(word)
+                    },
+                    onClearSearchHistory = { viewModel.clearSearchHistory() },
+                    onExitSearchMode = {
+                        isSearchMode = false
+                        searchQuery = ""
+                    },
                 )
                 SettingsSection.Providers -> ProvidersSection(
                     providers = providers,
@@ -562,6 +590,11 @@ internal fun SettingsMenu(
     onNavigateToCapabilityCenter: () -> Unit = {},
     // 问题6：搜索词由顶栏搜索框提供，不再内部管理
     searchQuery: String = "",
+    isSearchMode: Boolean = false,
+    searchHistory: List<String> = emptyList(),
+    onHistoryClick: (String) -> Unit = {},
+    onClearSearchHistory: () -> Unit = {},
+    onExitSearchMode: () -> Unit = {},
 ) {
     val themeLabel = stringResource(themeMode.labelRes)
 
@@ -865,34 +898,82 @@ internal fun SettingsMenu(
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
-            if (hasSearchQuery && searchResultCount == 0) {
-                // 空结果提示
-                EmptySearchResult(query = searchQuery)
-            } else {
-                for (groupName in groupOrder) {
-                    val items = filteredGroups[groupName] ?: continue
-                    CyberSectionHeader(text = groupName)
-                    CyberCard {
-                        Column {
-                            items.forEachIndexed { index, item ->
-                                CyberMenuRow(
-                                    icon = item.icon,
-                                    title = item.title,
-                                    subtitle = item.subtitle,
-                                    onClick = item.action,
-                                    showDivider = index < items.size - 1,
-                                    highlightQuery = searchQuery,
-                                    iconBg = if (item.iconBgLight != Color.Unspecified || item.iconBgDark != Color.Unspecified) {
-                                        if (LocalAppDarkMode.current) item.iconBgDark else item.iconBgLight
-                                    } else null,
-                                    trailing = item.trailing ?: {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                )
+            when {
+                // 搜索模式 + 空输入：展示搜索历史
+                isSearchMode && searchQuery.isBlank() -> {
+                    SearchHistorySection(
+                        history = searchHistory,
+                        onHistoryClick = onHistoryClick,
+                        onClearHistory = onClearSearchHistory,
+                    )
+                }
+                // 搜索模式 + 有输入 + 无结果：空状态
+                hasSearchQuery && searchResultCount == 0 -> {
+                    EmptySearchResult(query = searchQuery)
+                }
+                // 搜索模式 + 有输入 + 有结果：计数行 + 分组结果
+                hasSearchQuery -> {
+                    SearchResultCountRow(count = searchResultCount ?: 0)
+                    for (groupName in groupOrder) {
+                        val items = filteredGroups[groupName] ?: continue
+                        CyberSectionHeader(text = groupName)
+                        CyberCard {
+                            Column {
+                                items.forEachIndexed { index, item ->
+                                    CyberMenuRow(
+                                        icon = item.icon,
+                                        title = item.title,
+                                        subtitle = item.subtitle,
+                                        onClick = {
+                                            // 点击结果：先退出搜索模式，再执行跳转
+                                            if (isSearchMode) onExitSearchMode()
+                                            item.action()
+                                        },
+                                        showDivider = index < items.size - 1,
+                                        highlightQuery = searchQuery,
+                                        iconBg = if (item.iconBgLight != Color.Unspecified || item.iconBgDark != Color.Unspecified) {
+                                            if (LocalAppDarkMode.current) item.iconBgDark else item.iconBgLight
+                                        } else null,
+                                        trailing = item.trailing ?: {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                // 非搜索模式：展示全部分组
+                else -> {
+                    for (groupName in groupOrder) {
+                        val items = filteredGroups[groupName] ?: continue
+                        CyberSectionHeader(text = groupName)
+                        CyberCard {
+                            Column {
+                                items.forEachIndexed { index, item ->
+                                    CyberMenuRow(
+                                        icon = item.icon,
+                                        title = item.title,
+                                        subtitle = item.subtitle,
+                                        onClick = item.action,
+                                        showDivider = index < items.size - 1,
+                                        highlightQuery = "",
+                                        iconBg = if (item.iconBgLight != Color.Unspecified || item.iconBgDark != Color.Unspecified) {
+                                            if (LocalAppDarkMode.current) item.iconBgDark else item.iconBgLight
+                                        } else null,
+                                        trailing = item.trailing ?: {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -905,82 +986,36 @@ internal fun SettingsMenu(
 }
 
 /**
- * 问题6：顶栏搜索模式——替代标题栏，显示搜索输入框 + 关闭按钮。
- * 自动聚焦输入框，实时过滤由父组件的 searchQuery 驱动。
+ * 空搜索结果状态：图标 + 标题 + 副标题。
+ * 视觉走 ComponentTokens.emptyState 令牌。
  */
 @Composable
-private fun SearchTopBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onClose: () -> Unit,
-    placeholder: String,
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .height(44.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onClose, modifier = Modifier.size(40.dp)) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = stringResource(R.string.common_back),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                placeholder = { Text(placeholder, style = MaterialTheme.typography.bodyMedium) },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        Icons.Rounded.Close,
-                        contentDescription = "清除",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.width(Spacing.sm))
-        }
-    }
-}
-
-@Composable
 private fun EmptySearchResult(query: String) {
+    val tokens = LocalComponentTokens.current
+    val es = tokens.emptyState
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = 60.dp),
+            .padding(horizontal = Spacing.lg, vertical = PrimitiveSpacing.Xxxxl),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
             imageVector = Icons.Rounded.Search,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(48.dp)
+            tint = es.iconTintColor,
+            modifier = Modifier.size(es.iconSize)
         )
-        Spacer(Modifier.height(Spacing.lg))
+        Spacer(Modifier.height(es.spacingAfterIcon))
         Text(
             text = stringResource(R.string.settings_search_empty_title),
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurface
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = es.titleFontWeight),
+            color = es.titleColor
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(es.spacingAfterTitle))
         Text(
             text = stringResource(R.string.settings_search_empty_subtitle, query),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = es.subtitleColor
         )
     }
 }
