@@ -195,4 +195,39 @@ class ComponentTokensTest {
         assertEquals(999.dp, CornerScale.Sharp.pill)
         assertEquals(999.dp, CornerScale.Pill.pill)
     }
+
+    // ── 7. map() 非标圆角跟随风格切换 ──
+
+    @Test
+    fun `map Sharp 模式下非标值归零`() {
+        assertEquals(0.dp, CornerScale.Sharp.map(18.dp))
+        assertEquals(0.dp, CornerScale.Sharp.map(24.dp))
+        assertEquals(0.dp, CornerScale.Sharp.map(28.dp))
+        assertEquals(0.dp, CornerScale.Sharp.map(3.dp))
+        assertEquals(0.dp, CornerScale.Sharp.map(2.dp))
+        assertEquals(0.dp, CornerScale.Sharp.map(20.dp))
+    }
+
+    @Test
+    fun `map Pill 模式下非标值变胶囊`() {
+        assertEquals(999.dp, CornerScale.Pill.map(18.dp))
+        assertEquals(999.dp, CornerScale.Pill.map(24.dp))
+        assertEquals(999.dp, CornerScale.Pill.map(28.dp))
+        assertEquals(999.dp, CornerScale.Pill.map(3.dp))
+        assertEquals(999.dp, CornerScale.Pill.map(2.dp))
+        assertEquals(999.dp, CornerScale.Pill.map(20.dp))
+    }
+
+    @Test
+    fun `map Rounded 模式下透传原值`() {
+        assertEquals(18.dp, CornerScale.Rounded.map(18.dp))
+        assertEquals(24.dp, CornerScale.Rounded.map(24.dp))
+        assertEquals(28.dp, CornerScale.Rounded.map(28.dp))
+        assertEquals(3.dp, CornerScale.Rounded.map(3.dp))
+        assertEquals(2.dp, CornerScale.Rounded.map(2.dp))
+        assertEquals(20.dp, CornerScale.Rounded.map(20.dp))
+        // 标准档位值也透传
+        assertEquals(12.dp, CornerScale.Rounded.map(12.dp))
+        assertEquals(4.dp, CornerScale.Rounded.map(4.dp))
+    }
 }

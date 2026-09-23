@@ -148,7 +148,7 @@ internal fun ChatInputBar(
 
             // v2 混合模式：输入框容器——背景 surface，边框 1dp，圆角 20dp，无阴影
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(LocalCornerRadius.current.map(20.dp)),
                 color = MaterialTheme.colorScheme.surface,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 shadowElevation = com.mini.me_core.core.theme.tokens.PrimitiveElevation.Z0,

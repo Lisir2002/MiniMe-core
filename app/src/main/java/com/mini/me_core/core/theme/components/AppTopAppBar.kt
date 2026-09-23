@@ -50,7 +50,7 @@ fun AppTopAppBar(
     val colors = LocalAppTheme.current.colors
 
     Surface(
-        color = colors.surfaceCard,
+        color = colors.surfacePage,
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding(),

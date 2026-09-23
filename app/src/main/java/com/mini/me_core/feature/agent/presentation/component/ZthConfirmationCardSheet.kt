@@ -68,7 +68,12 @@ fun ZthConfirmationCardSheet(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 12.dp, bottomEnd = 12.dp),
+        shape = RoundedCornerShape(
+            topStart = LocalCornerRadius.current.map(24.dp),
+            topEnd = LocalCornerRadius.current.map(24.dp),
+            bottomStart = LocalCornerRadius.current.map(12.dp),
+            bottomEnd = LocalCornerRadius.current.map(12.dp)
+        ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),

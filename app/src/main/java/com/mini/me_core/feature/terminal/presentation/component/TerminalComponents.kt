@@ -611,11 +611,11 @@ private fun CompactFullSwitcher(full: Boolean, onClick: () -> Unit, skin: Termin
         modifier = Modifier
             .height(TerminalLayout.keyHeight)
             .width(TerminalLayout.switcherWidth)   // ← 固定宽度：强制不参与 Row 的 weight 挤压
-            .clip(RoundedCornerShape(TerminalLayout.keyRadius))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.map(TerminalLayout.keyRadius)))
             .border(
                 if (full) skin.keyGroupDBorderWidth else skin.keyGroupABorderWidth,
                 if (full) skin.keyGroupDBorder else skin.keyGroupABorder,
-                RoundedCornerShape(TerminalLayout.keyRadius)
+                RoundedCornerShape(LocalCornerRadius.current.map(TerminalLayout.keyRadius))
             )
             .background(
                 if (full) skin.keyGroupDBg else skin.keyGroupABg
@@ -721,9 +721,9 @@ private fun KeyChip(label: String, skin: TerminalSkinSnapshot, group: KeyGroup =
         modifier = Modifier
             .height(TerminalLayout.keyHeight)
             .then(if (label.length <= 1) Modifier.width(TerminalLayout.keyShortWidth) else Modifier)
-            .clip(RoundedCornerShape(TerminalLayout.keyRadius))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.map(TerminalLayout.keyRadius)))
             .background(bg)
-            .border(borderWidth, borderColor, RoundedCornerShape(TerminalLayout.keyRadius))
+            .border(borderWidth, borderColor, RoundedCornerShape(LocalCornerRadius.current.map(TerminalLayout.keyRadius)))
             .combinedClickable(onClick = onClick)
             .padding(horizontal = Spacing.sm),
         contentAlignment = Alignment.Center

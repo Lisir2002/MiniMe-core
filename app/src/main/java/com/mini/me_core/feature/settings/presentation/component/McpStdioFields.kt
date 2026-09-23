@@ -76,7 +76,7 @@ internal fun McpStdioFields(
     } else {
         args.forEachIndexed { index, value ->
             Card(
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(LocalCornerRadius.current.map(18.dp)),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -170,7 +170,7 @@ internal fun McpStdioFields(
     } else {
         env.forEachIndexed { index, (k, v) ->
             Card(
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(LocalCornerRadius.current.map(18.dp)),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
                 modifier = Modifier.fillMaxWidth()
             ) {

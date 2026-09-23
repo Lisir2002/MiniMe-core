@@ -286,7 +286,7 @@ private fun QuoteCard(lines: List<String>, color: Color) {
             Modifier
                 .width(2.dp)
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(1.dp))
+                .clip(RoundedCornerShape(LocalCornerRadius.current.map(1.dp)))
                 .background(colors.brandPrimary)
         )
         Spacer(Modifier.width(10.dp))
@@ -320,7 +320,7 @@ private fun BulletListCard(
                     Box(
                         Modifier
                             .size(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.map(2.dp)))
                             .background(MaterialTheme.colorScheme.primary)
                     )
                 }
@@ -384,9 +384,9 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(codeBlockCorner)
+            .clip(RoundedCornerShape(LocalCornerRadius.current.map(10.dp)))
             .background(bg)
-            .border(BorderStroke(1.dp, colors.borderDefault), codeBlockCorner)
+            .border(BorderStroke(1.dp, colors.borderDefault), RoundedCornerShape(LocalCornerRadius.current.map(10.dp)))
             .animateContentSize(animationSpec = tween(160))
     ) {
         // Header：语言角标 + 复制 + 展开/收起（渐变跟随品牌色）

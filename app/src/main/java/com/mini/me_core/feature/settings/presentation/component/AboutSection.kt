@@ -349,7 +349,7 @@ private fun HeroCard(
                     Box(
                         modifier = Modifier
                             .size(92.dp)
-                            .clip(RoundedCornerShape(24.dp))
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.map(24.dp)))
                             .background(
                                 Brush.linearGradient(
                                     listOf(ac.heroBgStart, ac.heroBgEnd)
@@ -357,7 +357,7 @@ private fun HeroCard(
                             )
                             .border(
                                 border = BorderStroke(0.8.dp, ac.heroBorder),
-                                shape = RoundedCornerShape(24.dp)
+                                shape = RoundedCornerShape(LocalCornerRadius.current.map(24.dp))
                             )
                             .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Md),
                         contentAlignment = Alignment.Center

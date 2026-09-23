@@ -178,11 +178,11 @@ fun BundleLogDialog(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        containerColor = MaterialTheme.colorScheme.background,
                     ),
                 )
             },
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.background,
             modifier = Modifier.fillMaxSize().padding(vertical = Spacing.xl, horizontal = Spacing.md),
         ) { paddingValues ->
             Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
@@ -753,7 +753,7 @@ private fun LogLineRow(
                     Spacer(Modifier.width(6.dp))
                     LinearProgressIndicator(
                         progress = { line.inlineProgress },
-                        modifier = Modifier.width(64.dp).height(4.dp).clip(RoundedCornerShape(2.dp)),
+                        modifier = Modifier.width(64.dp).height(4.dp).clip(RoundedCornerShape(LocalCornerRadius.current.map(2.dp))),
                         color = fg,
                         trackColor = fg.copy(alpha = 0.2f),
                     )

@@ -217,7 +217,7 @@ private fun ModelSelectionSheet(
                     .fillMaxWidth()
                     .height(screenHeight * 0.85f),
                 color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                shape = RoundedCornerShape(topStart = LocalCornerRadius.current.map(28.dp), topEnd = LocalCornerRadius.current.map(28.dp))
             ) {
                 Column(
                     modifier = Modifier

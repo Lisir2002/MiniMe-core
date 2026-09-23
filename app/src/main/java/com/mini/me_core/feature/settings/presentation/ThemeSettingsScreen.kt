@@ -316,9 +316,9 @@ private fun ThemePreviewCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(36.dp)
-                    .clip(RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.map(18.dp)))
                     .background(previewColors.surfaceSunken)
-                    .border(1.dp, previewColors.borderDefault, RoundedCornerShape(18.dp)),
+                    .border(1.dp, previewColors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.map(18.dp))),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 Text(
@@ -332,7 +332,7 @@ private fun ThemePreviewCard(
                         .align(Alignment.CenterEnd)
                         .padding(end = 6.dp)
                         .size(26.dp)
-                        .clip(RoundedCornerShape(13.dp))
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.map(13.dp)))
                         .background(previewColors.brandPrimary),
                     contentAlignment = Alignment.Center,
                 ) {

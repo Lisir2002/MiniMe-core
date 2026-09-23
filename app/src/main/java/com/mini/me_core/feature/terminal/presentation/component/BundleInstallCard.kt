@@ -904,7 +904,7 @@ private fun MicroSlotBlock(slot: DownloadSlot, size: Dp, onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .size(size)
-                .clip(RoundedCornerShape(3.dp))
+                .clip(RoundedCornerShape(LocalCornerRadius.current.map(3.dp)))
                 .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -917,14 +917,14 @@ private fun MicroSlotBlock(slot: DownloadSlot, size: Dp, onClick: () -> Unit) {
                         }
                     },
                 )
-                .background(baseLook.bg, RoundedCornerShape(3.dp))
+                .background(baseLook.bg, RoundedCornerShape(LocalCornerRadius.current.map(3.dp)))
                 .then(
                     if (baseLook.borderDashed) {
                         Modifier.dashedBorder(
-                            width = 1.dp, color = baseLook.border, shape = RoundedCornerShape(3.dp),
+                            width = 1.dp, color = baseLook.border, shape = RoundedCornerShape(LocalCornerRadius.current.map(3.dp)),
                         )
                     } else {
-                        Modifier.border(width = 1.dp, color = baseLook.border, shape = RoundedCornerShape(3.dp))
+                        Modifier.border(width = 1.dp, color = baseLook.border, shape = RoundedCornerShape(LocalCornerRadius.current.map(3.dp)))
                     },
                 ),
             contentAlignment = Alignment.Center,
@@ -938,7 +938,7 @@ private fun MicroSlotBlock(slot: DownloadSlot, size: Dp, onClick: () -> Unit) {
                         .height(1.dp)
                         .background(
                             color = if (slot.status == SlotStatus.DONE) Color.White else Color(0xFF64B5F6),
-                            shape = RoundedCornerShape(0.5.dp),
+                            shape = RoundedCornerShape(LocalCornerRadius.current.map(0.5.dp)),
                         ),
                 )
             }

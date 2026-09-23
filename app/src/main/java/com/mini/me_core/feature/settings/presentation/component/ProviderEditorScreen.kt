@@ -88,6 +88,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.feature.agent.data.local.entity.ModelCapabilityOverrideEntity
 import com.mini.me_core.feature.settings.data.remote.ModelTestResult
 import com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepository
@@ -644,7 +645,7 @@ private fun FetchModelsDialog(
                     .fillMaxWidth()
                     .height(screenHeight * 0.85f),
                 color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                shape = RoundedCornerShape(topStart = LocalCornerRadius.current.map(28.dp), topEnd = LocalCornerRadius.current.map(28.dp))
             ) {
                 Column(
                     modifier = Modifier

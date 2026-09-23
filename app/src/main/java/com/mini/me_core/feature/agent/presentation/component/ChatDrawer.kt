@@ -591,7 +591,7 @@ private fun DrawerTopTab(
                     .padding(top = Spacing.xs)
                     .width(20.dp)
                     .height(3.dp)
-                    .clip(RoundedCornerShape(2.dp))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.map(2.dp)))
                     .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
             )
         }

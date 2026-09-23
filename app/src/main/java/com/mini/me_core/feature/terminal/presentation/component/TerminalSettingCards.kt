@@ -444,7 +444,7 @@ internal fun SharedLinearProgress(modifier: Modifier = Modifier, color: Color? =
         modifier = modifier
             .fillMaxWidth()
             .height(ProgressSize.Height)
-            .clip(ProgressSize.Corner),
+            .clip(RoundedCornerShape(LocalCornerRadius.current.map(6.dp))),
         color = color ?: SemanticColors.InProgress
     )
 }

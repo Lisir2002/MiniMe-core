@@ -56,6 +56,22 @@ data class CornerScale(
             CornerStyle.ROUNDED -> Rounded
         }
     }
+
+    /**
+     * 将任意原始圆角值映射到当前圆角风格。
+     *
+     * 用于非标圆角（18dp/24dp/28dp 等）跟随 Sharp/Rounded/Pill 切换：
+     * - Sharp  → 返回 0.dp（直角）
+     * - Pill   → 返回 999.dp（胶囊，CircleShape 除外）
+     * - Rounded→ 透传 [original]（视觉零变化）
+     *
+     * 用法：`RoundedCornerShape(LocalCornerRadius.current.map(18.dp))`
+     */
+    fun map(original: Dp): Dp = when {
+        this == Sharp -> 0.dp
+        this == Pill -> 999.dp
+        else -> original
+    }
 }
 
 /**

@@ -452,7 +452,7 @@ private fun SegmentedControl(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(9.dp))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.map(9.dp)))
                     .then(if (selected) Modifier.background(AccentGradient) else Modifier)
                     .clickable { onTabChange(idx) }
                     .padding(vertical = Spacing.sm),

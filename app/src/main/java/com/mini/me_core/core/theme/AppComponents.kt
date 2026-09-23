@@ -90,7 +90,7 @@ fun AppTopAppBar(
     actions: @Composable () -> Unit = {}
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.background,
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
