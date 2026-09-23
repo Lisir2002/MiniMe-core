@@ -4,6 +4,8 @@ import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -64,6 +66,7 @@ import com.mini.logs.data.LogsViewModel
 import com.mini.logs.data.ScrollRequest
 import com.mini.logs.util.FormatUtils
 import com.mini.me_core.core.theme.components.AppButton
+import com.mini.me_core.core.theme.components.AppCard
 import com.mini.me_core.core.theme.components.AppButtonSize
 import com.mini.me_core.core.theme.components.AppButtonVariant
 import com.mini.me_core.core.theme.components.AppEmptyState
@@ -127,6 +130,14 @@ fun LogsScreen(
                 Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                 viewModel.consumeStatusMessage()
             }
+        }
+    }
+
+    // ── 文件级读取诊断（"有文件但无日志"时显示真实读取结果）──
+    var fileDiag by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(logFiles, isLoading) {
+        if (logFiles.isNotEmpty() && searchQuery.isEmpty()) {
+            fileDiag = viewModel.getFileLoadDiagnostics().map { it.describe() }
         }
     }
 
@@ -389,14 +400,54 @@ fun LogsScreen(
                     }
                 }
             } else if (filteredEntries.isEmpty() && !isLoading) {
-                AppEmptyState(
-                    icon = Icons.Rounded.Search,
-                    title = if (searchQuery.isNotEmpty()) "未找到匹配项" else "没有日志",
-                    subtitle = if (searchQuery.isNotEmpty()) "关键词：\"$searchQuery\"" else "尝试调整筛选条件",
-                    actionLabel = "清除筛选",
-                    onAction = { viewModel.resetFilter() },
-                    modifier = Modifier.weight(1f),
-                )
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    AppEmptyState(
+                        icon = Icons.Rounded.Search,
+                        title = if (searchQuery.isNotEmpty()) "未找到匹配项" else "没有日志",
+                        subtitle = if (searchQuery.isNotEmpty())
+                            "关键词：\"$searchQuery\""
+                        else
+                            "已找到文件但读不出日志，下方为每个文件的真实读取诊断",
+                        actionLabel = if (searchQuery.isNotEmpty()) "清除筛选" else "重新扫描",
+                        onAction = {
+                            if (searchQuery.isNotEmpty()) viewModel.resetFilter()
+                            else viewModel.refreshFiles()
+                        },
+                    )
+                    // 文件级读取诊断（非搜索时）
+                    if (searchQuery.isEmpty() && fileDiag.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        AppCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = PrimitiveSpacing.Lg),
+                        ) {
+                            Text(
+                                text = "文件读取诊断",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(
+                                    horizontal = PrimitiveSpacing.Md,
+                                    vertical = PrimitiveSpacing.Sm,
+                                ),
+                            )
+                            fileDiag.forEach { line ->
+                                Text(
+                                    text = line,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(
+                                        horizontal = PrimitiveSpacing.Md,
+                                        vertical = 2.dp,
+                                    ),
+                                )
+                            }
+                            Spacer(Modifier.height(PrimitiveSpacing.Sm))
+                        }
+                    }
+                }
             } else {
                 Box(modifier = Modifier.weight(1f)) {
                     LazyColumn(

@@ -118,6 +118,33 @@ class LogRepository(
         parseLinesToEntries(allLines)
     }
 
+    /** 单个文件的加载诊断（用于空状态精确定位）。 */
+    data class FileLoadDiagnostic(
+        val fileName: String,
+        val kind: String,        // 路径 / SAF
+        val rawLineCount: Int,   // 实际读到的原始行数
+        val parsedCount: Int,    // 能解析出等级的行数
+    ) {
+        fun describe(): String =
+            "[$kind] $fileName：读到 $rawLineCount 行，可解析 $parsedCount 行"
+    }
+
+    /** 对全部已知文件逐个诊断读取结果（IO 线程）。 */
+    suspend fun diagnoseRefLoad(safManager: SafDirectoryManager): List<FileLoadDiagnostic> =
+        withContext(Dispatchers.IO) {
+            val refs = listAllLogRefs(safManager)
+            refs.map { ref ->
+                val lines = runCatching { ref.readLines(context, 5000) }.getOrDefault(emptyList())
+                val parsed = lines.count { LogLineParser.parse(it) != null }
+                FileLoadDiagnostic(
+                    fileName = ref.fileName,
+                    kind = if (ref is LogFileRef.FileRef) "路径" else "SAF",
+                    rawLineCount = lines.size,
+                    parsedCount = parsed,
+                )
+            }
+        }
+
     /** 将 (sourceFile, rawLine) 对解析为 LogEntry 列表。 */
     private fun parseLinesToEntries(allLines: List<Pair<String, String>>): List<LogEntry> {
         val entries = mutableListOf<LogEntry>()
@@ -163,66 +190,18 @@ class LogRepository(
      */
     fun readLastLines(file: File, maxLines: Int = 5000): List<String> {
         if (!file.exists()) return emptyList()
+        val cap = maxLines.coerceAtLeast(1)
         return try {
-            RandomAccessFile(file, "r").use { raf ->
-                val length = raf.length()
-                if (length == 0L) return emptyList()
-
-                // 从文件末尾向前读，每次读 8KB，收集换行符
-                val lines = mutableListOf<String>()
-                var pos = length
-                val chunkSize = 8192
-                val sb = StringBuilder()
-
-                while (pos > 0 && lines.size < maxLines) {
-                    val readSize = minOf(chunkSize.toLong(), pos).toInt()
-                    pos -= readSize
-                    raf.seek(pos)
-                    val buffer = ByteArray(readSize)
-                    raf.readFully(buffer)
-                    val chunk = String(buffer, Charsets.UTF_8)
-
-                    // 在 chunk 前面拼接之前剩余的内容
-                    sb.insert(0, chunk)
-
-                    // 按换行分割
-                    var lastNewline = -1
-                    for (i in sb.length - 1 downTo 0) {
-                        if (sb[i] == '\n') {
-                            if (lastNewline == -1) {
-                                lastNewline = i
-                            } else {
-                                val line = sb.substring(i + 1, lastNewline).trimEnd('\r')
-                                if (line.isNotEmpty() && !line.startsWith("#")) {
-                                    lines.add(0, line)
-                                    if (lines.size >= maxLines) break
-                                }
-                                lastNewline = i
-                            }
-                        }
-                    }
-
-                    // 处理第一行（可能不完整）
-                    if (lines.size < maxLines && lastNewline > 0) {
-                        val firstLine = sb.substring(0, lastNewline).trimEnd('\r', '\n')
-                        if (firstLine.isNotEmpty() && !firstLine.startsWith("#")) {
-                            // 可能是不完整的行，保留
-                        }
-                    }
-
-                    if (pos == 0L) break
-                    sb.setLength(0)
-                    if (lastNewline > 0) {
-                        sb.append(sb.substring(0, lastNewline))
-                    }
+            // 正向逐行读取，仅在内存中滚动保留最后 cap 行（避免大文件 OOM）。
+            // 跳过空行与 # 开头的格式头。
+            val kept = ArrayDeque<String>(cap)
+            file.bufferedReader(Charsets.UTF_8).use { reader ->
+                reader.forEachLine { line ->
+                    if (kept.size >= cap) kept.removeFirst()
+                    kept.addLast(line)
                 }
-
-                // 简化方案：如果上面的复杂逻辑有问题，用 readLines 兜底
-                if (lines.isEmpty()) {
-                    file.readLines().filter { it.isNotEmpty() && !it.startsWith("#") }
-                        .takeLast(maxLines)
-                } else lines
             }
+            kept.filter { it.isNotEmpty() && !it.startsWith("#") }
         } catch (e: Exception) {
             emptyList()
         }

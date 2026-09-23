@@ -69,6 +69,10 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
     /** 获取目录诊断结果（用于 UI 显示具体原因）。 */
     fun getDiagnostics(): List<DirScanStatus> = repository.diagnoseDirs()
 
+    /** 获取每个文件的实际读取诊断（用于"有文件但无日志"时精确定位）。 */
+    suspend fun getFileLoadDiagnostics(): List<LogRepository.FileLoadDiagnostic> =
+        repository.diagnoseRefLoad(safManager)
+
     // ── 核心状态 ──
     private val _allEntries = MutableStateFlow<List<LogEntry>>(emptyList())
     val allEntries: StateFlow<List<LogEntry>> = _allEntries.asStateFlow()
