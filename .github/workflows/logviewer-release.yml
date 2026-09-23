@@ -1,0 +1,70 @@
+name: Logviewer Release
+
+# 打 logviewer-v* tag 时触发：构建 :logviewer-app:assembleRelease 并上传 APK 到 Release。
+# 与主应用 android-release.yml 并行，互不影响。
+#   tag 例：logviewer-v0.0.5
+#   产物：minime-logs-v0.0.5.apk
+on:
+  push:
+    tags:
+      - 'logviewer-v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Release Logviewer APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '14742923'
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Logviewer Release APK
+        run: ./gradlew :logviewer-app:assembleRelease --stacktrace
+
+      - name: Rename APK
+        id: rename
+        run: |
+          set -e
+          ver="${GITHUB_REF_NAME#logviewer-v}"
+          src="logviewer-app/build/outputs/apk/release/logviewer-app-release.apk"
+          out="dist/minime-logs-v${ver}.apk"
+          mkdir -p dist
+          cp "$src" "$out"
+          echo "apk=$out" >> "$GITHUB_OUTPUT"
+          ls -lh "$out"
+
+      - name: Verify signature
+        run: |
+          set -e
+          APK="${{ steps.rename.outputs.apk }}"
+          echo "--- apksigner verify ---"
+          $ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs "$APK" | head -3
+          echo "--- APK size ---"
+          ls -lh "$APK"
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            ${{ steps.rename.outputs.apk }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
