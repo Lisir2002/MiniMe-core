@@ -81,4 +81,28 @@ class LogLineItemTest {
         assertEquals(1, collapsed.size)
         assertEquals(2, (collapsed[0] as LogListItem.Collapsed).count)
     }
+
+    @Test
+    fun buildLogEntries_skipsFormatHeaderLines() {
+        val lines = listOf(
+            "# MiniMe Log Format v1",
+            "# app-version: 0.0.0.12",
+            "# pid: 12345",
+            "",
+            header(LogLevel.INFO, "App", "started"),
+        )
+        val items = buildLogEntries(lines)
+        // 头行与空行全部跳过，只剩一条 Entry
+        assertEquals(1, items.size)
+        assertTrue(items[0] is LogListItem.Entry)
+    }
+
+    @Test
+    fun buildLogEntries_parsesThreadName() {
+        val line = "2026-09-23 09:23:45.123 INFO [App] [thread:main] booting"
+        val items = buildLogEntries(listOf(line))
+        val entry = items[0] as LogListItem.Entry
+        assertEquals("main", entry.parsed.threadName)
+        assertEquals("booting", entry.parsed.message)
+    }
 }

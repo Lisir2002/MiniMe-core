@@ -84,6 +84,9 @@ fun buildLogEntries(lines: List<String>): List<LogListItem> {
     }
 
     for (line in lines) {
+        // 跳过日志文件格式头块（`# MiniMe Log Format vN` / `# app-version:` / `# pid:`）
+        if (line.isBlank()) continue
+        if (line.trimStart().startsWith("#")) continue
         val parsed = LogLineParser.parse(line)
         if (parsed != null) {
             flush()
@@ -313,6 +316,18 @@ fun LogLineItem(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.widthIn(max = 100.dp),
                     )
+                    // 可选线程名（新格式 `[thread:name]`，旧日志为 null 不展示）
+                    entry.parsed.threadName?.takeIf { it.isNotEmpty() }?.let { thread ->
+                        Spacer(Modifier.width(PrimitiveSpacing.Xxs))
+                        Text(
+                            text = "[$thread]",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = LocalAppTheme.current.colors.textTertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
 
                 // ── 消息体（关键词高亮）──

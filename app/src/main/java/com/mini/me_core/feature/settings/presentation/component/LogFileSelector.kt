@@ -79,8 +79,13 @@ fun LogFileSelector(
                     onClick = {},
                 )
                 files.reversed().forEach { file ->
+                    val displayName = file.removePrefix("log-").removeSuffix(".txt")
+                    // 滚动文件 log-<date>.N.txt 含额外点号；无点号的 log-<date>.txt 为当前活跃写入文件
+                    val isActive = !displayName.contains(".")
                     DropdownMenuItem(
-                        text = { Text(file.removePrefix("log-").removeSuffix(".txt")) },
+                        text = {
+                            Text(if (isActive) "$displayName（当前）" else displayName)
+                        },
                         leadingIcon = {
                             Text(if (file == selectedFileName && dateRangeMode == DateRangeMode.SINGLE_FILE) "●" else "○")
                         },
