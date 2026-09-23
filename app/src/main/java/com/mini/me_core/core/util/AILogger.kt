@@ -7,10 +7,11 @@ import android.os.Environment
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.gson.GsonBuilder
+import java.io.BufferedWriter
 import java.io.File
+import java.io.FileOutputStream
+import java.io.OutputStreamWriter
 
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -25,8 +26,11 @@ import java.util.concurrent.atomic.AtomicInteger
  * 文件写入**公共外部存储** `Documents/MiniMe-core/ai-logs/session-<id>.log`（当 WRITE_EXTERNAL_STORAGE
  * 权限已授予时），该目录在应用卸载后**仍然保留**；权限未授予时回退外部私有目录
  * `getExternalFilesDir/ai-logs/`（不可用时再回退内部 `filesDir/ai-logs/`）。
- * 所有写入串行化到单线程后台执行，不阻塞调用方协程。
- * 请求体不含 API Key（密钥在 HTTP 头，本类只记录 URL 与 body），可安全留存。
+ * 所有写入串行化到**独立**的单线程后台执行（与 [FileLogger] 互不阻塞）。
+ *
+ * 安全：写入前统一走 [LogSanitizer] 扫描——既打码 JSON/URL/内联中的 apiKey/token/password 等
+ * 凭据，也把 base64 媒体大数据截断为占位符（原 [redactLargeMedia] 逻辑已并入 Sanitizer），
+ * 不再依赖「请求体不含密钥」的口头假设。
  *
  * 使用前需在 [android.app.Application.onCreate] 调用一次 [init]；当外部存储权限在运行时被授予后，
  * 调用方（如 MainActivity 权限回调）应调用 [onExternalStorageGranted] 把日志目录切换到公共存储。
@@ -34,17 +38,12 @@ import java.util.concurrent.atomic.AtomicInteger
 object AILogger {
 
     private const val TAG = "AILogger"
-    private const val MAX_AGE_DAYS = 7
-    private const val MAX_FILE_BYTES = 20 * 1024 * 1024 // 单会话文件上限 20MB（每轮重发完整历史，增长快）
-
-    // 公共外部存储目录（卸载后仍保留）：/storage/emulated/0/Documents/MiniMe-core/ai-logs
-    private const val PUBLIC_ROOT_DIR = "MiniMe-core"
-    private const val PUBLIC_LOG_SUBDIR = "ai-logs"
 
     private val ioExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "ai-logger").apply { isDaemon = true }
     }
-    private val timestampFormat = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(java.time.ZoneId.systemDefault())
+    private val timestampFormat = java.time.format.DateTimeFormatter
+        .ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(java.time.ZoneId.systemDefault())
     // 与 Retrofit 的 GsonConverter 行为对齐（默认字段名、忽略 null），额外开启缩进便于阅读，
     // 关掉 HTML 转义避免把 prompt 里的 < > & 转成实体、影响可读性。
     private val gson = GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()
@@ -54,6 +53,9 @@ object AILogger {
 
     /** 每会话的调用计数：用于把同一次交互的 REQUEST / RESPONSE 配上同一序号。 */
     private val counters = ConcurrentHashMap<String, AtomicInteger>()
+
+    /** 每会话常驻的 BufferedWriter（避免每次 open/close；活动会话数通常很少）。 */
+    private val sessionWriters = ConcurrentHashMap<String, BufferedWriter>()
 
     /** 初始化日志目录。重复调用安全。 */
     fun init(context: Context) {
@@ -73,7 +75,10 @@ object AILogger {
         val current = logDir
         if (current == null || newDir.absolutePath != current.absolutePath) {
             logDir = newDir
-            ioExecutor.execute { cleanupOldLogs(newDir) }
+            ioExecutor.execute {
+                closeAllWriters()
+                cleanupOldLogs(newDir)
+            }
             FileLogger.i(TAG, "外部存储权限已授予，AI 会话日志目录切换为: ${newDir.absolutePath}")
         }
     }
@@ -86,12 +91,12 @@ object AILogger {
     private fun resolveLogDir(context: Context): File {
         if (hasExternalStorageWrite(context)) {
             val base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val dir = File(File(base, PUBLIC_ROOT_DIR), PUBLIC_LOG_SUBDIR)
+            val dir = File(File(base, LogConfig.publicRootDir), LogConfig.aiLogSubdir)
             if (dir.exists() || dir.mkdirs()) return dir
         }
         // 回退：外部私有目录（卸载时清除，但无需权限）；再回退内部存储。
         val base = context.getExternalFilesDir(null) ?: context.filesDir
-        return File(base, "ai-logs").apply { mkdirs() }
+        return File(base, LogConfig.aiLogSubdir).apply { mkdirs() }
     }
 
     private fun hasExternalStorageWrite(context: Context): Boolean =
@@ -133,7 +138,7 @@ object AILogger {
             append(now()).append("  RESPONSE #").append(counter(sessionId).get())
             append("   [").append(provider).append(" / stream]\n")
             append("--- raw SSE ---\n")
-            append(redactLargeMedia(raw).ifBlank { "(空响应)" })
+            append(raw.ifBlank { "(空响应)" })
             if (!raw.endsWith("\n")) append('\n')
         }
         write(sessionId, text)
@@ -158,46 +163,62 @@ object AILogger {
         null -> "null"
         is String -> body
         else -> runCatching { gson.toJson(body) }.getOrElse { body.toString() }
-    }.let(::redactLargeMedia)
-
-    private fun redactLargeMedia(text: String): String {
-        if (text.isBlank()) return text
-        return text
-            .replace(DATA_URL_IMAGE_REGEX) { match ->
-                val mime = match.groupValues[1]
-                val data = match.groupValues[2]
-                "data:$mime;base64,[base64 omitted: ${data.length} chars]"
-            }
-            .replace(BASE64_FIELD_REGEX) { match ->
-                val key = match.groupValues[1]
-                val data = match.groupValues[2]
-                "\"$key\": \"[base64 omitted: ${data.length} chars]\""
-            }
     }
+
+    private fun sanitize(text: String): String =
+        if (LogConfig.enableSanitizer) LogSanitizer.sanitize(text) else text
 
     private fun write(sessionId: String?, text: String) {
         val dir = logDir ?: return // 未初始化则直接丢弃，避免在无目录时报错刷屏
         val safeId = (sessionId ?: "unknown").replace(Regex("[^A-Za-z0-9_-]"), "_")
+        val safeText = sanitize(text)
         ioExecutor.execute {
             runCatching {
                 val file = File(dir, "session-$safeId.log")
-                if (file.length() > MAX_FILE_BYTES) {
-                    // 超上限则截断重开，避免单文件无限增长。
-                    file.writeText("--- AI 会话日志超过 ${MAX_FILE_BYTES / 1024 / 1024}MB 已重置 ---\n")
+                // 即将超限 → 非破坏性滚动（关闭旧 writer，rename .1/.2...）。
+                if (file.exists() && file.length() + safeText.length > LogConfig.maxAiFileBytes) {
+                    sessionWriters.remove(safeId)?.let { runCatching { it.flush(); it.close() } }
+                    rotateSessionFile(dir, safeId)
                 }
-                file.appendText(text)
+                val writer = sessionWriters.getOrPut(safeId) {
+                    BufferedWriter(
+                        OutputStreamWriter(FileOutputStream(file, true), Charsets.UTF_8),
+                        8192
+                    ).also { w ->
+                        if (!file.exists() || file.length() == 0L) w.write(aiHeaderText())
+                    }
+                }
+                writer.write(safeText)
+                writer.flush() // AI 日志块较大且重要，逐块 flush 避免大块滞留内存。
             }.onFailure { Log.e(TAG, "写入 AI 会话日志失败", it) }
         }
     }
 
-    /** 删除超过 [MAX_AGE_DAYS] 天未更新的会话日志文件。 */
+    /** session-<id>.log → .1，已有 .1 顺延 .2 ...（非破坏性）。 */
+    private fun rotateSessionFile(dir: File, safeId: String) {
+        var maxIdx = 0
+        while (File(dir, "session-$safeId.${maxIdx + 1}.log").exists()) maxIdx++
+        for (i in maxIdx downTo 1) {
+            File(dir, "session-$safeId.$i.log")
+                .renameTo(File(dir, "session-$safeId.${i + 1}.log"))
+        }
+        File(dir, "session-$safeId.log")
+            .renameTo(File(dir, "session-$safeId.1.log"))
+    }
+
+    private fun aiHeaderText(): String =
+        "# MiniMe AI Log Format v${LogConfig.formatVersion}\n"
+
+    private fun closeAllWriters() {
+        sessionWriters.values.forEach { runCatching { it.flush(); it.close() } }
+        sessionWriters.clear()
+    }
+
+    /** 删除超过 [LogConfig.maxAgeDays] 天未更新的会话日志文件（含滚动文件）。 */
     private fun cleanupOldLogs(dir: File) {
-        val cutoff = System.currentTimeMillis() - MAX_AGE_DAYS * 24L * 60 * 60 * 1000
-        dir.listFiles { f -> f.isFile && f.name.startsWith("session-") }?.forEach { file ->
+        val cutoff = System.currentTimeMillis() - LogConfig.maxAgeDays * 24L * 60 * 60 * 1000
+        dir.listFiles { f -> f.isFile && f.name.startsWith("session-") && f.name.endsWith(".log") }?.forEach { file ->
             if (file.lastModified() < cutoff) runCatching { file.delete() }
         }
     }
-
-    private val DATA_URL_IMAGE_REGEX = Regex("data:(image/[A-Za-z0-9.+-]+);base64,([A-Za-z0-9+/=_-]{512,})")
-    private val BASE64_FIELD_REGEX = Regex("\"(base64Data|data)\"\\s*:\\s*\"([A-Za-z0-9+/=_-]{512,})\"")
 }
