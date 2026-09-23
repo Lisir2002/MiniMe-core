@@ -97,18 +97,13 @@ android {
         checkReleaseBuilds = false
     }
 
-    // 复用主应用官方签名密钥（app/minime.jks + keystore.properties）
+    // 复用主应用官方签名密钥（app/minime.jks）
     signingConfigs {
-        val keystoreProps = java.util.Properties()
-        val keystoreFile = file("../app/keystore.properties")
-        if (keystoreFile.exists()) {
-            keystoreProps.load(java.io.FileInputStream(keystoreFile))
-        }
         create("release") {
-            storeFile = file("../app/${keystoreProps["storeFile"]}")
-            storePassword = keystoreProps["storePassword"] as String
-            keyAlias = keystoreProps["keyAlias"] as String
-            keyPassword = keystoreProps["keyPassword"] as String
+            storeFile = rootProject.file("app/minime.jks")
+            storePassword = "9d4d4f44c1eaf5bcd57c68c5c4dab893"
+            keyAlias = "minime"
+            keyPassword = "9d4d4f44c1eaf5bcd57c68c5c4dab893"
             enableV1Signing = true
             enableV2Signing = true
         }
