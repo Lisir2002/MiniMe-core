@@ -104,12 +104,30 @@ internal fun SegmentRenderer(
         lineBreak = lineBreak
     )
 
+    // 问题22：渲染前清洗分段——
+    // 1) 移除开头/末尾的所有 Blank（模型输出常带数量不等的尾部空行，否则每个 Blank
+    //    渲染为 4dp Spacer 再加 spacedBy 6dp，尾部空白大小随机）；
+    // 2) 合并中间连续 Blank 为一个（Markdown 中连续空行只等价于一次段落分隔）。
+    val cleanedSegments = remember(segments) {
+        segments
+            .dropWhile { it is RichSegment.Blank }
+            .dropLastWhile { it is RichSegment.Blank }
+            .fold(mutableListOf<RichSegment>()) { acc, seg ->
+                if (seg is RichSegment.Blank && acc.lastOrNull() is RichSegment.Blank) {
+                    acc
+                } else {
+                    acc.add(seg)
+                }
+                acc
+            }
+    }
+
     CompositionLocalProvider(LocalContentColor provides color) {
         Column(
             modifier = modifier,
             verticalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 6.dp)
         ) {
-            for (seg in segments) {
+            for (seg in cleanedSegments) {
                 when (seg) {
                     RichSegment.Blank -> Spacer(Modifier.height(if (compact) 2.dp else 4.dp))
 

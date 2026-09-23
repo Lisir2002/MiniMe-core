@@ -256,6 +256,13 @@ internal fun ReasoningBubble(
                             )
                         }
                     )
+                    // 问题23：流式思考中（initiallyExpanded=true）在内容末尾显示跳动点，
+                    // 明确「思考仍在继续」；思考分块到达的间隙动画不消失，避免用户误判已结束。
+                    // 历史消息 initiallyExpanded=false，不显示。
+                    if (initiallyExpanded) {
+                        Spacer(Modifier.height(Spacing.xs))
+                        TypingDots(color = MaterialTheme.colorScheme.primary, dotSize = 5.dp)
+                    }
                 } else if (overThreshold) {
                     // 折叠态：显示最新内容（尾部 N 行）+「还有 X 行」
                     Spacer(Modifier.height(Spacing.xs))
