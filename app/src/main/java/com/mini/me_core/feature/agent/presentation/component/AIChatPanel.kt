@@ -8,6 +8,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,12 +46,15 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
@@ -156,10 +164,15 @@ fun AIChatPanel(
     val projectRoot = currentWorkspace?.path ?: ""
     val currentMode by viewModel.currentSessionMode.collectAsStateWithLifecycle()
 
-    var inputText by remember { mutableStateOf("") }
+    // 问题17：草稿状态按 currentSessionId 隔离，切换/新建会话时自动重置为空
+    var inputText by remember(currentSessionId) { mutableStateOf("") }
     val inputDraft by viewModel.inputDraft.collectAsStateWithLifecycle()
     LaunchedEffect(inputDraft) {
         if (inputText != inputDraft) inputText = inputDraft
+    }
+    // 问题17：会话切换时清空 ViewModel 中的旧草稿，防止上一会话未发送文字串到新会话
+    LaunchedEffect(currentSessionId) {
+        viewModel.clearInputDraft()
     }
     var pendingAttachments by remember { mutableStateOf<List<PendingUploadAttachment>>(emptyList()) }
     // 编辑态：正在编辑的用户消息 id。发送时若非空则走「截断重发」而非普通发送。
@@ -293,6 +306,11 @@ fun AIChatPanel(
             lastVisible.index >= lastIndex &&
                 (lastVisible.offset + lastVisible.size) <= viewportBottom + 4
         }
+    }
+
+    // 问题18：不在底部且有消息时显示「回到底部」浮动按钮
+    val showScrollToBottom by remember {
+        derivedStateOf { messagesReady && messages.isNotEmpty() && !isAtBottom }
     }
 
     val autoScrollSignal by rememberUpdatedState(
@@ -560,6 +578,32 @@ fun AIChatPanel(
                                 TailKind.NONE -> Box(Modifier)
                             }
                         }
+                    }
+                }
+
+                // 问题18：回到底部浮动按钮——不在底部时显示，点击平滑滚到底部并恢复跟随
+                if (showScrollToBottom) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = Spacing.md, bottom = Spacing.sm)
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                            .clickable {
+                                followBottom = true
+                                scope.launch {
+                                    snapToBottom(listState.layoutInfo.totalItemsCount - 1)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.chat_scroll_to_bottom),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
                 }
             }

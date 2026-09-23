@@ -185,8 +185,14 @@ internal fun ReasoningBubble(
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     val lineCount = remember(text) { text.count { it == '\n' } + 1 }
     val overThreshold = lineCount > REASONING_COLLAPSE_LINE_LIMIT
-    // 自动折叠：仅在用户尚未手动 toggle 过时生效；用户手动展开/折叠后以用户选择为准
-    val effectiveExpanded = if (userToggled) expanded else (initiallyExpanded && !overThreshold)
+    // 自动折叠：仅在用户尚未手动 toggle 过时生效；用户手动展开/折叠后以用户选择为准。
+    // 问题19：流式输出中（initiallyExpanded=true）始终保持展开，不因超长自动折叠；
+    // 流式结束后历史气泡（initiallyExpanded=false）默认折叠，超长时显示尾部 N 行。
+    val effectiveExpanded = when {
+        userToggled -> expanded
+        initiallyExpanded -> true
+        else -> !overThreshold
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start

@@ -375,9 +375,11 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
     val lineCount = seg.code.count { it == '\n' } + 1
     val shouldCollapse = lineCount > 30
 
-    // 混合模式：代码块背景跟随 surfaceSunken，文字跟随 textPrimary
+    // 问题21：代码块背景改用 surfacePage（比 surfaceSunken 更深/更浅），
+    // 解决在思考气泡（surfaceVariant=surfaceSunken）中代码块背景融为一体的问题。
+    // 深色模式 surfacePage=#0F172A 在 #334155 气泡上形成凹陷层级；浅色模式 #F8FAFC 在 #F1F5F9 上有对比。
     val colors = LocalAppTheme.current.colors
-    val bg = colors.surfaceSunken
+    val bg = colors.surfacePage
     val fg = colors.textPrimary
     val label = seg.language?.uppercase() ?: "CODE"
 
@@ -386,7 +388,8 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(LocalCornerRadius.current.map(10.dp)))
             .background(bg)
-            .border(BorderStroke(1.dp, colors.borderDefault), RoundedCornerShape(LocalCornerRadius.current.map(10.dp)))
+            // 问题21：边框加强为 borderStrong，轮廓更清晰
+            .border(BorderStroke(1.dp, colors.borderStrong), RoundedCornerShape(LocalCornerRadius.current.map(10.dp)))
             .animateContentSize(animationSpec = tween(160))
     ) {
         // Header：语言角标 + 复制 + 展开/收起（渐变跟随品牌色）

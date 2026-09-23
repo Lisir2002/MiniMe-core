@@ -499,6 +499,7 @@
     <string name="chat_no_models_hint">暂无可用模型，请在「管理」中添加</string>
     <string name="chat_stop">停止</string>
     <string name="chat_send">发送</string>
+    <string name="chat_scroll_to_bottom">回到底部</string>
     <string name="chat_perm_single_use_desc">含命令替换/管道/重定向，无法记住，仅可单次放行</string>
     <string name="chat_perm_always_tool_desc">「始终允许」将在本项目记住：该工具的全部调用</string>
     <string name="chat_perm_always_prefix">「始终允许」将在本项目记住：</string>

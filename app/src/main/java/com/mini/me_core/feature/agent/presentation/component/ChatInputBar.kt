@@ -75,6 +75,8 @@ internal fun ChatInputBar(
 ) {
     val canSend = (value.isNotBlank() || pendingAttachments.isNotEmpty()) && !isBusy
     var showAttachmentSheet by remember { mutableStateOf(false) }
+    // 问题16：长文本展开编辑面板状态
+    var showExpandSheet by remember { mutableStateOf(false) }
     val showSlashMenu = !isBusy && slashCommands.isNotEmpty() &&
         value.startsWith("/") && !value.contains("\n")
     val filteredCommands = if (showSlashMenu) {
@@ -168,7 +170,8 @@ internal fun ChatInputBar(
                         onSend = onSend,
                         isBusy = isBusy,
                         pendingAttachments = pendingAttachments,
-                        onRemoveAttachment = onRemoveAttachment
+                        onRemoveAttachment = onRemoveAttachment,
+                        onExpandClick = { showExpandSheet = true }
                     )
 
                     ChatInputToolbar(
@@ -210,6 +213,20 @@ internal fun ChatInputBar(
                 onTakePhoto()
             },
             onDismiss = { showAttachmentSheet = false }
+        )
+    }
+
+    // 问题16：长文本展开编辑面板（双锚点半屏↔全屏拖拽），与主输入框共享同一 text state
+    if (showExpandSheet) {
+        ExpandInputSheet(
+            value = value,
+            onValueChange = onValueChange,
+            onSend = onSend,
+            isBusy = isBusy,
+            canSend = canSend,
+            tokenProgress = tokenProgress,
+            onStop = onStop,
+            onDismiss = { showExpandSheet = false }
         )
     }
 }
