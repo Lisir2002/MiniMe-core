@@ -549,7 +549,7 @@ private fun PreviewPanel(preview: ProxyPreview) {
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                (if (preview.ok) Color(0xFF2E7D32) else Color(0xFFC62828)).copy(alpha = 0.12f),
+                (if (preview.ok) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error).copy(alpha = 0.12f),
                 RoundedCornerShape(LocalCornerRadius.current.md)
             )
             .padding(Spacing.sm)
@@ -812,8 +812,8 @@ private fun NodeRow(node: ProxyNodeInfo, tested: Boolean, delay: Long?) {
 private fun LatencyBadge(tested: Boolean, delayMs: Long?) {
     val (text, color) = when {
         !tested -> stringResource(R.string.ui____21df949d) to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-        delayMs == null -> stringResource(R.string.ui____e944c7c9) to Color(0xFFC62828)
-        else -> "${delayMs} ms" to Color(0xFF2E7D32)
+        delayMs == null -> stringResource(R.string.ui____e944c7c9) to MaterialTheme.colorScheme.error
+        else -> "${delayMs} ms" to MaterialTheme.colorScheme.tertiary
     }
     Text(
         text = text,
@@ -953,7 +953,7 @@ private fun GroupNodeCard(group: ProxyGroupInfo, onSelectGroupNode: (String, Str
                         text = "${it} ms",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF2E7D32)
+                        color = MaterialTheme.colorScheme.tertiary
                     )
                 }
             }
