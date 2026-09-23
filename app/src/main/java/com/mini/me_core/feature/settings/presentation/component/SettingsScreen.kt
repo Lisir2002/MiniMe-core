@@ -442,8 +442,6 @@ fun SettingsScreen(
                     onToggleFilterPanel = { viewModel.toggleFilterPanel() },
                     onCloseFilterPanel = { viewModel.closeFilterPanel() },
                     onSetSelectedDates = { viewModel.setSelectedDates(it) },
-                    onSetDateRangeMode = { viewModel.setDateRangeMode(it) },
-                    onSetDateRange = { start, end -> viewModel.setDateRange(start, end) },
                     onToggleLevel = { viewModel.toggleLevel(it) },
                     onToggleTag = { viewModel.toggleTag(it) },
                     onResetFilters = { viewModel.resetFilters() },

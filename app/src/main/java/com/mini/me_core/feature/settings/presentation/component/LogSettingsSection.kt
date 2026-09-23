@@ -111,8 +111,6 @@ internal fun LogsSection(
     onToggleFilterPanel: () -> Unit = {},
     onCloseFilterPanel: () -> Unit = {},
     onSetSelectedDates: (Set<String>) -> Unit = {},
-    onSetDateRangeMode: (Boolean) -> Unit = {},
-    onSetDateRange: (String?, String?) -> Unit = { _, _ -> },
     onToggleLevel: (LogLevel) -> Unit = {},
     onToggleTag: (String) -> Unit = {},
     onResetFilters: () -> Unit = {},
@@ -160,8 +158,6 @@ internal fun LogsSection(
                     onToggleFilterPanel = onToggleFilterPanel,
                     onCloseFilterPanel = onCloseFilterPanel,
                     onSetSelectedDates = onSetSelectedDates,
-                    onSetDateRangeMode = onSetDateRangeMode,
-                    onSetDateRange = onSetDateRange,
                     onToggleLevel = onToggleLevel,
                     onToggleTag = onToggleTag,
                     onResetFilters = onResetFilters,
@@ -226,8 +222,6 @@ private fun ColumnScope.LogViewerContent(
     onToggleFilterPanel: () -> Unit,
     onCloseFilterPanel: () -> Unit,
     onSetSelectedDates: (Set<String>) -> Unit,
-    onSetDateRangeMode: (Boolean) -> Unit,
-    onSetDateRange: (String?, String?) -> Unit,
     onToggleLevel: (LogLevel) -> Unit,
     onToggleTag: (String) -> Unit,
     onResetFilters: () -> Unit,
@@ -311,7 +305,7 @@ private fun ColumnScope.LogViewerContent(
                 val hasActiveFilters = state.selectedLevels.isNotEmpty() ||
                     state.selectedTags.isNotEmpty() ||
                     state.selectedDates.isNotEmpty() ||
-                    state.dateRangeStart != null ||
+                    state.customDateStart != null ||
                     state.searchQuery.isNotBlank()
 
                 IconButton(onClick = onToggleFilterPanel) {
@@ -363,8 +357,6 @@ private fun ColumnScope.LogViewerContent(
             state = state,
             onClose = onCloseFilterPanel,
             onSetSelectedDates = onSetSelectedDates,
-            onSetDateRangeMode = onSetDateRangeMode,
-            onSetDateRange = onSetDateRange,
             onToggleLevel = onToggleLevel,
             onToggleTag = onToggleTag,
             onResetFilters = onResetFilters
@@ -545,8 +537,6 @@ private fun FilterPanel(
     state: LogViewerUiState,
     onClose: () -> Unit,
     onSetSelectedDates: (Set<String>) -> Unit,
-    onSetDateRangeMode: (Boolean) -> Unit,
-    onSetDateRange: (String?, String?) -> Unit,
     onToggleLevel: (LogLevel) -> Unit,
     onToggleTag: (String) -> Unit,
     onResetFilters: () -> Unit
@@ -599,27 +589,7 @@ private fun FilterPanel(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(Spacing.xs))
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = !state.dateRangeMode,
-                    onClick = { onSetDateRangeMode(false) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) { Text(stringResource(R.string.log_filter_date_list)) }
-                SegmentedButton(
-                    selected = state.dateRangeMode,
-                    onClick = { onSetDateRangeMode(true) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) { Text(stringResource(R.string.log_filter_date_range)) }
-            }
-            Spacer(Modifier.height(Spacing.xs))
-            if (state.dateRangeMode) {
-                DateRangeInput(
-                    start = state.dateRangeStart,
-                    end = state.dateRangeEnd,
-                    files = state.files,
-                    onApply = { start, end -> onSetDateRange(start, end) }
-                )
-            } else {
+            run {
                 val allDates = state.files.map { it.removePrefix("log-").removeSuffix(".txt") }
                 if (allDates.isNotEmpty()) {
                     FlowRow(
@@ -728,73 +698,6 @@ private fun FilterPanel(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-        }
-    }
-}
-
-/** 日期范围输入组件：两个日期按钮 + 应用按钮。 */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun DateRangeInput(
-    start: String?,
-    end: String?,
-    files: List<String>,
-    onApply: (String?, String?) -> Unit
-) {
-    val allDates = files.map { it.removePrefix("log-").removeSuffix(".txt") }
-
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = stringResource(R.string.log_filter_date_from),
-                style = MaterialTheme.typography.bodySmall
-            )
-            Text(
-                text = start ?: stringResource(R.string.log_filter_date_select),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f)
-            )
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = stringResource(R.string.log_filter_date_to),
-                style = MaterialTheme.typography.bodySmall
-            )
-            Text(
-                text = end ?: stringResource(R.string.log_filter_date_select),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f)
-            )
-        }
-        if (allDates.size > 1) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
-            ) {
-                allDates.forEach { date ->
-                    FilterChip(
-                        selected = date == start || date == end,
-                        onClick = {
-                            if (start == null || (end == null && start != null)) {
-                                if (start == null) onApply(date, null)
-                                else if (date >= start) onApply(start, date)
-                                else onApply(date, start)
-                            } else {
-                                onApply(null, null)
-                            }
-                        },
-                        label = { Text(date) }
-                    )
-                }
             }
         }
     }

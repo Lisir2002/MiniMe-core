@@ -70,6 +70,20 @@ sealed class FetchState {
     data class Error(val message: String) : FetchState()
 }
 
+/**
+ * 日志查看器的日期范围模式。
+ *
+ * 单一数据源：文件下拉与高级筛选底部弹窗都从 [LogViewerUiState.dateRangeMode] 读取，
+ * 保证两处状态严格同步（见设计文档 §7.4）。
+ *
+ * - [TODAY] / [YESTERDAY] / [LAST_3_DAYS] / [LAST_7_DAYS] / [ALL]：快捷范围
+ * - [SINGLE_FILE]：单文件精确查看（由 [LogViewerUiState.selectedFileName] 指定）
+ * - [CUSTOM]：自定义起止日期（由 [LogViewerUiState.customDateStart]/[customDateEnd] 指定）
+ */
+enum class DateRangeMode {
+    TODAY, YESTERDAY, LAST_3_DAYS, LAST_7_DAYS, ALL, SINGLE_FILE, CUSTOM
+}
+
 data class LogViewerUiState(
     val files: List<String> = emptyList(),
     val selectedFileName: String? = null,
@@ -86,16 +100,33 @@ data class LogViewerUiState(
     val selectedLevels: Set<LogLevel> = emptySet(),
     val selectedTags: Set<String> = emptySet(),
     val allAvailableTags: List<String> = emptyList(),
-    val dateRangeMode: Boolean = false,
-    val dateRangeStart: String? = null,
-    val dateRangeEnd: String? = null,
+
+    // 日期范围：快捷范围由 [dateRangeMode] 驱动，自定义范围由 customDateStart/End 指定
+    val dateRangeMode: DateRangeMode = DateRangeMode.TODAY,
+    val customDateStart: String? = null,
+    val customDateEnd: String? = null,
 
     // 搜索
     val searchQuery: String = "",
 
     // 实时尾随
     val liveTailEnabled: Boolean = false,
-    val hasNewLogs: Boolean = false
+    val hasNewLogs: Boolean = false,
+
+    // ── 新增字段（运行日志查看器 UI 重构）──
+    /** 各等级行数统计（文件/日期作用域内、等级/Tag/搜索过滤前），供筛选栏数量徽章使用。 */
+    val levelCounts: Map<LogLevel, Int> = emptyMap(),
+    /** 当前最低记录等级（写入阈值），与显示筛选区分。 */
+    val recordLevel: LogLevel = LogLevel.VERBOSE,
+    /** 顶栏搜索是否展开。 */
+    val searchExpanded: Boolean = false,
+    /** 搜索结果当前匹配下标（1-based 展示给用户）与总匹配数。 */
+    val currentMatchIndex: Int = 0,
+    val totalMatches: Int = 0,
+    /** 被折叠的等级集合（再次点击筛选 chip 时该等级整组折叠为一行）。 */
+    val collapsedLevels: Set<LogLevel> = emptySet(),
+    /** 是否自动贴底滚动（用户上滑后置 false，显示「返回最新」）。 */
+    val isAutoScrolling: Boolean = true
 )
 
 @HiltViewModel
@@ -415,17 +446,22 @@ class SettingsViewModel @Inject constructor(
                 }
             }
 
-            // 恢复持久化的日志筛选偏好
+            // 恢复持久化的日志筛选偏好（等级 / Tag；日期范围默认「今天」，不持久化旧的列表/范围开关）
             launch {
                 val levels = logFilterSettingsRepository.readSelectedLevels()
                 val tags = logFilterSettingsRepository.readSelectedTags()
-                val rangeMode = logFilterSettingsRepository.readDateRangeMode()
                 _logViewerState.update {
                     it.copy(
                         selectedLevels = levels,
-                        selectedTags = tags,
-                        dateRangeMode = rangeMode
+                        selectedTags = tags
                     )
+                }
+            }
+
+            // 记录等级（写入阈值）变化时同步进日志查看器 UiState，供顶部「记录等级」行展示
+            launch {
+                _logLevel.collectLatest { level ->
+                    _logViewerState.update { it.copy(recordLevel = level) }
                 }
             }
 
@@ -628,17 +664,87 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
-    fun setDateRangeMode(rangeMode: Boolean) {
-        _logViewerState.update { it.copy(dateRangeMode = rangeMode) }
-        viewModelScope.launch { logFilterSettingsRepository.saveDateRangeMode(rangeMode) }
-    }
+    // ── 日期范围：快捷范围 / 单文件 / 自定义（设计文档 §7）──
 
-    fun setDateRange(start: String?, end: String?) {
-        _logViewerState.update { it.copy(dateRangeStart = start, dateRangeEnd = end) }
+    /**
+     * 设置快捷日期范围（今天/昨天/近3天/近7天/全部）。
+     * 翻译成 [selectedDates] / 自定义范围后复用现有 [filterFilesByDate] 逻辑重新加载。
+     */
+    fun setDateRangeMode(mode: DateRangeMode) {
+        val (dates, rangeStart, rangeEnd) = resolveDateScope(mode, null)
+        _logViewerState.update {
+            it.copy(
+                dateRangeMode = mode,
+                selectedDates = dates,
+                customDateStart = rangeStart,
+                customDateEnd = rangeEnd,
+                selectedFileName = null
+            )
+        }
         loadLogs(
             filterServerName = _logViewerState.value.filterServerName,
-            preferredFileName = _logViewerState.value.selectedFileName
+            preferredFileName = null
         )
+    }
+
+    /** 选择单个日志文件：作用域收窄到该文件对应的日期。 */
+    fun selectSingleFile(fileName: String) {
+        val fileDate = fileName.removePrefix("log-").removeSuffix(".txt")
+        _logViewerState.update {
+            it.copy(
+                dateRangeMode = DateRangeMode.SINGLE_FILE,
+                selectedDates = setOf(fileDate),
+                customDateStart = null,
+                customDateEnd = null,
+                selectedFileName = fileName
+            )
+        }
+        loadLogs(
+            filterServerName = _logViewerState.value.filterServerName,
+            preferredFileName = fileName
+        )
+    }
+
+    /** 设置自定义日期范围（yyyy-MM-dd，含端点）；起止都为空时等价于「全部」。 */
+    fun setCustomDateRange(start: String?, end: String?) {
+        _logViewerState.update {
+            it.copy(
+                dateRangeMode = if (start == null && end == null) DateRangeMode.ALL else DateRangeMode.CUSTOM,
+                selectedDates = emptySet(),
+                customDateStart = start,
+                customDateEnd = end,
+                selectedFileName = null
+            )
+        }
+        loadLogs(
+            filterServerName = _logViewerState.value.filterServerName,
+            preferredFileName = null
+        )
+    }
+
+    /** 设置最低记录等级（写入阈值），持久化后由 FileLogger 实时生效。 */
+    fun setRecordLevel(level: LogLevel) {
+        viewModelScope.launch {
+            logSettingsRepository.setLevel(level)
+        }
+    }
+
+    /** 把快捷日期模式翻译成 [filterFilesByDate] 能理解的 (选中日期集合, 范围起止)。 */
+    private fun resolveDateScope(mode: DateRangeMode, singleFileName: String?): Triple<Set<String>, String?, String?> {
+        val today = java.time.LocalDate.now()
+        val fmt = java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
+        return when (mode) {
+            DateRangeMode.TODAY -> Triple(setOf(fmt.format(today)), null, null)
+            DateRangeMode.YESTERDAY -> Triple(setOf(fmt.format(today.minusDays(1))), null, null)
+            DateRangeMode.LAST_3_DAYS -> Triple((0L..2L).map { fmt.format(today.minusDays(it)) }.toSet(), null, null)
+            DateRangeMode.LAST_7_DAYS -> Triple(emptySet(), fmt.format(today.minusDays(6)), fmt.format(today))
+            DateRangeMode.ALL -> Triple(emptySet(), null, null)
+            DateRangeMode.SINGLE_FILE -> {
+                val date = singleFileName?.removePrefix("log-")?.removeSuffix(".txt")
+                Triple(date?.let { setOf(it) } ?: emptySet(), null, null)
+            }
+            DateRangeMode.CUSTOM -> Triple(emptySet(), null, null) // 起止由调用方写入 state
+        }
     }
 
     fun toggleLevel(level: LogLevel) {
@@ -686,8 +792,9 @@ class SettingsViewModel @Inject constructor(
                 selectedLevels = emptySet(),
                 selectedTags = emptySet(),
                 searchQuery = "",
-                dateRangeStart = null,
-                dateRangeEnd = null
+                customDateStart = null,
+                customDateEnd = null,
+                collapsedLevels = emptySet()
             )
         }
         viewModelScope.launch {
@@ -800,6 +907,9 @@ class SettingsViewModel @Inject constructor(
                     // 4. 提取所有可用 Tag
                     val allTags = LogLineParser.extractTags(allLines)
 
+                    // 4.1 各等级行数统计（文件/日期作用域内、等级/Tag/搜索过滤前），供筛选栏数量徽章
+                    val levelCounts = countLevels(allLines)
+
                     // 5. 多维度过滤
                     val filteredLines = allLines.filter { line ->
                         matchesFilters(line, filterServerName, snapshot)
@@ -826,10 +936,17 @@ class SettingsViewModel @Inject constructor(
                         selectedTags = snapshot.selectedTags,
                         allAvailableTags = allTags,
                         dateRangeMode = snapshot.dateRangeMode,
-                        dateRangeStart = snapshot.dateRangeStart,
-                        dateRangeEnd = snapshot.dateRangeEnd,
+                        customDateStart = snapshot.customDateStart,
+                        customDateEnd = snapshot.customDateEnd,
                         searchQuery = snapshot.searchQuery,
-                        liveTailEnabled = snapshot.liveTailEnabled
+                        liveTailEnabled = snapshot.liveTailEnabled,
+                        levelCounts = levelCounts,
+                        recordLevel = snapshot.recordLevel,
+                        searchExpanded = snapshot.searchExpanded,
+                        currentMatchIndex = snapshot.currentMatchIndex,
+                        totalMatches = snapshot.totalMatches,
+                        collapsedLevels = snapshot.collapsedLevels,
+                        isAutoScrolling = snapshot.isAutoScrolling
                     )
                 }.getOrElse { e ->
                     LogViewerUiState(
@@ -895,8 +1012,8 @@ class SettingsViewModel @Inject constructor(
                 fileDate in dates
             }
         }
-        val rangeStart = snapshot.dateRangeStart
-        val rangeEnd = snapshot.dateRangeEnd
+        val rangeStart = snapshot.customDateStart
+        val rangeEnd = snapshot.customDateEnd
         if (rangeStart != null || rangeEnd != null) {
             // 范围模式：按日期范围筛选
             return allFiles.filter { f ->
@@ -908,6 +1025,17 @@ class SettingsViewModel @Inject constructor(
         }
         // 无日期筛选：返回所有文件
         return allFiles
+    }
+
+    /** 统计日志行中各等级的行数（附属行/堆栈不计入）。供显示筛选栏的数量徽章使用。 */
+    private fun countLevels(lines: List<String>): Map<LogLevel, Int> {
+        val counts = HashMap<LogLevel, Int>()
+        for (line in lines) {
+            val parsed = LogLineParser.parse(line) ?: continue
+            val level = parsed.level ?: continue
+            counts[level] = (counts[level] ?: 0) + 1
+        }
+        return counts
     }
 
     /** 判断单行是否通过所有筛选条件。 */
