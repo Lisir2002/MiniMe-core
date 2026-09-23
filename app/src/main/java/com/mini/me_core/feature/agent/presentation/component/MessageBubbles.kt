@@ -192,7 +192,7 @@ internal fun AgentMessageItem(
                                 BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                             } else null,
                             // 混合模式：去掉 AI 回复投影（透明背景不需要阴影）
-                            shadowElevation = 0.dp,
+                            shadowElevation = com.mini.me_core.core.theme.tokens.PrimitiveElevation.Z0,
                             // 用户/AI 气泡按内容自适应宽度并限宽；工具气泡填满可用宽度，两侧外边距由 LazyColumn contentPadding 统一提供
                             modifier = when {
                                 isUser -> Modifier.widthIn(max = maxUserBubbleWidth)

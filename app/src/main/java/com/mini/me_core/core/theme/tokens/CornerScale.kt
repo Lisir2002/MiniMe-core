@@ -23,27 +23,29 @@ data class CornerScale(
     val md: Dp,
     val lg: Dp,
     val xl: Dp,
+    val xxl: Dp,
     /** 胶囊形，始终 999dp，不随 CornerStyle 变化 */
     val pill: Dp = 999.dp,
 ) {
     companion object {
         /** 默认圆角档位：与 PrimitiveRadius 对齐 */
         val Rounded = CornerScale(
-            xs = PrimitiveRadius.Xs,   // 4dp
-            sm = PrimitiveRadius.Sm,   // 6dp
-            md = PrimitiveRadius.Md,   // 8dp
-            lg = PrimitiveRadius.Lg,   // 10dp
-            xl = PrimitiveRadius.Xl,   // 12dp
+            xs = PrimitiveRadius.Xs,    // 4dp
+            sm = PrimitiveRadius.Sm,    // 6dp
+            md = PrimitiveRadius.Md,    // 8dp
+            lg = PrimitiveRadius.Lg,    // 10dp
+            xl = PrimitiveRadius.Xl,    // 12dp
+            xxl = PrimitiveRadius.Xxl,  // 16dp（气泡/大卡片）
         )
 
         /** 直角档位：全部 0dp */
         val Sharp = CornerScale(
-            xs = 0.dp, sm = 0.dp, md = 0.dp, lg = 0.dp, xl = 0.dp,
+            xs = 0.dp, sm = 0.dp, md = 0.dp, lg = 0.dp, xl = 0.dp, xxl = 0.dp,
         )
 
         /** 胶囊档位：全部 999dp */
         val Pill = CornerScale(
-            xs = 999.dp, sm = 999.dp, md = 999.dp, lg = 999.dp, xl = 999.dp,
+            xs = 999.dp, sm = 999.dp, md = 999.dp, lg = 999.dp, xl = 999.dp, xxl = 999.dp,
         )
 
         /** 根据 CornerStyle 映射到对应档位 */

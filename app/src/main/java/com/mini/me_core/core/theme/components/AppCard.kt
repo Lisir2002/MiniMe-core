@@ -47,7 +47,7 @@ fun AppCard(
         AppCardVariant.Outlined -> {
             containerColor = Color.Transparent
             border = BorderStroke(1.dp, colors.borderDefault)
-            shadowElevation = 0.dp
+            shadowElevation = PrimitiveElevation.Z0
         }
         AppCardVariant.Elevated -> {
             containerColor = colors.surfaceCard
@@ -57,7 +57,7 @@ fun AppCard(
         AppCardVariant.Sunken -> {
             containerColor = colors.surfaceSunken
             border = BorderStroke(0.8.dp, colors.borderMuted)
-            shadowElevation = 0.dp
+            shadowElevation = PrimitiveElevation.Z0
         }
     }
 

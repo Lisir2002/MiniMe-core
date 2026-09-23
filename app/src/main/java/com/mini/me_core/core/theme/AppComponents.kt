@@ -57,18 +57,19 @@ import androidx.compose.ui.unit.sp
 
 // ──────────────────────────────────────────────
 // Z 轴层次常量（elevation）
+// 已合并到 PrimitiveElevation（tokens/），此处保留兼容别名
 // ──────────────────────────────────────────────
 object Elevation {
     /** 背景层：页面背景、容器背景 */
-    val z0: Dp = 0.dp
+    val z0: Dp = com.mini.me_core.core.theme.tokens.PrimitiveElevation.Z0
     /** 内容层：列表、卡片、正文区域 */
-    val z1: Dp = 1.dp
+    val z1: Dp = com.mini.me_core.core.theme.tokens.PrimitiveElevation.Z1
     /** 交互层：输入栏、按钮、可交互卡片 */
-    val z2: Dp = 3.dp
+    val z2: Dp = com.mini.me_core.core.theme.tokens.PrimitiveElevation.Z2
     /** 浮层：面板、弹出 Sheet、Dialog */
-    val z3: Dp = 8.dp
+    val z3: Dp = com.mini.me_core.core.theme.tokens.PrimitiveElevation.Z3
     /** 通知层：状态横幅、Toast */
-    val z4: Dp = 12.dp
+    val z4: Dp = com.mini.me_core.core.theme.tokens.PrimitiveElevation.Z4
 }
 
 // ──────────────────────────────────────────────

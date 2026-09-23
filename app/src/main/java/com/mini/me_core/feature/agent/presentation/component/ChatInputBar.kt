@@ -150,7 +150,7 @@ internal fun ChatInputBar(
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                shadowElevation = 0.dp,
+                shadowElevation = com.mini.me_core.core.theme.tokens.PrimitiveElevation.Z0,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(

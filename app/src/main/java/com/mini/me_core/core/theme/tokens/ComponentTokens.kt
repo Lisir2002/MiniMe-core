@@ -60,11 +60,11 @@ data class ComponentTokens(
         dialog = dialog.copy(cornerRadius = scale.xl),
         toolCard = toolCard.copy(cornerRadius = scale.lg),
         bubble = bubble.copy(
-            userBubbleCornerTopStart = scale.xl,
-            userBubbleCornerTopEnd = scale.xl,
+            userBubbleCornerTopStart = scale.xxl,
+            userBubbleCornerTopEnd = scale.xxl,
             // 用户气泡右下小圆角：Rounded 模式 4dp，Sharp/Pill 跟随整体
-            userBubbleCornerBottomEnd = if (scale == CornerScale.Rounded) PrimitiveRadius.Xs else scale.xl,
-            userBubbleCornerBottomStart = scale.xl,
+            userBubbleCornerBottomEnd = if (scale == CornerScale.Rounded) PrimitiveRadius.Xs else scale.xxl,
+            userBubbleCornerBottomStart = scale.xxl,
         ),
     )
 

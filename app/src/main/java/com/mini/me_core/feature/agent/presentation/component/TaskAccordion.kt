@@ -134,7 +134,7 @@ internal fun TaskAccordion(
         color = Color.Transparent,
         border = null,
         tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
+        shadowElevation = com.mini.me_core.core.theme.tokens.PrimitiveElevation.Z0,
         modifier = modifier.fillMaxWidth()
     ) {
         Column {
