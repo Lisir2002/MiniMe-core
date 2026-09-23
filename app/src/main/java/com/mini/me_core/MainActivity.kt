@@ -414,7 +414,9 @@ fun AppNavigation(
                     },
                     // 「更多配置 → 工作台绑定」：当前会话 + 手动绑定回调
                     currentSession = currentSession,
-                    onBindWorkspace = { path -> agentViewModel.bindSessionWorkspace(path) }
+                    onBindWorkspace = { path -> agentViewModel.bindSessionWorkspace(path) },
+                    // 「所有工作台 → 查看对话绑定」：查询某工作台绑定的会话列表
+                    boundSessionsForWorkspace = { path -> agentViewModel.sessionsBoundToWorkspace(path) }
                 )
             }
         }
