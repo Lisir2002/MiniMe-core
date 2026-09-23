@@ -729,6 +729,65 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    // ── 显示筛选快捷操作（运行日志查看器重构）──
+
+    /** 显示筛选「全部」：清空等级多选，展示所有等级。 */
+    fun clearDisplayLevels() {
+        _logViewerState.update { it.copy(selectedLevels = emptySet(), collapsedLevels = emptySet()) }
+        viewModelScope.launch { logFilterSettingsRepository.saveSelectedLevels(emptySet()) }
+        triggerDebouncedFilter()
+    }
+
+    /**
+     * 快速筛选栏点击某等级：
+     * - 若该等级已是唯一选中 → 折叠/展开该等级整组行；
+     * - 否则 → 仅显示该等级（单选快速过滤）。
+     */
+    fun quickFilterLevel(level: LogLevel) {
+        val current = _logViewerState.value
+        if (current.selectedLevels == setOf(level)) {
+            toggleLevelCollapse(level)
+        } else {
+            _logViewerState.update {
+                it.copy(selectedLevels = setOf(level), collapsedLevels = emptySet())
+            }
+            viewModelScope.launch { logFilterSettingsRepository.saveSelectedLevels(setOf(level)) }
+            triggerDebouncedFilter()
+        }
+    }
+
+    /** 折叠/展开某等级整组行（设计文档 §5.3/§10.6）。 */
+    fun toggleLevelCollapse(level: LogLevel) {
+        _logViewerState.update {
+            val newCollapsed = if (level in it.collapsedLevels) it.collapsedLevels - level else it.collapsedLevels + level
+            it.copy(collapsedLevels = newCollapsed)
+        }
+    }
+
+    /** 顶栏搜索展开/收起；收起时清空关键词恢复完整日志。 */
+    fun setSearchExpanded(expanded: Boolean) {
+        _logViewerState.update { it.copy(searchExpanded = expanded) }
+        if (!expanded) {
+            _logViewerState.update {
+                it.copy(searchQuery = "", currentMatchIndex = 0, totalMatches = 0)
+            }
+            triggerDebouncedFilter()
+        }
+    }
+
+    /** 搜索结果上一处/下一处跳转（Stage 4 完善滚动定位）。 */
+    fun prevMatch() {
+        val total = _logViewerState.value.totalMatches
+        if (total <= 0) return
+        _logViewerState.update { it.copy(currentMatchIndex = (it.currentMatchIndex - 1 + total) % total) }
+    }
+
+    fun nextMatch() {
+        val total = _logViewerState.value.totalMatches
+        if (total <= 0) return
+        _logViewerState.update { it.copy(currentMatchIndex = (it.currentMatchIndex + 1) % total) }
+    }
+
     /** 把快捷日期模式翻译成 [filterFilesByDate] 能理解的 (选中日期集合, 范围起止)。 */
     private fun resolveDateScope(mode: DateRangeMode, singleFileName: String?): Triple<Set<String>, String?, String?> {
         val today = java.time.LocalDate.now()

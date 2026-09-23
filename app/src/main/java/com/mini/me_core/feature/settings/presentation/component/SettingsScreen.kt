@@ -244,6 +244,14 @@ fun SettingsScreen(
         return
     }
 
+    // 运行日志查看器为独立全屏页（自带顶栏：返回/搜索/筛选/导出）
+    if (section == SettingsSection.Logs) {
+        LogViewerScreen(
+            onNavigateBack = { section = logReturnSection }
+        )
+        return
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
