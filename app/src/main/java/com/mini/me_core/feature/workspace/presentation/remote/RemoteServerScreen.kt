@@ -166,7 +166,7 @@ fun RemoteServerScreen(
 
             uiState.error?.let { error ->
                 Snackbar(
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
                     action = {
                         TextButton(onClick = { viewModel.clearError() }) {
                             Text(stringResource(R.string.common_close))

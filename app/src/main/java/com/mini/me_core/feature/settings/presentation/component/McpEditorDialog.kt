@@ -188,7 +188,7 @@ fun McpServerEditDialog(
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                             RoundedCornerShape(LocalCornerRadius.current.xl)
                         )
-                        .padding(4.dp),
+                        .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Xs),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val tabs = listOf(stringResource(R.string.mcp_basic_settings), stringResource(R.string.common_tool))
@@ -287,7 +287,7 @@ fun McpServerEditDialog(
                                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                                             RoundedCornerShape(LocalCornerRadius.current.xl)
                                         )
-                                        .padding(4.dp),
+                                        .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Xs),
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     val types = listOf(false to stringResource(R.string.mcp_remote_http), true to stringResource(R.string.mcp_local_stdio))
@@ -380,7 +380,7 @@ fun McpServerEditDialog(
                                         Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(16.dp)
+                                                .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg)
                                         ) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),

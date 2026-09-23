@@ -238,7 +238,7 @@ private fun ThemePreviewCard(
         Column(
             modifier = Modifier
                 .background(previewColors.surfaceCard)
-                .padding(16.dp),
+                .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(
@@ -286,7 +286,7 @@ private fun ThemePreviewCard(
                     .width(220.dp)
                     .clip(RoundedCornerShape(LocalCornerRadius.current.xl))
                     .background(previewColors.surfaceSunken)
-                    .padding(12.dp),
+                    .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Md),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
@@ -369,7 +369,7 @@ private fun AppearanceModeSelector(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
+                .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             modes.forEach { (mode, label, icon) ->
@@ -440,7 +440,7 @@ private fun PresetCarousel(
                         shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                     )
                     .clickable { onPresetSelected(preset.id) }
-                    .padding(12.dp),
+                    .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Md),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(
@@ -501,7 +501,7 @@ private fun ColorCustomizationSection(
 
     AppCard(modifier = modifier) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Md),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             CustomColorFields.ALL_KEYS.forEach { field ->
@@ -742,7 +742,7 @@ private fun BackgroundImageSection(
 
     AppCard(modifier = modifier) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // 选择背景图按钮
@@ -816,7 +816,7 @@ private fun DisplayPreferencesSection(
 
     AppCard(modifier = modifier) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // 圆角风格三选一

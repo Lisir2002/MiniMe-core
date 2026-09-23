@@ -73,7 +73,7 @@ private fun buildGroup(
 private fun TaskCardRunningPreview() {
     AIEditorTheme {
         Surface {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 val runningTool = RunningToolOutput(
                     messageId = "tool-1",
                     text = "> Task :app:compileDebugKotlin\nw: deprecation note\ne: file.kt:10: Unresolved reference\n",
@@ -113,7 +113,7 @@ private fun TaskCardRunningPreview() {
 private fun TaskCardCompletedCollapsedPreview() {
     AIEditorTheme {
         Surface {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 val editContent = "{\"path\":\"LoginScreen.kt\",\"added_lines\":3,\"removed_lines\":1,\"hunks\":[{\"start_line\":42,\"diff\":\"+ buttonColor = Blue\"}]}"
                 TaskCard(
                     group = buildGroup(
@@ -150,7 +150,7 @@ private fun TaskCardCompletedCollapsedPreview() {
 private fun TaskCardFailedPreview() {
     AIEditorTheme {
         Surface {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 TaskCard(
                     group = buildGroup(
                         taskId = "task-fail-1",
@@ -188,7 +188,7 @@ private fun TaskCardFailedPreview() {
 private fun TaskCardWaitingApprovalPreview() {
     AIEditorTheme {
         Surface {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 val approvalArgs = "{\"command\":\"npm install axios\"}"
                 TaskCard(
                     group = buildGroup(

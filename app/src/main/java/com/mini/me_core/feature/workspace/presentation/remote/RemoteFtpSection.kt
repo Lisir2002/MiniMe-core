@@ -42,7 +42,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Card(
@@ -54,7 +54,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
                 verticalAlignment = Alignment.Top
             ) {
                 Icon(
@@ -86,7 +86,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -139,7 +139,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

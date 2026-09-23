@@ -42,7 +42,7 @@ private fun toolMsg(
 private fun ToolCallCardRunningExpandedPreview() {
     AIEditorTheme {
         Surface {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
                     message = toolMsg("t-run", content = ""),
                     liveOutput = RunningToolOutput(
@@ -64,7 +64,7 @@ private fun ToolCallCardRunningExpandedPreview() {
 private fun ToolCallCardSuccessCollapsedPreview() {
     AIEditorTheme {
         Surface {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
                     message = toolMsg("t-ok", content = "BUILD SUCCESSFUL in 2m 35s\n58 actionable tasks: 8 executed, 50 up-to-date"),
                     liveOutput = null,
@@ -82,7 +82,7 @@ private fun ToolCallCardSuccessCollapsedPreview() {
 private fun ToolCallCardSuccessExpandedPreview() {
     AIEditorTheme {
         Surface {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
                     message = toolMsg("t-ok2", content = "BUILD SUCCESSFUL in 2m 35s\n58 actionable tasks: 8 executed, 50 up-to-date"),
                     liveOutput = null,
@@ -100,7 +100,7 @@ private fun ToolCallCardSuccessExpandedPreview() {
 private fun ToolCallCardErrorExpandedPreview() {
     AIEditorTheme {
         Surface {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
                     message = toolMsg("t-err", content = "sh: gradlew: command not found", isError = true),
                     liveOutput = null,
@@ -118,7 +118,7 @@ private fun ToolCallCardErrorExpandedPreview() {
 private fun ToolCallCardErrorCollapsedPreview() {
     AIEditorTheme {
         Surface {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
                     message = toolMsg("t-err2", content = "sh: gradlew: command not found", isError = true),
                     liveOutput = null,
@@ -136,7 +136,7 @@ private fun ToolCallCardErrorCollapsedPreview() {
 private fun ToolCallCardTimedOutExpandedPreview() {
     AIEditorTheme {
         Surface {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
                     message = toolMsg("t-timeout", content = "命令执行超时：build did not finish within 300000ms", isError = true),
                     liveOutput = null,
@@ -154,7 +154,7 @@ private fun ToolCallCardTimedOutExpandedPreview() {
 private fun ToolCallCardCancelledCollapsedPreview() {
     AIEditorTheme {
         Surface {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
                     message = toolMsg("t-cancel", content = SessionUseCase.PENDING_TOOL_MARKER, isError = true),
                     liveOutput = null,
@@ -172,7 +172,7 @@ private fun ToolCallCardCancelledCollapsedPreview() {
 private fun ToolCallCardCancelledExpandedPreview() {
     AIEditorTheme {
         Surface {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
                     message = toolMsg("t-cancel2", content = SessionUseCase.PENDING_TOOL_MARKER, isError = true),
                     liveOutput = null,

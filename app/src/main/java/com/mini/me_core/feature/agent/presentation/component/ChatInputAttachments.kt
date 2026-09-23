@@ -181,7 +181,7 @@ private fun PendingAttachmentPreviewItem(
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(4.dp)
+                    .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Xs)
             ) {
                 IconButton(
                     onClick = onRemove,

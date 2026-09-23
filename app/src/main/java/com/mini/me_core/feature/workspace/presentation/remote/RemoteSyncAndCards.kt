@@ -47,7 +47,7 @@ fun SyncSettingsSection(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(androidx.compose.foundation.rememberScrollState())
-            .padding(16.dp),
+            .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Card(
@@ -56,7 +56,7 @@ fun SyncSettingsSection(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Rounded.Description,
@@ -105,7 +105,7 @@ fun SyncSettingsSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -147,7 +147,7 @@ fun SyncSettingsSection(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Rounded.Layers,
@@ -202,7 +202,7 @@ fun RemoteConnectionCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -257,7 +257,7 @@ fun RemoteMountCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

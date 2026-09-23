@@ -83,7 +83,7 @@ internal fun McpStdioFields(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
@@ -177,7 +177,7 @@ internal fun McpStdioFields(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(

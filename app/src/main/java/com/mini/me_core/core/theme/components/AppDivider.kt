@@ -46,7 +46,7 @@ fun AppDivider(
 @Composable
 private fun AppDividerPreview() {
     com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg)) {
             Text("Default divider")
             Spacer(Modifier.height(Spacing.sm))
             AppDivider()

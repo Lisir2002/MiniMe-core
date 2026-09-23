@@ -623,7 +623,7 @@ private fun TableCard(
                         Box(
                             Modifier
                                 .widthIn(min = 110.dp)
-                                .padding(8.dp)
+                                .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)
                                 .border(
                                     BorderStroke(0.5.dp, borderColor.copy(alpha = 0.5f))
                                 )
@@ -646,7 +646,7 @@ private fun TableCard(
                             Box(
                                 Modifier
                                     .widthIn(min = 110.dp)
-                                    .padding(8.dp)
+                                    .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)
                                     .border(
                                         BorderStroke(
                                             0.5.dp,

@@ -359,7 +359,7 @@ private fun HeroCard(
                                 border = BorderStroke(0.8.dp, ac.heroBorder),
                                 shape = RoundedCornerShape(24.dp)
                             )
-                            .padding(12.dp),
+                            .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Md),
                         contentAlignment = Alignment.Center
                     ) {
                         if (appIcon != null) {
