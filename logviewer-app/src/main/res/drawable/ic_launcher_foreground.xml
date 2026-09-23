@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 日志文档图标 -->
+    <path
+        android:fillColor="#4FC3F7"
+        android:pathData="M38,28h32c3.3,0 6,2.7 6,6v40c0,3.3 -2.7,6 -6,6h-32c-3.3,0 -6,-2.7 -6,-6v-40c0,-3.3 2.7,-6 6,-6z" />
+    <!-- 文档线条 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,42h20v3h-20zM44,50h20v3h-20zM44,58h14v3h-14z" />
+    <!-- 放大镜 -->
+    <path
+        android:fillColor="#FF7043"
+        android:pathData="M62,58m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+    <path
+        android:fillColor="#FF7043"
+        android:pathData="M66,64l8,8c1.2,1.2 1.2,3.1 0,4.2s-3,1.2 -4.2,0l-8,-8z" />
+</vector>

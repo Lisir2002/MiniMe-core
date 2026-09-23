@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- 外部公共 Downloads 目录（导出文件落盘位置） -->
+    <external-path
+        name="downloads"
+        path="Download" />
+    <!-- 应用私有外部目录 -->
+    <external-files-path
+        name="external_files"
+        path="." />
+    <!-- 缓存目录 -->
+    <cache-path
+        name="cache"
+        path="." />
+    <!-- 内部文件目录 -->
+    <files-path
+        name="files"
+        path="." />
+</paths>
