@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
 import androidx.compose.foundation.layout.Arrangement
@@ -100,7 +101,7 @@ private fun CopyChip(
     var copied by remember { mutableStateOf(false) }
 
     Surface(
-        shape = RoundedCornerShape(Radius.sm),
+        shape = RoundedCornerShape(LocalCornerRadius.current.md),
         color = MaterialTheme.colorScheme.surfaceVariant,
         onClick = {
             scope.launch {
@@ -143,7 +144,7 @@ private fun CopyChip(
 @Composable
 private fun RetryChip(onRetry: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(Radius.sm),
+        shape = RoundedCornerShape(LocalCornerRadius.current.md),
         color = MaterialTheme.colorScheme.surfaceVariant,
         onClick = onRetry
     ) {

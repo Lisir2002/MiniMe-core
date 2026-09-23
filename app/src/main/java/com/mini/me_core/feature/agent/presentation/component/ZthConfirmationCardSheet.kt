@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
@@ -128,7 +129,7 @@ fun ZthConfirmationCardSheet(
                                     .padding(end = if (i == 0) 6.dp else 0.dp)
                                     .background(
                                         if (isHigh) Color(0xFFFFEBEE) else Color(0xFFF3E5F5),
-                                        RoundedCornerShape(6.dp)
+                                        RoundedCornerShape(LocalCornerRadius.current.sm)
                                     )
                                     .padding(horizontal = 8.dp, vertical = 3.dp)
                             ) {
@@ -249,7 +250,7 @@ private fun RiskBadge(confidence: Float, tier: Int) {
     }
     Box(
         Modifier
-            .background(bg, RoundedCornerShape(10.dp))
+            .background(bg, RoundedCornerShape(LocalCornerRadius.current.lg))
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
         Text(text, style = MaterialTheme.typography.labelMedium, color = fg, fontWeight = FontWeight.SemiBold)
@@ -274,13 +275,13 @@ private fun HallucinationBar(confidence: Float) {
             Modifier
                 .fillMaxWidth()
                 .height(8.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(LocalCornerRadius.current.xs))
         ) {
             Box(
                 Modifier
                     .fillMaxWidth(pct)
                     .height(8.dp)
-                    .background(tint, RoundedCornerShape(4.dp))
+                    .background(tint, RoundedCornerShape(LocalCornerRadius.current.xs))
             )
         }
     }

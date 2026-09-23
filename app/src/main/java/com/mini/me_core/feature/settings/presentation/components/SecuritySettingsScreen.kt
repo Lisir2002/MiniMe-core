@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.components
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import androidx.compose.foundation.layout.Arrangement
@@ -62,7 +63,7 @@ fun SecuritySettingsScreen(
         // ── 生物识别保护 ──
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(Radius.sm),
+            shape = RoundedCornerShape(LocalCornerRadius.current.md),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(Spacing.md)) {
@@ -101,7 +102,7 @@ fun SecuritySettingsScreen(
         // ── 数据库加密（SQLCipher，P1）──
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(Radius.sm),
+            shape = RoundedCornerShape(LocalCornerRadius.current.md),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(Spacing.md)) {
@@ -179,7 +180,7 @@ fun SecuritySettingsScreen(
         // ── 凭据密钥轮换 ──
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(Radius.sm),
+            shape = RoundedCornerShape(LocalCornerRadius.current.md),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(Spacing.md)) {
@@ -226,7 +227,7 @@ fun SecuritySettingsScreen(
         // ── ZTH 零幻觉容忍档位（C.4.2 4 档 + C.4.8 滑动确认；C.6.2 P14 纠正挂到设置安全卡片） ──
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(Radius.sm),
+            shape = RoundedCornerShape(LocalCornerRadius.current.md),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(Spacing.md)) {

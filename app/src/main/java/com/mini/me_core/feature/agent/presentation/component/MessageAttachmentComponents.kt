@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.Context
 import android.content.Intent
@@ -72,7 +73,7 @@ private fun MessageAttachmentPreviewItem(
         Modifier
     }
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = clickModifier.size(76.dp)

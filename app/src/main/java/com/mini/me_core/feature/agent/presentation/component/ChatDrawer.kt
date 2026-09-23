@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -373,7 +374,7 @@ private fun DrawerNavIcon(
     Box(
         modifier = Modifier
             .size(36.dp)
-            .clip(RoundedCornerShape(Radius.md))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
             .background(if (LocalAppDarkMode.current) iconBgDark else iconBgLight),
         contentAlignment = Alignment.Center
     ) {
@@ -400,7 +401,7 @@ private fun DrawerBottomIconButton(
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .clickable(onClick = onClick)
             .semantics { this.contentDescription = contentDescription }
             .padding(vertical = Spacing.sm),
@@ -424,7 +425,7 @@ private fun DrawerSettingsButton(
 ) {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .clickable(onClick = onClick)
             .semantics { this.contentDescription = contentDescription }
             .padding(vertical = Spacing.sm),
@@ -534,7 +535,7 @@ private fun SheetActionRow(
             Box(
                 modifier = Modifier
                     .size(32.dp)
-                    .clip(RoundedCornerShape(Radius.sm))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                     .background(if (LocalAppDarkMode.current) iconBgDark else iconBgLight),
                 contentAlignment = Alignment.Center
             ) {
@@ -569,7 +570,7 @@ private fun DrawerTopTab(
     Box(
         modifier = modifier
             .height(44.dp)
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -689,7 +690,7 @@ private fun SwipeableSessionRow(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(Radius.sm))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                     .background(MaterialTheme.colorScheme.primaryContainer)
                     .padding(horizontal = Spacing.md),
                 contentAlignment = Alignment.CenterEnd
@@ -859,7 +860,7 @@ private fun WorkspaceDirPanel(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radius.sm))
+                .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
                 .padding(Spacing.xs),
             horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
@@ -1028,7 +1029,7 @@ private fun WorkspaceSubTab(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .background(if (selected) MaterialTheme.colorScheme.surface else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(vertical = Spacing.sm),
@@ -1140,7 +1141,7 @@ private fun WorkspaceFileRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .clickable(onClick = onClick)
             .padding(horizontal = Spacing.md, vertical = Spacing.md),
         verticalAlignment = Alignment.CenterVertically
@@ -1302,7 +1303,7 @@ private fun WorkspaceDirRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radius.sm))
+                .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                 .clickable { menuExpanded = true }
                 .padding(horizontal = Spacing.md, vertical = Spacing.md),
             verticalAlignment = Alignment.CenterVertically
@@ -1504,7 +1505,7 @@ private fun MoreConfigPanel(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(Radius.sm))
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                             .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
                             .padding(horizontal = Spacing.md, vertical = Spacing.md)
                     ) {
@@ -1575,7 +1576,7 @@ private fun WorkspaceBindRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .clickable(onClick = onClick)
             .padding(horizontal = Spacing.md, vertical = Spacing.md)
     ) {

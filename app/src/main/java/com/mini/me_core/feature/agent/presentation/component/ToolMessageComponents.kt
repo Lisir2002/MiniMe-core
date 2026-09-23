@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -310,7 +311,7 @@ internal fun ToolCallGroup(
     val successCount = messages.size - errorCount
 
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         // 混合模式：工具块背景 surfaceVariant（#F1F5F9 / #1E293B）
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -537,7 +538,7 @@ internal fun DiffView(diff: String, startLine: Int) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radius.sm))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                     .background(MaterialTheme.colorScheme.background)
                     .horizontalScroll(rememberScrollState())
             ) {
@@ -593,7 +594,7 @@ internal fun DiffExpandToggle(expanded: Boolean, hiddenCount: Int, onToggle: () 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .clickable(onClick = onToggle)
             .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
@@ -862,7 +863,7 @@ internal fun EnvironmentStatusStrip(
     }
 
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = if (isDark) Color(0xFF1E293B).copy(alpha = 0.5f) else Color(0xFFF1F5F9),
         border = BorderStroke(1.dp, statusColor.copy(alpha = 0.35f)),
         modifier = Modifier.fillMaxWidth()

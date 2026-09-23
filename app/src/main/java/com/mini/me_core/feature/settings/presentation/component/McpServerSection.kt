@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -87,7 +88,7 @@ internal fun McpServerSection(
         // ── 状态卡 ──
         item {
             Card(
-                shape = RoundedCornerShape(Radius.lg),
+                shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
@@ -103,7 +104,7 @@ internal fun McpServerSection(
                             .background(
                                 if (isRunning) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
                                 else MaterialTheme.colorScheme.surfaceVariant,
-                                RoundedCornerShape(Radius.md)
+                                RoundedCornerShape(LocalCornerRadius.current.lg)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -188,7 +189,7 @@ internal fun McpServerSection(
         // ── 端口 + 配置 ──
         item {
             Card(
-                shape = RoundedCornerShape(Radius.lg),
+                shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
@@ -274,7 +275,7 @@ internal fun McpServerSection(
         // ── 访问令牌 ──
         item {
             Card(
-                shape = RoundedCornerShape(Radius.lg),
+                shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
@@ -287,7 +288,7 @@ internal fun McpServerSection(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.md))
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(LocalCornerRadius.current.lg))
                             .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                         verticalAlignment = Alignment.CenterVertically
                     ) {

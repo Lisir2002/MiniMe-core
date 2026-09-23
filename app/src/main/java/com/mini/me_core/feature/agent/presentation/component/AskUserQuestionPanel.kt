@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -95,7 +96,7 @@ fun AskUserQuestionPanel(
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         shadowElevation = Elevation.z2,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
@@ -196,7 +197,7 @@ private fun QuestionCard(
             if (item.header.isNotBlank()) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(Radius.xs)
+                    shape = RoundedCornerShape(LocalCornerRadius.current.xs)
                 ) {
                     Text(
                         text = item.header,
@@ -236,12 +237,12 @@ private fun QuestionCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radius.xs))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.xs))
                     .then(
                         if (isDefault) {
                             Modifier
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f), RoundedCornerShape(Radius.xs))
+                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f), RoundedCornerShape(LocalCornerRadius.current.xs))
                         } else {
                             Modifier
                         }
@@ -287,7 +288,7 @@ private fun QuestionCard(
                             Spacer(Modifier.width(Spacing.xs))
                             Surface(
                                 color = MaterialTheme.colorScheme.primary,
-                                shape = RoundedCornerShape(Radius.xs)
+                                shape = RoundedCornerShape(LocalCornerRadius.current.xs)
                             ) {
                                 Text(
                                     text = stringResource(R.string.common_recommended),
@@ -327,7 +328,7 @@ private fun QuestionCard(
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                     ),
-                    shape = RoundedCornerShape(Radius.sm)
+                    shape = RoundedCornerShape(LocalCornerRadius.current.md)
                 )
             }
         }

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
@@ -101,7 +102,7 @@ internal fun TaskStepList(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(3.dp)
-                .clip(RoundedCornerShape(Radius.xs)),
+                .clip(RoundedCornerShape(LocalCornerRadius.current.xs)),
             color = Brand.Blue,
             trackColor = MaterialTheme.colorScheme.surfaceVariant
         )
@@ -150,7 +151,7 @@ private fun StepRow(step: TaskStep) {
             label = "step-pulse-alpha"
         )
         Modifier
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .background(Brand.Blue.copy(alpha = alpha))
     } else {
         Modifier

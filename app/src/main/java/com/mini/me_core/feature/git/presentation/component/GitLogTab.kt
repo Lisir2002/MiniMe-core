@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.git.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -181,7 +182,7 @@ private fun LogOverview(commits: List<GitCommit>, expandedCount: Int) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(Radius.sm),
+                    shape = RoundedCornerShape(LocalCornerRadius.current.md),
                     modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -225,7 +226,7 @@ private fun LogOverview(commits: List<GitCommit>, expandedCount: Int) {
 private fun DateMetric(date: String, modifier: Modifier = Modifier) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(Radius.sm),
+        shape = RoundedCornerShape(LocalCornerRadius.current.md),
         modifier = modifier
     ) {
         Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)) {
@@ -322,7 +323,7 @@ private fun GraphCommitRow(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Surface(
                                 color = nodeColor.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(Radius.pill)
+                                shape = RoundedCornerShape(LocalCornerRadius.current.pill)
                             ) {
                                 Text(
                                     text = commit.shortHash,
@@ -503,7 +504,7 @@ private fun RefPills(refs: List<GitGraphRef>) {
                 else MaterialTheme.colorScheme.onTertiaryContainer
             Surface(
                 color = bg,
-                shape = RoundedCornerShape(Radius.xs)
+                shape = RoundedCornerShape(LocalCornerRadius.current.xs)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 2.dp),

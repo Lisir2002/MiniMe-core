@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
@@ -123,7 +124,7 @@ private fun FinishedExpandToggle(expanded: Boolean, onToggle: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .clickable(onClick = onToggle)
             .padding(vertical = Spacing.xs),
         horizontalArrangement = Arrangement.Center,
@@ -200,7 +201,7 @@ private fun StreamingToolOutput(content: String, modifier: Modifier = Modifier) 
 @Composable
 private fun NewOutputPill(modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(Radius.pill),
+        shape = RoundedCornerShape(LocalCornerRadius.current.pill),
         color = MaterialTheme.colorScheme.primaryContainer,
         tonalElevation = 2.dp,
         modifier = modifier

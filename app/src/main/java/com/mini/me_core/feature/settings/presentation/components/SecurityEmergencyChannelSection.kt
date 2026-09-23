@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.components
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import androidx.compose.foundation.layout.Column
@@ -47,7 +48,7 @@ fun SecurityEmergencyChannelSection(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.sm),
+        shape = RoundedCornerShape(LocalCornerRadius.current.md),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
         )

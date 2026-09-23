@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
 import androidx.compose.foundation.background
@@ -342,7 +343,7 @@ internal fun ProviderModelRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(Radius.sm))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(LocalCornerRadius.current.md))
                         .padding(Spacing.sm)
                 )
                 Spacer(Modifier.height(Spacing.xl))
@@ -552,7 +553,7 @@ internal fun CapabilityOverrideSheet(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(Radius.md))
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                         .padding(Spacing.sm)
                 ) {

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.proxy.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import androidx.compose.foundation.background
@@ -296,7 +297,7 @@ private fun StatusHero(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.xxl))
             .background(AccentGradient)
             .padding(Spacing.lg)
     ) {
@@ -318,7 +319,7 @@ private fun StatusHero(
                 Spacer(Modifier.weight(1f))
                 Surface(
                     color = Color.White.copy(alpha = 0.18f),
-                    shape = RoundedCornerShape(6.dp)
+                    shape = RoundedCornerShape(LocalCornerRadius.current.sm)
                 ) {
                     Text(
                         text = "mode · $mode",
@@ -383,7 +384,7 @@ private fun StatusHero(
                         containerColor = Color.White,
                         contentColor = Color(0xFF0984E3)
                     ),
-                    shape = RoundedCornerShape(Radius.md)
+                    shape = RoundedCornerShape(LocalCornerRadius.current.lg)
                 ) {
                     Text(stringResource(R.string.ui______06fef6bd), fontWeight = FontWeight.Bold)
                 }
@@ -414,7 +415,7 @@ private fun ToolbarRow(
         Button(
             onClick = onTestAll,
             enabled = canTest && !testing,
-            shape = RoundedCornerShape(Radius.md),
+            shape = RoundedCornerShape(LocalCornerRadius.current.lg),
             contentPadding = PaddingValues(horizontal = Spacing.md, vertical = 8.dp)
         ) {
             if (testing) {
@@ -442,7 +443,7 @@ private fun SegmentedControl(
         modifier = modifier
             .background(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                RoundedCornerShape(12.dp)
+                RoundedCornerShape(LocalCornerRadius.current.xl)
             )
             .padding(Spacing.xs)
     ) {
@@ -483,7 +484,7 @@ private fun NodeSearchBar(
     val hasText = query.isNotEmpty()
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
         Row(
@@ -606,7 +607,7 @@ private fun GroupCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.lg),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         ),
@@ -649,7 +650,7 @@ private fun GroupCard(
                         fontWeight = FontWeight.SemiBold,
                         color = latencyColor(d),
                         modifier = Modifier
-                            .background(latencyColor(d).copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                            .background(latencyColor(d).copy(alpha = 0.12f), RoundedCornerShape(LocalCornerRadius.current.sm))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
@@ -687,7 +688,7 @@ private fun GroupMemberRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .clickable(onClick = onClick)
             .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically
@@ -721,7 +722,7 @@ private fun GroupMemberRow(
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFF0984E3),
                 modifier = Modifier
-                    .background(Color(0xFF0984E3).copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                    .background(Color(0xFF0984E3).copy(alpha = 0.12f), RoundedCornerShape(LocalCornerRadius.current.sm))
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             )
         }
@@ -805,7 +806,7 @@ private fun NodeStatsBar(total: Int, latencies: Map<String, Long?>) {
 @Composable
 private fun StatChip(label: String, value: String) {
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     ) {
         Row(
@@ -876,7 +877,7 @@ private fun LatencyPill(tested: Boolean, delayMs: Long?) {
         fontWeight = FontWeight.SemiBold,
         color = color,
         modifier = Modifier
-            .background(color.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.12f), RoundedCornerShape(LocalCornerRadius.current.sm))
             .padding(horizontal = 6.dp, vertical = 2.dp)
     )
 }
@@ -890,7 +891,7 @@ private fun TypeChip(type: String) {
         modifier = Modifier
             .background(
                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.08f),
-                RoundedCornerShape(6.dp)
+                RoundedCornerShape(LocalCornerRadius.current.sm)
             )
             .padding(horizontal = 6.dp, vertical = 2.dp)
     )

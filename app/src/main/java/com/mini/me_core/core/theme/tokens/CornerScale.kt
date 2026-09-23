@@ -1,4 +1,5 @@
 package com.mini.me_core.core.theme.tokens
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.Dp
@@ -8,7 +9,7 @@ import androidx.compose.ui.unit.dp
  * 圆角缩放档位。
  *
  * 由 [CornerStyle] 动态映射而来，组件通过 [LocalCornerRadius] 读取，
- * 不再硬编码 `RoundedCornerShape(12.dp)`。
+ * 不再硬编码 `RoundedCornerShape(LocalCornerRadius.current.xl)`。
  *
  * - Sharp  → 全部 0dp（直角）
  * - ROUNDED → 使用 PrimitiveRadius 基准值（默认）

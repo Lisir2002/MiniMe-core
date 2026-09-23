@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
@@ -324,7 +325,7 @@ private sealed interface FileContent {
 private fun HeroCard(skill: Skill) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.lg),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         ),
@@ -411,7 +412,7 @@ private fun CurrentFileBar(path: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(Radius.sm),
+        shape = RoundedCornerShape(LocalCornerRadius.current.md),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     ) {
         Row(
@@ -522,7 +523,7 @@ private fun DirectoryNodeRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radius.sm))
+                .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                 .background(
                     if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     else Color.Transparent
@@ -589,7 +590,7 @@ private fun CodeContentView(code: String, path: String) {
             .verticalScroll(rememberScrollState())
     ) {
         Surface(
-            shape = RoundedCornerShape(Radius.sm),
+            shape = RoundedCornerShape(LocalCornerRadius.current.md),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -617,7 +618,7 @@ private fun CodeContentView(code: String, path: String) {
         }
         Spacer(Modifier.height(Spacing.sm))
         Surface(
-            shape = RoundedCornerShape(Radius.sm),
+            shape = RoundedCornerShape(LocalCornerRadius.current.md),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -666,7 +667,7 @@ private fun ImageContentView(file: File) {
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(Radius.sm))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             )
         }
     }
@@ -686,7 +687,7 @@ private fun BinaryPlaceholder(path: String) {
 @Composable
 private fun InfoChip(label: String, color: Color) {
     Surface(
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(LocalCornerRadius.current.sm),
         color = color.copy(alpha = 0.15f)
     ) {
         Text(

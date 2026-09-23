@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -98,7 +99,7 @@ internal fun ChatInputBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = Spacing.sm),
-                    shape = RoundedCornerShape(Radius.lg),
+                    shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
@@ -111,7 +112,7 @@ internal fun ChatInputBar(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(Radius.sm))
+                                    .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                                     .clickable { onValueChange(command.trigger) }
                                     .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                                 verticalAlignment = Alignment.CenterVertically

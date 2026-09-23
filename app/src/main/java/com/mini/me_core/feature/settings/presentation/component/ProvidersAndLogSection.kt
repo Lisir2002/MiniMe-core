@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -97,7 +98,7 @@ fun ProviderItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onEdit() },
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -125,7 +126,7 @@ fun ProviderItem(
                 modifier = Modifier.weight(1f)
             )
             Surface(
-                shape = RoundedCornerShape(Radius.sm),
+                shape = RoundedCornerShape(LocalCornerRadius.current.md),
                 color = if (provider.isEnabled) {
                     MaterialTheme.colorScheme.primaryContainer
                 } else {

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -120,7 +121,7 @@ private fun FileDiffRow(
         // [diff] 按钮
         Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(Radius.sm))
+                .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .clickable { onViewDiff() }
                 .padding(horizontal = Spacing.sm, vertical = Spacing.xs)

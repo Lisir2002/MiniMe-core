@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.richsegment
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import androidx.compose.animation.animateContentSize
@@ -78,7 +79,9 @@ data class SegmentationNavigationActions(
     val onOpenFilePath: (String) -> Unit,
 )
 
-private val codeBlockCorner = RoundedCornerShape(Radius.md)
+// 静态值（非 Composable 上下文无法使用 LocalCornerRadius）
+// Composable 使用处可按需用 LocalCornerRadius.current.lg 覆盖
+private val codeBlockCorner = RoundedCornerShape(10.dp)
 private val codeBlockHeaderHeight = 34.dp
 
 @Composable
@@ -521,14 +524,14 @@ private fun CommandCard(command: String, isDark: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.md))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
             .background(if (isDark) Color(0xFF0B1018) else Color(0xFF0F172A))
             .border(
                 BorderStroke(
                     1.dp,
                     colors.success.copy(alpha = 0.6f)
                 ),
-                RoundedCornerShape(Radius.md)
+                RoundedCornerShape(LocalCornerRadius.current.lg)
             )
             .clickable { clipboard.setText(AnnotatedString(command)) },
         verticalAlignment = Alignment.CenterVertically
@@ -603,7 +606,7 @@ private fun TableCard(
     Surface(
         color = Color.Transparent,
         border = BorderStroke(0.8.dp, borderColor),
-        shape = RoundedCornerShape(Radius.sm),
+        shape = RoundedCornerShape(LocalCornerRadius.current.md),
         modifier = Modifier.fillMaxWidth()
     ) {
         // 外层横向滚动：表格宽度超屏宽时水平滚

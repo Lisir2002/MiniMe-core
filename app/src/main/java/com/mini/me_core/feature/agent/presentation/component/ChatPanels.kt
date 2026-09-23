@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -76,7 +77,7 @@ internal fun ToolPermissionPanel(
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         tonalElevation = Elevation.z2,
         shadowElevation = Elevation.z2,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -215,7 +216,7 @@ private fun ExpandableErrorBanner(
             .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
             .clickable { expanded = !expanded },
         color = container,
-        shape = RoundedCornerShape(Radius.md)
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg)
     ) {
         Row(
             modifier = Modifier.padding(Spacing.md),
@@ -256,7 +257,7 @@ internal fun InfoBanner(
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
         color = container,
-        shape = RoundedCornerShape(Radius.md)
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg)
     ) {
         Row(
             modifier = Modifier.padding(Spacing.md),
@@ -280,7 +281,7 @@ fun ChangePreviewPanel(
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         shadowElevation = Elevation.z2,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
@@ -368,7 +369,7 @@ internal fun PlanApprovalPanel(
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         shadowElevation = Elevation.z2,
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {

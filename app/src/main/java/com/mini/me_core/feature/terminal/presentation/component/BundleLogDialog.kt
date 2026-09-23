@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
@@ -348,7 +349,7 @@ fun BundleLogDialog(
                         .fillMaxWidth()
                         .weight(1f)
                         .padding(horizontal = Spacing.md)
-                        .clip(RoundedCornerShape(Radius.md))
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
                 ) {
                     items(
@@ -632,7 +633,7 @@ private fun ProgressSummary(state: AggregateProgressState) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp)
-                .clip(RoundedCornerShape(Radius.xs))
+                .clip(RoundedCornerShape(LocalCornerRadius.current.xs))
                 .background(
                     if (isFailed) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
                 ),
@@ -643,7 +644,7 @@ private fun ProgressSummary(state: AggregateProgressState) {
                         .fillMaxSize()
                         .background(
                             brush = brush,
-                            shape = RoundedCornerShape(Radius.xs),
+                            shape = RoundedCornerShape(LocalCornerRadius.current.xs),
                         ),
                 )
             } else {
@@ -660,7 +661,7 @@ private fun ProgressSummary(state: AggregateProgressState) {
                                     else -> listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)
                                 },
                             ),
-                            shape = RoundedCornerShape(Radius.xs),
+                            shape = RoundedCornerShape(LocalCornerRadius.current.xs),
                         ),
                 )
             }
@@ -788,9 +789,9 @@ private fun ErrorRowCard(line: LogLine, fg: Color, ctx: Context, modifier: Modif
     var expanded by remember(line.id) { mutableStateOf(false) }
     Card(
         modifier = modifier
-            .clip(RoundedCornerShape(Radius.md))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
             .clickableCopy(text = line.text, ctx),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
     ) {
         Column(modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)) {

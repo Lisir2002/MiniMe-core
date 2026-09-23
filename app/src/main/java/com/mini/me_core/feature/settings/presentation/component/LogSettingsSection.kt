@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -182,7 +183,7 @@ internal fun LogLevelCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
@@ -244,7 +245,7 @@ private fun ColumnScope.LogViewerContent(
     // ── 文件选择 + 操作按钮行 ──
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
@@ -390,7 +391,7 @@ private fun ColumnScope.LogViewerContent(
                 }
             },
             singleLine = true,
-            shape = RoundedCornerShape(Radius.md),
+            shape = RoundedCornerShape(LocalCornerRadius.current.lg),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
@@ -419,7 +420,7 @@ private fun ColumnScope.LogViewerContent(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = Spacing.sm),
-                shape = RoundedCornerShape(Radius.pill)
+                shape = RoundedCornerShape(LocalCornerRadius.current.pill)
             ) {
                 Text(
                     text = stringResource(R.string.log_new_logs),
@@ -437,7 +438,7 @@ private fun LogContentCard(state: LogViewerUiState) {
     Card(
         modifier = Modifier
             .fillMaxSize(),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
@@ -556,7 +557,7 @@ private fun FilterPanel(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(

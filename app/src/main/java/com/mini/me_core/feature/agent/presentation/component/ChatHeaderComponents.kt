@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -261,7 +262,7 @@ internal fun BrandMark(size: Dp, iconSize: Dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(RoundedCornerShape(Radius.lg))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.xl))
             .background(brandGradient()),
         contentAlignment = Alignment.Center
     ) {

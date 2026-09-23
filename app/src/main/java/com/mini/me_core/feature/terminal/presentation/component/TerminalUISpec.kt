@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -50,8 +51,8 @@ object TerminalLayout {
     /** 额外按键：单字按键固定宽度（如箭头 / - / /） */
     val keyShortWidth = 48.dp
 
-    /** 额外按键圆角（原 Radius.md=10dp，按键建议稍小一点） */
-    val keyRadius = Radius.md
+    /** 额外按键圆角（静态值 10dp，Composable 使用处可按需用 LocalCornerRadius 覆盖） */
+    val keyRadius = 10.dp
 
     /** 额外按键行顶部/底部 padding */
     val keyRowPaddingV = Spacing.xs + 2.dp  // 6 dp，行更紧凑

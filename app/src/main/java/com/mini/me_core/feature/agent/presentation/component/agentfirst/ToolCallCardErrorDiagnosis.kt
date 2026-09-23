@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
 import androidx.compose.foundation.BorderStroke
@@ -64,7 +65,7 @@ fun ToolCallCardErrorDiagnosis(
     val iconTint = Color(0xFFF59E0B)
 
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = barBg,
         border = BorderStroke(1.dp, barBorder),
         modifier = modifier.fillMaxWidth()
@@ -130,7 +131,7 @@ private fun FixCommandRow(fixCommand: String) {
         )
         // 复制按钮
         Surface(
-            shape = RoundedCornerShape(Radius.sm),
+            shape = RoundedCornerShape(LocalCornerRadius.current.md),
             color = MaterialTheme.colorScheme.primaryContainer,
             modifier = Modifier.clickable {
                 scope.launch {

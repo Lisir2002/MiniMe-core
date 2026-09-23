@@ -1,4 +1,5 @@
 package com.mini.me_core.core.theme
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -89,7 +90,7 @@ internal fun CyberCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val shape = RoundedCornerShape(Radius.lg)
+    val shape = RoundedCornerShape(LocalCornerRadius.current.xl)
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = cyberColor(CyberColors.CardBg, CyberColors.DarkCardBg),
@@ -227,7 +228,7 @@ internal fun CyberMenuRow(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(RoundedCornerShape(Radius.md))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
                     .background(color = effectiveIconBg),
                 contentAlignment = Alignment.Center
             ) {
@@ -292,7 +293,7 @@ internal fun CyberSearchBar(
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg)
             .height(44.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         color = bgColor,
         border = BorderStroke(1.dp, strokeColor)
     ) {
@@ -418,7 +419,7 @@ internal fun CyberChip(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(Radius.sm)
+    val shape = RoundedCornerShape(LocalCornerRadius.current.md)
     val gradientBrush = Brush.horizontalGradient(
         colors = listOf(CyberColors.Cyan, CyberColors.Blue)
     )
@@ -484,7 +485,7 @@ internal fun CyberProgressIndicator(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp)
-                .clip(RoundedCornerShape(Radius.xs))
+                .clip(RoundedCornerShape(LocalCornerRadius.current.xs))
                 .background(CyberColors.CardBg)
         ) {
             if (isIndeterminate) {

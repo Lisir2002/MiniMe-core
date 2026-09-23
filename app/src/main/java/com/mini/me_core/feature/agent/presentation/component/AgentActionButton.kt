@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,7 +34,7 @@ internal fun AgentActionButton(
     enabled: Boolean = true,
     tone: AgentActionTone = AgentActionTone.Neutral
 ) {
-    val shape = RoundedCornerShape(Radius.sm)
+    val shape = RoundedCornerShape(LocalCornerRadius.current.md)
     val success = Color(0xFF15803D)
     val (container, content, border) = when (tone) {
         AgentActionTone.Success -> Triple(

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -273,10 +274,10 @@ fun TerminalBundleManagerScreen(
                             modifier = Modifier
                                 .padding(horizontal = Spacing.md)
                                 .fillMaxWidth()
-                                .border(1.dp, borderColor, RoundedCornerShape(Radius.md)),
+                                .border(1.dp, borderColor, RoundedCornerShape(LocalCornerRadius.current.lg)),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = TerminalCardsSpec.BgSoftAlpha)),
                             elevation = CardDefaults.cardElevation(defaultElevation = TerminalCardsSpec.Elevation),
-                            shape = RoundedCornerShape(Radius.md)
+                            shape = RoundedCornerShape(LocalCornerRadius.current.lg)
                         ) {
                             Column(modifier = Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -367,10 +368,10 @@ private fun CustomInstallCard(
         modifier = Modifier
             .padding(horizontal = Spacing.md)
             .fillMaxWidth()
-            .border(1.dp, borderColor, RoundedCornerShape(Radius.md)),
+            .border(1.dp, borderColor, RoundedCornerShape(LocalCornerRadius.current.lg)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = TerminalCardsSpec.Elevation),
-        shape = RoundedCornerShape(Radius.md)
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg)
     ) {
         Column(modifier = Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Row(
@@ -444,10 +445,10 @@ private fun QuickPacksChipRow(
         modifier = Modifier
             .padding(horizontal = Spacing.md)
             .fillMaxWidth()
-            .border(1.dp, borderColor, RoundedCornerShape(Radius.md)),
+            .border(1.dp, borderColor, RoundedCornerShape(LocalCornerRadius.current.lg)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = TerminalCardsSpec.Elevation),
-        shape = RoundedCornerShape(Radius.md)
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg)
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(

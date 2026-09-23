@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
@@ -62,7 +63,7 @@ internal fun ThinkingBubble() {
         horizontalArrangement = Arrangement.Start
     ) {
         Surface(
-            shape = RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs),
+            shape = RoundedCornerShape(LocalCornerRadius.current.lg, LocalCornerRadius.current.lg, LocalCornerRadius.current.lg, LocalCornerRadius.current.xs),
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
@@ -84,7 +85,7 @@ internal fun CompactionProgressBubble() {
         horizontalArrangement = Arrangement.Start
     ) {
         Surface(
-            shape = RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs),
+            shape = RoundedCornerShape(LocalCornerRadius.current.lg, LocalCornerRadius.current.lg, LocalCornerRadius.current.lg, LocalCornerRadius.current.xs),
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
@@ -112,7 +113,7 @@ internal fun RetryingBubble(attempt: Int, maxRetries: Int) {
         horizontalArrangement = Arrangement.Start
     ) {
         Surface(
-            shape = RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs),
+            shape = RoundedCornerShape(LocalCornerRadius.current.lg, LocalCornerRadius.current.lg, LocalCornerRadius.current.lg, LocalCornerRadius.current.xs),
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
@@ -145,7 +146,7 @@ internal fun StreamingBubble(text: String) {
         horizontalArrangement = Arrangement.Start
     ) {
         Surface(
-            shape = RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs),
+            shape = RoundedCornerShape(LocalCornerRadius.current.lg, LocalCornerRadius.current.lg, LocalCornerRadius.current.lg, LocalCornerRadius.current.xs),
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier.fillMaxWidth()
@@ -192,7 +193,7 @@ internal fun ReasoningBubble(
         val isDark = LocalAppDarkMode.current
         // 混合模式：思考条背景 surfaceVariant（#F1F5F9 / #1E293B），圆角 8dp
         Surface(
-            shape = RoundedCornerShape(Radius.sm),
+            shape = RoundedCornerShape(LocalCornerRadius.current.md),
             color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -266,7 +267,7 @@ internal fun ReasoningBubble(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(Radius.sm))
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                             .clickable {
                                 userToggled = true
                                 expanded = true

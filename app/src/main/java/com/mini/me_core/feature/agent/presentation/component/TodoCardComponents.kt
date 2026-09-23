@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -186,7 +187,7 @@ internal fun TodoItemRow(item: ParsedTodoItem) {
         if (isInProgress) {
             Spacer(Modifier.width(Spacing.xs))
             Surface(
-                shape = RoundedCornerShape(4.dp),
+                shape = RoundedCornerShape(LocalCornerRadius.current.xs),
                 color = MaterialTheme.colorScheme.primaryContainer
             ) {
                 Text(

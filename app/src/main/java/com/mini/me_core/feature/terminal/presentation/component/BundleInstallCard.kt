@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import com.mini.me_core.R
 import androidx.compose.ui.res.stringResource
@@ -154,7 +155,7 @@ fun BundleInstallCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.md))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
             .clickable(onClick = onOpenLogDialog),
         colors = CardDefaults.cardColors(containerColor = tintColor),
     ) {
@@ -451,7 +452,7 @@ private fun FailedSummaryBoard(
                 .fillMaxWidth()
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { expanded = !expanded },
             colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
-            shape = RoundedCornerShape(Radius.md),
+            shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         ) {
             Column(modifier = Modifier.padding(Spacing.md)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -517,7 +518,7 @@ private fun StatMiniTile(
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = bg),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
     ) {
         Column(modifier = Modifier.padding(Spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -608,13 +609,13 @@ private fun SegmentedProgressBar(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(Radius.xs))
+                .clip(RoundedCornerShape(LocalCornerRadius.current.xs))
                 .background(track)
                 .then(
                     if (estimated) Modifier.dashedBorder(
                         width = 1.dp,
                         color = Color(0xFF64B5F6),
-                        shape = RoundedCornerShape(Radius.xs),
+                        shape = RoundedCornerShape(LocalCornerRadius.current.xs),
                     ) else Modifier,
                 ),
         )
@@ -624,7 +625,7 @@ private fun SegmentedProgressBar(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(Radius.xs))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.xs))
                     .background(Brush.horizontalGradient(COL_DONE_BG)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -649,7 +650,7 @@ private fun SegmentedProgressBar(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(Radius.xs))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.xs))
                     .background(COL_FAILED.copy(alpha = blinkAlpha)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -665,7 +666,7 @@ private fun SegmentedProgressBar(
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(Radius.xs)),
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.xs)),
             ) {
                 val w = size.width
                 val h = size.height
@@ -724,7 +725,7 @@ private fun SegmentedProgressBar(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(Radius.xs))
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.xs))
                         .shimmerOverlay(COL_DOWNLOAD.copy(alpha = 0.35f), COL_INSTALL.copy(alpha = 0.35f)),
                 )
             }
@@ -774,7 +775,7 @@ private fun MicroDownloadSlotsRow(slots: List<DownloadSlot>, modifier: Modifier 
                         .size(size * 3.2f)
                         .padding(start = (size.value / 2).dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(Radius.md),
+                    shape = RoundedCornerShape(LocalCornerRadius.current.lg),
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         MicroSlotBlock(slot = expandedSlot, size = size * 2.6f, onClick = { })

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image as ComposeImage
@@ -65,7 +66,7 @@ internal fun QueuedRequestPanel(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = Spacing.sm),
-        shape = RoundedCornerShape(Radius.lg),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
             1.dp, MaterialTheme.colorScheme.outlineVariant
@@ -96,7 +97,7 @@ internal fun QueuedRequestPanel(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(Radius.sm))
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                             .padding(horizontal = Spacing.md, vertical = Spacing.xs),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -162,7 +163,7 @@ private fun PendingAttachmentPreviewItem(
     onRemove: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
         modifier = Modifier.size(76.dp)
     ) {
@@ -215,7 +216,7 @@ private fun ImageThumbnail(
         }.getOrNull()
     }
     Surface(
-        shape = RoundedCornerShape(Radius.sm),
+        shape = RoundedCornerShape(LocalCornerRadius.current.md),
         color = MaterialTheme.colorScheme.surface,
         modifier = modifier
     ) {
@@ -352,7 +353,7 @@ private fun AttachmentSheetItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = Spacing.md, vertical = Spacing.md),
         verticalAlignment = Alignment.CenterVertically

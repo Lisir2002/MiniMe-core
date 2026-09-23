@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -52,7 +53,7 @@ internal fun McpHttpFields(
             onValueChange = onUrlChange,
             placeholder = { Text(stringResource(R.string.mcp_server_url_hint)) },
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(LocalCornerRadius.current.xl),
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -94,7 +95,7 @@ internal fun McpHttpFields(
                         onValueChange = { headers[index] = it to v },
                         placeholder = { Text(stringResource(R.string.mcp_header_name_hint)) },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = Color.Transparent,
                             focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
@@ -114,7 +115,7 @@ internal fun McpHttpFields(
                         onValueChange = { headers[index] = k to it },
                         placeholder = { Text(stringResource(R.string.mcp_header_value_hint)) },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = Color.Transparent,
                             focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
@@ -148,7 +149,7 @@ internal fun McpHttpFields(
     Row {
         Surface(
             onClick = { headers.add("" to "") },
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(LocalCornerRadius.current.xl),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
         ) {
             Row(

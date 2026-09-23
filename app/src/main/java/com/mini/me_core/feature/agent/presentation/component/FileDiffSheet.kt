@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
@@ -76,7 +77,7 @@ internal fun FileDiffSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = Radius.lg, topEnd = Radius.lg)
+        shape = RoundedCornerShape(topStart = LocalCornerRadius.current.xl, topEnd = LocalCornerRadius.current.xl)
     ) {
         // 占屏 8/10：ModalBottomSheet 本身无 fillMaxHeight 参数，用内部 Column 撑满
         Column(
@@ -221,7 +222,7 @@ private fun FileChangesTab(
                 // 删除：无 diff，展示删除提示
                 FileChangeType.DELETE -> {
                     Surface(
-                        shape = RoundedCornerShape(Radius.md),
+                        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
                         color = deleteColor.copy(alpha = 0.08f),
                         border = BorderStroke(1.dp, deleteColor.copy(alpha = 0.3f)),
                         modifier = Modifier.fillMaxWidth()
@@ -285,7 +286,7 @@ private fun ToolLogsTab(logs: List<ToolLogEntry>) {
 private fun ToolLogRow(log: ToolLogEntry) {
     val accent = if (log.isError) deleteColor else modifyColor
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = if (log.isError) deleteColor.copy(alpha = 0.06f)
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.2f)),

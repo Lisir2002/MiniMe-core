@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
@@ -104,6 +105,8 @@ object DotSize {
 @Immutable
 object ProgressSize {
     val Height = 4.dp
+    // 静态对象中无法使用 LocalCornerRadius（非 Composable 上下文）
+    // 保持静态值，使用处的 Composable 可按需覆盖
     val Corner = RoundedCornerShape(6.dp)
 }
 
@@ -185,12 +188,12 @@ internal fun SharedContainerEnvCard(
         modifier = Modifier
             .padding(horizontal = Spacing.md)
             .fillMaxWidth()
-            .border(1.dp, borderColor, RoundedCornerShape(Radius.md)),
+            .border(1.dp, borderColor, RoundedCornerShape(LocalCornerRadius.current.lg)),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = TerminalCardsSpec.BgSoftAlpha)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = TerminalCardsSpec.Elevation),
-        shape = RoundedCornerShape(Radius.md)  // 10.dp
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg)  // 10.dp
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -268,12 +271,12 @@ internal fun SharedAiRecommendationStrip(
         modifier = Modifier
             .padding(horizontal = Spacing.md)
             .fillMaxWidth()
-            .border(1.dp, borderColor, RoundedCornerShape(Radius.md)),
+            .border(1.dp, borderColor, RoundedCornerShape(LocalCornerRadius.current.lg)),
         colors = CardDefaults.cardColors(
             containerColor = accent.copy(alpha = TerminalCardsSpec.BgStrongAlpha)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = TerminalCardsSpec.Elevation),
-        shape = RoundedCornerShape(Radius.md)
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg)
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -348,10 +351,10 @@ internal fun SharedBundleCard(
         modifier = Modifier
             .padding(horizontal = Spacing.md)
             .fillMaxWidth()
-            .border(1.dp, borderColor, RoundedCornerShape(Radius.md)),
+            .border(1.dp, borderColor, RoundedCornerShape(LocalCornerRadius.current.lg)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = TerminalCardsSpec.Elevation),
-        shape = RoundedCornerShape(Radius.md)
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg)
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

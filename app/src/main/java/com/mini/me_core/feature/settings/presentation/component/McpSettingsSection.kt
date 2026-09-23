@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -95,7 +96,7 @@ internal fun McpSection(
                         Box(
                             modifier = Modifier
                                 .size(64.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.lg)),
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(LocalCornerRadius.current.xl)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -197,9 +198,9 @@ internal fun McpServerRow(
                             scaleX = (0.4f + 0.6f * progress).coerceIn(0f, 1f)
                             scaleY = (0.7f + 0.3f * progress).coerceIn(0f, 1f)
                         }
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.xxl))
                         .background(Color(0xFFEF4444))
-                        .border(1.dp, Color(0xFFF87171), RoundedCornerShape(16.dp))
+                        .border(1.dp, Color(0xFFF87171), RoundedCornerShape(LocalCornerRadius.current.xxl))
                         .clickable {
                             coroutineScope.launch {
                                 offsetX.animateTo(0f)
@@ -287,7 +288,7 @@ internal fun McpServerRow(
                         onClick()
                     }
                 },
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(LocalCornerRadius.current.xxl),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
@@ -303,7 +304,7 @@ internal fun McpServerRow(
                         .size(48.dp)
                         .background(
                             color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(LocalCornerRadius.current.xl)
                         )
                 ) {
                     Icon(
@@ -320,8 +321,8 @@ internal fun McpServerRow(
                             .align(Alignment.BottomEnd)
                             .padding(2.dp)
                             .size(10.dp)
-                            .background(color = statusColor, shape = RoundedCornerShape(Radius.pill))
-                            .border(1.5.dp, MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.pill))
+                            .background(color = statusColor, shape = RoundedCornerShape(LocalCornerRadius.current.pill))
+                            .border(1.5.dp, MaterialTheme.colorScheme.surface, RoundedCornerShape(LocalCornerRadius.current.pill))
                     )
                 }
 
@@ -349,7 +350,7 @@ internal fun McpServerRow(
                         // 1. 状态 Pill
                         Box(
                             modifier = Modifier
-                                .background(statusBgColor, RoundedCornerShape(Radius.pill))
+                                .background(statusBgColor, RoundedCornerShape(LocalCornerRadius.current.pill))
                                 .padding(horizontal = Spacing.sm, vertical = 2.dp)
                         ) {
                             Text(
@@ -364,7 +365,7 @@ internal fun McpServerRow(
                             modifier = Modifier
                                 .background(
                                     MaterialTheme.colorScheme.surfaceVariant,
-                                    RoundedCornerShape(Radius.pill)
+                                    RoundedCornerShape(LocalCornerRadius.current.pill)
                                 )
                                 .padding(horizontal = Spacing.sm, vertical = 2.dp)
                         ) {
@@ -385,7 +386,7 @@ internal fun McpServerRow(
                             modifier = Modifier
                                 .background(
                                     MaterialTheme.colorScheme.surfaceVariant,
-                                    RoundedCornerShape(Radius.pill)
+                                    RoundedCornerShape(LocalCornerRadius.current.pill)
                                 )
                                 .padding(horizontal = Spacing.sm, vertical = 2.dp)
                         ) {

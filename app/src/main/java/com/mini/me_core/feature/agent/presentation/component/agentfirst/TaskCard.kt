@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
@@ -134,12 +135,12 @@ internal fun TaskCard(
     val toolCount = remember(group) { TaskStateDeriver.collectToolMessages(group).size }
 
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.md))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
     ) {
         Column(
             modifier = Modifier
@@ -268,7 +269,7 @@ private fun TaskCardHeader(
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier
                 .size(20.dp)
-                .clip(RoundedCornerShape(Radius.sm))
+                .clip(RoundedCornerShape(LocalCornerRadius.current.md))
         )
     }
 }

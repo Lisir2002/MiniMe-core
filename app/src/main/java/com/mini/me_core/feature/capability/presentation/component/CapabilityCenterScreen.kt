@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.capability.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
@@ -162,7 +163,7 @@ private fun ToolCard(tool: ToolUiModel) {
     var expanded by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         ),
@@ -261,7 +262,7 @@ private fun PermissionBadge(policy: ToolPermissionPolicy) {
         color = color,
         fontWeight = FontWeight.Bold,
         modifier = Modifier
-            .background(color.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.12f), RoundedCornerShape(LocalCornerRadius.current.sm))
             .padding(horizontal = 6.dp, vertical = 2.dp)
     )
 }
@@ -275,7 +276,7 @@ private fun CapabilityChip(capability: ToolCapability) {
         modifier = Modifier
             .background(
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                RoundedCornerShape(6.dp)
+                RoundedCornerShape(LocalCornerRadius.current.sm)
             )
             .padding(horizontal = 6.dp, vertical = 2.dp)
     )
@@ -302,7 +303,7 @@ private fun ParameterRow(param: ParameterUiModel) {
             modifier = Modifier
                 .background(
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                    RoundedCornerShape(Radius.xs)
+                    RoundedCornerShape(LocalCornerRadius.current.xs)
                 )
                 .padding(horizontal = 4.dp, vertical = 1.dp)
         )
@@ -414,7 +415,7 @@ private fun AgentTab(
             Spacer(Modifier.height(Spacing.sm))
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                 )
@@ -440,7 +441,7 @@ private fun AgentInfoCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         )
@@ -490,7 +491,7 @@ private fun StatCard(
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         )

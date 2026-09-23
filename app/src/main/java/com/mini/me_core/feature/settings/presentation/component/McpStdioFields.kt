@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -53,7 +54,7 @@ internal fun McpStdioFields(
             onValueChange = onCommandChange,
             placeholder = { Text(stringResource(R.string.mcp_command_hint)) },
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(LocalCornerRadius.current.xl),
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -95,7 +96,7 @@ internal fun McpStdioFields(
                         onValueChange = { args[index] = it },
                         placeholder = { Text(stringResource(R.string.mcp_arg_hint)) },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = Color.Transparent,
                             focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
@@ -129,7 +130,7 @@ internal fun McpStdioFields(
     Row {
         Surface(
             onClick = { args.add("") },
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(LocalCornerRadius.current.xl),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
         ) {
             Row(
@@ -189,7 +190,7 @@ internal fun McpStdioFields(
                         onValueChange = { env[index] = it to v },
                         placeholder = { Text(stringResource(R.string.mcp_env_name_hint)) },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = Color.Transparent,
                             focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
@@ -209,7 +210,7 @@ internal fun McpStdioFields(
                         onValueChange = { env[index] = k to it },
                         placeholder = { Text(stringResource(R.string.mcp_env_value_hint)) },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = Color.Transparent,
                             focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
@@ -243,7 +244,7 @@ internal fun McpStdioFields(
     Row {
         Surface(
             onClick = { env.add("" to "") },
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(LocalCornerRadius.current.xl),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
         ) {
             Row(

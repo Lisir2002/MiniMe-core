@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -185,7 +186,7 @@ fun McpServerEditDialog(
                         .padding(horizontal = 20.dp)
                         .background(
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            RoundedCornerShape(Radius.lg)
+                            RoundedCornerShape(LocalCornerRadius.current.xl)
                         )
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -196,7 +197,7 @@ fun McpServerEditDialog(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(Radius.md))
+                                .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
                                 .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
                                 .clickable { selectedTab = index }
                                 .padding(vertical = 10.dp),
@@ -232,7 +233,7 @@ fun McpServerEditDialog(
                         ) {
                             // 是否启用 Card
                             Card(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(LocalCornerRadius.current.xxl),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -267,7 +268,7 @@ fun McpServerEditDialog(
                                     onValueChange = { name = it },
                                     placeholder = { Text(stringResource(R.string.mcp_name_hint)) },
                                     singleLine = true,
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -284,7 +285,7 @@ fun McpServerEditDialog(
                                         .fillMaxWidth()
                                         .background(
                                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                            RoundedCornerShape(12.dp)
+                                            RoundedCornerShape(LocalCornerRadius.current.xl)
                                         )
                                         .padding(4.dp),
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -295,7 +296,7 @@ fun McpServerEditDialog(
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .clip(RoundedCornerShape(Radius.sm))
+                                                .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                                                 .background(if (selected) MaterialTheme.colorScheme.surface else Color.Transparent)
                                                 .clickable { isStdio = stdioFlag }
                                                 .padding(vertical = 10.dp),
@@ -370,7 +371,7 @@ fun McpServerEditDialog(
                                     val isApprovalRequired = tool.name in requireApprovalToolsSet
 
                                     Card(
-                                        shape = RoundedCornerShape(16.dp),
+                                        shape = RoundedCornerShape(LocalCornerRadius.current.xxl),
                                         colors = CardDefaults.cardColors(
                                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                                         ),
@@ -421,7 +422,7 @@ fun McpServerEditDialog(
                                                             modifier = Modifier
                                                                 .background(
                                                                     MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                                                                    RoundedCornerShape(6.dp)
+                                                                    RoundedCornerShape(LocalCornerRadius.current.sm)
                                                                 )
                                                                 .padding(horizontal = 8.dp, vertical = 2.dp)
                                                         ) {
@@ -516,7 +517,7 @@ fun McpServerEditDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(LocalCornerRadius.current.xl)
                     ) {
                         Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
 import androidx.compose.foundation.BorderStroke
@@ -172,11 +173,11 @@ internal fun AgentMessageItem(
                                 message.role == MessageRole.TOOL -> when (cornerStyle) {
                                     com.mini.me_core.core.theme.tokens.CornerStyle.Sharp -> RoundedCornerShape(0.dp)
                                     com.mini.me_core.core.theme.tokens.CornerStyle.Pill -> RoundedCornerShape(999.dp)
-                                    else -> RoundedCornerShape(Radius.md)
+                                    else -> RoundedCornerShape(LocalCornerRadius.current.lg)
                                 }
                                 else -> {
                                     // AI 回复透明背景，形状无视觉影响
-                                    RoundedCornerShape(Radius.lg)
+                                    RoundedCornerShape(LocalCornerRadius.current.xl)
                                 }
                             },
                             color = when (message.role) {
@@ -395,7 +396,7 @@ private fun BackgroundNotificationBar(message: AgentUIMessage) {
     }
 
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -424,7 +425,7 @@ private fun BackgroundNotificationBar(message: AgentUIMessage) {
 @Composable
 private fun CompactionDivider() {
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
         modifier = Modifier

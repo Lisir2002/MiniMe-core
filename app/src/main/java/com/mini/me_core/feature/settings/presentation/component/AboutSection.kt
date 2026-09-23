@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.Context
 import android.content.Intent
@@ -466,7 +467,7 @@ private fun HeroCard(
 
 @Composable
 private fun VersionPill(text: String, outline: Boolean = false, ac: AboutColors) {
-    val shape = RoundedCornerShape(Radius.pill)
+    val shape = RoundedCornerShape(LocalCornerRadius.current.pill)
     val bgModifier = if (outline) {
         Modifier.background(ac.card, shape)
     } else {
@@ -505,7 +506,7 @@ private fun VersionPill(text: String, outline: Boolean = false, ac: AboutColors)
  */
 @Composable
 private fun VariantPill(isDebug: Boolean, ac: AboutColors) {
-    val shape = RoundedCornerShape(Radius.pill)
+    val shape = RoundedCornerShape(LocalCornerRadius.current.pill)
     Row(
         modifier = Modifier
             .clip(shape)
@@ -540,11 +541,11 @@ private fun HeroInfoChip(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .background(ac.statGrayBg)
             .border(
                 border = BorderStroke(0.8.dp, ac.border),
-                shape = RoundedCornerShape(Radius.sm)
+                shape = RoundedCornerShape(LocalCornerRadius.current.md)
             )
             .padding(horizontal = Spacing.sm, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -671,7 +672,7 @@ private fun CoreComponentsSection(
 private fun CoreComponentCard(item: CoreItem, modifier: Modifier = Modifier, ac: AboutColors) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(containerColor = ac.card),
         border = BorderStroke(0.8.dp, ac.border),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -689,7 +690,7 @@ private fun CoreComponentCard(item: CoreItem, modifier: Modifier = Modifier, ac:
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(RoundedCornerShape(Radius.sm))
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                         .background(item.accentBg),
                     contentAlignment = Alignment.Center
                 ) {
@@ -724,7 +725,7 @@ private fun CoreComponentCard(item: CoreItem, modifier: Modifier = Modifier, ac:
 private fun StatusPill(text: String, ok: Boolean, ac: AboutColors) {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.pill))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.pill))
             .background(if (ok) ac.greenBg else ac.statGrayBg)
             .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -849,7 +850,7 @@ private fun UsageStatCell(
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(
             containerColor = if (highlighted) ac.selectedBg else ac.card
         ),
@@ -1020,11 +1021,11 @@ private fun OpenSourceCreditsSection(ac: AboutColors) {
 private fun CreditChip(name: String, author: String, ac: AboutColors) {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .background(ac.statGrayBg)
             .border(
                 border = BorderStroke(0.8.dp, ac.border),
-                shape = RoundedCornerShape(Radius.sm)
+                shape = RoundedCornerShape(LocalCornerRadius.current.md)
             )
             .padding(horizontal = Spacing.sm, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1109,11 +1110,11 @@ private fun UpdateResultDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(180.dp)
-                                .clip(RoundedCornerShape(Radius.md))
+                                .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
                                 .background(ac.statGrayBg)
                                 .border(
                                     border = BorderStroke(0.8.dp, ac.border),
-                                    shape = RoundedCornerShape(Radius.md)
+                                    shape = RoundedCornerShape(LocalCornerRadius.current.lg)
                                 )
                         ) {
                             val notes = state.releaseNotes?.takeIf { it.isNotBlank() }
@@ -1280,7 +1281,7 @@ private fun PaperProgressIndicatorWithDetail(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp)
-                .clip(RoundedCornerShape(Radius.pill)),
+                .clip(RoundedCornerShape(LocalCornerRadius.current.pill)),
             color = ac.iconGray,
             trackColor = ac.statGrayBg,
             drawStopIndicator = {}

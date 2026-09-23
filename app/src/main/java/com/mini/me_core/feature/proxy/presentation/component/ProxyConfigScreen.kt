@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.proxy.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import android.net.Uri
@@ -247,7 +248,7 @@ private fun MasterToggle(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         )
@@ -283,7 +284,7 @@ private fun AiHostsDirectToggle(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         )
@@ -322,7 +323,7 @@ private fun NodesEntryCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = enabledClick, onClick = onClick),
-        shape = RoundedCornerShape(Radius.lg),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
         ),
@@ -337,7 +338,7 @@ private fun NodesEntryCard(
                     .size(40.dp)
                     .background(
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(LocalCornerRadius.current.xl)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -413,7 +414,7 @@ private fun ImportEditor(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         )
@@ -549,7 +550,7 @@ private fun PreviewPanel(preview: ProxyPreview) {
             .fillMaxWidth()
             .background(
                 (if (preview.ok) Color(0xFF2E7D32) else Color(0xFFC62828)).copy(alpha = 0.12f),
-                RoundedCornerShape(Radius.sm)
+                RoundedCornerShape(LocalCornerRadius.current.md)
             )
             .padding(Spacing.sm)
     ) {
@@ -573,7 +574,7 @@ private fun PreviewPanel(preview: ProxyPreview) {
 private fun OverrideCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         )
@@ -624,7 +625,7 @@ private fun ProfileRow(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         )
@@ -646,7 +647,7 @@ private fun ProfileRow(
                         modifier = Modifier
                             .background(
                                 MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                RoundedCornerShape(6.dp)
+                                RoundedCornerShape(LocalCornerRadius.current.sm)
                             )
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     )
@@ -892,7 +893,7 @@ private fun GroupsTrafficView(
 private fun TrafficCard(traffic: ProxyTraffic?) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         )
@@ -927,7 +928,7 @@ private fun TrafficCard(traffic: ProxyTraffic?) {
 private fun GroupNodeCard(group: ProxyGroupInfo, onSelectGroupNode: (String, String) -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
         )

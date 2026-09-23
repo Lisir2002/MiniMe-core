@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.components
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import androidx.compose.foundation.layout.Box
@@ -116,7 +117,7 @@ private fun AuditLogCard(log: RemoteAuditLogEntity) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.sm),
+        shape = RoundedCornerShape(LocalCornerRadius.current.md),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(Spacing.sm)) {

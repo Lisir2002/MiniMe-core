@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -105,7 +106,7 @@ internal fun ContainerSection(
         item(key = "storage_share") {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(Radius.md),
+                shape = RoundedCornerShape(LocalCornerRadius.current.lg),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(
                     1.dp,
@@ -145,7 +146,7 @@ internal fun ContainerSection(
             val active = profile.id == activeProfileId
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(Radius.md),
+                shape = RoundedCornerShape(LocalCornerRadius.current.lg),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(
                     1.dp,

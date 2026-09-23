@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.browser.presentation
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.Intent
 import android.webkit.MimeTypeMap
@@ -282,7 +283,7 @@ fun ServiceBrowserScreen(
                             imeAction = ImeAction.Go
                         ),
                         keyboardActions = KeyboardActions(onGo = { navigate() }),
-                        shape = RoundedCornerShape(Radius.md),
+                        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
                         textStyle = MaterialTheme.typography.bodySmall
                     )
                     IconButton(onClick = { browserController.reload() }, modifier = Modifier.size(36.dp)) {
@@ -686,7 +687,7 @@ private fun FindOnPageBar(
             modifier = Modifier.weight(1f),
             singleLine = true,
             placeholder = { Text(stringResource(R.string.browser_find_hint)) },
-            shape = RoundedCornerShape(Radius.md),
+            shape = RoundedCornerShape(LocalCornerRadius.current.lg),
             textStyle = MaterialTheme.typography.bodySmall
         )
         IconButton(onClick = onPrev, modifier = Modifier.size(36.dp)) {
@@ -735,7 +736,7 @@ private fun BrowserHomePage(
             placeholder = { Text(stringResource(R.string.browser_home_search_hint)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
             keyboardActions = KeyboardActions(onGo = { onNavigate() }),
-            shape = RoundedCornerShape(Radius.md),
+            shape = RoundedCornerShape(LocalCornerRadius.current.lg),
             leadingIcon = { Icon(Icons.Rounded.Search, null) }
         )
         Spacer(Modifier.height(Spacing.md))
@@ -1270,7 +1271,7 @@ private fun BrowserTabBar(
         items(tabs, key = { it.id }) { tab ->
             val active = tab.id == activeTabId
             Surface(
-                shape = RoundedCornerShape(Radius.sm),
+                shape = RoundedCornerShape(LocalCornerRadius.current.md),
                 color = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                 border = if (active) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
                 modifier = Modifier

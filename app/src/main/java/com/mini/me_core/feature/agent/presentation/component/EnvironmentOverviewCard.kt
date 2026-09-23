@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -245,7 +246,7 @@ internal fun EnvironmentComponentRow(component: EnvironmentComponentState) {
             )
         }
         Surface(
-            shape = RoundedCornerShape(Radius.pill),
+            shape = RoundedCornerShape(LocalCornerRadius.current.pill),
             color = badge.badgeBg
         ) {
             Text(

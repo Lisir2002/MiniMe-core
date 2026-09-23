@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -469,7 +470,7 @@ private fun BuiltInProviderContent(
                     style = MaterialTheme.typography.titleSmall
                 )
                 Surface(
-                    shape = RoundedCornerShape(Radius.md),
+                    shape = RoundedCornerShape(LocalCornerRadius.current.lg),
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -647,7 +648,7 @@ private fun BuiltInProviderCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(
             containerColor = if (selected) {
                 MaterialTheme.colorScheme.primaryContainer
@@ -727,7 +728,7 @@ private fun BuiltInModelFetchList(
             is FetchState.Loading -> {
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(Radius.md),
+                    shape = RoundedCornerShape(LocalCornerRadius.current.lg),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -750,7 +751,7 @@ private fun BuiltInModelFetchList(
             is FetchState.Error -> {
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer,
-                    shape = RoundedCornerShape(Radius.md),
+                    shape = RoundedCornerShape(LocalCornerRadius.current.lg),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -908,7 +909,7 @@ private fun CustomModelFetchList(
             is FetchState.Loading -> {
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(Radius.md),
+                    shape = RoundedCornerShape(LocalCornerRadius.current.lg),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -931,7 +932,7 @@ private fun CustomModelFetchList(
             is FetchState.Error -> {
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer,
-                    shape = RoundedCornerShape(Radius.md),
+                    shape = RoundedCornerShape(LocalCornerRadius.current.lg),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(

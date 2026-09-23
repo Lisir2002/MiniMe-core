@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -250,7 +251,7 @@ private fun ModelSelectionSheet(
                             item(key = "header_follow_chat") {
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(Radius.md),
+                                    shape = RoundedCornerShape(LocalCornerRadius.current.lg),
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                     border = BorderStroke(
                                         1.dp,

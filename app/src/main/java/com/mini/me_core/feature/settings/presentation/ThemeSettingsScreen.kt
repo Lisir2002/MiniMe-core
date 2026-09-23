@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -253,7 +254,7 @@ private fun ThemePreviewCard(
                 Box(
                     modifier = Modifier
                         .size(24.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.xl))
                         .background(previewColors.brandPrimary),
                 )
             }
@@ -267,7 +268,7 @@ private fun ThemePreviewCard(
                 Box(
                     modifier = Modifier
                         .width(180.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.xl))
                         .background(previewColors.brandPrimary)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
@@ -282,7 +283,7 @@ private fun ThemePreviewCard(
             Column(
                 modifier = Modifier
                     .width(220.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.xl))
                     .background(previewColors.surfaceSunken)
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -299,7 +300,7 @@ private fun ThemePreviewCard(
                     Box(
                         modifier = Modifier
                             .size(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.xs))
                             .background(previewColors.success),
                     )
                     Text(
@@ -375,7 +376,7 @@ private fun AppearanceModeSelector(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
                         .background(
                             if (isSelected) colors.brandContainer
                             else Color.Transparent
@@ -430,12 +431,12 @@ private fun PresetCarousel(
             Column(
                 modifier = Modifier
                     .width(120.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.xl))
                     .background(colors.surfaceCard)
                     .border(
                         width = if (isSelected) 2.dp else 1.dp,
                         color = if (isSelected) colors.brandPrimary else colors.borderDefault,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
                     )
                     .clickable { onPresetSelected(preset.id) }
                     .padding(12.dp),
@@ -445,7 +446,7 @@ private fun PresetCarousel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.md)),
                 ) {
                     Box(modifier = Modifier.weight(1f).background(preset.previewBackground))
                     Box(modifier = Modifier.weight(1f).background(preset.previewSurface))
@@ -658,9 +659,9 @@ private fun ColorPickerDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                         .background(selectedColor)
-                        .border(1.dp, colors.borderDefault, RoundedCornerShape(8.dp)),
+                        .border(1.dp, colors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.md)),
                 )
 
                 // 色板网格（5列）
@@ -675,12 +676,12 @@ private fun ColorPickerDialog(
                                 modifier = Modifier
                                     .weight(1f)
                                     .size(36.dp)
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
                                     .background(swatch)
                                     .border(
                                         width = if (isSelected) 2.dp else 1.dp,
                                         color = if (isSelected) colors.brandPrimary else colors.borderDefault,
-                                        shape = RoundedCornerShape(6.dp),
+                                        shape = RoundedCornerShape(LocalCornerRadius.current.sm),
                                     )
                                     .clickable { selectedColor = swatch },
                             )
@@ -829,7 +830,7 @@ private fun DisplayPreferencesSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val styles = listOf(
-                    Triple(CornerStyle.ROUNDED, "圆角", RoundedCornerShape(12.dp)),
+                    Triple(CornerStyle.ROUNDED, "圆角", RoundedCornerShape(LocalCornerRadius.current.xl)),
                     Triple(CornerStyle.Sharp, "直角", RoundedCornerShape(0.dp)),
                     Triple(CornerStyle.Pill, "胶囊", RoundedCornerShape(999.dp)),
                 )
@@ -838,7 +839,7 @@ private fun DisplayPreferencesSection(
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
                             .background(if (isSelected) colors.brandContainer else Color.Transparent)
                             .clickable { onCornerStyleChange(style) }
                             .padding(vertical = 10.dp),
@@ -907,7 +908,7 @@ private fun FactoryResetButton(
             containerColor = colors.error.copy(alpha = 0.1f),
             contentColor = colors.error,
         ),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
     ) {
         Text(
             text = "恢复出厂主题",

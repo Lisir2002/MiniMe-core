@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.git.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
@@ -255,7 +256,7 @@ fun GitScreen(
 internal fun StatusMetric(label: String, count: Int, color: Color, modifier: Modifier = Modifier) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(Radius.sm),
+        shape = RoundedCornerShape(LocalCornerRadius.current.md),
         modifier = modifier
     ) {
         Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)) {
@@ -313,7 +314,7 @@ internal fun StatusChip(text: String) {
     val (bg, fg) = statusColor(text)
     Surface(
         color = bg,
-        shape = RoundedCornerShape(Radius.xs),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xs),
         modifier = Modifier.size(width = 28.dp, height = 22.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {

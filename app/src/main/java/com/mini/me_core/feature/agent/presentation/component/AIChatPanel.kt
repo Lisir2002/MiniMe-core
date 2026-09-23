@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.net.Uri
 import android.widget.Toast
@@ -695,7 +696,7 @@ private fun EditingMessageBanner(
     onCancel: () -> Unit
 ) {
     Surface(
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(com.mini.me_core.core.theme.Radius.md),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(LocalCornerRadius.current.lg),
         color = MaterialTheme.colorScheme.primaryContainer,
         modifier = Modifier
             .fillMaxWidth()

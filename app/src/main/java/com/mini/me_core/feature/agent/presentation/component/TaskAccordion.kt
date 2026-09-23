@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -130,7 +131,7 @@ internal fun TaskAccordion(
 
     // v2 混合模式：去掉外层白色卡片，背景透明、无边框、无阴影
     Surface(
-        shape = RoundedCornerShape(Radius.lg),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         color = Color.Transparent,
         border = null,
         tonalElevation = 0.dp,
@@ -152,7 +153,7 @@ internal fun TaskAccordion(
             //     Box(
             //         modifier = Modifier
             //             .size(30.dp)
-            //             .clip(RoundedCornerShape(Radius.sm))
+            //             .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             //             .background(
             //                 brush = Brush.linearGradient(
             //                     colors = listOf(
@@ -266,7 +267,7 @@ private fun StreamingBadge(transition: InfiniteTransition) {
         label = "dotAlpha"
     )
     Surface(
-        shape = RoundedCornerShape(Radius.pill),
+        shape = RoundedCornerShape(LocalCornerRadius.current.pill),
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
     ) {
         Row(
@@ -293,7 +294,7 @@ private fun StreamingBadge(transition: InfiniteTransition) {
 @Composable
 private fun MessageCountBadge(count: Int) {
     Surface(
-        shape = RoundedCornerShape(Radius.pill),
+        shape = RoundedCornerShape(LocalCornerRadius.current.pill),
         color = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Text(
@@ -321,7 +322,7 @@ private fun ToolSummaryRow(
     val modifyCount = fileDiffs.count { it.type == FileChangeType.MODIFY }
     val visual = subGroupVisual(TaskSubGroupType.TOOL)
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = visual.bg,
         border = BorderStroke(1.dp, visual.accent.copy(alpha = 0.2f)),
         modifier = Modifier.fillMaxWidth()
@@ -490,7 +491,7 @@ private fun ToolCallCountRow(
         tools.firstNotNullOfOrNull { msg -> environmentSnapshots[msg.id] }
     }
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = visual.bg,
         border = BorderStroke(1.dp, visual.accent.copy(alpha = 0.2f)),
         modifier = Modifier.fillMaxWidth()
@@ -567,7 +568,7 @@ private fun EnvironmentStatusBubble(snapshot: EnvironmentSnapshot) {
         else -> stringResource(R.string.env_bubble_missing, missing.joinToString(", ") { it.name })
     }
     Surface(
-        shape = RoundedCornerShape(Radius.pill),
+        shape = RoundedCornerShape(LocalCornerRadius.current.pill),
         color = statusColor.copy(alpha = 0.1f),
         border = BorderStroke(1.dp, statusColor.copy(alpha = 0.3f))
     ) {
@@ -612,7 +613,7 @@ private fun ViewChangesButton(
     val totalAdded = fileDiffs.sumOf { it.added }
     val totalRemoved = fileDiffs.sumOf { it.removed }
     Surface(
-        shape = RoundedCornerShape(Radius.pill),
+        shape = RoundedCornerShape(LocalCornerRadius.current.pill),
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
         modifier = Modifier.fillMaxWidth()
@@ -863,7 +864,7 @@ private fun SubAccordion(
     val batchFileDiffs = remember(subGroup.id, attachedTools) { collectBatchFileDiffs(attachedTools) }
 
     Surface(
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = visual.bg,
         // 混合模式：REPLY/USER 容器透明，去掉边框（TOOL/REASONING 保留淡边框）
         border = if (subGroup.type == TaskSubGroupType.REPLY || subGroup.type == TaskSubGroupType.USER) {

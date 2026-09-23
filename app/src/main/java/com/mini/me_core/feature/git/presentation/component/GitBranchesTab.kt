@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.git.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -469,7 +470,7 @@ private fun BranchesOverview(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(Radius.sm),
+                    shape = RoundedCornerShape(LocalCornerRadius.current.md),
                     modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {

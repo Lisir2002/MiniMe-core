@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -489,11 +490,11 @@ private fun TerminalFirstRunBanner(
         modifier = Modifier
             .padding(horizontal = Spacing.md, vertical = Spacing.sm)
             .fillMaxWidth()
-            .border(1.dp, bannerBorderColor, RoundedCornerShape(Radius.md)),
+            .border(1.dp, bannerBorderColor, RoundedCornerShape(LocalCornerRadius.current.lg)),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer
         ),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.z0)
     ) {
         Column(modifier = Modifier.padding(TerminalLayout.bannerInnerPadding)) {

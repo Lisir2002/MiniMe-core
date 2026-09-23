@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.backup.presentation
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.Context
 import android.content.pm.PackageManager
@@ -324,7 +325,7 @@ private fun DataLossAlertBanner(
     val isPackageChanged = verdict == SentinelVerdict.PACKAGE_CHANGED
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F2)),
         border = BorderStroke(1.dp, Color(0xFFFECDD3))
     ) {
@@ -368,7 +369,7 @@ private fun AutoBackupCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
         border = BorderStroke(1.dp, Color(0xFFBBF7D0))
     ) {
@@ -422,7 +423,7 @@ private fun ExternalBackupCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFFEFCE8)),
         border = BorderStroke(1.dp, Color(0xFFFDE68A))
     ) {
@@ -494,7 +495,7 @@ private fun LegacyDataRecoveryBanner() {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBEB)),
         border = BorderStroke(1.dp, Color(0xFFFDE68A))
     ) {
@@ -555,7 +556,7 @@ private fun packageSignature(pm: PackageManager, packageName: String): ByteArray
 private fun BackupInfoCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
@@ -588,7 +589,7 @@ private fun ActionCard(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (enabled) Modifier.clickable { onClick() } else Modifier),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {

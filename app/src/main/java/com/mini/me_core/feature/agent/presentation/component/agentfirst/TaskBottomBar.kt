@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -54,7 +55,7 @@ fun TaskBottomBar(
             ) {
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(Radius.pill))
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.pill))
                         .background(Color(0xFFDC2626))
                         .clickable { onStop() }
                         .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
@@ -79,7 +80,7 @@ fun TaskBottomBar(
             ) {
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(Radius.pill))
+                        .clip(RoundedCornerShape(LocalCornerRadius.current.pill))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable { onViewChanges() }
                         .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
@@ -95,7 +96,7 @@ fun TaskBottomBar(
                 if (state == TaskState.FAILED && onRetry != null) {
                     Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(Radius.pill))
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.pill))
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
                             .clickable { onRetry() }
                             .padding(horizontal = Spacing.lg, vertical = Spacing.sm),

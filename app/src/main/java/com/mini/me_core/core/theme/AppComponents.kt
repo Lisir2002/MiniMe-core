@@ -1,4 +1,5 @@
 package com.mini.me_core.core.theme
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -227,7 +228,7 @@ fun AppSectionHeader(
             modifier = Modifier
                 .width(3.dp)
                 .height(16.dp)
-                .clip(RoundedCornerShape(Radius.xs))
+                .clip(RoundedCornerShape(LocalCornerRadius.current.xs))
                 .background(MaterialTheme.colorScheme.primary)
         )
         Spacer(Modifier.width(Spacing.sm))
@@ -254,7 +255,7 @@ fun AppSectionGroup(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg),
-        shape = RoundedCornerShape(Radius.md),
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         ),

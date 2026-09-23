@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -161,12 +162,12 @@ fun TabBar(
             Box(
                 modifier = Modifier
                     .size(TerminalLayout.newTabButtonSize)
-                    .clip(RoundedCornerShape(Radius.md))
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
                     .background(skin.surfaceVariant)
                     .border(
                         1.dp,
                         skin.dividingLine,
-                        RoundedCornerShape(Radius.md)
+                        RoundedCornerShape(LocalCornerRadius.current.lg)
                     )
                     .combinedClickable(onClick = onNew),
                 contentAlignment = Alignment.Center
@@ -208,9 +209,9 @@ private fun TabChip(
     Box(
         modifier = Modifier
             .height(TerminalLayout.tabHeight)
-            .clip(RoundedCornerShape(Radius.md))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
             .background(bg)
-            .border(1.dp, borderColor, RoundedCornerShape(Radius.md))
+            .border(1.dp, borderColor, RoundedCornerShape(LocalCornerRadius.current.lg))
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongPress
@@ -223,7 +224,7 @@ private fun TabChip(
                     .width(3.dp)
                     .fillMaxHeight()
                     .align(Alignment.CenterStart)
-                    .clip(RoundedCornerShape(topStart = Radius.md, bottomStart = Radius.md))
+                    .clip(RoundedCornerShape(topStart = LocalCornerRadius.current.lg, bottomStart = LocalCornerRadius.current.lg))
                     .background(tab.colorMarker.color)
             )
         }
@@ -316,7 +317,7 @@ private fun TabChip(
                     .height(2.dp)
                     .align(Alignment.BottomCenter)
                     .background(skin.primaryFg)
-                    .clip(RoundedCornerShape(bottomStart = Radius.md, bottomEnd = Radius.md))
+                    .clip(RoundedCornerShape(bottomStart = LocalCornerRadius.current.lg, bottomEnd = LocalCornerRadius.current.lg))
             )
         }
     }
@@ -1068,7 +1069,7 @@ fun BoxScope.TerminalSearchOverlay(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(Spacing.md),
-            shape = RoundedCornerShape(Radius.lg),
+            shape = RoundedCornerShape(LocalCornerRadius.current.xl),
             shadowElevation = Elevation.z3,
             tonalElevation = Elevation.z3
         ) {
@@ -1148,7 +1149,7 @@ fun CtrlHintBubble(modifier: Modifier, onGotIt: () -> Unit) {
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
         ),
-        shape = RoundedCornerShape(Radius.lg),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         elevation = CardDefaults.cardElevation(defaultElevation = Elevation.z3)
     ) {
         Row(

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.git.presentation.component
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -128,7 +129,7 @@ private fun StatusOverview(status: GitStatus?, clean: Boolean) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(Radius.sm),
+                    shape = RoundedCornerShape(LocalCornerRadius.current.md),
                     modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -177,7 +178,7 @@ private fun StatusOverview(status: GitStatus?, clean: Boolean) {
 private fun SyncPill(ahead: Int, behind: Int) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(Radius.pill)
+        shape = RoundedCornerShape(LocalCornerRadius.current.pill)
     ) {
         Text(
             text = buildString {
@@ -316,7 +317,7 @@ private fun ActionButton(
             onClick = onClick,
             enabled = enabled,
             modifier = modifier.height(48.dp),
-            shape = RoundedCornerShape(Radius.sm),
+            shape = RoundedCornerShape(LocalCornerRadius.current.md),
             colors = ButtonDefaults.filledTonalButtonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
@@ -332,7 +333,7 @@ private fun ActionButton(
             onClick = onClick,
             enabled = enabled,
             modifier = modifier.height(48.dp),
-            shape = RoundedCornerShape(Radius.sm),
+            shape = RoundedCornerShape(LocalCornerRadius.current.md),
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.onSurface
             ),

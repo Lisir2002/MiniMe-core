@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -260,7 +261,7 @@ private fun ToolTypeIcon(type: ToolType) {
     Box(
         modifier = Modifier
             .size(24.dp)
-            .clip(RoundedCornerShape(Radius.sm))
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .background(tint.copy(alpha = 0.12f)),
         contentAlignment = Alignment.Center
     ) {
