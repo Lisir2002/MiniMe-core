@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mini.logs.data.LogRepository
@@ -49,7 +50,8 @@ import com.mini.me_core.core.theme.tokens.LocalAppTheme
 @Composable
 fun StatsScreen() {
     val colors = LocalAppTheme.current.colors
-    val repository = remember { LogRepository() }
+    val context = LocalContext.current
+    val repository = remember { LogRepository(context) }
     var range by remember { mutableStateOf(StatsRange.LAST_7_DAYS) }
     var stats by remember { mutableStateOf<LogStatistics?>(null) }
     var isLoading by remember { mutableStateOf(false) }

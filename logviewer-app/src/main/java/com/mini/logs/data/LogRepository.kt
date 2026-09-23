@@ -1,5 +1,6 @@
 package com.mini.logs.data
 
+import android.content.Context
 import android.os.FileObserver
 import com.mini.me_core.core.util.LogLineParser
 import com.mini.me_core.core.util.LogLevel
@@ -16,31 +17,35 @@ import java.io.RandomAccessFile
 /**
  * 日志文件仓库。负责列出日志文件、读取并解析日志行。
  *
- * 主应用日志可能写入两个位置（按优先级）：
- * 1. 公共外部存储：/storage/emulated/0/Documents/MiniMe-core/logs/（需 WRITE_EXTERNAL_STORAGE 权限）
- * 2. 外部私有目录：/storage/emulated/0/Android/data/com.mini.me_core/files/logs/（权限未授予时回退）
+ * 日志目录由 LogDirResolver 动态计算，不写死路径。
+ * 主应用日志可能写入两个位置：
+ * 1. 公共外部存储：Documents/MiniMe-core/logs/（主应用有权限时）
+ * 2. 外部私有目录：Android/data/com.mini.me_core/files/logs/（主应用无权限时回退）
+ *
+ * 用户可在设置中选择日志来源（自动/仅外部/仅私有）。
  *
  * 文件名格式：log-yyyy-MM-dd.txt（含滚动文件 .1/.2）
  * 文件头：# MiniMe Log Format vN（读取时跳过 # 开头的行）
  *
  * 只读，不修改主应用的日志文件。
  */
-class LogRepository {
+class LogRepository(
+    private val context: Context,
+    private var logSource: LogDirResolver.LogSource = LogDirResolver.LogSource.AUTO,
+) {
 
-    /**
-     * 候选日志目录列表，按优先级排列。
-     * 第一个存在且有日志文件的目录为主目录，其余为补充。
-     */
-    private val candidateDirs: List<File> = listOf(
-        // 1. 公共外部存储（主应用有权限时写入这里）
-        File("/storage/emulated/0/Documents/MiniMe-core/logs/"),
-        // 2. 主应用外部私有目录（主应用无权限时回退到这里）
-        File("/storage/emulated/0/Android/data/com.mini.me_core/files/logs/"),
-    )
+    /** 更新日志来源。 */
+    fun setLogSource(source: LogDirResolver.LogSource) {
+        logSource = source
+    }
 
-    /** 当前有效的日志目录（第一个存在且非空的），用于 FileObserver 监听。 */
+    /** 当前生效的候选目录列表（动态计算）。 */
+    private val candidateDirs: List<File>
+        get() = LogDirResolver.getDirsForSource(context, logSource)
+
+    /** 当前有效的日志目录（第一个存在且非空的）。 */
     val activeLogDir: File?
-        get() = candidateDirs.firstOrNull { it.exists() && it.isDirectory && it.listFiles()?.isNotEmpty() == true }
+        get() = candidateDirs.firstOrNull { LogDirResolver.hasLogs(it) }
             ?: candidateDirs.firstOrNull { it.exists() && it.isDirectory }
 
     /** 列出所有候选目录中的日志文件，按文件名降序（最新的在前），去重。 */

@@ -17,8 +17,15 @@ import java.io.File
  */
 class LogsViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val repository = LogRepository()
     val settings = SettingsStore(app)
+    private val repository = LogRepository(app, settings.logSource)
+
+    /** 切换日志来源并重新加载。 */
+    fun setLogSource(source: LogDirResolver.LogSource) {
+        settings.logSource = source
+        repository.setLogSource(source)
+        refreshFiles()
+    }
 
     // ── 核心状态 ──
     private val _allEntries = MutableStateFlow<List<LogEntry>>(emptyList())

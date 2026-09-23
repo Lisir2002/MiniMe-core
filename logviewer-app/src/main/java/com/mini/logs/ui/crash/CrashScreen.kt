@@ -61,9 +61,9 @@ private enum class CrashFilter(val label: String) {
 @Composable
 fun CrashScreen() {
     val colors = LocalAppTheme.current.colors
-    val repository = remember { LogRepository() }
-    val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
+    val repository = remember { LogRepository(context) }
+    val clipboard = LocalClipboardManager.current
 
     var rawCrashes by remember { mutableStateOf<List<CrashGroup>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }

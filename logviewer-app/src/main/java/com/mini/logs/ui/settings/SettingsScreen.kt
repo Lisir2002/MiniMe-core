@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.logs.data.DefaultFileMode
 import com.mini.logs.data.FontSize
+import com.mini.logs.data.LogDirResolver
 import com.mini.logs.data.SettingsStore
 import com.mini.logs.data.ThemeMode
 import com.mini.logs.data.ViewMode
@@ -85,6 +86,7 @@ fun SettingsScreen() {
     // 行为状态
     var defaultFileMode by remember { mutableStateOf(store.defaultFileMode) }
     var autoTail by remember { mutableStateOf(store.autoTail) }
+    var logSource by remember { mutableStateOf(store.logSource) }
     var contextLines by remember { mutableIntStateOf(store.contextLines) }
     var maxLoadLines by remember { mutableIntStateOf(store.maxLoadLines) }
 
@@ -210,6 +212,21 @@ fun SettingsScreen() {
                 title = "自动尾随",
                 checked = autoTail,
                 onCheckedChange = { autoTail = it; store.autoTail = it },
+            )
+            AppDivider(horizontalPadding = 68.dp)
+            ValueSettingRow(
+                icon = Icons.Rounded.Description,
+                title = "日志来源",
+                valueText = logSource.label(),
+                onClick = {
+                    openSheet("日志来源", LogDirResolver.LogSource.entries.map { src ->
+                        OptionItem(src.label(), src == logSource) {
+                            logSource = src
+                            store.logSource = src
+                            toast("已切换到${src.label()}，返回日志页自动刷新")
+                        }
+                    })
+                },
             )
             AppDivider(horizontalPadding = 68.dp)
             ValueSettingRow(
@@ -502,4 +519,10 @@ private fun DefaultFileMode.label(): String = when (this) {
     DefaultFileMode.TODAY -> "今天"
     DefaultFileMode.LAST -> "记住上次"
     DefaultFileMode.ASK -> "每次询问"
+}
+
+private fun LogDirResolver.LogSource.label(): String = when (this) {
+    LogDirResolver.LogSource.AUTO -> "自动检测"
+    LogDirResolver.LogSource.EXTERNAL_PUBLIC -> "外部存储"
+    LogDirResolver.LogSource.APP_PRIVATE -> "应用私有"
 }

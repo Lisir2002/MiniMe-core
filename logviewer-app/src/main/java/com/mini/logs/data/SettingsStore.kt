@@ -38,6 +38,14 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("auto_tail", false)
         set(value) = prefs.edit().putBoolean("auto_tail", value).apply()
 
+    /** 日志来源：自动检测/仅外部公共存储/仅应用私有目录。 */
+    var logSource: LogDirResolver.LogSource
+        get() = LogDirResolver.LogSource.valueOf(
+            prefs.getString("log_source", LogDirResolver.LogSource.AUTO.name)
+                ?: LogDirResolver.LogSource.AUTO.name
+        )
+        set(value) = prefs.edit().putString("log_source", value.name).apply()
+
     var contextLines: Int
         get() = prefs.getInt("context_lines", 5)
         set(value) = prefs.edit().putInt("context_lines", value).apply()
