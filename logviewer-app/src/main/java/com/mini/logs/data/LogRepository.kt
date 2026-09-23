@@ -79,27 +79,27 @@ class LogRepository(
      * 列出所有日志文件引用（直接路径 + SAF），合并去重，按文件名降序。
      * 这是最可靠的文件列表方法，覆盖所有可能来源。
      */
-    fun listAllLogRefs(safManager: SafDirectoryManager): List<LogFileRef> {
-        val refs = mutableListOf<LogFileRef>()
-        val seenNames = mutableSetOf<String>()
+    suspend fun listAllLogRefs(safManager: SafDirectoryManager): List<LogFileRef> =
+        withContext(Dispatchers.IO) {
+            val refs = mutableListOf<LogFileRef>()
+            val seenNames = mutableSetOf<String>()
 
-        // 1. 直接文件路径
-        for (f in listLogFiles()) {
-            if (seenNames.add(f.name)) {
-                refs.add(LogFileRef.FileRef(f))
+            // 1. 直接文件路径
+            for (f in listLogFiles()) {
+                if (seenNames.add(f.name)) {
+                    refs.add(LogFileRef.FileRef(f))
+                }
             }
-        }
 
-        // 2. SAF 目录（补充直接路径读不到的文件）
-        for (docFile in safManager.listLogFiles()) {
-            val name = docFile.name ?: continue
-            if (seenNames.add(name)) {
-                refs.add(LogFileRef.UriRef(docFile.uri, name))
+            // 2. SAF 目录（补充直接路径读不到的文件）
+            for (docFile in safManager.listLogFiles()) {
+                if (seenNames.add(docFile.name)) {
+                    refs.add(LogFileRef.UriRef(docFile.uri, docFile.name))
+                }
             }
-        }
 
-        return refs.sortedByDescending { it.fileName }
-    }
+            refs.sortedByDescending { it.fileName }
+        }
 
     /**
      * 从 LogFileRef 列表加载日志条目（支持 File 和 SAF 两种来源）。

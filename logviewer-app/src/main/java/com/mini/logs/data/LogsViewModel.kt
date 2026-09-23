@@ -30,10 +30,31 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
         refreshFiles()
     }
 
-    /** SAF 目录选择完成后调用，触发刷新。 */
-    fun onSafDirectorySelected(uri: android.net.Uri) {
-        safManager.saveTreeUri(uri)
-        refreshFiles()
+    /** 一次性状态消息（UI 收集后显示 Toast/Snackbar）。 */
+    private val _statusMessage = MutableStateFlow<String?>(null)
+    val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
+    fun consumeStatusMessage() { _statusMessage.value = null }
+
+    /** SAF 目录选择完成后调用：保存授权、刷新、反馈结果。 */
+    fun onSafDirectorySelected(uri: android.net.Uri, grantedFlags: Int = 0) {
+        val persisted = safManager.saveTreeUri(uri, grantedFlags)
+        viewModelScope.launch {
+            _isLoading.value = true
+            val refs = repository.listAllLogRefs(safManager)
+            _logFileRefs.value = refs
+            if (_selectedFiles.value.isEmpty() && refs.isNotEmpty()) {
+                val today = refs.firstOrNull { it.fileName.contains(todayString()) } ?: refs.first()
+                _selectedFiles.value = setOf(today.fileName)
+            }
+            loadLogs()
+            _isLoading.value = false
+
+            _statusMessage.value = when {
+                refs.isNotEmpty() -> "已选择目录，找到 ${refs.size} 个日志文件" +
+                    if (persisted) "" else "（持久化授权失败，重启后可能需重新选择）"
+                else -> "该目录中未找到日志文件（log-*.txt），请确认选择的是日志目录"
+            }
+        }
     }
 
     /** 清除 SAF 目录。 */

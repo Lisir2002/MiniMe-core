@@ -72,8 +72,10 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
-            result.data?.data?.let { uri ->
-                logsViewModel.onSafDirectorySelected(uri)
+            val data = result.data
+            val uri = data?.data
+            if (uri != null) {
+                logsViewModel.onSafDirectorySelected(uri, data.flags)
             }
         }
     }

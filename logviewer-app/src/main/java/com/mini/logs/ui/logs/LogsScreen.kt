@@ -120,6 +120,16 @@ fun LogsScreen(
 
     val listState = rememberLazyListState()
 
+    // ── 状态消息（SAF 选择结果等）显示 Toast ──
+    LaunchedEffect(Unit) {
+        viewModel.statusMessage.collect { msg ->
+            if (msg != null) {
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                viewModel.consumeStatusMessage()
+            }
+        }
+    }
+
     // ── 滚动请求处理 ──
     LaunchedEffect(scrollRequest) {
         scrollRequest?.let { req ->
