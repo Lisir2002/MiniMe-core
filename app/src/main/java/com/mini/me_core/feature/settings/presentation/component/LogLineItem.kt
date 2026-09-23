@@ -170,7 +170,7 @@ private data class LevelVisual(
 private fun levelVisual(level: LogLevel): LevelVisual {
     val c = LocalAppTheme.current.colors
     return when (level) {
-        LogLevel.ERROR -> LevelVisual(
+        LogLevel.FATAL, LogLevel.ERROR -> LevelVisual(
             badgeBg = c.error, badgeText = c.onError, accent = c.error,
             borderWidth = 4.dp, backgroundTint = c.error.copy(alpha = 0.08f),
         )

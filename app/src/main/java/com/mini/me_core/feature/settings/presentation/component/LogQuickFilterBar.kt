@@ -54,8 +54,8 @@ fun LogQuickFilterBar(
                 }
             },
         )
-        // 仅展示有日志的等级（ERROR/WARN/INFO/DEBUG/VERBOSE），按严重程度倒序
-        val levels = listOf(LogLevel.ERROR, LogLevel.WARN, LogLevel.INFO, LogLevel.DEBUG, LogLevel.VERBOSE)
+        // 仅展示有日志的等级（FATAL/ERROR/WARN/INFO/DEBUG/VERBOSE），按严重程度倒序
+        val levels = listOf(LogLevel.FATAL, LogLevel.ERROR, LogLevel.WARN, LogLevel.INFO, LogLevel.DEBUG, LogLevel.VERBOSE)
         levels.forEach { level ->
             val count = levelCounts[level] ?: 0
             val collapsed = level in collapsedLevels

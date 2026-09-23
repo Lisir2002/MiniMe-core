@@ -143,7 +143,6 @@ fun SettingsScreen(
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val activeProvider by viewModel.activeProvider.collectAsStateWithLifecycle()
     val logLevel by viewModel.logLevel.collectAsStateWithLifecycle()
-    val logViewerState by viewModel.logViewerState.collectAsStateWithLifecycle()
     val mcpServers by viewModel.mcpServers.collectAsStateWithLifecycle()
     val mcpStatuses by viewModel.mcpStatuses.collectAsStateWithLifecycle()
     val mcpReloading by viewModel.mcpReloading.collectAsStateWithLifecycle()
@@ -341,6 +340,7 @@ fun SettingsScreen(
                 .padding(padding)
         ) {
             when (section) {
+                SettingsSection.Logs -> Unit // Logs 已在 Scaffold 前 early return 为独立全屏页
                 SettingsSection.Menu -> SettingsMenu(
                     providerCount = providers.size,
                     activeProviderName = activeProvider?.name,
@@ -440,22 +440,6 @@ fun SettingsScreen(
                     remoteConnections = remoteConnections,
                     storageShareEnabled = storageShareEnabled,
                     onStorageShareChange = { viewModel.setStorageShareEnabled(it) }
-                )
-                SettingsSection.Logs -> LogsSection(
-                    currentLogLevel = logLevel,
-                    onSelectLogLevel = { viewModel.setLogLevel(it) },
-                    logViewerState = logViewerState,
-                    onSelectFile = { viewModel.selectLogFile(it) },
-                    onRefresh = { viewModel.refreshLogs() },
-                    onToggleFilterPanel = { viewModel.toggleFilterPanel() },
-                    onCloseFilterPanel = { viewModel.closeFilterPanel() },
-                    onSetSelectedDates = { viewModel.setSelectedDates(it) },
-                    onToggleLevel = { viewModel.toggleLevel(it) },
-                    onToggleTag = { viewModel.toggleTag(it) },
-                    onResetFilters = { viewModel.resetFilters() },
-                    onSearchQuery = { viewModel.setSearchQuery(it) },
-                    onToggleLiveTail = { viewModel.toggleLiveTail() },
-                    onDismissNewLogs = { viewModel.dismissNewLogs() }
                 )
                 SettingsSection.Permissions -> PermissionsSection(
                     projectName = currentProjectName,
@@ -617,7 +601,7 @@ internal fun SettingsMenu(
             LogLevel.DEBUG -> R.string.log_level_debug
             LogLevel.INFO -> R.string.log_level_info
             LogLevel.WARN -> R.string.log_level_warn
-            LogLevel.ERROR -> R.string.log_level_error
+            LogLevel.ERROR, LogLevel.FATAL -> R.string.log_level_error
             LogLevel.NONE -> R.string.log_level_none
         }
     )

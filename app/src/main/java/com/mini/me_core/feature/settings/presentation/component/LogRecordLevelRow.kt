@@ -98,7 +98,7 @@ private fun recordLevelDescription(level: LogLevel): String = when (level) {
     LogLevel.DEBUG -> stringResource(R.string.log_record_desc_debug)
     LogLevel.INFO -> stringResource(R.string.log_record_desc_info)
     LogLevel.WARN -> stringResource(R.string.log_record_desc_warn)
-    LogLevel.ERROR -> stringResource(R.string.log_record_desc_error)
+    LogLevel.ERROR, LogLevel.FATAL -> stringResource(R.string.log_record_desc_error)
     LogLevel.NONE -> stringResource(R.string.log_record_desc_none)
 }
 

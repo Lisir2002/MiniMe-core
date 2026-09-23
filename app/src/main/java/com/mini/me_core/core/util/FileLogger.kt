@@ -20,15 +20,6 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
- * 日志等级，由低到高。[NONE] 用作阈值时关闭一切输出（没有任何等级 ≥ NONE）。
- *
- * 顺序即严重程度：阈值 [FileLogger.minLevel] 之下的日志（logcat 与落盘）都会被丢弃。
- */
-enum class LogLevel {
-    VERBOSE, DEBUG, INFO, WARN, ERROR, NONE
-}
-
-/**
  * 把日志落盘到 App 的存储，方便在没有连接 adb 的情况下调试。
  *
  * 日志写入**公共外部存储** `Documents/MiniMe-core/logs/`（当 WRITE_EXTERNAL_STORAGE 权限已授予时），
