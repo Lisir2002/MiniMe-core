@@ -44,7 +44,7 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FileSelectorSheet(
-    logFiles: List<File>,
+    logFiles: List<String>,
     selectedFiles: Set<String>,
     onSelectQuickRange: (Int) -> Unit,
     onToggleFile: (String, Boolean) -> Unit,
@@ -97,8 +97,8 @@ fun FileSelectorSheet(
 
             // 文件列表
             AppSectionHeader(title = "文件列表 (${logFiles.size})")
-            logFiles.forEach { file ->
-                val isSelected = file.name in selectedFiles
+            logFiles.forEach { fileName ->
+                val isSelected = fileName in selectedFiles
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -107,21 +107,15 @@ fun FileSelectorSheet(
                 ) {
                     Checkbox(
                         checked = isSelected,
-                        onCheckedChange = { onToggleFile(file.name, it) },
+                        onCheckedChange = { onToggleFile(fileName, it) },
                     )
                     Spacer(Modifier.width(PrimitiveSpacing.Sm))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = file.name,
-                            color = colors.textPrimary,
-                            fontSize = 13.sp,
-                        )
-                        Text(
-                            text = FormatUtils.formatFileSize(file.length()),
-                            color = colors.textTertiary,
-                            fontSize = 11.sp,
-                        )
-                    }
+                    Text(
+                        text = fileName,
+                        color = colors.textPrimary,
+                        fontSize = 13.sp,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
 

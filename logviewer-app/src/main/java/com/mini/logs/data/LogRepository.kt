@@ -54,15 +54,107 @@ class LogRepository(
         val seenNames = mutableSetOf<String>()
         for (dir in candidateDirs) {
             if (!dir.exists() || !dir.isDirectory) continue
-            dir.listFiles { f ->
-                f.isFile && f.name.startsWith("log-") && f.name.endsWith(".txt")
-            }?.forEach { f ->
+            val files = try {
+                dir.listFiles { f ->
+                    f.isFile && f.name.startsWith("log-") && f.name.endsWith(".txt")
+                }
+            } catch (e: SecurityException) { null }
+            files?.forEach { f ->
                 if (seenNames.add(f.name)) {
                     allFiles.add(f)
                 }
             }
         }
         return allFiles.sortedByDescending { it.name }
+    }
+
+    /**
+     * 扫描所有候选目录并生成诊断结果（用于 UI 显示具体失败原因）。
+     */
+    fun diagnoseDirs(): List<DirScanStatus> {
+        return candidateDirs.map { DirScanStatus.scan(it) }
+    }
+
+    /**
+     * 列出所有日志文件引用（直接路径 + SAF），合并去重，按文件名降序。
+     * 这是最可靠的文件列表方法，覆盖所有可能来源。
+     */
+    fun listAllLogRefs(safManager: SafDirectoryManager): List<LogFileRef> {
+        val refs = mutableListOf<LogFileRef>()
+        val seenNames = mutableSetOf<String>()
+
+        // 1. 直接文件路径
+        for (f in listLogFiles()) {
+            if (seenNames.add(f.name)) {
+                refs.add(LogFileRef.FileRef(f))
+            }
+        }
+
+        // 2. SAF 目录（补充直接路径读不到的文件）
+        for (docFile in safManager.listLogFiles()) {
+            val name = docFile.name ?: continue
+            if (seenNames.add(name)) {
+                refs.add(LogFileRef.UriRef(docFile.uri, name))
+            }
+        }
+
+        return refs.sortedByDescending { it.fileName }
+    }
+
+    /**
+     * 从 LogFileRef 列表加载日志条目（支持 File 和 SAF 两种来源）。
+     */
+    suspend fun loadEntriesFromRefs(
+        refs: List<LogFileRef>,
+        maxLines: Int = 5000
+    ): List<LogEntry> = withContext(Dispatchers.IO) {
+        val sortedRefs = refs.sortedBy { it.fileName }
+        val perFileLimit = maxLines / sortedRefs.size.coerceAtLeast(1)
+        val allLines = mutableListOf<Pair<String, String>>()
+        for (ref in sortedRefs) {
+            val lines = ref.readLines(context, perFileLimit)
+            lines.forEach { allLines.add(ref.fileName to it) }
+        }
+        parseLinesToEntries(allLines)
+    }
+
+    /** 将 (sourceFile, rawLine) 对解析为 LogEntry 列表。 */
+    private fun parseLinesToEntries(allLines: List<Pair<String, String>>): List<LogEntry> {
+        val entries = mutableListOf<LogEntry>()
+        var lineNumber = 0
+        for ((source, raw) in allLines) {
+            val parsed = LogLineParser.parse(raw)
+            if (parsed != null) {
+                lineNumber++
+                entries.add(
+                    LogEntry(
+                        rawLine = raw,
+                        timestamp = parsed.timestamp,
+                        date = parsed.date,
+                        time = extractTime(raw),
+                        level = parsed.level,
+                        tag = parsed.tag,
+                        message = parsed.message,
+                        threadName = parsed.threadName,
+                        sourceFile = source,
+                        lineNumber = lineNumber,
+                    )
+                )
+            } else {
+                if (raw.isNotBlank() && !raw.startsWith("#")) {
+                    entries.add(
+                        LogEntry(
+                            rawLine = raw,
+                            message = raw,
+                            sourceFile = source,
+                            lineNumber = lineNumber,
+                            isStackTraceLine = true,
+                        )
+                    )
+                }
+            }
+        }
+        return entries
     }
 
     /**

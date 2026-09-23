@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.logs.data.DefaultFileMode
 import com.mini.logs.data.FontSize
 import com.mini.logs.data.LogDirResolver
+import com.mini.logs.data.SafDirectoryManager
 import com.mini.logs.data.SettingsStore
 import com.mini.logs.data.ThemeMode
 import com.mini.logs.data.ViewMode
@@ -71,10 +72,14 @@ private const val LOG_DIR_PATH = "/storage/emulated/0/Documents/MiniMe-core/logs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    onPickLogDirectory: () -> Unit = {},
+) {
     val context = LocalContext.current
     val store = remember { SettingsStore(context) }
     val clipboard = LocalClipboardManager.current
+    val safManager = remember { SafDirectoryManager(context) }
+    var hasSafDir by remember { mutableStateOf(safManager.getSavedTreeUri() != null) }
 
     // 外观状态
     var themeMode by remember { mutableStateOf(store.themeMode) }
@@ -260,6 +265,13 @@ fun SettingsScreen() {
         Spacer(Modifier.height(PrimitiveSpacing.Lg))
         AppSectionHeader(title = "数据管理")
         AppCard(modifier = Modifier.padding(horizontal = PrimitiveSpacing.Lg)) {
+            ValueSettingRow(
+                icon = Icons.Rounded.FolderOpen,
+                title = "手动选择日志目录",
+                valueText = if (hasSafDir) "已选择" else null,
+                onClick = onPickLogDirectory,
+            )
+            AppDivider(horizontalPadding = 68.dp)
             DangerRow(
                 icon = Icons.Rounded.CleaningServices,
                 title = "清理 7 天前日志",

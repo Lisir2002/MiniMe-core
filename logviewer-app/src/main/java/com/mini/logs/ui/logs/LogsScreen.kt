@@ -82,6 +82,7 @@ fun LogsScreen(
     viewModel: LogsViewModel = viewModel(),
     storagePermissionGranted: Boolean? = null,
     onRequestPermission: () -> Unit = {},
+    onPickLogDirectory: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val colors = LocalAppTheme.current.colors
@@ -99,7 +100,7 @@ fun LogsScreen(
     val searchMatchCount by viewModel.searchMatchCount.collectAsStateWithLifecycle()
     val levelCounts by viewModel.levelCounts.collectAsStateWithLifecycle()
     val tagCounts by viewModel.tagCounts.collectAsStateWithLifecycle()
-    val logFiles by viewModel.logFiles.collectAsStateWithLifecycle()
+    val logFiles by viewModel.logFileNames.collectAsStateWithLifecycle()
     val selectedFiles by viewModel.selectedFiles.collectAsStateWithLifecycle()
     val scrollRequest by viewModel.scrollRequest.collectAsStateWithLifecycle()
     val expandedKeys by viewModel.expandedKeys.collectAsStateWithLifecycle()
@@ -349,14 +350,34 @@ fun LogsScreen(
                     modifier = Modifier.weight(1f),
                 )
             } else if (logFiles.isEmpty() && !isLoading) {
-                AppEmptyState(
-                    icon = Icons.Rounded.FolderOpen,
-                    title = "暂无日志文件",
-                    subtitle = "请先在主应用中使用产生日志\n日志目录：Documents/MiniMe-core/logs/\n（若主应用未授予存储权限，日志会写入私有目录）",
-                    actionLabel = "刷新",
-                    onAction = { viewModel.refreshFiles() },
-                    modifier = Modifier.weight(1f),
-                )
+                // 无日志文件：显示诊断 + 手动选择目录（最可靠的解决方案）
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    AppEmptyState(
+                        icon = Icons.Rounded.FolderOpen,
+                        title = "未找到日志文件",
+                        subtitle = buildString {
+                            appendLine("自动扫描未发现日志，可能因系统权限限制。")
+                            appendLine("请点击下方按钮，手动选择主应用的日志目录。")
+                            appendLine()
+                            // 显示诊断信息
+                            val diagnostics = viewModel.getDiagnostics()
+                            for (d in diagnostics) {
+                                appendLine("• ${d.describe()}")
+                            }
+                        },
+                        actionLabel = "手动选择日志目录",
+                        onAction = onPickLogDirectory,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { viewModel.refreshFiles() }) {
+                        Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("重新扫描")
+                    }
+                }
             } else if (filteredEntries.isEmpty() && !isLoading) {
                 AppEmptyState(
                     icon = Icons.Rounded.Search,

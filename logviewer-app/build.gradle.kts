@@ -56,8 +56,8 @@ android {
         applicationId = "com.mini.logs"
         minSdk = 26
         targetSdk = 28
-        versionCode = 3
-        versionName = "0.0.3"
+        versionCode = 4
+        versionName = "0.0.4"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -129,6 +129,7 @@ dependencies {
     // AndroidX Core
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.documentfile:documentfile:1.0.1")
 
     // Compose BOM
     implementation(platform("androidx.compose:compose-bom:2025.12.01"))

@@ -9,6 +9,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -19,6 +21,7 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
 
     val settings = SettingsStore(app)
     private val repository = LogRepository(app, settings.logSource)
+    private val safManager = SafDirectoryManager(app)
 
     /** 切换日志来源并重新加载。 */
     fun setLogSource(source: LogDirResolver.LogSource) {
@@ -26,6 +29,24 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
         repository.setLogSource(source)
         refreshFiles()
     }
+
+    /** SAF 目录选择完成后调用，触发刷新。 */
+    fun onSafDirectorySelected(uri: android.net.Uri) {
+        safManager.saveTreeUri(uri)
+        refreshFiles()
+    }
+
+    /** 清除 SAF 目录。 */
+    fun clearSafDirectory() {
+        safManager.clearTreeUri()
+        refreshFiles()
+    }
+
+    /** 是否配置了 SAF 目录。 */
+    fun hasSafDirectory(): Boolean = safManager.getSavedTreeUri() != null
+
+    /** 获取目录诊断结果（用于 UI 显示具体原因）。 */
+    fun getDiagnostics(): List<DirScanStatus> = repository.diagnoseDirs()
 
     // ── 核心状态 ──
     private val _allEntries = MutableStateFlow<List<LogEntry>>(emptyList())
@@ -37,8 +58,14 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _logFiles = MutableStateFlow<List<File>>(emptyList())
-    val logFiles: StateFlow<List<File>> = _logFiles.asStateFlow()
+    private val _logFileRefs = MutableStateFlow<List<LogFileRef>>(emptyList())
+    val logFileRefs: StateFlow<List<LogFileRef>> = _logFileRefs.asStateFlow()
+
+    /** 兼容 UI 的文件名列表。 */
+    val logFileNames: StateFlow<List<String>> =
+        _logFileRefs
+            .map { refs -> refs.map { it.fileName } }
+            .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptyList())
 
     private val _selectedFiles = MutableStateFlow<Set<String>>(emptySet())
     val selectedFiles: StateFlow<Set<String>> = _selectedFiles.asStateFlow()
@@ -88,15 +115,15 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
         refreshFiles()
     }
 
-    /** 刷新日志文件列表。 */
+    /** 刷新日志文件列表（直接路径 + SAF 合并）。 */
     fun refreshFiles() {
         viewModelScope.launch {
-            val files = repository.listLogFiles()
-            _logFiles.value = files
-            if (_selectedFiles.value.isEmpty() && files.isNotEmpty()) {
+            val refs = repository.listAllLogRefs(safManager)
+            _logFileRefs.value = refs
+            if (_selectedFiles.value.isEmpty() && refs.isNotEmpty()) {
                 // 默认选中今天的文件
-                val today = files.firstOrNull { it.name.contains(todayString()) } ?: files.first()
-                _selectedFiles.value = setOf(today.name)
+                val today = refs.firstOrNull { it.fileName.contains(todayString()) } ?: refs.first()
+                _selectedFiles.value = setOf(today.fileName)
             }
             loadLogs()
         }
@@ -106,8 +133,8 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
     fun loadLogs() {
         viewModelScope.launch {
             _isLoading.value = true
-            val files = _logFiles.value.filter { it.name in _selectedFiles.value }
-            val entries = repository.loadEntries(files, settings.maxLoadLines)
+            val refs = _logFileRefs.value.filter { it.fileName in _selectedFiles.value }
+            val entries = repository.loadEntriesFromRefs(refs, settings.maxLoadLines)
 
             // 恢复高亮和书签
             val highlights = settings.highlights
@@ -236,16 +263,16 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun selectAllFiles() {
-        _selectedFiles.value = _logFiles.value.map { it.name }.toSet()
+        _selectedFiles.value = _logFileRefs.value.map { it.fileName }.toSet()
         loadLogs()
     }
 
     fun selectQuickRange(days: Int) {
-        val all = _logFiles.value
+        val all = _logFileRefs.value
         val selected = if (days <= 0) {
-            all.take(1).map { it.name }.toSet()
+            all.take(1).map { it.fileName }.toSet()
         } else {
-            all.take(days).map { it.name }.toSet()
+            all.take(days).map { it.fileName }.toSet()
         }
         _selectedFiles.value = selected
         loadLogs()

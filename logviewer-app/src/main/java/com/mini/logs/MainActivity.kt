@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Article
@@ -31,6 +32,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.mini.me_core.core.theme.AIEditorTheme
+import com.mini.logs.data.LogsViewModel
 import com.mini.logs.ui.crash.CrashScreen
 import com.mini.logs.ui.logs.LogsScreen
 import com.mini.logs.ui.settings.SettingsScreen
@@ -54,10 +56,26 @@ class MainActivity : ComponentActivity() {
     // 存储权限状态：null=未决定, true=已授予, false=已拒绝
     private var storagePermissionGranted by mutableStateOf<Boolean?>(null)
 
+    // 日志页 ViewModel（Activity 级，SAF launcher 回调需要访问）
+    private val logsViewModel: LogsViewModel by viewModels()
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         storagePermissionGranted = granted
+        // 权限授予后刷新文件列表
+        if (granted) logsViewModel.refreshFiles()
+    }
+
+    // SAF 手动选择日志目录
+    private val openTreeLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            result.data?.data?.let { uri ->
+                logsViewModel.onSafDirectorySelected(uri)
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,7 +89,6 @@ class MainActivity : ComponentActivity() {
         if (hasPermission) {
             storagePermissionGranted = true
         } else {
-            // 立即请求权限
             requestPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
 
@@ -81,6 +98,11 @@ class MainActivity : ComponentActivity() {
                     storagePermissionGranted = storagePermissionGranted,
                     onRequestPermission = {
                         requestPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                    },
+                    onPickLogDirectory = {
+                        openTreeLauncher.launch(
+                            com.mini.logs.data.SafDirectoryManager.buildOpenTreeIntent()
+                        )
                     }
                 )
             }
@@ -91,7 +113,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun LogViewerRoot(
     storagePermissionGranted: Boolean?,
-    onRequestPermission: () -> Unit
+    onRequestPermission: () -> Unit,
+    onPickLogDirectory: () -> Unit,
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -127,12 +150,15 @@ fun LogViewerRoot(
             composable(BottomTab.Logs.route) {
                 LogsScreen(
                     storagePermissionGranted = storagePermissionGranted,
-                    onRequestPermission = onRequestPermission
+                    onRequestPermission = onRequestPermission,
+                    onPickLogDirectory = onPickLogDirectory,
                 )
             }
             composable(BottomTab.Stats.route) { StatsScreen() }
             composable(BottomTab.Crash.route) { CrashScreen() }
-            composable(BottomTab.Settings.route) { SettingsScreen() }
+            composable(BottomTab.Settings.route) {
+                SettingsScreen(onPickLogDirectory = onPickLogDirectory)
+            }
         }
     }
 }
