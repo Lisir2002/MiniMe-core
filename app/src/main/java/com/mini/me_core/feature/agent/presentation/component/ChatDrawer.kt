@@ -1056,12 +1056,23 @@ private fun WorkspaceDirPanel(
         )
     }
 
-    // 删除确认
+    // 删除确认：打开时查询绑定会话数量，提示用户将级联删除 N 个对话
     pendingDelete?.let { ws ->
+        var boundCount by remember(ws.path) { mutableStateOf<Int?>(null) }
+        LaunchedEffect(ws.path) {
+            boundCount = runCatching { boundSessionsForWorkspace(ws.path).size }.getOrNull()
+        }
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = { Text(stringResource(R.string.workspace_delete)) },
-            text = { Text(stringResource(R.string.workspace_delete_confirm, ws.name)) },
+            text = {
+                val count = boundCount
+                if (count != null && count > 0) {
+                    Text(stringResource(R.string.workspace_delete_confirm_with_sessions, ws.name, count))
+                } else {
+                    Text(stringResource(R.string.workspace_delete_confirm, ws.name))
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteWorkspace(ws.name)

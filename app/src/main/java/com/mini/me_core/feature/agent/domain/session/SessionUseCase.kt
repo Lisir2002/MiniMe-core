@@ -83,6 +83,36 @@ class SessionUseCase @Inject constructor(
         return id
     }
 
+    /**
+     * 级联删除某个工作区下的所有会话及其全部关联数据（12 张表），在单事务中完成。
+     * 供 WorkspaceRepository.deleteWorkspace 调用，确保删除工作区时不留孤儿会话/消息。
+     *
+     * 与 [deleteSession] 复用同一套级联清理表清单；区别在于先按 workspacePath 查出全部会话 id，
+     * 再在同一事务内逐会话级联删除，保证原子性。
+     */
+    suspend fun deleteSessionsByWorkspace(workspacePath: String): Int {
+        val sessions = v2Agent.getAllSessionsByWorkspaceOnce(workspacePath)
+        if (sessions.isEmpty()) return 0
+        v2Agent.runInTx { tx ->
+            sessions.forEach { s ->
+                tx.deleteBySession(s.id)
+                tx.deleteTodosBySession(s.id)
+                tx.deleteFileEditHunksBySession(s.id)
+                tx.deleteModeSwitchesBySession(s.id)
+                tx.deleteSkillConversationStatesBySession(s.id)
+                tx.deleteWakeItemsBySession(s.id)
+                tx.deleteGoalsBySession(s.id)
+                tx.deletePlansBySession(s.id)
+                tx.deleteJobsBySession(s.id)
+                tx.deleteSchedulesBySession(s.id)
+                tx.deleteTrajectories(s.id)
+                tx.deleteSession(s.id)
+            }
+        }
+        FileLogger.i(TAG, "工作区级联删除 ${sessions.size} 个会话（workspacePath=$workspacePath）")
+        return sessions.size
+    }
+
     suspend fun getFirstSessionOfWorkspace(workspacePath: String): ChatSessionEntity? {
         return v2Agent.getAllSessionsByWorkspaceOnce(workspacePath).firstOrNull()?.toEntity()
     }

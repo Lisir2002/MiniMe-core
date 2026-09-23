@@ -1017,6 +1017,7 @@
     <string name="workspace_empty_hint">No workspaces yet. Tap \"New\" to create one.</string>
     <string name="workspace_delete">Delete Workspace</string>
     <string name="workspace_delete_confirm">Delete \"%1$s\"? All files in this directory will be deleted and cannot be recovered.</string>
+    <string name="workspace_delete_confirm_with_sessions">Delete \"%1$s\"? This will also delete %2$d conversations and all their messages. All files in this directory will be deleted and cannot be recovered.</string>
     <string name="workspace_new_workspace">New Workspace</string>
     <string name="workspace_name_hint">e.g. my-project</string>
     <string name="workspace_name_exists">A workspace with this name already exists</string>

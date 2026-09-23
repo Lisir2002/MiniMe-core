@@ -7,6 +7,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.me_core.feature.agent.domain.container.ConnectionState
 import com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
+import com.mini.me_core.feature.agent.domain.session.SessionUseCase
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
 import com.mini.me_core.feature.workspace.domain.model.Workspace
@@ -34,6 +35,7 @@ class WorkspaceRepository @Inject constructor(
     private val executionModeHolder: ExecutionModeHolder,
     private val remoteSshConnection: RemoteSshConnection,
     private val v2Agent: V2AgentRepository,
+    private val sessionUseCase: SessionUseCase,
     private val kv: KVStore,
 ) {
     private companion object {
@@ -172,6 +174,13 @@ class WorkspaceRepository @Inject constructor(
     }
 
     suspend fun deleteWorkspace(name: String) = withContext(Dispatchers.IO) {
+        // 删除目录前，先级联删除该工作台下所有会话及其全部关联数据（12 张表）。
+        val wsPath = _workspaces.value.firstOrNull { it.name == name }?.path
+        if (!wsPath.isNullOrBlank()) {
+            runCatching { sessionUseCase.deleteSessionsByWorkspace(wsPath) }
+                .onFailure { FileLogger.e(TAG, "级联删除工作区会话失败: $wsPath", it) }
+                .onSuccess { FileLogger.i(TAG, "删除工作区前已清理 $it 个绑定会话") }
+        }
         if (isLocal()) {
             File(projectsRoot, name).deleteRecursively()
         } else {
