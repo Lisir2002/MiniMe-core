@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.backup.presentation
+import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.Context
@@ -323,11 +324,12 @@ private fun DataLossAlertBanner(
     if (verdict != SentinelVerdict.DATA_LOST && verdict != SentinelVerdict.PACKAGE_CHANGED) return
 
     val isPackageChanged = verdict == SentinelVerdict.PACKAGE_CHANGED
+    val colors = LocalAppTheme.current.colors
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(LocalCornerRadius.current.lg),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F2)),
-        border = BorderStroke(1.dp, Color(0xFFFECDD3))
+        colors = CardDefaults.cardColors(containerColor = colors.errorContainer),
+        border = BorderStroke(1.dp, colors.error)
     ) {
         Column(
             modifier = Modifier.padding(Spacing.lg),
@@ -367,11 +369,12 @@ private fun AutoBackupCard(
     working: Boolean,
     onBackupNow: () -> Unit
 ) {
+    val colors = LocalAppTheme.current.colors
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(LocalCornerRadius.current.lg),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
-        border = BorderStroke(1.dp, Color(0xFFBBF7D0))
+        colors = CardDefaults.cardColors(containerColor = colors.successContainer),
+        border = BorderStroke(1.dp, colors.success)
     ) {
         Column(
             modifier = Modifier.padding(Spacing.lg),
@@ -421,11 +424,12 @@ private fun ExternalBackupCard(
     onBackupNow: () -> Unit,
     onRestore: () -> Unit
 ) {
+    val colors = LocalAppTheme.current.colors
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(LocalCornerRadius.current.lg),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFEFCE8)),
-        border = BorderStroke(1.dp, Color(0xFFFDE68A))
+        colors = CardDefaults.cardColors(containerColor = colors.warningContainer),
+        border = BorderStroke(1.dp, colors.warning)
     ) {
         Column(
             modifier = Modifier.padding(Spacing.lg),
@@ -493,11 +497,12 @@ private fun LegacyDataRecoveryBanner() {
     val legacyPackage = remember { detectSameSignatureLegacyPackage(context) }
     if (legacyPackage == null) return
 
+    val colors = LocalAppTheme.current.colors
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(LocalCornerRadius.current.lg),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBEB)),
-        border = BorderStroke(1.dp, Color(0xFFFDE68A))
+        colors = CardDefaults.cardColors(containerColor = colors.warningContainer),
+        border = BorderStroke(1.dp, colors.warning)
     ) {
         Column(
             modifier = Modifier.padding(Spacing.lg),

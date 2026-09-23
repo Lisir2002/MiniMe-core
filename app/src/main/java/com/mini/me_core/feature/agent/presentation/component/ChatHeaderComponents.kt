@@ -88,7 +88,7 @@ internal fun ChatHeader(
                     Icon(
                         Icons.Rounded.Menu,
                         contentDescription = stringResource(R.string.chat_open_sidebar),
-                        tint = headerIconTint(light = Color(0xFF64748B), dark = Color(0xFF94A3B8)),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp))
                 }
                 Column(modifier = Modifier.weight(1f)) {

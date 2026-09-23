@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.theme.tokens.PrimitiveElevation
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
@@ -137,7 +138,7 @@ internal fun TaskCard(
     Surface(
         shape = RoundedCornerShape(LocalCornerRadius.current.lg),
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
+        tonalElevation = PrimitiveElevation.Z1,
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
