@@ -43,7 +43,9 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Tune
@@ -336,12 +338,7 @@ fun ProviderEditorScreen(
                             )
                         }
                     }
-                    IconButton(onClick = {
-                        selectedTab = 1
-                        showAddModelSheet = true
-                    }) {
-                        Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.provider_add_model))
-                    }
+                    // B8：移除顶栏「添加模型」按钮——模型 Tab 内已有「拉取模型」+「手动输入」入口，无需重复
                 }
             )
         },
@@ -378,6 +375,15 @@ fun ProviderEditorScreen(
                         .padding(Spacing.lg),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
+                    // ── Section 1：基本信息 ──
+                    Text(
+                        text = "基本信息",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(top = Spacing.xs)
+                    )
+                    HorizontalDivider()
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
@@ -410,6 +416,8 @@ fun ProviderEditorScreen(
                                     baseUrl = defaultProviderBaseUrl(ProviderType.OPENAI)
                                 }
                                 type = ProviderType.OPENAI
+                                // B1：类型切换时若开启了自定义 API Path，静默同步为新类型默认路径，避免请求 404
+                                if (useCustomApiPath) apiPath = defaultProviderApiPath(ProviderType.OPENAI)
                             },
                             label = { Text("OpenAI 兼容") }
                         )
@@ -421,6 +429,7 @@ fun ProviderEditorScreen(
                                     baseUrl = defaultProviderBaseUrl(ProviderType.ANTHROPIC)
                                 }
                                 type = ProviderType.ANTHROPIC
+                                if (useCustomApiPath) apiPath = defaultProviderApiPath(ProviderType.ANTHROPIC)
                             },
                             label = { Text("Anthropic 兼容") }
                         )
@@ -432,11 +441,21 @@ fun ProviderEditorScreen(
                                     baseUrl = defaultProviderBaseUrl(ProviderType.GEMINI)
                                 }
                                 type = ProviderType.GEMINI
+                                if (useCustomApiPath) apiPath = defaultProviderApiPath(ProviderType.GEMINI)
                             },
                             label = { Text("Gemini") }
                         )
                     }
 
+                    // ── Section 2：连接配置 ──
+                    Text(
+                        text = "连接配置",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(top = Spacing.sm)
+                    )
+                    HorizontalDivider()
                     val baseUrlError = baseUrl.isNotBlank() && !baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")
                     OutlinedTextField(
                         value = apiKey,
@@ -445,11 +464,21 @@ fun ProviderEditorScreen(
                         singleLine = true,
                         visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
-                            IconButton(onClick = { showApiKey = !showApiKey }) {
-                                Icon(
-                                    if (showApiKey) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
-                                    contentDescription = null
-                                )
+                            Row {
+                                // B5：眼睛（显隐）在前，粘贴在后
+                                IconButton(onClick = { showApiKey = !showApiKey }) {
+                                    Icon(
+                                        if (showApiKey) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                                        contentDescription = null
+                                    )
+                                }
+                                IconButton(onClick = {
+                                    val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                    val pasted = cm?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
+                                    if (!pasted.isNullOrBlank()) apiKey = pasted.trim()
+                                }) {
+                                    Icon(Icons.Rounded.ContentPaste, contentDescription = "粘贴")
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -491,13 +520,14 @@ fun ProviderEditorScreen(
                             is ConnectionTestState.Error -> Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Rounded.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(Spacing.xs))
-                                Text(st.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                Text(st.message.semanticConnectionError(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                             }
                             ConnectionTestState.Idle -> {}
                         }
                     }
 
                     // ── API Path 开关模式：默认关闭自动补充，打开后手动填写且不能为空 ──
+                    // B7：Full URL 模式下 API Path 由 Base URL 决定，开关禁用
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -506,20 +536,25 @@ fun ProviderEditorScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("自定义 API Path", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                             Text(
-                                if (useCustomApiPath) "手动填写请求路径，不能为空" else "自动使用默认路径：${defaultProviderApiPath(type)}",
+                                when {
+                                    useFullUrl -> "Full URL 模式下 Path 由 Base URL 决定"
+                                    useCustomApiPath -> "手动填写请求路径，不能为空"
+                                    else -> "自动使用默认路径：${defaultProviderApiPath(type)}"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Switch(
                             checked = useCustomApiPath,
+                            enabled = !useFullUrl,
                             onCheckedChange = {
                                 useCustomApiPath = it
                                 if (!it) apiPathError = false
                             }
                         )
                     }
-                    if (useCustomApiPath) {
+                    if (useCustomApiPath && !useFullUrl) {
                         Spacer(Modifier.height(Spacing.xs))
                         OutlinedTextField(
                             value = apiPath,
@@ -555,62 +590,18 @@ fun ProviderEditorScreen(
                         }
                         Switch(
                             checked = useFullUrl,
-                            onCheckedChange = { useFullUrl = it }
+                            onCheckedChange = {
+                                useFullUrl = it
+                                // B7：开启 Full URL 时关闭自定义 Path，避免两个开关语义冲突
+                                if (it) {
+                                    useCustomApiPath = false
+                                    apiPathError = false
+                                }
+                            }
                         )
                     }
 
-                    if (type == ProviderType.OPENAI) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(stringResource(R.string.provider_response_api))
-                            Switch(
-                                checked = useResponseApi,
-                                onCheckedChange = { useResponseApi = it }
-                            )
-                        }
-                    }
-
-                    // ───────────────────────────────────────────────────────
-                    // RC63 ③ 兼容端点策略区块（下拉 + 两个开关）
-                    // ───────────────────────────────────────────────────────
-                    HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.sm))
-                    Text(
-                        text = "兼容端点/未收录模型 · 能力判定策略",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    CompatibilityPolicyDropdown(
-                        currentPolicy = defaultPolicy,
-                        onPolicySelected = { viewModel.setCompatibilityDefaultPolicy(it) }
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("发送失败自动降级（识图兜底）", style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                "若当前聊天模型返回「不支持 image_url」，自动用识图模型生成文字摘要再重试。关闭后遇到此类错误将直接抛给用户（用于排查）。",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = autoDowngrade,
-                            onCheckedChange = { viewModel.setAutoDowngradeOnSendFailure(it) }
-                        )
-                    }
-                    ViewImageGuardDropdown(
-                        current = viewImageGuard,
-                        onChange = { viewModel.setViewImageUnknownGuardPolicy(it) }
-                    )
-
-                    // ── 高级参数折叠区 ──
+                    // ── Section 3：高级参数折叠区（Response API + 能力判定策略 + 采样/超时/备用） ──
                     HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.sm))
                     var advancedExpanded by remember { mutableStateOf(false) }
                     Row(
@@ -632,6 +623,58 @@ fun ProviderEditorScreen(
                     }
                     if (advancedExpanded) {
                         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            // ── Response API（仅 OpenAI）——从连接配置区移入高级参数 ──
+                            if (type == ProviderType.OPENAI) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(stringResource(R.string.provider_response_api))
+                                    Switch(
+                                        checked = useResponseApi,
+                                        onCheckedChange = { useResponseApi = it }
+                                    )
+                                }
+                            }
+
+                            // ── 能力判定策略子组（原独立区块移入高级参数） ──
+                            Text(
+                                text = "能力判定策略",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(top = Spacing.xs)
+                            )
+                            CompatibilityPolicyDropdown(
+                                currentPolicy = defaultPolicy,
+                                onPolicySelected = { viewModel.setCompatibilityDefaultPolicy(it) }
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("发送失败自动降级（识图兜底）", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        "若当前聊天模型返回「不支持 image_url」，自动用识图模型生成文字摘要再重试。关闭后遇到此类错误将直接抛给用户（用于排查）。",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = autoDowngrade,
+                                    onCheckedChange = { viewModel.setAutoDowngradeOnSendFailure(it) }
+                                )
+                            }
+                            ViewImageGuardDropdown(
+                                current = viewImageGuard,
+                                onChange = { viewModel.setViewImageUnknownGuardPolicy(it) }
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.xs))
+
                             // ── Temperature ──
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("Temperature（温度）", modifier = Modifier.weight(1f))
@@ -742,6 +785,48 @@ fun ProviderEditorScreen(
                         val rest = models.filter { it !in favoriteSet }
                         favOrdered + rest
                     }
+                    if (models.isEmpty()) {
+                        // B4：空状态引导——图标 + 文案 + 两个入口
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Rounded.Extension,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(Spacing.sm))
+                            Text(
+                                "还没有添加模型",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(Spacing.md))
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Button(onClick = {
+                                    fetchDialogKey++
+                                    showFetchDialog = true
+                                }) {
+                                    Icon(Icons.Rounded.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(Spacing.xs))
+                                    Text("从服务商拉取")
+                                }
+                                OutlinedButton(onClick = { showAddModelSheet = true }) {
+                                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(Spacing.xs))
+                                    Text("手动输入")
+                                }
+                            }
+                        }
+                    } else {
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -765,10 +850,15 @@ fun ProviderEditorScreen(
                                 isFavorite = model in favoriteSet,
                                 onToggleFavorite = {
                                     localFavorites = if (model in localFavorites) localFavorites - model else localFavorites + model
-                                    viewModel.toggleFavoriteModel(providerId, model)
+                                    // B2：新建模式下 providerId 是临时 UUID，DB 中尚无记录，直接调 ViewModel 会静默失败/空指针。
+                                    // 仅编辑已有供应商时才持久化；新建模式保存时由 Repository 统一写入 favoriteModels。
+                                    if (initialProvider != null) {
+                                        viewModel.toggleFavoriteModel(providerId, model)
+                                    }
                                 }
                             )
                         }
+                    }
                     }
                 }
             }
@@ -1069,6 +1159,23 @@ internal fun defaultProviderBaseUrl(type: ProviderType): String = when (type) {
     ProviderType.ANTHROPIC -> "https://api.anthropic.com/"
     ProviderType.GEMINI -> "https://generativelanguage.googleapis.com/"
     else -> "https://api.openai.com/"
+}
+
+/**
+ * B6：测试连接错误信息语义化。ViewModel 透传的是原始异常 message（可能是 "HTTP 401"、
+ * "SocketTimeoutException" 等），这里在 UI 层做一层简单映射，让普通用户看得懂。
+ * 已有明确信息（如非 HTTP 码）则原样返回。
+ */
+internal fun String.semanticConnectionError(): String {
+    val lower = this.lowercase()
+    return when {
+        contains("401") -> "API Key 无效或已过期"
+        contains("403") -> "API Key 无权限或被拒绝"
+        contains("404") -> "Base URL 或 API Path 错误"
+        contains("timeout") || lower.contains("sockettimeout") || lower.contains("connect") -> "网络不可达，请检查地址"
+        contains("Unable to resolve host") || contains("UnknownHost") -> "无法解析域名，请检查 Base URL"
+        else -> this
+    }
 }
 
 // ————————————————————————————————————————————————————————————
