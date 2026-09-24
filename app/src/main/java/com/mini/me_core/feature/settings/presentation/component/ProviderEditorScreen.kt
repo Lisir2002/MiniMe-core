@@ -42,11 +42,14 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ButtonDefaults
@@ -69,6 +72,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateListOf
@@ -84,6 +88,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -103,6 +109,8 @@ import com.mini.me_core.feature.settings.data.repository.ViewImageUnknownGuardPo
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.domain.model.ProviderType
+import com.mini.me_core.feature.settings.domain.model.defaultProviderApiPath
+import com.mini.me_core.feature.settings.presentation.ConnectionTestState
 import com.mini.me_core.feature.settings.presentation.FetchState
 import com.mini.me_core.feature.settings.presentation.SettingsViewModel
 import java.util.UUID
@@ -138,6 +146,17 @@ fun ProviderEditorScreen(
     // RC63 ④：当前「能力覆盖」面板正在编辑哪一个模型；null=关闭。
     var capabilityOverrideModel by remember { mutableStateOf<String?>(null) }
 
+    // ── 新增高级参数状态（采样 / API Path / 超时重试 / 备用供应商） ──
+    var temperature by remember { mutableFloatStateOf(initialProvider?.temperature ?: 1.0f) }
+    var topP by remember { mutableFloatStateOf(initialProvider?.topP ?: 1.0f) }
+    var maxTokensText by remember { mutableStateOf(initialProvider?.maxTokens?.takeIf { it > 0 }?.toString() ?: "") }
+    var apiPath by remember { mutableStateOf(initialProvider?.apiPath ?: defaultProviderApiPath(type)) }
+    var requestTimeoutText by remember { mutableStateOf(initialProvider?.requestTimeout?.toString() ?: "30") }
+    var retryCountText by remember { mutableStateOf(initialProvider?.retryCount?.toString() ?: "0") }
+    var fallbackProviderId by remember { mutableStateOf(initialProvider?.fallbackProviderId) }
+    /** 本地收藏列表（编辑期即时更新；保存时写入 config，已有供应商同时由 ViewModel 持久化）。 */
+    var localFavorites by remember { mutableStateOf<List<String>>(initialProvider?.favoriteModels ?: emptyList()) }
+
     val fetchState by viewModel.fetchState.collectAsStateWithLifecycle()
     val testResults by viewModel.testResults.collectAsStateWithLifecycle()
     val testing by viewModel.testing.collectAsStateWithLifecycle()
@@ -148,6 +167,10 @@ fun ProviderEditorScreen(
     val defaultPolicy by viewModel.compatibilityDefaultPolicyFlow.collectAsStateWithLifecycle()
     val autoDowngrade by viewModel.autoDowngradeOnSendFailureFlow.collectAsStateWithLifecycle()
     val viewImageGuard by viewModel.viewImageUnknownGuardPolicyFlow.collectAsStateWithLifecycle()
+    /** 供应商级连通性测试状态。 */
+    val connectionTestState by viewModel.connectionTestState.collectAsStateWithLifecycle()
+    /** 全量供应商列表（备用供应商下拉用）。 */
+    val allProviders by viewModel.providers.collectAsStateWithLifecycle()
     val modelSnapshot = models.toList()
 
     /** RC63 ④ 单模型覆盖：ProviderModelRow 每个模型 hasOverride 的即时快照（Flow -> State）。 */
@@ -183,11 +206,13 @@ fun ProviderEditorScreen(
     DisposableEffect(Unit) {
         viewModel.resetFetchState()
         viewModel.clearTestResults()
+        viewModel.resetConnectionTest()
         val activity = context as? android.app.Activity
         activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         onDispose {
             viewModel.resetFetchState()
             viewModel.clearTestResults()
+            viewModel.resetConnectionTest()
             activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
@@ -217,7 +242,16 @@ fun ProviderEditorScreen(
         isActive = initialProvider?.isActive ?: false,
         models = models.toList(),
         selectedModel = initialProvider?.selectedModel ?: "",
-        useResponseApi = useResponseApi
+        useResponseApi = useResponseApi,
+        temperature = temperature,
+        topP = topP,
+        maxTokens = maxTokensText.trim().toIntOrNull()?.takeIf { it > 0 },
+        apiPath = apiPath.ifBlank { defaultProviderApiPath(type) },
+        requestTimeout = requestTimeoutText.trim().toIntOrNull()?.coerceIn(5, 120) ?: 30,
+        retryCount = retryCountText.trim().toIntOrNull()?.coerceIn(0, 5) ?: 0,
+        fallbackProviderId = fallbackProviderId?.takeIf { it.isNotBlank() && it != providerId },
+        favoriteModels = localFavorites,
+        modelOrder = initialProvider?.modelOrder ?: emptyList(),
     )
 
     // 新建场景下判断用户是否填写了实质内容：名称、API Key、Base URL 任一非空白，或已添加模型。
@@ -391,6 +425,34 @@ fun ProviderEditorScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    // ── 测试连接按钮 + 内联结果 ──
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(
+                            onClick = { viewModel.testProviderConnection(currentConfig()) },
+                            enabled = connectionTestState !is ConnectionTestState.Loading
+                        ) {
+                            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(Spacing.xs))
+                            Text("测试连接")
+                        }
+                        Spacer(Modifier.width(Spacing.sm))
+                        when (val st = connectionTestState) {
+                            is ConnectionTestState.Loading -> CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            is ConnectionTestState.Success -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(Spacing.xs))
+                                Text(st.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+                            }
+                            is ConnectionTestState.Error -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(Spacing.xs))
+                                Text(st.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            }
+                            ConnectionTestState.Idle -> {}
+                        }
+                    }
+
                     OutlinedTextField(
                         value = baseUrl,
                         onValueChange = { baseUrl = it },
@@ -403,6 +465,16 @@ fun ProviderEditorScreen(
                                 Text("Base URL 需以 http:// 或 https:// 开头", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                             }
                         },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = apiPath,
+                        onValueChange = { apiPath = it },
+                        label = { Text("API Path") },
+                        placeholder = { Text(defaultProviderApiPath(type)) },
+                        singleLine = true,
+                        supportingText = { Text("一般无需修改", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -498,29 +570,76 @@ fun ProviderEditorScreen(
                     }
                     if (advancedExpanded) {
                         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            // ── Temperature ──
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("Temperature（温度）", modifier = Modifier.weight(1f))
-                                Text("1.0", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("%.1f".format(temperature), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            OutlinedTextField(
-                                value = "",
-                                onValueChange = {},
-                                label = { Text("Max Tokens（最大输出）") },
-                                enabled = false,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = "",
-                                onValueChange = {},
-                                label = { Text("系统提示词") },
-                                enabled = false,
-                                minLines = 3,
-                                modifier = Modifier.fillMaxWidth()
+                            Slider(
+                                value = temperature,
+                                onValueChange = { temperature = (it * 10).toInt() / 10f },
+                                valueRange = 0f..2f
                             )
                             Text(
-                                "高级参数（温度/最大Token/系统提示词）将在后续版本支持",
+                                "越高越随机，越低越确定",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            // ── Top P ──
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Top P", modifier = Modifier.weight(1f))
+                                Text("%.1f".format(topP), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Slider(
+                                value = topP,
+                                onValueChange = { topP = (it * 10).toInt() / 10f },
+                                valueRange = 0f..1f
+                            )
+                            Text(
+                                "核采样，与温度二选一",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            // ── Max Tokens ──
+                            OutlinedTextField(
+                                value = maxTokensText,
+                                onValueChange = { maxTokensText = it.filter { c -> c.isDigit() } },
+                                label = { Text("Max Tokens（最大输出）") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                supportingText = { Text("最大输出 token 数，留空=不限制", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // ── 请求超时 ──
+                            OutlinedTextField(
+                                value = requestTimeoutText,
+                                onValueChange = { requestTimeoutText = it.filter { c -> c.isDigit() } },
+                                label = { Text("请求超时（秒）") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                supportingText = { Text("请求超时时间（秒），范围 5-120", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // ── 重试次数 ──
+                            OutlinedTextField(
+                                value = retryCountText,
+                                onValueChange = { retryCountText = it.filter { c -> c.isDigit() } },
+                                label = { Text("重试次数") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                supportingText = { Text("失败时自动重试次数，范围 0-5", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // ── 备用供应商下拉 ──
+                            FallbackProviderDropdown(
+                                selectedId = fallbackProviderId,
+                                providers = allProviders.filter { it.id != providerId && it.isEnabled },
+                                onSelect = { fallbackProviderId = it }
                             )
                         }
                     }
@@ -554,14 +673,20 @@ fun ProviderEditorScreen(
                         }
                     }
 
-                    // 已添加模型列表
+                    // 已添加模型列表（收藏置顶：先按 localFavorites 顺序，其余按原顺序追加）
+                    val favoriteSet = localFavorites.toSet()
+                    val sortedModels = remember(models.toList(), favoriteSet) {
+                        val favOrdered = localFavorites.filter { it in models }
+                        val rest = models.filter { it !in favoriteSet }
+                        favOrdered + rest
+                    }
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
-                        models.forEach { model ->
+                        sortedModels.forEach { model ->
                             ProviderModelRow(
                                 model = model,
                                 metadata = modelMetadata[model],
@@ -571,9 +696,15 @@ fun ProviderEditorScreen(
                                 onTest = { viewModel.testModel(currentConfig(), model) },
                                 onRemove = {
                                     models.remove(model)
+                                    localFavorites = localFavorites - model
                                     saveCurrent()
                                 },
-                                onOpenCapabilityOverride = { capabilityOverrideModel = model }
+                                onOpenCapabilityOverride = { capabilityOverrideModel = model },
+                                isFavorite = model in favoriteSet,
+                                onToggleFavorite = {
+                                    localFavorites = if (model in localFavorites) localFavorites - model else localFavorites + model
+                                    viewModel.toggleFavoriteModel(providerId, model)
+                                }
                             )
                         }
                     }
@@ -1000,6 +1131,60 @@ private fun ViewImageGuardDropdown(
                     },
                     onClick = {
                         onChange(g)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FallbackProviderDropdown(
+    selectedId: String?,
+    providers: List<AIProviderConfig>,
+    onSelect: (String?) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedName = providers.firstOrNull { it.id == selectedId }?.name ?: "无"
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it }
+    ) {
+        OutlinedTextField(
+            value = selectedName,
+            onValueChange = { },
+            readOnly = true,
+            label = { Text("备用供应商") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            supportingText = {
+                Text(
+                    "当前供应商请求失败时自动切换到备用供应商",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("无") },
+                onClick = {
+                    onSelect(null)
+                    expanded = false
+                }
+            )
+            providers.forEach { p ->
+                DropdownMenuItem(
+                    text = { Text(p.name) },
+                    onClick = {
+                        onSelect(p.id)
                         expanded = false
                     }
                 )

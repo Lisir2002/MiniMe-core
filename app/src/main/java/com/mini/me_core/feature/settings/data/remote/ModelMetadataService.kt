@@ -243,6 +243,10 @@ class ModelMetadataService @Inject constructor(
             idLower.contains("qwen3-8b-a3b")
         val probablyTools =
             probablyVision || probablyReasoning || type != ProviderType.ANTHROPIC
+        val probablyCode = idLower.contains("coder") || idLower.contains("code") || idLower.contains("coding") || idLower.contains("程序员")
+        val probablyVideo = idLower.contains("video") || idLower.contains("omni")
+        val probablyAudio = idLower.contains("audio") || idLower.contains("omni") || idLower.contains("whisper") || idLower.contains("asr") || idLower.contains("transcribe") || idLower.contains("语音")
+        val modelDescription = buildModelDescription(idLower)
         return ModelMetadata(
             id = modelId,
             providerId = type.name.lowercase(),
@@ -253,6 +257,11 @@ class ModelMetadataService @Inject constructor(
             supportsTools = probablyTools,
             supportsVision = probablyVision,
             supportsReasoning = probablyReasoning,
+            supportsCode = probablyCode,
+            supportsVideo = probablyVideo,
+            supportsAudio = probablyAudio,
+            supportsStructuredOutput = true,
+            description = modelDescription,
             source = ModelMetadata.Source.INFERRED,
             // 保留启发式命中详情，便于阶段 4 ④单模型覆盖 UI 的「智能预填 banner」展示来源。
             inferenceReason = ModelMetadata.InferenceReason(
@@ -416,6 +425,7 @@ class ModelMetadataService @Inject constructor(
                     supportsTools = model["tool_call"]?.jsonPrimitive?.booleanOrNull == true,
                     supportsVision = "image" in inputModalities || "video" in inputModalities || "pdf" in inputModalities,
                     supportsReasoning = model["reasoning"]?.jsonPrimitive?.booleanOrNull == true,
+                    supportsStructuredOutput = true,
                     source = ModelMetadata.Source.MODELS_DEV
                 )
             }
@@ -438,6 +448,28 @@ class ModelMetadataService @Inject constructor(
         overrideReasoning = override_reasoning?.let { it != 0L },
         updatedAtMs = updated_at_ms
     )
+
+    private fun buildModelDescription(idLower: String): String = when {
+        idLower.contains("gpt-4o-mini") -> "轻量多模态，高性价比"
+        idLower.contains("gpt-4o") -> "多模态旗舰，快速均衡"
+        idLower.contains("gpt-4.1") || idLower.contains("gpt-4.5") -> "最新一代，长上下文"
+        idLower.contains("o1") || idLower.contains("o3") -> "深度推理模型"
+        idLower.contains("claude-3.7") || idLower.contains("claude-3-5-sonnet") || idLower.contains("claude-sonnet") -> "深度推理与编码"
+        idLower.contains("claude-3-opus") || idLower.contains("claude-opus") -> "最强性能，复杂任务"
+        idLower.contains("claude-3-haiku") || idLower.contains("claude-haiku") -> "快速轻量"
+        idLower.contains("deepseek-coder") -> "代码专精"
+        idLower.contains("deepseek-r1") || idLower.contains("deepseek-r") -> "深度推理"
+        idLower.contains("deepseek-chat") || idLower.contains("deepseek-v3") || idLower.contains("deepseek") -> "高效开源"
+        idLower.contains("qwen-vl") -> "通义千问多模态"
+        idLower.contains("qwen-coder") -> "通义千问代码"
+        idLower.contains("qwen") -> "通义千问"
+        idLower.contains("gemini-2.0-pro") || idLower.contains("gemini-1.5-pro") -> "谷歌旗舰多模态"
+        idLower.contains("gemini-2.0-flash") || idLower.contains("gemini-1.5-flash") -> "谷歌快速多模态"
+        idLower.contains("glm-4") -> "智谱清言"
+        idLower.contains("doubao") -> "豆包大模型"
+        idLower.contains("step") -> "阶跃星辰"
+        else -> ""
+    }
 
     private companion object {
         const val TAG = "ModelMetadataService"

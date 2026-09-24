@@ -69,6 +69,15 @@ class AIProviderRepositoryV2Impl @Inject constructor(
             isEnabled = provider.isEnabled,
             useFullUrl = provider.useFullUrl,
             useResponseApi = provider.useResponseApi,
+            temperature = provider.temperature.toDouble(),
+            topP = provider.topP.toDouble(),
+            maxTokens = provider.maxTokens?.toLong(),
+            apiPath = provider.apiPath,
+            requestTimeout = provider.requestTimeout.toLong(),
+            retryCount = provider.retryCount.toLong(),
+            fallbackProviderId = provider.fallbackProviderId,
+            favoriteModels = provider.favoriteModels.joinToString(","),
+            modelOrder = provider.modelOrder.joinToString(","),
         )
     }
 
@@ -145,6 +154,15 @@ class AIProviderRepositoryV2Impl @Inject constructor(
             isEnabled = is_enabled == 1L,
             useFullUrl = use_full_url == 1L,
             useResponseApi = use_response_api == 1L,
+            temperature = temperature.toFloat(),
+            topP = top_p.toFloat(),
+            maxTokens = max_tokens?.toInt(),
+            apiPath = api_path,
+            requestTimeout = request_timeout.toInt(),
+            retryCount = retry_count.toInt(),
+            fallbackProviderId = fallback_provider_id,
+            favoriteModels = favorite_models.split(",").filter { it.isNotEmpty() },
+            modelOrder = model_order.split(",").filter { it.isNotEmpty() },
         )
     }
 }

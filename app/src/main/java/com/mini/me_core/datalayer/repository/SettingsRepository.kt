@@ -65,6 +65,9 @@ class SettingsRepository(private val db: SettingsDb) {
         id: String, name: String, type: String, encryptedApiKey: String, baseUrl: String,
         defaultModel: String, isActive: Boolean, models: String, isEnabled: Boolean,
         useFullUrl: Boolean, useResponseApi: Boolean,
+        temperature: Double, topP: Double, maxTokens: Long?, apiPath: String,
+        requestTimeout: Long, retryCount: Long, fallbackProviderId: String?,
+        favoriteModels: String, modelOrder: String,
     ) = withContext(Dispatchers.IO) {
         db.transaction {
             if (isActive) q.deactivateAllProviders()
@@ -74,6 +77,9 @@ class SettingsRepository(private val db: SettingsDb) {
                 if (isEnabled) 1L else 0L,
                 if (useFullUrl) 1L else 0L,
                 if (useResponseApi) 1L else 0L,
+                temperature, topP, maxTokens, apiPath,
+                requestTimeout, retryCount, fallbackProviderId,
+                favoriteModels, modelOrder,
             )
         }
     }

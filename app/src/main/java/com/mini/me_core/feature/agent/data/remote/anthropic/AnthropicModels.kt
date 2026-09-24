@@ -7,6 +7,7 @@ data class AnthropicMessageRequest(
     val max_tokens: Int = 16384,
     // 开启 extended thinking 时不能携带 temperature（官方要求），置 null 由 Gson 跳过该字段。
     val temperature: Float? = null,
+    val top_p: Float? = null,
     val thinking: AnthropicThinkingConfig? = null,
     val tools: List<AnthropicToolDefinition>? = null,
     val stream: Boolean = false

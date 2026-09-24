@@ -2,6 +2,7 @@ package com.mini.me_core.feature.settings.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,18 +26,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +63,8 @@ import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ProviderType
+import com.mini.me_core.feature.settings.domain.model.defaultProviderApiPath
+import com.mini.me_core.feature.settings.presentation.ConnectionTestState
 import com.mini.me_core.feature.settings.presentation.FetchState
 import com.mini.me_core.feature.settings.presentation.SettingsViewModel
 import java.util.UUID
@@ -85,6 +92,10 @@ fun AddProviderSheet(
     var customModels by remember { mutableStateOf(listOf<String>()) }
     var customShowApiKey by remember { mutableStateOf(false) }
     var autoActivate by remember { mutableStateOf(false) }
+    var customApiPath by remember { mutableStateOf("") }
+
+    // 连通性测试状态
+    val connectionTestState by viewModel.connectionTestState.collectAsStateWithLifecycle()
 
     // 自定义供应商向导「选择模型」步骤的拉取状态
     val customFetchState by viewModel.customFetchState.collectAsStateWithLifecycle()
@@ -128,9 +139,11 @@ fun AddProviderSheet(
                 isActive = autoActivate,
                 models = customModels,
                 selectedModel = customModels.firstOrNull().orEmpty(),
-                isEnabled = true
+                isEnabled = true,
+                apiPath = customApiPath.ifBlank { defaultProviderApiPath(customType) }
             )
             onSave(provider)
+            viewModel.resetConnectionTest()
             android.widget.Toast.makeText(
                 context,
                 "已添加供应商「${customName.ifEmpty { "自定义供应商" }}」，可在聊天页切换使用",
@@ -209,7 +222,26 @@ fun AddProviderSheet(
                             customType
                         )
                     },
-                    viewModel = viewModel
+                    viewModel = viewModel,
+                    apiPath = customApiPath,
+                    onApiPathChange = { customApiPath = it },
+                    connectionTestState = connectionTestState,
+                    onTestConnection = {
+                        viewModel.testProviderConnection(
+                            AIProviderConfig(
+                                id = "custom-test",
+                                name = customName.ifEmpty { "自定义供应商" },
+                                type = customType,
+                                apiKey = customApiKey,
+                                baseUrl = customBaseUrl.ifBlank { defaultProviderBaseUrl(customType) },
+                                defaultModel = "",
+                                isActive = false,
+                                models = emptyList(),
+                                selectedModel = "",
+                                isEnabled = true
+                            )
+                        )
+                    }
                 )
             }
 
@@ -280,7 +312,11 @@ private fun CustomProviderContent(
     onModelsChange: (List<String>) -> Unit,
     fetchState: FetchState,
     onFetchModels: () -> Unit,
-    viewModel: SettingsViewModel
+    viewModel: SettingsViewModel,
+    apiPath: String,
+    onApiPathChange: (String) -> Unit,
+    connectionTestState: ConnectionTestState,
+    onTestConnection: () -> Unit
 ) {
     val baseUrlError = baseUrl.isNotBlank() && !baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")
     Column(
@@ -331,6 +367,34 @@ private fun CustomProviderContent(
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                // ── 测试连接按钮 + 内联结果 ──
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(
+                        onClick = onTestConnection,
+                        enabled = connectionTestState !is ConnectionTestState.Loading && apiKey.isNotBlank()
+                    ) {
+                        Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(Spacing.xs))
+                        Text("测试连接")
+                    }
+                    Spacer(Modifier.width(Spacing.sm))
+                    when (val st = connectionTestState) {
+                        is ConnectionTestState.Loading -> CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        is ConnectionTestState.Success -> Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(Spacing.xs))
+                            Text(st.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+                        }
+                        is ConnectionTestState.Error -> Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(Spacing.xs))
+                            Text(st.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        }
+                        ConnectionTestState.Idle -> {}
+                    }
+                }
+
                 OutlinedTextField(
                     value = baseUrl,
                     onValueChange = onBaseUrlChange,
@@ -345,6 +409,37 @@ private fun CustomProviderContent(
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                // ── 高级选项折叠区（API Path） ──
+                var advancedExpanded by remember { mutableStateOf(false) }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { advancedExpanded = !advancedExpanded },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "高级选项",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        if (advancedExpanded) Icons.Rounded.KeyboardArrowDown else Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = null
+                    )
+                }
+                if (advancedExpanded) {
+                    OutlinedTextField(
+                        value = apiPath,
+                        onValueChange = onApiPathChange,
+                        label = { Text("API Path") },
+                        placeholder = { Text(defaultProviderApiPath(type)) },
+                        singleLine = true,
+                        supportingText = { Text("一般无需修改", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
             2 -> {
                 Text(

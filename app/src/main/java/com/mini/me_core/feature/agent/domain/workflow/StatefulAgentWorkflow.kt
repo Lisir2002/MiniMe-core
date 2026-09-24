@@ -21,6 +21,7 @@ import com.mini.me_core.feature.agent.domain.prompt.SystemPromptProvider
 import com.mini.me_core.feature.agent.domain.provider.AIProvider
 import com.mini.me_core.feature.agent.domain.provider.AIResponse
 import com.mini.me_core.feature.agent.domain.provider.AIStreamChunk
+import com.mini.me_core.feature.agent.domain.provider.isRetriableNetworkError
 import com.mini.me_core.feature.agent.domain.skill.Skill
 import com.mini.me_core.feature.agent.domain.skill.SkillExecutionContext
 import com.mini.me_core.feature.agent.domain.skill.SkillExecutionResult
@@ -85,6 +86,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.withContext
@@ -315,11 +317,31 @@ class StatefulAgentWorkflow @Inject constructor(
     }
 
     private suspend fun getActiveProvider(sessionId: String?): AIProvider {
+        return getActiveProviderWithConfig(sessionId).first
+    }
+
+    /**
+     * 同 [getActiveProvider]，但同时返回 [AIProviderConfig]，供工作流读取 fallbackProviderId 等配置字段。
+     */
+    private suspend fun getActiveProviderWithConfig(sessionId: String?): Pair<AIProvider, AIProviderConfig> {
         val config = resolveProviderConfig(sessionId)
             ?: throw IllegalStateException("尚未配置 AI 提供商，请到设置中添加并选择一个")
         if (config.apiKey.isBlank()) throw IllegalStateException("「${config.name}」未填写 API Key")
         if (config.effectiveModel.isBlank()) throw IllegalStateException("「${config.name}」未选择模型")
-        return createStandaloneProvider(config, sessionId)
+        return createStandaloneProvider(config, sessionId) to config
+    }
+
+    /**
+     * 供应商故障转移：根据 [fallbackProviderId] 创建备用 provider 实例。
+     * 备用 provider 的配置独立从数据库读取，不继承主 provider 的运行时状态。
+     * 返回 null 表示备用 provider 不存在、被禁用或无 API Key，不应切换。
+     */
+    private suspend fun resolveFallbackProvider(fallbackId: String, sessionId: String?): AIProvider? {
+        if (fallbackId.isBlank()) return null
+        val fallbackConfig = aiProviderRepository.getProviderById(fallbackId) ?: return null
+        if (!fallbackConfig.isEnabled || fallbackConfig.apiKey.isBlank()) return null
+        if (fallbackConfig.effectiveModel.isBlank()) return null
+        return runCatching { createStandaloneProvider(fallbackConfig, sessionId) }.getOrNull()
     }
 
     /**
@@ -350,7 +372,21 @@ class StatefulAgentWorkflow @Inject constructor(
         val history = messagePersistenceUseCase.buildHistory(sessionId, "__manual_compress__")
         if (history.size <= 2) return false
         val compactionProvider = resolveCompactionFallbackProvider() ?: provider
-        val compacted = contextCompactor.compactIfNeeded(history, compactionProvider, sessionId, force = true, onEvent = onEvent)
+        // 非流式故障转移：压缩请求失败且错误可重试、且配置了备用 provider 时，切到备用 provider 重试一次。
+        val compacted = try {
+            contextCompactor.compactIfNeeded(history, compactionProvider, sessionId, force = true, onEvent = onEvent)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (isRetriableNetworkError(e) && !config.fallbackProviderId.isNullOrBlank()) {
+                val fallback = resolveFallbackProvider(config.fallbackProviderId, sessionId)
+                if (fallback != null) {
+                    FileLogger.i(TAG, "压缩 provider [${config.name}] 失败，故障转移到备用 provider [${config.fallbackProviderId}]: ${e.message}")
+                    return contextCompactor.compactIfNeeded(history, fallback, sessionId, force = true, onEvent = onEvent).let { it.size != history.size }
+                }
+            }
+            throw e
+        }
         return compacted.size != history.size
     }
 
@@ -369,6 +405,12 @@ class StatefulAgentWorkflow @Inject constructor(
         provider.model = config.effectiveModel
         provider.useFullUrl = config.useFullUrl
         provider.useResponseApi = config.useResponseApi
+        provider.temperature = config.temperature
+        provider.topP = config.topP
+        provider.maxTokens = config.maxTokens
+        provider.apiPath = config.apiPath
+        provider.requestTimeout = config.requestTimeout
+        provider.retryCount = config.retryCount
         provider.logSessionId = sessionId
         return provider
     }
@@ -657,11 +699,13 @@ class StatefulAgentWorkflow @Inject constructor(
         // 互不依赖，放到 IO 线程并行执行，避免在收集线程上串行阻塞、拖慢首字节反馈。
         val prepared = coroutineScope {
             val systemPromptDeferred = async(Dispatchers.IO) { promptProvider.build(currentContext) }
-            val providerDeferred = async(Dispatchers.IO) { getActiveProvider(currentContext.sessionId) }
+            val providerDeferred = async(Dispatchers.IO) { getActiveProviderWithConfig(currentContext.sessionId) }
             systemPromptDeferred.await() to providerDeferred.await()
         }
         var systemPrompt = prepared.first
-        val aiProvider = prepared.second
+        val aiProvider = prepared.second.first
+        /** 当前主 provider 的完整配置（含 fallbackProviderId 等），供供应商故障转移使用。 */
+        val activeConfig = prepared.second.second
 
         // 技能自动触发（自动化流程一环）：对声明 auto_trigger 的技能做智能识别（LLM 触发决策器），
         // 命中则自动加载/执行并把输出注入上下文（会话级去重，同会话不重复触发）。
@@ -908,27 +952,55 @@ class StatefulAgentWorkflow @Inject constructor(
                             // 是为了避免把 source=INFERRED 的自定义多模态模型误当成纯文本模型，
                             // 发送前剥离图片导致模型「图都收不到还怎么识别」。
                             val messagesToSend = sanitizeImagesForModel(compactedMessages, sendImages)
-                            providerInUse.completeStream(effectiveSystemPrompt, messagesToSend, currentTools, reasoningEffortForRound).collect { chunk ->
-                                when (chunk) {
-                                    is AIStreamChunk.TextDelta -> {
-                                        acc.accept(chunk.text)
-                                        send(AgentEvent.AssistantDelta(acc.text))
+                            // 供应商故障转移：主 provider 首字节前失败时，切到备用 provider 重试一次。
+                            // 一旦已输出 TextDelta（acc/reasoningAcc 非空）则不切换，避免重复文本。
+                            var streamProvider: AIProvider = providerInUse
+                            var fallbackUsed = false
+                            while (true) {
+                                try {
+                                    streamProvider.completeStream(effectiveSystemPrompt, messagesToSend, currentTools, reasoningEffortForRound).collect { chunk ->
+                                        when (chunk) {
+                                            is AIStreamChunk.TextDelta -> {
+                                                acc.accept(chunk.text)
+                                                send(AgentEvent.AssistantDelta(acc.text))
+                                            }
+                                            is AIStreamChunk.ReasoningDelta -> {
+                                                reasoningAcc.accept(chunk.text)
+                                                send(AgentEvent.ReasoningDelta(reasoningAcc.text))
+                                            }
+                                            is AIStreamChunk.Retrying -> {
+                                                acc.reset()
+                                                reasoningAcc.reset()
+                                                send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries))
+                                            }
+                                            is AIStreamChunk.Final -> finalResponse = chunk.response
+                                        }
                                     }
-                                    is AIStreamChunk.ReasoningDelta -> {
-                                        reasoningAcc.accept(chunk.text)
-                                        send(AgentEvent.ReasoningDelta(reasoningAcc.text))
+                                    break
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    coroutineContext.ensureActive()
+                                    // 仅在首字节前（未输出任何文本/思考）且错误可重试时才故障转移
+                                    if (!fallbackUsed && acc.text.isEmpty() && reasoningAcc.text.isEmpty()
+                                        && isRetriableNetworkError(e)
+                                        && !activeConfig.fallbackProviderId.isNullOrBlank()
+                                    ) {
+                                        val fallback = resolveFallbackProvider(activeConfig.fallbackProviderId, currentContext.sessionId)
+                                        if (fallback != null) {
+                                            fallbackUsed = true
+                                            FileLogger.i(TAG, "主 provider [${activeConfig.name}] 首字节前失败，故障转移到备用 provider [${activeConfig.fallbackProviderId}]: ${e.message}")
+                                            send(AgentEvent.Retrying(1, 1))
+                                            streamProvider = fallback
+                                            continue
+                                        }
                                     }
-                                    is AIStreamChunk.Retrying -> {
-                                        acc.reset()
-                                        reasoningAcc.reset()
-                                        send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries))
-                                    }
-                                    is AIStreamChunk.Final -> finalResponse = chunk.response
+                                    throw e
                                 }
                             }
                             val aiResponse = finalResponse ?: AIResponse(content = acc.text)
                             // 归一化护栏可观测埋点：全量重发去重 / 截断 / base64 折叠触发时告警。
-                            logNormalizerGuardrails(currentContext.sessionId, providerInUse.model, acc, reasoningAcc)
+                            logNormalizerGuardrails(currentContext.sessionId, streamProvider.model, acc, reasoningAcc)
                             // 将本轮 reasoning 附加到 AIResponse，以便 reduce 时存入 AssistantMessage 并在下一轮回传
                             val responseWithReasoning = if (reasoningAcc.text.isNotEmpty()) {
                                 aiResponse.copy(reasoning = reasoningAcc.text)

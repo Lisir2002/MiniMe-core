@@ -390,7 +390,8 @@ fun SettingsScreen(
                         section = SettingsSection.ProviderEditor
                     },
                     onSetActive = { viewModel.setActiveProvider(it) },
-                    onToggleEnabled = { id, enabled -> viewModel.setProviderEnabled(id, enabled) }
+                    onToggleEnabled = { id, enabled -> viewModel.setProviderEnabled(id, enabled) },
+                    onDuplicate = { viewModel.duplicateProvider(it) }
                 )
                 SettingsSection.DefaultModels -> DefaultModelsSection(
                     providers = providers,

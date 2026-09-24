@@ -20,10 +20,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +35,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -57,7 +65,8 @@ internal fun ProvidersSection(
     activeProviderId: String?,
     onEdit: (AIProviderConfig) -> Unit,
     onSetActive: (String) -> Unit,
-    onToggleEnabled: (String, Boolean) -> Unit
+    onToggleEnabled: (String, Boolean) -> Unit,
+    onDuplicate: (String) -> Unit
 ) {
     if (providers.isEmpty()) {
         EmptyHint(stringResource(R.string.providers_empty))
@@ -74,7 +83,8 @@ internal fun ProvidersSection(
                 isActive = provider.id == activeProviderId,
                 onEdit = { onEdit(provider) },
                 onSetActive = { onSetActive(provider.id) },
-                onToggleEnabled = { enabled -> onToggleEnabled(provider.id, enabled) }
+                onToggleEnabled = { enabled -> onToggleEnabled(provider.id, enabled) },
+                onDuplicate = { onDuplicate(provider.id) }
             )
         }
         // 导入/导出配置占位
@@ -139,8 +149,10 @@ fun ProviderItem(
     isActive: Boolean,
     onEdit: () -> Unit,
     onSetActive: () -> Unit,
-    onToggleEnabled: (Boolean) -> Unit
+    onToggleEnabled: (Boolean) -> Unit,
+    onDuplicate: () -> Unit
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -218,6 +230,28 @@ fun ProviderItem(
                             contentDescription = stringResource(R.string.common_edit),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(
+                                Icons.Rounded.MoreVert,
+                                contentDescription = "更多操作",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("复制") },
+                                leadingIcon = { Icon(Icons.Rounded.ContentCopy, contentDescription = null) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onDuplicate()
+                                }
+                            )
+                        }
                     }
                 }
             }

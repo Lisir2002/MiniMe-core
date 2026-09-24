@@ -49,6 +49,19 @@ interface AIProvider {
     var useResponseApi: Boolean
     var model: String
 
+    /** 采样温度：控制输出随机性，1.0 为服务端默认。 */
+    var temperature: Float
+    /** 核采样（top-p）：1.0 表示不限制，不传避免覆盖服务端默认。 */
+    var topP: Float
+    /** 最大输出 token 数；null 表示不限制（使用服务端默认）。 */
+    var maxTokens: Int?
+    /** API 路径（如 "/v1/chat/completions"），与 baseUrl 拼接成完整请求 URL。 */
+    var apiPath: String
+    /** 流式首字节等待超时（秒）。非流式请求超时由共享 OkHttp client 控制。 */
+    var requestTimeout: Int
+    /** 网络失败后的最大重试次数；0 表示不重试。 */
+    var retryCount: Int
+
     /**
      * 当前会话 id，仅用于日志归档：调用前由工作流设置，[com.mini.me_core.core.util.AILogger]
      * 据此把每次请求/响应写到对应会话的文件。为 null 时落到 `session-unknown.log`。

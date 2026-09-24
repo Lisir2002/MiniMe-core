@@ -360,6 +360,12 @@ class SubAgentRunner @Inject constructor(
         provider.model = config.effectiveModel
         provider.useFullUrl = config.useFullUrl
         provider.useResponseApi = config.useResponseApi
+        provider.temperature = config.temperature
+        provider.topP = config.topP
+        provider.maxTokens = config.maxTokens
+        provider.apiPath = config.apiPath
+        provider.requestTimeout = config.requestTimeout
+        provider.retryCount = config.retryCount
         provider.logSessionId = sessionId
         return provider
     }

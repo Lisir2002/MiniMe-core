@@ -43,9 +43,10 @@ const val FIRST_BYTE_TIMEOUT_MS = 60_000L
  */
 suspend fun launchFirstByteWatchdog(
     close: () -> Unit,
+    timeoutMs: Long = FIRST_BYTE_TIMEOUT_MS,
     isFirstByteReceived: () -> Boolean
 ): Job = CoroutineScope(coroutineContext[Job]!!).launch {
-    delay(FIRST_BYTE_TIMEOUT_MS)
+    delay(timeoutMs)
     if (!isFirstByteReceived()) {
         runCatching { close() }
     }
@@ -184,6 +185,7 @@ private const val MAX_RETRY_AFTER_MILLIS = 60_000L
  */
 suspend fun <T> retryStaircase(
     onRetry: (suspend (attempt: Int, maxRetries: Int) -> Unit)? = null,
+    maxRetries: Int = MAX_NETWORK_RETRIES,
     block: suspend () -> T
 ): T {
     var attempt = 0
@@ -194,10 +196,10 @@ suspend fun <T> retryStaircase(
             throw e
         } catch (e: Throwable) {
             coroutineContext.ensureActive()
-            if (attempt >= MAX_NETWORK_RETRIES || !isRetriableNetworkError(e)) throw e
+            if (attempt >= maxRetries || !isRetriableNetworkError(e)) throw e
             val wait = retryDelayMillis(attempt, e)
-            FileLogger.w(TAG, "网络请求失败，第 ${attempt + 1}/$MAX_NETWORK_RETRIES 次重试（等待 ${wait}ms）: ${e.javaClass.simpleName} ${e.message}")
-            onRetry?.invoke(attempt + 1, MAX_NETWORK_RETRIES)
+            FileLogger.w(TAG, "网络请求失败，第 ${attempt + 1}/$maxRetries 次重试（等待 ${wait}ms）: ${e.javaClass.simpleName} ${e.message}")
+            onRetry?.invoke(attempt + 1, maxRetries)
             attempt++
             if (wait > 0) delay(wait)
         }
@@ -213,7 +215,8 @@ suspend fun <T> retryStaircase(
  */
 suspend fun streamWithStaircaseRetry(
     attemptOnce: suspend (onProduced: () -> Unit) -> Unit,
-    onRetry: (suspend (attempt: Int, maxRetries: Int) -> Unit)? = null
+    onRetry: (suspend (attempt: Int, maxRetries: Int) -> Unit)? = null,
+    maxRetries: Int = MAX_NETWORK_RETRIES
 ) {
     var attempt = 0
     while (true) {
@@ -224,10 +227,10 @@ suspend fun streamWithStaircaseRetry(
             throw e
         } catch (e: Throwable) {
             coroutineContext.ensureActive()
-            if (attempt >= MAX_NETWORK_RETRIES || !isRetriableNetworkError(e)) throw e
+            if (attempt >= maxRetries || !isRetriableNetworkError(e)) throw e
             val wait = retryDelayMillis(attempt, e)
-            FileLogger.w(TAG, "流式请求失败，第 ${attempt + 1}/$MAX_NETWORK_RETRIES 次重试（等待 ${wait}ms）: ${e.javaClass.simpleName} ${e.message}")
-            onRetry?.invoke(attempt + 1, MAX_NETWORK_RETRIES)
+            FileLogger.w(TAG, "流式请求失败，第 ${attempt + 1}/$maxRetries 次重试（等待 ${wait}ms）: ${e.javaClass.simpleName} ${e.message}")
+            onRetry?.invoke(attempt + 1, maxRetries)
             attempt++
             if (wait > 0) delay(wait)
         }

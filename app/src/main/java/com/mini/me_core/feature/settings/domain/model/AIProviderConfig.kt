@@ -14,7 +14,16 @@ data class AIProviderConfig(
     val selectedModel: String = defaultModel,
     val isEnabled: Boolean = true,
     val useFullUrl: Boolean = false,
-    val useResponseApi: Boolean = false
+    val useResponseApi: Boolean = false,
+    val temperature: Float = 1.0f,
+    val topP: Float = 1.0f,
+    val maxTokens: Int? = null,
+    val apiPath: String = "/v1/chat/completions",
+    val requestTimeout: Int = 30,  // 秒
+    val retryCount: Int = 0,
+    val fallbackProviderId: String? = null,
+    val favoriteModels: List<String> = emptyList(),
+    val modelOrder: List<String> = emptyList(),
 ) {
     /** 实际生效的模型：优先 selectedModel，其次 defaultModel。 */
     val effectiveModel: String

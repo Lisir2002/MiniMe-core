@@ -5,8 +5,6 @@ import com.mini.me_core.core.network.DeltaAccumulator.Semantic
 import com.mini.me_core.core.network.SseFieldExtractor
 import com.mini.me_core.core.util.AILogger
 import com.mini.me_core.feature.agent.data.remote.openai.OpenAIApi
-import com.mini.me_core.feature.settings.domain.model.ProviderType
-import com.mini.me_core.feature.settings.domain.model.defaultProviderApiPath
 import java.io.IOException
 import com.mini.me_core.feature.agent.data.remote.openai.ChatCompletionRequest
 import com.mini.me_core.feature.agent.data.remote.openai.OpenAIChatMessage
@@ -68,6 +66,12 @@ class OpenAIAdapter @Inject constructor(
     override var useFullUrl = false
     override var useResponseApi = false
     override var model = "gpt-4-turbo"
+    override var temperature = 1.0f
+    override var topP = 1.0f
+    override var maxTokens: Int? = null
+    override var apiPath = "/v1/chat/completions"
+    override var requestTimeout = 30
+    override var retryCount = 0
     override var logSessionId: String? = null
 
     override suspend fun complete(
@@ -94,18 +98,21 @@ class OpenAIAdapter @Inject constructor(
             )
         }
 
-        val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, defaultProviderApiPath(ProviderType.OPENAI))
+        val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, apiPath)
         if (useResponseApi) {
             val request = mutableMapOf<String, Any?>(
                 "model" to model,
                 "input" to convertToResponseApiInput(openAIMessages),
-                "tools" to toolDefs
+                "tools" to toolDefs,
+                "temperature" to temperature,
+                "top_p" to topP.takeIf { it != 1.0f },
+                "max_tokens" to maxTokens
             )
             reasoningEffort?.let { request["reasoning"] = mapOf("effort" to it) }
             AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
 
             val response = try {
-                retryStaircase {
+                retryStaircase(maxRetries = retryCount.coerceAtLeast(0)) {
                     api.createResponses(url = url, authorization = "Bearer $apiKey", request = request)
                 }
             } catch (e: CancellationException) {
@@ -150,6 +157,9 @@ class OpenAIAdapter @Inject constructor(
         val request = ChatCompletionRequest(
             model = model,
             messages = openAIMessages,
+            temperature = temperature,
+            top_p = topP.takeIf { it != 1.0f },
+            max_tokens = maxTokens,
             reasoning_effort = reasoningEffort,
             tools = toolDefs,
             tool_choice = if (toolDefs != null) "auto" else null,
@@ -158,7 +168,7 @@ class OpenAIAdapter @Inject constructor(
         AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
 
         val response = try {
-            retryStaircase {
+            retryStaircase(maxRetries = retryCount.coerceAtLeast(0)) {
                 api.createChatCompletion(url = url, authorization = "Bearer $apiKey", request = request)
             }
         } catch (e: CancellationException) {
@@ -203,14 +213,17 @@ class OpenAIAdapter @Inject constructor(
             )
         }
 
-        val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, defaultProviderApiPath(ProviderType.OPENAI))
-        
+        val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, apiPath)
+
         if (useResponseApi) {
             val request = mutableMapOf<String, Any?>(
                 "model" to model,
                 "input" to convertToResponseApiInput(openAIMessages),
                 "tools" to toolDefs,
-                "stream" to true
+                "stream" to true,
+                "temperature" to temperature,
+                "top_p" to topP.takeIf { it != 1.0f },
+                "max_tokens" to maxTokens
             )
             reasoningEffort?.let { request["reasoning"] = mapOf("effort" to it) }
             AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
@@ -315,7 +328,8 @@ class OpenAIAdapter @Inject constructor(
                     onProduced()
                     emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = finishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens)))
                 },
-                onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }
+                onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) },
+                maxRetries = retryCount.coerceAtLeast(0)
             )
             } catch (e: CancellationException) {
                 throw e
@@ -331,6 +345,9 @@ class OpenAIAdapter @Inject constructor(
         val request = ChatCompletionRequest(
             model = model,
             messages = openAIMessages,
+            temperature = temperature,
+            top_p = topP.takeIf { it != 1.0f },
+            max_tokens = maxTokens,
             reasoning_effort = reasoningEffort,
             tools = toolDefs,
             tool_choice = if (toolDefs != null) "auto" else null,
@@ -359,9 +376,10 @@ class OpenAIAdapter @Inject constructor(
             )
 
             body.use { rb ->
-                // 首字节超时 watchdog：60s 内未收到首个内容块则关闭流，触发可重试的 IOException。
+                // 首字节超时 watchdog：requestTimeout 秒内未收到首个内容块则关闭流，触发可重试的 IOException。
+                // 非流式请求的超时由共享 OkHttp client 控制（120s），requestTimeout 主要影响流式首字节等待。
                 val firstByteReceived = java.util.concurrent.atomic.AtomicBoolean(false)
-                val watchdog = launchFirstByteWatchdog({ rb.close() }) { firstByteReceived.get() }
+                val watchdog = launchFirstByteWatchdog({ rb.close() }, timeoutMs = (requestTimeout * 1000L).coerceAtLeast(5000L)) { firstByteReceived.get() }
                 val closeHandle = coroutineContext[Job]?.invokeOnCompletion {
                     runCatching { rb.close() }
                 }
@@ -449,7 +467,8 @@ class OpenAIAdapter @Inject constructor(
             onProduced()
             emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = finishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens)))
             },
-            onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }
+            onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) },
+            maxRetries = retryCount.coerceAtLeast(0)
             )
         } catch (e: CancellationException) {
             throw e

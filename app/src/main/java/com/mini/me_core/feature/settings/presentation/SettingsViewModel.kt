@@ -70,6 +70,14 @@ sealed class FetchState {
     data class Error(val message: String) : FetchState()
 }
 
+/** 供应商级连通性测试状态（点击「测试连接」时通过 GET /v1/models 验证 Key + 端点）。 */
+sealed class ConnectionTestState {
+    object Idle : ConnectionTestState()
+    object Loading : ConnectionTestState()
+    data class Success(val message: String) : ConnectionTestState()
+    data class Error(val message: String) : ConnectionTestState()
+}
+
 /**
  * 日志查看器的日期范围模式。
  *
@@ -1387,6 +1395,59 @@ class SettingsViewModel @Inject constructor(
             val wasActive = repository.getActiveProviderSync()?.id == id
             repository.deleteProvider(id)
             if (wasActive) repository.ensureActiveProvider()
+        }
+    }
+
+    // ── 供应商级连通性测试（GET /v1/models） ──
+    private val _connectionTestState = MutableStateFlow<ConnectionTestState>(ConnectionTestState.Idle)
+    val connectionTestState: StateFlow<ConnectionTestState> = _connectionTestState.asStateFlow()
+
+    fun testProviderConnection(provider: AIProviderConfig) {
+        viewModelScope.launch {
+            _connectionTestState.value = ConnectionTestState.Loading
+            val result = modelApiService.fetchModels(provider.baseUrl, provider.apiKey, provider.type)
+            _connectionTestState.value = result.fold(
+                onSuccess = { models -> ConnectionTestState.Success("连接成功，发现 ${models.size} 个模型") },
+                onFailure = { e -> ConnectionTestState.Error(e.message ?: "连接失败") }
+            )
+        }
+    }
+
+    fun resetConnectionTest() {
+        _connectionTestState.value = ConnectionTestState.Idle
+    }
+
+    // ── 复制供应商（保留全部字段，重置 id / 名称加「（副本）」/ 不激活） ──
+    fun duplicateProvider(id: String) {
+        viewModelScope.launch {
+            val original = repository.getProviderById(id) ?: return@launch
+            val copy = original.copy(
+                id = java.util.UUID.randomUUID().toString(),
+                name = "${original.name}（副本）",
+                isActive = false
+            )
+            runCatching { repository.saveProvider(copy) }
+                .onFailure { e ->
+                    FileLogger.e("SettingsVM", "复制供应商失败: ${e.message}", e)
+                    _saveError.value = e.message ?: "复制失败，请重试"
+                }
+        }
+    }
+
+    // ── 模型收藏：收藏即置顶。切换 favoriteModels 中 modelId 的存在并持久化。 ──
+    fun toggleFavoriteModel(providerId: String, modelId: String) {
+        viewModelScope.launch {
+            val current = repository.getProviderById(providerId) ?: return@launch
+            val newFavorites = if (modelId in current.favoriteModels) {
+                current.favoriteModels - modelId
+            } else {
+                current.favoriteModels + modelId
+            }
+            runCatching { repository.saveProvider(current.copy(favoriteModels = newFavorites)) }
+                .onFailure { e ->
+                    FileLogger.e("SettingsVM", "更新收藏失败: ${e.message}", e)
+                    _saveError.value = e.message ?: "操作失败"
+                }
         }
     }
 

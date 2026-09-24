@@ -41,6 +41,12 @@ class GeminiAdapter @Inject constructor(
     override var useFullUrl = false
     override var useResponseApi = false
     override var model = "gemini-1.5-flash"
+    override var temperature = 1.0f
+    override var topP = 1.0f
+    override var maxTokens: Int? = null
+    override var apiPath = "v1beta"
+    override var requestTimeout = 30
+    override var retryCount = 0
     override var logSessionId: String? = null
 
     override suspend fun complete(
@@ -70,7 +76,12 @@ class GeminiAdapter @Inject constructor(
         if (toolDefs != null) {
             request["tools"] = toolDefs
         }
-        buildThinkingConfig(reasoningEffort)?.let { request["generationConfig"] = mapOf("thinkingConfig" to it) }
+        val genConfig = mutableMapOf<String, Any>()
+        buildThinkingConfig(reasoningEffort)?.let { genConfig["thinkingConfig"] = it }
+        genConfig["temperature"] = temperature
+        genConfig["topP"] = topP
+        maxTokens?.let { genConfig["maxOutputTokens"] = it }
+        if (genConfig.isNotEmpty()) request["generationConfig"] = genConfig
 
         val url = if (useFullUrl) {
             baseUrl
@@ -78,14 +89,14 @@ class GeminiAdapter @Inject constructor(
             val path = if (baseUrl.trimEnd('/').endsWith(model)) {
                 baseUrl.trimEnd('/') + ":generateContent"
             } else {
-                joinUrl(baseUrl, "v1beta/models/$model:generateContent")
+                joinUrl(baseUrl, "$apiPath/models/$model:generateContent")
             }
             path
         }
         AILogger.logRequest(logSessionId, "Gemini", model, "POST", url, request)
 
         val response = try {
-            retryStaircase {
+            retryStaircase(maxRetries = retryCount.coerceAtLeast(0)) {
                 api.generateContent(url = url, apiKey = apiKey, request = request)
             }
         } catch (e: CancellationException) {
@@ -161,7 +172,12 @@ class GeminiAdapter @Inject constructor(
         if (toolDefs != null) {
             request["tools"] = toolDefs
         }
-        buildThinkingConfig(reasoningEffort)?.let { request["generationConfig"] = mapOf("thinkingConfig" to it) }
+        val genConfig = mutableMapOf<String, Any>()
+        buildThinkingConfig(reasoningEffort)?.let { genConfig["thinkingConfig"] = it }
+        genConfig["temperature"] = temperature
+        genConfig["topP"] = topP
+        maxTokens?.let { genConfig["maxOutputTokens"] = it }
+        if (genConfig.isNotEmpty()) request["generationConfig"] = genConfig
 
         val url = if (useFullUrl) {
             baseUrl
@@ -169,7 +185,7 @@ class GeminiAdapter @Inject constructor(
             val path = if (baseUrl.trimEnd('/').endsWith(model)) {
                 baseUrl.trimEnd('/') + ":streamGenerateContent?alt=sse"
             } else {
-                joinUrl(baseUrl, "v1beta/models/$model:streamGenerateContent?alt=sse")
+                joinUrl(baseUrl, "$apiPath/models/$model:streamGenerateContent?alt=sse")
             }
             path
         }
@@ -189,9 +205,10 @@ class GeminiAdapter @Inject constructor(
                 val body = api.streamGenerateContent(url = url, apiKey = apiKey, request = request)
 
                 body.use { rb ->
-                    // 首字节超时 watchdog：60s 内未收到首个内容块则关闭流，触发可重试的 IOException。
+                    // 首字节超时 watchdog：requestTimeout 秒内未收到首个内容块则关闭流，触发可重试的 IOException。
+                    // 非流式请求的超时由共享 OkHttp client 控制（120s），requestTimeout 主要影响流式首字节等待。
                     val firstByteReceived = java.util.concurrent.atomic.AtomicBoolean(false)
-                    val watchdog = launchFirstByteWatchdog({ rb.close() }) { firstByteReceived.get() }
+                    val watchdog = launchFirstByteWatchdog({ rb.close() }, timeoutMs = (requestTimeout * 1000L).coerceAtLeast(5000L)) { firstByteReceived.get() }
                     val closeHandle = coroutineContext[Job]?.invokeOnCompletion {
                         runCatching { rb.close() }
                     }
@@ -263,7 +280,8 @@ class GeminiAdapter @Inject constructor(
                 onProduced()
                 emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = currentFinishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens)))
                 },
-                onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }
+                onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) },
+                maxRetries = retryCount.coerceAtLeast(0)
             )
         } catch (e: CancellationException) {
             throw e

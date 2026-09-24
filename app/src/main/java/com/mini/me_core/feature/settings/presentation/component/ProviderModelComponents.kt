@@ -31,10 +31,16 @@ import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.ListAlt
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Checkbox
@@ -90,6 +96,7 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
+        // Chat 标签（始终显示）
         ModelTag(
             text = "Chat",
             icon = Icons.Rounded.Chat,
@@ -97,69 +104,77 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
         metadata?.let {
-            // 识图
-            if (it.supportsVision) {
-                OverlayBadgeTag(
-                    label = "识图",
-                    icon = Icons.Rounded.Image,
-                    backgroundColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    overridden = hasOverride && it.inferenceReason?.overrideVision != null
-                )
-            } else {
+            // 识图（蓝色）
+            CapabilityTag(
+                supported = it.supportsVision,
+                label = "识图",
+                unsupportedLabel = "无识图",
+                icon = Icons.Rounded.Image,
+                backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                overridden = hasOverride && it.inferenceReason?.overrideVision != null
+            )
+            // 视频（蓝色）
+            CapabilityTag(
+                supported = it.supportsVideo,
+                label = "视频",
+                unsupportedLabel = "无视频",
+                icon = Icons.Rounded.Movie,
+                backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            // 语音（蓝色）
+            CapabilityTag(
+                supported = it.supportsAudio,
+                label = "语音",
+                unsupportedLabel = "无语音",
+                icon = Icons.Rounded.Mic,
+                backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            // 工具（绿色）
+            CapabilityTag(
+                supported = it.supportsTools,
+                label = "工具",
+                unsupportedLabel = "无工具",
+                icon = Icons.Rounded.Build,
+                backgroundColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                overridden = hasOverride && it.inferenceReason?.overrideTools != null
+            )
+            // 思考（紫色）
+            CapabilityTag(
+                supported = it.supportsReasoning,
+                label = "思考",
+                unsupportedLabel = "无思考",
+                icon = Icons.Rounded.AutoAwesome,
+                backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                overridden = hasOverride && it.inferenceReason?.overrideReasoning != null
+            )
+            // 代码（橙色）
+            CapabilityTag(
+                supported = it.supportsCode,
+                label = "代码",
+                unsupportedLabel = "无代码",
+                icon = Icons.Rounded.Code,
+                backgroundColor = Color(0xFFFFF3E0),
+                contentColor = Color(0xFFE65100)
+            )
+            // 结构化（青色）
+            CapabilityTag(
+                supported = it.supportsStructuredOutput,
+                label = "结构化",
+                unsupportedLabel = "无结构化",
+                icon = Icons.Rounded.ListAlt,
+                backgroundColor = Color(0xFFE0F7FA),
+                contentColor = Color(0xFF006064)
+            )
+            // 上下文（灰色）
+            val ctx = it.contextTokens.takeIf { t -> t > 0 }
+            if (ctx != null) {
                 ModelTag(
-                    text = "无识图",
-                    icon = Icons.Rounded.Image,
-                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-            // 工具
-            if (it.supportsTools) {
-                OverlayBadgeTag(
-                    label = "工具",
-                    icon = Icons.Rounded.Build,
-                    backgroundColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                    overridden = hasOverride && it.inferenceReason?.overrideTools != null
-                )
-            } else {
-                ModelTag(
-                    text = "无工具",
-                    icon = Icons.Rounded.Build,
-                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-            // 思考
-            if (it.supportsReasoning) {
-                OverlayBadgeTag(
-                    label = "思考",
-                    icon = Icons.Rounded.AutoAwesome,
-                    backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    overridden = hasOverride && it.inferenceReason?.overrideReasoning != null
-                )
-            } else {
-                ModelTag(
-                    text = "无思考",
-                    icon = Icons.Rounded.AutoAwesome,
-                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-            val input = it.inputTokens?.takeIf { tokens -> tokens > 0 }
-                ?: it.contextTokens.takeIf { tokens -> tokens > 0 }
-            if (input != null) {
-                ModelTag(
-                    text = "Input ${formatTokenLimit(input)}",
-                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            it.outputTokens?.takeIf { tokens -> tokens > 0 }?.let { output ->
-                ModelTag(
-                    text = "Output ${formatTokenLimit(output)}",
+                    text = formatTokenLimit(ctx),
                     backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -205,6 +220,34 @@ private fun OverlayBadgeTag(
                     .background(MaterialTheme.colorScheme.primary)
             )
         }
+    }
+}
+
+@Composable
+private fun CapabilityTag(
+    supported: Boolean,
+    label: String,
+    unsupportedLabel: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    backgroundColor: androidx.compose.ui.graphics.Color,
+    contentColor: androidx.compose.ui.graphics.Color,
+    overridden: Boolean = false
+) {
+    if (supported) {
+        OverlayBadgeTag(
+            label = label,
+            icon = icon,
+            backgroundColor = backgroundColor,
+            contentColor = contentColor,
+            overridden = overridden
+        )
+    } else {
+        ModelTag(
+            text = unsupportedLabel,
+            icon = icon,
+            backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        )
     }
 }
 
@@ -258,7 +301,9 @@ internal fun ProviderModelRow(
     onRemove: (() -> Unit)? = null,
     onOpenCapabilityOverride: (() -> Unit)? = null,
     selected: Boolean? = null,
-    onToggleSelected: (Boolean) -> Unit = {}
+    onToggleSelected: (Boolean) -> Unit = {},
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null
 ) {
     var showErrorDetail by remember { mutableStateOf(false) }
 
@@ -288,6 +333,16 @@ internal fun ProviderModelRow(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                if (metadata?.description?.isNotBlank() == true) {
+                    Text(
+                        text = metadata.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(2.dp))
+                }
                 Spacer(Modifier.height(4.dp))
                 ModelMetadataTags(metadata = metadata, hasOverride = hasOverride)
             }
@@ -305,6 +360,21 @@ internal fun ProviderModelRow(
                         contentDescription = "手动覆盖模型能力（识图Vision/工具Tools/思考Reasoning）",
                         tint = if (hasOverride) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            // 收藏按钮（编辑页使用；传 null 隐藏）
+            onToggleFavorite?.let { onFav ->
+                IconButton(
+                    onClick = onFav,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        if (isFavorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                        contentDescription = if (isFavorite) "取消收藏" else "收藏",
+                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -463,6 +533,16 @@ internal fun FetchModelRow(
         Spacer(Modifier.width(Spacing.md))
         Column(modifier = Modifier.weight(1f)) {
             Text(model, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            if (metadata?.description?.isNotBlank() == true) {
+                Text(
+                    text = metadata.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(2.dp))
+            }
             Spacer(Modifier.height(4.dp))
             ModelMetadataTags(metadata = metadata, hasOverride = false)
         }
