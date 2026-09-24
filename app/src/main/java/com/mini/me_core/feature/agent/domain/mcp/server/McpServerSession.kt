@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.agent.domain.mcp.server
 
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.feature.agent.domain.mcp.McpProtocol
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -31,9 +32,6 @@ class McpServerSession(
 ) {
     private companion object {
         const val TAG = "McpServerSession"
-        const val PROTOCOL_VERSION = "2025-06-18"
-        const val SERVER_NAME = "minime-mcp"
-        const val SERVER_VERSION = "0.1.0"
     }
 
     /**
@@ -75,13 +73,13 @@ class McpServerSession(
     // ── 各方法实现 ──────────────────────────────────────────────
 
     private fun initializeResult(): JsonObject = buildJsonObject {
-        put("protocolVersion", PROTOCOL_VERSION)
+        put("protocolVersion", McpProtocol.PROTOCOL_VERSION)
         putJsonObject("capabilities") {
             putJsonObject("tools") { }
         }
         putJsonObject("serverInfo") {
-            put("name", SERVER_NAME)
-            put("version", SERVER_VERSION)
+            put("name", McpProtocol.SERVER_NAME)
+            put("version", McpProtocol.SERVER_VERSION)
         }
         put(
             "instructions",

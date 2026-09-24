@@ -75,13 +75,14 @@ internal fun McpServerSection(
     errorMessage: String?,
     onToggleServer: () -> Unit,
     onSaveConfig: (port: Int, requireApproval: Boolean, autoStart: Boolean) -> Unit,
-    onRegenerateToken: () -> Unit
+    onRegenerateToken: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var portText by remember(port) { mutableStateOf(port.toString()) }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {

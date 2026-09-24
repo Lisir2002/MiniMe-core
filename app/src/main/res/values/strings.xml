@@ -19,7 +19,7 @@
     <string name="settings_default_models_subtitle">配置识图模型（多模态识图 Vision）等默认偏好</string>
     <string name="settings_vision_model">识图模型（多模态识图 Vision）</string>
     <string name="settings_compaction_model">压缩模型</string>
-    <string name="settings_mcp">工具服务</string>
+    <string name="settings_mcp">MCP 中心</string>
     <string name="settings_container">容器镜像</string>
     <string name="settings_logs">运行日志</string>
     <string name="settings_log_viewer">日志查看</string>
@@ -75,6 +75,11 @@
     <string name="settings_mcp_server_copy">复制</string>
     <string name="settings_mcp_server_url">连接地址</string>
     <string name="settings_mcp_server_connect_hint">真机同 WiFi 访问上方地址；模拟器执行 adb reverse tcp:PORT tcp:PORT 后访问 http://localhost:PORT/mcp</string>
+    <string name="mcp_tab_external_tools">外部工具</string>
+    <string name="mcp_tab_open_services">开放服务</string>
+    <string name="mcp_overview_external_connected">外部已连接 %1$d/%2$d</string>
+    <string name="mcp_overview_open_running">开放服务运行中</string>
+    <string name="mcp_overview_open_stopped">开放服务已停止</string>
     <string name="settings_container_current">当前：%1$s</string>
     <string name="settings_container_builtin_alpine">内置 Alpine</string>
     <string name="settings_log_current">当前：%1$s</string>

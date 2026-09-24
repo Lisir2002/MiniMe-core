@@ -114,8 +114,7 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Menu(R.string.settings_title),
     Providers(R.string.settings_providers),
     ProviderEditor(R.string.settings_provider_editor),
-    Mcp(R.string.settings_mcp),
-    McpServer(R.string.settings_mcp_server),
+    McpCenter(R.string.settings_mcp),
     Container(R.string.settings_container),
     Logs(R.string.settings_logs),
     Permissions(R.string.settings_permissions),
@@ -300,7 +299,7 @@ fun SettingsScreen(
                             ) {
                                 Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.settings_search_hint), modifier = Modifier.size(20.dp))
                             }
-                            SettingsSection.Mcp -> {
+                            SettingsSection.McpCenter -> {
                                 IconButton(onClick = { viewModel.reloadMcp() }, modifier = Modifier.size(40.dp)) {
                                     if (mcpReloading) {
                                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -385,19 +384,18 @@ fun SettingsScreen(
                         section = SettingsSection.ProviderEditor
                     }
                 )
-                SettingsSection.Mcp -> McpSection(
+                SettingsSection.McpCenter -> McpCenterScreen(
                     servers = mcpServers,
                     statuses = mcpStatuses,
                     reloading = mcpReloading,
                     onReload = { viewModel.reloadMcp() },
-                    onToggle = { name, enabled -> viewModel.setMcpServerEnabled(name, enabled) },
-                    onEdit = {
+                    onToggleServerEnabled = { name, enabled -> viewModel.setMcpServerEnabled(name, enabled) },
+                    onEditServer = {
                         editingMcp = it
                         showMcpDialog = true
                     },
-                    onDelete = { viewModel.deleteMcpServer(it) }
-                )
-                SettingsSection.McpServer -> McpServerSection(
+                    onDeleteServer = { viewModel.deleteMcpServer(it) },
+                    onAddServer = { editingMcp = null; showMcpDialog = true },
                     isRunning = mcpServerIsRunning,
                     port = mcpServerPort,
                     token = mcpServerToken,
@@ -405,8 +403,8 @@ fun SettingsScreen(
                     autoStart = mcpServerAutoStart,
                     serverUrl = mcpServerUrl,
                     errorMessage = mcpServerError,
-                    onToggleServer = { viewModel.toggleMcpServer() },
-                    onSaveConfig = { p, r, a -> viewModel.saveMcpServerConfig(p, r, a) },
+                    onToggleHostServer = { viewModel.toggleMcpServer() },
+                    onSaveHostConfig = { p, r, a -> viewModel.saveMcpServerConfig(p, r, a) },
                     onRegenerateToken = { viewModel.regenerateMcpServerToken() }
                 )
                 SettingsSection.Container -> ContainerSection(
@@ -483,7 +481,7 @@ fun SettingsScreen(
             onOpenLogs = editingMcp?.let { existing ->
                 {
                     showMcpDialog = false
-                    logReturnSection = SettingsSection.Mcp
+                    logReturnSection = SettingsSection.McpCenter
                     viewModel.refreshLogs(filterServerName = existing.name)
                     section = SettingsSection.Logs
                 }
@@ -613,31 +611,26 @@ internal fun SettingsMenu(
             action = { onOpen(SettingsSection.Providers) }
         ),
         MenuItem(
-            section = SettingsSection.Mcp,
+            section = SettingsSection.McpCenter,
             group = groupAI,
-            title = stringResource(SettingsSection.Mcp.titleRes),
-            subtitle = if (mcpCount == 0)
-                stringResource(R.string.settings_mcp_empty)
-            else
-                stringResource(R.string.settings_mcp_count_connected, mcpCount, mcpConnected),
+            title = stringResource(SettingsSection.McpCenter.titleRes),
+            subtitle = buildString {
+                if (mcpCount == 0) {
+                    append(stringResource(R.string.settings_mcp_empty))
+                } else {
+                    append(stringResource(R.string.settings_mcp_count_connected, mcpCount, mcpConnected))
+                }
+                append(" · ")
+                append(stringResource(
+                    if (mcpServerRunning) R.string.settings_mcp_server_running
+                    else R.string.settings_mcp_server_stopped
+                ))
+            },
             icon = Icons.Rounded.Extension,
             iconBgLight = Color(0xFF00B4A8),
             iconBgDark = Color(0xFF0E6E68),
             keywords = listOf("mcp", "server", stringResource(R.string.ui____20dce2c6), "function", stringResource(R.string.ui____faa1ad5e), stringResource(R.string.ui_____c566ca59)),
-            action = { onOpen(SettingsSection.Mcp) }
-        ),
-        MenuItem(
-            section = SettingsSection.McpServer,
-            group = groupAI,
-            title = stringResource(SettingsSection.McpServer.titleRes),
-            subtitle = stringResource(R.string.settings_mcp_server_subtitle) + " · " + stringResource(
-                if (mcpServerRunning) R.string.settings_mcp_server_running else R.string.settings_mcp_server_stopped
-            ),
-            icon = Icons.Rounded.Dns,
-            iconBgLight = Color(0xFF00A3C4),
-            iconBgDark = Color(0xFF0B6478),
-            keywords = listOf("mcp", "server", stringResource(R.string.ui_____55abea2d), stringResource(R.string.ui____4dbd9aec), stringResource(R.string.ui____89e180d6), stringResource(R.string.ui_____c566ca59_2)),
-            action = { onOpen(SettingsSection.McpServer) }
+            action = { onOpen(SettingsSection.McpCenter) }
         ),
         MenuItem(
             section = SettingsSection.Permissions,

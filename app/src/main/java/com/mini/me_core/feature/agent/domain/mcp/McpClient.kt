@@ -24,7 +24,6 @@ class McpClient(
 ) {
     private companion object {
         const val TAG = "McpClient"
-        const val PROTOCOL_VERSION = "2025-06-18"
     }
 
     @Volatile
@@ -42,11 +41,11 @@ class McpClient(
 
     private suspend fun initialize() {
         val params = buildJsonObject {
-            put("protocolVersion", PROTOCOL_VERSION)
+            put("protocolVersion", McpProtocol.PROTOCOL_VERSION)
             putJsonObject("capabilities") { /* 客户端暂不声明额外能力 */ }
             putJsonObject("clientInfo") {
-                put("name", "ai-code-editor")
-                put("version", "1.0.0")
+                put("name", McpProtocol.CLIENT_NAME)
+                put("version", McpProtocol.CLIENT_VERSION)
             }
         }
         transport.request("initialize", params)

@@ -75,10 +75,12 @@ internal fun McpSection(
     onReload: () -> Unit,
     onToggle: (String, Boolean) -> Unit,
     onEdit: (McpServerConfig) -> Unit,
-    onDelete: (String) -> Unit
+    onDelete: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    onAddServer: (() -> Unit)? = null
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
