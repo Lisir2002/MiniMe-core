@@ -36,7 +36,10 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.ListAlt
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Star
@@ -44,6 +47,8 @@ import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -112,7 +117,8 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
                 icon = Icons.Rounded.Image,
                 backgroundColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                overridden = hasOverride && it.inferenceReason?.overrideVision != null
+                overridden = hasOverride && it.inferenceReason?.overrideVision != null,
+                showUnsupported = false
             )
             // 视频（蓝色）
             CapabilityTag(
@@ -121,7 +127,8 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
                 unsupportedLabel = "无视频",
                 icon = Icons.Rounded.Movie,
                 backgroundColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                showUnsupported = false
             )
             // 语音（蓝色）
             CapabilityTag(
@@ -130,7 +137,8 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
                 unsupportedLabel = "无语音",
                 icon = Icons.Rounded.Mic,
                 backgroundColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                showUnsupported = false
             )
             // 工具（绿色）
             CapabilityTag(
@@ -140,7 +148,8 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
                 icon = Icons.Rounded.Build,
                 backgroundColor = MaterialTheme.colorScheme.tertiaryContainer,
                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                overridden = hasOverride && it.inferenceReason?.overrideTools != null
+                overridden = hasOverride && it.inferenceReason?.overrideTools != null,
+                showUnsupported = false
             )
             // 思考（紫色）
             CapabilityTag(
@@ -150,7 +159,8 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
                 icon = Icons.Rounded.AutoAwesome,
                 backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                overridden = hasOverride && it.inferenceReason?.overrideReasoning != null
+                overridden = hasOverride && it.inferenceReason?.overrideReasoning != null,
+                showUnsupported = false
             )
             // 代码（橙色）
             CapabilityTag(
@@ -159,7 +169,8 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
                 unsupportedLabel = "无代码",
                 icon = Icons.Rounded.Code,
                 backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                showUnsupported = false
             )
             // 结构化（青色）
             CapabilityTag(
@@ -168,7 +179,8 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
                 unsupportedLabel = "无结构化",
                 icon = Icons.Rounded.ListAlt,
                 backgroundColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                showUnsupported = false
             )
             // 上下文（灰色）
             val ctx = it.contextTokens.takeIf { t -> t > 0 }
@@ -231,7 +243,8 @@ private fun CapabilityTag(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     backgroundColor: androidx.compose.ui.graphics.Color,
     contentColor: androidx.compose.ui.graphics.Color,
-    overridden: Boolean = false
+    overridden: Boolean = false,
+    showUnsupported: Boolean = true
 ) {
     if (supported) {
         OverlayBadgeTag(
@@ -241,7 +254,7 @@ private fun CapabilityTag(
             contentColor = contentColor,
             overridden = overridden
         )
-    } else {
+    } else if (showUnsupported) {
         ModelTag(
             text = unsupportedLabel,
             icon = icon,
@@ -306,6 +319,7 @@ internal fun ProviderModelRow(
     onToggleFavorite: (() -> Unit)? = null
 ) {
     var showErrorDetail by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -319,20 +333,16 @@ internal fun ProviderModelRow(
                 Checkbox(checked = checked, onCheckedChange = onToggleSelected)
                 Spacer(Modifier.width(Spacing.xs))
             }
-            ModelLogoIcon(modelName = model, size = 24.dp)
-            Spacer(Modifier.width(Spacing.md))
 
-            // Center Content (Name & Tags)
+            // 模型名 + 描述
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        model,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                Text(
+                    model,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 if (metadata?.description?.isNotBlank() == true) {
                     Text(
                         text = metadata.description,
@@ -340,26 +350,6 @@ internal fun ProviderModelRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.height(2.dp))
-                }
-                Spacer(Modifier.height(4.dp))
-                ModelMetadataTags(metadata = metadata, hasOverride = hasOverride)
-            }
-
-            Spacer(Modifier.width(Spacing.sm))
-
-            // RC63 ④ 能力覆盖齿轮按钮（编辑页使用；向导传 null 隐藏，避免无意义死按钮）
-            onOpenCapabilityOverride?.let { onOpen ->
-                IconButton(
-                    onClick = onOpen,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        Icons.Rounded.Settings,
-                        contentDescription = "手动覆盖模型能力（识图Vision/工具Tools/思考Reasoning）",
-                        tint = if (hasOverride) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -379,38 +369,94 @@ internal fun ProviderModelRow(
                 }
             }
 
-            // Right Actions
-            Box(
-                modifier = Modifier.width(56.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (testing) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                } else {
-                    TextButton(onClick = onTest, contentPadding = PaddingValues(horizontal = Spacing.sm)) {
-                        Text(stringResource(R.string.provider_test), style = MaterialTheme.typography.labelMedium)
+            // 更多菜单按钮（仅编辑页：selected == null 时显示）
+            if (selected == null) {
+                Box {
+                    IconButton(
+                        onClick = { showMoreMenu = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.MoreVert,
+                            contentDescription = "更多操作",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showMoreMenu,
+                        onDismissRequest = { showMoreMenu = false }
+                    ) {
+                        // 参数设置（onOpenCapabilityOverride!=null 时显示）
+                        onOpenCapabilityOverride?.let { onOpen ->
+                            DropdownMenuItem(
+                                text = { Text("参数设置") },
+                                onClick = { showMoreMenu = false; onOpen() },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Rounded.Settings,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            )
+                        }
+                        // 测试模型（testing 时显示加载动画且不可点击）
+                        DropdownMenuItem(
+                            text = { Text("测试模型") },
+                            onClick = { if (!testing) { showMoreMenu = false; onTest() } },
+                            enabled = !testing,
+                            leadingIcon = {
+                                if (testing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Rounded.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        )
+                        // 删除模型（onRemove!=null 时显示，红色文字）
+                        onRemove?.let { onDel ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "删除模型",
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = { showMoreMenu = false; onDel() },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Rounded.Delete,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             }
-            // 删除按钮（编辑页使用；向导传 null 隐藏，取消选择走复选框）
-            onRemove?.let { onDel ->
-                IconButton(onClick = onDel, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Rounded.Close,
-                        contentDescription = stringResource(R.string.common_delete),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
         }
+
+        Spacer(Modifier.height(4.dp))
+        ModelMetadataTags(metadata = metadata, hasOverride = hasOverride)
 
         // Test Result
         result?.let { r ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .padding(top = Spacing.sm, start = 32.dp)
+                    .padding(top = Spacing.sm)
                     .then(
                         if (!r.success) Modifier.clickable { showErrorDetail = true } else Modifier
                     )
