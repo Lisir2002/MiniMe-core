@@ -21,7 +21,12 @@ import io.ktor.server.routing.routing
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -51,13 +56,17 @@ class McpHttpServer(
         const val ENDPOINT = "/mcp"
         const val SESSION_HEADER = "Mcp-Session-Id"
         val SSE_CONTENT_TYPE = ContentType.parse("text/event-stream")
+        const val SESSION_TIMEOUT_MS = 30 * 60 * 1000L
+        const val MAX_SESSIONS = 100
+        const val CLEANUP_INTERVAL_MS = 60 * 1000L
     }
 
     private var engine: ApplicationEngine? = null
 
-    /** 已下发过的会话 id（首期只做连接管理，不持久化、不强校验）。 */
-    private val sessionIds = ConcurrentHashMap.newKeySet<String>()
+    /** sessionId -> 最后活跃时间戳（ms），支持超时清理和上限管理。 */
+    private val sessions = ConcurrentHashMap<String, Long>()
     private val sessionCounter = AtomicLong(0)
+    private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val port: Int get() = settings.port
 
@@ -69,6 +78,7 @@ class McpHttpServer(
         }
         server.start(wait = false)
         engine = server
+        startCleanupLoop()
         FileLogger.i(TAG, "MCP 服务器已监听 0.0.0.0:${settings.port}$ENDPOINT")
         true
     } catch (e: Exception) {
@@ -84,6 +94,29 @@ class McpHttpServer(
             FileLogger.w(TAG, "停止 MCP 服务器时出错（忽略）: ${e.message}", e)
         } finally {
             engine = null
+            sessions.clear()
+        }
+    }
+
+    /** 定期清理超时会话：30 分钟无活动移除，上限 100 个。 */
+    private fun startCleanupLoop() {
+        cleanupScope.launch {
+            while (isActive) {
+                delay(CLEANUP_INTERVAL_MS)
+                val now = System.currentTimeMillis()
+                // 移除超时会话
+                val expired = sessions.entries.filter { now - it.value > SESSION_TIMEOUT_MS }
+                expired.forEach { sessions.remove(it.key) }
+                if (expired.isNotEmpty()) {
+                    FileLogger.i(TAG, "清理 ${expired.size} 个超时会话，剩余 ${sessions.size}")
+                }
+                // 超过上限时移除最旧的
+                while (sessions.size > MAX_SESSIONS) {
+                    val oldest = sessions.minByOrNull { it.value } ?: break
+                    sessions.remove(oldest.key)
+                    FileLogger.i(TAG, "会话数超上限，移除最旧会话: ${oldest.key}")
+                }
+            }
         }
     }
 
@@ -129,8 +162,20 @@ class McpHttpServer(
             return
         }
 
-        val sessionId = sessionIds.firstOrNull()
-            ?: "minime-${sessionCounter.incrementAndGet()}".also { sessionIds.add(it) }
+        // 会话管理：优先复用客户端传来的 session id，否则新建。
+        val now = System.currentTimeMillis()
+        val incomingSessionId = call.request.headers[SESSION_HEADER]
+        val sessionId = when {
+            incomingSessionId != null && sessions.containsKey(incomingSessionId) -> {
+                sessions[incomingSessionId] = now
+                incomingSessionId
+            }
+            else -> {
+                val newId = "minime-${sessionCounter.incrementAndGet()}"
+                sessions[newId] = now
+                newId
+            }
+        }
         call.response.headers.append(SESSION_HEADER, sessionId)
 
         val responseText = response.toString()
