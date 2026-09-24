@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Article
@@ -22,8 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -33,6 +36,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.mini.me_core.core.theme.AIEditorTheme
 import com.mini.logs.data.LogsViewModel
+import com.mini.logs.data.SettingsStore
+import com.mini.logs.data.ThemeMode
 import com.mini.logs.ui.crash.CrashScreen
 import com.mini.logs.ui.logs.LogsScreen
 import com.mini.logs.ui.settings.SettingsScreen
@@ -95,7 +100,15 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            AIEditorTheme {
+            val settings = remember { SettingsStore(this@MainActivity) }
+            val darkTheme = when (settings.themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+                // TODO: AMOLED 纯黑需自定义语义色，暂与 DARK 一致
+                ThemeMode.AMOLED -> true
+            }
+            AIEditorTheme(darkTheme = darkTheme) {
                 LogViewerRoot(
                     storagePermissionGranted = storagePermissionGranted,
                     onRequestPermission = {

@@ -85,6 +85,17 @@ class SettingsStore(context: Context) {
             val set = value.map { "${it.key}=${it.value}" }.toSet()
             prefs.edit().putStringSet("highlights", set).apply()
         }
+
+    // ── 崩溃状态 ──
+    /** 已标记为已修复的崩溃聚合 key 集合。 */
+    var fixedCrashKeys: Set<String>
+        get() = prefs.getStringSet("fixed_crash_keys", emptySet()) ?: emptySet()
+        set(value) = prefs.edit().putStringSet("fixed_crash_keys", value).apply()
+
+    /** 被忽略的崩溃聚合 key 集合（默认不在列表显示）。 */
+    var ignoredCrashKeys: Set<String>
+        get() = prefs.getStringSet("ignored_crash_keys", emptySet()) ?: emptySet()
+        set(value) = prefs.edit().putStringSet("ignored_crash_keys", value).apply()
 }
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK, AMOLED }

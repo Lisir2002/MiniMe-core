@@ -123,6 +123,11 @@ fun LogsScreen(
     var longPressEntry by remember { mutableStateOf<LogEntry?>(null) }
     val contextLines = remember { viewModel.settings.contextLines }
 
+    // ── 显示偏好（从设置读取，切回本页时重新组合即生效）──
+    val fontSize = viewModel.settings.fontSize
+    val useMonospace = viewModel.settings.useMonospace
+    val showMilliseconds = viewModel.settings.showMilliseconds
+
     val listState = rememberLazyListState()
 
     // ── 状态消息（SAF 选择结果等）显示 Toast ──
@@ -488,6 +493,9 @@ fun LogsScreen(
                                 isSearchMatch = searchQuery.isNotEmpty() &&
                                     entry.rawLine.contains(searchQuery, ignoreCase = true),
                                 inContextWindow = inContext && !entry.isStackTraceLine,
+                                fontSize = fontSize,
+                                useMonospace = useMonospace,
+                                showMilliseconds = showMilliseconds,
                                 onClick = {
                                     if (entry.isMainLine) {
                                         viewModel.toggleExpand(entry)

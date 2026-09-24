@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mini.logs.data.FontSize
 import com.mini.logs.data.HighlightColor
 import com.mini.logs.data.LogEntry
 import com.mini.logs.data.ViewMode
@@ -50,6 +51,9 @@ import com.mini.me_core.core.theme.tokens.SemanticColors
  * @param searchQuery 当前搜索关键词（用于高亮）
  * @param isSearchMatch 当前行是否是搜索匹配行
  * @param inContextWindow 是否处于上下文查看窗口（灰色背景）
+ * @param fontSize 消息字号档位
+ * @param useMonospace 消息体是否等宽字体
+ * @param showMilliseconds 时间是否显示毫秒
  * @param onClick 点击行
  * @param onLongClick 长按行
  * @param onDoubleClick 双击行（默认空，便于其他调用处兼容）
@@ -68,9 +72,30 @@ fun LogListItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onDoubleClick: () -> Unit = {},
+    fontSize: FontSize = FontSize.MEDIUM,
+    useMonospace: Boolean = false,
+    showMilliseconds: Boolean = true,
 ) {
     val colors = LocalAppTheme.current.colors
     val levelColor = LogLevelColors.colorFor(entry.level)
+
+    // 字号：消息体按档位，行头比消息小 2sp
+    val messageSp = when (fontSize) {
+        FontSize.SMALL -> 11.sp
+        FontSize.MEDIUM -> 13.sp
+        FontSize.LARGE -> 15.sp
+        FontSize.XLARGE -> 17.sp
+    }
+    val headerSp = when (fontSize) {
+        FontSize.SMALL -> 9.sp
+        FontSize.MEDIUM -> 11.sp
+        FontSize.LARGE -> 13.sp
+        FontSize.XLARGE -> 15.sp
+    }
+    // 消息体字体族
+    val messageFontFamily = if (useMonospace) FontFamily.Monospace else FontFamily.Default
+    // 时间显示：关闭毫秒时截取到秒
+    val displayTime = if (showMilliseconds) entry.time else entry.time.substringBefore(".")
 
     // 高亮颜色竖条
     val highlightBarColor: Color? = if (entry.isHighlighted) {
@@ -117,6 +142,10 @@ fun LogListItem(
                 stackTraceCount = stackTraceCount,
                 searchQuery = searchQuery,
                 levelColor = levelColor,
+                displayTime = displayTime,
+                messageSp = messageSp,
+                headerSp = headerSp,
+                messageFontFamily = messageFontFamily,
                 modifier = Modifier.weight(1f),
             )
         } else {
@@ -125,6 +154,10 @@ fun LogListItem(
                 isExpanded = isExpanded,
                 searchQuery = searchQuery,
                 levelColor = levelColor,
+                displayTime = displayTime,
+                messageSp = messageSp,
+                headerSp = headerSp,
+                messageFontFamily = messageFontFamily,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -153,6 +186,10 @@ private fun ComfortableRow(
     stackTraceCount: Int,
     searchQuery: String,
     levelColor: Color,
+    displayTime: String,
+    messageSp: androidx.compose.ui.unit.TextUnit,
+    headerSp: androidx.compose.ui.unit.TextUnit,
+    messageFontFamily: FontFamily,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalAppTheme.current.colors
@@ -163,9 +200,9 @@ private fun ComfortableRow(
         // 行头
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = entry.time,
+                text = displayTime,
                 fontFamily = FontFamily.Monospace,
-                fontSize = 11.sp,
+                fontSize = headerSp,
                 color = colors.textSecondary,
             )
             Spacer(Modifier.width(PrimitiveSpacing.Sm))
@@ -177,7 +214,7 @@ private fun ComfortableRow(
                 Text(
                     text = entry.levelLetter,
                     color = levelColor,
-                    fontSize = 10.sp,
+                    fontSize = headerSp,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -185,7 +222,7 @@ private fun ComfortableRow(
             Text(
                 text = entry.tag,
                 fontFamily = FontFamily.Monospace,
-                fontSize = 12.sp,
+                fontSize = headerSp,
                 color = colors.brandPrimary,
                 maxLines = 1,
             )
@@ -196,10 +233,11 @@ private fun ComfortableRow(
         // 消息
         Text(
             text = highlightText(entry.message, searchQuery, colors),
-            fontSize = 13.sp,
+            fontSize = messageSp,
+            fontFamily = messageFontFamily,
             color = colors.textPrimary,
             maxLines = if (isExpanded) Int.MAX_VALUE else 3,
-            lineHeight = 18.sp,
+            lineHeight = messageSp * 1.38f,
         )
 
         // 堆栈折叠提示
@@ -215,7 +253,7 @@ private fun ComfortableRow(
                 Spacer(Modifier.width(PrimitiveSpacing.Xxs))
                 Text(
                     text = "+$stackTraceCount 行堆栈",
-                    fontSize = 11.sp,
+                    fontSize = headerSp,
                     color = colors.textTertiary,
                 )
             }
@@ -232,6 +270,10 @@ private fun CompactRow(
     isExpanded: Boolean,
     searchQuery: String,
     levelColor: Color,
+    displayTime: String,
+    messageSp: androidx.compose.ui.unit.TextUnit,
+    headerSp: androidx.compose.ui.unit.TextUnit,
+    messageFontFamily: FontFamily,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalAppTheme.current.colors
@@ -241,23 +283,23 @@ private fun CompactRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = entry.time,
+            text = displayTime,
             fontFamily = FontFamily.Monospace,
-            fontSize = 11.sp,
+            fontSize = headerSp,
             color = colors.textSecondary,
         )
         Spacer(Modifier.width(PrimitiveSpacing.Sm))
         Text(
             text = entry.levelLetter,
             color = levelColor,
-            fontSize = 11.sp,
+            fontSize = headerSp,
             fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.width(PrimitiveSpacing.Sm))
         Text(
             text = entry.tag,
             fontFamily = FontFamily.Monospace,
-            fontSize = 11.sp,
+            fontSize = headerSp,
             color = colors.brandPrimary,
             maxLines = 1,
             modifier = Modifier.width(80.dp),
@@ -265,10 +307,11 @@ private fun CompactRow(
         Spacer(Modifier.width(PrimitiveSpacing.Sm))
         Text(
             text = highlightText(entry.message, searchQuery, colors),
-            fontSize = 12.sp,
+            fontSize = messageSp,
+            fontFamily = messageFontFamily,
             color = colors.textPrimary,
             maxLines = if (isExpanded) Int.MAX_VALUE else 1,
-            lineHeight = 16.sp,
+            lineHeight = messageSp * 1.33f,
             modifier = Modifier
                 .weight(1f)
                 .horizontalScroll(rememberScrollState()),

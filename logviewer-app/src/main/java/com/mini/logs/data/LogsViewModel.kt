@@ -54,9 +54,8 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
             _isLoading.value = true
             val refs = repository.listAllLogRefs(safManager)
             _logFileRefs.value = refs
-            if (_selectedFiles.value.isEmpty() && refs.isNotEmpty()) {
-                val today = refs.firstOrNull { it.fileName.contains(todayString()) } ?: refs.first()
-                _selectedFiles.value = setOf(today.fileName)
+            if (_selectedFiles.value.isEmpty()) {
+                _selectedFiles.value = pickInitialSelection(refs)
             }
             loadLogsSuspend()
             _isLoading.value = false
@@ -160,6 +159,36 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         refreshFiles()
+        // 自动尾随：开启后启动即进入尾随模式
+        if (settings.autoTail) {
+            toggleTailing(true)
+        }
+    }
+
+    /**
+     * 根据默认文件模式决定启动时选中哪些文件。
+     * TODAY → 选今天的文件；LAST → 记住上次选中（失效则回退今天）；ASK → 不自动选。
+     */
+    private fun pickInitialSelection(refs: List<LogFileRef>): Set<String> {
+        if (refs.isEmpty()) return emptySet()
+        return when (settings.defaultFileMode) {
+            DefaultFileMode.TODAY -> {
+                val today = refs.firstOrNull { it.fileName.contains(todayString()) } ?: refs.first()
+                setOf(today.fileName)
+            }
+            DefaultFileMode.LAST -> {
+                val persisted = settings.lastSelectedFiles
+                    .filter { name -> refs.any { it.fileName == name } }
+                    .toSet()
+                if (persisted.isNotEmpty()) {
+                    persisted
+                } else {
+                    val today = refs.firstOrNull { it.fileName.contains(todayString()) } ?: refs.first()
+                    setOf(today.fileName)
+                }
+            }
+            DefaultFileMode.ASK -> emptySet()
+        }
     }
 
     /** 刷新日志文件列表（直接路径 + SAF 合并）。 */
@@ -167,10 +196,8 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val refs = repository.listAllLogRefs(safManager)
             _logFileRefs.value = refs
-            if (_selectedFiles.value.isEmpty() && refs.isNotEmpty()) {
-                // 默认选中今天的文件
-                val today = refs.firstOrNull { it.fileName.contains(todayString()) } ?: refs.first()
-                _selectedFiles.value = setOf(today.fileName)
+            if (_selectedFiles.value.isEmpty()) {
+                _selectedFiles.value = pickInitialSelection(refs)
             }
             loadLogs()
         }

@@ -9,19 +9,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.CheckCircleOutline
+import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.FilterList
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,7 +33,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +43,7 @@ import com.mini.logs.data.AppDataSession
 import com.mini.logs.data.CrashAggregator
 import com.mini.logs.data.CrashGroup
 import com.mini.logs.data.LogRepository
+import com.mini.logs.data.SettingsStore
 import com.mini.logs.ui.components.CrashSkeleton
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.components.AppEmptyState
@@ -52,7 +54,8 @@ import com.mini.me_core.core.theme.tokens.LocalAppTheme
 private enum class CrashFilter(val label: String) {
     ALL("全部"),
     UNFIXED("未修复"),
-    FIXED("已修复");
+    FIXED("已修复"),
+    IGNORED("已忽略");
 
     companion object {
         val options = entries.toList()
@@ -60,20 +63,33 @@ private enum class CrashFilter(val label: String) {
 }
 
 /**
- * 崩溃聚合页。按异常类型聚合 ERROR/FATAL，支持筛选、标记已修复、全屏详情。
+ * 崩溃聚合页。按异常类型聚合 ERROR/FATAL，支持搜索、筛选、标记已修复、忽略、全屏详情。
  */
 @Composable
 fun CrashScreen() {
     val colors = LocalAppTheme.current.colors
     val context = LocalContext.current
     val repository = remember { LogRepository(context) }
+    val settings = remember { SettingsStore(context) }
     val clipboard = LocalClipboardManager.current
 
     var rawCrashes by remember { mutableStateOf<List<CrashGroup>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
+    // 已修复 / 已忽略状态：启动时从 SharedPreferences 读取
     val fixedKeys = remember { mutableStateMapOf<String, Boolean>() }
+    val ignoredKeys = remember { mutableStateMapOf<String, Boolean>() }
     var filter by remember { mutableStateOf(CrashFilter.ALL) }
     var detailCrash by remember { mutableStateOf<CrashGroup?>(null) }
+
+    // 搜索状态
+    var searchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    // 初始化持久化状态
+    LaunchedEffect(Unit) {
+        settings.fixedCrashKeys.forEach { fixedKeys[it] = true }
+        settings.ignoredCrashKeys.forEach { ignoredKeys[it] = true }
+    }
 
     // 监听全局数据版本：日志目录切换时自动重新加载
     val dataVersion by AppDataSession.dataVersion.collectAsState()
@@ -81,27 +97,55 @@ fun CrashScreen() {
     LaunchedEffect(dataVersion) {
         isLoading = true
         val files = repository.listLogFiles()
-        val entries = repository.loadEntries(files, maxLines = 60_000)
+        val entries = repository.loadEntries(files, maxLines = settings.maxLoadLines)
         rawCrashes = CrashAggregator.aggregate(entries)
         isLoading = false
     }
 
-    // 应用已修复状态 + 排序（未修复在前，各自按次数降序）+ 筛选
-    val crashes = remember(rawCrashes, fixedKeys, filter) {
-        val withFixed = rawCrashes.map { it.copy(isFixed = fixedKeys[it.key] == true) }
-        val sorted = withFixed.sortedWith(
+    // 应用已修复状态 + 排序（未修复在前，各自按次数降序）+ 搜索 + 筛选
+    val crashes = remember(rawCrashes, fixedKeys, ignoredKeys, filter, searchQuery) {
+        val withFixed = rawCrashes.map {
+            it.copy(isFixed = fixedKeys[it.key] == true)
+        }
+        // 搜索过滤：exceptionType + message + tags + fullStackTrace
+        val q = searchQuery.trim().lowercase()
+        val searched = if (q.isBlank()) {
+            withFixed
+        } else {
+            withFixed.filter { g ->
+                g.exceptionType.lowercase().contains(q) ||
+                    g.message.lowercase().contains(q) ||
+                    g.tags.any { it.lowercase().contains(q) } ||
+                    g.fullStackTrace.lowercase().contains(q)
+            }
+        }
+        val sorted = searched.sortedWith(
             compareBy({ it.isFixed }, { -it.occurrences })
         )
         when (filter) {
-            CrashFilter.ALL -> sorted
-            CrashFilter.UNFIXED -> sorted.filter { !it.isFixed }
-            CrashFilter.FIXED -> sorted.filter { it.isFixed }
+            CrashFilter.ALL -> sorted.filter { ignoredKeys[it.key] != true }
+            CrashFilter.UNFIXED -> sorted.filter { !it.isFixed && ignoredKeys[it.key] != true }
+            CrashFilter.FIXED -> sorted.filter { it.isFixed && ignoredKeys[it.key] != true }
+            CrashFilter.IGNORED -> sorted.filter { ignoredKeys[it.key] == true }
         }
     }
 
     fun toggleFixed(group: CrashGroup) {
-        if (fixedKeys[group.key] == true) fixedKeys.remove(group.key)
-        else fixedKeys[group.key] = true
+        if (fixedKeys[group.key] == true) {
+            fixedKeys.remove(group.key)
+        } else {
+            fixedKeys[group.key] = true
+        }
+        settings.fixedCrashKeys = fixedKeys.filterValues { it }.keys
+    }
+
+    fun toggleIgnored(group: CrashGroup) {
+        if (ignoredKeys[group.key] == true) {
+            ignoredKeys.remove(group.key)
+        } else {
+            ignoredKeys[group.key] = true
+        }
+        settings.ignoredCrashKeys = ignoredKeys.filterValues { it }.keys
     }
 
     Column(
@@ -109,15 +153,59 @@ fun CrashScreen() {
             .fillMaxSize()
             .background(colors.surfacePage),
     ) {
-        AppTopAppBar(
-            title = "崩溃聚合",
-            actions = {
-                FilterDropdown(
-                    filter = filter,
-                    onFilterChange = { filter = it },
+        if (searchActive) {
+            // 搜索模式顶栏
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = {
+                    searchActive = false
+                    searchQuery = ""
+                }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Clear,
+                        contentDescription = "退出搜索",
+                        tint = colors.textSecondary,
+                    )
+                }
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("搜索类型/消息/Tag/堆栈", fontSize = 13.sp) },
+                    singleLine = true,
                 )
-            },
-        )
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Clear,
+                            contentDescription = "清除",
+                            tint = colors.textSecondary,
+                        )
+                    }
+                }
+            }
+        } else {
+            AppTopAppBar(
+                title = "崩溃聚合",
+                actions = {
+                    IconButton(onClick = { searchActive = true }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Search,
+                            contentDescription = "搜索",
+                            tint = colors.textSecondary,
+                        )
+                    }
+                    FilterDropdown(
+                        filter = filter,
+                        onFilterChange = { filter = it },
+                    )
+                },
+            )
+        }
 
         Crossfade(targetState = isLoading, label = "crash-content") { loading ->
             when {
@@ -147,6 +235,8 @@ fun CrashScreen() {
                             onClick = { detailCrash = crash },
                             onCopy = { clipboard.setText(AnnotatedString(crash.fullStackTrace)) },
                             onToggleFixed = { toggleFixed(crash) },
+                            onIgnore = { toggleIgnored(crash) },
+                            searchQuery = searchQuery.trim().ifBlank { null },
                         )
                     }
                 }

@@ -1,6 +1,9 @@
 package com.mini.logs.ui.crash
 
+import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +20,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,6 +43,11 @@ import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.core.util.LogLevel
 
+/** 可点击堆栈行：at <pkg>.<Class>.<method>(<File>:<Line>) */
+private val STACK_AT_PATTERN = Regex(
+    """^\s*at\s+[A-Za-z_][A-Za-z0-9_.$]*\([^)]*\)\s*$"""
+)
+
 /**
  * 崩溃详情全屏覆盖（Dialog 铺满屏幕）。
  * 完整堆栈 + 发生记录 + 底部操作栏。
@@ -50,6 +61,8 @@ fun CrashDetailSheet(
     onToggleFixed: () -> Unit,
 ) {
     val colors = LocalAppTheme.current.colors
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -90,13 +103,32 @@ fun CrashDetailSheet(
                 Spacer(Modifier.height(Spacing.lg))
                 AppSectionHeader(title = "完整堆栈")
                 AppCard(variant = AppCardVariant.Sunken) {
-                    Text(
-                        text = crash.fullStackTrace.ifBlank { crash.message },
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = colors.textPrimary,
-                        modifier = Modifier.padding(Spacing.md),
-                    )
+                    Column(
+                        modifier = Modifier
+                            .horizontalScroll(rememberScrollState())
+                            .padding(Spacing.md),
+                    ) {
+                        val stackText = crash.fullStackTrace.ifBlank { crash.message }
+                        stackText.split('\n').forEach { line ->
+                            val isClickable = STACK_AT_PATTERN.matches(line)
+                            Text(
+                                text = line,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (isClickable) colors.brandPrimary else colors.textPrimary,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .let { m ->
+                                        if (isClickable) m.then(
+                                            Modifier.padding(vertical = 1.dp).clickable {
+                                                clipboard.setText(AnnotatedString(line))
+                                                Toast.makeText(context, "已复制堆栈行", Toast.LENGTH_SHORT).show()
+                                            }
+                                        ) else m.padding(vertical = 1.dp)
+                                    },
+                            )
+                        }
+                    }
                 }
 
                 Spacer(Modifier.height(Spacing.lg))
@@ -115,12 +147,19 @@ fun CrashDetailSheet(
                     )
                 } else {
                     records.forEach { rec ->
+                        val recordText = "${FormatUtils.formatDateTime(rec.timestamp)}  ·  ${rec.tag.ifBlank { "-" }}"
                         Text(
-                            text = "${FormatUtils.formatDateTime(rec.timestamp)}  ·  ${rec.tag.ifBlank { "-" }}",
+                            text = recordText,
                             fontSize = 12.sp,
                             fontFamily = FontFamily.Monospace,
                             color = colors.textSecondary,
-                            modifier = Modifier.padding(vertical = Spacing.xs),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.xs)
+                                .clickable {
+                                    clipboard.setText(AnnotatedString(recordText))
+                                    Toast.makeText(context, "已复制发生记录", Toast.LENGTH_SHORT).show()
+                                },
                         )
                     }
                 }

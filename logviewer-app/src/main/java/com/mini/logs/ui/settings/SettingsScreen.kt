@@ -2,7 +2,6 @@ package com.mini.logs.ui.settings
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,7 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.FolderOpen
@@ -100,7 +98,7 @@ fun SettingsScreen(
     var sheetTitle by remember { mutableStateOf("") }
     var sheetOptions by remember { mutableStateOf<List<OptionItem>>(emptyList()) }
     var sheetVisible by remember { mutableStateOf(false) }
-    var showClearLogsDialog by remember { mutableStateOf(false) }
+    var showComingSoonDialog by remember { mutableStateOf(false) }
     var showClearCacheDialog by remember { mutableStateOf(false) }
 
     fun openSheet(title: String, options: List<OptionItem>) {
@@ -128,6 +126,8 @@ fun SettingsScreen(
                     openSheet("主题", ThemeMode.entries.map { mode ->
                         OptionItem(mode.label(), mode == themeMode) {
                             themeMode = mode; store.themeMode = mode
+                            // 主题需要重建 Activity 才能生效
+                            context.findActivity()?.recreate()
                         }
                     })
                 },
@@ -181,11 +181,7 @@ fun SettingsScreen(
                 valueText = if (showMilliseconds) "显示毫秒" else "24小时制",
                 onClick = {
                     openSheet("时间格式", listOf(
-                        OptionItem("24小时制", !showMilliseconds && true) {
-                            showMilliseconds = false; store.showMilliseconds = false
-                        },
-                        OptionItem("12小时制", false) {
-                            // 12小时制暂无独立持久化位，先按 24h 无毫秒处理
+                        OptionItem("24小时制", !showMilliseconds) {
                             showMilliseconds = false; store.showMilliseconds = false
                         },
                         OptionItem("显示毫秒", showMilliseconds) {
@@ -273,24 +269,18 @@ fun SettingsScreen(
                 onClick = onPickLogDirectory,
             )
             AppDivider(horizontalPadding = 68.dp)
-            DangerRow(
-                icon = Icons.Rounded.CleaningServices,
-                title = "清理 7 天前日志",
-                onClick = { showClearLogsDialog = true },
-            )
-            AppDivider(horizontalPadding = 68.dp)
             ValueSettingRow(
                 icon = Icons.Rounded.Description,
                 title = "导出所有日志备份",
-                valueText = null,
-                onClick = { toast("功能开发中") },
+                valueText = "即将上线",
+                onClick = { showComingSoonDialog = true },
             )
             AppDivider(horizontalPadding = 68.dp)
             ValueSettingRow(
                 icon = Icons.Rounded.SettingsBackupRestore,
                 title = "导出/导入设置",
-                valueText = null,
-                onClick = { toast("功能开发中") },
+                valueText = "即将上线",
+                onClick = { showComingSoonDialog = true },
             )
             AppDivider(horizontalPadding = 68.dp)
             ValueSettingRow(
@@ -355,20 +345,14 @@ fun SettingsScreen(
         }
     }
 
-    // ── 清理日志确认 ──
-    if (showClearLogsDialog) {
+    // ── 功能预告（导出等未上线功能）──
+    if (showComingSoonDialog) {
         AlertDialog(
-            onDismissRequest = { showClearLogsDialog = false },
-            title = { Text("清理 7 天前日志？") },
-            text = { Text("附属应用为只读模式，不会删除主应用日志文件。此操作将在后续版本接入清理能力。") },
+            onDismissRequest = { showComingSoonDialog = false },
+            title = { Text("功能预告") },
+            text = { Text("此功能将在后续版本提供，敬请期待。") },
             confirmButton = {
-                TextButton(onClick = {
-                    showClearLogsDialog = false
-                    toast("功能开发中")
-                }) { Text("确定") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearLogsDialog = false }) { Text("取消") }
+                TextButton(onClick = { showComingSoonDialog = false }) { Text("知道了") }
             },
         )
     }
@@ -418,34 +402,6 @@ private fun ValueSettingRow(
             }
         },
     )
-}
-
-// ── 红色危险操作行（自定义标题颜色） ──
-@Composable
-private fun DangerRow(icon: ImageVector, title: String, onClick: () -> Unit) {
-    val colors = LocalAppTheme.current.colors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = PrimitiveSpacing.Lg, vertical = PrimitiveSpacing.Md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier.size(38.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = colors.error)
-        }
-        Spacer(Modifier.size(PrimitiveSpacing.Md))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = colors.error,
-            modifier = Modifier.weight(1f),
-        )
-    }
 }
 
 // ── Switch 行 ──
@@ -500,6 +456,16 @@ private data class OptionItem(
     val selected: Boolean,
     val onSelect: () -> Unit,
 )
+
+/** 从 Context 链中找到宿主 Activity（用于 recreate 切换主题）。 */
+private fun android.content.Context.findActivity(): android.app.Activity? {
+    var ctx: android.content.Context = this
+    while (ctx is android.content.ContextWrapper) {
+        if (ctx is android.app.Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
+}
 
 // ── 枚举中文标签 ──
 private fun ThemeMode.label(): String = when (this) {
