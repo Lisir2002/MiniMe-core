@@ -114,7 +114,6 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Menu(R.string.settings_title),
     Providers(R.string.settings_providers),
     ProviderEditor(R.string.settings_provider_editor),
-    DefaultModels(R.string.settings_default_models),
     Mcp(R.string.settings_mcp),
     McpServer(R.string.settings_mcp_server),
     Container(R.string.settings_container),
@@ -183,7 +182,6 @@ fun SettingsScreen(
     var section by remember { mutableStateOf(SettingsSection.Menu) }
     var logReturnSection by remember { mutableStateOf(SettingsSection.Menu) }
     var editingProvider by remember { mutableStateOf<AIProviderConfig?>(null) }
-    var showAddProviderSheet by remember { mutableStateOf(false) }
     var showMcpDialog by remember { mutableStateOf(false) }
     var editingMcp by remember { mutableStateOf<McpServerConfig?>(null) }
     var showContainerAddSheet by remember { mutableStateOf(false) }
@@ -256,6 +254,8 @@ fun SettingsScreen(
         contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
+            // 模型管理页（Providers section）自带 Scaffold 顶栏，外层不显示顶栏以避免双重顶栏
+            if (section != SettingsSection.Providers) {
             // 问题6：Menu 主页且搜索模式开启时，顶栏显示搜索输入框；带 Crossfade 平滑切换
             val animScale = com.mini.me_core.core.theme.LocalAnimationScale.current
             val barAnimDuration = (220L * animScale).toInt().coerceAtLeast(0)
@@ -300,12 +300,6 @@ fun SettingsScreen(
                             ) {
                                 Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.settings_search_hint), modifier = Modifier.size(20.dp))
                             }
-                            SettingsSection.Providers -> IconButton(
-                                onClick = { showAddProviderSheet = true },
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.settings_add_provider), modifier = Modifier.size(20.dp))
-                            }
                             SettingsSection.Mcp -> {
                                 IconButton(onClick = { viewModel.reloadMcp() }, modifier = Modifier.size(40.dp)) {
                                     if (mcpReloading) {
@@ -330,6 +324,7 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
             }
         }
 ) { padding ->
@@ -382,29 +377,13 @@ fun SettingsScreen(
                         searchQuery = ""
                     },
                 )
-                SettingsSection.Providers -> ProvidersSection(
-                    providers = providers,
-                    activeProviderId = activeProvider?.id,
-                    onEdit = {
+                SettingsSection.Providers -> ModelManagementScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { section = SettingsSection.Menu },
+                    onEditProvider = {
                         editingProvider = it
                         section = SettingsSection.ProviderEditor
-                    },
-                    onSetActive = { viewModel.setActiveProvider(it) },
-                    onToggleEnabled = { id, enabled -> viewModel.setProviderEnabled(id, enabled) },
-                    onDuplicate = { viewModel.duplicateProvider(it) }
-                )
-                SettingsSection.DefaultModels -> DefaultModelsSection(
-                    providers = providers,
-                    visionProviderId = visionProviderId,
-                    visionModel = visionModel,
-                    compactionProviderId = compactionProviderId,
-                    compactionModel = compactionModel,
-                    modelMetadata = modelMetadata,
-                    onLoadMetadata = { viewModel.loadAllModelMetadata() },
-                    onSelectVisionModel = { pid, m -> viewModel.setVisionModel(pid, m) },
-                    onClearVisionModel = { viewModel.clearVisionModel() },
-                    onSelectCompactionModel = { pid, m -> viewModel.setCompactionModel(pid, m) },
-                    onClearCompactionModel = { viewModel.clearCompactionModel() }
+                    }
                 )
                 SettingsSection.Mcp -> McpSection(
                     servers = mcpServers,
@@ -530,17 +509,6 @@ fun SettingsScreen(
             onDismiss = { showThemeSheet = false }
         )
     }
-
-    if (showAddProviderSheet) {
-        AddProviderSheet(
-            viewModel = viewModel,
-            onDismiss = { showAddProviderSheet = false },
-            onSave = { provider ->
-                viewModel.saveProvider(provider)
-                showAddProviderSheet = false
-            }
-        )
-    }
 }
 
 internal data class MenuItem(
@@ -615,38 +583,34 @@ internal fun SettingsMenu(
         MenuItem(
             section = SettingsSection.Providers,
             group = groupAI,
-            title = stringResource(SettingsSection.Providers.titleRes),
-            subtitle = if (providerCount == 0) {
-                stringResource(R.string.settings_providers_empty)
-            } else {
-                stringResource(R.string.settings_providers_count, providerCount) +
-                    (activeProviderName?.let { stringResource(R.string.settings_providers_active, it) } ?: "")
-            },
-            icon = Icons.Rounded.Cloud,
-            iconBgLight = Color(0xFF4C8DFF),
-            iconBgDark = Color(0xFF2B4E9E),
-            keywords = listOf("provider", stringResource(R.string.ui____8000f187), "api", "key", "providers", stringResource(R.string.ui_____8da5f75a)),
-            action = { onOpen(SettingsSection.Providers) }
-        ),
-        MenuItem(
-            section = SettingsSection.DefaultModels,
-            group = groupAI,
-            title = stringResource(SettingsSection.DefaultModels.titleRes),
+            title = "模型管理",
             subtitle = run {
                 val parts = mutableListOf<String>()
+                // 供应商信息：数量 + 活跃供应商
+                if (providerCount == 0) {
+                    parts.add(stringResource(R.string.settings_providers_empty))
+                } else {
+                    var providerInfo = stringResource(R.string.settings_providers_count, providerCount)
+                    activeProviderName?.let { providerInfo += stringResource(R.string.settings_providers_active, it) }
+                    parts.add(providerInfo)
+                }
+                // 默认模型信息：识图模型 + 压缩模型
                 if (!visionProviderName.isNullOrBlank() && visionModel.isNotBlank()) {
                     parts.add(stringResource(R.string.settings_default_models_vision_dedicated, visionProviderName, visionModel))
                 }
                 if (!compactionProviderName.isNullOrBlank() && compactionModel.isNotBlank()) {
                     parts.add(stringResource(R.string.settings_default_models_compaction_dedicated, compactionProviderName, compactionModel))
                 }
-                if (parts.isEmpty()) stringResource(R.string.settings_default_models_empty) else parts.joinToString("\n")
+                parts.joinToString("\n")
             },
-            icon = Icons.Rounded.Memory,
-            iconBgLight = Color(0xFF7C5CFF),
-            iconBgDark = Color(0xFF4A3A8F),
-            keywords = listOf("model", "default", stringResource(R.string.ui____18c63459), stringResource(R.string.ui____faa3c555), "vision", stringResource(R.string.ui____6612548a), "compaction", stringResource(R.string.ui____8000f187_2), stringResource(R.string.ui_____37acc94c)),
-            action = { onOpen(SettingsSection.DefaultModels) }
+            icon = Icons.Rounded.Cloud,
+            iconBgLight = Color(0xFF4C8DFF),
+            iconBgDark = Color(0xFF2B4E9E),
+            keywords = listOf(
+                "provider", stringResource(R.string.ui____8000f187), "api", "key", "providers", stringResource(R.string.ui_____8da5f75a),
+                "model", "default", stringResource(R.string.ui____18c63459), stringResource(R.string.ui____faa3c555), "vision", stringResource(R.string.ui____6612548a), "compaction", stringResource(R.string.ui____8000f187_2), stringResource(R.string.ui_____37acc94c)
+            ),
+            action = { onOpen(SettingsSection.Providers) }
         ),
         MenuItem(
             section = SettingsSection.Mcp,
