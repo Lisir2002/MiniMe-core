@@ -1,6 +1,11 @@
 package com.mini.logs.data
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.core.util.LogLevel
@@ -142,6 +147,14 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
     // ── 跳转请求（UI 层收集后执行滚动）──
     private val _scrollRequest = MutableStateFlow<ScrollRequest?>(null)
     val scrollRequest: StateFlow<ScrollRequest?> = _scrollRequest.asStateFlow()
+
+    // ── 上下文查看锚点（"查看前后上下文"时设置当前行 index，-1=无）──
+    private val _contextAnchorIndex = MutableStateFlow(-1)
+    val contextAnchorIndex: StateFlow<Int> = _contextAnchorIndex.asStateFlow()
+
+    fun clearContextAnchor() {
+        _contextAnchorIndex.value = -1
+    }
 
     private var tailJob: Job? = null
 
@@ -449,6 +462,124 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
             } else it
         }
         applyFilter()
+    }
+
+    // ── 长按菜单统一处理入口 ──
+
+    /**
+     * 统一处理 LogActionSheet 发起的所有操作。
+     *
+     * 复制 / 分享需要 Application Context（从 ViewModel 内启动，加 NEW_TASK flag）。
+     * 过滤 / 搜索直接复用现有方法；高亮 / 书签复用 setHighlight / setBookmark。
+     * Bookmark(note=null) 由 UI 层拦截（弹输入框），不应走到这里。
+     */
+    fun onLogAction(entry: LogEntry, action: LogAction) {
+        val app = getApplication<Application>()
+        when (action) {
+            LogAction.CopyRaw -> copyToClipboard(app, entry.rawLine, "已复制原始行")
+
+            LogAction.CopyMessage -> copyToClipboard(app, entry.message, "已复制消息")
+
+            is LogAction.CopyAs -> {
+                val (text, toast) = when (action.field) {
+                    LogAction.CopyAs.CopyField.TIMESTAMP -> entry.time to "已复制时间"
+                    LogAction.CopyAs.CopyField.TAG -> entry.tag to "已复制 Tag"
+                    LogAction.CopyAs.CopyField.LEVEL ->
+                        (entry.level?.name ?: entry.levelLetter) to "已复制等级"
+                    LogAction.CopyAs.CopyField.STACKTRACE -> entry.message to "已复制堆栈"
+                }
+                copyToClipboard(app, text, toast)
+            }
+
+            is LogAction.FilterTagOnly -> {
+                val current = _filterState.value.selectedTags.toMutableSet()
+                current.add(action.tag)
+                _filterState.value = _filterState.value.copy(selectedTags = current)
+                applyFilter()
+            }
+
+            is LogAction.FilterTagHide -> {
+                val current = _filterState.value.excludedTags.toMutableSet()
+                current.add(action.tag)
+                _filterState.value = _filterState.value.copy(excludedTags = current)
+                applyFilter()
+            }
+
+            is LogAction.FilterLevelOnly -> selectLevelAndAbove(action.level)
+
+            is LogAction.FilterSimilar -> {
+                setSearchActive(true)
+                updateSearchQuery(action.message.take(30))
+            }
+
+            is LogAction.SearchWith -> {
+                setSearchActive(true)
+                updateSearchQuery(action.query)
+            }
+
+            is LogAction.Highlight -> setHighlight(entry, action.colorIndex)
+
+            is LogAction.Bookmark -> {
+                // note != null 表示来自书签输入框保存；note==null 由 UI 层拦截
+                if (action.note != null) setBookmark(entry, action.note)
+            }
+
+            LogAction.ClearMarks -> {
+                setHighlight(entry, -1)
+                setBookmark(entry, null)
+            }
+
+            LogAction.ShareLine -> shareText(app, entry.rawLine)
+
+            LogAction.ShareContext -> {
+                val idx = _filteredEntries.value.indexOfFirst {
+                    it.sourceFile == entry.sourceFile && it.lineNumber == entry.lineNumber
+                }
+                if (idx >= 0) {
+                    val from = (idx - 5).coerceAtLeast(0)
+                    val to = (idx + 6).coerceAtMost(_filteredEntries.value.size)
+                    val text = _filteredEntries.value.subList(from, to)
+                        .joinToString("\n") { it.rawLine }
+                    shareText(app, text)
+                } else {
+                    Toast.makeText(app, "未在当前列表中找到该行", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            LogAction.ViewContext -> {
+                val idx = _filteredEntries.value.indexOfFirst {
+                    it.sourceFile == entry.sourceFile && it.lineNumber == entry.lineNumber
+                }
+                if (idx >= 0) {
+                    _contextAnchorIndex.value = idx
+                    _scrollRequest.value = ScrollRequest.ToIndex(idx)
+                }
+            }
+
+            is LogAction.JumpToTime -> {
+                val parts = action.time.split(":")
+                if (parts.size >= 2) {
+                    val h = parts[0].toIntOrNull()
+                    val m = parts[1].toIntOrNull()
+                    if (h != null && m != null) jumpToTime(h, m)
+                }
+            }
+        }
+    }
+
+    private fun copyToClipboard(context: Context, text: String, toast: String) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("log", text))
+        Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun shareText(context: Context, text: String) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(Intent.createChooser(intent, "分享日志"))
     }
 
     // ── 实时尾随 ──

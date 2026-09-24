@@ -1,5 +1,6 @@
 package com.mini.logs.ui.logs
 
+import android.view.HapticFeedbackConstants
 import android.widget.Toast
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.clickable
@@ -46,22 +47,21 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mini.logs.data.LogAction
 import com.mini.logs.data.LogEntry
 import com.mini.logs.data.LogsViewModel
 import com.mini.logs.data.ScrollRequest
@@ -91,7 +91,7 @@ fun LogsScreen(
 ) {
     val context = LocalContext.current
     val colors = LocalAppTheme.current.colors
-    val clipboard = LocalClipboardManager.current
+    val view = LocalView.current
 
     // ── 收集状态 ──
     val filteredEntries by viewModel.filteredEntries.collectAsStateWithLifecycle()
@@ -110,6 +110,7 @@ fun LogsScreen(
     val scrollRequest by viewModel.scrollRequest.collectAsStateWithLifecycle()
     val expandedKeys by viewModel.expandedKeys.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val contextAnchorIndex by viewModel.contextAnchorIndex.collectAsStateWithLifecycle()
 
     // ── UI 局部状态 ──
     var showFileSheet by remember { mutableStateOf(false) }
@@ -120,7 +121,6 @@ fun LogsScreen(
     var showJumpTimeDialog by remember { mutableStateOf(false) }
     var pendingBookmarkEntry by remember { mutableStateOf<LogEntry?>(null) }
     var longPressEntry by remember { mutableStateOf<LogEntry?>(null) }
-    var contextAnchorIndex by remember { mutableIntStateOf(-1) }
     val contextLines = remember { viewModel.settings.contextLines }
 
     val listState = rememberLazyListState()
@@ -493,14 +493,19 @@ fun LogsScreen(
                                         viewModel.toggleExpand(entry)
                                         // 点击上下文锚点外区域清除上下文
                                         if (contextAnchorIndex >= 0 && index != contextAnchorIndex) {
-                                            contextAnchorIndex = -1
+                                            viewModel.clearContextAnchor()
                                         }
                                     }
                                 },
                                 onLongClick = {
                                     if (entry.isMainLine) {
+                                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                                         longPressEntry = entry
                                     }
+                                },
+                                onDoubleClick = {
+                                    // 双击快速复制消息内容
+                                    viewModel.onLogAction(entry, LogAction.CopyMessage)
                                 },
                             )
                         }
@@ -545,40 +550,24 @@ fun LogsScreen(
             }
         }
 
-        // ── 长按操作菜单 ──
+        // ── 长按操作 BottomSheet ──
         longPressEntry?.let { entry ->
-            LogActionMenu(
-                expanded = true,
+            LogActionSheet(
+                entry = entry,
                 onDismiss = { longPressEntry = null },
-                onCopyFull = {
-                    clipboard.setText(AnnotatedString(entry.rawLine))
-                    Toast.makeText(context, "已复制全文", Toast.LENGTH_SHORT).show()
-                },
-                onCopyMessage = {
-                    clipboard.setText(AnnotatedString(entry.message))
-                    Toast.makeText(context, "已复制消息", Toast.LENGTH_SHORT).show()
-                },
-                onCopyTimestamp = {
-                    clipboard.setText(AnnotatedString(entry.time))
-                    Toast.makeText(context, "已复制时间戳", Toast.LENGTH_SHORT).show()
-                },
-                onCopyTag = {
-                    clipboard.setText(AnnotatedString(entry.tag))
-                    Toast.makeText(context, "已复制 Tag", Toast.LENGTH_SHORT).show()
-                },
-                onHighlight = { colorIdx ->
-                    viewModel.setHighlight(entry, colorIdx)
-                },
-                onBookmark = {
-                    pendingBookmarkEntry = entry
-                },
-                onViewContext = {
-                    val idx = filteredEntries.indexOfFirst {
-                        it.sourceFile == entry.sourceFile && it.lineNumber == entry.lineNumber
+                onAction = { action ->
+                    when {
+                        // Bookmark(note=null) 由 UI 层拦截：弹出书签输入框
+                        action is LogAction.Bookmark && action.note == null -> {
+                            pendingBookmarkEntry = entry
+                            longPressEntry = null
+                        }
+                        else -> {
+                            viewModel.onLogAction(entry, action)
+                            longPressEntry = null
+                        }
                     }
-                    if (idx >= 0) contextAnchorIndex = idx
                 },
-                onNextError = { viewModel.nextError() },
             )
         }
 

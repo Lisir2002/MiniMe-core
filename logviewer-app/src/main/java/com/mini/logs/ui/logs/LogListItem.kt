@@ -52,6 +52,7 @@ import com.mini.me_core.core.theme.tokens.SemanticColors
  * @param inContextWindow 是否处于上下文查看窗口（灰色背景）
  * @param onClick 点击行
  * @param onLongClick 长按行
+ * @param onDoubleClick 双击行（默认空，便于其他调用处兼容）
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -66,6 +67,7 @@ fun LogListItem(
     inContextWindow: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onDoubleClick: () -> Unit = {},
 ) {
     val colors = LocalAppTheme.current.colors
     val levelColor = LogLevelColors.colorFor(entry.level)
@@ -89,7 +91,11 @@ fun LogListItem(
         modifier = Modifier
             .fillMaxWidth()
             .background(rowBackground)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onDoubleClick = onDoubleClick,
+            )
             .padding(horizontal = PrimitiveSpacing.SmPlus),
     ) {
         // 左侧高亮竖条
