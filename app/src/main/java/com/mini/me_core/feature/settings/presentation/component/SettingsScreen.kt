@@ -384,10 +384,13 @@ fun SettingsScreen(
                 )
                 SettingsSection.Providers -> ProvidersSection(
                     providers = providers,
+                    activeProviderId = activeProvider?.id,
                     onEdit = {
                         editingProvider = it
                         section = SettingsSection.ProviderEditor
-                    }
+                    },
+                    onSetActive = { viewModel.setActiveProvider(it) },
+                    onToggleEnabled = { id, enabled -> viewModel.setProviderEnabled(id, enabled) }
                 )
                 SettingsSection.DefaultModels -> DefaultModelsSection(
                     providers = providers,

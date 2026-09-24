@@ -1384,7 +1384,9 @@ class SettingsViewModel @Inject constructor(
 
     fun deleteProvider(id: String) {
         viewModelScope.launch {
+            val wasActive = repository.getActiveProviderSync()?.id == id
             repository.deleteProvider(id)
+            if (wasActive) repository.ensureActiveProvider()
         }
     }
 
@@ -1478,7 +1480,9 @@ class SettingsViewModel @Inject constructor(
     fun testModel(provider: AIProviderConfig, model: String) {
         viewModelScope.launch {
             _testing.update { it + model }
-            val result = modelApiService.testModel(provider.baseUrl, provider.apiKey, provider.type, provider.useFullUrl, provider.useResponseApi, model)
+            val result = kotlinx.coroutines.withTimeoutOrNull(30_000) {
+                modelApiService.testModel(provider.baseUrl, provider.apiKey, provider.type, provider.useFullUrl, provider.useResponseApi, model)
+            } ?: ModelTestResult(success = false, latencyMs = 30_000, message = "连接超时（30秒）")
             _testResults.update { it + (model to result) }
             _testing.update { it - model }
         }

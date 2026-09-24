@@ -2,6 +2,7 @@ package com.mini.me_core.feature.settings.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,9 +26,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Warning
@@ -60,6 +65,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.stringResource
@@ -81,43 +87,114 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalLayoutApi::class)
 private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = false) {
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        ModelTag(text = "Chat")
+        ModelTag(
+            text = "Chat",
+            icon = Icons.Rounded.Chat,
+            backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         metadata?.let {
+            // 识图
             if (it.supportsVision) {
-                OverlayBadgeTag(label = "识图（Vision）", enabled = it.supportsVision, overridden = hasOverride && it.inferenceReason?.overrideVision != null)
+                OverlayBadgeTag(
+                    label = "识图",
+                    icon = Icons.Rounded.Image,
+                    backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    overridden = hasOverride && it.inferenceReason?.overrideVision != null
+                )
+            } else {
+                ModelTag(
+                    text = "无识图",
+                    icon = Icons.Rounded.Image,
+                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
             }
+            // 工具
             if (it.supportsTools) {
-                OverlayBadgeTag(label = "工具（Tools）", enabled = it.supportsTools, overridden = hasOverride && it.inferenceReason?.overrideTools != null)
+                OverlayBadgeTag(
+                    label = "工具",
+                    icon = Icons.Rounded.Build,
+                    backgroundColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    overridden = hasOverride && it.inferenceReason?.overrideTools != null
+                )
+            } else {
+                ModelTag(
+                    text = "无工具",
+                    icon = Icons.Rounded.Build,
+                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+            // 思考
+            if (it.supportsReasoning) {
+                OverlayBadgeTag(
+                    label = "思考",
+                    icon = Icons.Rounded.AutoAwesome,
+                    backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    overridden = hasOverride && it.inferenceReason?.overrideReasoning != null
+                )
+            } else {
+                ModelTag(
+                    text = "无思考",
+                    icon = Icons.Rounded.AutoAwesome,
+                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
             }
             val input = it.inputTokens?.takeIf { tokens -> tokens > 0 }
                 ?: it.contextTokens.takeIf { tokens -> tokens > 0 }
             if (input != null) {
-                ModelTag(text = "Input ${formatTokenLimit(input)}")
+                ModelTag(
+                    text = "Input ${formatTokenLimit(input)}",
+                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             it.outputTokens?.takeIf { tokens -> tokens > 0 }?.let { output ->
-                ModelTag(text = "Output ${formatTokenLimit(output)}")
-            }
-            if (it.supportsReasoning) {
-                OverlayBadgeTag(label = "思考（Reasoning）", enabled = it.supportsReasoning, overridden = hasOverride && it.inferenceReason?.overrideReasoning != null)
+                ModelTag(
+                    text = "Output ${formatTokenLimit(output)}",
+                    backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             if (hasOverride) {
-                ModelTag(text = "已覆盖（Manual）", icon = Icons.Rounded.Settings)
+                ModelTag(
+                    text = "已覆盖",
+                    icon = Icons.Rounded.Settings,
+                    backgroundColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                )
             }
         }
     }
 }
 
 /**
- * 三复选框其中之一的展示 Tag：右上角有小红点，小白一眼就能认出「这个能力是我手动覆盖过的」，
- * 不是系统自动推荐。未覆盖时红点隐藏。
+ * 三复选框其中之一的展示 Tag：右上角有小红点，表示该能力被手动覆盖过。
  */
 @Composable
-private fun OverlayBadgeTag(label: String, enabled: Boolean, overridden: Boolean) {
+private fun OverlayBadgeTag(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    backgroundColor: androidx.compose.ui.graphics.Color,
+    contentColor: androidx.compose.ui.graphics.Color,
+    overridden: Boolean
+) {
     Box {
-        ModelTag(text = label)
+        ModelTag(
+            text = label,
+            icon = icon,
+            backgroundColor = backgroundColor,
+            contentColor = contentColor
+        )
         if (overridden) {
             Box(
                 modifier = Modifier
@@ -129,21 +206,24 @@ private fun OverlayBadgeTag(label: String, enabled: Boolean, overridden: Boolean
             )
         }
     }
-    // 「关」的场景（被用户手动覆盖成 false）也要露个小徽章，免得小白以为显示丢了
-    if (!enabled && overridden) {
-        ModelTag(text = "禁用$label（Manual Off）", icon = Icons.Rounded.Close)
-    }
 }
 
 @Composable
-private fun ModelTag(text: String? = null, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
+private fun ModelTag(
+    text: String? = null,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    backgroundColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surfaceVariant,
+    contentColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    border: BorderStroke? = null
+) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = backgroundColor,
         shape = RoundedCornerShape(50),
+        border = border,
         modifier = Modifier.padding(end = 4.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (icon != null) {
@@ -151,14 +231,15 @@ private fun ModelTag(text: String? = null, icon: androidx.compose.ui.graphics.ve
                     icon,
                     contentDescription = null,
                     modifier = Modifier.size(12.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    tint = contentColor
+                )
             }
             if (icon != null && text != null) Spacer(Modifier.width(4.dp))
             if (text != null) {
                 Text(
                     text = text,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.labelMedium,
+                    color = contentColor
                 )
             }
         }

@@ -45,7 +45,11 @@ import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.*
@@ -80,6 +84,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.background
 import kotlinx.coroutines.launch
@@ -121,6 +127,8 @@ fun ProviderEditorScreen(
     var useResponseApi by remember { mutableStateOf(initialProvider?.useResponseApi ?: false) }
     var isEnabled by remember { mutableStateOf(initialProvider?.isEnabled ?: true) }
     var type by remember { mutableStateOf(initialProvider?.type ?: ProviderType.OPENAI) }
+    var showApiKey by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val providerId = remember { initialProvider?.id ?: UUID.randomUUID().toString() }
     val models = remember { mutableStateListOf<String>().apply { addAll(initialProvider?.models ?: emptyList()) } }
     var showAddModelSheet by remember { mutableStateOf(false) }
@@ -175,9 +183,12 @@ fun ProviderEditorScreen(
     DisposableEffect(Unit) {
         viewModel.resetFetchState()
         viewModel.clearTestResults()
+        val activity = context as? android.app.Activity
+        activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         onDispose {
             viewModel.resetFetchState()
             viewModel.clearTestResults()
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
 
@@ -247,8 +258,14 @@ fun ProviderEditorScreen(
                     }
                 },
                 actions = {
+                    TextButton(onClick = {
+                        saveCurrent()
+                        android.widget.Toast.makeText(context, "已保存", android.widget.Toast.LENGTH_SHORT).show()
+                    }) {
+                        Text("保存")
+                    }
                     if (initialProvider != null) {
-                        IconButton(onClick = { onDelete(initialProvider.id) }) {
+                        IconButton(onClick = { showDeleteConfirm = true }) {
                             Icon(
                                 Icons.Rounded.Delete,
                                 contentDescription = stringResource(R.string.provider_delete),
@@ -324,26 +341,54 @@ fun ProviderEditorScreen(
                     ) {
                         FilterChip(
                             selected = type == ProviderType.OPENAI,
-                            onClick = { type = ProviderType.OPENAI },
-                            label = { Text("OpenAI") }
+                            onClick = {
+                                val old = type
+                                if (baseUrl == defaultProviderBaseUrl(old) || baseUrl.isBlank()) {
+                                    baseUrl = defaultProviderBaseUrl(ProviderType.OPENAI)
+                                }
+                                type = ProviderType.OPENAI
+                            },
+                            label = { Text("OpenAI 兼容") }
                         )
                         FilterChip(
                             selected = type == ProviderType.ANTHROPIC,
-                            onClick = { type = ProviderType.ANTHROPIC },
-                            label = { Text("Anthropic") }
+                            onClick = {
+                                val old = type
+                                if (baseUrl == defaultProviderBaseUrl(old) || baseUrl.isBlank()) {
+                                    baseUrl = defaultProviderBaseUrl(ProviderType.ANTHROPIC)
+                                }
+                                type = ProviderType.ANTHROPIC
+                            },
+                            label = { Text("Anthropic 兼容") }
                         )
                         FilterChip(
                             selected = type == ProviderType.GEMINI,
-                            onClick = { type = ProviderType.GEMINI },
+                            onClick = {
+                                val old = type
+                                if (baseUrl == defaultProviderBaseUrl(old) || baseUrl.isBlank()) {
+                                    baseUrl = defaultProviderBaseUrl(ProviderType.GEMINI)
+                                }
+                                type = ProviderType.GEMINI
+                            },
                             label = { Text("Gemini") }
                         )
                     }
 
+                    val baseUrlError = baseUrl.isNotBlank() && !baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")
                     OutlinedTextField(
                         value = apiKey,
                         onValueChange = { apiKey = it },
                         label = { Text("API Key") },
                         singleLine = true,
+                        visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showApiKey = !showApiKey }) {
+                                Icon(
+                                    if (showApiKey) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                                    contentDescription = null
+                                )
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
@@ -352,6 +397,12 @@ fun ProviderEditorScreen(
                         label = { Text("Base URL") },
                         placeholder = { Text(defaultProviderBaseUrl(type)) },
                         singleLine = true,
+                        isError = baseUrlError,
+                        supportingText = {
+                            if (baseUrlError) {
+                                Text("Base URL 需以 http:// 或 https:// 开头", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -424,6 +475,55 @@ fun ProviderEditorScreen(
                         current = viewImageGuard,
                         onChange = { viewModel.setViewImageUnknownGuardPolicy(it) }
                     )
+
+                    // ── 高级参数折叠区 ──
+                    HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.sm))
+                    var advancedExpanded by remember { mutableStateOf(false) }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { advancedExpanded = !advancedExpanded },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "高级参数",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(
+                            if (advancedExpanded) Icons.Outlined.KeyboardArrowDown else Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null
+                        )
+                    }
+                    if (advancedExpanded) {
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Temperature（温度）", modifier = Modifier.weight(1f))
+                                Text("1.0", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            OutlinedTextField(
+                                value = "",
+                                onValueChange = {},
+                                label = { Text("Max Tokens（最大输出）") },
+                                enabled = false,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = "",
+                                onValueChange = {},
+                                label = { Text("系统提示词") },
+                                enabled = false,
+                                minLines = 3,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                "高级参数（温度/最大Token/系统提示词）将在后续版本支持",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             } else {
                 Column(
@@ -528,6 +628,28 @@ fun ProviderEditorScreen(
                 }
             )
         }
+    }
+
+    // 删除确认对话框
+    if (showDeleteConfirm && initialProvider != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("删除供应商") },
+            text = { Text("删除后 API Key、模型列表等配置将全部丢失，不可恢复。确认删除？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDelete(initialProvider.id)
+                }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                    Text("删除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 }
 
@@ -763,13 +885,31 @@ internal fun defaultProviderBaseUrl(type: ProviderType): String = when (type) {
 private fun policyDisplayName(p: DefaultPolicy): String = when (p) {
     DefaultPolicy.STRICT -> "严格模式（推荐·默认）—— 和官方收录模型走同一规则，避免 RC62e 那种「全部模型都支持多模态」的副作用"
     DefaultPolicy.HEURISTIC -> "启发式模式（=RC62d）—— 按 probablyVision / probablyTools / probablyReasoning 的名字匹配自动判定"
-    DefaultPolicy.LAX -> "完全手动—— 三能力默认全关，必须在单模型齿轮按钮里手动勾选你要的能力"
-    DefaultPolicy.MANUAL -> "完全手动—— 三能力默认全关，必须在单模型齿轮按钮里手动勾选你要的能力"
+    DefaultPolicy.LAX -> "宽松模式—— 三能力默认全开，按名字启发式微调"
+    DefaultPolicy.MANUAL -> "完全手动—— 三能力默认全关，必须逐个手动勾选"
+}
+
+private fun policyShortName(p: DefaultPolicy): String = when (p) {
+    DefaultPolicy.STRICT -> "严格模式"
+    DefaultPolicy.HEURISTIC -> "启发式模式"
+    DefaultPolicy.LAX -> "宽松模式"
+    DefaultPolicy.MANUAL -> "完全手动"
 }
 
 private fun viewImageGuardDisplayName(p: ViewImageUnknownGuardPolicy): String = when (p) {
-    ViewImageUnknownGuardPolicy.FALLBACK_VISION_MODEL -> "立即报错并提醒配置 —— 聊天模型不能识图时，直接提示用户去设置里配置专用识图模型或手动覆盖，方便排查"
-    ViewImageUnknownGuardPolicy.FAIL_FAST -> "立即报错并提醒配置 —— 聊天模型不能识图时，直接提示用户去设置里配置专用识图模型或手动覆盖，方便排查"
+    ViewImageUnknownGuardPolicy.FALLBACK_VISION_MODEL -> "自动用识图模型兜底（推荐）—— 聊天模型不能识图时，自动调用专用识图模型生成摘要再重试"
+    ViewImageUnknownGuardPolicy.FAIL_FAST -> "直接报错—— 聊天模型不能识图时立即提示用户配置，不自动降级"
+}
+
+private fun viewImageGuardShortName(p: ViewImageUnknownGuardPolicy): String = when (p) {
+    ViewImageUnknownGuardPolicy.FALLBACK_VISION_MODEL -> "自动兜底（推荐）"
+    ViewImageUnknownGuardPolicy.FAIL_FAST -> "直接报错"
+}
+
+internal fun providerTypeLabel(t: ProviderType): String = when (t) {
+    ProviderType.OPENAI -> "OpenAI 兼容"
+    ProviderType.ANTHROPIC -> "Anthropic 兼容"
+    ProviderType.GEMINI -> "Gemini"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -802,7 +942,7 @@ private fun CompatibilityPolicyDropdown(
                 DropdownMenuItem(
                     text = {
                         Column {
-                            Text(p.name, fontWeight = FontWeight.SemiBold)
+                            Text(policyShortName(p), fontWeight = FontWeight.SemiBold)
                             Text(
                                 policyDisplayName(p).substringAfter("—— ").trim(),
                                 style = MaterialTheme.typography.bodySmall,
@@ -850,7 +990,7 @@ private fun ViewImageGuardDropdown(
                 DropdownMenuItem(
                     text = {
                         Column {
-                            Text(if (g == ViewImageUnknownGuardPolicy.FALLBACK_VISION_MODEL) stringResource(R.string.ui__________14922199) else stringResource(R.string.ui______4a7b080f), fontWeight = FontWeight.SemiBold)
+                            Text(viewImageGuardShortName(g), fontWeight = FontWeight.SemiBold)
                             Text(
                                 viewImageGuardDisplayName(g).substringAfter("—— ").trim(),
                                 style = MaterialTheme.typography.bodySmall,
