@@ -45,7 +45,11 @@ data class ModelMetadata(
         val appliedPolicy: String? = null,
         val overrideVision: Boolean? = null,
         val overrideTools: Boolean? = null,
-        val overrideReasoning: Boolean? = null
+        val overrideReasoning: Boolean? = null,
+        val overrideVideo: Boolean? = null,
+        val overrideAudio: Boolean? = null,
+        val overrideCode: Boolean? = null,
+        val overrideStructuredOutput: Boolean? = null
     )
 }
 

@@ -87,6 +87,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -97,6 +99,7 @@ import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.agent.data.local.entity.ModelCapabilityOverrideEntity
+import com.mini.me_core.feature.agent.data.local.entity.ModelCustomConfigEntity
 import com.mini.me_core.feature.settings.data.remote.ModelTestResult
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.domain.model.ProviderType
@@ -766,29 +769,44 @@ private fun TriStateCapabilityRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun CapabilityOverrideSheet(
+internal fun ModelSettingsSheet(
     viewModel: com.mini.me_core.feature.settings.presentation.SettingsViewModel,
     providerType: ProviderType,
     modelId: String,
     metadata: ModelMetadata?,
     overrideFlow: kotlinx.coroutines.flow.Flow<ModelCapabilityOverrideEntity?>,
+    customConfigFlow: kotlinx.coroutines.flow.Flow<ModelCustomConfigEntity?>,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val override by overrideFlow.collectAsStateWithLifecycleCompat(initial = null)
+    val customConfig by customConfigFlow.collectAsStateWithLifecycleCompat(initial = null)
 
     // 本地三态（UI 编辑的草稿）：初始值从 overrideFlow 读，避免打开面板时丢失已有的覆盖。
     var draftVision by remember(override) { mutableStateOf(override?.overrideVision) }
     var draftTools by remember(override) { mutableStateOf(override?.overrideTools) }
     var draftReasoning by remember(override) { mutableStateOf(override?.overrideReasoning) }
-    var dirty by remember(override) { mutableStateOf(false) }
-    fun markDirty() { dirty = true }
+    var draftVideo by remember(override) { mutableStateOf(override?.overrideVideo) }
+    var draftAudio by remember(override) { mutableStateOf(override?.overrideAudio) }
+    var draftCode by remember(override) { mutableStateOf(override?.overrideCode) }
+    var draftStructuredOutput by remember(override) { mutableStateOf(override?.overrideStructuredOutput) }
 
-    val autoVision = metadata?.supportsVision == true && metadata.inferenceReason?.overrideVision == null
-    val autoVisionStrict = (metadata?.inferenceReason?.byProbablyVision ?: false) || metadata?.supportsVision == true
-    val autoTools = metadata?.supportsTools == true
-    val autoReasoning = metadata?.supportsReasoning == true
+    // 上下文长度草稿：文本框内容，空串表示不覆盖（留空用自动检测值）。
+    var draftInputTokens by remember(customConfig) {
+        mutableStateOf(customConfig?.customInputTokens?.toString() ?: "")
+    }
+    var draftOutputTokens by remember(customConfig) {
+        mutableStateOf(customConfig?.customOutputTokens?.toString() ?: "")
+    }
+
+    // 自动检测值（来自 metadata），用于 placeholder 和换算显示。
+    val autoInputTokens = metadata?.inputTokens ?: metadata?.contextTokens
+    val autoOutputTokens = metadata?.outputTokens
+
+    fun closeSheet() {
+        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -804,103 +822,196 @@ internal fun CapabilityOverrideSheet(
                 .padding(bottom = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
+            // —— 标题栏 ——
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Text(
-                    text = "模型能力覆盖（手动）",
+                    text = "模型设置",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(
-                    onClick = {
-                        viewModel.clearCapabilityOverride(providerType, modelId)
-                        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                    }
-                ) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text("恢复自动推荐")
-                }
             }
 
+            // 模型名 + 来源标注
             Text(
                 text = buildString {
                     append("模型：$modelId")
-                    append(if (metadata?.source == ModelMetadata.Source.MODELS_DEV) "（官方收录）" else "（官方收录）")
+                    append(if (metadata?.source == ModelMetadata.Source.MODELS_DEV) "（官方收录）" else "（自动检测）")
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            metadata?.inferenceReason?.let { reason ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .padding(Spacing.sm)
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                        Text(
-                            text = "🧭 判定链路审计（小白解释）：",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = buildString {
-                                append("· 启发式匹配：")
-                                append("识图=${if (reason.byProbablyVision) "✅" else "❌"} ")
-                                append("工具=${if (reason.byProbablyTools) "✅" else "❌"} ")
-                                append("思考=${if (reason.byProbablyReasoning) "✅" else "❌"}")
-                                appendLine()
-                                append("· 兼容端点策略：${reason.appliedPolicy ?: "（收录模型，跳过）"}")
-                                appendLine()
-                                append("· 你的手动覆盖：")
-                                append("识图=${reason.overrideVision?.let { if (it) "✅开" else "❌关" } ?: "未覆盖"} ")
-                                append("工具=${reason.overrideTools?.let { if (it) "✅开" else "❌关" } ?: "未覆盖"} ")
-                                append("思考=${reason.overrideReasoning?.let { if (it) "✅开" else "❌关" } ?: "未覆盖"}")
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
             HorizontalDivider()
+
+            // —— 能力覆盖分区 ——
+            Text(
+                text = "能力覆盖",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
 
             TriStateCapabilityRow(
                 label = "多模态识图",
                 englishTag = "Vision",
-                description = "模型是否能接收图片/截图并理解内容；step-3.7-flash 官方文档=支持。",
-                autoValue = autoVisionStrict,
+                description = "模型是否能接收图片/截图并理解内容",
+                autoValue = metadata?.supportsVision == true,
                 overrideValue = draftVision,
-                onChange = { draftVision = it; markDirty() }
+                onChange = { draftVision = it }
             )
             TriStateCapabilityRow(
                 label = "工具调用",
-                englishTag = "Tools / Function Calling",
-                description = "模型是否能调用外部工具（查文件/跑命令/查知识库）。",
-                autoValue = autoTools,
+                englishTag = "Tools",
+                description = "模型是否能调用外部工具（查文件/跑命令/查知识库）",
+                autoValue = metadata?.supportsTools == true,
                 overrideValue = draftTools,
-                onChange = { draftTools = it; markDirty() }
+                onChange = { draftTools = it }
             )
             TriStateCapabilityRow(
                 label = "深度思考",
                 englishTag = "Reasoning",
-                description = "模型是否支持 extended thinking / reasoning effort（长推理链）。",
-                autoValue = autoReasoning,
+                description = "模型是否支持 extended thinking / reasoning effort",
+                autoValue = metadata?.supportsReasoning == true,
                 overrideValue = draftReasoning,
-                onChange = { draftReasoning = it; markDirty() }
+                onChange = { draftReasoning = it }
             )
+            TriStateCapabilityRow(
+                label = "视频理解",
+                englishTag = "Video",
+                description = "模型是否能接收视频输入并理解内容",
+                autoValue = metadata?.supportsVideo == true,
+                overrideValue = draftVideo,
+                onChange = { draftVideo = it }
+            )
+            TriStateCapabilityRow(
+                label = "语音识别",
+                englishTag = "Audio",
+                description = "模型是否能接收语音/音频输入并转写",
+                autoValue = metadata?.supportsAudio == true,
+                overrideValue = draftAudio,
+                onChange = { draftAudio = it }
+            )
+            TriStateCapabilityRow(
+                label = "代码生成",
+                englishTag = "Code",
+                description = "模型是否擅长代码生成与理解",
+                autoValue = metadata?.supportsCode == true,
+                overrideValue = draftCode,
+                onChange = { draftCode = it }
+            )
+            TriStateCapabilityRow(
+                label = "结构化输出",
+                englishTag = "Structured Output",
+                description = "模型是否支持 JSON/结构化数据输出",
+                autoValue = metadata?.supportsStructuredOutput == true,
+                overrideValue = draftStructuredOutput,
+                onChange = { draftStructuredOutput = it }
+            )
+
+            // 恢复自动检测（能力覆盖）
+            TextButton(
+                onClick = {
+                    viewModel.clearCapabilityOverride(providerType, modelId)
+                    draftVision = null
+                    draftTools = null
+                    draftReasoning = null
+                    draftVideo = null
+                    draftAudio = null
+                    draftCode = null
+                    draftStructuredOutput = null
+                }
+            ) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(Spacing.xs))
+                Text("恢复自动检测")
+            }
+
+            HorizontalDivider()
+
+            // —— 上下文长度分区 ——
+            Text(
+                text = "上下文长度",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            // 输入上限
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                OutlinedTextField(
+                    value = draftInputTokens,
+                    onValueChange = { newValue ->
+                        // 只允许输入正整数
+                        draftInputTokens = newValue.filter { it.isDigit() }
+                    },
+                    label = { Text("输入上限") },
+                    placeholder = { Text("自动：${autoInputTokens ?: 0}") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "≈ ${formatTokens(draftInputTokens.toIntOrNull() ?: autoInputTokens)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // 输出上限
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                OutlinedTextField(
+                    value = draftOutputTokens,
+                    onValueChange = { newValue ->
+                        draftOutputTokens = newValue.filter { it.isDigit() }
+                    },
+                    label = { Text("输出上限") },
+                    placeholder = { Text("自动：${autoOutputTokens ?: 0}") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "≈ ${formatTokens(draftOutputTokens.toIntOrNull() ?: autoOutputTokens)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Text(
+                text = "留空则使用自动检测值，自定义值将覆盖自动检测结果。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // 恢复默认（上下文长度）
+            TextButton(
+                onClick = {
+                    viewModel.clearModelCustomConfig(providerType, modelId)
+                    draftInputTokens = ""
+                    draftOutputTokens = ""
+                }
+            ) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(Spacing.xs))
+                Text("恢复默认")
+            }
 
             Spacer(Modifier.height(Spacing.sm))
 
+            // —— 底部按钮 ——
             Row(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
@@ -912,27 +1023,42 @@ internal fun CapabilityOverrideSheet(
                 Spacer(Modifier.width(Spacing.sm))
                 TextButton(
                     onClick = {
+                        // 同时保存能力覆盖（8 参数）和自定义配置
                         viewModel.saveCapabilityOverride(
                             type = providerType,
                             modelId = modelId,
                             vision = draftVision,
                             tools = draftTools,
-                            reasoning = draftReasoning
+                            reasoning = draftReasoning,
+                            video = draftVideo,
+                            audio = draftAudio,
+                            code = draftCode,
+                            structuredOutput = draftStructuredOutput
                         )
-                        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                        viewModel.saveModelCustomConfig(
+                            type = providerType,
+                            modelId = modelId,
+                            inputTokens = draftInputTokens.toIntOrNull(),
+                            outputTokens = draftOutputTokens.toIntOrNull()
+                        )
+                        closeSheet()
                     }
                 ) {
                     Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(Spacing.xs))
-                    Text(
-                        if (!dirty) "保存覆盖"
-                        else if (draftVision == null && draftTools == null && draftReasoning == null) "保存覆盖"
-                        else "保存覆盖"
-                    )
+                    Text("保存")
                 }
             }
         }
     }
+}
+
+/** 将 token 数格式化为人类可读的 K/M 缩写。 */
+private fun formatTokens(tokens: Int?): String = when {
+    tokens == null -> ""
+    tokens >= 1_000_000 -> String.format("%.1fM", tokens / 1_000_000.0)
+    tokens >= 1_000 -> String.format("%.0fK", tokens / 1_000.0)
+    else -> tokens.toString()
 }
 
 /** 兼容 collectAsStateWithLifecycle 在非 androidx.lifecycle:lifecycle-runtime-compose 场景下的兜底实现（直接用 viewModel 的 flow + initial 初值）。 */

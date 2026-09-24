@@ -4,7 +4,9 @@ import android.content.Context
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides as V2ModelCapabilityOverride
+import com.mini.mecore.datalayer.sqldelight.agent.Model_custom_configs as V2ModelCustomConfig
 import com.mini.me_core.feature.agent.data.local.entity.ModelCapabilityOverrideEntity
+import com.mini.me_core.feature.agent.data.local.entity.ModelCustomConfigEntity
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
 import com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepository
 import com.mini.me_core.feature.settings.data.repository.DefaultPolicy
@@ -337,23 +339,55 @@ class ModelMetadataService @Inject constructor(
             v2Agent.getCapabilityOverride(type.name, modelId)?.toEntity()
         }.onFailure {
             FileLogger.w(TAG, "读取单模型能力覆盖失败(type=${type.name}, id=$modelId)", it)
-        }.getOrNull() ?: return afterPolicy
+        }.getOrNull()
 
         val override = overrideRow
-        val vision = override.overrideVision ?: afterPolicy.supportsVision
-        val tools = override.overrideTools ?: afterPolicy.supportsTools
-        val reasoning = override.overrideReasoning ?: afterPolicy.supportsReasoning
+        val vision = override?.overrideVision ?: afterPolicy.supportsVision
+        val tools = override?.overrideTools ?: afterPolicy.supportsTools
+        val reasoning = override?.overrideReasoning ?: afterPolicy.supportsReasoning
+        val video = override?.overrideVideo ?: afterPolicy.supportsVideo
+        val audio = override?.overrideAudio ?: afterPolicy.supportsAudio
+        val code = override?.overrideCode ?: afterPolicy.supportsCode
+        val structuredOutput = override?.overrideStructuredOutput ?: afterPolicy.supportsStructuredOutput
         val originReason = afterPolicy.inferenceReason ?: ModelMetadata.InferenceReason()
-        return afterPolicy.copy(
+        val afterOverride = afterPolicy.copy(
             supportsVision = vision,
             supportsTools = tools,
             supportsReasoning = reasoning,
+            supportsVideo = video,
+            supportsAudio = audio,
+            supportsCode = code,
+            supportsStructuredOutput = structuredOutput,
             inferenceReason = originReason.copy(
-                overrideVision = override.overrideVision,
-                overrideTools = override.overrideTools,
-                overrideReasoning = override.overrideReasoning
+                overrideVision = override?.overrideVision,
+                overrideTools = override?.overrideTools,
+                overrideReasoning = override?.overrideReasoning,
+                overrideVideo = override?.overrideVideo,
+                overrideAudio = override?.overrideAudio,
+                overrideCode = override?.overrideCode,
+                overrideStructuredOutput = override?.overrideStructuredOutput
             )
         )
+
+        // 模型自定义配置：用户手动覆盖输入/输出 token 上限。
+        val customConfig = runCatching {
+            v2Agent.getCustomConfig(type.name, modelId)?.toCustomConfigEntity()
+        }.onFailure {
+            FileLogger.w(TAG, "读取模型自定义配置失败(type=${type.name}, id=$modelId)", it)
+        }.getOrNull()
+
+        if (customConfig != null) {
+            val finalInputTokens = customConfig.customInputTokens ?: afterOverride.inputTokens ?: afterOverride.contextTokens
+            val finalOutputTokens = customConfig.customOutputTokens ?: afterOverride.outputTokens
+            val finalContextTokens = customConfig.customInputTokens ?: afterOverride.contextTokens
+            return afterOverride.copy(
+                inputTokens = finalInputTokens,
+                outputTokens = finalOutputTokens,
+                contextTokens = finalContextTokens
+            )
+        } else {
+            return afterOverride
+        }
     }
 
     // —— RC63 备选方案④对外接口：设置页 UI（单选按钮 / 一键推荐）统一通过下面几个方法写入覆盖。 ——
@@ -364,7 +398,11 @@ class ModelMetadataService @Inject constructor(
         modelId: String,
         vision: Boolean?,
         tools: Boolean?,
-        reasoning: Boolean?
+        reasoning: Boolean?,
+        video: Boolean?,
+        audio: Boolean?,
+        code: Boolean?,
+        structuredOutput: Boolean?
     ) = withContext(Dispatchers.IO) {
         val entity = ModelCapabilityOverrideEntity(
             id = ModelCapabilityOverrideEntity.composeId(type.name, modelId),
@@ -372,7 +410,11 @@ class ModelMetadataService @Inject constructor(
             modelId = modelId,
             overrideVision = vision,
             overrideTools = tools,
-            overrideReasoning = reasoning
+            overrideReasoning = reasoning,
+            overrideVideo = video,
+            overrideAudio = audio,
+            overrideCode = code,
+            overrideStructuredOutput = structuredOutput
         )
         v2Agent.upsertCapabilityOverride(
             id = entity.id,
@@ -381,6 +423,10 @@ class ModelMetadataService @Inject constructor(
             overrideVision = entity.overrideVision?.let { if (it) 1L else 0L },
             overrideTools = entity.overrideTools?.let { if (it) 1L else 0L },
             overrideReasoning = entity.overrideReasoning?.let { if (it) 1L else 0L },
+            overrideVideo = entity.overrideVideo?.let { if (it) 1L else 0L },
+            overrideAudio = entity.overrideAudio?.let { if (it) 1L else 0L },
+            overrideCode = entity.overrideCode?.let { if (it) 1L else 0L },
+            overrideStructuredOutput = entity.overrideStructuredOutput?.let { if (it) 1L else 0L },
             updatedAtMs = System.currentTimeMillis()
         )
     }
@@ -393,6 +439,36 @@ class ModelMetadataService @Inject constructor(
     /** 流式观察单模型覆盖（设置页 UI 观察后实时刷新标签角标）。 */
     fun observeOverride(type: ProviderType, modelId: String): Flow<ModelCapabilityOverrideEntity?> =
         v2Agent.observeCapabilityOverride(type.name, modelId).map { list -> list.firstOrNull()?.toEntity() }
+
+    // ── 模型自定义配置（输入/输出 token 上限覆盖）──────────────────────
+
+    /** 保存模型自定义输入/输出 token 上限；传 null 表示不覆盖该字段。 */
+    suspend fun saveCustomConfig(type: ProviderType, modelId: String, inputTokens: Int?, outputTokens: Int?) = withContext(Dispatchers.IO) {
+        val entity = ModelCustomConfigEntity(
+            id = ModelCustomConfigEntity.composeId(type.name, modelId),
+            providerType = type.name,
+            modelId = modelId,
+            customInputTokens = inputTokens,
+            customOutputTokens = outputTokens
+        )
+        v2Agent.upsertCustomConfig(
+            id = entity.id,
+            providerType = entity.providerType,
+            modelId = entity.modelId,
+            customInputTokens = entity.customInputTokens?.toLong(),
+            customOutputTokens = entity.customOutputTokens?.toLong(),
+            updatedAtMs = System.currentTimeMillis()
+        )
+    }
+
+    /** 清除模型自定义配置（恢复自动检测的上下文长度）。 */
+    suspend fun clearCustomConfig(type: ProviderType, modelId: String) = withContext(Dispatchers.IO) {
+        v2Agent.deleteCustomConfig(type.name, modelId)
+    }
+
+    /** 流式观察模型自定义配置。 */
+    fun observeCustomConfig(type: ProviderType, modelId: String): Flow<ModelCustomConfigEntity?> =
+        v2Agent.observeCustomConfig(type.name, modelId).map { it?.toCustomConfigEntity() }
 
     private fun findMetadata(
         catalog: Map<String, Map<String, ModelMetadata>>,
@@ -456,6 +532,19 @@ class ModelMetadataService @Inject constructor(
         overrideVision = override_vision?.let { it != 0L },
         overrideTools = override_tools?.let { it != 0L },
         overrideReasoning = override_reasoning?.let { it != 0L },
+        overrideVideo = override_video?.let { it != 0L },
+        overrideAudio = override_audio?.let { it != 0L },
+        overrideCode = override_code?.let { it != 0L },
+        overrideStructuredOutput = override_structured_output?.let { it != 0L },
+        updatedAtMs = updated_at_ms
+    )
+
+    private fun V2ModelCustomConfig.toCustomConfigEntity() = ModelCustomConfigEntity(
+        id = id,
+        providerType = provider_type,
+        modelId = model_id,
+        customInputTokens = custom_input_tokens?.toInt(),
+        customOutputTokens = custom_output_tokens?.toInt(),
         updatedAtMs = updated_at_ms
     )
 

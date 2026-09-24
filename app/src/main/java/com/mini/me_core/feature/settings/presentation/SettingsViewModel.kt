@@ -1612,7 +1612,7 @@ class SettingsViewModel @Inject constructor(
     // RC63 备选方案④：单模型能力复选框覆盖（ProviderEditorScreen Tab1 调用）
     // ────────────────────────────────────────────────────────────────
 
-    /** 观察某模型的手动覆盖（用于 CapabilityOverrideSheet 实时回显勾选状态）。 */
+    /** 观察某模型的手动覆盖（用于 ModelSettingsSheet 实时回显勾选状态）。 */
     fun observeCapabilityOverride(type: ProviderType, modelId: String) =
         modelMetadataService.observeOverride(type, modelId)
 
@@ -1622,12 +1622,16 @@ class SettingsViewModel @Inject constructor(
         modelId: String,
         vision: Boolean?,
         tools: Boolean?,
-        reasoning: Boolean?
+        reasoning: Boolean?,
+        video: Boolean?,
+        audio: Boolean?,
+        code: Boolean?,
+        structuredOutput: Boolean?
     ) {
         viewModelScope.launch {
-            modelMetadataService.saveOverride(type, modelId, vision, tools, reasoning)
-            // 立即重算该 provider 全部模型元数据（以便 CapabilityOverrideSheet 返回后
-            // ProviderModelRow 的「识图/工具/思考」徽章立即刷新，用户看不到过期值）。
+            modelMetadataService.saveOverride(type, modelId, vision, tools, reasoning, video, audio, code, structuredOutput)
+            // 立即重算该 provider 全部模型元数据（以便 ModelSettingsSheet 返回后
+            // ProviderModelRow 的能力徽章与上下文标签立即刷新，用户看不到过期值）。
             val typeProviderModels = _providers.value
                 .filter { it.type == type && it.models.isNotEmpty() }
                 .flatMap { it.models.map(String::trim).filter(String::isNotEmpty).distinct() }
@@ -1639,10 +1643,34 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** 清除某模型覆盖（恢复自动推荐）。 */
+    /** 清除某模型覆盖（恢复自动检测）。 */
     fun clearCapabilityOverride(type: ProviderType, modelId: String) {
         viewModelScope.launch {
             modelMetadataService.clearOverride(type, modelId)
+            val refreshed = modelMetadataService.resolveAll(type, listOf(modelId))
+            _modelMetadata.update { it + refreshed }
+        }
+    }
+
+    // ── 模型自定义配置（输入/输出 token 上限覆盖）──────────────────────
+
+    /** 观察某模型的自定义配置（用于 ModelSettingsSheet 回显输入框）。 */
+    fun observeModelCustomConfig(type: ProviderType, modelId: String) =
+        modelMetadataService.observeCustomConfig(type, modelId)
+
+    /** 保存模型自定义输入/输出 token 上限；传 null 表示不覆盖该字段。保存后立即刷新元数据。 */
+    fun saveModelCustomConfig(type: ProviderType, modelId: String, inputTokens: Int?, outputTokens: Int?) {
+        viewModelScope.launch {
+            modelMetadataService.saveCustomConfig(type, modelId, inputTokens, outputTokens)
+            val refreshed = modelMetadataService.resolveAll(type, listOf(modelId))
+            _modelMetadata.update { it + refreshed }
+        }
+    }
+
+    /** 清除模型自定义配置（恢复自动检测的上下文长度）。 */
+    fun clearModelCustomConfig(type: ProviderType, modelId: String) {
+        viewModelScope.launch {
+            modelMetadataService.clearCustomConfig(type, modelId)
             val refreshed = modelMetadataService.resolveAll(type, listOf(modelId))
             _modelMetadata.update { it + refreshed }
         }

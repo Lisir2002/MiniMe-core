@@ -1,0 +1,21 @@
+-- v3 → v4 迁移：模型设置面板升级
+--
+-- 1. model_capability_overrides 扩展 4 个能力覆盖字段（video/audio/code/structured_output）。
+--    均为可空 INTEGER，旧记录这些列自动为 NULL（表示「未覆盖，跟随自动检测」）。
+-- 2. 新建 model_custom_configs 表：保存用户自定义的输入/输出 token 上限，
+--    覆盖 models.dev catalog 或启发式推断出的上下文长度。
+
+ALTER TABLE model_capability_overrides ADD COLUMN override_video INTEGER;
+ALTER TABLE model_capability_overrides ADD COLUMN override_audio INTEGER;
+ALTER TABLE model_capability_overrides ADD COLUMN override_code INTEGER;
+ALTER TABLE model_capability_overrides ADD COLUMN override_structured_output INTEGER;
+
+CREATE TABLE model_custom_configs (
+  id                   TEXT NOT NULL,
+  provider_type        TEXT NOT NULL,
+  model_id             TEXT NOT NULL,
+  custom_input_tokens  INTEGER,
+  custom_output_tokens INTEGER,
+  updated_at_ms        INTEGER NOT NULL,
+  PRIMARY KEY (provider_type, model_id)
+);

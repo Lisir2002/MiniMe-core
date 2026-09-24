@@ -878,15 +878,16 @@ fun ProviderEditorScreen(
         )
     }
 
-    // RC63 ④ 单模型「三能力覆盖」底部面板：点击齿轮按钮时打开。
+    // 模型设置底部面板：点击齿轮按钮时打开（能力覆盖 + 上下文长度自定义）。
     val overrideModel = capabilityOverrideModel
     if (overrideModel != null) {
-        CapabilityOverrideSheet(
+        ModelSettingsSheet(
             viewModel = viewModel,
             providerType = type,
             modelId = overrideModel,
             metadata = modelMetadata[overrideModel],
             overrideFlow = viewModel.observeCapabilityOverride(type, overrideModel),
+            customConfigFlow = viewModel.observeModelCustomConfig(type, overrideModel),
             onDismiss = { capabilityOverrideModel = null }
         )
     }

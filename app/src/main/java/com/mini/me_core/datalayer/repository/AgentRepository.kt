@@ -377,9 +377,11 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
 
     suspend fun upsertCapabilityOverride(
         id: String, providerType: String, modelId: String,
-        overrideVision: Long?, overrideTools: Long?, overrideReasoning: Long?, updatedAtMs: Long,
+        overrideVision: Long?, overrideTools: Long?, overrideReasoning: Long?,
+        overrideVideo: Long?, overrideAudio: Long?, overrideCode: Long?, overrideStructuredOutput: Long?,
+        updatedAtMs: Long,
     ) = withContext(Dispatchers.IO) {
-        q.insertCapabilityOverride(id, providerType, modelId, overrideVision, overrideTools, overrideReasoning, updatedAtMs)
+        q.insertCapabilityOverride(id, providerType, modelId, overrideVision, overrideTools, overrideReasoning, overrideVideo, overrideAudio, overrideCode, overrideStructuredOutput, updatedAtMs)
     }
 
     suspend fun getCapabilityOverride(providerType: String, modelId: String): com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides? =
@@ -390,6 +392,24 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
 
     suspend fun deleteCapabilityOverride(providerType: String, modelId: String) =
         withContext(Dispatchers.IO) { q.deleteCapabilityOverride(providerType, modelId) }
+
+    // ── 模型自定义配置（输入/输出 token 上限覆盖）──────────────────────
+
+    suspend fun upsertCustomConfig(
+        id: String, providerType: String, modelId: String,
+        customInputTokens: Long?, customOutputTokens: Long?, updatedAtMs: Long,
+    ) = withContext(Dispatchers.IO) {
+        q.insertCustomConfig(id, providerType, modelId, customInputTokens, customOutputTokens, updatedAtMs)
+    }
+
+    suspend fun getCustomConfig(providerType: String, modelId: String): com.mini.mecore.datalayer.sqldelight.agent.Model_custom_configs? =
+        withContext(Dispatchers.IO) { q.getCustomConfig(providerType, modelId).executeAsOneOrNull() }
+
+    fun observeCustomConfig(providerType: String, modelId: String): Flow<com.mini.mecore.datalayer.sqldelight.agent.Model_custom_configs?> =
+        q.observeCustomConfig(providerType, modelId).asFlow().mapToOneOrNull(Dispatchers.IO)
+
+    suspend fun deleteCustomConfig(providerType: String, modelId: String) =
+        withContext(Dispatchers.IO) { q.deleteCustomConfig(providerType, modelId) }
 
     suspend fun insertGoal(
         goalId: String, sessionId: String, text: String, status: String, revision: Long,

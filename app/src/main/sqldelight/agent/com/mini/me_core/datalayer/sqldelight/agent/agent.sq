@@ -308,7 +308,21 @@ CREATE TABLE model_capability_overrides (
   override_vision   INTEGER,
   override_tools    INTEGER,
   override_reasoning INTEGER,
+  override_video    INTEGER,
+  override_audio    INTEGER,
+  override_code     INTEGER,
+  override_structured_output INTEGER,
   updated_at_ms     INTEGER NOT NULL,
+  PRIMARY KEY (provider_type, model_id)
+);
+
+CREATE TABLE model_custom_configs (
+  id                   TEXT NOT NULL,
+  provider_type        TEXT NOT NULL,
+  model_id             TEXT NOT NULL,
+  custom_input_tokens  INTEGER,
+  custom_output_tokens INTEGER,
+  updated_at_ms        INTEGER NOT NULL,
   PRIMARY KEY (provider_type, model_id)
 );
 
@@ -598,8 +612,8 @@ selectModeSwitchesBySession:
 SELECT * FROM mode_switch_history WHERE session_id = ? ORDER BY timestamp_ms DESC;
 
 insertCapabilityOverride:
-INSERT OR REPLACE INTO model_capability_overrides (id, provider_type, model_id, override_vision, override_tools, override_reasoning, updated_at_ms)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO model_capability_overrides (id, provider_type, model_id, override_vision, override_tools, override_reasoning, override_video, override_audio, override_code, override_structured_output, updated_at_ms)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 selectCapabilityOverride:
 SELECT * FROM model_capability_overrides WHERE provider_type = ? AND model_id = ?;
@@ -609,6 +623,19 @@ SELECT * FROM model_capability_overrides WHERE provider_type = ? AND model_id = 
 
 deleteCapabilityOverride:
 DELETE FROM model_capability_overrides WHERE provider_type = ? AND model_id = ?;
+
+insertCustomConfig:
+INSERT OR REPLACE INTO model_custom_configs (id, provider_type, model_id, custom_input_tokens, custom_output_tokens, updated_at_ms)
+VALUES (?, ?, ?, ?, ?, ?);
+
+getCustomConfig:
+SELECT * FROM model_custom_configs WHERE provider_type = ? AND model_id = ? LIMIT 1;
+
+observeCustomConfig:
+SELECT * FROM model_custom_configs WHERE provider_type = ? AND model_id = ? LIMIT 1;
+
+deleteCustomConfig:
+DELETE FROM model_custom_configs WHERE provider_type = ? AND model_id = ?;
 
 insertGoal:
 INSERT INTO agent_goals (goal_id, session_id, text, status, revision, parent_goal_id, round_seq, created_at_ms, updated_at_ms)
