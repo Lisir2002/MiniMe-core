@@ -2,9 +2,6 @@ package com.mini.me_core.feature.settings.presentation
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -55,7 +52,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -88,9 +84,11 @@ import com.mini.me_core.core.theme.tokens.SemanticColors
  *
  * Phase 5 新增：
  * - 颜色自定义（9 项可自定义颜色 + 对比度警告）
- * - 背景图设置（图片选择 + 遮罩浓度 + 卡片透明度）
  * - 显示偏好（圆角风格 + 字体大小 + 动效强度）
  * - 恢复出厂主题（底部红色按钮 + 确认弹窗）
+ *
+ * 注意：背景图功能（backgroundImage / backgroundMask / cardOpacity）数据层接口已预留，
+ * UI 暂不暴露，后续单独调试后再开放。
  */
 @Composable
 fun ThemeSettingsScreen(
@@ -157,22 +155,7 @@ fun ThemeSettingsScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            // ── Section 5: 背景图（Phase 5）──
-            AppSectionHeader(title = "背景图", subtitle = "自定义全局背景图片")
-            BackgroundImageSection(
-                backgroundImage = settings.backgroundImage,
-                backgroundMask = settings.backgroundMask,
-                cardOpacity = settings.cardOpacity,
-                onPickImage = { uri -> viewModel.setBackgroundImage(uri) },
-                onClearImage = { viewModel.setBackgroundImage(null) },
-                onMaskChange = { v -> viewModel.setBackgroundMask(v) },
-                onCardOpacityChange = { v -> viewModel.setCardOpacity(v) },
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            // ── Section 6: 显示偏好（Phase 5）──
+            // ── Section 5: 显示偏好（Phase 5）──
             AppSectionHeader(title = "显示偏好", subtitle = "圆角、字体大小和动效")
             DisplayPreferencesSection(
                 cornerStyle = settings.cornerStyleEnum(),
@@ -200,7 +183,7 @@ fun ThemeSettingsScreen(
         AlertDialog(
             onDismissRequest = { showResetConfirm = false },
             title = { Text("恢复出厂主题？") },
-            text = { Text("将清除所有自定义颜色、背景图和显示偏好，恢复到默认预设和外观模式。") },
+            text = { Text("将清除所有自定义颜色和显示偏好，恢复到默认预设和外观模式。") },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.resetToDefaults()
@@ -762,89 +745,6 @@ private fun Color.toHexShort(): String =
         (green * 255).toInt(),
         (blue * 255).toInt(),
     )
-
-// ──────────────────────────────────────────────
-// Phase 5: 背景图区域
-// ──────────────────────────────────────────────
-
-/**
- * 背景图设置区域：选择图片 + 遮罩浓度滑块 + 卡片透明度滑块。
- */
-@Composable
-private fun BackgroundImageSection(
-    backgroundImage: String?,
-    backgroundMask: Float,
-    cardOpacity: Float,
-    onPickImage: (String) -> Unit,
-    onClearImage: () -> Unit,
-    onMaskChange: (Float) -> Unit,
-    onCardOpacityChange: (Float) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = LocalAppTheme.current.colors
-    val context = androidx.compose.ui.platform.LocalContext.current
-
-    // 系统图片选择器（Photo Picker）
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-    ) { uri: Uri? ->
-        uri?.let { onPickImage(it.toString()) }
-    }
-
-    AppCard(modifier = modifier) {
-        Column(
-            modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // 选择背景图按钮
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = if (backgroundImage != null) "已设置背景图" else "未设置背景图",
-                    fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
-                    color = colors.textPrimary,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = {
-                        imagePickerLauncher.launch(
-                            androidx.activity.result.PickVisualMediaRequest(
-                                ActivityResultContracts.PickVisualMedia.ImageOnly
-                            )
-                        )
-                    }) {
-                        Text("选择图片", color = colors.brandPrimary, fontSize = LocalComponentTokens.current.text.bodySmallFontSize)
-                    }
-                    if (backgroundImage != null) {
-                        TextButton(onClick = onClearImage) {
-                            Text("清除", color = colors.error, fontSize = LocalComponentTokens.current.text.bodySmallFontSize)
-                        }
-                    }
-                }
-            }
-
-            // 遮罩浓度滑块
-            SliderRow(
-                label = "遮罩浓度",
-                value = backgroundMask,
-                valueRange = 0f..1f,
-                onValueChange = onMaskChange,
-                valueLabel = "%.0f%%".format(backgroundMask * 100),
-            )
-
-            // 卡片透明度滑块
-            SliderRow(
-                label = "卡片透明度",
-                value = cardOpacity,
-                valueRange = 0.3f..1f,
-                onValueChange = onCardOpacityChange,
-                valueLabel = "%.0f%%".format(cardOpacity * 100),
-            )
-        }
-    }
-}
 
 // ──────────────────────────────────────────────
 // Phase 5: 显示偏好区域

@@ -5,6 +5,7 @@ import android.content.ClipData
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,6 +63,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -201,17 +203,15 @@ internal fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = 
             val inputValue = m.inputTokens ?: m.contextTokens
             if (inputValue > 0) {
                 ContextTokenTag(
-                    icon = Icons.Rounded.Input,
-                    text = formatTokenLimit(inputValue),
-                    contentDescription = "输入窗口"
+                    label = "输入",
+                    text = formatTokenLimit(inputValue)
                 )
             }
             // 输出窗口：outputTokens 独立显示
             m.outputTokens?.takeIf { it > 0 }?.let { out ->
                 ContextTokenTag(
-                    icon = Icons.Rounded.Output,
-                    text = formatTokenLimit(out),
-                    contentDescription = "输出窗口"
+                    label = "输出",
+                    text = formatTokenLimit(out)
                 )
             }
             if (hasOverride) {
@@ -317,13 +317,12 @@ private fun CapabilityFlowTag(
 }
 
 /**
- * 上下文窗口标签：「图标 + 格式化 token 数」pill，灰色。
+ * 上下文窗口标签：「文字 + 格式化 token 数」pill，灰色。
  */
 @Composable
 private fun ContextTokenTag(
-    icon: ImageVector,
-    text: String,
-    contentDescription: String? = null
+    label: String,
+    text: String
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -334,11 +333,10 @@ private fun ContextTokenTag(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                icon,
-                contentDescription = contentDescription,
-                modifier = Modifier.size(12.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
             Spacer(Modifier.width(3.dp))
             Text(
@@ -405,7 +403,6 @@ internal fun ProviderModelRow(
     onToggleFavorite: (() -> Unit)? = null
 ) {
     var showErrorDetail by remember { mutableStateOf(false) }
-    var showMoreMenu by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -454,120 +451,130 @@ internal fun ProviderModelRow(
                     )
                 }
             }
-
-            // 更多菜单按钮（仅编辑页：selected == null 时显示）
-            if (selected == null) {
-                Box {
-                    IconButton(
-                        onClick = { showMoreMenu = true },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            Icons.Rounded.MoreVert,
-                            contentDescription = "更多操作",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = showMoreMenu,
-                        onDismissRequest = { showMoreMenu = false }
-                    ) {
-                        // 参数设置（onOpenCapabilityOverride!=null 时显示）
-                        onOpenCapabilityOverride?.let { onOpen ->
-                            DropdownMenuItem(
-                                text = { Text("参数设置") },
-                                onClick = { showMoreMenu = false; onOpen() },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Rounded.Settings,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            )
-                        }
-                        // 测试模型（testing 时显示加载动画且不可点击）
-                        DropdownMenuItem(
-                            text = { Text("测试模型") },
-                            onClick = { if (!testing) { showMoreMenu = false; onTest() } },
-                            enabled = !testing,
-                            leadingIcon = {
-                                if (testing) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Icon(
-                                        Icons.Rounded.PlayArrow,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        )
-                        // 删除模型（onRemove!=null 时显示，红色文字）
-                        onRemove?.let { onDel ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        "删除模型",
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                onClick = { showMoreMenu = false; onDel() },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Rounded.Delete,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            )
-                        }
-                    }
-                }
-            }
         }
 
         Spacer(Modifier.height(4.dp))
-        ModelMetadataTags(metadata = metadata, hasOverride = hasOverride)
 
-        // Test Result
-        result?.let { r ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .padding(top = Spacing.sm)
-                    .then(
+        // 能力标签：单行横向滚动，超出可滑动
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ModelMetadataTags(metadata = metadata, hasOverride = hasOverride)
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // 功能按钮行：参数设置 / 测试模型(+测速结果) / 删除模型
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) {
+            // 参数设置按钮
+            onOpenCapabilityOverride?.let { onOpen ->
+                OutlinedButton(
+                    onClick = onOpen,
+                    contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "参数设置",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // 测试模型按钮 + 测速结果
+            OutlinedButton(
+                onClick = { if (!testing) onTest() },
+                enabled = !testing,
+                contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = 4.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                if (testing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    "测试",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // 测速结果：显示在测试按钮旁边
+            result?.let { r ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.then(
                         if (!r.success) Modifier.clickable { showErrorDetail = true } else Modifier
                     )
-            ) {
-                Icon(
-                    if (r.success) Icons.Rounded.Check else Icons.Rounded.Warning,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(Modifier.width(Spacing.xs))
-                val displayMsg = if (r.success) {
-                    r.message
-                } else {
-                    val codeMatch = Regex("""(?i)(HTTP\s*\d{3}|code[:\s]+[a-zA-Z0-9_]+)""").find(r.message)
-                    if (codeMatch != null) codeMatch.value
-                    else r.message.lines().firstOrNull()?.let { if (it.length > 20) it.take(20) + "..." else it } ?: "Error"
+                ) {
+                    Icon(
+                        if (r.success) Icons.Rounded.Check else Icons.Rounded.Warning,
+                        contentDescription = null,
+                        tint = if (r.success) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    val displayMsg = if (r.success) {
+                        r.message
+                    } else {
+                        val codeMatch = Regex("""(?i)(HTTP\s*\d{3}|code[:\s]+[a-zA-Z0-9_]+)""").find(r.message)
+                        if (codeMatch != null) codeMatch.value
+                        else r.message.lines().firstOrNull()?.let { if (it.length > 20) it.take(20) + "..." else it } ?: "Error"
+                    }
+                    Text(
+                        text = displayMsg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (r.success) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
-                Text(
-                    text = displayMsg,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (r.success) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+            }
+
+            // 删除模型按钮（红色，推到行尾）
+            onRemove?.let { onDel ->
+                Spacer(Modifier.weight(1f))
+                TextButton(
+                    onClick = onDel,
+                    contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "删除",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }
