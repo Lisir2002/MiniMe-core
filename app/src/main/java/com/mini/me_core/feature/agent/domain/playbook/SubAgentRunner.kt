@@ -20,12 +20,14 @@ import com.mini.me_core.feature.agent.domain.tool.ToolCall
 import com.mini.me_core.feature.agent.domain.tool.ToolCapability
 import com.mini.me_core.feature.agent.domain.tool.ToolRegistry
 import com.mini.me_core.feature.agent.domain.tool.ToolResult
+import com.mini.me_core.feature.settings.data.remote.ModelMetadataService
 import com.mini.me_core.feature.settings.domain.model.ProviderType
 import com.mini.me_core.feature.settings.domain.repository.AIProviderRepository
 import dagger.Lazy
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonPrimitive
@@ -66,7 +68,8 @@ class SubAgentRunner @Inject constructor(
     private val okHttpClient: OkHttpClient,
     private val agentAssetRegistry: AgentAssetRegistry,
     private val policyEngine: ToolPermissionPolicyEngine,
-    private val messagePersistenceUseCase: MessagePersistenceUseCase
+    private val messagePersistenceUseCase: MessagePersistenceUseCase,
+    private val modelMetadataService: ModelMetadataService
 ) {
     private companion object {
         const val TAG = "SubAgentRunner"
@@ -362,9 +365,14 @@ class SubAgentRunner @Inject constructor(
         provider.model = config.effectiveModel
         provider.useFullUrl = config.useFullUrl
         provider.useResponseApi = config.useResponseApi
-        provider.temperature = config.temperature
-        provider.topP = config.topP
-        provider.maxTokens = config.maxTokens
+        // 模型级采样参数覆盖：严格优先级 模型级(非null) > 供应商级默认。
+        val samplingConfig = runCatching {
+            modelMetadataService.observeSamplingConfig(config.type, config.effectiveModel).firstOrNull()
+        }.getOrNull()
+        val resolved = modelMetadataService.resolveSamplingParams(config, samplingConfig)
+        provider.temperature = resolved.temperature
+        provider.topP = resolved.topP
+        provider.maxTokens = resolved.maxTokens
         provider.apiPath = config.apiPath
         provider.requestTimeout = config.requestTimeout
         provider.retryCount = config.retryCount

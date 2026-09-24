@@ -393,6 +393,9 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
     suspend fun deleteCapabilityOverride(providerType: String, modelId: String) =
         withContext(Dispatchers.IO) { q.deleteCapabilityOverride(providerType, modelId) }
 
+    suspend fun deleteCapabilityOverridesByProvider(providerType: String) =
+        withContext(Dispatchers.IO) { q.deleteCapabilityOverridesByProvider(providerType) }
+
     // ── 模型自定义配置（输入/输出 token 上限覆盖）──────────────────────
 
     suspend fun upsertCustomConfig(
@@ -410,6 +413,30 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
 
     suspend fun deleteCustomConfig(providerType: String, modelId: String) =
         withContext(Dispatchers.IO) { q.deleteCustomConfig(providerType, modelId) }
+
+    suspend fun deleteCustomConfigsByProvider(providerType: String) =
+        withContext(Dispatchers.IO) { q.deleteCustomConfigsByProvider(providerType) }
+
+    // ── 模型级采样参数覆盖（temperature/topP/maxTokens，与供应商级物理隔离）──────────
+
+    suspend fun upsertSamplingConfig(
+        id: String, providerType: String, modelId: String,
+        customTemperature: Double?, customTopP: Double?, customMaxTokens: Long?, updatedAtMs: Long,
+    ) = withContext(Dispatchers.IO) {
+        q.insertSamplingConfig(id, providerType, modelId, customTemperature, customTopP, customMaxTokens, updatedAtMs)
+    }
+
+    suspend fun getSamplingConfig(providerType: String, modelId: String): com.mini.mecore.datalayer.sqldelight.agent.Model_sampling_configs? =
+        withContext(Dispatchers.IO) { q.getSamplingConfig(providerType, modelId).executeAsOneOrNull() }
+
+    fun observeSamplingConfig(providerType: String, modelId: String): Flow<com.mini.mecore.datalayer.sqldelight.agent.Model_sampling_configs?> =
+        q.observeSamplingConfig(providerType, modelId).asFlow().mapToOneOrNull(Dispatchers.IO)
+
+    suspend fun deleteSamplingConfig(providerType: String, modelId: String) =
+        withContext(Dispatchers.IO) { q.deleteSamplingConfig(providerType, modelId) }
+
+    suspend fun deleteSamplingConfigsByProvider(providerType: String) =
+        withContext(Dispatchers.IO) { q.deleteSamplingConfigsByProvider(providerType) }
 
     suspend fun insertGoal(
         goalId: String, sessionId: String, text: String, status: String, revision: Long,

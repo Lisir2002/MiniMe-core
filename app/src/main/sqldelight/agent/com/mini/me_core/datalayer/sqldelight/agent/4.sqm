@@ -1,0 +1,17 @@
+-- v4 → v5 迁移：模型级采样参数覆盖（方案B 强化版——物理隔离 + 零污染）
+--
+-- 新建 model_sampling_configs 表：保存模型级 temperature/topP/maxTokens 覆盖。
+-- 与供应商级 AIProviderConfig 的同名字段严格物理隔离，模型级读写绝不修改 AIProviderConfig。
+-- 字段可空 = 未覆盖（继承供应商级默认）；非空 = 已覆盖。
+-- 与 model_custom_configs（上下文长度）、model_capability_overrides（能力开关）完全独立。
+
+CREATE TABLE model_sampling_configs (
+  id                TEXT NOT NULL,
+  provider_type     TEXT NOT NULL,
+  model_id          TEXT NOT NULL,
+  custom_temperature REAL,
+  custom_top_p      REAL,
+  custom_max_tokens INTEGER,
+  updated_at_ms     INTEGER NOT NULL,
+  PRIMARY KEY (provider_type, model_id)
+);

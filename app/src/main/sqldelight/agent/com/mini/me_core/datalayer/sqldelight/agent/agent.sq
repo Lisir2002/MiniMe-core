@@ -326,6 +326,19 @@ CREATE TABLE model_custom_configs (
   PRIMARY KEY (provider_type, model_id)
 );
 
+-- 模型级采样参数覆盖：与供应商级 AIProviderConfig.temperature/topP/maxTokens 物理隔离。
+-- 字段可空表示「未覆盖，继承供应商级默认值」；非空即覆盖。绝不写入 AIProviderConfig。
+CREATE TABLE model_sampling_configs (
+  id                TEXT NOT NULL,
+  provider_type     TEXT NOT NULL,
+  model_id          TEXT NOT NULL,
+  custom_temperature REAL,
+  custom_top_p      REAL,
+  custom_max_tokens INTEGER,
+  updated_at_ms     INTEGER NOT NULL,
+  PRIMARY KEY (provider_type, model_id)
+);
+
 CREATE TABLE agent_goals (
   goal_id       TEXT    NOT NULL PRIMARY KEY,
   session_id    TEXT    NOT NULL,
@@ -624,6 +637,9 @@ SELECT * FROM model_capability_overrides WHERE provider_type = ? AND model_id = 
 deleteCapabilityOverride:
 DELETE FROM model_capability_overrides WHERE provider_type = ? AND model_id = ?;
 
+deleteCapabilityOverridesByProvider:
+DELETE FROM model_capability_overrides WHERE provider_type = ?;
+
 insertCustomConfig:
 INSERT OR REPLACE INTO model_custom_configs (id, provider_type, model_id, custom_input_tokens, custom_output_tokens, updated_at_ms)
 VALUES (?, ?, ?, ?, ?, ?);
@@ -636,6 +652,25 @@ SELECT * FROM model_custom_configs WHERE provider_type = ? AND model_id = ? LIMI
 
 deleteCustomConfig:
 DELETE FROM model_custom_configs WHERE provider_type = ? AND model_id = ?;
+
+deleteCustomConfigsByProvider:
+DELETE FROM model_custom_configs WHERE provider_type = ?;
+
+insertSamplingConfig:
+INSERT OR REPLACE INTO model_sampling_configs (id, provider_type, model_id, custom_temperature, custom_top_p, custom_max_tokens, updated_at_ms)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+getSamplingConfig:
+SELECT * FROM model_sampling_configs WHERE provider_type = ? AND model_id = ? LIMIT 1;
+
+observeSamplingConfig:
+SELECT * FROM model_sampling_configs WHERE provider_type = ? AND model_id = ? LIMIT 1;
+
+deleteSamplingConfig:
+DELETE FROM model_sampling_configs WHERE provider_type = ? AND model_id = ?;
+
+deleteSamplingConfigsByProvider:
+DELETE FROM model_sampling_configs WHERE provider_type = ?;
 
 insertGoal:
 INSERT INTO agent_goals (goal_id, session_id, text, status, revision, parent_goal_id, round_seq, created_at_ms, updated_at_ms)

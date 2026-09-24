@@ -1400,7 +1400,15 @@ class SettingsViewModel @Inject constructor(
     fun deleteProvider(id: String) {
         viewModelScope.launch {
             val wasActive = repository.getActiveProviderSync()?.id == id
+            val providerToDelete = repository.getProviderById(id)
+            val providerType = providerToDelete?.type
             repository.deleteProvider(id)
+            // 级联清理：删除供应商时清理其下所有模型级配置（能力覆盖/上下文长度/采样参数三张独立表）。
+            if (providerType != null) {
+                modelMetadataService.clearOverrideByProvider(providerType)
+                modelMetadataService.clearCustomConfigByProvider(providerType)
+                modelMetadataService.clearSamplingConfigByProvider(providerType)
+            }
             if (wasActive) repository.ensureActiveProvider()
         }
     }
@@ -1673,6 +1681,26 @@ class SettingsViewModel @Inject constructor(
             modelMetadataService.clearCustomConfig(type, modelId)
             val refreshed = modelMetadataService.resolveAll(type, listOf(modelId))
             _modelMetadata.update { it + refreshed }
+        }
+    }
+
+    // ── 模型级采样参数覆盖（temperature/topP/maxTokens）────────────────────
+
+    /** 观察某模型的采样参数覆盖（用于 ModelSettingsSheet 回显滑块/输入框）。 */
+    fun observeModelSamplingConfig(type: ProviderType, modelId: String) =
+        modelMetadataService.observeSamplingConfig(type, modelId)
+
+    /** 保存模型级采样参数覆盖；传 null 表示不覆盖该字段（继承供应商级默认）。 */
+    fun saveModelSamplingConfig(type: ProviderType, modelId: String, temperature: Float?, topP: Float?, maxTokens: Int?) {
+        viewModelScope.launch {
+            modelMetadataService.saveSamplingConfig(type, modelId, temperature, topP, maxTokens)
+        }
+    }
+
+    /** 清除模型级采样参数覆盖（恢复全部继承供应商级默认值）。 */
+    fun clearModelSamplingConfig(type: ProviderType, modelId: String) {
+        viewModelScope.launch {
+            modelMetadataService.clearSamplingConfig(type, modelId)
         }
     }
 }

@@ -63,6 +63,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -100,14 +101,16 @@ import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.agent.data.local.entity.ModelCapabilityOverrideEntity
 import com.mini.me_core.feature.agent.data.local.entity.ModelCustomConfigEntity
+import com.mini.me_core.feature.agent.data.local.entity.ModelSamplingConfigEntity
 import com.mini.me_core.feature.settings.data.remote.ModelTestResult
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.domain.model.ProviderType
+import com.mini.me_core.feature.settings.domain.model.temperatureRange
 import kotlinx.coroutines.launch
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = false) {
+internal fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = false) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -776,12 +779,17 @@ internal fun ModelSettingsSheet(
     metadata: ModelMetadata?,
     overrideFlow: kotlinx.coroutines.flow.Flow<ModelCapabilityOverrideEntity?>,
     customConfigFlow: kotlinx.coroutines.flow.Flow<ModelCustomConfigEntity?>,
+    samplingConfigFlow: kotlinx.coroutines.flow.Flow<ModelSamplingConfigEntity?>,
+    providerDefaultTemperature: Float,
+    providerDefaultTopP: Float,
+    providerDefaultMaxTokens: Int?,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val override by overrideFlow.collectAsStateWithLifecycleCompat(initial = null)
     val customConfig by customConfigFlow.collectAsStateWithLifecycleCompat(initial = null)
+    val samplingConfig by samplingConfigFlow.collectAsStateWithLifecycleCompat(initial = null)
 
     // 本地三态（UI 编辑的草稿）：初始值从 overrideFlow 读，避免打开面板时丢失已有的覆盖。
     var draftVision by remember(override) { mutableStateOf(override?.overrideVision) }
@@ -799,6 +807,11 @@ internal fun ModelSettingsSheet(
     var draftOutputTokens by remember(customConfig) {
         mutableStateOf(customConfig?.customOutputTokens?.toString() ?: "")
     }
+
+    // 采样参数草稿：null 表示未覆盖（继承供应商级默认），非 null 表示已覆盖。
+    var draftTemperature by remember(samplingConfig) { mutableStateOf(samplingConfig?.customTemperature) }
+    var draftTopP by remember(samplingConfig) { mutableStateOf(samplingConfig?.customTopP) }
+    var draftMaxTokens by remember(samplingConfig) { mutableStateOf(samplingConfig?.customMaxTokens?.toString()) }
 
     // 自动检测值（来自 metadata），用于 placeholder 和换算显示。
     val autoInputTokens = metadata?.inputTokens ?: metadata?.contextTokens
@@ -1009,6 +1022,121 @@ internal fun ModelSettingsSheet(
                 Text("恢复默认")
             }
 
+            HorizontalDivider()
+
+            // —— 采样参数分区 ——
+            Text(
+                text = "采样参数",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            // Temperature 行
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Temperature（温度）", modifier = Modifier.weight(1f))
+                Text(
+                    text = if (draftTemperature != null) "%.1f".format(draftTemperature) else "继承：%.1f".format(providerDefaultTemperature),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (draftTemperature != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Slider(
+                value = draftTemperature ?: providerDefaultTemperature,
+                onValueChange = { draftTemperature = (it * 10).toInt() / 10f },
+                valueRange = providerType.temperatureRange()
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (draftTemperature != null) "已覆盖" else "继承供应商默认",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (draftTemperature != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                if (draftTemperature != null) {
+                    TextButton(onClick = { draftTemperature = null }) {
+                        Text("清除", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+
+            // Top P 行
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Top P（核采样）", modifier = Modifier.weight(1f))
+                Text(
+                    text = if (draftTopP != null) "%.1f".format(draftTopP) else "继承：%.1f".format(providerDefaultTopP),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (draftTopP != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Slider(
+                value = draftTopP ?: providerDefaultTopP,
+                onValueChange = { draftTopP = (it * 10).toInt() / 10f },
+                valueRange = 0f..1f
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (draftTopP != null) "已覆盖" else "继承供应商默认",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (draftTopP != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                if (draftTopP != null) {
+                    TextButton(onClick = { draftTopP = null }) {
+                        Text("清除", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+
+            // Max Tokens 行
+            val modelOutputLimit = metadata?.outputTokens
+            val draftMaxTokensInt = draftMaxTokens?.toIntOrNull()
+            val maxTokensExceedsLimit = draftMaxTokensInt != null && modelOutputLimit != null && draftMaxTokensInt > modelOutputLimit
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = draftMaxTokens ?: "",
+                    onValueChange = { newValue ->
+                        draftMaxTokens = newValue.filter { it.isDigit() }.ifEmpty { null }
+                    },
+                    label = { Text("Max Tokens（最大输出）") },
+                    placeholder = {
+                        Text(
+                            "继承：${providerDefaultMaxTokens?.toString() ?: "不限制"}"
+                        )
+                    },
+                    isError = maxTokensExceedsLimit,
+                    supportingText = {
+                        if (maxTokensExceedsLimit) {
+                            Text("超过模型输出上限（$modelOutputLimit）", color = MaterialTheme.colorScheme.error)
+                        } else {
+                            Text("留空=继承供应商默认", style = MaterialTheme.typography.bodySmall)
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = if (draftMaxTokens != null) "已覆盖" else "继承",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (draftMaxTokens != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // 恢复采样默认
+            TextButton(
+                onClick = {
+                    viewModel.clearModelSamplingConfig(providerType, modelId)
+                    draftTemperature = null
+                    draftTopP = null
+                    draftMaxTokens = null
+                }
+            ) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(Spacing.xs))
+                Text("恢复采样默认")
+            }
+
             Spacer(Modifier.height(Spacing.sm))
 
             // —— 底部按钮 ——
@@ -1040,6 +1168,13 @@ internal fun ModelSettingsSheet(
                             modelId = modelId,
                             inputTokens = draftInputTokens.toIntOrNull(),
                             outputTokens = draftOutputTokens.toIntOrNull()
+                        )
+                        viewModel.saveModelSamplingConfig(
+                            type = providerType,
+                            modelId = modelId,
+                            temperature = draftTemperature,
+                            topP = draftTopP,
+                            maxTokens = draftMaxTokens?.toIntOrNull()
                         )
                         closeSheet()
                     }

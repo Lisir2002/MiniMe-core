@@ -677,7 +677,10 @@ fun ProviderEditorScreen(
 
                             // ── Temperature ──
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Temperature（温度）", modifier = Modifier.weight(1f))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Temperature（温度）")
+                                    Text("默认值，模型可单独覆盖", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                                 Text("%.1f".format(temperature), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Slider(
@@ -693,7 +696,10 @@ fun ProviderEditorScreen(
 
                             // ── Top P ──
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Top P", modifier = Modifier.weight(1f))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Top P（核采样）")
+                                    Text("默认值，模型可单独覆盖", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                                 Text("%.1f".format(topP), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Slider(
@@ -714,7 +720,7 @@ fun ProviderEditorScreen(
                                 label = { Text("Max Tokens（最大输出）") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                supportingText = { Text("最大输出 token 数，留空=不限制", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                supportingText = { Text("默认值，模型可单独覆盖；最大输出 token 数，留空=不限制", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 modifier = Modifier.fillMaxWidth()
                             )
 
@@ -888,6 +894,10 @@ fun ProviderEditorScreen(
             metadata = modelMetadata[overrideModel],
             overrideFlow = viewModel.observeCapabilityOverride(type, overrideModel),
             customConfigFlow = viewModel.observeModelCustomConfig(type, overrideModel),
+            samplingConfigFlow = viewModel.observeModelSamplingConfig(type, overrideModel),
+            providerDefaultTemperature = currentConfig().temperature,
+            providerDefaultTopP = currentConfig().topP,
+            providerDefaultMaxTokens = currentConfig().maxTokens,
             onDismiss = { capabilityOverrideModel = null }
         )
     }

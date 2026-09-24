@@ -90,6 +90,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -396,7 +397,7 @@ class StatefulAgentWorkflow @Inject constructor(
      * 根据 [config] 创建一个全新的、独立的 [AIProvider] 实例。
      * 用于识图回退和上下文压缩等独立请求场景，完全不占用或修改主对话所用的 Provider 单例。
      */
-    private fun createStandaloneProvider(config: AIProviderConfig, sessionId: String?): AIProvider {
+    private suspend fun createStandaloneProvider(config: AIProviderConfig, sessionId: String?): AIProvider {
         val provider: AIProvider = when (config.type) {
             ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi, okHttpClient)
             ProviderType.GEMINI -> GeminiAdapter(geminiApi, okHttpClient)
@@ -407,9 +408,15 @@ class StatefulAgentWorkflow @Inject constructor(
         provider.model = config.effectiveModel
         provider.useFullUrl = config.useFullUrl
         provider.useResponseApi = config.useResponseApi
-        provider.temperature = config.temperature
-        provider.topP = config.topP
-        provider.maxTokens = config.maxTokens
+        // 模型级采样参数覆盖：严格优先级 模型级(非null) > 供应商级默认。
+        // 只读 providerConfig，绝不修改；解析结果只设置到当前 provider 实例。
+        val samplingConfig = runCatching {
+            modelMetadataService.observeSamplingConfig(config.type, config.effectiveModel).firstOrNull()
+        }.getOrNull()
+        val resolved = modelMetadataService.resolveSamplingParams(config, samplingConfig)
+        provider.temperature = resolved.temperature
+        provider.topP = resolved.topP
+        provider.maxTokens = resolved.maxTokens
         provider.apiPath = config.apiPath
         provider.requestTimeout = config.requestTimeout
         provider.retryCount = config.retryCount

@@ -1,13 +1,11 @@
 package com.mini.me_core.feature.settings.presentation.component
-import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,14 +22,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.FullscreenExit
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Compress
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Input
+import androidx.compose.material.icons.rounded.SyncAlt
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -48,17 +52,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
-import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
+
+private enum class SelectionType { VISION, COMPACTION }
 
 /**
  * 默认模型二级页：集中管理应用中的默认/特定用途模型设置（如识图模型、压缩模型）。
@@ -92,6 +97,7 @@ internal fun DefaultModelsSection(
             visionModel
         }
     }
+    val visionMetadata = if (visionProviderId.isBlank() || visionModel.isBlank()) null else modelMetadata[visionModel]
 
     val compactionProviderName = providers.firstOrNull { it.id == compactionProviderId }?.name
     val compactionSubtitle = if (compactionProviderId.isBlank() || compactionModel.isBlank()) {
@@ -103,6 +109,7 @@ internal fun DefaultModelsSection(
             compactionModel
         }
     }
+    val compactionMetadata = if (compactionProviderId.isBlank() || compactionModel.isBlank()) null else modelMetadata[compactionModel]
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -110,18 +117,24 @@ internal fun DefaultModelsSection(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
         item {
-            MenuRow(
+            DefaultModelMenuRow(
                 icon = Icons.Rounded.Image,
                 title = stringResource(R.string.settings_vision_model),
                 subtitle = visionSubtitle,
+                usageHint = "用于图片理解、截图分析等场景",
+                previewMetadata = visionMetadata,
+                selectionType = SelectionType.VISION,
                 onClick = { showVisionSheet = true }
             )
         }
         item {
-            MenuRow(
-                icon = Icons.Rounded.FullscreenExit,
+            DefaultModelMenuRow(
+                icon = Icons.Rounded.Compress,
                 title = stringResource(R.string.settings_compaction_model),
                 subtitle = compactionSubtitle,
+                usageHint = "对话过长时自动压缩历史消息",
+                previewMetadata = compactionMetadata,
+                selectionType = SelectionType.COMPACTION,
                 onClick = { showCompactionSheet = true }
             )
         }
@@ -133,6 +146,7 @@ internal fun DefaultModelsSection(
             followChatModelText = stringResource(R.string.vision_follow_chat_model),
             followDescText = stringResource(R.string.vision_follow_desc),
             noModelsText = stringResource(R.string.vision_no_models),
+            selectionType = SelectionType.VISION,
             providers = providers,
             currentProviderId = visionProviderId,
             currentModel = visionModel,
@@ -155,6 +169,7 @@ internal fun DefaultModelsSection(
             followChatModelText = stringResource(R.string.compaction_follow_chat_model),
             followDescText = stringResource(R.string.compaction_follow_desc),
             noModelsText = stringResource(R.string.compaction_no_models),
+            selectionType = SelectionType.COMPACTION,
             providers = providers,
             currentProviderId = compactionProviderId,
             currentModel = compactionModel,
@@ -173,8 +188,143 @@ internal fun DefaultModelsSection(
 }
 
 /**
+ * 自定义默认模型菜单行：图标 + 标题 + 当前选择 + 使用说明 + 右侧能力预览 + 箭头。
+ */
+@Composable
+private fun DefaultModelMenuRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    usageHint: String,
+    previewMetadata: ModelMetadata?,
+    selectionType: SelectionType,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = usageHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            previewMetadata?.let { meta ->
+                CompactCapabilityPreview(metadata = meta, selectionType = selectionType)
+                Spacer(Modifier.width(Spacing.sm))
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * 菜单行右侧紧凑能力预览：14dp 图标 pill。
+ */
+@Composable
+private fun CompactCapabilityPreview(metadata: ModelMetadata, selectionType: SelectionType) {
+    when (selectionType) {
+        SelectionType.VISION -> {
+            if (metadata.supportsVision) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Rounded.Image,
+                            contentDescription = "识图",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            } else {
+                CompactInputTokenTag(metadata)
+            }
+        }
+        SelectionType.COMPACTION -> {
+            CompactInputTokenTag(metadata)
+        }
+    }
+}
+
+@Composable
+private fun CompactInputTokenTag(metadata: ModelMetadata) {
+    val tokens = metadata.inputTokens ?: metadata.contextTokens
+    if (tokens > 0) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(50)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Rounded.Input,
+                    contentDescription = "输入窗口",
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    text = formatCompactTokens(tokens),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+private fun formatCompactTokens(tokens: Int): String = when {
+    tokens >= 1_000_000 -> "${tokens / 1_000_000}M"
+    tokens >= 1_000 -> "${tokens / 1_000}K"
+    else -> tokens.toString()
+}
+
+/**
  * 模型选择弹窗：风格与 [FetchModelsDialog] 保持一致（包含搜索框、Logo 图标、能力 Tag、提供商折叠分组）。
- * 识图模型与压缩模型共用此组件，仅文案不同。
+ * 识图模型与压缩模型共用此组件，仅文案与排序规则不同。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -183,6 +333,7 @@ private fun ModelSelectionSheet(
     followChatModelText: String,
     followDescText: String,
     noModelsText: String,
+    selectionType: SelectionType,
     providers: List<AIProviderConfig>,
     currentProviderId: String,
     currentModel: String,
@@ -226,11 +377,25 @@ private fun ModelSelectionSheet(
                         .padding(bottom = Spacing.md),
                     verticalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    // 标题栏：左侧标题 + 右侧关闭按钮
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "关闭",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
 
                     OutlinedTextField(
                         value = searchQuery,
@@ -266,6 +431,13 @@ private fun ModelSelectionSheet(
                                             .padding(Spacing.lg),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.SyncAlt,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        Spacer(Modifier.width(Spacing.md))
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = followChatModelText,
@@ -296,17 +468,48 @@ private fun ModelSelectionSheet(
                         val activeProviders = providers.filter { it.isEnabled && it.models.isNotEmpty() }
                         if (activeProviders.isEmpty()) {
                             item {
-                                Text(
-                                    text = noModelsText,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(Spacing.md)
-                                )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = Spacing.xl),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.CloudOff,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                    Spacer(Modifier.height(Spacing.md))
+                                    Text(
+                                        text = noModelsText,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(Modifier.height(Spacing.xs))
+                                    Text(
+                                        text = "请先在「服务商」Tab 添加并启用供应商",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         } else {
                             activeProviders.forEach { provider ->
-                                val filteredModels = provider.models.filter {
-                                    searchQuery.isBlank() || it.contains(searchQuery, ignoreCase = true)
+                                // 智能排序：VISION 按识图能力优先，COMPACTION 按上下文长度降序
+                                val sortedModels = when (selectionType) {
+                                    SelectionType.VISION -> provider.models.sortedByDescending {
+                                        modelMetadata[it]?.supportsVision == true
+                                    }
+                                    SelectionType.COMPACTION -> provider.models.sortedByDescending {
+                                        modelMetadata[it]?.let { m -> m.inputTokens ?: m.contextTokens } ?: 0
+                                    }
+                                }
+                                // 搜索同时匹配模型名和供应商名
+                                val filteredModels = sortedModels.filter { model ->
+                                    searchQuery.isBlank() ||
+                                        model.contains(searchQuery, ignoreCase = true) ||
+                                        provider.name.contains(searchQuery, ignoreCase = true)
                                 }
                                 if (filteredModels.isNotEmpty()) {
                                     item(key = "header_${provider.id}") {
@@ -339,8 +542,10 @@ private fun ModelSelectionSheet(
                                         items(filteredModels, key = { "${provider.id}_$it" }) { model ->
                                             ModelSelectionRow(
                                                 model = model,
+                                                providerName = provider.name,
                                                 selected = provider.id == currentProviderId && model == currentModel,
                                                 metadata = modelMetadata[model],
+                                                selectionType = selectionType,
                                                 onClick = { onSelect(provider.id, model) }
                                             )
                                         }
@@ -358,112 +563,93 @@ private fun ModelSelectionSheet(
 @Composable
 private fun ModelSelectionRow(
     model: String,
+    providerName: String,
     selected: Boolean,
     metadata: ModelMetadata?,
+    selectionType: SelectionType,
     onClick: () -> Unit
 ) {
-    Row(
+    val showVisionWarning = selectionType == SelectionType.VISION &&
+        (metadata == null || metadata.supportsVision == false)
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (selected) Modifier.background(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(LocalCornerRadius.current.md)
+                ) else Modifier
+            )
             .clickable { onClick() }
-            .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = Spacing.sm, horizontal = Spacing.xs)
     ) {
-        ModelLogoIcon(modelName = model, size = 20.dp)
-        Spacer(Modifier.width(Spacing.md))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = model,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ModelLogoIcon(modelName = model, size = 20.dp)
+            Spacer(Modifier.width(Spacing.md))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = model,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = when {
+                        selected -> MaterialTheme.colorScheme.primary
+                        showVisionWarning -> MaterialTheme.colorScheme.onSurfaceVariant
+                        else -> MaterialTheme.colorScheme.onSurface
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(2.dp))
+                Row {
+                    Text(
+                        text = providerName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                    val desc = metadata?.description
+                    if (!desc.isNullOrBlank()) {
+                        Text(
+                            text = " · ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = desc,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+            if (selected) {
+                Spacer(Modifier.width(Spacing.sm))
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        ModelMetadataTags(metadata)
+        if (showVisionWarning) {
             Spacer(Modifier.height(4.dp))
-            ModelMetadataTags(metadata)
-        }
-        if (selected) {
-            Spacer(Modifier.width(Spacing.sm))
-            Icon(
-                imageVector = Icons.Rounded.Check,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
-}
-
-@Composable
-@OptIn(ExperimentalLayoutApi::class)
-private fun ModelMetadataTags(metadata: ModelMetadata?) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        ModelTag(text = "Chat")
-        if (metadata != null) {
-            if (metadata.supportsVision) {
-                // 小白友好：把英文 Image 换成「识图（Vision）」，既保留技术术语，又不晦涩
-                ModelTag(text = "识图（Vision）", isHighlight = true)
-            }
-            if (metadata.supportsTools) {
-                // 同理：Tools → 「工具（Tools）」
-                ModelTag(text = "工具（Tools）")
-            }
-            val input = metadata.inputTokens?.takeIf { it > 0 } ?: metadata.contextTokens.takeIf { it > 0 }
-            if (input != null) {
-                ModelTag(text = "Input ${formatTokenLimit(input)}")
-            }
-            metadata.outputTokens?.takeIf { it > 0 }?.let { output ->
-                ModelTag(text = "Output ${formatTokenLimit(output)}")
-            }
-            if (metadata.supportsReasoning) {
-                // Reasoning 单独加一枚「思考（Reasoning）」徽章，避免思考强度设置里只有「思考」看不到英文对照
-                ModelTag(text = "思考（Reasoning）")
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = RoundedCornerShape(50)
+            ) {
+                Text(
+                    text = "可能不支持识图",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                )
             }
         }
     }
 }
-
-@Composable
-private fun ModelTag(
-    text: String,
-    isHighlight: Boolean = false
-) {
-    val backgroundColor = if (isHighlight) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val textColor = if (isHighlight) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Surface(
-        color = backgroundColor,
-        shape = RoundedCornerShape(50),
-        modifier = Modifier.padding(end = 4.dp)
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = textColor,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-        )
-    }
-}
-
-private fun formatTokenLimit(tokens: Int): String =
-    when {
-        tokens >= 1_000_000 && tokens % 1_000_000 == 0 -> "${tokens / 1_000_000}M"
-        tokens >= 1_000_000 -> "${tokens / 1_000_000.0}".trimDecimal() + "M"
-        tokens >= 1_000 && tokens % 1_000 == 0 -> "${tokens / 1_000}K"
-        tokens >= 1_000 -> "${tokens / 1_000.0}".trimDecimal() + "K"
-        else -> tokens.toString()
-    }
-
-private fun String.trimDecimal(): String =
-    replace(Regex("(\\.\\d)\\d+"), "$1").removeSuffix(".0")

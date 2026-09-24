@@ -5,11 +5,14 @@ import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides as V2ModelCapabilityOverride
 import com.mini.mecore.datalayer.sqldelight.agent.Model_custom_configs as V2ModelCustomConfig
+import com.mini.mecore.datalayer.sqldelight.agent.Model_sampling_configs as V2ModelSamplingConfig
 import com.mini.me_core.feature.agent.data.local.entity.ModelCapabilityOverrideEntity
 import com.mini.me_core.feature.agent.data.local.entity.ModelCustomConfigEntity
+import com.mini.me_core.feature.agent.data.local.entity.ModelSamplingConfigEntity
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
 import com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepository
 import com.mini.me_core.feature.settings.data.repository.DefaultPolicy
+import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.domain.model.ProviderType
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -470,6 +473,82 @@ class ModelMetadataService @Inject constructor(
     fun observeCustomConfig(type: ProviderType, modelId: String): Flow<ModelCustomConfigEntity?> =
         v2Agent.observeCustomConfig(type.name, modelId).map { it?.toCustomConfigEntity() }
 
+    // ── 模型级采样参数覆盖（temperature/topP/maxTokens）────────────────────
+    // 【物理隔离】只读写 model_sampling_configs 表，绝不修改 AIProviderConfig。
+    // 【严格优先级】字段 null = 未覆盖（继承供应商级默认），非 null = 已覆盖。
+
+    /** 保存模型级采样参数覆盖；传 null 表示不覆盖该字段（保持继承供应商级默认）。 */
+    suspend fun saveSamplingConfig(type: ProviderType, modelId: String, temperature: Float?, topP: Float?, maxTokens: Int?) = withContext(Dispatchers.IO) {
+        val entity = ModelSamplingConfigEntity(
+            id = ModelSamplingConfigEntity.composeId(type.name, modelId),
+            providerType = type.name,
+            modelId = modelId,
+            customTemperature = temperature,
+            customTopP = topP,
+            customMaxTokens = maxTokens
+        )
+        v2Agent.upsertSamplingConfig(
+            id = entity.id,
+            providerType = entity.providerType,
+            modelId = entity.modelId,
+            customTemperature = entity.customTemperature?.toDouble(),
+            customTopP = entity.customTopP?.toDouble(),
+            customMaxTokens = entity.customMaxTokens?.toLong(),
+            updatedAtMs = System.currentTimeMillis()
+        )
+    }
+
+    /** 清除模型级采样参数覆盖（恢复全部继承供应商级默认值）。 */
+    suspend fun clearSamplingConfig(type: ProviderType, modelId: String) = withContext(Dispatchers.IO) {
+        v2Agent.deleteSamplingConfig(type.name, modelId)
+    }
+
+    /** 流式观察模型级采样参数覆盖。 */
+    fun observeSamplingConfig(type: ProviderType, modelId: String): Flow<ModelSamplingConfigEntity?> =
+        v2Agent.observeSamplingConfig(type.name, modelId).map { it?.toSamplingConfigEntity() }
+
+    // ── 供应商级联清理：删除供应商时清理其下所有模型级配置（三张独立表）────────────
+
+    /** 清理某供应商下全部模型能力覆盖。 */
+    suspend fun clearOverrideByProvider(type: ProviderType) = withContext(Dispatchers.IO) {
+        v2Agent.deleteCapabilityOverridesByProvider(type.name)
+    }
+
+    /** 清理某供应商下全部模型自定义配置（上下文长度覆盖）。 */
+    suspend fun clearCustomConfigByProvider(type: ProviderType) = withContext(Dispatchers.IO) {
+        v2Agent.deleteCustomConfigsByProvider(type.name)
+    }
+
+    /** 清理某供应商下全部模型采样参数覆盖。 */
+    suspend fun clearSamplingConfigByProvider(type: ProviderType) = withContext(Dispatchers.IO) {
+        v2Agent.deleteSamplingConfigsByProvider(type.name)
+    }
+
+    /**
+     * 解析模型最终生效的采样参数。
+     *
+     * 【严格优先级】模型级覆盖（非null）> 供应商级默认 > 系统默认。
+     * 模型级字段为 null 表示未覆盖，完全继承供应商级值，不做任何合并/插值计算。
+     *
+     * 【零污染】本函数为纯函数，只读 [providerConfig]，绝不修改它。
+     * 调用方只能将返回值设置到 AIProvider 实例上，不能写回 AIProviderConfig。
+     */
+    fun resolveSamplingParams(
+        providerConfig: AIProviderConfig,
+        modelSamplingConfig: ModelSamplingConfigEntity?
+    ): ResolvedSamplingParams = ResolvedSamplingParams(
+        temperature = modelSamplingConfig?.customTemperature ?: providerConfig.temperature,
+        topP = modelSamplingConfig?.customTopP ?: providerConfig.topP,
+        maxTokens = modelSamplingConfig?.customMaxTokens ?: providerConfig.maxTokens
+    )
+
+    /** 解析后的最终采样参数（已确定具体值，不再含 null 覆盖语义）。 */
+    data class ResolvedSamplingParams(
+        val temperature: Float,
+        val topP: Float,
+        val maxTokens: Int?
+    )
+
     private fun findMetadata(
         catalog: Map<String, Map<String, ModelMetadata>>,
         type: ProviderType,
@@ -545,6 +624,16 @@ class ModelMetadataService @Inject constructor(
         modelId = model_id,
         customInputTokens = custom_input_tokens?.toInt(),
         customOutputTokens = custom_output_tokens?.toInt(),
+        updatedAtMs = updated_at_ms
+    )
+
+    private fun V2ModelSamplingConfig.toSamplingConfigEntity() = ModelSamplingConfigEntity(
+        id = id,
+        providerType = provider_type,
+        modelId = model_id,
+        customTemperature = custom_temperature?.toFloat(),
+        customTopP = custom_top_p?.toFloat(),
+        customMaxTokens = custom_max_tokens?.toInt(),
         updatedAtMs = updated_at_ms
     )
 
