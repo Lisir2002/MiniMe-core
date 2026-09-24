@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Chat
@@ -34,10 +35,12 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Input
 import androidx.compose.material.icons.rounded.ListAlt
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.Output
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Refresh
@@ -77,14 +80,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
@@ -101,94 +109,103 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // Chat 标签（始终显示）
-        ModelTag(
-            text = "Chat",
-            icon = Icons.Rounded.Chat,
+        // Chat 标签（始终显示）：对话 文字→文字
+        CapabilityFlowTag(
+            inputIcon = Icons.Rounded.Chat,
+            outputIcon = Icons.Rounded.Chat,
+            tooltip = "对话：文字→文字",
             backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        metadata?.let {
-            // 识图（蓝色）
-            CapabilityTag(
-                supported = it.supportsVision,
-                label = "识图",
-                unsupportedLabel = "无识图",
-                icon = Icons.Rounded.Image,
-                backgroundColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                overridden = hasOverride && it.inferenceReason?.overrideVision != null,
-                showUnsupported = false
-            )
-            // 视频（蓝色）
-            CapabilityTag(
-                supported = it.supportsVideo,
-                label = "视频",
-                unsupportedLabel = "无视频",
-                icon = Icons.Rounded.Movie,
-                backgroundColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                showUnsupported = false
-            )
-            // 语音（蓝色）
-            CapabilityTag(
-                supported = it.supportsAudio,
-                label = "语音",
-                unsupportedLabel = "无语音",
-                icon = Icons.Rounded.Mic,
-                backgroundColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                showUnsupported = false
-            )
-            // 工具（绿色）
-            CapabilityTag(
-                supported = it.supportsTools,
-                label = "工具",
-                unsupportedLabel = "无工具",
-                icon = Icons.Rounded.Build,
-                backgroundColor = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                overridden = hasOverride && it.inferenceReason?.overrideTools != null,
-                showUnsupported = false
-            )
-            // 思考（紫色）
-            CapabilityTag(
-                supported = it.supportsReasoning,
-                label = "思考",
-                unsupportedLabel = "无思考",
-                icon = Icons.Rounded.AutoAwesome,
-                backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                overridden = hasOverride && it.inferenceReason?.overrideReasoning != null,
-                showUnsupported = false
-            )
-            // 代码（橙色）
-            CapabilityTag(
-                supported = it.supportsCode,
-                label = "代码",
-                unsupportedLabel = "无代码",
-                icon = Icons.Rounded.Code,
-                backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                showUnsupported = false
-            )
-            // 结构化（青色）
-            CapabilityTag(
-                supported = it.supportsStructuredOutput,
-                label = "结构化",
-                unsupportedLabel = "无结构化",
-                icon = Icons.Rounded.ListAlt,
-                backgroundColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                showUnsupported = false
-            )
-            // 上下文（灰色）
-            val ctx = it.contextTokens.takeIf { t -> t > 0 }
-            if (ctx != null) {
-                ModelTag(
-                    text = formatTokenLimit(ctx),
+        metadata?.let { m ->
+            // 识图 图片→文字（蓝色）
+            if (m.supportsVision) {
+                CapabilityFlowTag(
+                    inputIcon = Icons.Rounded.Image,
+                    outputIcon = Icons.Rounded.Chat,
+                    tooltip = "识图：图片→文字",
+                    backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    overridden = hasOverride && m.inferenceReason?.overrideVision != null
+                )
+            }
+            // 视频 视频→文字（蓝色）
+            if (m.supportsVideo) {
+                CapabilityFlowTag(
+                    inputIcon = Icons.Rounded.Movie,
+                    outputIcon = Icons.Rounded.Chat,
+                    tooltip = "视频：视频→文字",
+                    backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            // 语音 语音→文字（蓝色）
+            if (m.supportsAudio) {
+                CapabilityFlowTag(
+                    inputIcon = Icons.Rounded.Mic,
+                    outputIcon = Icons.Rounded.Chat,
+                    tooltip = "语音：语音→文字",
+                    backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            // 工具 文字→工具调用（绿色）
+            if (m.supportsTools) {
+                CapabilityFlowTag(
+                    inputIcon = Icons.Rounded.Chat,
+                    outputIcon = Icons.Rounded.Build,
+                    tooltip = "工具：文字→工具调用",
+                    backgroundColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    overridden = hasOverride && m.inferenceReason?.overrideTools != null
+                )
+            }
+            // 思考 文字→推理链（紫色）
+            if (m.supportsReasoning) {
+                CapabilityFlowTag(
+                    inputIcon = Icons.Rounded.Chat,
+                    outputIcon = Icons.Rounded.AutoAwesome,
+                    tooltip = "思考：文字→推理链",
+                    backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    overridden = hasOverride && m.inferenceReason?.overrideReasoning != null
+                )
+            }
+            // 代码 文字→代码（灰色）
+            if (m.supportsCode) {
+                CapabilityFlowTag(
+                    inputIcon = Icons.Rounded.Chat,
+                    outputIcon = Icons.Rounded.Code,
+                    tooltip = "代码：文字→代码",
                     backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // 结构化 文字→JSON（青色）
+            if (m.supportsStructuredOutput) {
+                CapabilityFlowTag(
+                    inputIcon = Icons.Rounded.Chat,
+                    outputIcon = Icons.Rounded.ListAlt,
+                    tooltip = "结构化：文字→JSON",
+                    backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            // 输入窗口：inputTokens 优先，缺失时回退 contextTokens
+            val inputValue = m.inputTokens ?: m.contextTokens
+            if (inputValue > 0) {
+                ContextTokenTag(
+                    icon = Icons.Rounded.Input,
+                    text = formatTokenLimit(inputValue),
+                    contentDescription = "输入窗口"
+                )
+            }
+            // 输出窗口：outputTokens 独立显示
+            m.outputTokens?.takeIf { it > 0 }?.let { out ->
+                ContextTokenTag(
+                    icon = Icons.Rounded.Output,
+                    text = formatTokenLimit(out),
+                    contentDescription = "输出窗口"
                 )
             }
             if (hasOverride) {
@@ -205,23 +222,60 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
 }
 
 /**
- * 三复选框其中之一的展示 Tag：右上角有小红点，表示该能力被手动覆盖过。
+ * 能力标签：纯图标 pill，形式为「输入图标 → 箭头 → 输出图标」，无文字。
+ * 点击后在标签上方弹出文字说明气泡，2 秒后自动消失。
+ * overridden=true 时右上角显示小红点，表示该能力被手动覆盖过。
  */
 @Composable
-private fun OverlayBadgeTag(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    backgroundColor: androidx.compose.ui.graphics.Color,
-    contentColor: androidx.compose.ui.graphics.Color,
-    overridden: Boolean
+private fun CapabilityFlowTag(
+    inputIcon: ImageVector,
+    outputIcon: ImageVector,
+    tooltip: String,
+    backgroundColor: Color,
+    contentColor: Color,
+    overridden: Boolean = false
 ) {
+    var showTip by remember { mutableStateOf(false) }
+    LaunchedEffect(showTip) {
+        if (showTip) {
+            kotlinx.coroutines.delay(2000)
+            showTip = false
+        }
+    }
     Box {
-        ModelTag(
-            text = label,
-            icon = icon,
-            backgroundColor = backgroundColor,
-            contentColor = contentColor
-        )
+        Surface(
+            color = backgroundColor,
+            shape = RoundedCornerShape(50),
+            modifier = Modifier
+                .padding(end = 4.dp)
+                .clickable { showTip = true }
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    inputIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = contentColor
+                )
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    Icons.Rounded.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(10.dp),
+                    tint = contentColor.copy(alpha = 0.6f)
+                )
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    outputIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = contentColor
+                )
+            }
+        }
         if (overridden) {
             Box(
                 modifier = Modifier
@@ -232,35 +286,61 @@ private fun OverlayBadgeTag(
                     .background(MaterialTheme.colorScheme.primary)
             )
         }
+        if (showTip) {
+            val density = LocalDensity.current
+            Popup(
+                alignment = Alignment.BottomCenter,
+                offset = with(density) { IntOffset(0, (-30).dp.roundToPx()) },
+                onDismissRequest = { showTip = false },
+                properties = PopupProperties(focusable = false, dismissOnClickOutside = true)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.inverseSurface
+                ) {
+                    Text(
+                        text = tooltip,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.inverseOnSurface
+                    )
+                }
+            }
+        }
     }
 }
 
+/**
+ * 上下文窗口标签：「图标 + 格式化 token 数」pill，灰色。
+ */
 @Composable
-private fun CapabilityTag(
-    supported: Boolean,
-    label: String,
-    unsupportedLabel: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    backgroundColor: androidx.compose.ui.graphics.Color,
-    contentColor: androidx.compose.ui.graphics.Color,
-    overridden: Boolean = false,
-    showUnsupported: Boolean = true
+private fun ContextTokenTag(
+    icon: ImageVector,
+    text: String,
+    contentDescription: String? = null
 ) {
-    if (supported) {
-        OverlayBadgeTag(
-            label = label,
-            icon = icon,
-            backgroundColor = backgroundColor,
-            contentColor = contentColor,
-            overridden = overridden
-        )
-    } else if (showUnsupported) {
-        ModelTag(
-            text = unsupportedLabel,
-            icon = icon,
-            backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-        )
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(50),
+        modifier = Modifier.padding(end = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                icon,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(12.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(3.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
