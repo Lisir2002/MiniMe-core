@@ -9,6 +9,37 @@
 
 ## [Unreleased]
 
+## [0.0.0.13] - 2026-09-24
+
+> 主应用模型供应商设置全面升级版本：8维能力标签体系、供应商级连通性测试、采样参数实装、API Path 自定义、请求超时/重试、模型收藏置顶、供应商复制、故障转移，从"基础配置"升级为"专业级模型管理"。
+
+### Added
+
+- `[settings]` 模型能力标签从3维扩展为8维：识图、视频、语音、工具、思考、代码、结构化输出、上下文窗口，不支持的能力显示灰色"无XX"禁用态
+- `[settings]` 模型行显示简短描述（如"多模态旗舰，快速均衡"、"深度推理与编码"），覆盖 GPT/Claude/DeepSeek/Qwen/Gemini/GLM/豆包/阶跃等主流模型
+- `[settings]` 供应商级连通性测试：编辑页和添加页均支持一键"测试连接"，通过 GET /models 验证 API Key + 端点有效性，内联显示成功/失败原因
+- `[settings]` 采样参数实装：Temperature（0-2 Slider，Anthropic 为 0-1）、Top P（0-1 Slider）、Max Tokens（数字输入），实际传递到所有适配器请求体
+- `[settings]` API Path 显式配置：默认按供应商类型自动填充（OpenAI=/v1/chat/completions，Anthropic=v1/messages，Gemini=v1beta），可自定义修改
+- `[settings]` 请求超时与重试次数配置：超时 5-120 秒，重试 0-5 次，非流式请求和流式首字节等待均生效
+- `[settings]` 模型收藏置顶：⭐标记收藏模型，收藏的模型在列表顶部显示
+- `[settings]` 供应商复制：列表项一键复制配置（名称加"副本"后缀），适合同平台多 Key 场景
+- `[settings]` 供应商故障转移：配置备用供应商后，主供应商请求失败（429/500/超时/网络错误）时自动切换到备用供应商重试
+
+### Changed
+
+- `[settings]` 能力标签颜色统一使用 MaterialTheme 主题色，深色模式自动适配，移除硬编码 ARGB
+- `[settings]` Temperature Slider 范围按供应商类型动态区分：Anthropic 0-1，OpenAI/Gemini 0-2，避免超出 API 合法范围导致 400 错误
+- `[settings]` 非对话模型（嵌入/语音识别/图像生成等）的工具调用和结构化输出能力正确标记为不支持，不再一刀切默认支持
+- `[agent]` 非流式请求（上下文压缩、识图摘要）使用配置的 requestTimeout，不再固定 120 秒
+
+### Fixed
+
+- `[settings]` Anthropic 供应商 Temperature 设置超过 1.0 导致 API 400 错误
+- `[settings]` 代码和结构化输出能力标签在深色模式下颜色不协调
+- `[agent]` 非流式请求超时不受用户配置控制
+- `[settings]` 嵌入/语音/生图等非对话模型被错误标记为支持工具调用和结构化输出
+- `[agent]` Anthropic max_tokens 默认值 16384 可能超出部分模型输出限制，改为保守默认 4096
+
 ## [logviewer-0.0.6] - 2026-09-24
 
 > MiniMe Logs 附属应用全面体验升级版本：长按菜单、设置页、崩溃页三大核心页面深度重构，功能从"可用"升级为"专业"。
