@@ -26,6 +26,7 @@ import com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepo
 import com.mini.me_core.feature.settings.data.repository.DefaultPolicy
 import com.mini.me_core.feature.settings.data.repository.ViewImageUnknownGuardPolicy
 import com.mini.me_core.feature.settings.data.repository.ContainerSettingsRepository
+import com.mini.me_core.feature.settings.data.repository.SecureScreenRepository
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
@@ -165,6 +166,8 @@ class SettingsViewModel @Inject constructor(
     private val compatibilityPolicyRepository: CompatibilityPolicyRepository,
     /** 设置页搜索历史（KVStore 持久化，最近 10 条）。 */
     private val searchHistoryManager: SettingsSearchHistoryManager,
+    /** 防截图录屏开关。 */
+    private val secureScreenRepository: SecureScreenRepository,
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
@@ -205,6 +208,10 @@ class SettingsViewModel @Inject constructor(
 
     // ── 设置页搜索历史（KVStore 持久化，最近 10 条）──
     val searchHistory: StateFlow<List<String>> = searchHistoryManager.history
+
+    // ── 防截图录屏开关（供 ProviderEditorScreen 动态控制 FLAG_SECURE）──
+    val secureScreenEnabled: StateFlow<Boolean> = secureScreenRepository.enabledFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     /** 记录一次搜索词（在 IME Search / 点击结果时调用）。 */
     fun recordSearch(query: String) {

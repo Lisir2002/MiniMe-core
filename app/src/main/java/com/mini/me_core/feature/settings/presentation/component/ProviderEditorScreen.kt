@@ -151,7 +151,22 @@ fun ProviderEditorScreen(
     var temperature by remember { mutableFloatStateOf(initialProvider?.temperature ?: 1.0f) }
     var topP by remember { mutableFloatStateOf(initialProvider?.topP ?: 1.0f) }
     var maxTokensText by remember { mutableStateOf(initialProvider?.maxTokens?.takeIf { it > 0 }?.toString() ?: "") }
-    var apiPath by remember { mutableStateOf(initialProvider?.apiPath ?: defaultProviderApiPath(type)) }
+    // API Path 开关：默认关闭（自动补充默认路径），打开后用户手动填写且不能为空。
+    // 编辑已有供应商时，若其 apiPath 与该类型默认值不同，则视为已自定义，开关默认打开。
+    var useCustomApiPath by remember {
+        mutableStateOf(
+            initialProvider?.apiPath != null &&
+                initialProvider.apiPath != defaultProviderApiPath(initialProvider.type ?: ProviderType.OPENAI)
+        )
+    }
+    var apiPath by remember {
+        mutableStateOf(
+            if (initialProvider?.apiPath != null &&
+                initialProvider.apiPath != defaultProviderApiPath(initialProvider.type ?: ProviderType.OPENAI)
+            ) initialProvider.apiPath else ""
+        )
+    }
+    var apiPathError by remember { mutableStateOf(false) }
     var requestTimeoutText by remember { mutableStateOf(initialProvider?.requestTimeout?.toString() ?: "30") }
     var retryCountText by remember { mutableStateOf(initialProvider?.retryCount?.toString() ?: "0") }
     var fallbackProviderId by remember { mutableStateOf(initialProvider?.fallbackProviderId) }
@@ -204,12 +219,19 @@ fun ProviderEditorScreen(
     // "2 type arguments expected for fun <T : R, R> Flow<T>.collectAsState(...)"
     }.collectAsState(initial = emptyMap())
 
-    DisposableEffect(Unit) {
+    // ── 防截图录屏：读取用户开关，动态控制 FLAG_SECURE ──
+    val secureScreenEnabled by viewModel.secureScreenEnabled.collectAsState()
+
+    DisposableEffect(secureScreenEnabled) {
         viewModel.resetFetchState()
         viewModel.clearTestResults()
         viewModel.resetConnectionTest()
         val activity = context as? android.app.Activity
-        activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        if (secureScreenEnabled) {
+            activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        }
         onDispose {
             viewModel.resetFetchState()
             viewModel.clearTestResults()
@@ -247,7 +269,7 @@ fun ProviderEditorScreen(
         temperature = temperature,
         topP = topP,
         maxTokens = maxTokensText.trim().toIntOrNull()?.takeIf { it > 0 },
-        apiPath = apiPath.ifBlank { defaultProviderApiPath(type) },
+        apiPath = if (useCustomApiPath) apiPath.trim() else defaultProviderApiPath(type),
         requestTimeout = requestTimeoutText.trim().toIntOrNull()?.coerceIn(5, 120) ?: 30,
         retryCount = retryCountText.trim().toIntOrNull()?.coerceIn(0, 5) ?: 0,
         fallbackProviderId = fallbackProviderId?.takeIf { it.isNotBlank() && it != providerId },
@@ -266,6 +288,12 @@ fun ProviderEditorScreen(
 
     fun saveCurrent() {
         if (!hasSubstantiveInput()) return
+        // 自定义 API Path 时不能为空
+        if (useCustomApiPath && apiPath.isBlank()) {
+            apiPathError = true
+            android.widget.Toast.makeText(context, "自定义 API Path 不能为空", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
         onSave(currentConfig())
     }
 
@@ -427,7 +455,22 @@ fun ProviderEditorScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // ── 测试连接按钮 + 内联结果 ──
+                    OutlinedTextField(
+                        value = baseUrl,
+                        onValueChange = { baseUrl = it },
+                        label = { Text("Base URL") },
+                        placeholder = { Text(defaultProviderBaseUrl(type)) },
+                        singleLine = true,
+                        isError = baseUrlError,
+                        supportingText = {
+                            if (baseUrlError) {
+                                Text("Base URL 需以 http:// 或 https:// 开头", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // ── 测试连接按钮 + 内联结果（放在 Base URL 下方）──
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(
                             onClick = { viewModel.testProviderConnection(currentConfig()) },
@@ -454,30 +497,48 @@ fun ProviderEditorScreen(
                         }
                     }
 
-                    OutlinedTextField(
-                        value = baseUrl,
-                        onValueChange = { baseUrl = it },
-                        label = { Text("Base URL") },
-                        placeholder = { Text(defaultProviderBaseUrl(type)) },
-                        singleLine = true,
-                        isError = baseUrlError,
-                        supportingText = {
-                            if (baseUrlError) {
-                                Text("Base URL 需以 http:// 或 https:// 开头", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    // ── API Path 开关模式：默认关闭自动补充，打开后手动填写且不能为空 ──
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("自定义 API Path", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Text(
+                                if (useCustomApiPath) "手动填写请求路径，不能为空" else "自动使用默认路径：${defaultProviderApiPath(type)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = useCustomApiPath,
+                            onCheckedChange = {
+                                useCustomApiPath = it
+                                if (!it) apiPathError = false
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = apiPath,
-                        onValueChange = { apiPath = it },
-                        label = { Text("API Path") },
-                        placeholder = { Text(defaultProviderApiPath(type)) },
-                        singleLine = true,
-                        supportingText = { Text("一般无需修改", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                        )
+                    }
+                    if (useCustomApiPath) {
+                        Spacer(Modifier.height(Spacing.xs))
+                        OutlinedTextField(
+                            value = apiPath,
+                            onValueChange = {
+                                apiPath = it
+                                apiPathError = it.isBlank()
+                            },
+                            label = { Text("API Path") },
+                            placeholder = { Text(defaultProviderApiPath(type)) },
+                            singleLine = true,
+                            isError = apiPathError,
+                            supportingText = {
+                                if (apiPathError) {
+                                    Text("API Path 不能为空", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),

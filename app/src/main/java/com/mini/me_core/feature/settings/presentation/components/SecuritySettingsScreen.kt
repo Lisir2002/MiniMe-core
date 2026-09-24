@@ -99,6 +99,49 @@ fun SecuritySettingsScreen(
 
         Spacer(Modifier.height(Spacing.md))
 
+        // ── 防截图录屏 ──
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(LocalCornerRadius.current.md),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(Spacing.md)) {
+                Text(
+                    text = "防截图录屏",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    text = "开启后，模型供应商编辑页（含 API Key）将禁止系统截图、录屏和最近任务缩略图，" +
+                        "防止敏感凭据被恶意应用截取。关闭后可正常截图（如用于教程分享）。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(Spacing.sm))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (uiState.secureScreenEnabled) "已开启" else "已关闭",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = if (uiState.secureScreenEnabled)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Switch(
+                        checked = uiState.secureScreenEnabled,
+                        onCheckedChange = { viewModel.toggleSecureScreen(it) }
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(Spacing.md))
+
         // ── 数据库加密（SQLCipher，P1）──
         Card(
             modifier = Modifier.fillMaxWidth(),

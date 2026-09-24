@@ -13,6 +13,7 @@ import com.mini.me_core.datalayer.engine.MigrationStateStore
 import com.mini.me_core.feature.agent.domain.zth.ZthPerformanceClass
 import com.mini.me_core.feature.agent.domain.zth.ZthPresetTier
 import com.mini.me_core.feature.settings.data.repository.ZthTierRepository
+import com.mini.me_core.feature.settings.data.repository.SecureScreenRepository
 import com.mini.me_core.feature.workspace.domain.RemoteAuditAction
 import com.mini.me_core.feature.workspace.domain.RemoteAuditCategory
 import com.mini.me_core.feature.workspace.domain.repository.RemoteAuditLogRepository
@@ -46,7 +47,9 @@ data class SecurityUiState(
     // ZTH 三字段（Phase 3.4）：默认值仅用于 UI 初始帧；真实值由 tierFlow 组合覆盖
     val zthTier: ZthPresetTier = ZthPresetTier.BALANCED,
     val zthPerfClass: ZthPerformanceClass = ZthPerformanceClass.HIGH_END,
-    val zthSwipeEnabled: Boolean = true
+    val zthSwipeEnabled: Boolean = true,
+    // 防截图录屏：模型供应商编辑页是否启用 FLAG_SECURE
+    val secureScreenEnabled: Boolean = true
 )
 
 @HiltViewModel
@@ -56,9 +59,10 @@ class SecuritySettingsViewModel @Inject constructor(
     private val zthTierRepository: ZthTierRepository,
     private val dbMigrationEngine: DbEncryptionMigrationEngine,
     private val dbMigrationStateStore: MigrationStateStore,
+    private val secureScreenRepository: SecureScreenRepository,
 ) : ViewModel() {
 
-    // BaseState（凭据/轮换部分）+ ZTH StateFlow 三字段 → 合成一个统一 SecurityUiState
+    // BaseState（凭据/轮换部分）+ ZTH StateFlow 三字段 + 防截图开关 → 合成一个统一 SecurityUiState
     private val _baseState = MutableStateFlow(SecurityUiState())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -67,9 +71,10 @@ class SecuritySettingsViewModel @Inject constructor(
             _baseState,
             zthTierRepository.tierFlow,
             zthTierRepository.perfClassFlow,
-            zthTierRepository.swipeEnabledFlow
-        ) { base, tier, perf, swipe ->
-            base.copy(zthTier = tier, zthPerfClass = perf, zthSwipeEnabled = swipe)
+            zthTierRepository.swipeEnabledFlow,
+            secureScreenRepository.enabledFlow
+        ) { base, tier, perf, swipe, secure ->
+            base.copy(zthTier = tier, zthPerfClass = perf, zthSwipeEnabled = swipe, secureScreenEnabled = secure)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
@@ -339,6 +344,16 @@ class SecuritySettingsViewModel @Inject constructor(
                 enabled
             }
             _baseState.value = _baseState.value.copy(zthSwipeEnabled = actual)
+        }
+    }
+
+    // ── 防截图录屏开关 ──
+    fun toggleSecureScreen(enabled: Boolean) {
+        viewModelScope.launch {
+            secureScreenRepository.setEnabled(enabled)
+            _baseState.value = _baseState.value.copy(
+                successMessage = "防截图录屏已${if (enabled) "开启" else "关闭"}"
+            )
         }
     }
 }

@@ -29,6 +29,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -93,6 +94,8 @@ fun AddProviderSheet(
     var customShowApiKey by remember { mutableStateOf(false) }
     var autoActivate by remember { mutableStateOf(false) }
     var customApiPath by remember { mutableStateOf("") }
+    var customUseCustomApiPath by remember { mutableStateOf(false) }
+    var customApiPathError by remember { mutableStateOf(false) }
 
     // 连通性测试状态
     val connectionTestState by viewModel.connectionTestState.collectAsStateWithLifecycle()
@@ -129,6 +132,12 @@ fun AddProviderSheet(
         if (customStep < 2) {
             customStep++
         } else {
+            // 自定义 API Path 时不能为空
+            if (customUseCustomApiPath && customApiPath.isBlank()) {
+                customApiPathError = true
+                android.widget.Toast.makeText(context, "自定义 API Path 不能为空", android.widget.Toast.LENGTH_SHORT).show()
+                return
+            }
             val provider = AIProviderConfig(
                 id = UUID.randomUUID().toString(),
                 name = customName.ifEmpty { "自定义供应商" },
@@ -140,7 +149,7 @@ fun AddProviderSheet(
                 models = customModels,
                 selectedModel = customModels.firstOrNull().orEmpty(),
                 isEnabled = true,
-                apiPath = customApiPath.ifBlank { defaultProviderApiPath(customType) }
+                apiPath = if (customUseCustomApiPath) customApiPath.trim() else defaultProviderApiPath(customType)
             )
             onSave(provider)
             viewModel.resetConnectionTest()
@@ -224,7 +233,16 @@ fun AddProviderSheet(
                     },
                     viewModel = viewModel,
                     apiPath = customApiPath,
-                    onApiPathChange = { customApiPath = it },
+                    onApiPathChange = {
+                        customApiPath = it
+                        customApiPathError = it.isBlank()
+                    },
+                    useCustomApiPath = customUseCustomApiPath,
+                    onUseCustomApiPathChange = {
+                        customUseCustomApiPath = it
+                        if (!it) customApiPathError = false
+                    },
+                    apiPathError = customApiPathError,
                     connectionTestState = connectionTestState,
                     onTestConnection = {
                         viewModel.testProviderConnection(
@@ -238,7 +256,8 @@ fun AddProviderSheet(
                                 isActive = false,
                                 models = emptyList(),
                                 selectedModel = "",
-                                isEnabled = true
+                                isEnabled = true,
+                                apiPath = if (customUseCustomApiPath) customApiPath.trim() else defaultProviderApiPath(customType)
                             )
                         )
                     }
@@ -315,6 +334,9 @@ private fun CustomProviderContent(
     viewModel: SettingsViewModel,
     apiPath: String,
     onApiPathChange: (String) -> Unit,
+    useCustomApiPath: Boolean,
+    onUseCustomApiPathChange: (Boolean) -> Unit,
+    apiPathError: Boolean,
     connectionTestState: ConnectionTestState,
     onTestConnection: () -> Unit
 ) {
@@ -368,7 +390,22 @@ private fun CustomProviderContent(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // ── 测试连接按钮 + 内联结果 ──
+                OutlinedTextField(
+                    value = baseUrl,
+                    onValueChange = onBaseUrlChange,
+                    label = { Text("Base URL") },
+                    placeholder = { Text(defaultProviderBaseUrl(type)) },
+                    singleLine = true,
+                    isError = baseUrlError,
+                    supportingText = {
+                        if (baseUrlError) {
+                            Text("Base URL 需以 http:// 或 https:// 开头", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // ── 测试连接按钮 + 内联结果（放在 Base URL 下方）──
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(
                         onClick = onTestConnection,
@@ -395,48 +432,38 @@ private fun CustomProviderContent(
                     }
                 }
 
-                OutlinedTextField(
-                    value = baseUrl,
-                    onValueChange = onBaseUrlChange,
-                    label = { Text("Base URL") },
-                    placeholder = { Text(defaultProviderBaseUrl(type)) },
-                    singleLine = true,
-                    isError = baseUrlError,
-                    supportingText = {
-                        if (baseUrlError) {
-                            Text("Base URL 需以 http:// 或 https:// 开头", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                // ── 高级选项折叠区（API Path） ──
-                var advancedExpanded by remember { mutableStateOf(false) }
+                // ── API Path 开关模式：默认关闭自动补充，打开后手动填写且不能为空 ──
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { advancedExpanded = !advancedExpanded },
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        "高级选项",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Icon(
-                        if (advancedExpanded) Icons.Rounded.KeyboardArrowDown else Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                        contentDescription = null
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("自定义 API Path", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                        Text(
+                            if (useCustomApiPath) "手动填写请求路径，不能为空" else "自动使用默认路径：${defaultProviderApiPath(type)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = useCustomApiPath,
+                        onCheckedChange = onUseCustomApiPathChange
                     )
                 }
-                if (advancedExpanded) {
+                if (useCustomApiPath) {
                     OutlinedTextField(
                         value = apiPath,
                         onValueChange = onApiPathChange,
                         label = { Text("API Path") },
                         placeholder = { Text(defaultProviderApiPath(type)) },
                         singleLine = true,
-                        supportingText = { Text("一般无需修改", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        isError = apiPathError,
+                        supportingText = {
+                            if (apiPathError) {
+                                Text("API Path 不能为空", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
