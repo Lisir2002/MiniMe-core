@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.logs.data.DefaultFileMode
 import com.mini.logs.data.FontSize
+import com.mini.logs.BuildConfig
 import com.mini.logs.data.LogDirResolver
 import com.mini.logs.data.SafDirectoryManager
 import com.mini.logs.data.SettingsStore
@@ -307,7 +308,7 @@ fun SettingsScreen(
             ValueSettingRow(
                 icon = Icons.Rounded.Info,
                 title = "版本",
-                valueText = "1.0.0",
+                valueText = BuildConfig.VERSION_NAME,
                 onClick = null,
             )
             AppDivider(horizontalPadding = 68.dp)
@@ -319,13 +320,6 @@ fun SettingsScreen(
                     clipboard.setText(AnnotatedString(LOG_DIR_PATH))
                     toast("已复制到剪贴板")
                 },
-            )
-            AppDivider(horizontalPadding = 68.dp)
-            ValueSettingRow(
-                icon = Icons.Rounded.Info,
-                title = "开源声明",
-                valueText = null,
-                onClick = { toast("功能开发中") },
             )
         }
     }

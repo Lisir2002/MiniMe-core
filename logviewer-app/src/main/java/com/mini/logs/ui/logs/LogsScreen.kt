@@ -1,6 +1,7 @@
 package com.mini.logs.ui.logs
 
 import android.widget.Toast
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -64,6 +65,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mini.logs.data.LogEntry
 import com.mini.logs.data.LogsViewModel
 import com.mini.logs.data.ScrollRequest
+import com.mini.logs.ui.components.LogListSkeleton
 import com.mini.logs.util.FormatUtils
 import com.mini.me_core.core.theme.components.AppButton
 import com.mini.me_core.core.theme.components.AppCard
@@ -452,10 +454,14 @@ fun LogsScreen(
                 }
             } else {
                 Box(modifier = Modifier.weight(1f)) {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
+                    Crossfade(targetState = isLoading, label = "logs-content") { loading ->
+                        if (loading) {
+                            LogListSkeleton()
+                        } else {
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(),
+                            ) {
                         itemsIndexed(
                             items = filteredEntries,
                             key = { index, entry -> "${entry.sourceFile}_${entry.lineNumber}_$index" },
@@ -499,6 +505,8 @@ fun LogsScreen(
                             )
                         }
                     }
+                        }
+                    }
 
                     // ── 浮动按钮层 ──
                     Column(
@@ -526,7 +534,7 @@ fun LogsScreen(
                                 containerColor = colors.brandPrimary,
                             ) {
                                 Text(
-                                    text = "↓ 有 ${if (tailingState.newLinesCount > 99) "99+" else tailingState.newLinesCount} 条新日志",
+                                    text = "↑ 有 ${if (tailingState.newLinesCount > 99) "99+" else tailingState.newLinesCount} 条新日志",
                                     color = colors.onBrandPrimary,
                                     fontSize = 12.sp,
                                 )

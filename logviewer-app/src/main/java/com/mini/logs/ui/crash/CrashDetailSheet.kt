@@ -152,7 +152,7 @@ fun CrashDetailSheet(
                             },
                         )
                     },
-                    variant = AppButtonVariant.Outlined,
+                    variant = AppButtonVariant.Tonal,
                     size = AppButtonSize.Small,
                     modifier = Modifier.weight(1f),
                 )

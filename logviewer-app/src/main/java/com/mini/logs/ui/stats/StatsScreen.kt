@@ -1,5 +1,6 @@
 package com.mini.logs.ui.stats
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,9 +35,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mini.logs.data.AppDataSession
 import com.mini.logs.data.LogRepository
 import com.mini.logs.data.LogStatistics
 import com.mini.logs.data.StatsCalculator
+import com.mini.logs.ui.components.StatsSkeleton
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.components.AppCard
 import com.mini.me_core.core.theme.components.AppCardVariant
@@ -56,7 +60,10 @@ fun StatsScreen() {
     var stats by remember { mutableStateOf<LogStatistics?>(null) }
     var isLoading by remember { mutableStateOf(false) }
 
-    LaunchedEffect(range) {
+    // 监听全局数据版本：日志目录切换时自动重新加载
+    val dataVersion by AppDataSession.dataVersion.collectAsState()
+
+    LaunchedEffect(range, dataVersion) {
         isLoading = true
         val files = repository.listLogFiles()
         val (currentFiles, prevFiles) = selectFilesForRange(files, range)
@@ -78,19 +85,17 @@ fun StatsScreen() {
             },
         )
 
-        when {
-            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = colors.brandPrimary)
+        Crossfade(targetState = isLoading, label = "stats-content") { loading ->
+            when {
+                loading -> StatsSkeleton()
+                stats == null || stats!!.totalLines == 0 -> AppEmptyState(
+                    title = "暂无日志数据",
+                    subtitle = "在「日志」页产生日志后即可查看统计",
+                    icon = Icons.Rounded.BarChart,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                else -> StatsContent(stats = stats!!)
             }
-
-            stats == null || stats!!.totalLines == 0 -> AppEmptyState(
-                title = "暂无日志数据",
-                subtitle = "在「日志」页产生日志后即可查看统计",
-                icon = Icons.Rounded.BarChart,
-                modifier = Modifier.fillMaxSize(),
-            )
-
-            else -> StatsContent(stats = stats!!)
         }
     }
 }

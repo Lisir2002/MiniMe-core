@@ -1,6 +1,7 @@
 package com.mini.logs.ui.crash
 
 import android.content.Intent
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,9 +38,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mini.logs.data.AppDataSession
 import com.mini.logs.data.CrashAggregator
 import com.mini.logs.data.CrashGroup
 import com.mini.logs.data.LogRepository
+import com.mini.logs.ui.components.CrashSkeleton
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.components.AppEmptyState
 import com.mini.me_core.core.theme.components.AppTopAppBar
@@ -71,7 +75,10 @@ fun CrashScreen() {
     var filter by remember { mutableStateOf(CrashFilter.ALL) }
     var detailCrash by remember { mutableStateOf<CrashGroup?>(null) }
 
-    LaunchedEffect(Unit) {
+    // 监听全局数据版本：日志目录切换时自动重新加载
+    val dataVersion by AppDataSession.dataVersion.collectAsState()
+
+    LaunchedEffect(dataVersion) {
         isLoading = true
         val files = repository.listLogFiles()
         val entries = repository.loadEntries(files, maxLines = 60_000)
@@ -112,38 +119,36 @@ fun CrashScreen() {
             },
         )
 
-        when {
-            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = colors.brandPrimary)
-            }
-
-            rawCrashes.isEmpty() -> AppEmptyState(
-                title = "暂无崩溃记录",
-                subtitle = "✅ 运行日志中未发现 ERROR / FATAL 崩溃",
-                icon = Icons.Rounded.CheckCircleOutline,
-                modifier = Modifier.fillMaxSize(),
-            )
-
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                item {
-                    Text(
-                        text = "${rawCrashes.size} 类崩溃 · 共 ${rawCrashes.sumOf { it.occurrences }} 次",
-                        fontSize = 12.sp,
-                        color = colors.textSecondary,
-                    )
-                    Spacer(Modifier.height(Spacing.sm))
-                }
-                items(crashes, key = { it.key }) { crash ->
-                    CrashCard(
-                        crash = crash,
-                        onClick = { detailCrash = crash },
-                        onCopy = { clipboard.setText(AnnotatedString(crash.fullStackTrace)) },
-                        onToggleFixed = { toggleFixed(crash) },
-                    )
+        Crossfade(targetState = isLoading, label = "crash-content") { loading ->
+            when {
+                loading -> CrashSkeleton()
+                rawCrashes.isEmpty() -> AppEmptyState(
+                    title = "暂无崩溃记录",
+                    subtitle = "✅ 运行日志中未发现 ERROR / FATAL 崩溃",
+                    icon = Icons.Rounded.CheckCircleOutline,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                else -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    item {
+                        Text(
+                            text = "${rawCrashes.size} 类崩溃 · 共 ${rawCrashes.sumOf { it.occurrences }} 次",
+                            fontSize = 12.sp,
+                            color = colors.textSecondary,
+                        )
+                        Spacer(Modifier.height(Spacing.sm))
+                    }
+                    items(crashes, key = { it.key }) { crash ->
+                        CrashCard(
+                            crash = crash,
+                            onClick = { detailCrash = crash },
+                            onCopy = { clipboard.setText(AnnotatedString(crash.fullStackTrace)) },
+                            onToggleFixed = { toggleFixed(crash) },
+                        )
+                    }
                 }
             }
         }

@@ -1,6 +1,8 @@
 package com.mini.logs.ui.logs
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -261,7 +263,9 @@ private fun CompactRow(
             color = colors.textPrimary,
             maxLines = if (isExpanded) Int.MAX_VALUE else 1,
             lineHeight = 16.sp,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .horizontalScroll(rememberScrollState()),
         )
     }
 }

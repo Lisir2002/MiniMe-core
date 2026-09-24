@@ -53,11 +53,13 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
                 val today = refs.firstOrNull { it.fileName.contains(todayString()) } ?: refs.first()
                 _selectedFiles.value = setOf(today.fileName)
             }
-            loadLogs()
+            loadLogsSuspend()
             _isLoading.value = false
+            // 通知全局：日志源已变更，统计/崩溃等页面同步刷新
+            AppDataSession.notifyDataSourceChanged()
 
             _statusMessage.value = when {
-                refs.isNotEmpty() -> "已选择目录，找到 ${refs.size} 个日志文件" +
+                refs.isNotEmpty() -> "已切换日志目录，找到 ${refs.size} 个日志文件" +
                     if (persisted) "" else "（持久化授权失败，重启后可能需重新选择）"
                 else -> "该目录中未找到日志文件（log-*.txt），请确认选择的是日志目录"
             }
@@ -161,29 +163,32 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 加载选中文件的日志（suspend 版本，供尾随等需要同步结果的场景调用）。 */
+    private suspend fun loadLogsSuspend() {
+        val refs = _logFileRefs.value.filter { it.fileName in _selectedFiles.value }
+        val entries = repository.loadEntriesFromRefs(refs, settings.maxLoadLines)
+
+        val highlights = settings.highlights
+        val bookmarks = settings.bookmarks
+        val enriched = entries.map { entry ->
+            val key = "${entry.sourceFile}:${entry.lineNumber}"
+            entry.copy(
+                isHighlighted = highlights.containsKey(key),
+                highlightColor = highlights[key] ?: -1,
+                bookmarkNote = bookmarks[key],
+            )
+        }
+
+        _allEntries.value = enriched.reversed()  // 倒序：最新日志在顶部
+        _levelCounts.value = repository.countByLevel(enriched)
+        _tagCounts.value = repository.countByTag(enriched)
+        applyFilter()
+    }
+
     /** 加载选中文件的日志。 */
     fun loadLogs() {
         viewModelScope.launch {
-            _isLoading.value = true
-            val refs = _logFileRefs.value.filter { it.fileName in _selectedFiles.value }
-            val entries = repository.loadEntriesFromRefs(refs, settings.maxLoadLines)
-
-            // 恢复高亮和书签
-            val highlights = settings.highlights
-            val bookmarks = settings.bookmarks
-            val enriched = entries.map { entry ->
-                val key = "${entry.sourceFile}:${entry.lineNumber}"
-                entry.copy(
-                    isHighlighted = highlights.containsKey(key),
-                    highlightColor = highlights[key] ?: -1,
-                    bookmarkNote = bookmarks[key],
-                )
-            }
-
-            _allEntries.value = enriched
-            _levelCounts.value = repository.countByLevel(enriched)
-            _tagCounts.value = repository.countByTag(enriched)
-            applyFilter()
+            loadLogsSuspend()
             _isLoading.value = false
         }
     }
@@ -463,8 +468,10 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun resumeTailing() {
         _tailingState.value = _tailingState.value.copy(isPaused = false, newLinesCount = 0)
-        loadLogs()
-        _scrollRequest.value = ScrollRequest.ToBottom
+        viewModelScope.launch {
+            loadLogsSuspend()
+            _scrollRequest.value = ScrollRequest.ToTop
+        }
     }
 
     private fun startTailing() {
@@ -476,10 +483,11 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
             while (true) {
                 delay(1000)
                 val before = _allEntries.value.size
-                loadLogs()
+                // 同步加载，确保 after 反映真实加载结果
+                loadLogsSuspend()
                 val after = _allEntries.value.size
-                val newLines = after - before
-                linesInWindow += newLines.coerceAtLeast(0)
+                val newLines = (after - before).coerceAtLeast(0)
+                linesInWindow += newLines
 
                 val now = System.currentTimeMillis()
                 if (now - lastTick >= 3000) {
@@ -490,7 +498,8 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
                 }
 
                 if (!_tailingState.value.isPaused && newLines > 0) {
-                    _scrollRequest.value = ScrollRequest.ToBottom
+                    // 倒序显示：最新在顶部，新日志到达时滚动到顶部
+                    _scrollRequest.value = ScrollRequest.ToTop
                 } else if (_tailingState.value.isPaused && newLines > 0) {
                     _tailingState.value = _tailingState.value.copy(
                         newLinesCount = _tailingState.value.newLinesCount + newLines

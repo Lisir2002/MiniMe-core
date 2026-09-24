@@ -134,7 +134,7 @@ fun FileSelectorSheet(
                 AppButton(
                     text = "重置",
                     onClick = onReset,
-                    variant = AppButtonVariant.Outlined,
+                    variant = AppButtonVariant.Tonal,
                     size = AppButtonSize.Small,
                     modifier = Modifier.weight(1f),
                 )
