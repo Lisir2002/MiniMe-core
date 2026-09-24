@@ -32,19 +32,13 @@
 - `[settings]` 供应商编辑页高级参数标注「默认值，模型可单独覆盖」，引导用户到模型设置面板精细化配置
 - `[settings]` 压缩模型默认图标更换，更贴合语义
 - `[settings]` 「跟随对话」选项增加图标标识
+- `[db]` 新增 `model_sampling_configs` 表（migration 4.sqm），与能力覆盖表、上下文长度表物理隔离；migration 同时对 `model_capability_overrides` 扩列 4 列
+- `[agent]` 采样参数解析链路改为严格优先级：模型级覆盖（非 null）> 供应商级默认 > 系统默认；模型级字段为 null 时完全继承供应商值，不做合并计算；请求链路在 StatefulAgentWorkflow 与 SubAgentRunner 创建 provider 时注入解析结果
 
 ### Fixed
 
 - `[settings]` 删除供应商时级联清理所有关联模型的采样参数覆盖配置，避免孤儿数据
 - `[settings]` 模型级采样参数覆盖不污染供应商配置：模型级读写绝不修改 AIProviderConfig，清除覆盖只删模型表行
-
-### 技术细节
-
-- 新建独立 `model_sampling_configs` 表（migration 4.sqm），与能力覆盖表、上下文长度表物理隔离
-- 严格优先级链：模型级覆盖（非null）> 供应商级默认 > 系统默认
-- 模型级字段为 null 时完全继承供应商值，不做合并计算
-- 请求链路注入：StatefulAgentWorkflow 和 SubAgentRunner 创建 provider 时解析模型级覆盖
-- 数据库 migration 4.sqm 同时包含 model_capability_overrides 扩列（4列）和 model_sampling_configs 建表
 
 ## [0.0.0.14] - 2026-09-24
 
