@@ -80,6 +80,17 @@
     <string name="mcp_overview_external_connected">外部已连接 %1$d/%2$d</string>
     <string name="mcp_overview_open_running">开放服务运行中</string>
     <string name="mcp_overview_open_stopped">开放服务已停止</string>
+    <string name="mcp_error_details">错误详情</string>
+    <string name="mcp_tap_to_view_error">点击查看错误详情</string>
+    <string name="mcp_tap_to_hide_error">收起错误详情</string>
+    <string name="mcp_add_server_button">添加外部服务器</string>
+    <string name="mcp_add_first_server">添加第一个服务器</string>
+    <string name="mcp_show_token">显示令牌</string>
+    <string name="mcp_hide_token">隐藏令牌</string>
+    <string name="mcp_regenerate_confirm_title">重新生成令牌</string>
+    <string name="mcp_regenerate_confirm_message">重新生成令牌会断开所有已连接客户端，确认继续？</string>
+    <string name="mcp_regenerate_confirm">确认重新生成</string>
+    <string name="mcp_security_banner">开放服务在局域网暴露工具，请勿在不可信网络使用</string>
     <string name="settings_container_current">当前：%1$s</string>
     <string name="settings_container_builtin_alpine">内置 Alpine</string>
     <string name="settings_log_current">当前：%1$s</string>

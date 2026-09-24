@@ -28,20 +28,29 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -119,6 +128,20 @@ internal fun McpSection(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        if (onAddServer != null) {
+                            Spacer(Modifier.height(Spacing.sm))
+                            Button(
+                                onClick = onAddServer,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            ) {
+                                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.mcp_add_first_server))
+                            }
+                        }
                     }
                 }
             }
@@ -130,6 +153,24 @@ internal fun McpSection(
                     onClick = { onEdit(server) },
                     onDelete = { onDelete(server.name) }
                 )
+            }
+            if (onAddServer != null) {
+                item {
+                    Button(
+                        onClick = onAddServer,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        shape = RoundedCornerShape(LocalCornerRadius.current.xxl)
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.mcp_add_server_button))
+                    }
+                }
             }
         }
     }
@@ -145,6 +186,8 @@ internal fun McpServerRow(
     onDelete: () -> Unit
 ) {
     val isConnected = server.enabled && status?.state == McpServerStatus.State.CONNECTED
+    val hasError = status?.state == McpServerStatus.State.FAILED && !status.error.isNullOrBlank()
+    var expanded by remember { mutableStateOf(false) }
 
     val statusText = when {
         !server.enabled -> stringResource(R.string.mcp_disabled)
@@ -287,6 +330,8 @@ internal fun McpServerRow(
                         coroutineScope.launch {
                             offsetX.animateTo(0f, spring(stiffness = Spring.StiffnessMedium))
                         }
+                    } else if (hasError) {
+                        expanded = !expanded
                     } else {
                         onClick()
                     }
@@ -295,6 +340,7 @@ internal fun McpServerRow(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
+            Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -381,7 +427,7 @@ internal fun McpServerRow(
 
                         // 3. 工具数量/信息 Pill
                         val infoText = when {
-                            isConnected -> stringResource(R.string.mcp_tools_count, status?.toolCount ?: 0, status?.toolCount ?: 0)
+                            isConnected -> stringResource(R.string.mcp_tools_count, status?.toolCount ?: 0, status?.totalToolCount ?: 0)
                             server.isStdio -> server.command.orEmpty().ifEmpty { "stdio" }
                             else -> server.url.orEmpty().ifEmpty { "HTTP" }
                         }
@@ -406,13 +452,50 @@ internal fun McpServerRow(
 
                 Spacer(modifier = Modifier.width(Spacing.sm))
 
-                // 右侧箭头
+                // 右侧箭头：失败时显示展开/收起箭头，否则显示前进箭头
                 Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                    contentDescription = stringResource(R.string.mcp_details),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    imageVector = when {
+                        hasError && expanded -> Icons.Rounded.KeyboardArrowUp
+                        hasError -> Icons.Rounded.KeyboardArrowDown
+                        else -> Icons.AutoMirrored.Rounded.KeyboardArrowRight
+                    },
+                    contentDescription = stringResource(
+                        if (hasError) {
+                            if (expanded) R.string.mcp_tap_to_hide_error else R.string.mcp_tap_to_view_error
+                        } else {
+                            R.string.mcp_details
+                        }
+                    ),
+                    tint = if (hasError) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
+            }
+
+            // 失败错误详情展开区域
+            if (hasError && expanded) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                ) {
+                    Text(
+                        text = stringResource(R.string.mcp_error_details),
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = status.error ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             }
         }
     }

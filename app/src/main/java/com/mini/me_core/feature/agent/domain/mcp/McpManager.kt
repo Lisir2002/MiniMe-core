@@ -24,6 +24,7 @@ data class McpServerStatus(
     val name: String,
     val state: State,
     val toolCount: Int = 0,
+    val totalToolCount: Int = 0,
     val error: String? = null
 ) {
     enum class State { CONNECTING, CONNECTED, FAILED, DISABLED }
@@ -123,7 +124,7 @@ class McpManager @Inject constructor(
                 }
             }
             FileLogger.i(TAG, "[${cfg.name}] 连接成功，注册 ${enabledTools.size}/${tools.size} 个工具")
-            McpServerStatus(cfg.name, McpServerStatus.State.CONNECTED, toolCount = enabledTools.size)
+            McpServerStatus(cfg.name, McpServerStatus.State.CONNECTED, toolCount = enabledTools.size, totalToolCount = tools.size)
         } catch (e: Exception) {
             FileLogger.e(TAG, "[${cfg.name}] 连接失败", e)
             McpServerStatus(cfg.name, McpServerStatus.State.FAILED, error = e.message)

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -32,12 +33,16 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,12 +85,41 @@ internal fun McpServerSection(
 ) {
     val context = LocalContext.current
     var portText by remember(port) { mutableStateOf(port.toString()) }
+    var tokenVisible by remember { mutableStateOf(false) }
+    var showRegenerateConfirm by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
+        // ── 安全提示横幅 ──
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                        RoundedCornerShape(LocalCornerRadius.current.lg)
+                    )
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Rounded.Security,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Spacer(Modifier.width(Spacing.sm))
+                Text(
+                    text = stringResource(R.string.mcp_security_banner),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
+
         // ── 状态卡 ──
         item {
             Card(
@@ -294,14 +328,24 @@ internal fun McpServerSection(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = token,
+                            text = if (tokenVisible) token else maskToken(token),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
-                        IconButton(onClick = { onRegenerateToken() }) {
+                        IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                            Icon(
+                                if (tokenVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                contentDescription = stringResource(
+                                    if (tokenVisible) R.string.mcp_hide_token else R.string.mcp_show_token
+                                ),
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = { showRegenerateConfirm = true }) {
                             Icon(
                                 Icons.Rounded.Refresh,
                                 contentDescription = stringResource(R.string.settings_mcp_server_regenerate),
@@ -322,6 +366,33 @@ internal fun McpServerSection(
             }
         }
     }
+
+    if (showRegenerateConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRegenerateConfirm = false },
+            title = { Text(stringResource(R.string.mcp_regenerate_confirm_title)) },
+            text = { Text(stringResource(R.string.mcp_regenerate_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRegenerateConfirm = false
+                    onRegenerateToken()
+                }) {
+                    Text(stringResource(R.string.mcp_regenerate_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRegenerateConfirm = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
+    }
+}
+
+/** 令牌掩码：前4位 + 省略号 + 后4位。 */
+private fun maskToken(token: String): String {
+    if (token.length <= 8) return "••••"
+    return "${token.take(4)}••••${token.takeLast(4)}"
 }
 
 /** 复制文本到系统剪贴板。 */
