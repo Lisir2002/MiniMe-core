@@ -8,23 +8,13 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Lisir2002/MiniMe-core/releases/latest"><img src="https://img.shields.io/github/v/release/Lisir2002/MiniMe-core?display_name=tag&include_prereleases" alt="Latest Release" /></a>
+  <a href="https://github.com/Lisir2002/MiniMe-core/releases"><img src="https://img.shields.io/github/downloads/Lisir2002/MiniMe-core/total" alt="Total Downloads" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="License GPL-3.0" /></a>
   <img src="https://img.shields.io/badge/Platform-Android-green.svg" alt="Android Platform" />
   <img src="https://img.shields.io/badge/Language-Kotlin-purple.svg" alt="Kotlin" />
   <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4.svg" alt="Jetpack Compose UI" />
   <img src="https://img.shields.io/badge/MinSDK-26-orange.svg" alt="Min SDK 26 (Android 8.0)" />
-  <a href="https://github.com/Lisir2002/deepcode-R/actions"><img src="https://github.com/Lisir2002/deepcode-R/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
-  <a href="https://github.com/Lisir2002/deepcode-R/releases/latest"><img src="https://img.shields.io/github/v/release/Lisir2002/deepcode-R?display_name=tag&include_prereleases" alt="Latest Release" /></a>
-  <a href="https://github.com/Lisir2002/deepcode-R/releases"><img src="https://img.shields.io/github/downloads/Lisir2002/deepcode-R/total" alt="Total Downloads" /></a>
-</p>
-
-<p align="center">
-  <table>
-    <tr>
-      <td align="center">主页 · AI 对话</td>
-      <td align="center">终端 · Alpine Linux</td>
-    </tr>
-  </table>
 </p>
 
 ---
@@ -33,8 +23,10 @@
 
 - [简介](#简介)
 - [功能特性](#功能特性)
+- [附属应用](#附属应用)
 - [安装](#安装)
 - [快速上手](#快速上手)
+- [常见问题](#常见问题)
 - [开发者：构建与测试](#开发者构建与测试)
 - [技术栈](#技术栈)
 - [项目结构](#项目结构)
@@ -48,12 +40,15 @@
 
 MiniMe-core 是一款在 Android 手机上运行的 AI 编程工具，将大语言模型与本地 Linux 开发环境深度集成。它内置 Alpine Linux 容器和终端模拟器，让 AI 能直接读写文件、执行 Shell 命令、运行构建工具；同时支持远程 SSH 服务器作为执行后端，把手机变成远程项目的移动工作站。
 
+**最新版本**：[v0.0.0.15](https://github.com/Lisir2002/MiniMe-core/releases/tag/v0.0.0.15) — 模型级采样参数独立调节与默认模型选择体验升级
+
 ## 功能特性
 
-- **AI Agent** — 支持 Anthropic（Claude）、OpenAI（GPT）、Gemini 等多家提供商，通过 **20+ 个内置工具**（文件读写/编辑、Shell 执行、终端管理、网页搜索/抓取、图片生成、MCP 管理等）与开发环境深度交互；支持流式输出、上下文压缩、多会话管理、PLAN/BUILD/AUTO 三种执行模式
-- **权限与安全** — 七层权限评估引擎：灾难性命令拦截、PLAN 模式只读约束、Shell 静态分析、内置只读白名单、用户审批与规则记忆，确保 AI 操作可控
+- **AI Agent** — 支持 Anthropic（Claude）、OpenAI（GPT）、Gemini 等多家提供商，通过 20+ 个内置工具（文件读写/编辑、Shell 执行、终端管理、网页搜索/抓取、图片生成、MCP 管理等）与开发环境深度交互；支持流式输出、上下文压缩、多会话管理、PLAN/BUILD/AUTO 三种执行模式
+- **模型管理** — 自定义模型供应商配置，8 维能力标签（识图/视频/语音/工具/思考/代码/结构化输出/上下文窗口），模型级采样参数独立调节，供应商级连通性测试，故障转移与备用供应商
+- **权限与安全** — 七层权限评估引擎：灾难性命令拦截、PLAN 模式只读约束、Shell 静态分析、内置只读白名单、用户审批与规则记忆，确保 AI 操作可控；供应商编辑页支持防截图录屏
 - **检查点与回滚** — 文件修改前自动创建检查点快照，支持随时回滚到任意检查点
-- **内置终端** — 基于 Termux 组件 + PRoot Alpine Linux 容器，提供完整 Linux 命令行环境，支持后台常驻、多标签管理、**7 个内置功能包**（Python/Node/Git/Bash/rg/网络工具/QEMU x86 转译）
+- **内置终端** — 基于 Termux 组件 + PRoot Alpine Linux 容器，提供完整 Linux 命令行环境，支持后台常驻、多标签管理、7 个内置功能包（Python/Node/Git/Bash/rg/网络工具/QEMU x86 转译）
 - **远程 SSH 模式** — 连接远程 SSH 服务器作为执行后端，命令走 exec channel、文件读写走 exec + cat/base64、终端走 shell channel，支持自动重连与状态指示
 - **MCP 协议** — Model Context Protocol 客户端，连接本地（stdio）或远程（HTTP）MCP 服务器动态扩展工具能力
 - **Git 集成** — 内置可视化 Git 操作（状态/分支/提交/标签/拓扑图），三端凭据统一管理（UI Git / AI Bash / 终端 git 共用同一份凭据）
@@ -62,34 +57,59 @@ MiniMe-core 是一款在 Android 手机上运行的 AI 编程工具，将大语�
 - **Markdown 渲染** — AI 对话中实时渲染 Markdown，支持代码高亮
 - **自定义提示词** — 系统提示词支持用户自定义覆盖，App 升级不丢失
 
+## 附属应用
+
+| 应用 | 说明 | 最新版本 |
+|------|------|----------|
+| **MiniMe Logs** | 独立日志查看附属应用，读取主应用运行日志，支持等级筛选、关键词搜索、实时尾随、崩溃分析、长按菜单等专业功能 | [v0.0.6](https://github.com/Lisir2002/MiniMe-core/releases/tag/logviewer-v0.0.6) |
+
 ## 安装
 
-> MiniMe-core 以 APK 形式发布，**无需自己编译**，直接下载安装即可。
+> MiniMe-core 以 APK 形式发布，无需自己编译，直接下载安装即可。
 
-1. 前往 [Releases 页面](https://github.com/Lisir2002/deepcode-R/releases)，下载最新版本 APK（`minime-<tag>.apk`，单包通用：真机与模拟器同一安装包）。
+1. 前往 [Releases 页面](https://github.com/Lisir2002/MiniMe-core/releases)，下载最新版本 APK。
 2. 将 APK 传输到手机/模拟器（浏览器直下 / 网盘 / USB）。
 3. 在手机上点击 APK 安装。若提示「未知来源」，需在系统设置中允许「安装未知应用」（不同品牌路径略有差异）。
 
+**安装包命名规范**：自 v0.0.0.16 起统一为 `MiniMe-{版本号}-{变体}.apk`（如 `MiniMe-v0.0.0.16-release.apk`）。历史版本使用 `minime-{版本号}.apk` 命名。
+
 **环境要求**
 
-- **真机（正式支持）**：Android 8.0+（API 26）**arm64-v8a** 设备（当前 Android 真机主流 ABI）
+- **真机（正式支持）**：Android 8.0+（API 26）arm64-v8a 设备（当前 Android 真机主流 ABI）
 - **虚拟环境（模拟器 / 虚拟机）**：x86_64 或 arm64 系统镜像均支持——同一通用包安装即用，容器按宿主架构自动选用（x86_64 走 x86_64 原生 proot，arm64 走原生执行）
 
 ## 快速上手
 
-1. **添加 AI 提供商**：进入「设置 → AI 提供商」，添加 Anthropic（Claude）/ OpenAI（GPT）/ Gemini 的 API Key。
-2. **开始对话**：回到主页输入需求，AI 即可读写文件、执行命令。可选择 **PLAN / BUILD / AUTO** 三种执行模式控制 AI 的操作自由度。
+1. **添加 AI 提供商**：进入「设置 → 模型管理」，添加自定义供应商并配置 API Key、Base URL 和模型列表。
+2. **开始对话**：回到主页输入需求，AI 即可读写文件、执行命令。可选择 PLAN / BUILD / AUTO 三种执行模式控制 AI 的操作自由度。
 3. **使用终端**：打开「终端」标签，按需安装内置功能包（Python / Node / Git / Bash 等），即可获得完整 Linux 命令行环境。
 4. **连接远程**：在设置中配置远程 SSH 服务器，即可把手机作为远程项目的移动工作站。
 5. **接入更多能力**：可通过 MCP 服务器动态扩展工具；可连接内置浏览器让 AI 读取登录态网页。
 
-> 💡 更多细节见 App 内置帮助文档（「设置 → 帮助」）与 [相关文档](#相关文档)。
+更多细节见 App 内置帮助文档（「设置 → 帮助」）与 [相关文档](#相关文档)。
+
+## 常见问题
+
+**Q：为什么无法上架 Google Play？**
+A：为支持 PRoot 容器执行，targetSdk 锁定为 28 以绕过 Android 10+ 的 W^X 策略，与 Termux 采用相同取舍，因此不符合 Google Play 的 targetSdk 要求。
+
+**Q：APK 为什么这么大？**
+A：APK 为双 ABI 通用包（arm64-v8a + x86_64），内置 Alpine Linux rootfs 和 7 个功能包，确保开箱即用。
+
+**Q：支持哪些 AI 提供商？**
+A：支持所有兼容 OpenAI / Anthropic / Gemini API 协议的自定义供应商，包括但不限于 OpenAI、Anthropic、Google Gemini、DeepSeek、通义千问、智谱 GLM、豆包、阶跃星辰等。
+
+**Q：数据安全吗？**
+A：所有 API Key 和凭据使用 Android Keystore 加密存储；备份文件使用 AES-256-GCM 加密；供应商编辑页支持防截图录屏。AI 对话数据仅存储在本地，不上传任何第三方服务器（除你配置的 AI 提供商 API 外）。
+
+**Q：如何查看应用日志？**
+A：使用附属应用 [MiniMe Logs](https://github.com/Lisir2002/MiniMe-core/releases/tag/logviewer-v0.0.6)，可读取主应用运行日志并进行专业分析。
 
 ## 开发者：构建与测试
 
 ### 环境要求
 
-- **JDK 17**
+- JDK 17
 
 ### 构建
 
@@ -118,7 +138,7 @@ keyAlias=your_alias
 keyPassword=your_key_password
 ```
 
-> `storeFile` 路径可自定义（不固定文件名），CI 会从 secrets 还原到 `app/minime.jks`。未配置时 release 会自动回退到 debug keystore 签名，保证零配置下 `assembleRelease` 也能产出 APK。
+`storeFile` 路径可自定义（不固定文件名），CI 会从 secrets 还原到 `app/minime.jks`。未配置时 release 会自动回退到 debug keystore 签名，保证零配置下 `assembleRelease` 也能产出 APK。
 
 </details>
 
@@ -132,11 +152,11 @@ keyPassword=your_key_password
 
 ### 云端构建（GitHub Actions 自动发版）
 
-发版走 Tag 驱动：在 `main` 节点上打 `v*` Tag 推送（如 `git push origin v0.1.0-rc1` / `v0.1.0`），由 [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) 自动接管 → 单测 → `assembleRelease` → 正式签名 → **ABI 双架构产物校验** → 上传 R8 mapping → 创建 GitHub Release → 挂载 `minime-<tag>.apk` → 写入 Run Summary。RC Tag（含 `-rc`）自动标记为 prerelease。
+发版走 Tag 驱动：在 `main` 节点上打 `v*` Tag 推送（如 `git push origin v0.0.0.16` / `v0.0.0.16-rc1`），由 [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) 自动接管：单测 → assembleRelease → 正式签名 → ABI 双架构产物校验 → 上传 R8 mapping → 创建 GitHub Release → 挂载 APK → 写入 Run Summary。RC Tag（含 `-rc`）自动标记为 prerelease。
 
-- **正式签名前置条件**：仓库 `Settings → Secrets → Actions` 必须配置 4 个 secrets —— `AICODE_KEYSTORE_BASE64` / `AICODE_KEYSTORE_PASSWORD` / `AICODE_KEY_ALIAS` / `AICODE_KEY_PASSWORD`。缺失任一会**静默回退到 debug keystore 签名**，产物不可上架。
+- **正式签名前置条件**：仓库 `Settings → Secrets → Actions` 必须配置 4 个 secrets —— `AICODE_KEYSTORE_BASE64` / `AICODE_KEYSTORE_PASSWORD` / `AICODE_KEY_ALIAS` / `AICODE_KEY_PASSWORD`。缺失任一会静默回退到 debug keystore 签名，产物不可上架。
 - **实时监控与产物校验**、完整命令与 CI job 详解：见 [docs/ci-release.md](./docs/ci-release.md)（云端构建发版运维手册）。
-- **Release 页面**：https://github.com/Lisir2002/deepcode-R/releases
+- **发版规范**：安装包命名、标题格式、正文格式等强制约束见 [AGENTS.md 发版规范](./AGENTS.md#发版规范最高优先级--强制约束--发版前逐条核对)。
 
 ## 技术栈
 
@@ -146,7 +166,7 @@ keyPassword=your_key_password
 | 构建 | Android Gradle Plugin 8.9.3 + KSP |
 | UI | Jetpack Compose (BOM 2025.12.01) + Material 3 |
 | 依赖注入 | Hilt 2.56.1 (Dagger) |
-| 数据库 | SQLDelight 2.2.1（6 库拓扑：agent / credentials / settings / workspace / t2i / infra；支持可选 SQLCipher AES-256 加密，默认明文，可在设置页开启；旧 Room 数据层已完全移除） |
+| 数据库 | SQLDelight 2.2.1（6 库拓扑：agent / credentials / settings / workspace / t2i / infra；支持可选 SQLCipher AES-256 加密，默认明文，可在设置页开启） |
 | 网络 | Retrofit 2.11.0 + OkHttp 4.12.0 + Gson |
 | 异步 | Kotlin Coroutines / Flow |
 | 终端 | Termux terminal-emulator + terminal-view（JNI libtermux.so） |
@@ -171,7 +191,7 @@ app/src/main/java/com/mini/me_core/
 │   ├── credentials/     # Git 凭据统一管理（三端 IPC 桥、文件同步、全局弹窗）
 │   ├── git/             # Git 可视化（状态/分支/提交/标签/拓扑图/Diff）
 │   ├── proxy/           # 网络代理（mihomo 内核、订阅、路由注入）
-│   ├── settings/        # 应用设置（AI Provider 管理、容器、MCP、远程、日志等）
+│   ├── settings/        # 应用设置（模型管理、容器、MCP、远程、日志等）
 │   ├── t2i/             # 文生图（Provider 抽象、SYNC/ASYNC/AUTO 端点）
 │   ├── terminal/        # 终端模拟与会话管理（本地 PRoot + 远程 SSH，7 个内置 Bundle）
 │   └── workspace/       # 工作区与文档管理（本地 + 远程 SFTP/FTP 同步）
@@ -179,20 +199,22 @@ app/src/main/java/com/mini/me_core/
 └── MainActivity.kt      # 主 Activity（NavHost + Drawer + 全局凭据弹窗）
 ```
 
-> 端到端架构说明围绕核心模块：`agent`（AI Agent 与 MCP 集成）、`terminal`（终端与容器）、`settings`、`git`、`workspace`、`credentials`、`backup`（详见 [AGENTS.md](./AGENTS.md#架构概览)）。
+端到端架构说明围绕核心模块：`agent`（AI Agent 与 MCP 集成）、`terminal`（终端与容器）、`settings`、`git`、`workspace`、`credentials`、`backup`（详见 [AGENTS.md](./AGENTS.md#架构概览)）。
 
 ## 相关文档
 
 | 文档 | 说明 |
 |---|---|
-| [AGENTS.md](./AGENTS.md) | **AI 协同开发规范**：资产同步纪律、Conventional Commits、分支工作流、发版流程 |
-| [docs/ci-release.md](./docs/ci-release.md) | **云端构建发版运维手册**：CI 全流程、产物校验、签名策略 |
+| [AGENTS.md](./AGENTS.md) | AI 协同开发规范：资产同步纪律、Conventional Commits、分支工作流、发版规范（最高优先级强制约束） |
+| [CHANGELOG.md](./CHANGELOG.md) | 用户面向版本更新日志 |
+| [docs/ci-release.md](./docs/ci-release.md) | 云端构建发版运维手册：CI 全流程、产物校验、签名策略 |
+| [SECURITY.md](./SECURITY.md) | 安全策略与漏洞报告 |
 | `app/src/main/assets/docs/` | App 内置帮助文档（运行时可在「设置 → 帮助」查看） |
 
 ## 已知限制
 
 - `targetSdk` 锁定为 28 以绕过 Android 10+ W^X 策略，使 PRoot 可执行；代价为无法上架 Google Play（与 Termux 同一取舍）。
-- 发布产物为**双 ABI 通用包**（arm64-v8a + x86_64）：
+- 发布产物为双 ABI 通用包（arm64-v8a + x86_64）：
   - 适配所有主流 Android 真机（骁龙/天玑/麒麟等 64 位 ARM 芯片）与 x86_64 / arm64 模拟器、虚拟机；
   - 极端罕见的主机 ABI（非 arm64/x86_64）下容器不可用，AI 核心（对话/文件/远程 SSH）仍可用，容器/终端走明确降级提示。
 
