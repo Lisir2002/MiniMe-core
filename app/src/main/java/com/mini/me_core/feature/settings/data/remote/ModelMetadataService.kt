@@ -241,8 +241,18 @@ class ModelMetadataService @Inject constructor(
             idLower.contains("reasoning") || idLower.contains("o1") || idLower.contains("o3") ||
             idLower.contains("deepseek-r") || idLower.contains("rwkv") && idLower.contains("-r") ||
             idLower.contains("qwen3-8b-a3b")
+        val probablyNonChat = idLower.contains("embedding") || idLower.contains("embed") ||
+            idLower.contains("whisper") || idLower.contains("asr") ||
+            idLower.contains("transcribe") || idLower.contains("tts") ||
+            idLower.contains("elevenlabs") || idLower.contains("dalle") ||
+            idLower.contains("flux") || idLower.contains("stable-diffusion") ||
+            idLower.contains("t2i") || idLower.contains("sora") ||
+            idLower.contains("veo") || idLower.contains("wan") ||
+            idLower.contains("t2v") || idLower.contains("生图") ||
+            idLower.contains("生视频") || idLower.contains("生语音") ||
+            idLower.contains("向量") || idLower.contains("语音识别")
         val probablyTools =
-            probablyVision || probablyReasoning || type != ProviderType.ANTHROPIC
+            !probablyNonChat && (probablyVision || probablyReasoning || type != ProviderType.ANTHROPIC)
         val probablyCode = idLower.contains("coder") || idLower.contains("code") || idLower.contains("coding") || idLower.contains("程序员")
         val probablyVideo = idLower.contains("video") || idLower.contains("omni")
         val probablyAudio = idLower.contains("audio") || idLower.contains("omni") || idLower.contains("whisper") || idLower.contains("asr") || idLower.contains("transcribe") || idLower.contains("语音")
@@ -260,7 +270,7 @@ class ModelMetadataService @Inject constructor(
             supportsCode = probablyCode,
             supportsVideo = probablyVideo,
             supportsAudio = probablyAudio,
-            supportsStructuredOutput = true,
+            supportsStructuredOutput = !probablyNonChat,
             description = modelDescription,
             source = ModelMetadata.Source.INFERRED,
             // 保留启发式命中详情，便于阶段 4 ④单模型覆盖 UI 的「智能预填 banner」展示来源。

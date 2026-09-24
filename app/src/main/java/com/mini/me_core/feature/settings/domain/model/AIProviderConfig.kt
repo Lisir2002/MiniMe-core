@@ -39,3 +39,8 @@ fun defaultProviderApiPath(type: ProviderType): String = when (type) {
     ProviderType.GEMINI -> "v1beta"
     else -> "v1/chat/completions"
 }
+
+fun ProviderType.temperatureRange(): ClosedFloatingPointRange<Float> = when (this) {
+    ProviderType.ANTHROPIC -> 0f..1f
+    else -> 0f..2f
+}

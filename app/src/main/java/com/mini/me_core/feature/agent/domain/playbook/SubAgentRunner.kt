@@ -15,6 +15,7 @@ import com.mini.me_core.feature.agent.domain.provider.AnthropicAdapter
 import com.mini.me_core.feature.agent.domain.provider.GeminiAdapter
 import com.mini.me_core.feature.agent.domain.provider.OpenAIAdapter
 import com.mini.me_core.feature.agent.domain.session.MessagePersistenceUseCase
+import okhttp3.OkHttpClient
 import com.mini.me_core.feature.agent.domain.tool.ToolCall
 import com.mini.me_core.feature.agent.domain.tool.ToolCapability
 import com.mini.me_core.feature.agent.domain.tool.ToolRegistry
@@ -62,6 +63,7 @@ class SubAgentRunner @Inject constructor(
     private val openAIApi: OpenAIApi,
     private val anthropicApi: AnthropicApi,
     private val geminiApi: GeminiApi,
+    private val okHttpClient: OkHttpClient,
     private val agentAssetRegistry: AgentAssetRegistry,
     private val policyEngine: ToolPermissionPolicyEngine,
     private val messagePersistenceUseCase: MessagePersistenceUseCase
@@ -351,9 +353,9 @@ class SubAgentRunner @Inject constructor(
         val config = aiProviderRepository.getActiveProviderSync() ?: return null
         if (config.apiKey.isBlank() || config.effectiveModel.isBlank()) return null
         val provider: AIProvider = when (config.type) {
-            ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi)
-            ProviderType.GEMINI -> GeminiAdapter(geminiApi)
-            else -> OpenAIAdapter(openAIApi)
+            ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi, okHttpClient)
+            ProviderType.GEMINI -> GeminiAdapter(geminiApi, okHttpClient)
+            else -> OpenAIAdapter(openAIApi, okHttpClient)
         }
         provider.apiKey = config.apiKey
         provider.baseUrl = config.baseUrl

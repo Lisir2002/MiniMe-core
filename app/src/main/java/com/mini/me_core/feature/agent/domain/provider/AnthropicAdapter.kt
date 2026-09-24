@@ -15,6 +15,7 @@ import com.mini.me_core.feature.agent.domain.model.AgentMessage
 import com.mini.me_core.feature.agent.domain.tool.AgentTool
 import com.mini.me_core.feature.agent.domain.tool.ToolCall
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import javax.inject.Inject
@@ -29,6 +30,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 /** P1 定点字段抽取路径：Anthropic 流式各事件所需的标量字段（点连接 = 嵌套路径，数组下标为路径段）。 */
 private val ANTHROPIC_STREAM_PATHS: List<List<String>> = listOf(
@@ -50,7 +54,8 @@ private val ANTHROPIC_STREAM_PATHS: List<List<String>> = listOf(
 )
 
 class AnthropicAdapter @Inject constructor(
-    private val api: AnthropicApi
+    private val api: AnthropicApi,
+    private val okHttpClient: OkHttpClient
 ) : AIProvider {
 
     override var apiKey = ""
@@ -65,6 +70,24 @@ class AnthropicAdapter @Inject constructor(
     override var requestTimeout = 30
     override var retryCount = 0
     override var logSessionId: String? = null
+
+    /** 构建带 requestTimeout 的超时 API 实例（非流式 complete 用）。流式仍用共享 120s client。 */
+    private fun createTimeoutApi(): AnthropicApi {
+        val timeoutSec = requestTimeout.toLong()
+        val client = okHttpClient.newBuilder()
+            .callTimeout(timeoutSec, TimeUnit.SECONDS)
+            .connectTimeout(timeoutSec, TimeUnit.SECONDS)
+            .readTimeout(timeoutSec, TimeUnit.SECONDS)
+            .writeTimeout(timeoutSec, TimeUnit.SECONDS)
+            .build()
+        val base = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        return Retrofit.Builder()
+            .baseUrl(base)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(AnthropicApi::class.java)
+    }
 
     override suspend fun complete(
         systemPrompt: String,
@@ -88,7 +111,7 @@ class AnthropicAdapter @Inject constructor(
             model = model,
             messages = anthropicMessages,
             system = systemPrompt.ifBlank { null },
-            max_tokens = this@AnthropicAdapter.maxTokens ?: 16384,
+            max_tokens = this@AnthropicAdapter.maxTokens ?: DEFAULT_ANTHROPIC_MAX_TOKENS,
             temperature = if (thinking != null) null else this@AnthropicAdapter.temperature,
             top_p = this@AnthropicAdapter.topP.takeIf { it != 1.0f },
             thinking = thinking,
@@ -99,7 +122,7 @@ class AnthropicAdapter @Inject constructor(
 
         val response = try {
             retryStaircase(maxRetries = retryCount.coerceAtLeast(0)) {
-                api.createMessage(url = url, apiKey = apiKey, request = request)
+                createTimeoutApi().createMessage(url = url, apiKey = apiKey, request = request)
             }
         } catch (e: CancellationException) {
             throw e
@@ -159,7 +182,7 @@ class AnthropicAdapter @Inject constructor(
             model = model,
             messages = anthropicMessages,
             system = systemPrompt.ifBlank { null },
-            max_tokens = this@AnthropicAdapter.maxTokens ?: 16384,
+            max_tokens = this@AnthropicAdapter.maxTokens ?: DEFAULT_ANTHROPIC_MAX_TOKENS,
             temperature = if (thinking != null) null else this@AnthropicAdapter.temperature,
             top_p = this@AnthropicAdapter.topP.takeIf { it != 1.0f },
             thinking = thinking,
@@ -309,7 +332,7 @@ class AnthropicAdapter @Inject constructor(
         val args = DeltaAccumulator(Semantic.INCREMENTAL)
     }
 
-    /** 思考强度 → Anthropic thinking 预算。budget_tokens 最小 1024，且须小于 max_tokens(16384)。 */
+    /** 思考强度 → Anthropic thinking 预算。budget_tokens 最小 1024，且须小于 max_tokens(默认4096)。 */
     private fun buildThinkingConfig(reasoningEffort: String?): AnthropicThinkingConfig? {
         if (reasoningEffort == null) return null
         val budget = when (reasoningEffort) {
@@ -447,5 +470,9 @@ class AnthropicAdapter @Inject constructor(
                 "data" to base64Data
             )
         )
+    }
+
+    companion object {
+        private const val DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
     }
 }

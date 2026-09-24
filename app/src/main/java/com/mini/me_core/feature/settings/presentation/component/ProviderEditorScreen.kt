@@ -110,6 +110,7 @@ import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.domain.model.ProviderType
 import com.mini.me_core.feature.settings.domain.model.defaultProviderApiPath
+import com.mini.me_core.feature.settings.domain.model.temperatureRange
 import com.mini.me_core.feature.settings.presentation.ConnectionTestState
 import com.mini.me_core.feature.settings.presentation.FetchState
 import com.mini.me_core.feature.settings.presentation.SettingsViewModel
@@ -578,10 +579,10 @@ fun ProviderEditorScreen(
                             Slider(
                                 value = temperature,
                                 onValueChange = { temperature = (it * 10).toInt() / 10f },
-                                valueRange = 0f..2f
+                                valueRange = type.temperatureRange()
                             )
                             Text(
-                                "越高越随机，越低越确定",
+                                "越高越随机，越低越确定（范围 0-${if (type == ProviderType.ANTHROPIC) "1" else "2"}）",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

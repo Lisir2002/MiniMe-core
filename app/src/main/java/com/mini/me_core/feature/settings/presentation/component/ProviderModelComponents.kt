@@ -158,8 +158,8 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
                 label = "代码",
                 unsupportedLabel = "无代码",
                 icon = Icons.Rounded.Code,
-                backgroundColor = Color(0xFFFFF3E0),
-                contentColor = Color(0xFFE65100)
+                backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
             // 结构化（青色）
             CapabilityTag(
@@ -167,8 +167,8 @@ private fun ModelMetadataTags(metadata: ModelMetadata?, hasOverride: Boolean = f
                 label = "结构化",
                 unsupportedLabel = "无结构化",
                 icon = Icons.Rounded.ListAlt,
-                backgroundColor = Color(0xFFE0F7FA),
-                contentColor = Color(0xFF006064)
+                backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             )
             // 上下文（灰色）
             val ctx = it.contextTokens.takeIf { t -> t > 0 }

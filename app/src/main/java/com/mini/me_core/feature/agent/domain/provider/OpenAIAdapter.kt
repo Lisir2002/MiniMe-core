@@ -13,6 +13,10 @@ import com.mini.me_core.feature.agent.domain.model.AgentMessage
 import com.mini.me_core.feature.agent.domain.tool.AgentTool
 import com.mini.me_core.feature.agent.domain.tool.ToolCall
 import com.google.gson.JsonParser
+import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CancellationException
@@ -58,7 +62,8 @@ private val OPENAI_RESPONSES_STREAM_PATHS: List<List<String>> = listOf(
 )
 
 class OpenAIAdapter @Inject constructor(
-    private val api: OpenAIApi
+    private val api: OpenAIApi,
+    private val okHttpClient: OkHttpClient
 ) : AIProvider {
 
     override var apiKey = ""
@@ -73,6 +78,24 @@ class OpenAIAdapter @Inject constructor(
     override var requestTimeout = 30
     override var retryCount = 0
     override var logSessionId: String? = null
+
+    /** 构建带 requestTimeout 的超时 API 实例（非流式 complete 用）。流式仍用共享 120s client。 */
+    private fun createTimeoutApi(): OpenAIApi {
+        val timeoutSec = requestTimeout.toLong()
+        val client = okHttpClient.newBuilder()
+            .callTimeout(timeoutSec, TimeUnit.SECONDS)
+            .connectTimeout(timeoutSec, TimeUnit.SECONDS)
+            .readTimeout(timeoutSec, TimeUnit.SECONDS)
+            .writeTimeout(timeoutSec, TimeUnit.SECONDS)
+            .build()
+        val base = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        return Retrofit.Builder()
+            .baseUrl(base)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(OpenAIApi::class.java)
+    }
 
     override suspend fun complete(
         systemPrompt: String,
@@ -113,7 +136,7 @@ class OpenAIAdapter @Inject constructor(
 
             val response = try {
                 retryStaircase(maxRetries = retryCount.coerceAtLeast(0)) {
-                    api.createResponses(url = url, authorization = "Bearer $apiKey", request = request)
+                    createTimeoutApi().createResponses(url = url, authorization = "Bearer $apiKey", request = request)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -169,7 +192,7 @@ class OpenAIAdapter @Inject constructor(
 
         val response = try {
             retryStaircase(maxRetries = retryCount.coerceAtLeast(0)) {
-                api.createChatCompletion(url = url, authorization = "Bearer $apiKey", request = request)
+                createTimeoutApi().createChatCompletion(url = url, authorization = "Bearer $apiKey", request = request)
             }
         } catch (e: CancellationException) {
             throw e

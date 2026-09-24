@@ -77,6 +77,7 @@ import com.mini.me_core.feature.agent.data.remote.openai.OpenAIApi
 import com.mini.me_core.feature.agent.domain.provider.AnthropicAdapter
 import com.mini.me_core.feature.agent.domain.provider.GeminiAdapter
 import com.mini.me_core.feature.agent.domain.provider.OpenAIAdapter
+import okhttp3.OkHttpClient
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.domain.model.ProviderType
 import com.mini.me_core.feature.settings.domain.repository.AIProviderRepository
@@ -112,6 +113,7 @@ class StatefulAgentWorkflow @Inject constructor(
     private val openAIApi: OpenAIApi,
     private val anthropicApi: AnthropicApi,
     private val geminiApi: GeminiApi,
+    private val okHttpClient: OkHttpClient,
     private val promptProvider: SystemPromptProvider,
     private val permissionManager: ToolPermissionManager,
     private val policyEngine: ToolPermissionPolicyEngine,
@@ -396,9 +398,9 @@ class StatefulAgentWorkflow @Inject constructor(
      */
     private fun createStandaloneProvider(config: AIProviderConfig, sessionId: String?): AIProvider {
         val provider: AIProvider = when (config.type) {
-            ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi)
-            ProviderType.GEMINI -> GeminiAdapter(geminiApi)
-            else -> OpenAIAdapter(openAIApi)
+            ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi, okHttpClient)
+            ProviderType.GEMINI -> GeminiAdapter(geminiApi, okHttpClient)
+            else -> OpenAIAdapter(openAIApi, okHttpClient)
         }
         provider.apiKey = config.apiKey
         provider.baseUrl = config.baseUrl
