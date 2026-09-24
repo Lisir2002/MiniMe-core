@@ -381,7 +381,9 @@ fun LogsScreen(
                         title = "未找到日志文件",
                         subtitle = buildString {
                             appendLine("自动扫描未发现日志，可能因系统权限限制。")
-                            appendLine("请点击下方按钮，手动选择主应用的日志目录。")
+                            appendLine("请点下方按钮，在弹出的窗口中进入：")
+                            appendLine("  Documents → MiniMe-core → logs")
+                            appendLine("（选择器已自动定位到 MiniMe-core 目录）")
                             appendLine()
                             // 显示诊断信息
                             val diagnostics = viewModel.getDiagnostics()

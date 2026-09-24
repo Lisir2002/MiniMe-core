@@ -3,10 +3,12 @@ package com.mini.logs.data
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * SAF（Storage Access Framework）目录管理器。
@@ -29,6 +31,24 @@ class SafDirectoryManager(private val context: Context) {
     fun getSavedTreeUri(): Uri? {
         val uriStr = prefs.getString(KEY_TREE_URI, null) ?: return null
         return try { Uri.parse(uriStr) } catch (e: Exception) { null }
+    }
+
+    /**
+     * 校验用户选中的目录是否指向主应用日志目录。
+     * 解析 tree URI 中的 document id，检查路径是否包含 MiniMe-core 日志目录特征。
+     * 返回 true = 是正确目录（或无法判定时宽容放行）；false = 明显选错了目录。
+     */
+    fun isExpectedLogDir(uri: Uri): Boolean {
+        return try {
+            val docId = DocumentsContract.getTreeDocumentId(uri)
+            // document id 形如 "primary:Documents/MiniMe-core/logs" 或 "primary:Android/data/com.mini.me_core/files/logs"
+            val path = Uri.decode(docId)
+            path.contains("MiniMe-core/logs", ignoreCase = true) ||
+            path.contains("com.mini.me_core/files/logs", ignoreCase = true)
+        } catch (e: Exception) {
+            // URI 格式异常时宽容放行（由后续文件列表诊断兜底）
+            true
+        }
     }
 
     /**
@@ -124,14 +144,26 @@ class SafDirectoryManager(private val context: Context) {
     companion object {
         private const val KEY_TREE_URI = "saf_tree_uri"
 
-        /** 构建选择目录的 Intent（供 ActivityResultLauncher 使用）。 */
+        /** 构造选择目录的 Intent，预定位到主应用日志目录（Documents/MiniMe-core/）。 */
         fun buildOpenTreeIntent(): Intent {
-            return Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
                 addFlags(
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or
                     Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
                 )
             }
+            // 预定位到 Documents/MiniMe-core/，用户一打开就看到正确目录
+            val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            val targetDir = File(docsDir, "MiniMe-core")
+            if (targetDir.exists()) {
+                // externalstorage provider 的 document id: primary:Documents/MiniMe-core
+                val docId = "primary:Documents/MiniMe-core"
+                val initialUri = DocumentsContract.buildTreeDocumentUri(
+                    "com.android.externalstorage.documents", docId
+                )
+                intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialUri)
+            }
+            return intent
         }
     }
 }

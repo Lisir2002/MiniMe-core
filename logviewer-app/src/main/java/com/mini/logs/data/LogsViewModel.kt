@@ -35,8 +35,15 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
     fun consumeStatusMessage() { _statusMessage.value = null }
 
-    /** SAF 目录选择完成后调用：保存授权、刷新、反馈结果。 */
+    /** SAF 目录选择完成后调用：校验路径、保存授权、刷新、反馈结果。 */
     fun onSafDirectorySelected(uri: android.net.Uri, grantedFlags: Int = 0) {
+        // 校验是否选了正确的主应用日志目录
+        if (!safManager.isExpectedLogDir(uri)) {
+            viewModelScope.launch {
+                _statusMessage.value = "未选择主应用日志目录，请选 Documents/MiniMe-core/logs/（当前目录已忽略）"
+            }
+            return
+        }
         val persisted = safManager.saveTreeUri(uri, grantedFlags)
         viewModelScope.launch {
             _isLoading.value = true
