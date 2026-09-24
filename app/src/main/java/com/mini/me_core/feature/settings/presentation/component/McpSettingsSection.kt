@@ -5,10 +5,12 @@ import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +34,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -176,8 +180,8 @@ internal fun McpSection(
     }
 }
 
-/** 单个 MCP server 行：现代化卡片样式（图标状态标签 + 药丸标签 + 右侧箭头，支持左滑删除）。 */
-@OptIn(ExperimentalMaterial3Api::class)
+/** 单个 MCP server 行：现代化卡片样式（图标状态标签 + 药丸标签 + 右侧箭头，支持左滑删除和长按菜单）。 */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 internal fun McpServerRow(
     server: McpServerConfig,
@@ -188,6 +192,7 @@ internal fun McpServerRow(
     val isConnected = server.enabled && status?.state == McpServerStatus.State.CONNECTED
     val hasError = status?.state == McpServerStatus.State.FAILED && !status.error.isNullOrBlank()
     var expanded by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
 
     val statusText = when {
         !server.enabled -> stringResource(R.string.mcp_disabled)
@@ -325,17 +330,20 @@ internal fun McpServerRow(
                         }
                     )
                 }
-                .clickable {
-                    if (offsetX.value < -10f) {
-                        coroutineScope.launch {
-                            offsetX.animateTo(0f, spring(stiffness = Spring.StiffnessMedium))
+                .combinedClickable(
+                    onClick = {
+                        if (offsetX.value < -10f) {
+                            coroutineScope.launch {
+                                offsetX.animateTo(0f, spring(stiffness = Spring.StiffnessMedium))
+                            }
+                        } else if (hasError) {
+                            expanded = !expanded
+                        } else {
+                            onClick()
                         }
-                    } else if (hasError) {
-                        expanded = !expanded
-                    } else {
-                        onClick()
-                    }
-                },
+                    },
+                    onLongClick = { showMenu = true }
+                ),
             shape = RoundedCornerShape(LocalCornerRadius.current.xxl),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -496,6 +504,35 @@ internal fun McpServerRow(
                     )
                 }
             }
+            }
+        }
+
+        // 长按弹出的编辑/删除菜单
+        Box {
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.common_edit)) },
+                    onClick = {
+                        showMenu = false
+                        onClick()
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Dns, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) },
+                    onClick = {
+                        showMenu = false
+                        onDelete()
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                    }
+                )
             }
         }
     }

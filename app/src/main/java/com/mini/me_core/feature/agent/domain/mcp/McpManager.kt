@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,13 +42,16 @@ class McpManager @Inject constructor(
 ) {
     private companion object {
         const val TAG = "McpManager"
+        const val MAX_RETRY_ATTEMPTS = 3
+        val RETRY_DELAYS_MS = listOf(2000L, 4000L, 8000L)
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val reloadMutex = Mutex()
 
     private val activeClients = mutableMapOf<String, McpClient>()
-    private val registeredToolNames = mutableSetOf<String>()
+    /** serverName -> 该服务器注册的工具名集合，按服务器分组避免同名工具误删。 */
+    private val registeredToolsByServer = mutableMapOf<String, MutableSet<String>>()
 
     private val _statuses = MutableStateFlow<List<McpServerStatus>>(emptyList())
     val statuses: StateFlow<List<McpServerStatus>> = _statuses.asStateFlow()
@@ -56,61 +60,88 @@ class McpManager @Inject constructor(
         scope.launch { reload() }
     }
 
+    /**
+     * 增量重载：只断开被删除/禁用的服务器，只连接新增/启用的服务器，已连接且配置不变的保持连接。
+     */
     suspend fun reload() = reloadMutex.withLock {
         val servers = configRepository.getServers()
-        FileLogger.i(TAG, "重新加载 MCP 配置，共 ${servers.size} 个 server")
+        FileLogger.i(TAG, "增量加载 MCP 配置，共 ${servers.size} 个 server")
 
-        teardown()
+        val newNames = servers.map { it.name }.toSet()
+        val newEnabledNames = servers.filter { it.enabled }.map { it.name }.toSet()
 
-        if (servers.isEmpty()) {
-            _statuses.value = emptyList()
+        // 1. 断开：已删除或被禁用的服务器
+        val toDisconnect = synchronized(activeClients) {
+            activeClients.keys.filter { it !in newNames || it !in newEnabledNames }
+        }
+        toDisconnect.forEach { name ->
+            FileLogger.i(TAG, "断开不再需要的 server: $name")
+            disconnectServer(name)
+        }
+
+        // 2. 待连接：新增或新启用的服务器（已连接的跳过）
+        val toConnect = servers.filter { it.enabled && it.name !in activeClients }
+
+        // 3. 更新状态：已连接的保留，禁用的置 DISABLED，待连接的先置 CONNECTING
+        val existingStatuses = _statuses.value.associateBy { it.name }
+        _statuses.value = servers.map { cfg ->
+            if (!cfg.enabled) {
+                McpServerStatus(cfg.name, McpServerStatus.State.DISABLED)
+            } else if (cfg.name in activeClients) {
+                existingStatuses[cfg.name] ?: McpServerStatus(cfg.name, McpServerStatus.State.CONNECTED)
+            } else {
+                McpServerStatus(cfg.name, McpServerStatus.State.CONNECTING)
+            }
+        }
+
+        if (toConnect.isEmpty()) {
+            FileLogger.i(TAG, "无需新连接，增量重载完成")
             return@withLock
         }
 
-        // 先把所有 server 置为「连接中/禁用」，UI 立即有反馈。
-        _statuses.value = servers.map { cfg ->
-            McpServerStatus(
-                name = cfg.name,
-                state = if (cfg.enabled) McpServerStatus.State.CONNECTING else McpServerStatus.State.DISABLED
-            )
-        }
-
-        // 并行连接所有启用的 server；各自独立失败。
+        // 4. 并行连接新增/启用的 server；各自独立失败。
+        FileLogger.i(TAG, "需要连接 ${toConnect.size} 个新 server")
         val results = withContext(Dispatchers.IO) {
-            servers.filter { it.enabled }.map { cfg ->
-                async { connectOne(cfg) }
+            toConnect.map { cfg ->
+                async { connectOneWithRetry(cfg) }
             }.awaitAll()
         }
 
-        // 合并禁用项与连接结果，保持原始顺序。
-        val byName = results.associateBy { it.name }
+        // 5. 合并结果：保持原有顺序，已连接的不变。
+        val resultByMap = results.associateBy { it.name }
         _statuses.value = servers.map { cfg ->
-            byName[cfg.name] ?: McpServerStatus(cfg.name, McpServerStatus.State.DISABLED)
+            if (!cfg.enabled) {
+                McpServerStatus(cfg.name, McpServerStatus.State.DISABLED)
+            } else if (cfg.name in activeClients && cfg.name !in resultByMap) {
+                existingStatuses[cfg.name] ?: McpServerStatus(cfg.name, McpServerStatus.State.CONNECTED)
+            } else {
+                resultByMap[cfg.name] ?: McpServerStatus(cfg.name, McpServerStatus.State.DISABLED)
+            }
         }
+    }
+
+    /** 连接一个 server，失败后指数退避重试最多 [MAX_RETRY_ATTEMPTS] 次。 */
+    private suspend fun connectOneWithRetry(cfg: McpServerConfig): McpServerStatus {
+        var lastError: String? = null
+        for (attempt in 0..MAX_RETRY_ATTEMPTS) {
+            val result = connectOne(cfg)
+            if (result.state == McpServerStatus.State.CONNECTED) {
+                return result
+            }
+            lastError = result.error
+            if (attempt < MAX_RETRY_ATTEMPTS) {
+                val delayMs = RETRY_DELAYS_MS[attempt]
+                FileLogger.i(TAG, "[${cfg.name}] 第 ${attempt + 1} 次连接失败，${delayMs}ms 后重试")
+                delay(delayMs)
+            }
+        }
+        FileLogger.e(TAG, "[${cfg.name}] 重试 $MAX_RETRY_ATTEMPTS 次后仍失败: $lastError")
+        return McpServerStatus(cfg.name, McpServerStatus.State.FAILED, error = lastError)
     }
 
     private suspend fun connectOne(cfg: McpServerConfig): McpServerStatus {
         return try {
-            val transport = if (cfg.isStdio) {
-                // 本地 stdio server 需要容器就绪；未就绪不自动初始化，直接失败并引导去终端页完成初始化。
-                containerEngine.notReadyHint()?.let {
-                    throw IllegalStateException(it)
-                }
-                StdioTransport(
-                    serverName = cfg.name,
-                    engine = containerEngine,
-                    program = cfg.command!!,
-                    programArgs = cfg.args,
-                    projectPath = workspaceRepository.currentPath(),
-                    extraEnv = cfg.env
-                )
-            } else {
-                StreamableHttpTransport(
-                    endpoint = cfg.url.orEmpty(),
-                    client = okHttpClient,
-                    extraHeaders = cfg.headers
-                )
-            }
+            val transport = createTransport(cfg)
             val client = McpClient(serverName = cfg.name, transport = transport)
             client.connect()
 
@@ -118,10 +149,12 @@ class McpManager @Inject constructor(
             val enabledTools = tools.filter { it.remoteName !in cfg.disabledTools }
             synchronized(activeClients) {
                 activeClients[cfg.name] = client
+                val registered = mutableSetOf<String>()
                 enabledTools.forEach { tool ->
                     toolRegistry.register(tool.name, tool)
-                    registeredToolNames.add(tool.name)
+                    registered.add(tool.name)
                 }
+                registeredToolsByServer[cfg.name] = registered
             }
             FileLogger.i(TAG, "[${cfg.name}] 连接成功，注册 ${enabledTools.size}/${tools.size} 个工具")
             McpServerStatus(cfg.name, McpServerStatus.State.CONNECTED, toolCount = enabledTools.size, totalToolCount = tools.size)
@@ -131,18 +164,43 @@ class McpManager @Inject constructor(
         }
     }
 
+    /**
+     * 创建传输层：stdio 走容器，HTTP 走 OkHttp。
+     * 从 connectOne() 和 testConnection() 中提取，消除重复逻辑。
+     */
+    private suspend fun createTransport(cfg: McpServerConfig): McpTransport {
+        return if (cfg.isStdio) {
+            containerEngine.notReadyHint()?.let {
+                throw IllegalStateException(it)
+            }
+            StdioTransport(
+                serverName = cfg.name,
+                engine = containerEngine,
+                program = cfg.command!!,
+                programArgs = cfg.args,
+                projectPath = workspaceRepository.currentPath(),
+                extraEnv = cfg.env
+            )
+        } else {
+            StreamableHttpTransport(
+                endpoint = cfg.url.orEmpty(),
+                client = okHttpClient,
+                extraHeaders = cfg.headers
+            )
+        }
+    }
+
     fun getServerTools(serverName: String): List<McpToolDescriptor> {
         return synchronized(activeClients) {
             activeClients[serverName]?.tools ?: emptyList()
         }
     }
 
-    private fun teardown() {
+    /** 断开单个服务器：关闭连接并只移除该服务器注册的工具。 */
+    private fun disconnectServer(name: String) {
         synchronized(activeClients) {
-            registeredToolNames.forEach { toolRegistry.unregister(it) }
-            registeredToolNames.clear()
-            activeClients.values.forEach { runCatching { it.close() } }
-            activeClients.clear()
+            registeredToolsByServer.remove(name)?.forEach { toolRegistry.unregister(it) }
+            activeClients.remove(name)?.let { runCatching { it.close() } }
         }
     }
 
@@ -156,23 +214,7 @@ class McpManager @Inject constructor(
      */
     suspend fun testConnection(cfg: McpServerConfig): String = withContext(Dispatchers.IO) {
         try {
-            val transport = if (cfg.isStdio) {
-                containerEngine.notReadyHint()?.let { return@withContext it }
-                StdioTransport(
-                    serverName = cfg.name,
-                    engine = containerEngine,
-                    program = cfg.command!!,
-                    programArgs = cfg.args,
-                    projectPath = workspaceRepository.currentPath(),
-                    extraEnv = cfg.env
-                )
-            } else {
-                StreamableHttpTransport(
-                    endpoint = cfg.url.orEmpty(),
-                    client = okHttpClient,
-                    extraHeaders = cfg.headers
-                )
-            }
+            val transport = createTransport(cfg)
             val client = McpClient(serverName = cfg.name, transport = transport)
             val toolCount = client.connect()
             client.close()

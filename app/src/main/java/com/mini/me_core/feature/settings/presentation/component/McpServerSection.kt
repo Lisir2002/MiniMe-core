@@ -44,10 +44,12 @@ import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -87,6 +89,15 @@ internal fun McpServerSection(
     var portText by remember(port) { mutableStateOf(port.toString()) }
     var tokenVisible by remember { mutableStateOf(false) }
     var showRegenerateConfirm by remember { mutableStateOf(false) }
+
+    // 端口自动保存：输入停止 500ms 后自动生效（与开关行为一致）。
+    LaunchedEffect(portText) {
+        if (portText.isBlank()) return@LaunchedEffect
+        val newPort = portText.toIntOrNull()?.coerceIn(1, 65535) ?: return@LaunchedEffect
+        if (newPort == port) return@LaunchedEffect
+        delay(500)
+        onSaveConfig(newPort, requireApproval, autoStart)
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -242,19 +253,8 @@ internal fun McpServerSection(
                                 portText = input.filter { it.isDigit() }.take(5)
                             },
                             singleLine = true,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(Modifier.width(Spacing.sm))
-                        Button(
-                            onClick = {
-                                val newPort = portText.toIntOrNull()?.coerceIn(1, 65535) ?: port
-                                portText = newPort.toString()
-                                onSaveConfig(newPort, requireApproval, autoStart)
-                            },
-                            contentPadding = PaddingValues(horizontal = Spacing.md, vertical = 8.dp)
-                        ) {
-                            Text(stringResource(R.string.ui____be5fbbe3))
-                        }
                     }
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
