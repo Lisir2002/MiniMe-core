@@ -3,6 +3,7 @@ package com.mini.logs.ui.crash
 import android.content.Intent
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,13 +18,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material.icons.rounded.Clear
-import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +38,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -51,7 +57,7 @@ import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
 
 /** 崩溃筛选条件。 */
-private enum class CrashFilter(val label: String) {
+private enum class CrashTab(val label: String) {
     ALL("全部"),
     UNFIXED("未修复"),
     FIXED("已修复"),
@@ -62,8 +68,15 @@ private enum class CrashFilter(val label: String) {
     }
 }
 
+/** 排序方式。 */
+private enum class SortMode(val label: String) {
+    OCCURRENCES("按次数"),
+    LAST("按最近时间"),
+    FIRST("按首次时间");
+}
+
 /**
- * 崩溃聚合页。按异常类型聚合 ERROR/FATAL，支持搜索、筛选、标记已修复、忽略、全屏详情。
+ * 崩溃聚合页。按异常类型聚合 ERROR/FATAL，支持搜索、Tab 筛选、排序、标记已修复、忽略、全屏详情。
  */
 @Composable
 fun CrashScreen() {
@@ -78,12 +91,17 @@ fun CrashScreen() {
     // 已修复 / 已忽略状态：启动时从 SharedPreferences 读取
     val fixedKeys = remember { mutableStateMapOf<String, Boolean>() }
     val ignoredKeys = remember { mutableStateMapOf<String, Boolean>() }
-    var filter by remember { mutableStateOf(CrashFilter.ALL) }
+    var tab by remember { mutableStateOf(CrashTab.ALL) }
+    var sortMode by remember { mutableStateOf(SortMode.OCCURRENCES) }
     var detailCrash by remember { mutableStateOf<CrashGroup?>(null) }
 
     // 搜索状态
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+
+    // 多选状态
+    val selectedKeys = remember { mutableStateMapOf<String, Boolean>() }
+    val selectionMode = selectedKeys.any { it.value }
 
     // 初始化持久化状态
     LaunchedEffect(Unit) {
@@ -102,12 +120,24 @@ fun CrashScreen() {
         isLoading = false
     }
 
-    // 应用已修复状态 + 排序（未修复在前，各自按次数降序）+ 搜索 + 筛选
-    val crashes = remember(rawCrashes, fixedKeys, ignoredKeys, filter, searchQuery) {
+    // Tab 计数
+    val counts = remember(rawCrashes, fixedKeys, ignoredKeys) {
+        val all = rawCrashes
+        CrashTab.values().associateWith { t ->
+            when (t) {
+                CrashTab.ALL -> all.count { ignoredKeys[it.key] != true }
+                CrashTab.UNFIXED -> all.count { fixedKeys[it.key] != true && ignoredKeys[it.key] != true }
+                CrashTab.FIXED -> all.count { fixedKeys[it.key] == true && ignoredKeys[it.key] != true }
+                CrashTab.IGNORED -> all.count { ignoredKeys[it.key] == true }
+            }
+        }
+    }
+
+    // 搜索 + 排序 + Tab 过滤
+    val crashes = remember(rawCrashes, fixedKeys, ignoredKeys, tab, sortMode, searchQuery) {
         val withFixed = rawCrashes.map {
             it.copy(isFixed = fixedKeys[it.key] == true)
         }
-        // 搜索过滤：exceptionType + message + tags + fullStackTrace
         val q = searchQuery.trim().lowercase()
         val searched = if (q.isBlank()) {
             withFixed
@@ -119,14 +149,20 @@ fun CrashScreen() {
                     g.fullStackTrace.lowercase().contains(q)
             }
         }
-        val sorted = searched.sortedWith(
-            compareBy({ it.isFixed }, { -it.occurrences })
-        )
-        when (filter) {
-            CrashFilter.ALL -> sorted.filter { ignoredKeys[it.key] != true }
-            CrashFilter.UNFIXED -> sorted.filter { !it.isFixed && ignoredKeys[it.key] != true }
-            CrashFilter.FIXED -> sorted.filter { it.isFixed && ignoredKeys[it.key] != true }
-            CrashFilter.IGNORED -> sorted.filter { ignoredKeys[it.key] == true }
+        // Tab 过滤
+        val filtered = when (tab) {
+            CrashTab.ALL -> searched.filter { ignoredKeys[it.key] != true }
+            CrashTab.UNFIXED -> searched.filter { !it.isFixed && ignoredKeys[it.key] != true }
+            CrashTab.FIXED -> searched.filter { it.isFixed && ignoredKeys[it.key] != true }
+            CrashTab.IGNORED -> searched.filter { ignoredKeys[it.key] == true }
+        }
+        // 排序
+        when (sortMode) {
+            SortMode.OCCURRENCES -> filtered.sortedWith(
+                compareBy({ it.isFixed }, { -it.occurrences })
+            )
+            SortMode.LAST -> filtered.sortedByDescending { it.lastOccurrence }
+            SortMode.FIRST -> filtered.sortedByDescending { it.firstOccurrence }
         }
     }
 
@@ -148,18 +184,94 @@ fun CrashScreen() {
         settings.ignoredCrashKeys = ignoredKeys.filterValues { it }.keys
     }
 
+    fun toggleSelect(key: String) {
+        if (selectedKeys[key] == true) selectedKeys.remove(key)
+        else selectedKeys[key] = true
+    }
+
+    fun clearSelection() {
+        selectedKeys.clear()
+    }
+
+    fun selectAllVisible() {
+        crashes.forEach { selectedKeys[it.key] = true }
+    }
+
+    fun batchMarkFixed() {
+        val keys = selectedKeys.filterValues { it }.keys
+        keys.forEach { fixedKeys[it] = true }
+        settings.fixedCrashKeys = fixedKeys.filterValues { it }.keys
+        clearSelection()
+    }
+
+    fun batchIgnore() {
+        val keys = selectedKeys.filterValues { it }.keys
+        keys.forEach { ignoredKeys[it] = true }
+        settings.ignoredCrashKeys = ignoredKeys.filterValues { it }.keys
+        clearSelection()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.surfacePage),
     ) {
-        if (searchActive) {
+        if (selectionMode) {
+            // 多选模式顶栏
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.surfaceCard)
+                    .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "已选 ${selectedKeys.count { it.value }} 项",
+                    fontSize = 15.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    color = colors.textPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "全选",
+                    fontSize = 13.sp,
+                    color = colors.brandPrimary,
+                    modifier = Modifier
+                        .clickable { selectAllVisible() }
+                        .padding(Spacing.sm),
+                )
+                Text(
+                    text = "清除",
+                    fontSize = 13.sp,
+                    color = colors.textSecondary,
+                    modifier = Modifier
+                        .clickable { clearSelection() }
+                        .padding(Spacing.sm),
+                )
+                Text(
+                    text = "修复",
+                    fontSize = 13.sp,
+                    color = colors.success,
+                    modifier = Modifier
+                        .clickable { batchMarkFixed() }
+                        .padding(Spacing.sm),
+                )
+                Text(
+                    text = "忽略",
+                    fontSize = 13.sp,
+                    color = colors.error,
+                    modifier = Modifier
+                        .clickable { batchIgnore() }
+                        .padding(Spacing.sm),
+                )
+            }
+        } else if (searchActive) {
             // 搜索模式顶栏
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = {
                     searchActive = false
@@ -199,12 +311,40 @@ fun CrashScreen() {
                             tint = colors.textSecondary,
                         )
                     }
-                    FilterDropdown(
-                        filter = filter,
-                        onFilterChange = { filter = it },
+                    SortDropdown(
+                        sortMode = sortMode,
+                        onSortChange = { sortMode = it },
                     )
                 },
             )
+        }
+
+        // 筛选 Tab 行
+        ScrollableTabRow(
+            selectedTabIndex = CrashTab.options.indexOf(tab).coerceAtLeast(0),
+            edgePadding = Spacing.md,
+            indicator = { tabPositions ->
+                if (CrashTab.options.indexOf(tab) < tabPositions.size) {
+                    TabRowDefaults.Indicator(
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[CrashTab.options.indexOf(tab)]),
+                        color = colors.brandPrimary,
+                    )
+                }
+            },
+        ) {
+            CrashTab.options.forEach { t ->
+                Tab(
+                    selected = tab == t,
+                    onClick = { tab = t },
+                    text = {
+                        Text(
+                            "${t.label} ${counts[t] ?: 0}",
+                            fontSize = 13.sp,
+                            color = if (tab == t) colors.brandPrimary else colors.textSecondary,
+                        )
+                    },
+                )
+            }
         }
 
         Crossfade(targetState = isLoading, label = "crash-content") { loading ->
@@ -232,11 +372,14 @@ fun CrashScreen() {
                     items(crashes, key = { it.key }) { crash ->
                         CrashCard(
                             crash = crash,
-                            onClick = { detailCrash = crash },
+                            onClick = { if (selectionMode) toggleSelect(crash.key) else detailCrash = crash },
                             onCopy = { clipboard.setText(AnnotatedString(crash.fullStackTrace)) },
                             onToggleFixed = { toggleFixed(crash) },
                             onIgnore = { toggleIgnored(crash) },
                             searchQuery = searchQuery.trim().ifBlank { null },
+                            selectionMode = selectionMode,
+                            isSelected = selectedKeys[crash.key] == true,
+                            onLongPress = { toggleSelect(crash.key) },
                         )
                     }
                 }
@@ -264,31 +407,31 @@ fun CrashScreen() {
     }
 }
 
-/** 顶栏右侧筛选下拉。 */
+/** 排序下拉。 */
 @Composable
-private fun FilterDropdown(filter: CrashFilter, onFilterChange: (CrashFilter) -> Unit) {
+private fun SortDropdown(sortMode: SortMode, onSortChange: (SortMode) -> Unit) {
     val colors = LocalAppTheme.current.colors
     var expanded by remember { mutableStateOf(false) }
 
     Box {
         IconButton(onClick = { expanded = true }) {
             Icon(
-                imageVector = Icons.Rounded.FilterList,
-                contentDescription = "筛选",
+                imageVector = Icons.Rounded.Sort,
+                contentDescription = "排序",
                 tint = colors.textSecondary,
             )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            CrashFilter.options.forEach { option ->
+            SortMode.values().forEach { m ->
                 DropdownMenuItem(
                     text = {
                         Text(
-                            option.label,
-                            color = if (option == filter) colors.brandPrimary else colors.textPrimary,
+                            m.label,
+                            color = if (m == sortMode) colors.brandPrimary else colors.textPrimary,
                         )
                     },
                     onClick = {
-                        onFilterChange(option)
+                        onSortChange(m)
                         expanded = false
                     },
                 )

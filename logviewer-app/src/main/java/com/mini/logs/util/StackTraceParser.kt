@@ -26,9 +26,9 @@ object StackTraceParser {
         """^(\s*at\s+)([A-Za-z_][A-Za-z0-9_.$]*)\.([A-Za-z_][A-Za-z0-9_$]*)\(([^)]*)\)(.*)$"""
     )
 
-    private val CAUSED_BY = Regex("^(\s*Caused by:\s*)(.*)$")
+    private val CAUSED_BY = Regex("""^(\s*Caused by:\s*)(.*)$""")
 
-    private val MORE = Regex("^(\s*)\.\.\.\s+\d+\s+more\s*$")
+    private val MORE = Regex("""^(\s*)\.\.\.\s+\d+\s+more\s*$""")
 
     /**
      * 把完整堆栈渲染为带样式的 AnnotatedString。

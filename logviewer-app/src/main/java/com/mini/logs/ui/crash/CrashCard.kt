@@ -1,7 +1,7 @@
 package com.mini.logs.ui.crash
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +16,7 @@ import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.WatchLater
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,9 +44,11 @@ import com.mini.me_core.core.theme.components.AppCard
 import com.mini.me_core.core.theme.components.AppCardVariant
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
 
+private const val DAY_MS = 24L * 60 * 60 * 1000
+
 /**
  * 崩溃聚合卡片。左侧 4dp 竖条指示状态（未修复 error / 已修复 success）。
- * 根据 crashKind 显示不同图标。支持搜索关键词高亮与忽略操作。
+ * 根据 crashKind 显示不同图标。支持搜索关键词高亮、趋势徽标、忽略操作。
  */
 @Composable
 fun CrashCard(
@@ -55,6 +58,9 @@ fun CrashCard(
     onToggleFixed: () -> Unit,
     onIgnore: () -> Unit = {},
     searchQuery: String? = null,
+    selectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onLongPress: () -> Unit = {},
 ) {
     val colors = LocalAppTheme.current.colors
 
@@ -67,11 +73,27 @@ fun CrashCard(
     }
     val leadingIcon = if (crash.isFixed) Icons.Rounded.CheckCircle else kindIcon
 
+    // 趋势：最近 24h vs 之前 24h
+    val trend = remember(crash.key, crash.occurrences) {
+        if (crash.occurrences < 3) return@remember null
+        val now = System.currentTimeMillis()
+        val recent = crash.entries.count { it.timestamp in (now - DAY_MS) until now }
+        val previous = crash.entries.count { it.timestamp in (now - 2 * DAY_MS) until (now - DAY_MS) }
+        when {
+            recent > previous -> "up"
+            recent < previous -> "down"
+            else -> "flat"
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .alpha(if (crash.isFixed) 0.6f else 1f)
-            .clickable { onClick() },
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongPress,
+            ),
     ) {
         // 左侧状态竖条
         Box(
@@ -103,15 +125,43 @@ fun CrashCard(
                         fontWeight = FontWeight.Bold,
                         color = if (crash.isFixed) colors.textSecondary else colors.error,
                         maxLines = 1,
+                        modifier = Modifier.weight(1f),
                     )
+                    // 多选模式下显示 Checkbox
+                    if (selectionMode) {
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { onLongPress() },
+                        )
+                    }
                 }
                 Spacer(Modifier.height(Spacing.xs))
-                Text(
-                    text = "发生 ${crash.occurrences} 次 · 最近: ${FormatUtils.formatRelativeTime(crash.lastOccurrence)}" +
-                        " · Tag: ${crash.tags.joinToString(", ")}",
-                    fontSize = 12.sp,
-                    color = colors.textSecondary,
-                )
+                // 副标题行：次数 + 时间 + Tag + 趋势徽标
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "发生 ${crash.occurrences} 次 · 最近: ${FormatUtils.formatRelativeTime(crash.lastOccurrence)}" +
+                            " · Tag: ${crash.tags.joinToString(", ")}",
+                        fontSize = 12.sp,
+                        color = colors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    trend?.let { t ->
+                        Spacer(Modifier.width(Spacing.sm))
+                        val (arrow, label, color) = when (t) {
+                            "up" -> Triple("↑", "恶化", colors.error)
+                            "down" -> Triple("↓", "好转", colors.success)
+                            else -> Triple("→", "持平", colors.textTertiary)
+                        }
+                        Text(
+                            text = "$arrow$label",
+                            fontSize = 11.sp,
+                            color = color,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
                 Spacer(Modifier.height(Spacing.xs))
                 // 消息文本，搜索关键词黄色高亮
                 HighlightedText(
@@ -125,7 +175,8 @@ fun CrashCard(
                     AppButton(
                         text = "详情",
                         onClick = onClick,
-                        variant = AppButtonVariant.Text,
+                        variant = AppButtonVariant.Filled,
+                        buttonColor = AppButtonColor.Primary,
                         size = AppButtonSize.Small,
                     )
                     AppButton(
