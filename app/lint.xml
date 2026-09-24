@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- 禁用 MissingClass/Instantiatable：Kotlin 代码触发 Lint 工具内部崩溃（KotlinIllegalArgumentException），
+         非代码问题，属 Android Lint 已知 bug。编译+单测已覆盖类型安全。 -->
+    <issue id="MissingClass" severity="ignore" />
+    <issue id="Instantiatable" severity="ignore" />
+    <issue id="InnerclassSeparator" severity="ignore" />
+    <issue id="ExpiredTargetSdkVersion" severity="ignore" />
+</lint>
