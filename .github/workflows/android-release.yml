@@ -201,15 +201,30 @@ jobs:
       - name: Build Release APK
         run: ./gradlew --warning-mode=all assembleRelease --stacktrace
 
-      # 重命名 APK 为「品牌-版本」格式（品牌前缀来自 branding.gradle.kts 的 APK_PREFIX）：
-      #   minime-v1.0.0-rc1.apk
+      # 重命名 APK 为「软件名-版本号-变体」格式（品牌前缀来自 branding.gradle.kts 的 APK_PREFIX）：
+      #   MiniMe-v0.0.15-release.apk（正式版）
+      #   MiniMe-v0.0.16-rc1.apk（预览版）
+      # 变体规则：tag 含 -rcN → 变体=rcN；否则 → release
       - name: Rename APK
         run: |
           mkdir -p dist
-          ver="${GITHUB_REF_NAME:-manual}"   # tag 如 v1.0.0-rc1；手动触发时为 manual-N
+          ver="${GITHUB_REF_NAME:-manual}"   # tag 如 v0.0.15 或 v0.0.16-rc1；手动触发时为 manual-N
+          # 提取基础版本号（去掉预发布后缀）和变体
+          if [[ "$ver" =~ ^(v[0-9.]+)-(rc[0-9]+)$ ]]; then
+            base_ver="${BASH_REMATCH[1]}"
+            variant="${BASH_REMATCH[2]}"
+          elif [[ "$ver" =~ ^(v[0-9.]+)-(dev|beta|alpha)[0-9]*$ ]]; then
+            base_ver="${BASH_REMATCH[1]}"
+            variant="${BASH_REMATCH[2]}"
+          else
+            base_ver="$ver"
+            variant="release"
+          fi
+          echo "APK_BASE_VER=$base_ver" >> "$GITHUB_ENV"
+          echo "APK_VARIANT=$variant" >> "$GITHUB_ENV"
           src="app/build/outputs/apk/release/app-release.apk"
           if [[ -f "$src" ]]; then
-            out="dist/${APK_PREFIX}-${ver}.apk"
+            out="dist/${APK_PREFIX}-${base_ver}-${variant}.apk"
             cp "$src" "$out"
             echo "packaged $out"
             ls -lh "$out"
@@ -275,9 +290,8 @@ jobs:
 
       # GitHub 的 generate_release_notes 只列 merged PR，直接 push 的 commit 不会出现。
       # 本仓库在 main 上直接 commit，不走 PR 流程，所以手动用 release-log.py 生成用户层 Release 正文。
-      # 三层规范见 AGENTS.md「版本日志（发版必做 · 三层写法规约）」——
-      #   本步骤只产「用户层」（用户语体），开发者层（CHANGELOG.md）、大模型层（AGENTS.md）由
-      #   发版前 gitops 生成并人工复核；CI 专注于发布正文本自动生成。
+      # 发版规范见 AGENTS.md「发版规范（最高优先级）」——只保留用户层，CI 自动生成正文基础结构，
+      #   AI/维护者发版后需补充「更新内容概括」到 Release 标题，并核对写作铁律。
       - name: Generate release notes (user layer)
         id: changelog
         if: startsWith(github.ref, 'refs/tags/v')
@@ -285,14 +299,13 @@ jobs:
           cur_tag="${GITHUB_REF_NAME}"
           prev_tag=$(git tag --sort=-creatordate | grep -vE "^${cur_tag}$" | head -1)
           version="${cur_tag#v}"
-          # 多行输出用 EOF 分隔符；--layer user 直接产出 GitHub Release 用户层正文
+          # 多行输出用 EOF 分隔符；release-log.py 直接产出用户层 GitHub Release 正文草稿
           delimiter="EOF_$(date +%s)"
           # 多行输出：必须把 python 产出的用户层正文「整体重定向」进 GITHUB_OUTPUT，
           #   不能分开 append（python 的 stdout 默认不会进文件，只进步骤日志）。
           {
             echo "body<<${delimiter}"
             python3 scripts/gitops/release-log.py \
-              --layer user \
               --prev "$prev_tag" \
               --cur "$cur_tag" \
               --version "$version" \
@@ -307,12 +320,13 @@ jobs:
         id: gh_release
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          name: Release ${{ steps.release.outputs.tag }}
+          # 标题基础格式「MiniMe 版本号」，AI/维护者发版后需补充「— 更新内容概括」（≤20字，用户语言）
+          name: MiniMe ${{ env.APK_BASE_VER }}
           body: ${{ steps.changelog.outputs.body }}
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           fail_on_unmatched_files: true
           generate_release_notes: false
-          # 产物名约定 <APK_PREFIX>-<版本>.apk（见 Rename 步骤），版本段用 * 兼容 tag/manual-*。
+          # 产物名约定 <APK_PREFIX>-<版本号>-<变体>.apk（见 Rename 步骤），通配符兼容 release/rcN。
           # ${APK_PREFIX} 在此处是字面量不会展开，须用 ${{ env.APK_PREFIX }} 表达式。
           files: |
             dist/${{ env.APK_PREFIX }}-**.apk
@@ -331,13 +345,13 @@ jobs:
           IS_PRERELEASE: ${{ steps.prerelease.outputs.is_prerelease }}
           REPO: ${{ github.repository }}
         run: |
-          apk="dist/${APK_PREFIX}-${TAG}.apk"
+          apk="dist/${APK_PREFIX}-${APK_BASE_VER}-${APK_VARIANT}.apk"
           sha256="$(sha256sum "$apk" 2>/dev/null | cut -d' ' -f1 || echo unavailable)"
           {
             echo "## ${APP_NAME} Release — ${TAG}"
             echo ""
             echo "- **Prerelease**: ${IS_PRERELEASE}"
-            echo "- **APK**: \`${APK_PREFIX}-${TAG}.apk\` (双 ABI 通用包：arm64-v8a + x86_64)"
+            echo "- **APK**: \`${APK_PREFIX}-${APK_BASE_VER}-${APK_VARIANT}.apk\` (双 ABI 通用包：arm64-v8a + x86_64)"
             echo "- **SHA256**: \`${sha256}\`"
             echo "- **Release page**: https://github.com/${REPO}/releases/tag/${TAG}"
             echo "- **Artifact**: r8-mapping-${TAG} (Run artifact, 90d retention)"

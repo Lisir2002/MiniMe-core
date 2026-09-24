@@ -17,8 +17,9 @@
  *  英文翻译保留在 values-en/strings.xml（本品牌名中英一致）。 */
 val APP_NAME = "MiniMe-core"
 
-/** APK / Release 资产名前缀，产物形如 <APK_PREFIX>-<版本>.apk（如 minime-v1.0.0-rc1.apk）。 */
-val APK_PREFIX = "minime"
+/** APK / Release 资产名前缀，产物形如 <APK_PREFIX>-<版本号>-<变体>.apk（如 MiniMe-v0.0.15-release.apk）。
+ *  命名规范见 AGENTS.md「发版规范（最高优先级）」第1条。 */
+val APK_PREFIX = "MiniMe"
 
 /** release keystore 文件名（app 目录下，与生成的 keystore.properties 的 storeFile 对应）。 */
 val KEYSTORE_FILE = "minime.jks"
