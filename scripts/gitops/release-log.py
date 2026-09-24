@@ -12,11 +12,11 @@ release-log.py — MiniMe-core 用户层发版说明自动生成器。
 输出结构（严格按此顺序）：
   # MiniMe {版本号}（{YYYY-MM-DD}）
   > {100字以内简介 —— 由 AI/维护者补充，脚本生成占位提示}
-  ## ✨ 新功能
-  ## ⚡ 改进
-  ## 🐛 修复
-  ## ⚠️ 已知问题
-  ## 📦 安装包
+  ## 新功能
+  ## 改进
+  ## 修复
+  ## 已知问题
+  ## 安装包
   **完整更新历史**：{compare 链接}
 
 用法（仓库根执行）：
@@ -143,40 +143,40 @@ def user_layer(commits, version, date_str):
 
     # 破坏性变更醒目标注
     if breaking:
-        lines.append("## ⚠️ 破坏性变更")
+        lines.append("## 破坏性变更")
         lines.append("")
-        lines.extend(f"- ⚠️ {b}" for b in breaking)
+        lines.extend(f"- 注意：{b}" for b in breaking)
         lines.append("")
 
-    # ✨ 新功能
+    # 新功能
     if categories["new"]:
-        lines.append("## ✨ 新功能")
+        lines.append("## 新功能")
         lines.append("")
         lines.extend(f"- {item}" for item in categories["new"])
         lines.append("")
 
-    # ⚡ 改进
+    # 改进
     if categories["improve"]:
-        lines.append("## ⚡ 改进")
+        lines.append("## 改进")
         lines.append("")
         lines.extend(f"- {item}" for item in categories["improve"])
         lines.append("")
 
-    # 🐛 修复
+    # 修复
     if categories["fix"]:
-        lines.append("## 🐛 修复")
+        lines.append("## 修复")
         lines.append("")
         lines.extend(f"- {item}" for item in categories["fix"])
         lines.append("")
 
-    # ⚠️ 已知问题（占位）
-    lines.append("## ⚠️ 已知问题")
+    # 已知问题（占位）
+    lines.append("## 已知问题")
     lines.append("")
     lines.append("_（无已知问题则写「无」；如有请描述症状+临时规避方法+预计修复版本）_")
     lines.append("")
 
-    # 📦 安装包（占位，CI 会替换实际文件名和大小）
-    lines.append("## 📦 安装包")
+    # 安装包（占位，CI 会替换实际文件名和大小）
+    lines.append("## 安装包")
     lines.append("")
     lines.append("_（CI 构建完成后自动补充 APK 下载链接与大小）_")
     lines.append("")
