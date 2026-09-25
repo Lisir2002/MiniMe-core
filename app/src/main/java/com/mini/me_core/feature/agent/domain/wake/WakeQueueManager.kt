@@ -23,9 +23,6 @@ import javax.inject.Singleton
  * - [markConsumed]：注入成功后原子化消费确认（防重复注入；失败则保留待下次）。
  *
  * 生命周期：持久化 + 重扫——App 被杀后下次启动重扫待注入队列继续唤醒（R10 阶段落地重扫入口）。
- *
- * 设计依据：docs/plan-docs/claude-code-study-design.md 第 11 节（11.3 asyncRewake 下轮注入）
- * 与第 16 节（16.2 统一 WakeQueue）。
  */
 @Singleton
 class WakeQueueManager @Inject constructor(

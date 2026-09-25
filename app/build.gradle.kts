@@ -322,7 +322,7 @@ gradle.projectsEvaluated {
 
 // ── 数据保全：applicationId 白名单硬校验 ──────────────────────────────
 // 包名（applicationId）变更在 Android 眼里是"全新安装"，私有数据目录随之隔离，
-// 历史对话会全部"消失"（历史上已因此丢失三次，见 docs/plan-docs/data-preservation-design.md）。
+// 历史对话会全部"消失"（历史上已因此多次数据丢失）。
 // 这里在配置期对每个 variant 做白名单校验：包名不在白名单内 → 构建直接失败，
 // 与单测 ApplicationIdStabilityTest（release classpath 断言）、CI 发版门禁（Tag 间一致性）
 // 构成三重防线，杜绝 rebrand 误改包名再次造成用户数据丢失。
@@ -331,8 +331,7 @@ androidComponents {
         val id: String = variant.applicationId.get()
         require(id in ALLOWED_APPLICATION_IDS) {
             "applicationId=$id 不在白名单 $ALLOWED_APPLICATION_IDS 内。禁止变更包名——" +
-                "包名变更在 Android 上是全新安装，会导致用户历史对话不可见" +
-                "（详见 docs/plan-docs/data-preservation-design.md）。" +
+                "包名变更在 Android 上是全新安装，会导致用户历史对话不可见。" +
                 "如需 rebrand 请只改应用名/图标/namespace，勿改 applicationId。"
         }
     }
@@ -383,7 +382,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
 
     // 内置 MCP 服务器（Streamable HTTP）：Ktor CIO 起 HTTP 监听 + SSE，供外部 MCP 客户端连入。
-    // 与项目协程/序列化栈同源（见 docs/plan-docs/builtin-mcp-server-design.md 决策记录）。
+    // 与项目协程/序列化栈同源。
     implementation("io.ktor:ktor-server-core:2.3.13")
     implementation("io.ktor:ktor-server-cio:2.3.13")
 

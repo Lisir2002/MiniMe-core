@@ -21,7 +21,6 @@ gradle-local.properties
 .claude/
 /.kotlin/
 /.agents/
-/.rcode/
 
 # 临时调试文件
 /*.log

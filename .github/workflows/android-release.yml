@@ -3,7 +3,7 @@ name: Android Release
 # 打 Tag（如 v1.0.0）时触发：构建「真机 + 虚拟环境通用」的 Release APK（双 ABI：arm64-v8a + x86_64）。
 #   - 单包通用（用户决策「不分包」）：同一 APK 同时携带 arm64-v8a 与 x86_64 两套原生库，
 #     Android 包管理器安装/运行期按设备 ABI 自动选用——真机（arm64）与 x86_64 模拟器都安装即用，
-#     无需用户选择、不存在「误装到 x86_64 模拟器」的问题（详见 docs/plan-docs/emulator-support-design.md）。
+#     无需用户选择、不存在「误装到 x86_64 模拟器」的问题。
 #   - 容器 rootfs 同理双架构打入（container/arm + container/x86_64），运行时按宿主架构选装/选用。
 # 创建 GitHub Release 并把 APK 作为资产发布。
 on:

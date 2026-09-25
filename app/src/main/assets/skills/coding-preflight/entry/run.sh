@@ -275,7 +275,7 @@ if $is_android; then
       fi
     done
   fi
-  for d in docs/modules docs/plan-docs app/src/main/assets/prompts app/src/main/assets/docs; do
+  for d in app/src/main/assets/prompts app/src/main/assets/docs; do
     [ -d "$ROOT/$d" ] && echo "[结构] $d 存在" || echo "[结构] $d 缺失"
   done
 else

@@ -84,7 +84,7 @@ data class TerminalBundle(
  *
  * **架构无关性说明**：bundle 只声明 apk 包名，不涉及架构——apk 在容器内运行时按容器
  * 所在架构（arm64 / x86_64 rootfs）自动解析并安装对应架构的包，无需为 x86_64 环境单独
- * 维护一套包定义（见 docs/plan-docs/emulator-support-design.md「Bundle 架构维度」）。
+ * 维护一套包定义。
  */
 object TerminalBundles {
 

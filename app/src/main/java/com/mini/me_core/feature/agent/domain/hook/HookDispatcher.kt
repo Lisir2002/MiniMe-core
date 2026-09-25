@@ -13,8 +13,6 @@ import javax.inject.Singleton
  * - **异常隔离**：每个 handler 独立 try/catch——单个 hook 抛错不中断后续 hook、不破坏主流程；
  *   错误以 [HookOutcome.error] 上报，调用方决定如何记录。
  * - **协程卫生**：`CancellationException` 一律重抛（不吞取消信号，对齐 workflow 既有约定）。
- *
- * 设计依据：docs/plan-docs/claude-code-study-design.md 第 11 节（11.3）。
  */
 @Singleton
 class HookDispatcher @Inject constructor(

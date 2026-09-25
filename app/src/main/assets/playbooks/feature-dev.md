@@ -14,7 +14,7 @@ stages:
     guards:
       timeout: 60000
   - name: 设计文档
-    description: 新增/复杂改动先出设计文档到 docs/plan-docs/（<名称>-design.md，含评审状态行），走 Spec 评审；简单改动跳过
+    description: 新增/复杂改动先出设计方案（在对话中讨论确认），走评审；简单改动跳过
     agents: []
     sop: [60-ai-conduct]
     gates: approval
@@ -89,4 +89,4 @@ stages:
 
 > 作用：多阶段大任务按剧本推进不跳步。阶段由 `playbook_advance(action=done|fail)` 显式推进；
 > `gates: approval` 阶段需用户批准（`!` 标记可跳过）；阶段内无 `agents[]` 声明时由主模型按
-> 阶段注入的目标执行。设计文档阶段联动 Spec（docs/plan-docs/ 评审状态行）。
+> 阶段注入的目标执行。设计文档阶段在对话中讨论确认方案。

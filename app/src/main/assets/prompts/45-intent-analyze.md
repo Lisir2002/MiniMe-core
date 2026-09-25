@@ -50,7 +50,7 @@ includes: []
 - `chat`：普通对话，不调用工具。
 - **plan 形态强制 design**：判定为 plan 时，批准前只出方案不改代码；批准后转 execute。design 阶段允许只读调研。
 - 默认每轮按新输入重判（意图变则模式自然变）；显式指令（`/mode design|execute|research|chat` 切换、`?` 咨询标记）锁定到下次显式解除。
-- 新增/复杂改动：design 模式纪律下，先出设计文档到 `docs/plan-docs/` 走 Spec 评审。
+- 新增/复杂改动：design 模式纪律下，先在对话中给出设计方案，得到用户认可后再实施。
 
 ### 五、`!` / `?` 标记说明
 - 首 token `!`（立即执行）：跳过**流程级确认**（plan 批准 + playbook approval gate），**不绕过权限系统**（危险操作仍走权限审批）。

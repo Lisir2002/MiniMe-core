@@ -7,9 +7,6 @@ package com.mini.me_core.feature.agent.data.local.entity
  * 下轮会话开始前注入 system-reminder + 消费确认（防重复/防丢失），Room 持久化支撑
  * App 被杀后下次启动重扫待注入队列继续唤醒。
  *
- * 设计依据：docs/plan-docs/claude-code-study-design.md 第 11 节（11.3 asyncRewake 下轮注入）
- * 与第 16 节（16.2 统一 WakeQueue）。
- *
  * @param wakeId 唤醒唯一标识（UUID）。
  * @param sessionId 归属会话；空串表示全局（不按会话过滤）。
  * @param source 来源标识（如 `hook.commit-discipline` / 耗时任务名）。

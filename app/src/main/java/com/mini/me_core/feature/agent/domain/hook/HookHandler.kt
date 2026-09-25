@@ -8,8 +8,6 @@ import com.mini.me_core.feature.agent.domain.tool.ToolCall
  *
  * 实现类通过 Hilt `@Binds @IntoSet` 注册到 [HookDispatcher]（模式对齐
  * [SlashCommandHandler]：接口 + multibinding + Registry 汇集）。
- *
- * 设计依据：docs/plan-docs/claude-code-study-design.md 第 11 节（11.3 完整事件集）。
  */
 interface HookHandler {
     /** 唯一标识：日志与去重。 */

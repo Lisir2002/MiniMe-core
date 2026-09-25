@@ -6,7 +6,7 @@ import java.security.SecureRandom
 /**
  * 内置 MCP 服务器安全助手：token 生成/校验 + 远程暴露黑名单。
  *
- * 设计原则（见 docs/plan-docs/builtin-mcp-server-design.md §5.4）：
+ * 设计原则：
  * - 默认关闭、token 鉴权、远程强制审批、局域网限制、审计日志。
  * - 黑名单「宁缺毋滥」：强依赖 UI/本机会话、或修改 MCP 配置本身的工具不暴露。
  */
