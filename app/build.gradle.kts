@@ -393,7 +393,7 @@ dependencies {
     // 远程同步 (SFTP/FTP) 与内置 FTP 服务端
     implementation("com.hierynomus:sshj:0.38.0")
     // BouncyCastle：sshj 0.38.0 用 X25519 密钥交换，Android 自带裁剪版 BC 不含该算法，
-    // 需显式引入完整版并注册替换（见 AIEditorApp.registerBouncyCastle）。版本与 sshj 传递依赖一致。
+    // 需显式引入完整版并注册替换（见 MiniMeCore.registerBouncyCastle）。版本与 sshj 传递依赖一致。
     implementation("org.bouncycastle:bcprov-jdk18on:1.75")
     implementation("commons-net:commons-net:3.10.0")
     implementation("org.apache.ftpserver:ftpserver-core:1.2.0")

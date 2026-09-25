@@ -196,7 +196,7 @@ app/src/main/java/com/mini/me_core/
 │   ├── t2i/             # Text-to-image (provider abstraction, SYNC/ASYNC/AUTO endpoints)
 │   ├── terminal/        # Terminal emulation & session management (local PRoot + remote SSH, 7 built-in bundles)
 │   └── workspace/       # Workspace & document management (local + remote SFTP/FTP sync)
-├── AIEditorApp.kt       # Application entry (BC registration, credential bridge, MCP, keepalive init)
+├── MiniMeCore.kt       # Application entry (BC registration, credential bridge, MCP, keepalive init)
 └── MainActivity.kt      # Main Activity (NavHost + Drawer + global credential dialog)
 ```
 

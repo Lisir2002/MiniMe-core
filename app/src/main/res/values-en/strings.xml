@@ -457,8 +457,6 @@
     <string name="backup_stat_mcp_servers">· MCP servers %1$s</string>
     <string name="backup_stat_permission_rules">· Global permission rules %1$s</string>
     <string name="backup_settings_covered">Theme, keep-alive, logs, vision and sync preferences are included</string>
-    <string name="backup_legacy_found_title">Old-version data detected</string>
-    <string name="backup_legacy_found_desc">An older version of the app \"%1$s\" (same signature but different package name) is still installed. Because the package name changed, old chat history will not migrate automatically. To recover it, use \"Backup &amp; Restore → Export backup (check chat history)\" in the old version, then \"Import backup\" in this version.</string>
 
     <!-- Data preservation: sentinel + local auto backup -->
     <string name="backup_data_lost_title">Possible data loss detected</string>

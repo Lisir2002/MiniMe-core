@@ -90,7 +90,7 @@ fun LogBottomStatusBar(
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 380, heightDp = 80)
 @Composable
 private fun LogBottomStatusBarPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         LogBottomStatusBar(
             shownLines = 45,
             totalLines = 234,

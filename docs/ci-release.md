@@ -44,7 +44,7 @@ curl -s -u "<owner>:<token>" \
 2. **ABI 校验** → `unzip -l <apk> | grep 'lib/.*\.so'` 必须**同时**含 `lib/arm64-v8a/*.so` 与 `lib/x86_64/*.so`（双 ABI 通用包）；容器资产应含 `assets/container/arm/alpine-rootfs.bin` 与 `assets/container/x86_64/alpine-rootfs-x86_64.bin`
 3. **签名校验** → `keytool -printcert -jarfile <apk>` → Owner 必须为正式签名（非 `CN=Android Debug`）
 4. **SHA256** → `sha256sum <apk>` 记录指纹
-5. **Release 页面** → https://github.com/Lisir2002/deepcode-R/releases/tag/<tag>
+5. **Release 页面** → https://github.com/Lisir2002/MiniMe-core/releases/tag/<tag>
 
 ## 签名策略（唯一官方密钥，已入库）
 

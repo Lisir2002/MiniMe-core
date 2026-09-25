@@ -78,7 +78,7 @@
 
 **RC 判定规则**（对齐仓库发版纪律）：
 - tag 含 `-rc` / `-beta` / `-alpha` / `-dev` 后缀 → 按 RC 处理
-- 改动触及启动 / 容器 / 构建链路（`AndroidManifest.xml`、`AIEditorApp.kt`、`feature/terminal/`、`feature/container/`、`app/build.gradle.kts`、`.github/workflows` 等）→ 建议先发 RC 预览版
+- 改动触及启动 / 容器 / 构建链路（`AndroidManifest.xml`、`MiniMeCore.kt`、`feature/terminal/`、`feature/container/`、`app/build.gradle.kts`、`.github/workflows` 等）→ 建议先发 RC 预览版
 - 含功能代码改动 → 建议先发 RC
 - 仅 `.md` / `values/strings.xml` 文档或资源文案改动 → 可直接发正式版
 - 无提交变更 → 可直接发正式版（需人工确认 tag 语义）

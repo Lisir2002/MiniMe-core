@@ -53,7 +53,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.mini.me_core.core.theme.AIEditorTheme
+import com.mini.me_core.core.theme.MiniMeTheme
 import com.mini.me_core.feature.agent.presentation.AIAgentViewModel
 import com.mini.me_core.feature.agent.presentation.component.AIChatPanel
 import com.mini.me_core.feature.agent.presentation.component.ChatDrawerContent
@@ -103,7 +103,7 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var executionModeHolder: com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
 
-    /** 三端（UI/AI Bash/交互终端）git 缺凭据统一弹窗桥：在 AIEditorApp 启动后监听 helper 的文件 IPC 请求。 */
+    /** 三端（UI/AI Bash/交互终端）git 缺凭据统一弹窗桥：在 MiniMeCore 启动后监听 helper 的文件 IPC 请求。 */
     @Inject
     lateinit var credentialRequestBridge: com.mini.me_core.feature.credentials.data.CredentialRequestBridge
 
@@ -225,14 +225,14 @@ class MainActivity : ComponentActivity() {
             val bgImageUri = themeSettingsState.backgroundImage
             val bgScrim = themeSettingsState.backgroundMask
             val cardAlpha = themeSettingsState.cardOpacity
-            // 问题3：提取显示偏好（圆角/字体/动效）传给 AIEditorTheme
+            // 问题3：提取显示偏好（圆角/字体/动效）传给 MiniMeTheme
             val cornerStyle = themeSettingsState.cornerStyleEnum()
             val fontScale = themeSettingsState.fontScale
             val animationScale = themeSettingsState.animationScale
             // Component Tokens：字体粗细缩放
             val fontWeightScale = themeSettingsState.fontWeightScale
 
-            AIEditorTheme(
+            MiniMeTheme(
                 darkTheme = darkTheme,
                 customColors = customColors,
                 backgroundImageUri = bgImageUri,
@@ -251,8 +251,8 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
-                        // 问题2修复：根 Surface 改为透明，让 AIEditorTheme 内部的背景图层透出。
-                        // AIEditorTheme.kt:270 已有不透明底色层（.background(colorScheme.background)），
+                        // 问题2修复：根 Surface 改为透明，让 MiniMeTheme 内部的背景图层透出。
+                        // MiniMeTheme.kt:270 已有不透明底色层（.background(colorScheme.background)），
                         // 透明 Surface 不会导致视觉问题。
                         color = androidx.compose.ui.graphics.Color.Transparent
                     ) {

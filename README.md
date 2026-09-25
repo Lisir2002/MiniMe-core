@@ -195,7 +195,7 @@ app/src/main/java/com/mini/me_core/
 │   ├── t2i/             # 文生图（Provider 抽象、SYNC/ASYNC/AUTO 端点）
 │   ├── terminal/        # 终端模拟与会话管理（本地 PRoot + 远程 SSH，7 个内置 Bundle）
 │   └── workspace/       # 工作区与文档管理（本地 + 远程 SFTP/FTP 同步）
-├── AIEditorApp.kt       # Application 入口（BC 注册、凭据桥、MCP、保活服务初始化）
+├── MiniMeCore.kt       # Application 入口（BC 注册、凭据桥、MCP、保活服务初始化）
 └── MainActivity.kt      # 主 Activity（NavHost + Drawer + 全局凭据弹窗）
 ```
 

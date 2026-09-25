@@ -1547,7 +1547,7 @@ private val SHARED_CLIENT: OkHttpClient = OkHttpClient.Builder()
     .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
     .build()
 
-private const val GITHUB_REPO_URL = "https://github.com/Lisir2002/deepcode-R"
+private const val GITHUB_REPO_URL = "https://github.com/Lisir2002/MiniMe-core"
 private const val GITHUB_LATEST_API =
-    "https://api.github.com/repos/Lisir2002/deepcode-R/releases/latest"
+    "https://api.github.com/repos/Lisir2002/MiniMe-core/releases/latest"
 private const val RELEASES_URL = "$GITHUB_REPO_URL/releases"

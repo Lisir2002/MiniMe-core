@@ -53,7 +53,6 @@ class PermissionRulesRepository @Inject constructor(
         const val TAG = "PermissionRules"
         const val PERMISSIONS_FILE = "permissions.json"
         const val MINIME_DIR = ".minime"
-        const val LEGACY_MINIME_DIR = ".deepcode"
         val JSON = Json { ignoreUnknownKeys = true; encodeDefaults = true; prettyPrint = true }
     }
 
@@ -89,15 +88,7 @@ class PermissionRulesRepository @Inject constructor(
         if (state.value != null) return
         mutex.withLock {
             if (state.value != null) return
-            // 新路径 → 旧路径 fallback（品牌迁移向下兼容）
-            val newFile = projectFileForPath(workspacePath)
-            if (newFile.isFile) {
-                state.value = loadFromFile(newFile)
-            } else {
-                val legacyFile = File(File(workspacePath, LEGACY_MINIME_DIR), PERMISSIONS_FILE)
-                state.value = loadFromFile(legacyFile)
-                if (legacyFile.isFile) FileLogger.i(TAG, "项目级权限从旧品牌路径迁移到新品牌")
-            }
+            state.value = loadFromFile(projectFileForPath(workspacePath))
         }
     }
 

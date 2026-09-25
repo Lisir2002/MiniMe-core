@@ -26,7 +26,7 @@ except ImportError:
 # ============ 配置 ============
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 REPO_OWNER = "Lisir2002"
-REPO_NAME = "deepcode-R"
+REPO_NAME = "MiniMe-core"
 API_BASE = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}"
 
 POLL_INTERVAL = 15  # 秒

@@ -161,7 +161,7 @@ enum class AppDialogType {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 400, heightDp = 300)
 @Composable
 private fun AppDialogDefaultPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         AppDialog(
             title = "删除确认",
             message = "确定要删除这个项目吗？此操作不可撤销。",
@@ -175,7 +175,7 @@ private fun AppDialogDefaultPreview() {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 400, heightDp = 300)
 @Composable
 private fun AppDialogDestructivePreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         AppDialog(
             title = "清除所有数据",
             message = "此操作将删除所有本地数据，且无法恢复。",
@@ -190,7 +190,7 @@ private fun AppDialogDestructivePreview() {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 400, heightDp = 400)
 @Composable
 private fun AppDialogSingleChoicePreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         AppDialog(
             title = "选择主题",
             type = AppDialogType.SingleChoice,

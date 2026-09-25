@@ -79,6 +79,6 @@ data class CornerScale(
  *
  * 用法：`RoundedCornerShape(LocalCornerRadius.current.md)`
  *
- * 由 AIEditorTheme 根据用户 cornerStyle 设置提供。
+ * 由 MiniMeTheme 根据用户 cornerStyle 设置提供。
  */
 val LocalCornerRadius = staticCompositionLocalOf { CornerScale.Rounded }

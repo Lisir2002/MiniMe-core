@@ -3,9 +3,7 @@ import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -124,7 +122,6 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
-        LegacyDataRecoveryBanner()
         DataLossAlertBanner(
             verdict = dataSafety.verdict,
             hasBackup = dataSafety.backupCount > 0,
@@ -483,79 +480,6 @@ private fun formatBackupTime(epochMs: Long?): String {
     val ts = epochMs ?: return ""
     return SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(ts))
 }
-
-/**
- * 历史数据恢复横幅：检测到"同签名但包名不同"的旧版本应用仍安装在本机时展示。
- *
- * 背景：applicationId 三次变更（com.aicodeeditor → com.deep.rcode → com.mini.me_core），
- * 每次变更是完全不同的 App，新包名全新安装 → 旧包的历史对话不会自动迁移，用户以为"历史被清空"。
- * 本横幅提示用户：在旧版本中导出备份（含聊天历史），再在本版本导入备份即可找回。
- */
-@Composable
-private fun LegacyDataRecoveryBanner() {
-    val context = LocalContext.current
-    val legacyPackage = remember { detectSameSignatureLegacyPackage(context) }
-    if (legacyPackage == null) return
-
-    val colors = LocalAppTheme.current.colors
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
-        colors = CardDefaults.cardColors(containerColor = colors.warningContainer),
-        border = BorderStroke(1.dp, colors.warning)
-    ) {
-        Column(
-            modifier = Modifier.padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs)
-        ) {
-            Text(
-                text = stringResource(R.string.backup_legacy_found_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = stringResource(R.string.backup_legacy_found_desc, legacyPackage),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-/** 历史遗留包名（禁止修改 applicationId 回退到这些包名，否则用户数据再次隔离）。 */
-private val LEGACY_APPLICATION_IDS = listOf("com.aicodeeditor", "com.deep.rcode")
-
-/**
- * 检测是否存在与本应用"同签名但包名不同"的旧版本应用。
- * 若存在则返回其包名；否则返回 null。
- */
-private fun detectSameSignatureLegacyPackage(context: Context): String? {
-    val pm = context.packageManager
-    val currentSig = runCatching {
-        packageSignature(pm, context.packageName)
-    }.getOrNull() ?: return null
-    for (pkg in LEGACY_APPLICATION_IDS) {
-        if (pkg == context.packageName) continue
-        val sig = runCatching { packageSignature(pm, pkg) }.getOrNull() ?: continue
-        if (sig.contentEquals(currentSig)) return pkg
-    }
-    return null
-}
-
-private fun packageSignature(pm: PackageManager, packageName: String): ByteArray? =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        runCatching {
-            pm.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
-                ?.signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()
-        }.getOrNull()
-    } else {
-        @Suppress("DEPRECATION")
-        runCatching {
-            pm.getPackageInfo(packageName, PackageManager.GET_SIGNATURES)
-                ?.signatures?.firstOrNull()?.toByteArray()
-        }.getOrNull()
-    }
 
 @Composable
 private fun BackupInfoCard() {

@@ -80,7 +80,7 @@ fun LogQuickFilterBar(
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 380, heightDp = 80)
 @Composable
 private fun LogQuickFilterBarPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         Row(Modifier.padding(PrimitiveSpacing.Sm)) {
             LogQuickFilterBar(
                 levelCounts = mapOf(LogLevel.ERROR to 5, LogLevel.WARN to 23, LogLevel.INFO to 156, LogLevel.DEBUG to 40),

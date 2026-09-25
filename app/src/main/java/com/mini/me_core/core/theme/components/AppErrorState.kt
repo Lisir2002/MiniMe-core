@@ -90,7 +90,7 @@ fun AppErrorState(
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 400, heightDp = 300)
 @Composable
 private fun AppErrorStatePreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,

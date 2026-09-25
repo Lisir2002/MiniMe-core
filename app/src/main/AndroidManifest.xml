@@ -11,7 +11,7 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
-        android:name=".AIEditorApp"
+        android:name=".MiniMeCore"
         android:allowBackup="true"
         android:fullBackupContent="@xml/full_backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"

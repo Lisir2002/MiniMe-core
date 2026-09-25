@@ -45,7 +45,7 @@ fun AppDivider(
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, heightDp = 120)
 @Composable
 private fun AppDividerPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         Column(modifier = Modifier.fillMaxWidth().padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg)) {
             Text("Default divider")
             Spacer(Modifier.height(Spacing.sm))

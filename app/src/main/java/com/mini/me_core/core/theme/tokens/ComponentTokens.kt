@@ -610,14 +610,14 @@ data class BubbleTokens(
  * 用法：`val tokens = LocalComponentTokens.current`
  *       `tokens.card.cornerRadius`
  *
- * 由 AIEditorTheme 根据用户设置 + 暗色模式提供。
+ * 由 MiniMeTheme 根据用户设置 + 暗色模式提供。
  */
 val LocalComponentTokens = staticCompositionLocalOf { ComponentTokens.Light }
 
 /**
  * CompositionLocal：字体粗细缩放比例。
  *
- * 由 AIEditorTheme 根据用户设置提供（1.0=标准，<1.0=更细，>1.0=更粗）。
+ * 由 MiniMeTheme 根据用户设置提供（1.0=标准，<1.0=更细，>1.0=更粗）。
  * 组件读取后映射到 FontWeight 档位。
  *
  * 注意：Markdown 渲染器的加粗（**bold**）是语义解析，不跟随此值。

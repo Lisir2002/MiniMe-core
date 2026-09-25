@@ -24,7 +24,7 @@ import javax.inject.Singleton
  * UI `git config --global user.name/email` 增量写。这样署名真源就是 `.gitconfig` 本身，UI 与命令行共用同一份，
  * 不存在两套写入路径竞争。
  *
- * 调用方：[AIEditorApp] 启动兜底、[CredentialViewModel] 增删改后、[GitViewModel] 弹窗保存后。
+ * 调用方：[MiniMeCore] 启动兜底、[CredentialViewModel] 增删改后、[GitViewModel] 弹窗保存后。
  */
 @Singleton
 class GitCredentialsFileSync @Inject constructor(

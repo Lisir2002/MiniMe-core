@@ -23,7 +23,7 @@
 -dontwarn org.openjsse.**
 
 # ---- BouncyCastle (bcprov-jdk18on) ----
-# AIEditorApp.registerBouncyCastle() 在启动时注册 BC Provider 供 sshj 做 X25519 密钥交换。
+# MiniMeCore.registerBouncyCastle() 在启动时注册 BC Provider 供 sshj 做 X25519 密钥交换。
 # BouncyCastleProvider 构造时通过反射动态加载 jcajce/jce 下的 *Mappings 类与各算法 SPI。
 # 精确保留 Provider 及 SPI 反射包，避免 R8 误删抛 KeyStoreException: BKS not found，
 # 同时允许 R8 裁剪 PQC(后量子密码学)、OpenPGP 等巨型无关模块以大幅缩减包体积。

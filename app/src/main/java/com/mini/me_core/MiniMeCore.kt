@@ -7,7 +7,6 @@ import android.app.NotificationManager
 import android.content.ComponentCallbacks2
 import android.content.SharedPreferences
 import android.os.Build
-import com.mini.me_core.core.BrandMigration
 import com.mini.me_core.core.migration.MigrationRunner
 import com.mini.me_core.core.migration.StartupSelfCheck
 import com.mini.me_core.core.util.AILogger
@@ -40,10 +39,10 @@ import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 @HiltAndroidApp
-class AIEditorApp : Application() {
+class MiniMeCore : Application() {
 
     private companion object {
-        const val TAG = "AIEditorApp"
+        const val TAG = "MiniMeCore"
 
         /** 预防闸门诊断标记存储（见 [diagnoseLastExit] / [recordTrimCritical]）。 */
         const val DIAG_PREFS = "minime_diag"
@@ -180,9 +179,9 @@ class AIEditorApp : Application() {
         // 仅当某环节失败时才以 W/E 级别显眼输出上下文。
         FileLogger.i(TAG, "[启动/1/3] 数据层初始化")
 
-        // 通用启动期迁移框架：按序执行所有一次性数据迁移任务（品牌迁移 DeepCore→MiniMe 等历史任务）。
+        // 通用启动期迁移框架：按序执行所有一次性数据迁移任务。
         // 必须在任何 DB 访问之前（任务会重命名数据库文件）。已完成任务命中标记，零开销跳过。
-        MigrationRunner.runAll(this, listOf(BrandMigration))
+        MigrationRunner.runAll(this, emptyList())
 
         // 数据库加密迁移崩溃恢复：扫描 6 库迁移状态，回滚非稳定状态。
         // 正常情况下为幂等空操作，仅清理可能残留的临时文件。
@@ -218,14 +217,14 @@ class AIEditorApp : Application() {
         // 内置文档 + 提示词提取（覆盖式，随 App 升级更新）
         appScope.launch {
             runCatching {
-                ContainerInstaller.extractDocs(this@AIEditorApp)
-                ContainerInstaller.extractPrompts(this@AIEditorApp)
+                ContainerInstaller.extractDocs(this@MiniMeCore)
+                ContainerInstaller.extractPrompts(this@MiniMeCore)
             }.onFailure { FileLogger.w(TAG, "内置文档/提示词提取失败", it) }
             FileLogger.v(TAG, "异步预热：文档/提示词提取完成")
         }
         // 上一轮日志导出到公共目录（解决"闪退时来不及导出"的盲区）
         appScope.launch {
-            runCatching { FileLogger.exportLogsToDownloads(this@AIEditorApp) }
+            runCatching { FileLogger.exportLogsToDownloads(this@MiniMeCore) }
                 .onFailure { FileLogger.w(TAG, "启动时自动导出日志到公共目录失败（忽略，私有日志仍在）", it) }
             FileLogger.v(TAG, "异步预热：上一轮日志导出完成")
         }
@@ -334,9 +333,9 @@ class AIEditorApp : Application() {
             var last: Boolean? = null
             keepaliveSettings.enabledFlow.distinctUntilChanged().collect { enabled ->
                 if (enabled) {
-                    TerminalKeepaliveService.enablePersistent(this@AIEditorApp)
+                    TerminalKeepaliveService.enablePersistent(this@MiniMeCore)
                 } else if (last == true) {
-                    TerminalKeepaliveService.disablePersistent(this@AIEditorApp)
+                    TerminalKeepaliveService.disablePersistent(this@MiniMeCore)
                 }
                 last = enabled
             }
@@ -418,7 +417,7 @@ class AIEditorApp : Application() {
                     append("MiniMe-core 崩溃快照  ").append(stamp).append('\n')
                     append("version=").append(BuildConfig.VERSION_NAME).append('\n')
                     append("schemaVersion=AGENT-v3").append('\n')
-                    append("agentPreheatRan=").append(AIEditorApp.agentPreheatCompleted.get()).append('\n')
+                    append("agentPreheatRan=").append(MiniMeCore.agentPreheatCompleted.get()).append('\n')
                     append("=".repeat(60)).append('\n')
                     append(summary).append('\n')
                     val sw = java.io.StringWriter()
@@ -427,7 +426,7 @@ class AIEditorApp : Application() {
                     append("=".repeat(60)).append('\n')
                     append("日志已同步落盘到私有目录，本快照用于快速定位。完整日志见同目录 log-*.txt。\n")
                 }
-                FileLogger.exportLogsToDownloads(this@AIEditorApp, "crash-$stamp.log" to snapshot)
+                FileLogger.exportLogsToDownloads(this@MiniMeCore, "crash-$stamp.log" to snapshot)
             }.onFailure {
                 android.util.Log.e("CRASH", "⚠️ 崩溃日志导出到公共目录失败，仍保留私有日志", it)
             }

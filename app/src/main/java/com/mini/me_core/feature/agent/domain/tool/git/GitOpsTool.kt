@@ -365,7 +365,7 @@ class GitOpsTool @Inject constructor(
         }.getOrDefault(emptyList())
         val sensitivePatterns = listOf(
             "AndroidManifest\\.xml",
-            "AIEditorApp\\.kt",
+            "MiniMeCore\\.kt",
             "feature/(terminal|container|settings)/",
             "LinuxContainerEngine",
             "ContainerInstaller",

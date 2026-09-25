@@ -443,7 +443,7 @@ fun LooseLogLine(line: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun PreviewWrapper(content: @Composable () -> Unit) {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         androidx.compose.foundation.layout.Column(
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.background)

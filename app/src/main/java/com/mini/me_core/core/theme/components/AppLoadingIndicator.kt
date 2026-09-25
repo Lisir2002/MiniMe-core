@@ -84,7 +84,7 @@ enum class AppIndicatorType {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 200, heightDp = 100)
 @Composable
 private fun AppLoadingIndicatorCircularPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         androidx.compose.foundation.layout.Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
@@ -99,7 +99,7 @@ private fun AppLoadingIndicatorCircularPreview() {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 400, heightDp = 100)
 @Composable
 private fun AppLoadingIndicatorLinearPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         androidx.compose.foundation.layout.Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),

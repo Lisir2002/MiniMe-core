@@ -43,7 +43,7 @@ val stageReferencedSources by tasks.registering(Copy::class) {
         "com/mini/me_core/core/theme/components/AppDivider.kt",
         "com/mini/me_core/core/theme/components/AppEmptyState.kt",
         // 主题入口（含 Spacing 定义）
-        "com/mini/me_core/core/theme/AIEditorTheme.kt",
+        "com/mini/me_core/core/theme/MiniMeTheme.kt",
     )
     into(referencedSrcDir)
 }

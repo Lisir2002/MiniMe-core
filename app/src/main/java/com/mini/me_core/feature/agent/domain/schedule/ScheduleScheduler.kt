@@ -14,7 +14,7 @@ import javax.inject.Singleton
 /**
  * 定时提醒调度循环（对齐 DSH schedule 运行时，App 级单例）。
  *
- * 启动时由 [AIEditorApp] 用 appScope 启动 [start]，按固定间隔轮询扫描
+ * 启动时由 [MiniMeCore] 用 appScope 启动 [start]，按固定间隔轮询扫描
  * [ScheduleService.dueAt] 到点的待投递项；到点项若对应会话已注册 [ScheduleFiredListener]
  * （由 AIAgentViewModel 在创建会话时注册），则回调注入一条带 "scheduled" 标记的
  * user/message，随后 [ScheduleService.markFired] 推进状态（一次性置 FIRED / 周期推进锚点）。

@@ -142,7 +142,7 @@ fun AppStatusDot(
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 300, heightDp = 200)
 @Composable
 private fun AppBadgePreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         val colors = LocalAppTheme.current.colors
         Row(
             modifier = Modifier.padding(Spacing.lg),
@@ -163,7 +163,7 @@ private fun AppBadgePreview() {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 300, heightDp = 200)
 @Composable
 private fun AppStatusDotPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         Row(
             modifier = Modifier.padding(Spacing.lg),
             verticalAlignment = Alignment.CenterVertically,

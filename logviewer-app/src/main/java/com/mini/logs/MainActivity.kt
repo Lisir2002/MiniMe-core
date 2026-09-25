@@ -34,7 +34,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.mini.me_core.core.theme.AIEditorTheme
+import com.mini.me_core.core.theme.MiniMeTheme
 import com.mini.logs.data.LogsViewModel
 import com.mini.logs.data.SettingsStore
 import com.mini.logs.data.ThemeMode
@@ -108,7 +108,7 @@ class MainActivity : ComponentActivity() {
                 // TODO: AMOLED 纯黑需自定义语义色，暂与 DARK 一致
                 ThemeMode.AMOLED -> true
             }
-            AIEditorTheme(darkTheme = darkTheme) {
+            MiniMeTheme(darkTheme = darkTheme) {
                 LogViewerRoot(
                     storagePermissionGranted = storagePermissionGranted,
                     onRequestPermission = {

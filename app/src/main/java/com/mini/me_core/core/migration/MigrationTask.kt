@@ -5,9 +5,8 @@ import android.content.Context
 /**
  * 启动期数据迁移任务抽象（通用迁移框架）。
  *
- * 背景：历史上「品牌迁移（DeepCore-Code → MiniMe-core）」是一段写死在启动入口里的特例逻辑。
- * 现把它抽象为可扩展的任务接口——任何「首次升级后需要跑一次」的一次性数据搬迁/修复，
- * 都实现本接口并注册进 [MigrationRunner]，由编排器在启动早期统一按序执行。
+ * 任何「首次升级后需要跑一次」的一次性数据搬迁/修复，都实现本接口并注册进 [MigrationRunner]，
+ * 由编排器在启动早期统一按序执行。
  *
  * 设计纪律：
  *  - 每个任务有全局唯一 [id]，[MigrationRunner] 据此持久化「已完成」标记；
@@ -18,10 +17,10 @@ import android.content.Context
  */
 interface MigrationTask {
 
-    /** 全局唯一标识（如 "brand_deepcode_to_minime"），作为完成标记的 key。 */
+    /** 全局唯一标识（如 "db_schema_fix_v2"），作为完成标记的 key。 */
     val id: String
 
-    /** 人类可读的任务名（如 "品牌迁移 DeepCore→MiniMe"），用于 Info 日志。 */
+    /** 人类可读的任务名（如 "数据库 Schema 修复"），用于 Info 日志。 */
     val title: String
 
     /**

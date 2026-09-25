@@ -86,7 +86,7 @@ enum class AppStatusType {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 400, heightDp = 200)
 @Composable
 private fun AppStatusDotPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         androidx.compose.foundation.layout.Row(
             modifier = Modifier.padding(24.dp),
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),

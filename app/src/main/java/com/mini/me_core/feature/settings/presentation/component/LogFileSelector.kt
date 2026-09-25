@@ -145,7 +145,7 @@ private fun selectorLabel(
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 380, heightDp = 120)
 @Composable
 private fun LogFileSelectorPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         Row(Modifier.padding(PrimitiveSpacing.Sm)) {
             LogFileSelector(
                 files = listOf("log-2026-09-23.txt", "log-2026-09-22.txt", "log-2026-09-21.txt"),

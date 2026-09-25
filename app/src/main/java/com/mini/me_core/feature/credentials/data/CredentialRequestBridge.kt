@@ -40,7 +40,7 @@ import javax.inject.Singleton
  * FileObserver 跨 PRoot -b 对 app filesDir 基本可靠，但个别机型 inotify 在绑定目录可能失效，故另起一个低频
  * 兜底轮询协程（[fallbackPollLoop]）扫 `cred-req-*` 未处理项；两者按 requestId 去重防双处理。
  *
- * 生命周期：@Singleton = App 级，借 [com.mini.me_core.AIEditorApp] 主线程调 [start]。FileObserver 必须主线程创建与
+ * 生命周期：@Singleton = App 级，借 [com.mini.me_core.MiniMeCore] 主线程调 [start]。FileObserver 必须主线程创建与
  * startWatching。弹窗在任意页面（终端页/聊天页/Git 页）都能弹，不限于 Git 页。
  */
 @Singleton

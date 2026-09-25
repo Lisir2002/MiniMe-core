@@ -223,7 +223,7 @@ enum class AppButtonSize {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 420, heightDp = 600)
 @Composable
 private fun AppButtonPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         androidx.compose.foundation.layout.Column(
             modifier = Modifier.padding(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(8.dp),

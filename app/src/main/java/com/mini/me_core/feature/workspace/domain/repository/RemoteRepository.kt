@@ -52,7 +52,7 @@ class RemoteRepository @Inject constructor(
     }
 
     /** 按 id 一次性读出带原始 RemoteAuth（含密码或私钥+passphrase）的完整配置。
-     * 用于 AIEditorApp 冷启动、SettingsViewModel 切远程时组装 SSH 连接——
+     * 用于 MiniMeCore 冷启动、SettingsViewModel 切远程时组装 SSH 连接——
      * RemoteConnection.domain 只暴露 password（PASSWORD 类型），但 PRIVATE_KEY
      * 类型时还需 passphrase，这个方法直接返回 auth 密封类。
      *

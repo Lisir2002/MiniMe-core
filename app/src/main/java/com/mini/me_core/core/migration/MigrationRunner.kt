@@ -16,7 +16,7 @@ import com.mini.me_core.core.util.FileLogger
  * 私有 [SharedPreferences]（与 CrashRecovery 的 MigrationStateStore 同一思路）。
  * 标记一旦写入，后续启动恒为快速路径。
  *
- * 调用点：[com.mini.me_core.AIEditorApp.onCreate] 数据层阶段最开头，
+ * 调用点：[com.mini.me_core.MiniMeCore.onCreate] 数据层阶段最开头，
  * 早于 crashRecovery / connectionPool.driver(...)。
  */
 object MigrationRunner {

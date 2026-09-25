@@ -37,7 +37,7 @@ SINGLETON_STATEFLOW_WHITELIST = {
     "RemoteSshConnection.kt",           # SSH 活连接状态，冷启动后确实断开
     "SkillStateRepository.kt",          # refreshTrigger 刷新计数器，非持久化
     "RealProgressAggregator.kt",        # 安装进度聚合器，运行时状态
-    "ExecutionModeHolder.kt",           # 由 AIEditorApp 启动时 setMode 恢复（外部注入）
+    "ExecutionModeHolder.kt",           # 由 MiniMeCore 启动时 setMode 恢复（外部注入）
     "TerminalSessionManager.kt",        # PTY 会话 revision 计数器，运行时状态
     "RemoteTerminalSessionManager.kt",  # 远程 PTY 会话，运行时状态
     "McpServerManager.kt",              # init 块中从 KVStore 恢复（脚本检测不到 init 块内的赋值）

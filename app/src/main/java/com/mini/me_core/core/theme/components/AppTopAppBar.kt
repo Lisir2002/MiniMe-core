@@ -97,7 +97,7 @@ fun AppTopAppBar(
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 400, heightDp = 120)
 @Composable
 private fun AppTopAppBarPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         AppTopAppBar(
             title = "设置",
             onNavigateBack = {},
@@ -119,7 +119,7 @@ private fun AppTopAppBarPreview() {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 400, heightDp = 120)
 @Composable
 private fun AppTopAppBarNoBackPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         AppTopAppBar(title = "主页")
     }
 }

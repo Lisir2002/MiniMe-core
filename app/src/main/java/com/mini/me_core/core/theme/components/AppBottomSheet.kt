@@ -108,7 +108,7 @@ private fun DefaultDragHandle() {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 400, heightDp = 500)
 @Composable
 private fun AppBottomSheetPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         Column(
             modifier = Modifier.fillMaxWidth(),
         ) {

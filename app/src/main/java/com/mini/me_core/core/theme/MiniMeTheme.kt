@@ -96,7 +96,7 @@ fun ChatAccent.Tone.resolveOn(): Color = if (LocalAppDarkMode.current) onDark el
 
 /**
  * 动效缩放比例 CompositionLocal。
- * 由 AIEditorTheme 根据用户设置提供（0.0=关闭动效，1.0=正常速度）。
+ * 由 MiniMeTheme 根据用户设置提供（0.0=关闭动效，1.0=正常速度）。
  * 组件读取后乘以 tween/durationMillis，实现动效全局缩放。
  */
 val LocalAnimationScale = staticCompositionLocalOf { 1.0f }
@@ -269,7 +269,7 @@ private fun rememberBitmapFromUri(uri: String?): ImageBitmap? {
 }
 
 @Composable
-fun AIEditorTheme(
+fun MiniMeTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Phase 4：可选自定义语义色（来自主题预设）。null 时使用默认 Light/Dark。
     customColors: com.mini.me_core.core.theme.tokens.SemanticColors? = null,

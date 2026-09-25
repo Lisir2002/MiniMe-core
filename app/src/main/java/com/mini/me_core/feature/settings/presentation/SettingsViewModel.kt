@@ -1285,7 +1285,7 @@ class SettingsViewModel @Inject constructor(
         return true
     }
 
-    // 仅持久化标志位——启停 Service 由 AIEditorApp 监听 enabledFlow 统一完成。
+    // 仅持久化标志位——启停 Service 由 MiniMeCore 监听 enabledFlow 统一完成。
     fun setKeepaliveEnabled(enabled: Boolean) {
         viewModelScope.launch {
             keepaliveSettingsRepository.setEnabled(enabled)
@@ -1496,7 +1496,7 @@ class SettingsViewModel @Inject constructor(
                     executionModeRepository.setRemoteConnection(settings, activeProfileId = id)
                     executionModeRepository.setExecutionMode(ExecutionMode.REMOTE_SSH)
                     executionModeHolder.setMode(ExecutionMode.REMOTE_SSH)
-                    // 运行时切换需主动连接（启动时由 AIEditorApp 连）；复用 RemoteSshConnection.connect
+                    // 运行时切换需主动连接（启动时由 MiniMeCore 连）；复用 RemoteSshConnection.connect
                     runCatching {
                         remoteSshConnection.connect(
                             com.mini.me_core.feature.agent.domain.container.RemoteConnectionConfig(

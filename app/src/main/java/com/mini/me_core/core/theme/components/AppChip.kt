@@ -194,7 +194,7 @@ enum class AppChipColor {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 400, heightDp = 500)
 @Composable
 private fun AppChipPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         androidx.compose.foundation.layout.Column(
             modifier = Modifier.padding(Spacing.lg),
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),

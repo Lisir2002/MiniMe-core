@@ -63,7 +63,7 @@ object AppTheme {
  * 应用主题 Provider。
  *
  * Phase 0：包裹现有 MaterialTheme，同时提供 LocalAppTheme。
- * 现有 `AIEditorTheme()` 调用点零改动，内部委托给本 Provider。
+ * 现有 `MiniMeTheme()` 调用点零改动，内部委托给本 Provider。
  *
  * @param isDark 是否暗色模式（由现有 LocalAppDarkMode 传入）
  * @param content 子内容

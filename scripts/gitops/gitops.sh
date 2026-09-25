@@ -73,7 +73,7 @@ touches_sensitive() {
   local changes="$1"
   [[ -z "$changes" ]] && return 1
   echo "$changes" | grep -qE \
-    'AndroidManifest\.xml|AIEditorApp\.kt|feature/(terminal|container|settings)/|LinuxContainerEngine|ContainerInstaller|app/build\.gradle\.kts|gradle/libs\.versions\.toml|\.github/workflows'
+    'AndroidManifest\.xml|MiniMeCore\.kt|feature/(terminal|container|settings)/|LinuxContainerEngine|ContainerInstaller|app/build\.gradle\.kts|gradle/libs\.versions\.toml|\.github/workflows'
 }
 
 # 仅文档/资源改动

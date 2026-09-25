@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.mini.me_core.core.theme.AIEditorTheme
+import com.mini.me_core.core.theme.MiniMeTheme
 import com.mini.me_core.feature.agent.domain.tool.PendingToolPermission
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
@@ -71,7 +71,7 @@ private fun buildGroup(
 @Preview(showBackground = true, widthDp = 380)
 @Composable
 private fun TaskCardRunningPreview() {
-    AIEditorTheme {
+    MiniMeTheme {
         Surface {
             Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 val runningTool = RunningToolOutput(
@@ -111,7 +111,7 @@ private fun TaskCardRunningPreview() {
 @Preview(showBackground = true, widthDp = 380)
 @Composable
 private fun TaskCardCompletedCollapsedPreview() {
-    AIEditorTheme {
+    MiniMeTheme {
         Surface {
             Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 val editContent = "{\"path\":\"LoginScreen.kt\",\"added_lines\":3,\"removed_lines\":1,\"hunks\":[{\"start_line\":42,\"diff\":\"+ buttonColor = Blue\"}]}"
@@ -148,7 +148,7 @@ private fun TaskCardCompletedCollapsedPreview() {
 @Preview(showBackground = true, widthDp = 380)
 @Composable
 private fun TaskCardFailedPreview() {
-    AIEditorTheme {
+    MiniMeTheme {
         Surface {
             Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 TaskCard(
@@ -186,7 +186,7 @@ private fun TaskCardFailedPreview() {
 @Preview(showBackground = true, widthDp = 380)
 @Composable
 private fun TaskCardWaitingApprovalPreview() {
-    AIEditorTheme {
+    MiniMeTheme {
         Surface {
             Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 val approvalArgs = "{\"command\":\"npm install axios\"}"

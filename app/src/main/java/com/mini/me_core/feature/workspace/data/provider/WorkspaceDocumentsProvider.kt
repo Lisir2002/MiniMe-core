@@ -76,7 +76,7 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
      * RC61b hotfix3: **这里绝对不能再同步调 ContainerInstaller.extractDocs(ctx())**。
      * 它会触发 AssetManager.open（主线程 IO）且在个别 ROM 上会因 asset 路径不存在等原因抛
      * RuntimeException，直接穿透到 queryRoots→ContentProvider→系统杀进程。
-     * 提取 docs 改为「AIEditorApp appScope 后台协程 + ContainerInstaller.init 协程」两处异步完成，
+     * 提取 docs 改为「MiniMeCore appScope 后台协程 + ContainerInstaller.init 协程」两处异步完成，
      * Provider 内只保证目录存在、文档到时自然就能列出。
      */
     private fun exposedChildren(): List<File> {

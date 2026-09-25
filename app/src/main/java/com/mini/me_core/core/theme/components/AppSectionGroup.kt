@@ -59,7 +59,7 @@ fun AppSectionGroup(
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 400, heightDp = 300)
 @Composable
 private fun AppSectionGroupPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         Column(
             modifier = Modifier.padding(vertical = 16.dp),
         ) {

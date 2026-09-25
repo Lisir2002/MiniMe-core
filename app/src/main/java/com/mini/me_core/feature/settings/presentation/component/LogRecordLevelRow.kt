@@ -105,7 +105,7 @@ private fun recordLevelDescription(level: LogLevel): String = when (level) {
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true, widthDp = 380, heightDp = 200)
 @Composable
 private fun LogRecordLevelRowPreview() {
-    com.mini.me_core.core.theme.AIEditorTheme(darkTheme = false) {
+    com.mini.me_core.core.theme.MiniMeTheme(darkTheme = false) {
         Column(Modifier.padding(Spacing.sm)) {
             LogRecordLevelRow(currentLevel = LogLevel.VERBOSE, onSelectLevel = {})
         }

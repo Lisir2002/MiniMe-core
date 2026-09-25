@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.mini.me_core.core.theme.AIEditorTheme
+import com.mini.me_core.core.theme.MiniMeTheme
 import com.mini.me_core.feature.agent.domain.session.SessionUseCase
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
@@ -40,7 +40,7 @@ private fun toolMsg(
 @Preview(showBackground = true, widthDp = 380)
 @Composable
 private fun ToolCallCardRunningExpandedPreview() {
-    AIEditorTheme {
+    MiniMeTheme {
         Surface {
             Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
@@ -62,7 +62,7 @@ private fun ToolCallCardRunningExpandedPreview() {
 @Preview(showBackground = true, widthDp = 380)
 @Composable
 private fun ToolCallCardSuccessCollapsedPreview() {
-    AIEditorTheme {
+    MiniMeTheme {
         Surface {
             Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
@@ -80,7 +80,7 @@ private fun ToolCallCardSuccessCollapsedPreview() {
 @Preview(showBackground = true, widthDp = 380)
 @Composable
 private fun ToolCallCardSuccessExpandedPreview() {
-    AIEditorTheme {
+    MiniMeTheme {
         Surface {
             Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
@@ -98,7 +98,7 @@ private fun ToolCallCardSuccessExpandedPreview() {
 @Preview(showBackground = true, widthDp = 380)
 @Composable
 private fun ToolCallCardErrorExpandedPreview() {
-    AIEditorTheme {
+    MiniMeTheme {
         Surface {
             Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
@@ -116,7 +116,7 @@ private fun ToolCallCardErrorExpandedPreview() {
 @Preview(showBackground = true, widthDp = 380)
 @Composable
 private fun ToolCallCardErrorCollapsedPreview() {
-    AIEditorTheme {
+    MiniMeTheme {
         Surface {
             Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
@@ -134,7 +134,7 @@ private fun ToolCallCardErrorCollapsedPreview() {
 @Preview(showBackground = true, widthDp = 380)
 @Composable
 private fun ToolCallCardTimedOutExpandedPreview() {
-    AIEditorTheme {
+    MiniMeTheme {
         Surface {
             Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
@@ -152,7 +152,7 @@ private fun ToolCallCardTimedOutExpandedPreview() {
 @Preview(showBackground = true, widthDp = 380)
 @Composable
 private fun ToolCallCardCancelledCollapsedPreview() {
-    AIEditorTheme {
+    MiniMeTheme {
         Surface {
             Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
@@ -170,7 +170,7 @@ private fun ToolCallCardCancelledCollapsedPreview() {
 @Preview(showBackground = true, widthDp = 380)
 @Composable
 private fun ToolCallCardCancelledExpandedPreview() {
-    AIEditorTheme {
+    MiniMeTheme {
         Surface {
             Column(Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm)) {
                 ToolCallCard(
