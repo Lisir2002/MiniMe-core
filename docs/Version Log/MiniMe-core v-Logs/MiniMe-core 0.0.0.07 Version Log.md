@@ -6,16 +6,16 @@
 
 ### 新功能
 
-- Design Token 基础设施：PrimitiveColors（8色系×10色阶）、PrimitiveSpacing/Radius/Elevation/Alpha、SemanticColors（50个语义色字段，亮/暗双模式）、AppThemeState + LocalAppTheme，现有调用点零改动
-- 基础组件库：AppCard（4变体）、AppListItem、AppChip（3变体×6色）、AppSectionHeader、AppDivider、AppEmptyState、AppButton（4变体×5色×3尺寸）、AppTopAppBar（API兼容）、AppBadge/AppStatusDot，每个组件含 @Preview
-- 主题设置页第一期：外观模式（AUTO/LIGHT/DARK）、6 套主题预设（Default/Cyber/Sunset/Forest/Ocean/Mono）、实时聊天预览、KVStore 持久化
-- 主题设置页第二期：9 项可自定义颜色（主色/背景/卡片/工具块/文字/边框/错误/成功）、WCAG 对比度警告（<4.5:1 提示）、背景图（系统 Photo Picker + 遮罩浓度 + 卡片透明度）、显示偏好（圆角风格/字体大小/动效强度）、恢复出厂主题
+- **设计令牌体系**：建立八色阶间距圆角等基础令牌与五十个语义色双模式。
+- **基础组件库**：新增卡片列表芯片按钮顶栏等九种通用组件，含预览支持。
+- **主题设置页一期**：支持外观模式切换六套主题预设与聊天实时预览持久化。
+- **主题设置页二期**：九项颜色自定义对比度警告背景图与显示偏好可恢复默认。
 
 ### 改进
 
-- 逐模块硬编码 Token 化：agent/settings/terminal/git/proxy/workspace/capability/core/theme 共 33 个文件，~142 处间距/圆角替换为 Spacing/Radius Token，视觉零变化
-- AboutSection 试点：9 个颜色字段替换为 Semantic Token 引用，视觉零变化
+- **硬编码令牌化**：逐模块替换约一百四十处间距圆角为令牌引用，视觉无变化。
+- **关于区块试点**：九个颜色字段替换为语义令牌引用，视觉效果零变化。
 
 ### 修复
 
-- 主题切换时 Material3 组件颜色同步：自定义 SemanticColors 动态映射到 Material ColorScheme，MaterialTheme.colorScheme 组件自动跟随主题变化
+- **主题色同步修复**：自定义语义色动态映射到材料配色方案，组件自动跟随。

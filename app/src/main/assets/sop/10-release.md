@@ -25,14 +25,15 @@ source: AGENTS.md「发版流程（RC 判定）」「版本号规范」
 - **判定**：`git log --oneline -1` 位于 `main`；严禁在功能分支（`feat/*` / `refactor/*`）上打 Tag。
 - **产出**：处于 main 且无未合并分支；出错则先完成合并再继续。
 
-## 3. 维护版本日志（发版必做 · 三层写法规约）
+## 3. 维护版本日志（发版必做 · 统一格式规约）
 
-- **操作**：打 Tag 前先按三层口径更新版本日志（见 `AGENTS.md`「发版流程 → 版本日志（发版必做 · 三层写法规约）」）。三层草稿统一由 `gitops release-log --layer <user|dev|ai>` 生成（底层 `scripts/gitops/release-log.py`）。
+- **操作**：打 Tag 前按统一格式更新版本日志（见 `docs/Version Log/README.md`「文档格式规范」）。所有版本说明文档必须格式一致。
 - **判定**：
-  1. **用户层（GitHub Release 正文）**：打 Tag 后由 CI 自动调用 `release-log --layer user` 生成（叙事、无内部术语），人工做价值化润色即可。
-  2. **开发者层（`docs/Version Log/CHANGELOG.md`）**：用 `gitops release-log --layer dev --prev vX.Y.Z` 生成 Keep a Changelog 六类草稿（`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`）生成草稿，润色后写入，版本倒序 + ISO 日期；⚠️ Breaking 必须显著标注并附迁移说明；仅当无任何用户可见变更时才可跳过。每个版本同时在 `docs/Version Log/MiniMe-core v-Logs/` 下生成独立版本日志文档。
-  3. **大模型层（`AGENTS.md`）**：用 `gitops release-log --layer ai` 生成 AI 工作流影响结构化摘要，凡与 AI 工作流相关（工具 / prompt / schema / 接口）的变更，必须在 `AGENTS.md`「资产同步纪律」及相应章节登记影响；无 schema 变化也须显式声明。
-- **产出**：三层日志口径一致，开发者层随代码在 main 上提交；用户层由 CI 生成并随 Release 正文发布；大模型层登记 AI 影响。
+  1. **总日志（`docs/Version Log/CHANGELOG.md`）**：在 `[Unreleased]` 下方添加新版本条目，版本倒序 + ISO 日期；⚠️ Breaking 必须显著标注并附迁移说明；仅当无任何用户可见变更时才可跳过。
+  2. **独立版本文档**：在 `docs/Version Log/MiniMe-core v-Logs/` 或 `docs/Version Log/MiniMe-Logs v-Logs/` 下创建对应版本文档（文件名用补零版本号），内容与 CHANGELOG 一致。
+  3. **Release 正文（GitHub Release）**：CI 构建成功后更新 Release 正文，必须遵循同样的条目格式规范（**4-9字小标题**：20-40字简练说明），与版本日志内容一致。
+- **条目格式**：每条必须为「**4-9字小标题**：20-40字说明」结构，小标题加粗，后接全角冒号，说明句简练明确。分类顺序：新功能 → 改进 → 移除 → 修复 → 安全 → 已知问题，无内容的分类省略。禁止 emoji。
+- **产出**：CHANGELOG、独立文档、Release 正文三处格式一致、内容一致；CHANGELOG 和独立文档随代码在 main 上提交；Release 正文在 CI 成功后更新。
 
 ## 4. 打 Tag 并推送
 

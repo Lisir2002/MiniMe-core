@@ -6,20 +6,20 @@
 
 ### 新功能
 
-- 初始化 MiniMe-core：运行于 Android 真机/虚拟机的 AI 编程工具（`app` / `terminal-emulator` / `terminal-view` / `newui` 四模块 + 双层数据仓库 `datalayer`）。
-- 内置 AI Agent，可读写文件、执行 Shell、运行构建；支持多 Provider 适配（Anthropic / OpenAI / Gemini）。
-- 内置 PRoot + Alpine Linux 容器与终端（arm64-v8a / x86_64 双架构，运行时按宿主选择）。
-- 本地 Termux 终端（`terminal-emulator` + `terminal-view`）+ `newui` 全新设计系统/UI 层。
-- 远程 SSH 后端（exec channel + SFTP 文件 + 交互终端会话）。
-- MCP（Model Context Protocol）客户端 + 内置 MCP 服务器（应用成为「客户端 + 服务器」双角色，手机当开发后端）。
-- Git 集成与可视化操作；`credentials` 集中式凭据管理（UI Git / AI Bash / 终端 git 三端共用）。
-- AES 加密备份与恢复；`workspace` 工作区与文档管理。
+- **项目初始化**：Android端AI编程工具首发，含四模块架构与双层数据仓库。
+- **智能体内置**：内置AI Agent可读写文件、执行Shell与构建，适配多家供应商。
+- **容器终端内置**：内置PRoot+Alpine Linux容器与终端，双架构自动适配。
+- **本地终端集成**：集成Termux本地终端与全新设计系统UI层。
+- **远程SSH后端**：支持远程SSH连接，含命令执行、SFTP与交互终端。
+- **MCP双角色**：内置MCP客户端与服务器，手机可兼作开发后端。
+- **Git凭据管理**：Git可视化操作与集中式凭据管理，三端共用凭证。
+- **加密备份恢复**：支持AES加密备份与恢复，工作区文档统一管理。
 
 ### 改进
 
-- 四段式版本号由 Git Tag 动态推导（`0.0.0.1`），唯一官方签名密钥入库，CI 一键发版。
-- 数据层采用 SQLDelight V2 六库拓扑（KV / Document / Queue / Blob / TimeSeries + 业务聚合）。
+- **版本号动态推导**：四段式版本号由Git Tag动态推导，CI一键签名发版。
+- **六库数据拓扑**：数据层采用SQLDelight V2六库拓扑，支撑多业务场景。
 
 ### 安全
 
-- 凭据加密存储（`CredentialEncryptor` / `DEKManager`）+ HostKey 校验 + AES 备份加密，敏感信息不落明文。
+- **凭据加密存储**：凭据加密存储加HostKey校验，敏感信息不落明文。
