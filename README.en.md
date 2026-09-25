@@ -207,7 +207,7 @@ End-to-end architecture notes around core modules: `agent` (AI Agent & MCP integ
 | Document | Description |
 |---|---|
 | [AGENTS.md](./AGENTS.md) | AI collaboration guidelines: asset sync discipline, Conventional Commits, branching workflow, release conventions (highest-priority mandatory constraints) |
-| [CHANGELOG.md](./CHANGELOG.md) | User-facing version changelog |
+| [CHANGELOG.md](./docs/Version%20Log/CHANGELOG.md) | User-facing version changelog (per-version logs) |
 | [docs/ci-release.md](./docs/ci-release.md) | Cloud build & release operations manual: full CI pipeline, artifact verification, signing strategy |
 | [SECURITY.md](./SECURITY.md) | Security policy and vulnerability reporting |
 | `app/src/main/assets/docs/` | In-app help documents (viewable at runtime via Settings → Help) |

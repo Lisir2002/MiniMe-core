@@ -206,7 +206,7 @@ app/src/main/java/com/mini/me_core/
 | 文档 | 说明 |
 |---|---|
 | [AGENTS.md](./AGENTS.md) | AI 协同开发规范：资产同步纪律、Conventional Commits、分支工作流、发版规范（最高优先级强制约束） |
-| [CHANGELOG.md](./CHANGELOG.md) | 用户面向版本更新日志 |
+| [CHANGELOG.md](./docs/Version%20Log/CHANGELOG.md) | 用户面向版本更新日志（含各版本独立日志） |
 | [docs/ci-release.md](./docs/ci-release.md) | 云端构建发版运维手册：CI 全流程、产物校验、签名策略 |
 | [SECURITY.md](./SECURITY.md) | 安全策略与漏洞报告 |
 | `app/src/main/assets/docs/` | App 内置帮助文档（运行时可在「设置 → 帮助」查看） |
