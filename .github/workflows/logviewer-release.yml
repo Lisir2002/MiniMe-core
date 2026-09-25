@@ -81,11 +81,48 @@ jobs:
             echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
 
+      # 保留已更新的 Release 内容（与主应用逻辑一致）
+      - name: Preserve existing release content
+        id: preserve
+        env:
+          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          cur_tag="${GITHUB_REF_NAME}"
+          delimiter="EOF_$(date +%s)"
+
+          existing=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${cur_tag}" || echo "")
+
+          final_body="${{ steps.changelog.outputs.body }}"
+          final_name="MiniMe Logs v${LOGVIEWER_VER}"
+
+          if echo "$existing" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('id') else 1)" 2>/dev/null; then
+            existing_body=$(echo "$existing" | python3 -c "import json,sys; print(json.load(sys.stdin).get('body',''))")
+            existing_name=$(echo "$existing" | python3 -c "import json,sys; print(json.load(sys.stdin).get('name',''))")
+
+            if ! echo "$existing_body" | grep -qE "请补充|请提炼|_（"; then
+              final_body="$existing_body"
+            fi
+            if echo "$existing_name" | grep -q "—"; then
+              final_name="$existing_name"
+            fi
+          fi
+
+          {
+            echo "body<<${delimiter}"
+            echo "$final_body"
+            echo "${delimiter}"
+            echo "name<<${delimiter}"
+            echo "$final_name"
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
+
       # 发版格式硬校验门禁（与主应用一致）
       - name: Validate release notes (hard checks)
         run: |
           set -e
-          body="${{ steps.changelog.outputs.body }}"
+          body="${{ steps.preserve.outputs.body }}"
           echo "--- 硬校验：emoji ---"
           if echo "$body" | grep -qP '[\x{1F300}-\x{1F9FF}]|[\x{2600}-\x{27BF}]'; then
             echo "::error::Release 正文包含 emoji，违反发版规范"
@@ -99,8 +136,8 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           # 标题基础格式「MiniMe Logs v{版本号}」，发版后必须手动补充「— 更新内容概括」（≤20字，用户语言）
-          name: MiniMe Logs v${{ env.LOGVIEWER_VER }}
-          body: ${{ steps.changelog.outputs.body }}
+          name: ${{ steps.preserve.outputs.name }}
+          body: ${{ steps.preserve.outputs.body }}
           files: |
             ${{ steps.rename.outputs.apk }}
         env:
