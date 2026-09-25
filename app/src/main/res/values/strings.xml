@@ -40,6 +40,7 @@
     <string name="settings_remote_servers">远程工作区</string>
     <string name="settings_terminal">终端设置</string>
     <string name="settings_terminal_subtitle">环境、功能包、外观、键盘、SSH</string>
+    <string name="settings_terminal_container_subtitle">容器镜像、终端外观、键盘、SSH</string>
     <string name="settings_backup">备份与还原</string>
     <string name="settings_security">安全设置</string>
     <string name="settings_remote_audit_logs">远程连接审计</string>
@@ -1894,5 +1895,33 @@
     <string name="log_level_switched">日志等级已切换为 %1$s</string>
     <string name="log_custom_range_label">自定义范围</string>
     <string name="log_custom_range_days">共 %1$d 天，%2$d 个文件</string>
+
+    <!-- Terminal & Container merged page (tc_ prefix) -->
+    <string name="settings_terminal_container">终端与容器</string>
+    <string name="tc_tab_container">容器</string>
+    <string name="tc_tab_terminal">终端</string>
+    <string name="tc_status_not_initialized">未初始化</string>
+    <string name="tc_status_initializing">初始化中</string>
+    <string name="tc_status_running">运行中</string>
+    <string name="tc_status_error">异常</string>
+    <string name="tc_restart_container">重启容器</string>
+    <string name="tc_switch_image">切换镜像</string>
+    <string name="tc_mirror_source">镜像源</string>
+    <string name="tc_init_container">初始化容器</string>
+    <string name="tc_storage_usage">存储用量</string>
+    <string name="tc_remote_mode_not_applicable">远程模式不适用</string>
+    <string name="tc_profile_local">本地</string>
+    <string name="tc_profile_ssh">SSH</string>
+    <string name="tc_add_image">添加镜像</string>
+    <string name="tc_switch_warning_title">切换镜像</string>
+    <string name="tc_switch_warning_message">有 %1$d 个终端会话正在运行，切换将强制终止。是否继续？</string>
+    <string name="tc_force_switch">强制切换</string>
+    <string name="tc_delete_active_warning">删除当前激活的镜像后将自动切换到内置 Alpine。</string>
+    <string name="tc_delete_free_space">释放约 %1$d MB 空间</string>
+    <string name="tc_new_profile_hint">新镜像已添加，点击切换并初始化</string>
+    <string name="tc_advanced">高级</string>
+    <string name="tc_container_remote_mode">远程模式</string>
+    <string name="tc_bindings_hint">额外绑定目录</string>
+    <string name="tc_add_binding">添加绑定</string>
 
 </resources>

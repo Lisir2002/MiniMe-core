@@ -70,6 +70,7 @@ import com.mini.me_core.feature.terminal.presentation.TerminalViewModel
 import com.mini.me_core.feature.terminal.presentation.component.TerminalBundleManagerScreen
 import com.mini.me_core.feature.terminal.presentation.component.TerminalScreen
 import com.mini.me_core.feature.terminal.presentation.component.TerminalSettingsScreen
+import com.mini.me_core.feature.terminal.presentation.component.TerminalContainerScreen
 import com.mini.me_core.feature.workspace.presentation.FileReaderViewModel
 import com.mini.me_core.feature.workspace.presentation.WorkspaceFileViewModel
 import com.mini.me_core.feature.workspace.presentation.WorkspaceViewModel
@@ -591,7 +592,7 @@ fun AppNavigation(
             }
             composable("terminal_settings") {
                 val terminalSettingsVM: TerminalSettingsViewModel = hiltViewModel()
-                TerminalSettingsScreen(
+                TerminalContainerScreen(
                     viewModel = terminalSettingsVM,
                     onNavigateBack = { navController.popBackStack() },
                     // RC62：TerminalSettings 里点「管理 SSH 主机配置」→ 跨路由栈切到 Settings 的 RemoteServers 分区。

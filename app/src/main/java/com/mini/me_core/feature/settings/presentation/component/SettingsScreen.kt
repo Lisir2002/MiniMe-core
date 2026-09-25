@@ -112,7 +112,6 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Providers(R.string.settings_providers),
     ProviderEditor(R.string.settings_provider_editor),
     McpCenter(R.string.settings_mcp),
-    Container(R.string.settings_container),
     Logs(R.string.settings_logs),
     Permissions(R.string.settings_permissions),
     NormFlow(R.string.settings_norm_flow),
@@ -158,10 +157,6 @@ fun SettingsScreen(
     val compactionProviderId by viewModel.compactionProviderId.collectAsStateWithLifecycle()
     val compactionModel by viewModel.compactionModel.collectAsStateWithLifecycle()
     val modelMetadata by viewModel.modelMetadata.collectAsStateWithLifecycle()
-    val containerProfiles by viewModel.profiles.collectAsStateWithLifecycle()
-    val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
-    val remoteConnections by viewModel.remoteConnections.collectAsStateWithLifecycle()
-    val storageShareEnabled by viewModel.storageShareEnabled.collectAsStateWithLifecycle()
     // D1-7 规范流程统一开关（对齐 norm-chain §3.5：总开关 + step_inject/tool_guard 子开关）。
     val normFlowEnabled by viewModel.normFlowEnabled.collectAsStateWithLifecycle()
     val stepInjectEnabled by viewModel.stepInjectEnabled.collectAsStateWithLifecycle()
@@ -195,7 +190,6 @@ fun SettingsScreen(
     var editingProvider by remember { mutableStateOf<AIProviderConfig?>(null) }
     var showMcpDialog by remember { mutableStateOf(false) }
     var editingMcp by remember { mutableStateOf<McpServerConfig?>(null) }
-    var showContainerAddSheet by remember { mutableStateOf(false) }
     var showThemeSheet by remember { mutableStateOf(false) }
     // P1：规范查看器导航（0=静态规则, 1=SOP, null=关闭）
     var assetViewerTab by remember { mutableStateOf<Int?>(null) }
@@ -334,9 +328,6 @@ fun SettingsScreen(
                                     Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.settings_add_mcp_server), modifier = Modifier.size(20.dp))
                                 }
                             }
-                            SettingsSection.Container -> IconButton(onClick = { showContainerAddSheet = true }, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.container_add_image), modifier = Modifier.size(20.dp))
-                            }
                             SettingsSection.Logs -> {
                                 IconButton(onClick = { viewModel.refreshLogs() }, modifier = Modifier.size(40.dp)) {
                                     Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.settings_refresh_logs), modifier = Modifier.size(20.dp))
@@ -361,7 +352,6 @@ fun SettingsScreen(
                 SettingsSection.Menu -> SettingsMenu(
                     providerCount = providers.size,
                     activeProviderName = activeProvider?.name,
-                    activeContainerProfileName = containerProfiles.firstOrNull { it.id == activeProfileId }?.name,
                     visionProviderName = providers.firstOrNull { it.id == visionProviderId }?.name,
                     visionModel = visionModel,
                     compactionProviderName = providers.firstOrNull { it.id == compactionProviderId }?.name,
@@ -429,21 +419,6 @@ fun SettingsScreen(
                     onToggleHostServer = { viewModel.toggleMcpServer() },
                     onSaveHostConfig = { p, r, a -> viewModel.saveMcpServerConfig(p, r, a) },
                     onRegenerateToken = { viewModel.regenerateMcpServerToken() }
-                )
-                SettingsSection.Container -> ContainerSection(
-                    profiles = containerProfiles,
-                    activeProfileId = activeProfileId,
-                    showAddSheetExternal = showContainerAddSheet,
-                    onDismissAddSheet = { showContainerAddSheet = false },
-                    onSelect = { viewModel.setActiveContainerProfile(it) },
-                    onSaveCustom = { viewModel.saveCustomContainerProfile(it) },
-                    onEditCustom = { viewModel.editCustomContainerProfile(it) },
-                    onDeleteCustom = { viewModel.deleteCustomContainerProfile(it) },
-                    onSwitchConfirmed = onStopAllAndCloseTerminal,
-                    onResetBuiltin = { viewModel.resetBuiltinContainer(it) },
-                    remoteConnections = remoteConnections,
-                    storageShareEnabled = storageShareEnabled,
-                    onStorageShareChange = { viewModel.setStorageShareEnabled(it) }
                 )
                 SettingsSection.Permissions -> PermissionsSection(
                     projectName = currentProjectName,
@@ -637,7 +612,6 @@ internal data class MenuItem(
 internal fun SettingsMenu(
     providerCount: Int,
     activeProviderName: String?,
-    activeContainerProfileName: String?,
     visionProviderName: String?,
     visionModel: String,
     compactionProviderName: String?,
@@ -785,12 +759,12 @@ internal fun SettingsMenu(
         MenuItem(
             section = null,
             group = groupEnv,
-            title = stringResource(R.string.settings_terminal),
-            subtitle = stringResource(R.string.settings_terminal_subtitle),
+            title = stringResource(R.string.settings_terminal_container),
+            subtitle = stringResource(R.string.settings_terminal_container_subtitle),
             icon = Icons.Rounded.Terminal,
             iconBgLight = Color(0xFF22C55E),
             iconBgDark = Color(0xFF14693A),
-            keywords = listOf("terminal", stringResource(R.string.ui____4722bc0c), "ssh", "shell", "bash", stringResource(R.string.ui____ddf7d2a5)),
+            keywords = listOf("terminal", stringResource(R.string.ui____4722bc0c), "ssh", "shell", "bash", stringResource(R.string.ui____ddf7d2a5), "container", stringResource(R.string.ui____34772285), stringResource(R.string.ui____22c79904), "docker", "alpine", "proot"),
             action = onNavigateToTerminalSettings
         ),
         MenuItem(
@@ -803,20 +777,6 @@ internal fun SettingsMenu(
             iconBgDark = Color(0xFF4338CA),
             keywords = listOf("proxy", stringResource(R.string.ui____fc954d25), "vpn", "clash", "mihomo", stringResource(R.string.ui____02daf71f), "network"),
             action = onNavigateToNetProxy
-        ),
-        MenuItem(
-            section = SettingsSection.Container,
-            group = groupEnv,
-            title = stringResource(SettingsSection.Container.titleRes),
-            subtitle = stringResource(
-                R.string.settings_container_current,
-                activeContainerProfileName ?: stringResource(R.string.settings_container_builtin_alpine)
-            ),
-            icon = Icons.Rounded.Storage,
-            iconBgLight = Color(0xFF14B8A6),
-            iconBgDark = Color(0xFF0F766E),
-            keywords = listOf("container", "docker", stringResource(R.string.ui____34772285), "alpine", stringResource(R.string.ui____22c79904), "proot", stringResource(R.string.ui____fa405f59)),
-            action = { onOpen(SettingsSection.Container) }
         ),
         MenuItem(
             section = SettingsSection.RemoteServers,

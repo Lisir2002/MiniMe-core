@@ -34,6 +34,7 @@
     <string name="settings_remote_servers">Remote Workspaces</string>
     <string name="settings_terminal">Terminal Settings</string>
     <string name="settings_terminal_subtitle">Environment, bundles, appearance, keyboard, SSH</string>
+    <string name="settings_terminal_container_subtitle">Container images, terminal appearance, keyboard, SSH</string>
     <string name="settings_backup">Backup &amp; Restore</string>
     <string name="settings_security">Security Settings</string>
     <string name="settings_remote_audit_logs">Remote Connection Audit</string>
@@ -1871,5 +1872,33 @@
     <string name="log_level_switched">Log level switched to %1$s</string>
     <string name="log_custom_range_label">Custom range</string>
     <string name="log_custom_range_days">%1$d days, %2$d files</string>
+
+    <!-- Terminal & Container merged page (tc_ prefix) -->
+    <string name="settings_terminal_container">Terminal &amp; Container</string>
+    <string name="tc_tab_container">Container</string>
+    <string name="tc_tab_terminal">Terminal</string>
+    <string name="tc_status_not_initialized">Not initialized</string>
+    <string name="tc_status_initializing">Initializing</string>
+    <string name="tc_status_running">Running</string>
+    <string name="tc_status_error">Error</string>
+    <string name="tc_restart_container">Restart Container</string>
+    <string name="tc_switch_image">Switch Image</string>
+    <string name="tc_mirror_source">Mirror Source</string>
+    <string name="tc_init_container">Initialize Container</string>
+    <string name="tc_storage_usage">Storage Usage</string>
+    <string name="tc_remote_mode_not_applicable">Not applicable in remote mode</string>
+    <string name="tc_profile_local">Local</string>
+    <string name="tc_profile_ssh">SSH</string>
+    <string name="tc_add_image">Add Image</string>
+    <string name="tc_switch_warning_title">Switch Image</string>
+    <string name="tc_switch_warning_message">%1$d terminal session(s) running. Switching will forcefully terminate them. Continue?</string>
+    <string name="tc_force_switch">Force Switch</string>
+    <string name="tc_delete_active_warning">Deleting the active image will switch to built-in Alpine automatically.</string>
+    <string name="tc_delete_free_space">Free up ~%1$d MB</string>
+    <string name="tc_new_profile_hint">New image added. Tap to switch and initialize.</string>
+    <string name="tc_advanced">Advanced</string>
+    <string name="tc_container_remote_mode">Remote Mode</string>
+    <string name="tc_bindings_hint">Extra Bindings</string>
+    <string name="tc_add_binding">Add Binding</string>
 
 </resources>

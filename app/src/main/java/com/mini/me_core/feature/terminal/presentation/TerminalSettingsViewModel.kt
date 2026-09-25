@@ -3,11 +3,20 @@ package com.mini.me_core.feature.terminal.presentation
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.domain.container.ContainerArch
+import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
 import com.mini.me_core.feature.agent.domain.container.ContainerProfile
 import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
+import com.mini.me_core.feature.agent.domain.container.RemoteConnectionConfig
+import com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
+import com.mini.me_core.feature.agent.domain.container.RootfsSource
 import com.mini.me_core.feature.agent.domain.container.progress.AggregateProgressState
 import com.mini.me_core.feature.settings.data.repository.ContainerSettingsRepository
+import com.mini.me_core.feature.settings.data.repository.ExecutionMode
+import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
+import com.mini.me_core.feature.settings.data.repository.ExecutionModeRepository
+import com.mini.me_core.feature.settings.data.repository.RemoteConnectionSettings
 import com.mini.me_core.feature.terminal.data.bundle.BundleInstallState
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundle
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId
@@ -16,6 +25,10 @@ import com.mini.me_core.feature.terminal.data.repository.SshHeartbeatSeconds
 import com.mini.me_core.feature.terminal.data.repository.TerminalBundleRepository
 import com.mini.me_core.feature.terminal.data.repository.TerminalSettingsRepository
 import com.mini.me_core.feature.terminal.data.repository.TerminalTheme
+import com.mini.me_core.feature.terminal.domain.TerminalSessionManager
+import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
+import com.mini.me_core.feature.workspace.domain.remote.RemoteAuth
+import com.mini.me_core.feature.workspace.domain.repository.RemoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -38,6 +51,7 @@ import javax.inject.Inject
  *  - Bundle 卡片状态：读取 TerminalBundleRepository 的 Map StateFlow。
  *  - 执行具体动作：初始化容器 / 重置 / 换源 / 安装 bundle / 卸载 bundle / 自定义包。
  *  - 通用 toast 错误：一个 MutableStateFlow<String?>（UI 在终端设置页里用 Snackbar 承接）。
+ *  - 容器 Profile 管理：内置 + 自定义 profile 列表、激活切换、增删改、远程 SSH 模式切换。
  */
 @HiltViewModel
 class TerminalSettingsViewModel @Inject constructor(
@@ -45,7 +59,13 @@ class TerminalSettingsViewModel @Inject constructor(
     private val settingsRepo: TerminalSettingsRepository,
     private val bundleRepo: TerminalBundleRepository,
     private val containerEngine: LinuxContainerEngine,
-    private val containerSettingsRepository: ContainerSettingsRepository
+    private val containerSettingsRepository: ContainerSettingsRepository,
+    private val remoteRepository: RemoteRepository,
+    private val terminalSessionManager: TerminalSessionManager,
+    private val executionModeRepository: ExecutionModeRepository,
+    private val containerInstaller: ContainerInstaller,
+    private val executionModeHolder: ExecutionModeHolder,
+    private val remoteSshConnection: RemoteSshConnection,
 ) : AndroidViewModel(application) {
 
     private val appContext get() = getApplication<Application>().applicationContext
@@ -128,6 +148,54 @@ class TerminalSettingsViewModel @Inject constructor(
                 is com.mini.me_core.feature.agent.domain.container.ContainerInitState.Failed -> false
             }
         }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    // ── 容器 Profile 管理 ─────────────────────────────────────────
+
+    /** 当前激活的 profile ID。 */
+    val activeProfileId: StateFlow<String> = containerSettingsRepository.activeProfileIdFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ContainerProfile.BUILTIN_ID)
+
+    /** 存储共享开关。 */
+    val storageShareEnabled: StateFlow<Boolean> = containerSettingsRepository.storageShareEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** 远程 SSH 连接列表。 */
+    val remoteConnections: StateFlow<List<RemoteConnection>> = remoteRepository.getConnections()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** 运行中的终端会话数。 */
+    val runningSessionCount: StateFlow<Int> = terminalSessionManager.tabs
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    /**
+     * 全部 Profile 列表 = 内置 Alpine(arm64) + 内置 Alpine(x86_64) + 自定义 profiles。
+     */
+    val profiles: StateFlow<List<ContainerProfile>> = combine(
+        containerSettingsRepository.customProfilesFlow,
+        containerSettingsRepository.activeProfileIdFlow
+    ) { custom, _ ->
+        listOf(
+            ContainerProfile.BUILTIN_ALPINE,
+            ContainerProfile.BUILTIN_ALPINE_X86,
+        ) + custom
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, listOf(
+        ContainerProfile.BUILTIN_ALPINE,
+        ContainerProfile.BUILTIN_ALPINE_X86,
+    ))
+
+    /** 当前激活的 Profile 对象。 */
+    val activeProfile: StateFlow<ContainerProfile?> = combine(
+        activeProfileId,
+        profiles
+    ) { id, list ->
+        list.firstOrNull { it.id == id }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, ContainerProfile.BUILTIN_ALPINE)
+
+    /** 是否处于远程 SSH 模式。 */
+    val isRemoteMode: StateFlow<Boolean> = activeProfile
+        .map { it?.mode == ExecutionMode.REMOTE_SSH }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /**
@@ -259,6 +327,131 @@ class TerminalSettingsViewModel @Inject constructor(
             val ok = runCatching { containerEngine.setApkMirrorAndUpdate(mirror) }
                 .getOrDefault(false)
             if (!ok) postError("换源失败，请确认网络后重试")
+        }
+    }
+
+    // ─────────── 动作：容器 Profile 管理 ──────────────────────────
+
+    /**
+     * 切换当前选中的容器 profile，并按其 [ContainerProfile.mode] 同步切全局执行模式。
+     *
+     * 本地镜像 → [ExecutionMode.LOCAL_PROOT]；远程 SSH 镜像 → [ExecutionMode.REMOTE_SSH]，
+     * 并据其 [RootfsSource.RemoteSsh] 绑定的工作区通道构造 [RemoteConnectionSettings] 持久化 + 触发 SSH 连接。
+     */
+    fun setActiveContainerProfile(id: String) {
+        viewModelScope.launch {
+            val profile = profiles.value.firstOrNull { it.id == id } ?: return@launch
+            containerSettingsRepository.setActiveProfile(id)
+            when (profile.mode) {
+                ExecutionMode.LOCAL_PROOT -> {
+                    executionModeRepository.setExecutionMode(ExecutionMode.LOCAL_PROOT)
+                    executionModeHolder.setMode(ExecutionMode.LOCAL_PROOT)
+                }
+
+                ExecutionMode.REMOTE_SSH -> {
+                    val ssh = profile.rootfsSource as? RootfsSource.RemoteSsh ?: return@launch
+                    val conn = remoteConnections.value.firstOrNull { it.id == ssh.connectionId }
+                        ?: return@launch
+                    val auth = runCatching { remoteRepository.getAuthById(ssh.connectionId) }.getOrNull()
+                        ?: RemoteAuth.Password(conn.password)
+                    val workspacePath = ssh.remoteWorkspacePath.ifBlank { "/home/${conn.username}/workspace" }
+                    val settings = RemoteConnectionSettings(
+                        host = "",
+                        port = 22,
+                        username = "",
+                        password = "",
+                        remoteWorkspacePath = workspacePath,
+                        activeConnectionId = ssh.connectionId,
+                    )
+                    executionModeRepository.setRemoteConnection(settings, activeProfileId = id)
+                    executionModeRepository.setExecutionMode(ExecutionMode.REMOTE_SSH)
+                    executionModeHolder.setMode(ExecutionMode.REMOTE_SSH)
+                    runCatching {
+                        remoteSshConnection.connect(
+                            RemoteConnectionConfig(
+                                host = conn.host,
+                                port = conn.port,
+                                username = conn.username,
+                                auth = auth,
+                                remoteWorkspacePath = workspacePath
+                            )
+                        )
+                    }.onFailure { FileLogger.w(TAG, "切换到远程镜像时 SSH 连接失败", it) }
+                }
+            }
+            refreshStorageUsed()
+        }
+    }
+
+    /** 切换「共享设备存储」开关。生效对象为后续启动的容器进程，已运行的 shell 需重开。 */
+    fun setStorageShareEnabled(enabled: Boolean) {
+        viewModelScope.launch { containerSettingsRepository.setStorageShareEnabled(enabled) }
+    }
+
+    /** 保存（新增或更新）自定义容器 Profile。 */
+    fun saveCustomContainerProfile(profile: ContainerProfile) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { containerSettingsRepository.upsertCustomProfile(profile) }
+                .onFailure { postError(it.message ?: "保存镜像失败") }
+        }
+    }
+
+    /** 编辑自定义容器 Profile：如果镜像来源变了则删旧 rootfs，然后 upsert。 */
+    fun editCustomContainerProfile(oldProfile: ContainerProfile, newProfile: ContainerProfile) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            // 如果 rootfsSource 变了，删除旧的 rootfs
+            if (oldProfile.rootfsSource != newProfile.rootfsSource
+                && oldProfile.rootfsSource !is RootfsSource.RemoteSsh
+                && !oldProfile.isBuiltin
+            ) {
+                containerInstaller.deleteCustomRootfs(oldProfile)
+            }
+            runCatching { containerSettingsRepository.upsertCustomProfile(newProfile) }
+                .onFailure { postError(it.message ?: "更新镜像失败") }
+        }
+    }
+
+    /** 删除自定义容器 Profile：删除 profile + rootfs，如果删的是当前激活的则切回内置 Alpine。 */
+    fun deleteCustomContainerProfile(profile: ContainerProfile) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            containerInstaller.deleteCustomRootfs(profile)
+            containerSettingsRepository.deleteCustomProfile(profile.id)
+            // 如果删的是当前激活的，切回内置 Alpine
+            if (activeProfileId.value == profile.id) {
+                setActiveContainerProfile(ContainerProfile.BUILTIN_ID)
+            }
+            refreshStorageUsed()
+        }
+    }
+
+    /** 重置内置容器（arm64 或 x86_64）：删除对应架构 rootfs，下次初始化重新解压 + provision。 */
+    fun resetBuiltinContainer(profile: ContainerProfile) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            when (profile.arch) {
+                ContainerArch.X86_64 -> containerInstaller.resetBuiltinX86Rootfs()
+                else -> containerInstaller.resetBuiltinRootfs()
+            }
+            refreshStorageUsed()
+        }
+    }
+
+    /** 重启容器：resetContainer 后 ensureInstalled（如果容器已安装）。 */
+    fun restartContainer() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { containerEngine.resetContainer() }
+                .onFailure { postError(it.message ?: "重启容器失败") }
+            // resetContainer 后容器会回到未安装状态，这里重新初始化
+            runCatching { containerEngine.ensureInstalled() }
+                .onFailure { postError(it.message ?: "重启后初始化失败") }
+            refreshStorageUsed()
+        }
+    }
+
+    /** 刷新容器状态（存储用量等）。 */
+    fun refreshContainerStatus() {
+        refreshStorageUsed()
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { containerEngine.refreshBundleStatesFromApk() }
         }
     }
 
