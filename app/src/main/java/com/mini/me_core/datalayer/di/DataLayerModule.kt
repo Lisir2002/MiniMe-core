@@ -147,10 +147,10 @@ object DataLayerModule {
                 FileLogger.w(TAG, "未知 LibName=$lib，跳过 preOpen")
                 return@preOpenHook
             }
-            FileLogger.i(TAG, "preOpen($lib) target=${schema.version}")
+            FileLogger.d(TAG, "preOpen($lib) target=${schema.version}")
             runCatching {
                 engine.preOpen(lib, schema)
-                FileLogger.i(TAG, "preOpen($lib) 完成")
+                FileLogger.v(TAG, "preOpen($lib) 完成")
             }.onFailure {
                 // preOpen 失败（如只读探测异常）：不阻断启动，driver 仍会打开并由 ensureSchema 兜底。
                 FileLogger.e(TAG, "preOpen($lib) 失败（忽略，driver 打开后由 ensureSchema 兜底）", it)
@@ -163,10 +163,10 @@ object DataLayerModule {
                 FileLogger.w(TAG, "未知 LibName=$lib，跳过 ensureSchema")
                 return@hook
             }
-            FileLogger.i(TAG, "ensureSchema($lib) target=${schema.version}")
+            FileLogger.d(TAG, "ensureSchema($lib) target=${schema.version}")
             runCatching {
                 engine.ensureSchema(lib, driver, schema)
-                FileLogger.i(TAG, "ensureSchema($lib) 完成")
+                FileLogger.v(TAG, "ensureSchema($lib) 完成")
             }.onFailure {
                 FileLogger.e(TAG, "ensureSchema($lib) 失败（忽略，下次打开重试）", it)
             }
@@ -176,13 +176,13 @@ object DataLayerModule {
             // 遇到 user_version 已对齐但 agent_message/agent_session 表缺关键列的旧表。
             // 自愈幂等（结构完好则跳过），只在首次打开时跑一次。
             if (lib == LibName.AGENT) {
-                FileLogger.i(TAG, "开始 AGENT 库结构自愈（agent_session + agent_message）")
+                FileLogger.d(TAG, "开始 AGENT 库结构自愈（agent_session + agent_message）")
                 runCatching {
                     SchemaSelfHealer.healAgentSession(driver)
                     SchemaSelfHealer.healAgentMessage(driver)
                     SchemaSelfHealer.ensureAgentMessageUsable(driver)
                     SchemaSelfHealer.ensureAgentSessionUsable(driver)
-                    FileLogger.i(TAG, "AGENT 库结构自愈完成，agent_message.id 列已确认存在")
+                    FileLogger.d(TAG, "AGENT 库结构自愈完成，agent_message.id 列已确认存在")
                 }.onFailure {
                     // 自愈失败是 FATAL：AGENT 库若 agent_message 缺 id，任何消息查询都会崩。
                     // 让异常向上冒泡，进程以明确的错误崩溃（不再落回 confusing 的 no such column）。

@@ -95,7 +95,7 @@ class CredentialRequestBridge @Inject constructor(
             }
             obs.startWatching()
             observer = obs
-            FileLogger.i(TAG, "FileObserver 启动，监听 ${dir.absolutePath}")
+            FileLogger.d(TAG, "FileObserver 启动，监听 ${dir.absolutePath}")
         }
         // 兜底轮询：个别机型 -b 目录 inotify 失效时仍能取到请求；并清理上次会话残留。
         scope.launch { cleanupStale(dir); fallbackPollLoop(dir) }

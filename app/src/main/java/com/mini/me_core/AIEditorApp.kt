@@ -212,53 +212,46 @@ class AIEditorApp : Application() {
         mcpManager.start()
         FileLogger.i(TAG, "核心服务：凭据桥接 + MCP 已启动")
         // ── 阶段3：异步预热（不阻塞首帧，后台并行）──
-        FileLogger.i(TAG, "异步预热：文档/提示词/日志导出/凭据同步/模型元数据/连接预热")
-        // 启动即把最新的内置指南手册提取到私有配置目录
+        FileLogger.i(TAG, "异步预热：后台任务已启动")
+        // 内置文档 + 提示词提取（覆盖式，随 App 升级更新）
         appScope.launch {
-            ContainerInstaller.extractDocs(this@AIEditorApp)
+            runCatching {
+                ContainerInstaller.extractDocs(this@AIEditorApp)
+                ContainerInstaller.extractPrompts(this@AIEditorApp)
+            }.onFailure { FileLogger.w(TAG, "内置文档/提示词提取失败", it) }
+            FileLogger.v(TAG, "异步预热：文档/提示词提取完成")
         }
-        // 启动即把内置提示词全量释放到 ~/.minime/prompts/（覆盖式，随 App 升级更新）；
-        // 用户自定义覆盖放在 ~/.minime/prompts.custom/，同名即覆盖，不被升级覆盖。
-        appScope.launch {
-            ContainerInstaller.extractPrompts(this@AIEditorApp)
-        }
-        // 启动即自动导出上一轮日志到公共外部存储 Download/MiniMe-core/logs/。
-        // 目的：解决「进入应用即闪退」时崩溃处理来不及同步导出（或 CrashHandler 前的早期崩溃）
-        // 拿不到日志的问题——只要 App 能再次启动，上一轮的全部日志（含 CRASH 记录）就会自动
-        // 落到文件管理器可见的公共目录（API 29+ MediaStore 免权限，卸载后仍保留）。
-        // 与崩溃时同步导出互补：崩溃时导出保证当次崩溃可被捕获，启动时导出保证"漏网"的早期崩溃
-        // 也能在下次启动后被拿到。失败仅记日志，不阻断启动。
+        // 上一轮日志导出到公共目录（解决"闪退时来不及导出"的盲区）
         appScope.launch {
             runCatching { FileLogger.exportLogsToDownloads(this@AIEditorApp) }
                 .onFailure { FileLogger.w(TAG, "启动时自动导出日志到公共目录失败（忽略，私有日志仍在）", it) }
+            FileLogger.v(TAG, "异步预热：上一轮日志导出完成")
         }
-        // 启动即把 Room 凭据 + DataStore 署名落盘到容器持久挂载（/root/.minime），
-        // 让终端裸 git / AI 工具 / UI 三端共用同一份凭据与署名配置。
+        // Git 凭据 + 署名同步到容器持久挂载
         appScope.launch {
-            gitCredentialsFileSync.syncAll()
+            runCatching { gitCredentialsFileSync.syncAll() }
+                .onFailure { FileLogger.w(TAG, "Git 凭据同步失败", it) }
+            FileLogger.v(TAG, "异步预热：Git 凭据同步完成")
         }
-        // 启动即异步刷新 models.dev 模型元数据（24h 缓存；失败静默，resolve 兜底内置 assets 数据）。
+        // 模型元数据刷新（24h 缓存，失败静默兜底内置数据）
         appScope.launch {
-            modelMetadataService.refreshFromNetworkIfStale()
+            runCatching { modelMetadataService.refreshFromNetworkIfStale() }
+                .onFailure { FileLogger.w(TAG, "模型元数据刷新失败（兜底内置数据）", it) }
+            FileLogger.v(TAG, "异步预热：模型元数据刷新完成")
         }
-        // 网络层优化 C1：后台预热三家 AI host 连接（DNS+TCP+TLS+HTTP2 握手留在共享连接池），
-        // 正式请求复用后省掉 1~3 RTT 首字延迟；失败静默，绝不影响主链路与首帧。
+        // 三家 AI host 连接预热（DNS+TCP+TLS+HTTP2，降低首字延迟）
         appScope.launch {
             runCatching { connectionPrewarmer.warmDefaults() }
                 .onFailure { FileLogger.w(TAG, "连接预热异常（忽略，不影响主链路）", it) }
+            FileLogger.v(TAG, "异步预热：AI 连接预热完成")
         }
-        // 启动即后台做数据库完整性检查：损坏的 DB 会触发 SQLite 原生崩溃（SIGSEGV/SIGABRT），
-        // 完全绕过 Java CrashHandler，表现为「模型输出/写入时突然闪退、日志无报错」。
-        // 这里提前把损坏状态写进日志（并在崩溃时随快照导出），让下次闪退有迹可循。
-        // 失败仅记日志，不阻断启动；integrity_check 在 IO 线程跑，不抢首帧。
-        // 预防闸门（异常退出自诊断）：上次运行若触发过内存临界（RUNNING_CRITICAL/lowMemory），
-        // 进程可能已被 LMKD 静默回收（无 Java 日志）——本次启动读出标记并写日志留痕，
-        // 配合启动时自动导出日志，让「无报错闪退」在下一次启动自动留下排查证据。
+        // 上次退出诊断（内存临界/LMKD 杀进程留痕）
         appScope.launch {
             runCatching { diagnoseLastExit() }
                 .onFailure { FileLogger.w(TAG, "上次退出诊断异常（忽略，不影响启动）", it) }
+            FileLogger.v(TAG, "异步预热：上次退出诊断完成")
         }
-        // 启动即加载持久化等级，并随设置页改动实时生效（唯一同步点）。
+        // 日志等级持久化同步（唯一同步点）
         appScope.launch {
             logSettings.levelFlow.collectLatest { FileLogger.setMinLevel(it) }
         }

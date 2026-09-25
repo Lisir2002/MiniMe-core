@@ -52,14 +52,14 @@ class MigrationEngine(
         val action = decidePreOpen(current, target)
         when (action) {
             PreOpenAction.FRESH -> {
-                FileLogger.i(TAG, "  $lib 全新库（current=0），待 driver 打开时 onCreate 建表，无需快照")
+                FileLogger.d(TAG, "  $lib 全新库（current=0），待 driver 打开时 onCreate 建表，无需快照")
             }
             PreOpenAction.UPGRADE_SNAPSHOT -> {
                 FileLogger.i(TAG, "  $lib 旧版本 $current → $target，driver 打开(迁移)前先快照保命")
                 snapshot(lib, heavy)
             }
             PreOpenAction.ALIGNED_NOOP -> {
-                FileLogger.i(TAG, "  $lib 版本已对齐（current==target==$current），无需快照；结构完整性由 onOpened 的 SchemaSelfHealer 保证")
+                FileLogger.d(TAG, "  $lib 版本已对齐（current==target==$current），无需快照")
             }
             PreOpenAction.DOWNGRADE -> {
                 // 提前到打开前拒绝，避免用低版本 schema 打开高版本数据造成损坏。
@@ -83,12 +83,12 @@ class MigrationEngine(
         //    本方法现在只负责：打开后兜底校验 + codeMigrations + 日志。
         val current = currentVersion(driver)
         val target = schema.version
-        FileLogger.i(TAG, "ensureSchema($lib): current=$current target=$target（打开后兜底）")
+        FileLogger.d(TAG, "ensureSchema($lib): current=$current target=$target（打开后兜底）")
         when {
             current.toLong() == target -> {
                 // 显式 no-op。⚠️ 版本相等 ≠ 表结构一致（v0.5.0-rc1 事故）：结构演进未同步新增 .sqm 时
                 // user_version 不变但表缺列，结构完整性由 ConnectionPool.onOpened 里的 SchemaSelfHealer 保证。
-                FileLogger.i(TAG, "  $lib 版本已对齐（current==target==$current），no-op；结构完整性由 SchemaSelfHealer 保证")
+                FileLogger.v(TAG, "  $lib 版本已对齐（current==target==$current），no-op")
             }
             current.toLong() < target -> {
                 // 正常不该进入（preOpen 已先快照并让 driver 完成迁移）；
