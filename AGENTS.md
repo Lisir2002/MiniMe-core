@@ -158,6 +158,8 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 2. CI 接收到 `v*` Tag 后，自动捕获 Tag 版本推导生成 APK，构建 Release 发出。
 3. **真机装 rc 包**，至少跑通 AI 对话 + 终端 + 容器启动三条主线。
 4. 有问题 -> 从该 RC Tag 拉 `hotfix/xxx` 分支修复（**勿从最新 `main` 拉**，否则会把已合入的未发版功能带进修复包）-> 升 rc 序号打 Tag（`v1.7.0-rc2`）推送重发 -> 将修复合回 `main` 并推送 -> 删除 hotfix 分支；无问题 -> 直接打正式 Tag（`v1.7.0`）推远端转正。
+5. **Release 正文人工更新（强制）**：CI 自动生成的 Release 正文是带占位符的草稿（`_（请补充...）_`），**必须在发版后手动更新为完整格式**。正文内容必须与 `docs/Version Log/MiniMe-core v-Logs/` 下对应版本文档完全一致，包含完整简介和所有分类条目。未更新正文的 Release 视为发版未完成。
+6. **打 Tag 前脚本同步检查（强制）**：打 Tag 前必须确认 `scripts/gitops/release-log.py`、`AGENTS.md` 等发版相关脚本和规范的最新改动已提交到 `main`。CI 使用 Tag 指向 commit 中的脚本，若脚本更新在 Tag 之后的 commit 中，CI 仍会使用旧脚本生成旧格式草稿。
 
 ### 发版规范（最高优先级 · 强制约束 · 发版前逐条核对）
 
