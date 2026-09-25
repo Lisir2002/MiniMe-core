@@ -314,6 +314,74 @@ Hilt 被广泛使用。各 Feature 模块定义自己的 DI 模块（如 `AgentM
 
 **迁移器改造易错点**：SQLite 游标取值列名必须与旧库实际建表列精确一致；`SQLiteDatabase.query(table)` 无单参重载，须用 `rawQuery("SELECT * FROM t", null)`；`data class` 只允许一个 `companion object`，否则常量全 unresolved；`port` 等跨层类型要显式 `toInt()/toLong()`（V2 用 `Long`、备份 DTO 用 `Int`）。
 
+## 数据持久化编码规范（强制约束 · 防止设置丢失）
+
+本项目历史上多次出现"设置项重启后丢失"类 bug，根因均为持久化读写不一致或状态未从磁盘恢复。以下规则为**强制约束**，新增/修改任何持久化代码时必须逐条遵守。
+
+### 规则 1：KVStore 读写类型必须严格匹配
+
+KVStore 按类型拆列存储（`stringVal` / `intVal` / `boolVal` / `jsonVal`），**写入方法与读取方法必须一一对应**：
+
+| 写入方法 | 存储列 | 必须配对的读取方法 |
+|---|---|---|
+| `putString()` | `stringVal` | `getString()` / `observeString()` |
+| `putInt()` | `intVal` | `getInt()` / `observeInt()` |
+| `putBool()` | `boolVal` | `getBool()` / `observeBool()` |
+| `putJson()` | `jsonVal` | `getJson()` / `observeJson()` |
+
+**绝对禁止**：用 `putJson()` 写入后用 `getString()` 读取（会读到 null，导致设置丢失）。
+
+### 规则 2：Singleton 的 StateFlow 初始值必须从磁盘恢复
+
+任何 `@Singleton` 类中暴露给 UI 的 `MutableStateFlow`，其初始值**不得硬编码为默认值**，必须在构造函数或 `init` 块中从磁盘（KVStore / DB / 文件标记）读取真实状态后初始化。
+
+**正确模式**：
+```kotlin
+@Singleton
+class XxxManager @Inject constructor(private val kv: KVStore) {
+    private val _state = MutableStateFlow(loadFromKv())  // 构造时同步读磁盘
+    val state: StateFlow<XxxSettings> = _state.asStateFlow()
+
+    private fun loadFromKv(): XxxSettings {
+        val raw = kv.getJson(NS, KEY) ?: return DEFAULT
+        return runCatching { Json.decodeFromString(raw) }.getOrDefault(DEFAULT)
+    }
+}
+```
+
+**错误模式**（会导致冷启动后 UI 显示默认值，用户以为设置丢失）：
+```kotlin
+private val _state = MutableStateFlow(DEFAULT)  // ❌ 硬编码，未读磁盘
+```
+
+### 规则 3：导出/备份配置时必须用与写入一致的类型读取
+
+`exportConfig()` / `snapshot()` 等导出方法中，读取每个键时必须使用与写入时相同类型的读取方法。写入用 `putBool()` 的键，导出时必须用 `getBool()`，不能用 `getString()`。
+
+### 规则 4：旧版数据迁移必须覆盖
+
+当持久化键名、存储位置或数据结构发生变化时，必须在读取逻辑中添加旧版数据回退迁移：
+1. 先尝试读新版键
+2. 若不存在，回退读旧版键
+3. 读到旧版数据后自动写入新版键（一次性迁移）
+4. 删除旧版键（可选）
+
+### 规则 5：文件标记状态必须在 init 时扫描
+
+使用 `.installed` / `.done` / `.provisioned` 等文件标记记录状态的类，必须在 `init` 块中扫描磁盘标记来初始化内存状态，不能依赖"上次运行时设置过"。
+
+### 静态检查
+
+项目根目录 `scripts/check-persistence.py` 为数据持久化静态检查脚本，CI 中自动运行。本地修改持久化代码后建议手动跑一次：
+```bash
+python3 scripts/check-persistence.py
+```
+
+检查项：
+- `putJson()` 调用处是否有对应的 `getJson()` 读取（而非 `getString()`）
+- `@Singleton` 类的 `MutableStateFlow` 初始值是否硬编码默认值（需人工确认是否已从磁盘恢复）
+- `exportConfig`/`snapshot` 方法中读取类型是否与写入一致
+
 ## 常见坑
 
 | 症状 | 原因 | 处理 |
@@ -324,6 +392,9 @@ Hilt 被广泛使用。各 Feature 模块定义自己的 DI 模块（如 `AgentM
 | APK 装不上/装后崩溃 | ABI 不符 | 通用包含 arm64-v8a + x86_64；若宿主为其它 ABI（少见），走无容器降级（AI 核心仍可用） |
 | 版本号对不上 | 手改 `versionName` | 靠 Git Tag 动态推导，代码中勿手写版本号 |
 | 提交被 commit-msg 阻断 | 提交信息不合 Conventional Commits | 按 `type(scope): subject` 重写提交信息 |
+| **设置项重启后丢失** | **KVStore putJson 写 jsonVal 列，但 getString 读 stringVal 列，读写列不匹配** | **putJson 必须配 getJson；putBool 配 getBool；putInt 配 getInt；putString 配 getString** |
+| **容器初始化状态重启后丢失** | **Singleton 的 MutableStateFlow 初始值硬编码（如 Idle），未从磁盘标记恢复** | **init 块中必须根据磁盘状态（文件标记/DB/KV）初始化 StateFlow，不能硬编码默认值** |
+| **配置导出内容为空** | **exportConfig 中用 getString 读取实际用 putBool/putInt 写入的键** | **导出时必须用与写入时一致的类型读取方法** |
 
 ## 关键文件
 

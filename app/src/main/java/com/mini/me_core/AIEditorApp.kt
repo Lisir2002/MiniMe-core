@@ -290,6 +290,25 @@ class AIEditorApp : Application() {
                                 remoteSshConnection.connect(cfg)
                             }
                             syncDocsToRemote()
+                            // 冷启动自动重连 autoConnect 的 SFTP 挂载：
+                            // SSH 连接建立后遍历所有挂载，过滤 autoConnect=true 且未激活的，逐个连接。
+                            // 失败只记日志不阻断启动，用户进入远程服务器页时可手动重连。
+                            runCatching {
+                                val mounts = remoteRepository.getMounts().first()
+                                val autoMounts = mounts.filter { it.autoConnect && !it.isActive }
+                                if (autoMounts.isNotEmpty()) {
+                                    FileLogger.i(TAG, "冷启动自动重连 ${autoMounts.size} 个 SFTP 挂载: ${autoMounts.joinToString { it.id }}")
+                                    autoMounts.forEach { mount ->
+                                        runCatching {
+                                            withTimeout(10_000L) { remoteRepository.connectMount(mount.id) }
+                                        }.onFailure {
+                                            FileLogger.w(TAG, "冷启动自动重连 SFTP 挂载失败: ${mount.id}", it)
+                                        }
+                                    }
+                                }
+                            }.onFailure {
+                                FileLogger.w(TAG, "冷启动读取 SFTP 挂载列表失败", it)
+                            }
                         }.onFailure { ex ->
                             val note = when (ex) {
                                 is TimeoutCancellationException -> "SSH 连接超时 15s，将在首次命令时重试"

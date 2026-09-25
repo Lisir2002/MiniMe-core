@@ -62,6 +62,13 @@ jobs:
           done
           echo "All skill scripts pass POSIX sh syntax check"
 
+      # 数据持久化静态检查：防止 putJson/getString 读写列不匹配、Singleton 状态硬编码等
+      # 导致"设置项重启后丢失"类 bug。脚本见 scripts/dev/check-persistence.py。
+      - name: Persistence static check
+        run: |
+          set -e
+          python3 scripts/dev/check-persistence.py
+
       # 安全门禁：检测 CipherDriverFactory 是否仍为空实现（P0 级安全修复回归检测）。
       # 历史上 CipherDriverFactory.create() 直接 throw error("...尚未启用...")，
       # 导致所有 6 个数据库以明文 SQLite 落盘。此步骤防止该空实现被意外回退。
