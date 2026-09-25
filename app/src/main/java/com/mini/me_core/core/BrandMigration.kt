@@ -1,13 +1,15 @@
 package com.mini.me_core.core
 
 import android.content.Context
+import com.mini.me_core.core.migration.MigrationTask
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.engine.LibName
 import java.io.File
 
 /**
- * 品牌迁移器：DeepCore-Code → MiniMe-core。
+ * 品牌迁移：DeepCore-Code → MiniMe-core（作为通用迁移框架中的一个历史任务）。
  *
+ * 实现 [MigrationTask]，由 [com.mini.me_core.core.migration.MigrationRunner] 在启动早期编排执行。
  * 负责在应用启动最早期（任何数据库/容器/KeyStore 访问之前），
  * 将旧品牌名的运行时数据路径迁移到新路径。幂等、静默、失败不阻塞启动。
  *
@@ -19,9 +21,9 @@ import java.io.File
  * 设计纪律：
  *   - 所有迁移均为「检测旧路径存在 + 新路径不存在 → rename」，已迁移过的设备直接跳过。
  *   - 全部 runCatching 包裹，任何 IO/权限/并发问题都降级为 FileLogger.w，绝不 throw。
- *   - 调用点：AIEditorApp.onCreate 最开头，super.onCreate() 之后、Hilt 注入/业务初始化之前。
+ *   - 完成标记由 [com.mini.me_core.core.migration.MigrationRunner] 持久化，本任务只负责业务搬迁。
  */
-object BrandMigration {
+object BrandMigration : MigrationTask {
 
     private const val TAG = "BrandMigration"
 
@@ -37,17 +39,28 @@ object BrandMigration {
      */
     private fun LibName.legacyFileName(): String = fileName.replaceFirst("minime_", "deepcode_")
 
+    // ── MigrationTask 接口 ────────────────────────────────────────────────
+
+    override val id: String = "brand_deepcode_to_minime"
+
+    override val title: String = "品牌迁移 DeepCore→MiniMe"
+
+    override fun execute(context: Context): Boolean = migrateIfNeeded(context)
+
     /**
      * 启动期执行全部品牌迁移。
      * 必须在任何业务初始化之前调用（数据库连接池打开、容器目录访问之前）。
+     *
+     * @return true = 本次实际进入了迁移流程（探测到旧路径并尝试搬迁）；
+     *         false = 检测到新路径已就绪、无需迁移（快速路径）。
      */
-    fun migrateIfNeeded(context: Context) {
-        val appDir = context.filesDir.parentFile ?: return
+    fun migrateIfNeeded(context: Context): Boolean {
+        val appDir = context.filesDir.parentFile ?: return false
 
         // 快速路径：如果所有新数据库和新容器目录都已存在，说明迁移早已完成，直接跳过
         if (isMigrationAlreadyComplete(context, appDir)) {
             FileLogger.v(TAG, "品牌迁移已完成，跳过检查")
-            return
+            return false
         }
 
         FileLogger.i(TAG, "=== 品牌迁移检查（DeepCore-Code → MiniMe-core）===")
@@ -59,6 +72,7 @@ object BrandMigration {
         migrateContainerDir(context)
 
         FileLogger.i(TAG, "=== 品牌迁移检查完成 ===")
+        return true
     }
 
     /**

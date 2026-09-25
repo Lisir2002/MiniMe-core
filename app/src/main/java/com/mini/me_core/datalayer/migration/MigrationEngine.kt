@@ -48,7 +48,7 @@ class MigrationEngine(
     fun preOpen(lib: LibName, schema: SqlSchema<*>, heavy: Boolean = false): PreOpenAction {
         val current = probe.readVersion(lib)
         val target = schema.version
-        FileLogger.i(TAG, "preOpen($lib): current=$current target=$target")
+        FileLogger.d(TAG, "preOpen($lib): current=$current target=$target")
         val action = decidePreOpen(current, target)
         when (action) {
             PreOpenAction.FRESH -> {

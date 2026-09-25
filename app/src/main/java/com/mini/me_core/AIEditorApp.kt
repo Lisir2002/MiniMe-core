@@ -7,7 +7,9 @@ import android.app.NotificationManager
 import android.content.ComponentCallbacks2
 import android.content.SharedPreferences
 import android.os.Build
-import app.cash.sqldelight.db.QueryResult
+import com.mini.me_core.core.BrandMigration
+import com.mini.me_core.core.migration.MigrationRunner
+import com.mini.me_core.core.migration.StartupSelfCheck
 import com.mini.me_core.core.util.AILogger
 import com.mini.me_core.core.util.FileLogger
 import net.schmizz.sshj.common.SecurityUtils
@@ -22,7 +24,6 @@ import com.mini.me_core.feature.terminal.domain.TerminalKeepaliveService
 import com.mini.me_core.core.security.CredentialEncryptor
 import com.mini.me_core.datalayer.engine.ConnectionPool
 import com.mini.me_core.datalayer.engine.LibName
-import com.mini.mecore.datalayer.sqldelight.AgentDb
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -51,10 +52,10 @@ class AIEditorApp : Application() {
         const val KEY_LAST_TRIM_CRITICAL = "last_trim_critical_ms"
 
         /**
-         * 启动预热 AGENT 库是否已成功完成（rc6 指纹）。崩溃快照首行输出该标记：
+         * 启动预热 AGENT 库是否已成功完成（崩溃快照指纹）。崩溃快照首行输出该标记：
          *  - `true` = 本进程已执行过 AGENT 库结构自愈/对齐，若此刻仍出现 `no such column`，
          *    说明坏表残留但自愈未修复（真·数据层问题），据此继续深挖；
-         *  - `false` = 本进程根本没跑到预热，直接指向「跑的不是含 rc6 代码的包 / 旧进程残留」。
+         *  - `false` = 本进程根本没跑到预热，直接指向「跑的不是含自检代码的包 / 旧进程残留」。
          * 一次性坐实「是不是装对包」，结束此前反复的版本扯皮。
          */
         val agentPreheatCompleted = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -174,11 +175,19 @@ class AIEditorApp : Application() {
         super.onCreate()
         FileLogger.i(TAG, "=== 应用启动 ===")
 
-        // ── 阶段1：数据层初始化（同步，必须先于任何 UI 查询）──
+        // ── [启动/1/3] 数据层初始化（同步，必须先于任何 UI 查询）──
+        // 正常启动只输出这一条 Info 汇总；崩溃恢复/库预热/自检等细节全部降级为 Debug/Verbose，
+        // 仅当某环节失败时才以 W/E 级别显眼输出上下文。
+        FileLogger.i(TAG, "[启动/1/3] 数据层初始化")
+
+        // 通用启动期迁移框架：按序执行所有一次性数据迁移任务（品牌迁移 DeepCore→MiniMe 等历史任务）。
+        // 必须在任何 DB 访问之前（任务会重命名数据库文件）。已完成任务命中标记，零开销跳过。
+        MigrationRunner.runAll(this, listOf(BrandMigration))
+
         // 数据库加密迁移崩溃恢复：扫描 6 库迁移状态，回滚非稳定状态。
         // 正常情况下为幂等空操作，仅清理可能残留的临时文件。
         crashRecovery.recoverAll()
-        FileLogger.i(TAG, "数据层：崩溃恢复检查完成")
+        FileLogger.d(TAG, "数据层：崩溃恢复检查完成")
 
         registerBouncyCastle()
         createNotificationChannels()
@@ -187,32 +196,21 @@ class AIEditorApp : Application() {
         // 正常库只是两次 PRAGMA 幂等检查（毫秒级），缺失才重建。
         val agentDriver = connectionPool.driver(LibName.AGENT)
         agentPreheatCompleted.set(true)
+        FileLogger.d(TAG, "数据层：AGENT 库预热完成")
 
-        // 启动期冒烟测试：直接调用 SQLDelight 生成的查询，与线上崩溃路径 100% 同构。
-        // 任何 SQL 编译/列绑定失败都会在启动阶段就地暴露，而不是等用户进会话页才炸。
-        // 正常通过时仅输出 Verbose，失败时输出 Error。
-        runCatching {
-            agentDriver.executeQuery(null, "PRAGMA table_info(agent_message)", { cursor ->
-                val cols = mutableListOf<String>()
-                while (cursor.next().value) { cursor.getString(1)?.let { cols.add(it) } }
-                FileLogger.v(TAG, "AGENT 表结构: ${cols.joinToString()}")
-                QueryResult.Unit
-            }, 0, null).value
-            AgentDb(agentDriver).agentQueries
-                .selectMessagesBySessionPaged("__startup_smoke__", 1L)
-                .executeAsList()
-            FileLogger.v(TAG, "AGENT 数据层冒烟测试通过")
-        }.onFailure { e ->
-            FileLogger.e(TAG, "AGENT 数据层冒烟测试失败（生成 SQL 有问题，非表结构问题）", e)
-        }
-        FileLogger.i(TAG, "数据层：AGENT 库预热完成")
+        // 启动自检/冒烟测试：表结构校验 + SQL 冒烟 + 连接可用性。
+        // 与线上崩溃路径同构，任何 SQL 编译/缺列失败都在此就地暴露。
+        // 通过仅 Debug 汇总，失败 Error 显眼输出（见 StartupSelfCheck）。
+        StartupSelfCheck.runDataLayerChecks(agentDriver)
 
-        // ── 阶段2：核心服务启动（同步）──
+        // ── [启动/2/3] 核心服务启动（同步）──
+        FileLogger.i(TAG, "[启动/2/3] 核心服务启动")
         credentialRequestBridge.start()
         mcpManager.start()
-        FileLogger.i(TAG, "核心服务：凭据桥接 + MCP 已启动")
-        // ── 阶段3：异步预热（不阻塞首帧，后台并行）──
-        FileLogger.i(TAG, "异步预热：后台任务已启动")
+        FileLogger.d(TAG, "核心服务：凭据桥接 + MCP 已启动")
+
+        // ── [启动/3/3] 异步预热（不阻塞首帧，后台并行）──
+        FileLogger.i(TAG, "[启动/3/3] 异步预热")
         // 内置文档 + 提示词提取（覆盖式，随 App 升级更新）
         appScope.launch {
             runCatching {

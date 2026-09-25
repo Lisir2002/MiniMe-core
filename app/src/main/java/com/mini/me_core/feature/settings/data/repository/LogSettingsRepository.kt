@@ -9,7 +9,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 持久化「日志最低记录等级」。等级以枚举名（字符串）存取，默认 [LogLevel.VERBOSE]（开发期全量）。
+ * 持久化「日志最低记录等级」与「诊断模式」。等级以枚举名（字符串）存取。
+ *
+ * 智能分层日志：
+ *  - 正常启动只输出阶段汇总（Info），细节降级 Verbose/Debug；
+ *  - [isDiagnosticMode] 打开后，各模块可据此输出上下文详情（预留接口，暂未接 UI）。
  */
 @Singleton
 class LogSettingsRepository @Inject constructor(
@@ -18,6 +22,7 @@ class LogSettingsRepository @Inject constructor(
     private companion object {
         const val NS = "settings"
         const val LEVEL_KEY = "log_min_level"
+        const val DIAGNOSTIC_KEY = "log_diagnostic_mode"
         val DEFAULT_LEVEL = LogLevel.VERBOSE
     }
 
@@ -34,5 +39,21 @@ class LogSettingsRepository @Inject constructor(
     suspend fun restore(value: String?) {
         val level = value?.let { runCatching { LogLevel.valueOf(it) }.getOrNull() } ?: return
         setLevel(level)
+    }
+
+    // ── 诊断模式（预留接口，暂未接设置页 UI）──────────────────────────────
+    // 开启后：各模块在出现 W/E 时输出上下文详情日志，正常启动也可临时降到 VERBOSE 排查。
+    // 当前默认关闭——正常启动保持「只输出阶段汇总」的安静行为。
+
+    /** 诊断模式是否开启（响应式）。默认 false。 */
+    val diagnosticModeFlow: Flow<Boolean> =
+        kv.observeBool(NS, DIAGNOSTIC_KEY).map { it ?: false }
+
+    /** 一次性读取诊断模式开关。默认 false。 */
+    suspend fun isDiagnosticMode(): Boolean = kv.getBool(NS, DIAGNOSTIC_KEY) ?: false
+
+    /** 设置诊断模式开关（预留：未来设置页 UI 接入时调用）。 */
+    suspend fun setDiagnosticMode(enabled: Boolean) {
+        kv.putBool(NS, DIAGNOSTIC_KEY, enabled)
     }
 }
