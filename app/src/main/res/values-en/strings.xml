@@ -583,6 +583,29 @@
     <string name="browser_credential_username">Username: %1$s</string>
     <string name="browser_credential_detail">Username: %1$s   Password: %2$s</string>
 
+    <!-- Browser bottom toolbar / AI panel / home (R3 refactor) -->
+    <string name="browser_bottom_home">Home</string>
+    <string name="browser_bottom_bookmarks">Bookmarks</string>
+    <string name="browser_bottom_history">History</string>
+    <string name="browser_bottom_downloads">Downloads</string>
+    <string name="browser_bottom_ai">AI Assistant</string>
+    <string name="browser_ai_panel_title">AI Browser Assistant</string>
+    <string name="browser_ai_panel_status_active">Working</string>
+    <string name="browser_ai_panel_status_idle">Idle</string>
+    <string name="browser_ai_panel_status_paused">Paused</string>
+    <string name="browser_ai_panel_empty">No AI action records</string>
+    <string name="browser_ai_panel_pause">Pause AI</string>
+    <string name="browser_ai_panel_takeover">Take over</string>
+    <string name="browser_home_shortcuts">Shortcuts</string>
+    <string name="browser_home_recent">Recent visits</string>
+    <string name="browser_home_empty_shortcuts">No shortcuts yet</string>
+    <string name="browser_home_empty_recent">No recent visits</string>
+    <string name="browser_home_empty_bookmarks">No bookmarks yet</string>
+    <string name="browser_stop_loading">Stop loading</string>
+    <string name="browser_history_today">Today</string>
+    <string name="browser_history_yesterday">Yesterday</string>
+    <string name="browser_history_earlier">Earlier</string>
+
     <!-- Chat Input Bar -->
     <string name="chat_input_placeholder">Type a message for the AI…</string>
     <string name="chat_queue_hint">AI is working; pressing Enter will queue your message</string>
@@ -1900,5 +1923,6 @@
     <string name="tc_container_remote_mode">Remote Mode</string>
     <string name="tc_bindings_hint">Extra Bindings</string>
     <string name="tc_add_binding">Add Binding</string>
+    <string name="splash_skip">Skip</string>
 
 </resources>

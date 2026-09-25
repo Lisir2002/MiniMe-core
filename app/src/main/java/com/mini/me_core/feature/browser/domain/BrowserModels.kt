@@ -146,6 +146,23 @@ data class AgentBrowserStatus(
     val active: Boolean = false
 )
 
+/**
+ * AI 操作历史记录（R3 操作时间线）：模型每执行一个浏览器动作追加一条，
+ * 供 UI AI 助手面板展示操作时间线。敏感信息（密码、手机号）已脱敏。
+ */
+data class AgentActionRecord(
+    /** 动作类型：navigate / click / type / select / submit / scroll / wait / screenshot / extract / hover / press / drag / upload / back / forward / reload / new_tab / fill_form */
+    val action: String,
+    /** 人类可读描述（已脱敏），如 "点击登录按钮"、"输入用户名 admin"、"导航到 https://example.com" */
+    val description: String,
+    /** 动作执行时间（epoch millis）。 */
+    val timestamp: Long = System.currentTimeMillis(),
+    /** 是否成功。 */
+    val success: Boolean = true,
+    /** 失败时的错误信息（已脱敏）。 */
+    val error: String = ""
+)
+
 /** 浏览器对话框（alert/confirm/prompt）等待处理。 */
 data class PendingBrowserDialog(
     val id: String,

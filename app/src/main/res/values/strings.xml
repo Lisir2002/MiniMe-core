@@ -605,6 +605,29 @@
     <string name="browser_credential_username">用户名: %1$s</string>
     <string name="browser_credential_detail">用户名: %1$s  密码: %2$s</string>
 
+    <!-- Browser bottom toolbar / AI panel / home (R3 refactor) -->
+    <string name="browser_bottom_home">主页</string>
+    <string name="browser_bottom_bookmarks">收藏</string>
+    <string name="browser_bottom_history">历史</string>
+    <string name="browser_bottom_downloads">下载</string>
+    <string name="browser_bottom_ai">AI助手</string>
+    <string name="browser_ai_panel_title">AI 浏览器助手</string>
+    <string name="browser_ai_panel_status_active">正在操作</string>
+    <string name="browser_ai_panel_status_idle">空闲</string>
+    <string name="browser_ai_panel_status_paused">已暂停</string>
+    <string name="browser_ai_panel_empty">暂无AI操作记录</string>
+    <string name="browser_ai_panel_pause">暂停AI</string>
+    <string name="browser_ai_panel_takeover">接管操作</string>
+    <string name="browser_home_shortcuts">快捷方式</string>
+    <string name="browser_home_recent">最近访问</string>
+    <string name="browser_home_empty_shortcuts">暂无快捷方式</string>
+    <string name="browser_home_empty_recent">暂无最近访问</string>
+    <string name="browser_home_empty_bookmarks">暂无收藏</string>
+    <string name="browser_stop_loading">停止加载</string>
+    <string name="browser_history_today">今天</string>
+    <string name="browser_history_yesterday">昨天</string>
+    <string name="browser_history_earlier">更早</string>
+
     <!-- Chat Input Bar -->
     <string name="chat_input_placeholder">输入消息与 AI 聊天…</string>
     <string name="chat_queue_hint">AI 工作中，回车发送将自动排队</string>
@@ -1923,5 +1946,6 @@
     <string name="tc_container_remote_mode">远程模式</string>
     <string name="tc_bindings_hint">额外绑定目录</string>
     <string name="tc_add_binding">添加绑定</string>
+    <string name="splash_skip">跳过</string>
 
 </resources>

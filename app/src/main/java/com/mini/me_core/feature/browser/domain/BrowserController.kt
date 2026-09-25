@@ -808,6 +808,101 @@ class BrowserController @Inject constructor(
               } catch (e) {}
             })();
         """
+
+        /**
+         * 反检测 JS：在 onPageStarted 中注入，覆盖 navigator.webdriver / plugins / languages /
+         * window.chrome / permissions.query 等自动化检测特征，降低被网站识别为机器人的概率。
+         */
+        const val JS_ANTI_DETECT = """
+            (function(){
+              Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+              Object.defineProperty(navigator, 'plugins', { get: () => [
+                {name:'Chrome PDF Plugin',filename:'internal-pdf-viewer'},
+                {name:'Chrome PDF Viewer',filename:'mhjfbmdgcfjbbpaeojofohoefgiehjai'},
+                {name:'Native Client',filename:'internal-nacl-plugin'},
+                {name:'Widevine Content Decryption Module',filename:'widevinecdmadapter.so'},
+                {name:'Shockwave Flash',filename:'pepflashplayer.so'}
+              ]});
+              Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN','zh','en'] });
+              window.chrome = { runtime: {} };
+              var originalQuery = window.navigator.permissions.query;
+              window.navigator.permissions.query = function(parameters) {
+                return parameters.name === 'notifications' ? Promise.resolve({ state: Notification.permission }) : originalQuery(parameters);
+              };
+            })()
+        """
+
+        /**
+         * 结构化内容提取 JS：自动识别页面类型（article / product / search_results / profile），
+         * 提取标题、作者、日期、正文、图片等语义化字段，返回 JSON 字符串。
+         */
+        const val JS_STRUCTURED_EXTRACT = """
+            (function(){
+              var result = { page_type: 'unknown', data: {} };
+              var article = document.querySelector('article');
+              var ogType = (document.querySelector('meta[property="og:type"]') || {}).content;
+              if (article || ogType === 'article' || /blog|article|post/.test(location.href)) {
+                result.page_type = 'article';
+                result.data = {
+                  title: (document.querySelector('h1') || {}).textContent || document.title,
+                  author: (document.querySelector('meta[name="author"]') || {}).content || '',
+                  date: (document.querySelector('meta[property="article:published_time"]') || {}).content || (document.querySelector('time') || {}).datetime || '',
+                  content: ((article || document.querySelector('main') || document.body) || {}).innerText ? (article || document.querySelector('main') || document.body).innerText.slice(0, 8000) : '',
+                  images: Array.prototype.slice.call(document.querySelectorAll('article img, main img')).slice(0,10).map(function(img){return img.src;})
+                };
+              }
+              else if (/product|item|goods|sku/.test(location.href) || document.querySelector('[itemprop="price"]')) {
+                result.page_type = 'product';
+                result.data = {
+                  title: (document.querySelector('h1') || {}).textContent || document.title,
+                  price: (document.querySelector('[itemprop="price"]') || {}).content || (document.querySelector('.price') || {}).textContent || '',
+                  description: ((document.querySelector('[itemprop="description"]') || {}).content || (document.querySelector('.description') || {}).textContent || '').slice(0,2000),
+                  images: Array.prototype.slice.call(document.querySelectorAll('img')).slice(0,10).map(function(img){return img.src;}).filter(function(src){return src;})
+                };
+              }
+              else if (/search|query|s=|q=/.test(location.href) || document.querySelector('.search-results, #search-results, .results')) {
+                result.page_type = 'search_results';
+                var links = Array.prototype.slice.call(document.querySelectorAll('a')).filter(function(a){return a.href && a.textContent.trim().length > 5;}).slice(0,20);
+                result.data = { results: links.map(function(a){ return { title: a.textContent.trim().slice(0,200), url: a.href }; }) };
+              }
+              else if (/profile|user|account|member/.test(location.pathname)) {
+                result.page_type = 'profile';
+                result.data = {
+                  username: (document.querySelector('h1') || {}).textContent || document.title,
+                  bio: ((document.querySelector('.bio, .description, [class*="bio"]') || {}).textContent || '').slice(0,1000),
+                  links: Array.prototype.slice.call(document.querySelectorAll('a')).slice(0,10).map(function(a){ return {text: a.textContent.trim().slice(0,100), url: a.href}; }).filter(function(l){return l.text;})
+                };
+              }
+              return JSON.stringify(result);
+            })()
+        """
+
+        /** 逐字符追加输入 JS（不触发事件，配合 JS_FIRE_INPUT 在最后统一派发）。 */
+        const val JS_APPEND_CHAR = """
+            (function() {
+              var id = arguments[0], ch = arguments[1];
+              var el = document.querySelector('[data-rcb-id="' + id + '"]');
+              if (!el) return JSON.stringify({ok:false, reason:'NOT_FOUND'});
+              el.scrollIntoView({block:'center', behavior:'smooth'});
+              el.focus();
+              var proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+              var setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+              setter.call(el, (el.value || '') + ch);
+              return JSON.stringify({ok:true});
+            })();
+        """
+
+        /** 派发 input/change 事件 JS（逐字符输入完成后统一调用）。 */
+        const val JS_FIRE_INPUT = """
+            (function() {
+              var id = arguments[0];
+              var el = document.querySelector('[data-rcb-id="' + id + '"]');
+              if (!el) return JSON.stringify({ok:false, reason:'NOT_FOUND'});
+              el.dispatchEvent(new Event('input', {bubbles:true}));
+              el.dispatchEvent(new Event('change', {bubbles:true}));
+              return JSON.stringify({ok:true});
+            })();
+        """
     }
 
     /** 内部标签：id + WebView + 标题/URL 缓存。 */
@@ -884,6 +979,29 @@ class BrowserController @Inject constructor(
 
     private val _agentStatus = MutableStateFlow(AgentBrowserStatus())
     val agentStatus: StateFlow<AgentBrowserStatus> = _agentStatus.asStateFlow()
+
+    /** AI 操作历史（R3 操作时间线）：最多保留 100 条，供 UI AI 助手面板展示。 */
+    private val _agentActionHistory = MutableStateFlow<List<AgentActionRecord>>(emptyList())
+    val agentActionHistory: StateFlow<List<AgentActionRecord>> = _agentActionHistory.asStateFlow()
+
+    /** 追加一条 AI 操作记录（自动截断到 100 条）。敏感信息需在调用方脱敏后传入。 */
+    private fun recordAction(action: String, description: String, success: Boolean = true, error: String = "") {
+        val record = AgentActionRecord(
+            action = action,
+            description = description,
+            timestamp = System.currentTimeMillis(),
+            success = success,
+            error = error
+        )
+        val current = _agentActionHistory.value
+        val updated = if (current.size >= 100) current.drop(1) + record else current + record
+        _agentActionHistory.value = updated
+    }
+
+    /** 清空 AI 操作历史。 */
+    fun clearAgentActionHistory() {
+        _agentActionHistory.value = emptyList()
+    }
 
     private val _downloads = MutableStateFlow<List<BrowserDownloadInfo>>(emptyList())
     /** 最近下载任务（供 downloads 工具 / 模型查询）。 */
@@ -1114,26 +1232,41 @@ class BrowserController @Inject constructor(
         val blocked = validateUrl(normalized)
         if (blocked != null) {
             FileLogger.w(TAG, blocked)
+            recordAction("navigate", "导航到 $url", success = false, error = blocked)
             return@withLock BrowserPageSnapshot(url = "", pageText = blocked)
         }
         _agentStatus.value = AgentBrowserStatus("正在导航到 $url", true)
         try {
             withContext(Dispatchers.Main) { ensureWebView().loadUrl(normalized) }
             waitForPageSettled(30_000)
+            // 智能等待页面真正就绪（网络空闲 + DOM 稳定 + 关键元素出现），超时降级不阻塞导航主流程
+            runCatching { waitForPageReady(3000) }
             // 导航到新页面：重置增量基线与上次增量（新旧页面不可比），下次写操作后重新建立。
             deltaBaseline = null
             lastDelta = null
-            snapshotInternal(SnapshotLevel.SUMMARY)
+            val snap = snapshotInternal(SnapshotLevel.SUMMARY)
+            recordAction("navigate", "导航到 $url")
+            snap
+        } catch (e: Exception) {
+            recordAction("navigate", "导航到 $url", success = false, error = e.message ?: "未知错误")
+            throw e
         } finally {
             _agentStatus.value = AgentBrowserStatus()
         }
     }
 
-    /** 获取当前页面快照（元素树 + 文本）。 */
-    suspend fun snapshot(level: SnapshotLevel = SnapshotLevel.FULL): BrowserPageSnapshot = mutex.withLock {
+    /**
+     * 获取当前页面快照（元素树 + 文本）。
+     * @param level 快照分级
+     * @param autoScroll 是否自动滚动到底部加载更多内容（懒加载页面），滚动完成后重新获取快照
+     */
+    suspend fun snapshot(level: SnapshotLevel = SnapshotLevel.FULL, autoScroll: Boolean = false): BrowserPageSnapshot = mutex.withLock {
         _agentStatus.value = AgentBrowserStatus("正在提取页面结构", true)
         try {
-            snapshotInternal(level)
+            if (autoScroll) autoScrollLoad()
+            val snap = snapshotInternal(level)
+            recordAction("snapshot", "获取页面快照（${level.name.lowercase()}级${if (autoScroll) ", 自动滚动加载" else ""}），${snap.elements.size}个可交互元素")
+            snap
         } finally {
             _agentStatus.value = AgentBrowserStatus()
         }
@@ -1246,6 +1379,8 @@ class BrowserController @Inject constructor(
                 recordAction("click", "失败：元素未找到（$elementId）")
                 return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 未找到：data-rcb-id / CSS 路径 / 语义均未命中")
             }
+            // 反检测：点击前随机延迟 100-300ms，模拟人类操作
+            delay((100..300).random().toLong())
             evalJs("($JS_CLICK)(${quote(resolved.id)})")
             waitForPageSettled(10_000)
             afterWrite("click", snapshotInternal(SnapshotLevel.SUMMARY))
@@ -1254,7 +1389,10 @@ class BrowserController @Inject constructor(
         }
     }
 
-    /** 在元素中输入文本。 */
+    /**
+     * 在元素中输入文本。
+     * 反检测：多字符文本逐字符输入，每个字符间随机延迟 50-150ms，模拟人类打字节奏。
+     */
     suspend fun type(elementId: String, text: String): BrowserPageSnapshot = mutex.withLock {
         _agentStatus.value = AgentBrowserStatus("正在向 $elementId 输入内容", true)
         try {
@@ -1263,8 +1401,64 @@ class BrowserController @Inject constructor(
                 recordAction("type", "失败：元素未找到（$elementId）")
                 return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 未找到：data-rcb-id / CSS 路径 / 语义均未命中")
             }
-            evalJs("($JS_TYPE)(${quote(resolved.id)}, ${quote(text)})")
+            if (text.isEmpty()) {
+                // 空文本：直接触发清空事件
+                evalJs("($JS_TYPE)(${quote(resolved.id)}, ${quote("")})")
+            } else if (text.length == 1) {
+                // 单字符：直接用原 JS_TYPE
+                evalJs("($JS_TYPE)(${quote(resolved.id)}, ${quote(text)})")
+            } else {
+                // 多字符：逐字符输入，每字符间隔 50-150ms 随机延迟，最后统一触发 input/change
+                for (ch in text) {
+                    evalJs("($JS_APPEND_CHAR)(${quote(resolved.id)}, ${quote(ch.toString())})")
+                    delay((50..150).random().toLong())
+                }
+                evalJs("($JS_FIRE_INPUT)(${quote(resolved.id)})")
+            }
             afterWrite("type", snapshotInternal(SnapshotLevel.SUMMARY))
+        } finally {
+            _agentStatus.value = AgentBrowserStatus()
+        }
+    }
+
+    /**
+     * 批量表单填写：对多个 (elementId, text) 字段依次定位并输入文本。
+     *
+     * 每个字段：resolveElementId -> 逐字符输入（复用 type 的人类打字节奏）-> delay(100)。
+     * 某个字段定位失败时跳过该字段，继续填写后续字段。
+     * 全部完成后返回 SUMMARY 级快照。
+     *
+     * @param fields 元素定位符 -> 待填文本 的映射
+     * @return 填写完成后的页面快照
+     */
+    suspend fun fillForm(fields: Map<String, String>): BrowserPageSnapshot = mutex.withLock {
+        _agentStatus.value = AgentBrowserStatus("正在批量填写表单（${fields.size}个字段）", true)
+        try {
+            var filled = 0
+            var failed = 0
+            for ((elementId, text) in fields) {
+                val resolved = resolveElementId(elementId)
+                if (resolved == null) {
+                    failed++
+                    continue
+                }
+                if (text.isEmpty()) {
+                    evalJs("($JS_TYPE)(${quote(resolved.id)}, ${quote("")})")
+                } else if (text.length == 1) {
+                    evalJs("($JS_TYPE)(${quote(resolved.id)}, ${quote(text)})")
+                } else {
+                    for (ch in text) {
+                        evalJs("($JS_APPEND_CHAR)(${quote(resolved.id)}, ${quote(ch.toString())})")
+                        delay((50..150).random().toLong())
+                    }
+                    evalJs("($JS_FIRE_INPUT)(${quote(resolved.id)})")
+                }
+                delay(100)
+                filled++
+            }
+            val snap = snapshotInternal(SnapshotLevel.SUMMARY)
+            recordAction("fill_form", "批量填写 ${fields.size} 个字段（成功$filled, 失败$failed）")
+            snap
         } finally {
             _agentStatus.value = AgentBrowserStatus()
         }
@@ -1328,11 +1522,28 @@ class BrowserController @Inject constructor(
         }
     }
 
-    /** 结构化取数：按 CSS selector + mode 抽取文本/链接/标题/表格/HTML，返回原始 JSON 字符串。 */
-    suspend fun extract(selector: String?, mode: String): String {
+    /**
+     * 结构化取数：按 CSS selector + mode 抽取文本/链接/标题/表格/HTML，返回原始 JSON 字符串。
+     *
+     * @param selector CSS 选择器，null 表示整页
+     * @param mode 抽取模式：text / links / headings / table / html
+     * @param autoScroll 是否自动滚动到底部加载更多内容后再提取
+     * @param structured 为 true 时自动识别页面类型并输出结构化 JSON（article/product/search_results/profile），忽略 selector 和 mode
+     */
+    suspend fun extract(selector: String?, mode: String, autoScroll: Boolean = false, structured: Boolean = false): String = mutex.withLock {
         _agentStatus.value = AgentBrowserStatus("正在抽取结构化数据", true)
-        return try {
-            evalJs("($JS_EXTRACT)(${if (selector == null) "null" else quote(selector)}, ${quote(mode)})")
+        return@withLock try {
+            if (structured) {
+                if (autoScroll) autoScrollLoad()
+                val result = evalJs(JS_STRUCTURED_EXTRACT)
+                recordAction("extract", "结构化提取页面内容（自动识别页面类型）")
+                result
+            } else {
+                if (autoScroll) autoScrollLoad()
+                val result = evalJs("($JS_EXTRACT)(${if (selector == null) "null" else quote(selector)}, ${quote(mode)})")
+                recordAction("extract", "抽取结构化数据（mode=$mode${if (selector != null) ", selector=$selector" else ""}${if (autoScroll) ", 自动滚动" else ""}）")
+                result
+            }
         } finally {
             _agentStatus.value = AgentBrowserStatus()
         }
@@ -1376,6 +1587,7 @@ class BrowserController @Inject constructor(
             bmp.compress(Bitmap.CompressFormat.PNG, 90, bos)
             bmp.recycle()
             val b64 = Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP)
+            recordAction("screenshot", if (elementId != null) "截取元素 #$elementId" else "截取页面")
             "data:image/png;base64,$b64"
         } finally {
             _agentStatus.value = AgentBrowserStatus()
@@ -1401,14 +1613,22 @@ class BrowserController @Inject constructor(
             while (System.currentTimeMillis() < deadline) {
                 val snap = snapshotInternal(SnapshotLevel.STANDARD)
                 if (selector.isNullOrBlank()) {
-                    if (snap.url.isNotBlank()) return@withLock snap
+                    if (snap.url.isNotBlank()) {
+                        recordAction("wait", "等待页面加载完成")
+                        return@withLock snap
+                    }
                 } else {
                     val found = evalJs("(function(){ return !!document.querySelector(${quote(selector)}); })()")
-                    if (found.trim() == "true") return@withLock snap
+                    if (found.trim() == "true") {
+                        recordAction("wait", "等待元素出现：$selector")
+                        return@withLock snap
+                    }
                 }
                 delay(500)
             }
-            snapshotInternal(SnapshotLevel.STANDARD)
+            val snap = snapshotInternal(SnapshotLevel.STANDARD)
+            recordAction("wait", "等待超时（${timeoutMs}ms）${if (selector != null) "：$selector" else ""}", success = false)
+            snap
         } finally {
             _agentStatus.value = AgentBrowserStatus()
         }
@@ -1429,18 +1649,105 @@ class BrowserController @Inject constructor(
                 val version = readMutVersion()
                 if (version > startVersion) {
                     val summary = decodeJsString(evalJs("JSON.stringify((window.__rcb_mut || []).slice(-10))"))
+                    recordAction("wait", "检测到页面变化（DOM mutation v$version）")
                     return@withLock WaitChangeResult(changed = true, version = version, summary = summary)
                 }
                 // 网络事件也唤醒（wait_for_change 同时监听网络动静）
                 if (networkPendingCount() > 0) {
                     val recs = listNetwork(1)
                     if (recs.isNotEmpty() && recs.first().startTs > System.currentTimeMillis() - 2000) {
+                        recordAction("wait", "检测到新的网络请求：${recs.first().url.take(80)}")
                         return@withLock WaitChangeResult(changed = true, version = version, summary = "检测到新的网络请求：${recs.first().url.take(120)}")
                     }
                 }
                 delay(300)
             }
+            recordAction("wait", "等待页面变化超时（${timeoutMs}ms）", success = false)
             WaitChangeResult(changed = false, version = readMutVersion(), summary = "")
+        } finally {
+            _agentStatus.value = AgentBrowserStatus()
+        }
+    }
+
+    /**
+     * 渲染完成智能等待：三重判断页面是否真正就绪。
+     *
+     * 条件（同时满足）：
+     *  1. 网络空闲：在途请求数为 0 且持续 500ms 无新请求
+     *  2. DOM 稳定：MutationObserver 版本号连续 500ms 无变化
+     *  3. 关键元素：body 非空且页面存在可交互元素（a/button/input/select/textarea）
+     *
+     * 轮询间隔 100ms，超时后降级返回 false（不阻塞主流程）。
+     * 注意：本方法不自行加锁，应在持有 mutex 的上下文中调用（如 navigate 内部）。
+     *
+     * @param timeoutMs 最长等待毫秒，默认 3000
+     * @return true 表示三重条件均满足；false 表示超时降级
+     */
+    suspend fun waitForPageReady(timeoutMs: Long = 3000): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var netIdleSince = 0L
+        var domStableSince = 0L
+        var lastMutVersion = -1L
+        while (System.currentTimeMillis() < deadline) {
+            val now = System.currentTimeMillis()
+            // 条件1：网络空闲（在途请求为0且持续500ms）
+            val pending = readPendingCount()
+            if (pending == 0) {
+                if (netIdleSince == 0L) netIdleSince = now
+            } else {
+                netIdleSince = 0L
+            }
+            // 条件2：DOM稳定（版本号连续500ms不变）
+            val mutVer = readMutVersion()
+            if (mutVer == lastMutVersion) {
+                if (domStableSince == 0L) domStableSince = now
+            } else {
+                domStableSince = 0L
+                lastMutVersion = mutVer
+            }
+            // 条件3：body非空且有可交互元素
+            val bodyReady = evalJs(
+                "(function(){ return document.body && document.body.innerText.length > 0 && " +
+                "document.querySelectorAll('a,button,input,select,textarea').length > 0; })()"
+            ).trim() == "true"
+
+            val netIdle = netIdleSince > 0 && (now - netIdleSince) >= 500
+            val domStable = domStableSince > 0 && (now - domStableSince) >= 500
+            if (netIdle && domStable && bodyReady) return true
+            delay(100)
+        }
+        return false
+    }
+
+    /**
+     * 等待网络空闲：轮询在途业务请求数（fetch/XHR/WS/SSE），
+     * 当连续 idleMs 毫秒内 pendingCount == 0 时返回 true。
+     *
+     * @param timeoutMs 最长等待毫秒，默认 10000
+     * @param idleMs 判定空闲所需的持续无请求时长，默认 500ms
+     * @return true 表示网络已空闲；false 表示超时
+     */
+    suspend fun waitForNetworkIdle(timeoutMs: Long = 10000, idleMs: Long = 500): Boolean = mutex.withLock {
+        _agentStatus.value = AgentBrowserStatus("等待网络空闲", true)
+        try {
+            val deadline = System.currentTimeMillis() + timeoutMs
+            var idleSince = 0L
+            while (System.currentTimeMillis() < deadline) {
+                val pending = readPendingCount()
+                val now = System.currentTimeMillis()
+                if (pending == 0) {
+                    if (idleSince == 0L) idleSince = now
+                    if (now - idleSince >= idleMs) {
+                        recordAction("wait", "网络已空闲（持续${idleMs}ms无在途请求）")
+                        return@withLock true
+                    }
+                } else {
+                    idleSince = 0L
+                }
+                delay(100)
+            }
+            recordAction("wait", "等待网络空闲超时（${timeoutMs}ms）", success = false)
+            false
         } finally {
             _agentStatus.value = AgentBrowserStatus()
         }
@@ -1542,7 +1849,9 @@ class BrowserController @Inject constructor(
         try {
             withContext(Dispatchers.Main) { activeWebView()?.takeIf { it.canGoBack() }?.goBack() }
             waitForPageSettled(15_000)
-            snapshotInternal()
+            val snap = snapshotInternal()
+            recordAction("back", "后退一页")
+            snap
         } finally {
             _agentStatus.value = AgentBrowserStatus()
         }
@@ -1554,7 +1863,9 @@ class BrowserController @Inject constructor(
         try {
             withContext(Dispatchers.Main) { activeWebView()?.takeIf { it.canGoForward() }?.goForward() }
             waitForPageSettled(15_000)
-            snapshotInternal()
+            val snap = snapshotInternal()
+            recordAction("forward", "前进一页")
+            snap
         } finally {
             _agentStatus.value = AgentBrowserStatus()
         }
@@ -1566,7 +1877,9 @@ class BrowserController @Inject constructor(
         try {
             withContext(Dispatchers.Main) { activeWebView()?.reload() }
             waitForPageSettled(30_000)
-            snapshotInternal()
+            val snap = snapshotInternal()
+            recordAction("reload", "刷新页面")
+            snap
         } finally {
             _agentStatus.value = AgentBrowserStatus()
         }
@@ -1578,11 +1891,13 @@ class BrowserController @Inject constructor(
     suspend fun newTab(url: String?): BrowserTabInfo = mutex.withLock {
         _agentStatus.value = AgentBrowserStatus("正在新建标签页", true)
         try {
-            withContext(Dispatchers.Main) {
+            val info = withContext(Dispatchers.Main) {
                 val tab = createTab(url)
                 switchToTab(tab.id)
                 BrowserTabInfo(tab.id, tab.title, tab.url)
             }
+            recordAction("new_tab", "新建标签页${if (url != null) "：$url" else ""}")
+            info
         } finally {
             _agentStatus.value = AgentBrowserStatus()
         }
@@ -1777,6 +2092,8 @@ class BrowserController @Inject constructor(
             }
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 onTabLoading(tabId, true)
+                // 反检测：页面开始加载时注入 webdriver/plugins/languages 等覆盖脚本
+                view?.evaluateJavascript(JS_ANTI_DETECT, null)
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 onTabFinished(tabId, view, url)
@@ -1895,6 +2212,21 @@ class BrowserController @Inject constructor(
     private fun detachAndDestroy(wv: WebView) {
         detachFromParent(wv)
         wv.destroy()
+    }
+
+    /**
+     * 自动滚动加载：反复滚动到底部触发懒加载，直到 scrollHeight 不再增长或达到最大滚动次数（10次）。
+     * 每次滚动间隔 800ms，模拟人类浏览节奏。调用方需已持有 mutex。
+     */
+    private suspend fun autoScrollLoad() {
+        var lastHeight = 0
+        repeat(10) {
+            evalJs("window.scrollTo(0, document.body.scrollHeight)")
+            delay(800)
+            val height = evalJs("document.body.scrollHeight").trim().toIntOrNull() ?: 0
+            if (height == lastHeight) return
+            lastHeight = height
+        }
     }
 
     /**

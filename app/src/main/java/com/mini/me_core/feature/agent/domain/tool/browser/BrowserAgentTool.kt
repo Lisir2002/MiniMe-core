@@ -27,6 +27,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URI
 import javax.inject.Inject
@@ -81,9 +83,13 @@ class BrowserAgentTool @Inject constructor(
 
     override val name = "browser"
     override val description =
-        "操作内置服务浏览器。可打开网页（外网或容器内 http://localhost:PORT）、提取页面内容、点击/输入/提交表单、" +
-            "悬停/拖拽/按键/上传文件、前后退/刷新、截图、执行 JS、自动登录、请求用户接管(takeover)。与用户共享同一个浏览会话和登录态。" +
-            "典型用法：browser.navigate(url) → browser.snapshot() 查看页面 → browser.click/type/submit 操作 → browser.wait_for_change() 等待变化 → browser.screenshot() 查看效果。" +
+        "操作内置服务浏览器。核心动作：open(navigate)/view(智能页面查看)/click/fill_form/submit/scroll/wait/screenshot。" +
+            "view 是首选的页面观察动作：自动等待页面稳定、识别页面类型（article/search_results/product/login/unknown）并按需返回对应级别快照。" +
+            "fill_form 可一次性批量填写多个表单字段（fields 为 元素标识->文本 的对象映射）。" +
+            "其他高级动作：extract（结构化/按模式抽取）、select_option、hover、drag、press_key、upload_file、back/forward/reload、evaluate、" +
+            "wait_for_change、wait_for_network_idle、history、get_attribute、handle_dialog、login、takeover、标签页管理、网络请求查询。" +
+            "与用户共享同一个浏览会话和登录态。支持外网 https/http 与容器内 http://localhost:PORT。" +
+            "典型用法：browser.navigate(url) 或 browser.view(url) → 阅读 summary/snapshot → browser.click/type/fill_form/submit 操作 → browser.wait_for_change() 等待变化 → browser.screenshot() 查看效果。" +
             "所有动作返回统一 envelope：{ok, action, changed, summary, note|error, recoverable, snapshot?, delta?}，写操作自带 delta 增量对比，无需反复 snapshot。" +
             "快照分级 snapshot_level：summary（默认，控件摘要，最省 token）/ standard（含完整元素）/ full（含页面正文）。" +
             "element_id 可传 data-rcb-id / CSS 绝对路径 / 语义描述符（role=… name=… index=…）三者任一。" +
@@ -94,12 +100,12 @@ class BrowserAgentTool @Inject constructor(
         "action" to ToolParameter(
             name = "action",
             type = ParameterType.STRING,
-            description = "要执行的浏览器动作：navigate / snapshot / page_text / extract / click / type / select_option / submit / scroll / hover / drag / press_key / upload_file / back / forward / reload / screenshot / evaluate / wait_for / wait_for_change / history / get_attribute / handle_dialog / login / takeover / new_tab / switch_tab / close_tab / list_tabs / downloads / network / network_get / wait_for_request",
+            description = "要执行的浏览器动作：核心动作 navigate/view/snapshot/click/type/fill_form/submit/scroll/wait_for/screenshot；高级动作 extract/select_option/hover/drag/press_key/upload_file/back/forward/reload/evaluate/wait_for_change/wait_for_network_idle/history/get_attribute/handle_dialog/login/takeover/new_tab/switch_tab/close_tab/list_tabs/downloads/network/network_get/wait_for_request",
             required = true,
             enum = listOf(
-                "navigate", "snapshot", "page_text", "extract", "click", "type", "select_option", "submit",
+                "navigate", "view", "snapshot", "page_text", "extract", "click", "type", "fill_form", "select_option", "submit",
                 "scroll", "hover", "drag", "press_key", "upload_file", "back", "forward", "reload",
-                "screenshot", "evaluate", "wait_for", "wait_for_change", "history", "get_attribute",
+                "screenshot", "evaluate", "wait_for", "wait_for_change", "wait_for_network_idle", "history", "get_attribute",
                 "handle_dialog", "login", "takeover",
                 "new_tab", "switch_tab", "close_tab", "list_tabs", "downloads",
                 "network", "network_get", "wait_for_request"
@@ -170,7 +176,7 @@ class BrowserAgentTool @Inject constructor(
         "timeout_ms" to ToolParameter(
             name = "timeout_ms",
             type = ParameterType.INTEGER,
-            description = "wait_for / wait_for_change / wait_for_request 时可选：等待超时毫秒（wait_for 默认 10000，wait_for_change 默认 15000，wait_for_request 默认 15000）",
+            description = "wait_for / wait_for_change / wait_for_request / wait_for_network_idle 时可选：等待超时毫秒（wait_for 默认 10000，wait_for_change 默认 15000，wait_for_request 默认 15000，wait_for_network_idle 默认 10000）",
             required = false
         ),
         "limit" to ToolParameter(
@@ -221,6 +227,30 @@ class BrowserAgentTool @Inject constructor(
             type = ParameterType.STRING,
             description = "switch_tab / close_tab 时必填：要切换/关闭的标签 id（从 list_tabs 获取）",
             required = false
+        ),
+        "fields" to ToolParameter(
+            name = "fields",
+            type = ParameterType.OBJECT,
+            description = "fill_form 时必填：要填写的字段映射，key 为元素 id（data-rcb-id / CSS路径 / 语义描述符），value 为要输入的文本。如 {\"username\": \"admin\", \"password\": \"123\"}",
+            required = false
+        ),
+        "auto_scroll" to ToolParameter(
+            name = "auto_scroll",
+            type = ParameterType.BOOLEAN,
+            description = "snapshot / extract 时可选：true=自动滚动到底部加载更多内容（最多10次，间隔800ms），默认false",
+            required = false
+        ),
+        "structured" to ToolParameter(
+            name = "structured",
+            type = ParameterType.BOOLEAN,
+            description = "extract 时可选：true=自动识别页面类型并输出结构化JSON（article/product/search_results/profile），默认false。为true时忽略selector和mode",
+            required = false
+        ),
+        "idle_ms" to ToolParameter(
+            name = "idle_ms",
+            type = ParameterType.INTEGER,
+            description = "wait_for_network_idle 时可选：判定网络空闲所需的连续无在途请求毫秒数，默认500",
+            required = false
         )
     )
 
@@ -229,11 +259,13 @@ class BrowserAgentTool @Inject constructor(
         return try {
             when (action) {
                 "navigate" -> doNavigate(args)
+                "view" -> doView(args)
                 "snapshot" -> doSnapshot(args)
                 "page_text" -> doPageText()
                 "extract" -> doExtract(args)
                 "click" -> doClick(args)
                 "type" -> doType(args)
+                "fill_form" -> doFillForm(args)
                 "select_option" -> doSelect(args)
                 "submit" -> doSubmit(args)
                 "scroll" -> doScroll(args)
@@ -248,6 +280,7 @@ class BrowserAgentTool @Inject constructor(
                 "evaluate" -> doEvaluate(args)
                 "wait_for" -> doWaitFor(args)
                 "wait_for_change" -> doWaitForChange(args)
+                "wait_for_network_idle" -> doWaitForNetworkIdle(args)
                 "history" -> doHistory()
                 "get_attribute" -> doGetAttribute(args)
                 "handle_dialog" -> doHandleDialog(args)
@@ -290,7 +323,8 @@ class BrowserAgentTool @Inject constructor(
 
     private suspend fun doSnapshot(args: Map<String, JsonElement>): ToolResult {
         val level = snapshotLevelOf(args)
-        val snap = browserController.snapshot(level)
+        val autoScroll = args["auto_scroll"]?.jsonPrimitive?.booleanOrNull ?: false
+        val snap = browserController.snapshot(level, autoScroll)
         return envelope("snapshot", ok = true, summary = snapshotSummary(snap), snapshot = snapshotToJson(snap, level))
     }
 
@@ -300,13 +334,55 @@ class BrowserAgentTool @Inject constructor(
         return envelope("page_text", ok = true, summary = "页面正文共 ${text.length} 字（超过 ${MAX_TEXT} 字已截断）", note = text)
     }
 
+    /**
+     * 智能页面查看：可选导航到 url，等待页面稳定，识别页面类型并按需返回对应级别快照。
+     * article -> FULL（含正文）；search_results/product -> STANDARD；其余 -> STANDARD。
+     */
+    private suspend fun doView(args: Map<String, JsonElement>): ToolResult {
+        val url = args["url"]?.jsonPrimitive?.contentOrNull
+        if (url != null) {
+            browserController.validateUrl(url)?.let {
+                return envelope("view", ok = false, error = it, recoverable = true, summary = "导航被拦截：$it")
+            }
+            browserController.navigate(url)
+        }
+        runCatching { browserController.waitForPageReady(3000) }
+        val structured = browserController.extract(null, "text", autoScroll = false, structured = true)
+        val pageType = runCatching {
+            json.parseToJsonElement(structured).jsonObject["page_type"]?.jsonPrimitive?.contentOrNull ?: "unknown"
+        }.getOrNull() ?: "unknown"
+        val level = when (pageType) {
+            "article" -> SnapshotLevel.FULL
+            "search_results", "product" -> SnapshotLevel.STANDARD
+            else -> SnapshotLevel.STANDARD
+        }
+        val snap = browserController.snapshot(level)
+        return envelope(
+            action = "view",
+            ok = true,
+            changed = url != null,
+            summary = "页面类型: $pageType，已获取${level.name.lowercase()}级快照（${snap.elements.size}个元素）",
+            snapshot = snapshotToJson(snap, level),
+            note = structured.take(4000)
+        )
+    }
+
     private suspend fun doExtract(args: Map<String, JsonElement>): ToolResult {
         val selector = args["selector"]?.jsonPrimitive?.contentOrNull
         val mode = args["mode"]?.jsonPrimitive?.contentOrNull ?: "text"
-        val result = browserController.extract(selector, mode)
-        val parsed = runCatching { json.parseToJsonElement(result) }.getOrNull()
-        val note = if (parsed != null) result.take(MAX_TEXT) else result.take(MAX_TEXT)
-        return envelope("extract", ok = true, summary = "已按 mode=$mode 抽取数据", note = note)
+        val autoScroll = args["auto_scroll"]?.jsonPrimitive?.booleanOrNull ?: false
+        val structured = args["structured"]?.jsonPrimitive?.booleanOrNull ?: false
+        val result = browserController.extract(selector, mode, autoScroll, structured)
+        val note = result.take(MAX_TEXT)
+        val summary = if (structured) {
+            val pageType = runCatching {
+                json.parseToJsonElement(result).jsonObject["page_type"]?.jsonPrimitive?.contentOrNull
+            }.getOrNull()
+            "结构化提取完成（页面类型: ${pageType ?: "unknown"}）"
+        } else {
+            "已按 mode=$mode 抽取数据"
+        }
+        return envelope("extract", ok = true, summary = summary, note = note)
     }
 
     // ─────────────────── 写操作（统一 envelope + 增量 delta） ───────────────────
@@ -325,7 +401,7 @@ class BrowserAgentTool @Inject constructor(
                 error = notFound,
                 recoverable = true,
                 summary = "$action 失败：$notFound",
-                note = "元素可能因页面刷新/重渲染失效，请重新 snapshot 获取最新元素标识"
+                note = "元素可能因页面刷新/重渲染失效。建议：1) 重新 snapshot 获取最新元素标识；2) 调用 screenshot 查看页面实际状态后通过视觉定位；3) 尝试使用 CSS 绝对路径或语义描述符（role=… name=… index=…）替代 data-rcb-id"
             )
         }
         val delta = browserController.lastDelta()
@@ -349,6 +425,19 @@ class BrowserAgentTool @Inject constructor(
         val id = args["element_id"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("type 需要 element_id", "MISSING_ELEMENT_ID")
         val text = args["text"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("type 需要 text", "MISSING_TEXT")
         return writeEnvelope("type", args) { browserController.type(id, text) }
+    }
+
+    /** 批量表单填写：fields 为 元素标识 -> 文本 的对象映射，一次性填写多个字段。 */
+    private suspend fun doFillForm(args: Map<String, JsonElement>): ToolResult {
+        val fieldsObj = args["fields"]?.jsonObject
+            ?: return ToolResult.Error("fill_form 需要 fields 参数（对象映射：元素标识->文本）", "MISSING_FIELDS")
+        val fields: Map<String, String> = fieldsObj.mapValues { (_, v) ->
+            v.jsonPrimitive.contentOrNull ?: ""
+        }
+        if (fields.isEmpty()) {
+            return envelope("fill_form", ok = false, recoverable = true, summary = "fill_form 失败：fields 为空", error = "fields 不能为空")
+        }
+        return writeEnvelope("fill_form", args) { browserController.fillForm(fields) }
     }
 
     private suspend fun doSelect(args: Map<String, JsonElement>): ToolResult {
@@ -474,6 +563,19 @@ class BrowserAgentTool @Inject constructor(
                 note = "可调用 snapshot 查看当前状态，或继续其他操作"
             )
         }
+    }
+
+    /** 等待网络空闲：连续 idleMs 无在途请求即返回，超时则报告。 */
+    private suspend fun doWaitForNetworkIdle(args: Map<String, JsonElement>): ToolResult {
+        val timeoutMs = args["timeout_ms"]?.jsonPrimitive?.intOrNull?.toLong() ?: 10000L
+        val idleMs = args["idle_ms"]?.jsonPrimitive?.intOrNull?.toLong() ?: 500L
+        val ok = browserController.waitForNetworkIdle(timeoutMs, idleMs)
+        return envelope(
+            action = "wait_for_network_idle",
+            ok = ok,
+            summary = if (ok) "网络已空闲（连续${idleMs}ms无在途请求）" else "等待网络空闲超时（${timeoutMs}ms）",
+            recoverable = true
+        )
     }
 
     /** 动作历史查询（R2.3）：返回最近 30 条操作 + 结果摘要，避免重复操作。 */
