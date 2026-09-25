@@ -290,6 +290,49 @@ class SettingsViewModel @Inject constructor(
     private val _idleConvergeEnabled = MutableStateFlow(false)
     val idleConvergeEnabled: StateFlow<Boolean> = _idleConvergeEnabled.asStateFlow()
 
+    // P0 step 前注入子开关（默认全开）
+    private val _stepInjectGoalEnabled = MutableStateFlow(true)
+    val stepInjectGoalEnabled: StateFlow<Boolean> = _stepInjectGoalEnabled.asStateFlow()
+
+    private val _stepInjectStaticRulesEnabled = MutableStateFlow(true)
+    val stepInjectStaticRulesEnabled: StateFlow<Boolean> = _stepInjectStaticRulesEnabled.asStateFlow()
+
+    private val _stepInjectLayeredRulesEnabled = MutableStateFlow(true)
+    val stepInjectLayeredRulesEnabled: StateFlow<Boolean> = _stepInjectLayeredRulesEnabled.asStateFlow()
+
+    private val _stepInjectProjectAgentsEnabled = MutableStateFlow(true)
+    val stepInjectProjectAgentsEnabled: StateFlow<Boolean> = _stepInjectProjectAgentsEnabled.asStateFlow()
+
+    // 文件观察护栏独立开关（默认开）
+    private val _fileObservationEnabled = MutableStateFlow(true)
+    val fileObservationEnabled: StateFlow<Boolean> = _fileObservationEnabled.asStateFlow()
+
+    // P1：推理预算强度（low/medium/high，默认 medium）
+    private val _reasoningBudgetLevel = MutableStateFlow("medium")
+    val reasoningBudgetLevel: StateFlow<String> = _reasoningBudgetLevel.asStateFlow()
+
+    // P1：空转收敛阈值轮数（默认 6）
+    private val _idleConvergeRounds = MutableStateFlow(6)
+    val idleConvergeRounds: StateFlow<Int> = _idleConvergeRounds.asStateFlow()
+
+    // P1：当前预设方案
+    private val _activePreset = MutableStateFlow("standard")
+    val activePreset: StateFlow<String> = _activePreset.asStateFlow()
+
+    // P2：新增护栏独立开关
+    private val _guardDangerousCommandEnabled = MutableStateFlow(false)
+    val guardDangerousCommandEnabled: StateFlow<Boolean> = _guardDangerousCommandEnabled.asStateFlow()
+
+    private val _guardLargeFileEnabled = MutableStateFlow(false)
+    val guardLargeFileEnabled: StateFlow<Boolean> = _guardLargeFileEnabled.asStateFlow()
+
+    private val _guardPathBoundaryEnabled = MutableStateFlow(false)
+    val guardPathBoundaryEnabled: StateFlow<Boolean> = _guardPathBoundaryEnabled.asStateFlow()
+
+    // P2：用量卡片显示项
+    private val _usageCardItems = MutableStateFlow<Set<String>>(setOf("token"))
+    val usageCardItems: StateFlow<Set<String>> = _usageCardItems.asStateFlow()
+
     private val _themeMode = MutableStateFlow(AppThemeMode.AUTO)
     val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
 
@@ -531,6 +574,78 @@ class SettingsViewModel @Inject constructor(
             launch {
                 normFlowSettingsRepository.idleConvergeEnabledFlow.collectLatest {
                     _idleConvergeEnabled.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.stepInjectGoalEnabledFlow.collectLatest {
+                    _stepInjectGoalEnabled.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.stepInjectStaticRulesEnabledFlow.collectLatest {
+                    _stepInjectStaticRulesEnabled.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.stepInjectLayeredRulesEnabledFlow.collectLatest {
+                    _stepInjectLayeredRulesEnabled.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.stepInjectProjectAgentsEnabledFlow.collectLatest {
+                    _stepInjectProjectAgentsEnabled.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.fileObservationEnabledFlow.collectLatest {
+                    _fileObservationEnabled.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.reasoningBudgetLevelFlow.collectLatest {
+                    _reasoningBudgetLevel.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.idleConvergeRoundsFlow.collectLatest {
+                    _idleConvergeRounds.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.activePresetFlow.collectLatest {
+                    _activePreset.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.guardDangerousCommandEnabledFlow.collectLatest {
+                    _guardDangerousCommandEnabled.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.guardLargeFileEnabledFlow.collectLatest {
+                    _guardLargeFileEnabled.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.guardPathBoundaryEnabledFlow.collectLatest {
+                    _guardPathBoundaryEnabled.value = it
+                }
+            }
+
+            launch {
+                normFlowSettingsRepository.usageCardItemsFlow.collectLatest {
+                    _usageCardItems.value = it
                 }
             }
 
@@ -1178,21 +1293,25 @@ class SettingsViewModel @Inject constructor(
     }
 
     // D1-7 规范流程统一开关：总开关/子开关持久化（workflow 运行期读同一 repository）。
+    // P1：用户手动调整后自动标记为 custom 预设。
     fun setNormFlowEnabled(enabled: Boolean) {
         viewModelScope.launch {
             normFlowSettingsRepository.setNormFlowEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
         }
     }
 
     fun setStepInjectEnabled(enabled: Boolean) {
         viewModelScope.launch {
             normFlowSettingsRepository.setStepInjectEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
         }
     }
 
     fun setToolGuardEnabled(enabled: Boolean) {
         viewModelScope.launch {
             normFlowSettingsRepository.setToolGuardEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
         }
     }
 
@@ -1200,32 +1319,134 @@ class SettingsViewModel @Inject constructor(
     fun setReasoningBudgetEnabled(enabled: Boolean) {
         viewModelScope.launch {
             normFlowSettingsRepository.setReasoningBudgetEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
         }
     }
 
     fun setUsageCardEnabled(enabled: Boolean) {
         viewModelScope.launch {
             normFlowSettingsRepository.setUsageCardEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
         }
     }
 
     fun setSopSummaryEnabled(enabled: Boolean) {
         viewModelScope.launch {
             normFlowSettingsRepository.setSopSummaryEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
         }
     }
 
     fun setPlaybookAutoEnabled(enabled: Boolean) {
         viewModelScope.launch {
             normFlowSettingsRepository.setPlaybookAutoEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
         }
     }
 
     fun setIdleConvergeEnabled(enabled: Boolean) {
         viewModelScope.launch {
             normFlowSettingsRepository.setIdleConvergeEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
         }
     }
+
+    // P0 step 前注入子开关持久化
+    fun setStepInjectGoalEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            normFlowSettingsRepository.setStepInjectGoalEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
+        }
+    }
+
+    fun setStepInjectStaticRulesEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            normFlowSettingsRepository.setStepInjectStaticRulesEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
+        }
+    }
+
+    fun setStepInjectLayeredRulesEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            normFlowSettingsRepository.setStepInjectLayeredRulesEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
+        }
+    }
+
+    fun setStepInjectProjectAgentsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            normFlowSettingsRepository.setStepInjectProjectAgentsEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
+        }
+    }
+
+    fun setFileObservationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            normFlowSettingsRepository.setFileObservationEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
+        }
+    }
+
+    // P1：推理预算强度
+    fun setReasoningBudgetLevel(level: String) {
+        viewModelScope.launch {
+            normFlowSettingsRepository.setReasoningBudgetLevel(level)
+            normFlowSettingsRepository.markCustom()
+        }
+    }
+
+    // P1：空转收敛阈值
+    fun setIdleConvergeRounds(rounds: Int) {
+        viewModelScope.launch {
+            normFlowSettingsRepository.setIdleConvergeRounds(rounds)
+            normFlowSettingsRepository.markCustom()
+        }
+    }
+
+    // P1：应用预设方案
+    fun applyPreset(preset: String) {
+        viewModelScope.launch {
+            normFlowSettingsRepository.applyPreset(preset)
+        }
+    }
+
+    // P2：新增护栏独立开关
+    fun setGuardDangerousCommandEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            normFlowSettingsRepository.setGuardDangerousCommandEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
+        }
+    }
+
+    fun setGuardLargeFileEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            normFlowSettingsRepository.setGuardLargeFileEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
+        }
+    }
+
+    fun setGuardPathBoundaryEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            normFlowSettingsRepository.setGuardPathBoundaryEnabled(enabled)
+            normFlowSettingsRepository.markCustom()
+        }
+    }
+
+    // P2：用量卡片显示项（切换某个 item）
+    fun toggleUsageCardItem(item: String) {
+        viewModelScope.launch {
+            val current = _usageCardItems.value
+            val newItems = if (item in current) current - item else current + item
+            normFlowSettingsRepository.setUsageCardItems(newItems)
+            normFlowSettingsRepository.markCustom()
+        }
+    }
+
+    // P3：导出配置
+    fun exportConfig(): String = normFlowSettingsRepository.exportConfig()
+
+    // P3：导入配置
+    fun importConfig(json: String): Boolean = normFlowSettingsRepository.importConfig(json)
 
     fun setThemeMode(mode: AppThemeMode) {
         viewModelScope.launch {

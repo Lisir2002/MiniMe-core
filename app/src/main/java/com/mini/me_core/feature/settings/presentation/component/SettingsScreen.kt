@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -177,6 +178,21 @@ fun SettingsScreen(
     val playbookAutoEnabled by viewModel.playbookAutoEnabled.collectAsStateWithLifecycle()
     // D2-1 空转软收敛子开关（默认关）。
     val idleConvergeEnabled by viewModel.idleConvergeEnabled.collectAsStateWithLifecycle()
+    // P0 step 前注入子开关
+    val stepInjectGoalEnabled by viewModel.stepInjectGoalEnabled.collectAsStateWithLifecycle()
+    val stepInjectStaticRulesEnabled by viewModel.stepInjectStaticRulesEnabled.collectAsStateWithLifecycle()
+    val stepInjectLayeredRulesEnabled by viewModel.stepInjectLayeredRulesEnabled.collectAsStateWithLifecycle()
+    val stepInjectProjectAgentsEnabled by viewModel.stepInjectProjectAgentsEnabled.collectAsStateWithLifecycle()
+    val fileObservationEnabled by viewModel.fileObservationEnabled.collectAsStateWithLifecycle()
+    // P1：推理强度 / 空转阈值 / 预设方案
+    val reasoningBudgetLevel by viewModel.reasoningBudgetLevel.collectAsStateWithLifecycle()
+    val idleConvergeRounds by viewModel.idleConvergeRounds.collectAsStateWithLifecycle()
+    val activePreset by viewModel.activePreset.collectAsStateWithLifecycle()
+    // P2：新增护栏 + 用量卡片项
+    val dangerousCommandEnabled by viewModel.guardDangerousCommandEnabled.collectAsStateWithLifecycle()
+    val largeFileEnabled by viewModel.guardLargeFileEnabled.collectAsStateWithLifecycle()
+    val pathBoundaryEnabled by viewModel.guardPathBoundaryEnabled.collectAsStateWithLifecycle()
+    val usageCardItems by viewModel.usageCardItems.collectAsStateWithLifecycle()
 
     var section by remember { mutableStateOf(SettingsSection.Menu) }
     var logReturnSection by remember { mutableStateOf(SettingsSection.Menu) }
@@ -185,6 +201,17 @@ fun SettingsScreen(
     var editingMcp by remember { mutableStateOf<McpServerConfig?>(null) }
     var showContainerAddSheet by remember { mutableStateOf(false) }
     var showThemeSheet by remember { mutableStateOf(false) }
+    // P1：规范查看器导航（0=静态规则, 1=SOP, null=关闭）
+    var assetViewerTab by remember { mutableStateOf<Int?>(null) }
+    // P2：注入诊断面板 / 护栏日志导航
+    var showDiagnosis by remember { mutableStateOf(false) }
+    var showGuardLogs by remember { mutableStateOf(false) }
+    // P3：规则管理 / 导入导出
+    var showRuleManager by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importText by remember { mutableStateOf("") }
+    var importResult by remember { mutableStateOf<String?>(null) }
+    val clipboardContext = androidx.compose.ui.platform.LocalContext.current
     // 问题6：搜索模式状态（顶栏按钮触发，替代常驻搜索框）
     var isSearchMode by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -430,24 +457,70 @@ fun SettingsScreen(
                     onPromote = { viewModel.promoteRuleToGlobal(it) },
                     onDeleteGlobal = { viewModel.deleteGlobalRule(it) }
                 )
-                SettingsSection.NormFlow -> NormFlowSection(
-                    normFlowEnabled = normFlowEnabled,
-                    stepInjectEnabled = stepInjectEnabled,
-                    toolGuardEnabled = toolGuardEnabled,
-                    reasoningBudgetEnabled = reasoningBudgetEnabled,
-                    usageCardEnabled = usageCardEnabled,
-                    sopSummaryEnabled = sopSummaryEnabled,
-                    playbookAutoEnabled = playbookAutoEnabled,
-                    idleConvergeEnabled = idleConvergeEnabled,
-                    onToggleNormFlow = { viewModel.setNormFlowEnabled(it) },
-                    onToggleStepInject = { viewModel.setStepInjectEnabled(it) },
-                    onToggleToolGuard = { viewModel.setToolGuardEnabled(it) },
-                    onToggleReasoningBudget = { viewModel.setReasoningBudgetEnabled(it) },
-                    onToggleUsageCard = { viewModel.setUsageCardEnabled(it) },
-                    onToggleSopSummary = { viewModel.setSopSummaryEnabled(it) },
-                    onTogglePlaybookAuto = { viewModel.setPlaybookAutoEnabled(it) },
-                    onToggleIdleConverge = { viewModel.setIdleConvergeEnabled(it) }
-                )
+                SettingsSection.NormFlow -> {
+                    when {
+                        showDiagnosis -> NormFlowDiagnosisScreen(onBack = { showDiagnosis = false })
+                        showGuardLogs -> GuardLogsScreen(onBack = { showGuardLogs = false })
+                        showRuleManager -> RuleManagerScreen(projectRoot = "", onBack = { showRuleManager = false })
+                        assetViewerTab != null -> NormFlowAssetViewerScreen(
+                            initialTab = assetViewerTab!!,
+                            onBack = { assetViewerTab = null }
+                        )
+                        else -> NormFlowSection(
+                            normFlowEnabled = normFlowEnabled,
+                            stepInjectEnabled = stepInjectEnabled,
+                            toolGuardEnabled = toolGuardEnabled,
+                            fileObservationEnabled = fileObservationEnabled,
+                            reasoningBudgetEnabled = reasoningBudgetEnabled,
+                            usageCardEnabled = usageCardEnabled,
+                            sopSummaryEnabled = sopSummaryEnabled,
+                            playbookAutoEnabled = playbookAutoEnabled,
+                            idleConvergeEnabled = idleConvergeEnabled,
+                            stepInjectGoalEnabled = stepInjectGoalEnabled,
+                            stepInjectStaticRulesEnabled = stepInjectStaticRulesEnabled,
+                            stepInjectLayeredRulesEnabled = stepInjectLayeredRulesEnabled,
+                            stepInjectProjectAgentsEnabled = stepInjectProjectAgentsEnabled,
+                            reasoningBudgetLevel = reasoningBudgetLevel,
+                            idleConvergeRounds = idleConvergeRounds,
+                            activePreset = activePreset,
+                            dangerousCommandEnabled = dangerousCommandEnabled,
+                            largeFileEnabled = largeFileEnabled,
+                            pathBoundaryEnabled = pathBoundaryEnabled,
+                            usageCardItems = usageCardItems,
+                            onToggleNormFlow = { viewModel.setNormFlowEnabled(it) },
+                            onToggleStepInject = { viewModel.setStepInjectEnabled(it) },
+                            onToggleToolGuard = { viewModel.setToolGuardEnabled(it) },
+                            onToggleFileObservation = { viewModel.setFileObservationEnabled(it) },
+                            onToggleReasoningBudget = { viewModel.setReasoningBudgetEnabled(it) },
+                            onToggleUsageCard = { viewModel.setUsageCardEnabled(it) },
+                            onToggleSopSummary = { viewModel.setSopSummaryEnabled(it) },
+                            onTogglePlaybookAuto = { viewModel.setPlaybookAutoEnabled(it) },
+                            onToggleIdleConverge = { viewModel.setIdleConvergeEnabled(it) },
+                            onToggleStepInjectGoal = { viewModel.setStepInjectGoalEnabled(it) },
+                            onToggleStepInjectStaticRules = { viewModel.setStepInjectStaticRulesEnabled(it) },
+                            onToggleStepInjectLayeredRules = { viewModel.setStepInjectLayeredRulesEnabled(it) },
+                            onToggleStepInjectProjectAgents = { viewModel.setStepInjectProjectAgentsEnabled(it) },
+                            onSetReasoningBudgetLevel = { viewModel.setReasoningBudgetLevel(it) },
+                            onSetIdleConvergeRounds = { viewModel.setIdleConvergeRounds(it) },
+                            onApplyPreset = { viewModel.applyPreset(it) },
+                            onViewStaticRules = { assetViewerTab = 0 },
+                            onViewSop = { assetViewerTab = 1 },
+                            onToggleDangerousCommand = { viewModel.setGuardDangerousCommandEnabled(it) },
+                            onToggleLargeFile = { viewModel.setGuardLargeFileEnabled(it) },
+                            onTogglePathBoundary = { viewModel.setGuardPathBoundaryEnabled(it) },
+                            onToggleUsageCardItem = { viewModel.toggleUsageCardItem(it) },
+                            onOpenDiagnosis = { showDiagnosis = true },
+                            onOpenGuardLogs = { showGuardLogs = true },
+                            onManageRules = { showRuleManager = true },
+                            onExportConfig = {
+                                val json = viewModel.exportConfig()
+                                val cm = clipboardContext.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                cm.setPrimaryClip(android.content.ClipData.newPlainText("norm_flow_config", json))
+                            },
+                            onImportConfig = { showImportDialog = true }
+                        )
+                    }
+                }
                 SettingsSection.Backup -> {
                     val backupViewModel: com.mini.me_core.feature.backup.presentation.BackupViewModel =
                         androidx.hilt.navigation.compose.hiltViewModel()
@@ -472,6 +545,44 @@ fun SettingsScreen(
             }
         }
     }
+
+    // P3：导入配置对话框
+    if (showImportDialog) {
+        val importSuccessStr = stringResource(R.string.norm_flow_import_success)
+        val importFailedStr = stringResource(R.string.norm_flow_import_failed)
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showImportDialog = false; importText = ""; importResult = null },
+            title = { Text(stringResource(R.string.norm_flow_import_config)) },
+            text = {
+                Column {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = importText,
+                        onValueChange = { importText = it },
+                        label = { Text(stringResource(R.string.norm_flow_import_hint)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3
+                    )
+                    importResult?.let {
+                        Spacer(Modifier.height(Spacing.sm))
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    val ok = viewModel.importConfig(importText)
+                    importResult = if (ok) importSuccessStr else importFailedStr
+                    if (ok) { showImportDialog = false; importText = "" }
+                }) { Text(stringResource(R.string.norm_flow_import_config)) }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showImportDialog = false; importText = ""; importResult = null }) {
+                    Text(stringResource(R.string.norm_flow_asset_back))
+                }
+            }
+        )
+    }
+
 
     if (showMcpDialog) {
         McpServerEditDialog(
@@ -1070,44 +1181,76 @@ internal fun GroupMenuRow(
     }
 }
 
-/** 分组内开关行：无边框、无 Card，带 Switch。 */
+/** 分组内开关行：无边框、无 Card，带 Switch。可选 onViewClick 在 Switch 旁显示「查看」按钮。 */
 @Composable
 internal fun GroupSwitchRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
+    onViewClick: (() -> Unit)? = null,
+    isChild: Boolean = false,
+    valueSummary: String? = null
 ) {
-    Column {
+    val startPadding = if (isChild) Spacing.lg + 54.dp else Spacing.lg
+    Column(
+        modifier = Modifier.then(
+            if (!enabled) Modifier.alpha(0.4f) else Modifier
+        )
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.lg),
+                .padding(start = startPadding, end = Spacing.lg)
+                .padding(top = Spacing.sm, bottom = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val iconSize = if (isChild) 18.dp else 22.dp
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(iconSize)
             )
             Spacer(Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = if (isChild) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = if (isChild) MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                    else MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (valueSummary != null) {
+                    Text(
+                        text = valueSummary,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            if (onViewClick != null) {
+                IconButton(
+                    onClick = onViewClick,
+                    enabled = enabled
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = stringResource(R.string.norm_flow_asset_view),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange
+                onCheckedChange = onCheckedChange,
+                enabled = enabled
             )
         }
         HorizontalDivider(

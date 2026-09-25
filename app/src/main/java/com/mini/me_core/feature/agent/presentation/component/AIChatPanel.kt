@@ -678,6 +678,8 @@ fun AIChatPanel(
                 }
             }
 
+            NormFlowIndicatorBar(onClick = onNavigateToSettings)
+
             ChatInputBar(
                 value = inputText,
                 onValueChange = { inputText = it; viewModel.updateInputDraft(it) },
