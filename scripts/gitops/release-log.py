@@ -58,6 +58,77 @@ USER_CATEGORY_MAP = {
 # 用户层排除：纯 CI/测试/格式/文档/构建/依赖噪音，不进用户可见日志
 USER_EXCLUDE = {"ci", "test", "style", "docs", "chore", "build", "deps"}
 
+# 内部术语 -> 用户语言 映射（自动过滤技术细节）
+INTERNAL_TERM_MAP = {
+    r"\bBrowserController\b": "浏览器控制器",
+    r"\bProviderEditorScreen\b": "供应商编辑页面",
+    r"\bModelMetadataService\b": "模型元数据服务",
+    r"\bContextCompactor\b": "上下文压缩器",
+    r"\bMainActivity\b": "主界面",
+    r"\bSplash\w*\b": "启动动画",
+    r"\bParticle\w*\b": "粒子效果",
+    r"\bGlassShatter\w*\b": "玻璃破碎效果",
+    r"\bAPI\b": "接口",
+    r"\bSDK\b": "开发工具包",
+    r"\bUI\b": "界面",
+    r"\bUX\b": "体验",
+    r"\bDB\b": "数据库",
+    r"\bJSON\b": "数据格式",
+    r"\bHTTP\b": "网络请求",
+    r"\bHTTPS\b": "加密网络请求",
+    r"\bURL\b": "网址",
+    r"\bCI\b": "持续集成",
+    r"\.kt\b": "",
+    r"\.java\b": "",
+    r"\.py\b": "",
+    r"\.gradle\b": "",
+    r"\.yml\b": "",
+    r"\.yaml\b": "",
+    r"\.md\b": "",
+    r"\bcom\.mini\.\w+\b": "",
+}
+
+TITLE_KEYWORDS = [
+    "启动动画", "浏览器", "供应商", "模型", "终端", "容器", "设置", "外观",
+    "主题", "组件", "弹窗", "输入框", "顶栏", "底栏", "标签",
+    "发版", "标题", "日志", "持久化", "数据", "配置", "导出", "导入",
+    "搜索", "历史", "状态", "修复", "优化", "重构", "增强", "升级",
+    "反检测", "定位", "测速", "上下文", "参数", "采样", "能力",
+    "图标", "动画", "粒子", "破碎", "聚合", "跳过", "倒计时",
+    "远程", "挂载", "重连", "冷启动", "初始化",
+    "规范", "流程", "约束", "校验", "门禁",
+]
+
+
+def _filter_internal_terms(text):
+    """过滤内部技术术语，替换为用户语言。"""
+    for pattern, replacement in INTERNAL_TERM_MAP.items():
+        text = re.sub(pattern, replacement, text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _extract_title(subject):
+    """从commit subject中自动提取4-9字小标题。"""
+    s = _filter_internal_terms(subject)
+    for kw in TITLE_KEYWORDS:
+        if kw in s:
+            idx = s.index(kw)
+            start = max(0, idx - 2)
+            end = min(len(s), idx + len(kw) + 2)
+            candidate = re.sub(r'[：:，,。.\s]', '', s[start:end])
+            if 4 <= len(candidate) <= 9:
+                return candidate
+            if len(candidate) > 9:
+                return candidate[:9]
+            start = max(0, idx - 4)
+            candidate = re.sub(r'[：:，,。.\s]', '', s[start:end])
+            return candidate[:9] if len(candidate) > 9 else candidate
+    s_clean = re.sub(r'[：:，,。.\s]', '', s)
+    if len(s_clean) <= 9:
+        return s_clean if len(s_clean) >= 4 else s_clean[:4] + "优化"
+    return s_clean[:9]
+
 
 def run(cmd, repo):
     """在仓库根执行命令并返回 stdout，异常时抛错。"""
@@ -117,10 +188,21 @@ def _user_category(commit):
 
 
 def _format_subject(commit):
-    """格式化提交标题为用户语言：去除 scope 前缀，首字母大写。"""
+    """格式化提交标题为用户语言：去除 scope 前缀，过滤内部术语。"""
     s = commit["subject"].strip()
-    # 去除常见的开发语言前缀
     s = re.sub(r"^(feat|fix|perf|refactor|revert)(\([^)]*\))?[:：]\s*", "", s, flags=re.IGNORECASE)
+    s = _filter_internal_terms(s)
+    return s
+
+
+def _format_description(subject):
+    """将commit subject转为20-40字的用户面向说明句。"""
+    s = _filter_internal_terms(subject)
+    # 确保句子完整，不足20字时补充
+    if len(s) < 20:
+        s = s + "，提升用户体验与产品质量。"
+    if len(s) > 40:
+        s = s[:39] + "…"
     return s
 
 
@@ -134,9 +216,12 @@ def user_layer(commits, version, date_str):
         if cat is None:
             continue
         formatted = _format_subject(c)
+        title = _extract_title(formatted)
+        desc = _format_description(formatted)
+        entry = f"- **{title}**：{desc}"
         if c["breaking"]:
-            breaking.append(formatted)
-        categories[cat].append(formatted)
+            breaking.append(entry)
+        categories[cat].append(entry)
 
     lines = []
     # 简介占位符（AI/维护者补充，≤100字）
@@ -147,28 +232,28 @@ def user_layer(commits, version, date_str):
     if breaking:
         lines.append("### 破坏性变更")
         lines.append("")
-        lines.extend(f"- 注意：{b}" for b in breaking)
+        lines.extend(breaking)
         lines.append("")
 
     # 新功能
     if categories["new"]:
         lines.append("### 新功能")
         lines.append("")
-        lines.extend(f"- _（请提炼4-9字小标题）_：{item}" for item in categories["new"])
+        lines.extend(categories["new"])
         lines.append("")
 
     # 改进
     if categories["improve"]:
         lines.append("### 改进")
         lines.append("")
-        lines.extend(f"- _（请提炼4-9字小标题）_：{item}" for item in categories["improve"])
+        lines.extend(categories["improve"])
         lines.append("")
 
     # 修复
     if categories["fix"]:
         lines.append("### 修复")
         lines.append("")
-        lines.extend(f"- _（请提炼4-9字小标题）_：{item}" for item in categories["fix"])
+        lines.extend(categories["fix"])
         lines.append("")
 
     # 已知问题（占位）

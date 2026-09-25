@@ -292,6 +292,55 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 
 > **云端构建的完整运维手册**（CI 全流程 6 阶段 / 实时监控 GitHub API 命令 / 产物校验清单 / 签名 secrets 配置与回退说明）：见 **[docs/ci-release.md](./docs/ci-release.md)**。AI 或维护者推 Tag 发版后，必须按该手册实时监控并校验产物。
 
+#### 5. 发版完成 Checklist（强制 · 逐项核对）
+
+> **发版"完成"的唯一定义：以下所有项全部通过。任何一项未完成即视为发版未完成，必须继续处理。**
+
+**发版前（打 Tag 前）：**
+- [ ] 本地编译验证通过（`compileDebugKotlin` 0 error）
+- [ ] 所有代码变更已 commit 并 push 到 `main`
+- [ ] `scripts/gitops/release-log.py`、`AGENTS.md` 等发版相关脚本和规范的最新改动已提交到 `main`（CI 使用 Tag 指向 commit 中的脚本）
+- [ ] `CHANGELOG.md` 已更新，新增版本条目符合格式规范
+- [ ] 独立版本文档已创建，格式与 CHANGELOG 一致
+
+**发版后（CI 构建成功后）：**
+- [ ] CI 构建成功，APK 已上传到 Release Assets
+- [ ] APK 签名校验通过（非 debug 包，签名正确）
+- [ ] APK 大小在合理范围（约 80-90MB）
+- [ ] **Release 标题**符合格式：`{软件名} v{版本} — {更新概括}`（主应用 MiniMe-core，附属应用 MiniMe Logs，概括≤20字）
+- [ ] **Release 正文**已从草稿更新为完整格式，无占位符残留
+- [ ] 正文条目格式合规：每条为 `**4-9字小标题**：20-40字说明`
+- [ ] 正文无 emoji
+- [ ] 正文无内部技术术语（类名、文件名、包名、技术缩写）
+- [ ] 正文仅记录用户可感知的应用程序变更，无文档/CI/项目管理等元变更
+- [ ] 三处载体内容一致：GitHub Release 正文 = CHANGELOG.md = 独立版本文档
+- [ ] 运行 `python3 scripts/gitops/check-release-format.py --tag {tag}` 校验通过（退出码 0）
+
+#### 6. 发版格式校验工具
+
+项目提供自动化校验脚本，发版后必须运行：
+
+```bash
+# 校验指定版本
+python3 scripts/gitops/check-release-format.py --tag v0.0.0.19
+
+# 校验最新正式版本
+python3 scripts/gitops/check-release-format.py --latest
+
+# 校验附属应用
+python3 scripts/gitops/check-release-format.py --tag logviewer-v0.0.8 --app logviewer
+```
+
+**校验项：**
+1. 标题格式（软件名 + 版本 + 更新概括）
+2. 正文无占位符（请补充、请提炼）
+3. 条目格式（4-9字小标题 + 20-40字说明）
+4. 无 emoji
+5. 无内部技术术语
+6. 分类正确（新功能/改进/修复/移除/安全/已知问题）
+
+**CI 门禁：** CI 在创建 Release 前会执行硬校验（emoji、明显内部术语），不合规则构建失败。完整格式校验由发版后脚本负责，因为 CI 生成的是草稿，简介和小标题仍需人工补充。
+
 ## 架构概览
 
 应用采用基于功能的架构（Feature-based Architecture）与领域驱动设计（DDD）原则，重度依赖 Jetpack Compose（UI）、Hilt（依赖注入）、Kotlin Coroutines/Flow（异步）。

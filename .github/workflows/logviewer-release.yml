@@ -61,12 +61,46 @@ jobs:
           echo "--- APK size ---"
           ls -lh "$APK"
 
+      # 生成附属应用发版说明草稿（与主应用共用 release-log.py，只取 logviewer-v* tag 之间的 commit）
+      - name: Generate release notes
+        id: changelog
+        run: |
+          set -e
+          cur_tag="${GITHUB_REF_NAME}"
+          prev_tag=$(git tag --sort=-creatordate | grep '^logviewer-v' | grep -v "^${cur_tag}$" | head -1)
+          version="${cur_tag#logviewer-v}"
+          delimiter="EOF_$(date +%s)"
+          {
+            echo "body<<${delimiter}"
+            python3 scripts/gitops/release-log.py \
+              --prev "$prev_tag" \
+              --cur "$cur_tag" \
+              --version "$version" \
+              --date "$(date +%Y-%m-%d)"
+            echo ""
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
+
+      # 发版格式硬校验门禁（与主应用一致）
+      - name: Validate release notes (hard checks)
+        run: |
+          set -e
+          body="${{ steps.changelog.outputs.body }}"
+          echo "--- 硬校验：emoji ---"
+          if echo "$body" | grep -qP '[\x{1F300}-\x{1F9FF}]|[\x{2600}-\x{27BF}]'; then
+            echo "::error::Release 正文包含 emoji，违反发版规范"
+            exit 1
+          fi
+          echo "  PASS: 无 emoji"
+          echo "--- 硬校验完成 ---"
+
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           # 标题基础格式「MiniMe Logs v{版本号}」，发版后必须手动补充「— 更新内容概括」（≤20字，用户语言）
           name: MiniMe Logs v${{ env.LOGVIEWER_VER }}
+          body: ${{ steps.changelog.outputs.body }}
           files: |
             ${{ steps.rename.outputs.apk }}
         env:

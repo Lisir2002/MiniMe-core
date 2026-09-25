@@ -303,6 +303,29 @@ jobs:
             echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
 
+      # 发版格式硬校验门禁（CI层）：检查草稿中的硬错误，阻止明显违规的 Release 创建。
+      # 完整格式校验（占位符、条目字数等）由发版后 scripts/gitops/check-release-format.py 负责，
+      # 因为 CI 生成的是草稿，简介和小标题仍需人工补充。
+      - name: Validate release notes (hard checks)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -e
+          body="${{ steps.changelog.outputs.body }}"
+          echo "--- 硬校验：emoji ---"
+          if echo "$body" | grep -qP '[\x{1F300}-\x{1F9FF}]|[\x{2600}-\x{27BF}]'; then
+            echo "::error::Release 正文包含 emoji，违反发版规范"
+            exit 1
+          fi
+          echo "  PASS: 无 emoji"
+          echo "--- 硬校验：内部技术术语（类名/文件名）---"
+          # 检查常见的内部术语模式：Kotlin/Java类名、文件路径、技术缩写
+          if echo "$body" | grep -qE '\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\.(kt|java|py)\b|\bcom\.mini\.\w+\b|\.kt\b|\.gradle\b'; then
+            echo "::warning::Release 正文可能包含内部技术术语（类名/文件名），请人工复核"
+          else
+            echo "  PASS: 未检测到明显内部术语"
+          fi
+          echo "--- 硬校验完成 ---"
+
       - name: Create GitHub Release & Upload assets
         uses: softprops/action-gh-release@v2
         id: gh_release
