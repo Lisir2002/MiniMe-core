@@ -590,6 +590,9 @@
     <string name="browser_zoom_less">缩小</string>
     <string name="browser_zoom_more">放大</string>
     <string name="browser_zoom_reset">重置</string>
+    <string name="browser_address_bar_position">地址栏位置</string>
+    <string name="browser_address_bar_top">顶部</string>
+    <string name="browser_address_bar_bottom">底部</string>
     <string name="browser_open">打开</string>
     <string name="browser_retry">重试</string>
     <string name="browser_open_failed">没有可打开该文件的应用</string>

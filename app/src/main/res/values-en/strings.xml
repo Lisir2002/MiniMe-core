@@ -568,6 +568,9 @@
     <string name="browser_zoom_less">Zoom out</string>
     <string name="browser_zoom_more">Zoom in</string>
     <string name="browser_zoom_reset">Reset</string>
+    <string name="browser_address_bar_position">Address bar position</string>
+    <string name="browser_address_bar_top">Top</string>
+    <string name="browser_address_bar_bottom">Bottom</string>
     <string name="browser_open">Open</string>
     <string name="browser_retry">Retry</string>
     <string name="browser_open_failed">No app can open this file</string>

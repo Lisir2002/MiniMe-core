@@ -137,6 +137,22 @@ class BrowserController @Inject constructor(
                 }
                 return '';
               }
+              function computeAccessibleName(el) {
+                var label = resolveLabel(el);
+                if (label) return label;
+                var tag = el.tagName.toLowerCase();
+                if (tag === 'button' || tag === 'a' || tag === 'summary') {
+                  var t = txt(el);
+                  if (t) return t;
+                }
+                if (tag === 'input' || tag === 'textarea') {
+                  var ph = (el.getAttribute('placeholder') || '').trim();
+                  if (ph) return ph;
+                }
+                var nm = (el.getAttribute('name') || '').trim();
+                if (nm) return nm;
+                return '';
+              }
               // CSS 绝对路径：html > body > div#main > form > div:nth-child(2) > input
               function cssPath(el) {
                 if (!el || el.nodeType !== 1) return '';
@@ -213,6 +229,7 @@ class BrowserController @Inject constructor(
                   else if (tag === 'select') kind = 'select';
                   else if (tag === 'textarea') kind = 'textarea';
                   var label = resolveLabel(el);
+                  var accessibleName = computeAccessibleName(el);
                   var visibleText = (tag === 'input' || tag === 'textarea') ? '' : txt(el);
                   var value = (tag === 'input' || tag === 'textarea') ? (sensitive ? '' : (el.value || '')) : '';
                   var options = [];
@@ -239,6 +256,7 @@ class BrowserController @Inject constructor(
                     type: type,
                     name: el.getAttribute('name') || '',
                     label: label,
+                    accessibleName: accessibleName,
                     text: visibleText.slice(0, 200),
                     value: value.slice(0, 200),
                     href: el.getAttribute('href') || '',
@@ -283,31 +301,72 @@ class BrowserController @Inject constructor(
             })();
         """
 
-        /** 滚动 JS。 */
+        /** 滚动 JS（easeOutCubic 缓动，页面侧自行执行动画，Kotlin 侧 delay 后取快照）。 */
         const val JS_SCROLL = """
             (function() {
               var d = arguments[0];
               var h = window.innerHeight || 600;
-              if (d === 'top') window.scrollTo(0, 0);
-              else if (d === 'bottom') window.scrollTo(0, document.body.scrollHeight);
-              else if (d === 'up') window.scrollBy(0, -Math.floor(h * 0.8));
-              else window.scrollBy(0, Math.floor(h * 0.8));
+              var startY = window.scrollY;
+              var endY = startY, duration = 400;
+              if (d === 'top') { endY = 0; duration = 500; }
+              else if (d === 'bottom') { endY = document.body.scrollHeight; duration = 600; }
+              else if (d === 'up') { endY = startY - Math.floor(h * 0.8); duration = 400; }
+              else { endY = startY + Math.floor(h * 0.8); duration = 400; }
+              endY = Math.max(0, Math.min(endY, document.body.scrollHeight - h));
+              function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+              var startTime = null;
+              function step(ts) {
+                if (!startTime) startTime = ts;
+                var elapsed = ts - startTime;
+                var t = Math.min(elapsed / duration, 1);
+                window.scrollTo(0, startY + (endY - startY) * easeOutCubic(t));
+                if (t < 1) requestAnimationFrame(step);
+              }
+              requestAnimationFrame(step);
               return window.scrollY;
             })();
         """
 
-        /** 点击元素 JS。 */
-        const val JS_CLICK = """
+        /** 获取元素中心坐标并 scrollIntoView（点击前准备）。 */
+        const val JS_GET_ELEMENT_CENTER = """
             (function() {
               var id = arguments[0];
               var el = document.querySelector('[data-rcb-id="' + id + '"]');
               if (!el) return JSON.stringify({ok:false, reason:'NOT_FOUND'});
-              el.scrollIntoView({block:'center', behavior:'smooth'});
+              el.scrollIntoView({block:'center', behavior:'instant'});
               var r = el.getBoundingClientRect();
-              var x = r.left + r.width / 2, y = r.top + r.height / 2;
-              ['pointerdown','mousedown','pointerup','mouseup','click'].forEach(function(t) {
-                el.dispatchEvent(new MouseEvent(t, {bubbles:true, cancelable:true, view:window, clientX:x, clientY:y}));
-              });
+              return JSON.stringify({ok:true, x: r.left + r.width / 2, y: r.top + r.height / 2});
+            })();
+        """
+
+        /** 触发 mousemove 到指定视口坐标（贝塞尔轨迹中间步）。 */
+        const val JS_MOUSE_MOVE = """
+            (function() {
+              var x = arguments[0], y = arguments[1];
+              if (!window.__rcb_mouse_pos) window.__rcb_mouse_pos = {x: window.innerWidth / 2, y: window.innerHeight / 2};
+              var from = window.__rcb_mouse_pos;
+              var over = document.elementFromPoint(x, y);
+              var target = over || document.body;
+              target.dispatchEvent(new MouseEvent('mouseover', {bubbles:true, cancelable:true, view:window, clientX:x, clientY:y}));
+              target.dispatchEvent(new MouseEvent('mouseenter', {bubbles:true, cancelable:true, view:window, clientX:x, clientY:y}));
+              document.dispatchEvent(new MouseEvent('mousemove', {bubbles:true, cancelable:true, view:window, clientX:x, clientY:y}));
+              window.__rcb_mouse_pos = {x: x, y: y};
+              return 'ok';
+            })();
+        """
+
+        /** 在指定坐标对元素触发完整点击事件序列（贝塞尔轨迹终点）。 */
+        const val JS_CLICK_AT = """
+            (function() {
+              var id = arguments[0], x = arguments[1], y = arguments[2];
+              var el = document.querySelector('[data-rcb-id="' + id + '"]');
+              if (!el) return JSON.stringify({ok:false, reason:'NOT_FOUND'});
+              el.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, cancelable:true, view:window, clientX:x, clientY:y, pointerType:'mouse'}));
+              el.dispatchEvent(new MouseEvent('mousedown', {bubbles:true, cancelable:true, view:window, clientX:x, clientY:y}));
+              el.dispatchEvent(new PointerEvent('pointerup', {bubbles:true, cancelable:true, view:window, clientX:x, clientY:y, pointerType:'mouse'}));
+              el.dispatchEvent(new MouseEvent('mouseup', {bubbles:true, cancelable:true, view:window, clientX:x, clientY:y}));
+              el.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true, view:window, clientX:x, clientY:y}));
+              window.__rcb_mouse_pos = {x: x, y: y};
               return JSON.stringify({ok:true});
             })();
         """
@@ -343,55 +402,202 @@ class BrowserController @Inject constructor(
         """
 
         /**
-         * 三级定位 JS（R2.2）：把模型传入的 element_id（data-rcb-id / CSS 绝对路径 / 语义描述符
-         * 三者任一）解析成元素并返回其 data-rcb-id。
-         * 解析顺序：`[data-rcb-id]` 直查 → CSS 路径 querySelector → 语义（role=… name=… index=…）匹配。
-         * 命中且元素尚无 id 时补打新 data-rcb-id（单调递增，保证后续操作可用同一 id）。
+         * 四级定位 JS：把模型传入的 element_id 解析成元素的 data-rcb-id。
+         * 解析优先级：
+         *   1. role+name 语义定位（role=button,name=Submit 或带 :nth(N)/,index=N）
+         *   2. data-rcb-id 直查
+         *   3. CSS 绝对路径 / 选择器
+         *   4. 旧版语义描述符（role=... name="..." index=N，向后兼容）
+         * 严格模式：role+name 或 CSS 匹配多个元素时报错，需用 :nth(N) 或 index=N 指定。
          */
         const val JS_LOCATE = """
             (function() {
               var loc = arguments[0];
               if (!loc) return JSON.stringify({ok:false, reason:'EMPTY'});
               function nextId() { if (!window.__rcb_seq) window.__rcb_seq = 0; return String(++window.__rcb_seq); }
-              // 1) data-rcb-id 直查
-              try {
-                var byId = document.querySelector('[data-rcb-id="' + loc + '"]');
-                if (byId) return JSON.stringify({ok:true, id: byId.getAttribute('data-rcb-id'), method:'id'});
-              } catch (e) {}
-              // 2) CSS 绝对路径 / 选择器
-              try {
-                var byCss = document.querySelector(loc);
-                if (byCss && byCss.getAttribute('data-rcb-skip') === null) {
-                  var cid = byCss.getAttribute('data-rcb-id');
-                  if (!cid) { cid = nextId(); byCss.setAttribute('data-rcb-id', cid); }
-                  return JSON.stringify({ok:true, id: cid, method:'css'});
+              function markId(el) {
+                var sid = el.getAttribute('data-rcb-id');
+                if (!sid) { sid = nextId(); el.setAttribute('data-rcb-id', sid); }
+                return sid;
+              }
+              function tagToRole(tag, type) {
+                if (tag === 'a') return 'link';
+                if (tag === 'button') return 'button';
+                if (tag === 'input') {
+                  if (type === 'checkbox') return 'checkbox';
+                  if (type === 'radio') return 'radio';
+                  if (type === 'submit' || type === 'button') return 'button';
+                  if (type === 'password' || type === 'email' || type === 'tel' || type === 'url' || type === 'search' || type === 'number') return 'textbox';
+                  return 'input';
                 }
-              } catch (e) {}
-              // 3) 语义描述符 role=… name=… index=…
-              var m = loc.match(/^role=([\w-]+)\s+name="?([^"]*?)"?\s+index=(\d+)$/i);
-              if (m) {
-                var role = m[1].toLowerCase(), name = m[2].trim(), index = parseInt(m[3], 10);
-                var nodes = document.querySelectorAll('a,button,input,select,textarea,[role]');
-                var n = 0;
+                if (tag === 'select') return 'combobox';
+                if (tag === 'textarea') return 'textbox';
+                if (tag === 'img') return 'img';
+                return tag;
+              }
+              function elRole(el) {
+                var tag = el.tagName.toLowerCase();
+                var type = (el.getAttribute('type') || '').toLowerCase();
+                return (el.getAttribute('role') || tagToRole(tag, type)).toLowerCase();
+              }
+              function elName(el) {
+                var al = (el.getAttribute('aria-label') || '').trim();
+                if (al) return al;
+                var lb = el.getAttribute('aria-labelledby');
+                if (lb) {
+                  var parts = [], ns = lb.split(/\s+/);
+                  for (var i = 0; i < ns.length; i++) {
+                    var ref = document.getElementById(ns[i]);
+                    if (ref) { var t = (ref.innerText || ref.textContent || '').replace(/\\s+/g, ' ').trim(); if (t) parts.push(t); }
+                  }
+                  if (parts.length) return parts.join(' ');
+                }
+                var fid = el.id || el.name;
+                if (fid) {
+                  try {
+                    var lab = document.querySelector('label[for="' + fid + '"]');
+                    if (lab) { var t = (lab.innerText || lab.textContent || '').replace(/\\s+/g, ' ').trim(); if (t) return t; }
+                  } catch (e) {}
+                }
+                if (el.closest) {
+                  var parent = el.closest('label');
+                  if (parent) { var t2 = (parent.innerText || parent.textContent || '').replace(/\\s+/g, ' ').trim(); if (t2) return t2; }
+                }
+                var tag = el.tagName.toLowerCase();
+                if (tag === 'button' || tag === 'a' || tag === 'summary' || tag === 'li') {
+                  var t3 = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+                  if (t3) return t3;
+                }
+                if (tag === 'input' || tag === 'textarea') {
+                  var ph = (el.getAttribute('placeholder') || '').trim();
+                  if (ph) return ph;
+                }
+                var nm = (el.getAttribute('name') || '').trim();
+                if (nm) return nm;
+                return '';
+              }
+
+              // Parse :nth(N) suffix
+              var nthMatch = loc.match(/^(.*?):nth\\((\\d+)\\)$/);
+              var baseLoc = loc, explicitIndex = -1;
+              if (nthMatch) { baseLoc = nthMatch[1]; explicitIndex = parseInt(nthMatch[2], 10); }
+
+              // 1) role+name semantic locator (highest priority)
+              var rnMatch = baseLoc.match(/^role=([\\w-]+)\\s*,\\s*name=([^,]+?)(?:\\s*,\\s*index=(\\d+))?$/i);
+              if (rnMatch) {
+                var role = rnMatch[1].toLowerCase();
+                var name = rnMatch[2].trim();
+                if (explicitIndex < 0 && rnMatch[3]) explicitIndex = parseInt(rnMatch[3], 10);
+                var nodes = document.querySelectorAll('a,button,input,select,textarea,[role],[contenteditable="true"],summary,li,h1,h2,h3,h4,h5,h6,img');
+                var exactMatches = [], containsMatches = [];
                 for (var i = 0; i < nodes.length; i++) {
                   var e = nodes[i];
                   if (e.closest && e.closest('[data-rcb-skip]')) continue;
                   var tag = e.tagName.toLowerCase();
-                  if (tag === 'INPUT' && e.type === 'hidden') continue;
-                  var r = (e.getAttribute('role') || (tag === 'a' ? 'link' : (tag === 'input' ? 'input' : tag))).toLowerCase();
+                  if (tag === 'input' && e.type === 'hidden') continue;
+                  var r = elRole(e);
                   if (r !== role) continue;
-                  var nm = (e.getAttribute('aria-label') || (tag === 'a' || tag === 'button' ? (e.innerText || '') : (e.getAttribute('name') || ''))).trim();
-                  if (nm !== name) continue;
+                  var en = elName(e);
+                  if (en === name) exactMatches.push(e);
+                  else if (en.toLowerCase().indexOf(name.toLowerCase()) >= 0) containsMatches.push(e);
+                }
+                var matches = exactMatches.length > 0 ? exactMatches : containsMatches;
+                var method = exactMatches.length > 0 ? 'role_exact' : 'role_contains';
+                if (matches.length === 0) {
+                  return JSON.stringify({ok:false, reason:'NOT_FOUND', message:'No element with role=' + role + ' name=' + name});
+                }
+                var target;
+                if (explicitIndex >= 0) {
+                  if (explicitIndex >= matches.length) {
+                    return JSON.stringify({ok:false, reason:'INDEX_OUT_OF_RANGE', matchCount:matches.length, message:'Index ' + explicitIndex + ' out of range, total ' + matches.length});
+                  }
+                  target = matches[explicitIndex];
+                } else if (matches.length === 1) {
+                  target = matches[0];
+                } else {
+                  return JSON.stringify({ok:false, reason:'STRICT_MODE', matchCount:matches.length, message:'Locator not unique, matched ' + matches.length + ' elements, use :nth(N) or index=N'});
+                }
+                var sid = markId(target);
+                return JSON.stringify({ok:true, id:sid, method:method, matchCount:matches.length});
+              }
+
+              // 2) data-rcb-id direct lookup
+              try {
+                var byId = document.querySelector('[data-rcb-id="' + loc + '"]');
+                if (byId) return JSON.stringify({ok:true, id: byId.getAttribute('data-rcb-id'), method:'id', matchCount:1});
+              } catch (e) {}
+
+              // 3) CSS absolute path / selector
+              try {
+                var cssResults = document.querySelectorAll(loc);
+                if (cssResults.length > 0) {
+                  var cssTarget;
+                  if (cssResults.length === 1) {
+                    cssTarget = cssResults[0];
+                  } else if (explicitIndex >= 0 && explicitIndex < cssResults.length) {
+                    cssTarget = cssResults[explicitIndex];
+                  } else {
+                    return JSON.stringify({ok:false, reason:'STRICT_MODE', matchCount:cssResults.length, message:'CSS matched ' + cssResults.length + ' elements, use :nth(N)'});
+                  }
+                  if (cssTarget.getAttribute('data-rcb-skip') === null) {
+                    var cid = markId(cssTarget);
+                    return JSON.stringify({ok:true, id:cid, method:'css', matchCount:cssResults.length});
+                  }
+                }
+              } catch (e) {}
+
+              // 4) Legacy semantic descriptor: role=... name="..." index=N
+              var m = loc.match(/^role=([\\w-]+)\\s+name="?([^"]*?)"?\\s+index=(\\d+)$/i);
+              if (m) {
+                var role2 = m[1].toLowerCase(), name2 = m[2].trim(), index2 = parseInt(m[3], 10);
+                var nodes2 = document.querySelectorAll('a,button,input,select,textarea,[role]');
+                var n = 0;
+                for (var j = 0; j < nodes2.length; j++) {
+                  var e2 = nodes2[j];
+                  if (e2.closest && e2.closest('[data-rcb-skip]')) continue;
+                  var tag2 = e2.tagName.toLowerCase();
+                  if (tag2 === 'input' && e2.type === 'hidden') continue;
+                  var r2 = (e2.getAttribute('role') || (tag2 === 'a' ? 'link' : (tag2 === 'input' ? 'input' : tag2))).toLowerCase();
+                  if (r2 !== role2) continue;
+                  var nm2 = (e2.getAttribute('aria-label') || (tag2 === 'a' || tag2 === 'button' ? (e2.innerText || '') : (e2.getAttribute('name') || ''))).trim();
+                  if (nm2 !== name2) continue;
                   n++;
-                  if (n === index) {
-                    var sid = e.getAttribute('data-rcb-id');
-                    if (!sid) { sid = nextId(); e.setAttribute('data-rcb-id', sid); }
-                    return JSON.stringify({ok:true, id: sid, method:'semantic'});
+                  if (n === index2) {
+                    var sid2 = markId(e2);
+                    return JSON.stringify({ok:true, id: sid2, method:'semantic', matchCount:1});
                   }
                 }
                 return JSON.stringify({ok:false, reason:'SEMANTIC_NOT_FOUND'});
               }
               return JSON.stringify({ok:false, reason:'NOT_FOUND'});
+            })();
+        """
+
+        /**
+         * 元素可交互性检查 JS：在 click/type 前检查元素是否 attached/visible/enabled/receiving events。
+         * 返回 {ok:true} 或 {ok:false, reason:'NOT_FOUND'|'NOT_VISIBLE'|'DISABLED'|'OVERLAPPED', detail:...}。
+         */
+        const val JS_ACTIONABILITY = """
+            (function() {
+              var id = arguments[0];
+              var skipOverlap = arguments[1] === true;
+              var el = document.querySelector('[data-rcb-id="' + id + '"]');
+              if (!el) return JSON.stringify({ok:false, reason:'NOT_FOUND'});
+              var rect = el.getBoundingClientRect();
+              if (rect.width < 1 || rect.height < 1) return JSON.stringify({ok:false, reason:'NOT_VISIBLE', detail:'zero size'});
+              var cs = window.getComputedStyle(el);
+              if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0)
+                return JSON.stringify({ok:false, reason:'NOT_VISIBLE', detail:'hidden style'});
+              if (el.disabled || el.getAttribute('aria-disabled') === 'true')
+                return JSON.stringify({ok:false, reason:'DISABLED'});
+              if (!skipOverlap) {
+                var x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+                var top;
+                try { top = document.elementFromPoint(x, y); } catch(e) { top = null; }
+                if (top && top !== el && !el.contains(top))
+                  return JSON.stringify({ok:false, reason:'OVERLAPPED', detail: top.tagName});
+              }
+              return JSON.stringify({ok:true});
             })();
         """
 
@@ -810,26 +1016,137 @@ class BrowserController @Inject constructor(
         """
 
         /**
-         * 反检测 JS：在 onPageStarted 中注入，覆盖 navigator.webdriver / plugins / languages /
-         * window.chrome / permissions.query 等自动化检测特征，降低被网站识别为机器人的概率。
+         * 反检测 JS（document-start 注入）：覆盖 navigator.webdriver / plugins / mimeTypes /
+         * languages / permissions.query / hardwareConcurrency / deviceMemory / window.chrome.runtime /
+         * WebGL 指纹等自动化检测特征，降低被网站识别为机器人的概率。
+         * 通过 addDocumentStartJavaScript 在任何页面脚本之前执行。
          */
         const val JS_ANTI_DETECT = """
-            (function(){
-              Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-              Object.defineProperty(navigator, 'plugins', { get: () => [
-                {name:'Chrome PDF Plugin',filename:'internal-pdf-viewer'},
-                {name:'Chrome PDF Viewer',filename:'mhjfbmdgcfjbbpaeojofohoefgiehjai'},
-                {name:'Native Client',filename:'internal-nacl-plugin'},
-                {name:'Widevine Content Decryption Module',filename:'widevinecdmadapter.so'},
-                {name:'Shockwave Flash',filename:'pepflashplayer.so'}
-              ]});
-              Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN','zh','en'] });
-              window.chrome = { runtime: {} };
-              var originalQuery = window.navigator.permissions.query;
-              window.navigator.permissions.query = function(parameters) {
-                return parameters.name === 'notifications' ? Promise.resolve({ state: Notification.permission }) : originalQuery(parameters);
+            (function() {
+              try {
+                Object.defineProperty(Navigator.prototype, 'webdriver', {
+                  get: function() { return undefined; },
+                  configurable: true
+                });
+              } catch(e) {}
+              try {
+                Object.defineProperty(navigator, 'webdriver', {
+                  get: function() { return undefined; },
+                  configurable: true
+                });
+              } catch(e) {}
+
+              function makeMimeType(type, suffixes, description, enabledPlugin) {
+                var mt = Object.create(MimeType.prototype);
+                Object.defineProperty(mt, 'type', { get: function() { return type; }, configurable: true });
+                Object.defineProperty(mt, 'suffixes', { get: function() { return suffixes; }, configurable: true });
+                Object.defineProperty(mt, 'description', { get: function() { return description; }, configurable: true });
+                Object.defineProperty(mt, 'enabledPlugin', { get: function() { return enabledPlugin; }, configurable: true });
+                return mt;
+              }
+              function makePlugin(name, filename, description, mimes) {
+                var p = Object.create(Plugin.prototype);
+                Object.defineProperty(p, 'name', { get: function() { return name; }, configurable: true });
+                Object.defineProperty(p, 'filename', { get: function() { return filename; }, configurable: true });
+                Object.defineProperty(p, 'description', { get: function() { return description; }, configurable: true });
+                Object.defineProperty(p, 'length', { get: function() { return mimes.length; }, configurable: true });
+                for (var i = 0; i < mimes.length; i++) {
+                  (function(idx, m) {
+                    Object.defineProperty(p, idx, { get: function() { return m; }, configurable: true });
+                  })(i, mimes[i]);
+                }
+                return p;
+              }
+              var pdfMime1 = makeMimeType('application/pdf', 'pdf', 'Portable Document Format', null);
+              var pdfMime2 = makeMimeType('application/pdf', 'pdf', 'Portable Document Format', null);
+              var naclMime1 = makeMimeType('application/x-nacl', 'nexe', 'Native Client Executable', null);
+              var naclMime2 = makeMimeType('application/x-pnacl', 'nexe', 'Portable Native Client Executable', null);
+              var pdfPlugin1 = makePlugin('Chrome PDF Plugin', 'internal-pdf-viewer', 'Portable Document Format', [pdfMime1]);
+              var pdfPlugin2 = makePlugin('Chrome PDF Viewer', 'mhjfbmdgcfjbbpaeojofohoefgiehjai', '', [pdfMime2]);
+              var naclPlugin = makePlugin('Native Client', 'internal-nacl-plugin', '', [naclMime1, naclMime2]);
+              pdfMime1 = makeMimeType('application/pdf', 'pdf', 'Portable Document Format', pdfPlugin1);
+              pdfMime2 = makeMimeType('application/pdf', 'pdf', 'Portable Document Format', pdfPlugin2);
+              naclMime1 = makeMimeType('application/x-nacl', 'nexe', 'Native Client Executable', naclPlugin);
+              naclMime2 = makeMimeType('application/x-pnacl', 'nexe', 'Portable Native Client Executable', naclPlugin);
+              pdfPlugin1 = makePlugin('Chrome PDF Plugin', 'internal-pdf-viewer', 'Portable Document Format', [pdfMime1]);
+              pdfPlugin2 = makePlugin('Chrome PDF Viewer', 'mhjfbmdgcfjbbpaeojofohoefgiehjai', '', [pdfMime2]);
+              naclPlugin = makePlugin('Native Client', 'internal-nacl-plugin', '', [naclMime1, naclMime2]);
+              var pluginArray = [pdfPlugin1, pdfPlugin2, naclPlugin];
+              var mimeArray = [pdfMime1, pdfMime2, naclMime1, naclMime2];
+              try {
+                Object.defineProperty(navigator, 'plugins', {
+                  get: function() { return pluginArray; },
+                  configurable: true
+                });
+                Object.defineProperty(navigator, 'mimeTypes', {
+                  get: function() { return mimeArray; },
+                  configurable: true
+                });
+              } catch(e) {}
+
+              try {
+                Object.defineProperty(navigator, 'languages', {
+                  get: function() { return ['zh-CN', 'zh', 'en']; },
+                  configurable: true
+                });
+              } catch(e) {}
+
+              try {
+                var originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = function(parameters) {
+                  if (parameters.name === 'notifications') {
+                    return Promise.resolve({ state: Notification.permission });
+                  }
+                  return originalQuery.call(window.navigator.permissions, parameters);
+                };
+              } catch(e) {}
+
+              try {
+                Object.defineProperty(navigator, 'hardwareConcurrency', {
+                  get: function() { return 8; },
+                  configurable: true
+                });
+              } catch(e) {}
+
+              try {
+                Object.defineProperty(navigator, 'deviceMemory', {
+                  get: function() { return 8; },
+                  configurable: true
+                });
+              } catch(e) {}
+
+              window.chrome = window.chrome || {};
+              window.chrome.runtime = window.chrome.runtime || {
+                OnInstalledReason: { CHROME_UPDATE: 'chrome_update', INSTALL: 'install', SHARED_MODULE_UPDATE: 'shared_module_update', UPDATE: 'update' },
+                OnRestartRequiredReason: { APP_UPDATE: 'app_update', OS_UPDATE: 'os_update', PERIODIC: 'periodic' },
+                PlatformArch: { ARM: 'arm', ARM64: 'arm64', MIPS: 'mips', MIPS64: 'mips64', X86_32: 'x86-32', X86_64: 'x86-64' },
+                PlatformNaclArch: { ARM: 'arm', MIPS: 'mips', X86_32: 'x86-32', X86_64: 'x86-64' },
+                PlatformOs: { ANDROID: 'android', CROS: 'cros', LINUX: 'linux', MAC: 'mac', OPENBSD: 'openbsd', WIN: 'win' },
+                RequestUpdateCheckStatus: { NO_UPDATE: 'no_update', THROTTLED: 'throttled', UPDATE_AVAILABLE: 'update_available' },
+                connect: function() { return { onDisconnect: { addListener: function() {} }, onMessage: { addListener: function() {} }, postMessage: function() {} }; },
+                sendMessage: function() {},
+                getManifest: function() { return {}; },
+                getURL: function(path) { return 'chrome-extension://' + path; },
+                id: ''
               };
-            })()
+
+              try {
+                var getParameter = WebGLRenderingContext.prototype.getParameter;
+                WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                  if (parameter === 37445) return 'Intel Inc.';
+                  if (parameter === 37446) return 'Intel Iris OpenGL Engine';
+                  return getParameter.apply(this, arguments);
+                };
+              } catch(e) {}
+              try {
+                var getParameter2 = WebGL2RenderingContext.prototype.getParameter;
+                WebGL2RenderingContext.prototype.getParameter = function(parameter) {
+                  if (parameter === 37445) return 'Intel Inc.';
+                  if (parameter === 37446) return 'Intel Iris OpenGL Engine';
+                  return getParameter2.apply(this, arguments);
+                };
+              } catch(e) {}
+            })();
         """
 
         /**
@@ -1278,9 +1595,9 @@ class BrowserController @Inject constructor(
     }
 
     /**
-     * 三级定位解析（R2.2）：把模型传入的 element_id（data-rcb-id / CSS 绝对路径 / 语义描述符
-     * 三者任一）解析成元素的 data-rcb-id。
-     * @return null 表示全部解析失败；否则返回（id, 命中方式）。
+     * 四级定位解析：把模型传入的 element_id（role+name / data-rcb-id / CSS / 旧版语义）
+     * 解析成元素的 data-rcb-id。
+     * @return null 表示全部解析失败；否则返回（id, 命中方式, 匹配数）。
      */
     suspend fun resolveElementId(locator: String): ResolvedElement? = mutex.withLock {
         val raw = evalJs("($JS_LOCATE)(${quote(locator)})")
@@ -1289,7 +1606,33 @@ class BrowserController @Inject constructor(
         if (!ok) return@withLock null
         val id = (obj["id"] as? JsonPrimitive)?.content ?: return@withLock null
         val method = (obj["method"] as? JsonPrimitive)?.content ?: "id"
-        ResolvedElement(id, method)
+        val matchCount = runCatching { (obj["matchCount"] as? JsonPrimitive)?.content?.toInt() }.getOrNull() ?: 1
+        ResolvedElement(id, method, matchCount)
+    }
+
+    /**
+     * 元素可交互性等待：最多等待 timeoutMs，每 intervalMs 重试 JS_ACTIONABILITY。
+     * 元素不在视口内时先 scrollIntoView。skipOverlap=true 时跳过遮挡检查（输入框可能被键盘遮挡）。
+     * @return null 表示超时仍不可交互；否则返回失败原因字符串（成功时返回 null）。
+     */
+    private suspend fun waitForActionable(id: String, skipOverlap: Boolean = false, timeoutMs: Long = 5000): String? {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var lastReason: String? = null
+        while (System.currentTimeMillis() < deadline) {
+            val raw = evalJs("($JS_ACTIONABILITY)(${quote(id)}, ${if (skipOverlap) "true" else "false"})")
+            val obj = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull()
+            val ok = runCatching { (obj?.get("ok") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+            if (ok) return null
+            val reason = (obj?.get("reason") as? JsonPrimitive)?.content ?: "UNKNOWN"
+            val detail = (obj?.get("detail") as? JsonPrimitive)?.content ?: ""
+            lastReason = "$reason${if (detail.isNotBlank()) " ($detail)" else ""}"
+            // NOT_VISIBLE 时尝试 scrollIntoView
+            if (reason == "NOT_VISIBLE") {
+                evalJs("(function(){var el=document.querySelector('[data-rcb-id=" + quote(id) + "']'); if(el) el.scrollIntoView({block:'center'});})()")
+            }
+            delay(100)
+        }
+        return lastReason ?: "timeout waiting for element to become actionable"
     }
 
     /**
@@ -1377,11 +1720,42 @@ class BrowserController @Inject constructor(
             val resolved = resolveElementId(elementId)
             if (resolved == null) {
                 recordAction("click", "失败：元素未找到（$elementId）")
-                return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 未找到：data-rcb-id / CSS 路径 / 语义均未命中")
+                return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 未找到：data-rcb-id / role+name / CSS 均未命中")
+            }
+            // 可交互性等待：最多 5 秒，每 100ms 重试
+            val notActionable = waitForActionable(resolved.id, skipOverlap = false)
+            if (notActionable != null) {
+                recordAction("click", "失败：元素不可交互（$notActionable）")
+                return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 不可交互：$notActionable")
             }
             // 反检测：点击前随机延迟 100-300ms，模拟人类操作
             delay((100..300).random().toLong())
-            evalJs("($JS_CLICK)(${quote(resolved.id)})")
+            // 鼠标移动轨迹：获取元素中心坐标，从当前鼠标位置贝塞尔曲线移动过去
+            val centerRaw = evalJs("($JS_GET_ELEMENT_CENTER)(${quote(resolved.id)})")
+            val centerObj = runCatching { json.parseToJsonElement(centerRaw).jsonObject }.getOrNull()
+            val targetX = runCatching { (centerObj?.get("x") as? JsonPrimitive)?.content?.toDouble() }.getOrNull() ?: 0.0
+            val targetY = runCatching { (centerObj?.get("y") as? JsonPrimitive)?.content?.toDouble() }.getOrNull() ?: 0.0
+            // 获取当前鼠标位置
+            val mouseRaw = evalJs("JSON.stringify(window.__rcb_mouse_pos || {x:window.innerWidth/2, y:window.innerHeight/2})")
+            val mouseObj = runCatching { json.parseToJsonElement(mouseRaw).jsonObject }.getOrNull()
+            val startX = runCatching { (mouseObj?.get("x") as? JsonPrimitive)?.content?.toDouble() }.getOrNull() ?: (targetX / 2)
+            val startY = runCatching { (mouseObj?.get("y") as? JsonPrimitive)?.content?.toDouble() }.getOrNull() ?: (targetY / 2)
+            // 生成二次贝塞尔曲线点（控制点随机偏移，模拟人类鼠标弧线）
+            val steps = (12..18).random()
+            val midX = (startX + targetX) / 2 + ((-50..50).random().toDouble())
+            val midY = (startY + targetY) / 2 + ((-50..50).random().toDouble())
+            for (i in 1..steps) {
+                val t = i.toDouble() / steps
+                val invT = 1.0 - t
+                val px = invT * invT * startX + 2 * invT * t * midX + t * t * targetX
+                val py = invT * invT * startY + 2 * invT * t * midY + t * t * targetY
+                evalJs("($JS_MOUSE_MOVE)(${px}, ${py})")
+                delay((10..30).random().toLong())
+            }
+            // hover 停留 50-150ms
+            delay((50..150).random().toLong())
+            // 触发点击事件序列
+            evalJs("($JS_CLICK_AT)(${quote(resolved.id)}, ${targetX}, ${targetY})")
             waitForPageSettled(10_000)
             afterWrite("click", snapshotInternal(SnapshotLevel.SUMMARY))
         } finally {
@@ -1399,7 +1773,13 @@ class BrowserController @Inject constructor(
             val resolved = resolveElementId(elementId)
             if (resolved == null) {
                 recordAction("type", "失败：元素未找到（$elementId）")
-                return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 未找到：data-rcb-id / CSS 路径 / 语义均未命中")
+                return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 未找到：data-rcb-id / role+name / CSS 均未命中")
+            }
+            // 可交互性等待：最多 5 秒，跳过遮挡检查（输入框可能被键盘遮挡）
+            val notActionable = waitForActionable(resolved.id, skipOverlap = true)
+            if (notActionable != null) {
+                recordAction("type", "失败：输入框不可交互（$notActionable）")
+                return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 不可交互：$notActionable")
             }
             if (text.isEmpty()) {
                 // 空文本：直接触发清空事件
@@ -1498,7 +1878,7 @@ class BrowserController @Inject constructor(
         _agentStatus.value = AgentBrowserStatus("正在滚动页面", true)
         try {
             evalJs("($JS_SCROLL)(${quote(direction)})")
-            delay(300)
+            delay(550)
             afterWrite("scroll", snapshotInternal(SnapshotLevel.SUMMARY))
         } finally {
             _agentStatus.value = AgentBrowserStatus()
@@ -2092,8 +2472,6 @@ class BrowserController @Inject constructor(
             }
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 onTabLoading(tabId, true)
-                // 反检测：页面开始加载时注入 webdriver/plugins/languages 等覆盖脚本
-                view?.evaluateJavascript(JS_ANTI_DETECT, null)
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 onTabFinished(tabId, view, url)
@@ -2156,6 +2534,12 @@ class BrowserController @Inject constructor(
             WebViewCompat.addDocumentStartJavaScript(wv, JS_CHANGE_OBSERVER, setOf("*"))
         } catch (e: Exception) {
             FileLogger.w(TAG, "addDocumentStartJavaScript 注入失败（旧 WebView 降级：wait_for_change 不可用）", e)
+        }
+        // 反检测：document-start 注入，确保在任何页面脚本之前覆盖 webdriver/plugins 等特征
+        try {
+            WebViewCompat.addDocumentStartJavaScript(wv, JS_ANTI_DETECT, setOf("*"))
+        } catch (e: Exception) {
+            FileLogger.w(TAG, "addDocumentStartJavaScript 反检测注入失败（降级 onPageStarted 注入）", e)
         }
         // 新 WebView 创建即按当前代理开关接管网络出口（WebView 不认 Java ProxySelector）。
         applyWebViewProxy(wv)

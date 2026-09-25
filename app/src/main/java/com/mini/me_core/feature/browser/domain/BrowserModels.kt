@@ -15,6 +15,8 @@ data class BrowserElement(
     val name: String = "",
     /** 元素人类可读名称（优先 aria-label / <label for> / 包裹 label / name）。 */
     val label: String = "",
+    /** 计算后的无障碍名称（综合 aria-label / aria-labelledby / label / 可见文本 / placeholder / name）。 */
+    val accessibleName: String = "",
     /** 可见文本（链接/按钮文案等；input/textarea 为空）。 */
     val text: String = "",
     /** 当前取值（input/textarea 的 value、select 的选中项文本；敏感字段已清空）。 */
@@ -264,7 +266,8 @@ data class BrowserBookmark(
  */
 data class ResolvedElement(
     val id: String,
-    val method: String
+    val method: String,
+    val matchCount: Int = 1
 )
 
 /**

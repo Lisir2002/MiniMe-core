@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.browser.presentation
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
+import android.content.Context
 import android.content.Intent
 import android.webkit.MimeTypeMap
 import android.widget.Toast
@@ -13,6 +14,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +25,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -73,6 +77,7 @@ import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.SmartToy
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -144,6 +149,26 @@ import java.util.Date
 import java.util.Locale
 
 /**
+ * 浏览器 UI 偏好持久化：地址栏位置（顶部/底部），纯 UI 偏好，不涉及 BrowserController 状态。
+ */
+private object BrowserUiPrefs {
+    private const val PREFS_NAME = "browser_ui_prefs"
+    private const val KEY_ADDRESS_BAR_POSITION = "address_bar_position"
+    const val POSITION_TOP = "top"
+    const val POSITION_BOTTOM = "bottom"
+
+    fun getAddressBarPosition(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_ADDRESS_BAR_POSITION, POSITION_TOP) ?: POSITION_TOP
+    }
+
+    fun setAddressBarPosition(context: Context, position: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_ADDRESS_BAR_POSITION, position).apply()
+    }
+}
+
+/**
  * 内置服务浏览器页。
  *
  * 布局（R3 重构）：顶部两层 = 标签栏(40dp) + 地址栏(56dp，底部 2dp 加载进度)；
@@ -189,6 +214,18 @@ fun ServiceBrowserScreen(
     var showZoom by remember { mutableStateOf(false) }
     var showAiPanel by remember { mutableStateOf(false) }
     var aiPaused by remember { mutableStateOf(false) }
+
+    // 地址栏位置偏好（SharedPreferences 持久化）
+    var addressBarAtBottom by remember {
+        mutableStateOf(BrowserUiPrefs.getAddressBarPosition(context) == BrowserUiPrefs.POSITION_BOTTOM)
+    }
+    fun toggleAddressBarPosition() {
+        addressBarAtBottom = !addressBarAtBottom
+        BrowserUiPrefs.setAddressBarPosition(
+            context,
+            if (addressBarAtBottom) BrowserUiPrefs.POSITION_BOTTOM else BrowserUiPrefs.POSITION_TOP
+        )
+    }
 
     // 页面 URL 变化时同步地址栏
     LaunchedEffect(uiState.currentUrl) {
@@ -273,7 +310,7 @@ fun ServiceBrowserScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             Column {
-                // 第1层：标签栏（40dp）
+                // 第1层：标签栏（40dp），始终在顶部
                 BrowserTabBar(
                     tabs = tabs,
                     activeTabId = uiState.activeTabId,
@@ -281,142 +318,53 @@ fun ServiceBrowserScreen(
                     onClose = { closeTab(it) },
                     onNewTab = { newTab() }
                 )
-                // 第2层：地址栏（56dp），底部 2dp 加载进度线
-                Column {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(horizontal = Spacing.sm),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                    ) {
-                        // 后退按钮：可后退则 goBack，否则退出浏览器页
-                        IconButton(
-                            onClick = {
-                                if (uiState.canGoBack) browserController.goBack() else onNavigateBack()
-                            },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = stringResource(R.string.common_back),
-                                tint = if (uiState.canGoBack) MaterialTheme.colorScheme.onSurfaceVariant
-                                else MaterialTheme.colorScheme.outlineVariant,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        IconButton(
-                            onClick = { browserController.goForward() },
-                            enabled = uiState.canGoForward,
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Rounded.ArrowForward,
-                                contentDescription = stringResource(R.string.browser_forward),
-                                tint = if (uiState.canGoForward) MaterialTheme.colorScheme.onSurfaceVariant
-                                else MaterialTheme.colorScheme.outlineVariant,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        // 地址 pill（40dp 高）：左侧锁图标 + 右侧 停止/刷新 二合一
-                        val isHttps = uiState.currentUrl.startsWith("https://")
-                        OutlinedTextField(
-                            value = addressText,
-                            onValueChange = { addressText = it },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                            singleLine = true,
-                            placeholder = { Text(stringResource(R.string.browser_address_hint)) },
-                            leadingIcon = {
-                                Icon(
-                                    if (isHttps) Icons.Rounded.Lock else Icons.Rounded.Public,
-                                    contentDescription = null,
-                                    tint = if (isHttps) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.outlineVariant,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            },
-                            trailingIcon = {
-                                IconButton(
-                                    onClick = {
-                                        if (uiState.isLoading) browserController.stopLoading()
-                                        else browserController.reload()
-                                    }
-                                ) {
-                                    Icon(
-                                        if (uiState.isLoading) Icons.Rounded.Close else Icons.Rounded.Refresh,
-                                        contentDescription = if (uiState.isLoading)
-                                            stringResource(R.string.browser_stop_loading)
-                                        else stringResource(R.string.browser_refresh),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                // 地址栏：顶部模式时显示在标签栏下方，底部模式时隐藏（移至 bottomBar）
+                AnimatedVisibility(
+                    visible = !addressBarAtBottom,
+                    enter = slideInVertically { -it } + fadeIn(),
+                    exit = slideOutVertically { -it } + fadeOut()
+                ) {
+                    BrowserAddressBar(
+                        canGoBack = uiState.canGoBack,
+                        canGoForward = uiState.canGoForward,
+                        currentUrl = uiState.currentUrl,
+                        isLoading = uiState.isLoading,
+                        progress = uiState.progress,
+                        addressText = addressText,
+                        onAddressTextChange = { addressText = it },
+                        onNavigate = { navigate() },
+                        onGoBack = { browserController.goBack() },
+                        onNavigateBack = { onNavigateBack() },
+                        onGoForward = { browserController.goForward() },
+                        onStopLoading = { browserController.stopLoading() },
+                        onReload = { browserController.reload() },
+                        showMore = showMore,
+                        onShowMoreChange = { showMore = it },
+                        bookmarked = uiState.currentUrl.isNotBlank() && browserController.isBookmarked(uiState.currentUrl),
+                        incognito = uiState.incognito,
+                        desktopMode = uiState.desktopMode,
+                        addressBarAtBottom = addressBarAtBottom,
+                        onToggleAddressBar = { toggleAddressBarPosition() },
+                        onFind = { showMore = false; findVisible = true; findText = "" },
+                        onToggleBookmark = {
+                            showMore = false
+                            if (uiState.currentUrl.isNotBlank()) {
+                                if (browserController.isBookmarked(uiState.currentUrl)) {
+                                    browserController.removeBookmark(uiState.currentUrl)
+                                } else {
+                                    browserController.addBookmark()
                                 }
-                            },
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Uri,
-                                imeAction = ImeAction.Go
-                            ),
-                            keyboardActions = KeyboardActions(onGo = { navigate() }),
-                            shape = RoundedCornerShape(LocalCornerRadius.current.lg),
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
-                        )
-                        // 「更多」菜单入口
-                        Box {
-                            IconButton(
-                                onClick = { showMore = true },
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(
-                                    Icons.Rounded.MoreVert,
-                                    contentDescription = stringResource(R.string.browser_more),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(24.dp)
-                                )
                             }
-                            BrowserMoreMenu(
-                                expanded = showMore,
-                                onDismiss = { showMore = false },
-                                bookmarked = uiState.currentUrl.isNotBlank() && browserController.isBookmarked(uiState.currentUrl),
-                                incognito = uiState.incognito,
-                                desktopMode = uiState.desktopMode,
-                                onFind = { showMore = false; findVisible = true; findText = "" },
-                                onToggleBookmark = {
-                                    showMore = false
-                                    if (uiState.currentUrl.isNotBlank()) {
-                                        if (browserController.isBookmarked(uiState.currentUrl)) {
-                                            browserController.removeBookmark(uiState.currentUrl)
-                                        } else {
-                                            browserController.addBookmark()
-                                        }
-                                    }
-                                },
-                                onCredentials = { showMore = false; showCredentials = true },
-                                onShare = { showMore = false; shareCurrent() },
-                                onCopyLink = { showMore = false; copyCurrentLink() },
-                                onIncognito = { browserController.setIncognito(!uiState.incognito) },
-                                onDesktopMode = { browserController.toggleDesktopMode() },
-                                onZoom = { showMore = false; showZoom = true }
-                            )
-                        }
-                    }
-                    // 2dp 加载进度线（不占额外高度）
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(2.dp)
-                    ) {
-                        if (uiState.isLoading) {
-                            LinearProgressIndicator(
-                                progress = { (uiState.progress.coerceIn(0, 100)) / 100f },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
+                        },
+                        onCredentials = { showMore = false; showCredentials = true },
+                        onShare = { showMore = false; shareCurrent() },
+                        onCopyLink = { showMore = false; copyCurrentLink() },
+                        onIncognito = { browserController.setIncognito(!uiState.incognito) },
+                        onDesktopMode = { browserController.toggleDesktopMode() },
+                        onZoom = { showMore = false; showZoom = true }
+                    )
                 }
-                // 页内查找条：覆盖在地址栏下方，动画展开/收起
+                // 页内查找条：始终在顶部区域，动画展开/收起
                 AnimatedVisibility(visible = findVisible, enter = fadeIn(), exit = fadeOut()) {
                     FindOnPageBar(
                         text = findText,
@@ -432,7 +380,7 @@ fun ServiceBrowserScreen(
                 }
             }
         },
-        // ===== 底部工具栏（56dp） =====
+        // ===== 底部工具栏（56dp） + 可选底部地址栏 =====
         bottomBar = {
             Column {
                 // 模型操作状态条（AI 操作中时顶部细条提示）
@@ -465,6 +413,52 @@ fun ServiceBrowserScreen(
                             )
                         }
                     }
+                }
+                // 地址栏：底部模式时显示在工具栏上方
+                AnimatedVisibility(
+                    visible = addressBarAtBottom,
+                    enter = slideInVertically { it } + fadeIn(),
+                    exit = slideOutVertically { it } + fadeOut()
+                ) {
+                    BrowserAddressBar(
+                        canGoBack = uiState.canGoBack,
+                        canGoForward = uiState.canGoForward,
+                        currentUrl = uiState.currentUrl,
+                        isLoading = uiState.isLoading,
+                        progress = uiState.progress,
+                        addressText = addressText,
+                        onAddressTextChange = { addressText = it },
+                        onNavigate = { navigate() },
+                        onGoBack = { browserController.goBack() },
+                        onNavigateBack = { onNavigateBack() },
+                        onGoForward = { browserController.goForward() },
+                        onStopLoading = { browserController.stopLoading() },
+                        onReload = { browserController.reload() },
+                        showMore = showMore,
+                        onShowMoreChange = { showMore = it },
+                        bookmarked = uiState.currentUrl.isNotBlank() && browserController.isBookmarked(uiState.currentUrl),
+                        incognito = uiState.incognito,
+                        desktopMode = uiState.desktopMode,
+                        addressBarAtBottom = addressBarAtBottom,
+                        onToggleAddressBar = { toggleAddressBarPosition() },
+                        onFind = { showMore = false; findVisible = true; findText = "" },
+                        onToggleBookmark = {
+                            showMore = false
+                            if (uiState.currentUrl.isNotBlank()) {
+                                if (browserController.isBookmarked(uiState.currentUrl)) {
+                                    browserController.removeBookmark(uiState.currentUrl)
+                                } else {
+                                    browserController.addBookmark()
+                                }
+                            }
+                        },
+                        onCredentials = { showMore = false; showCredentials = true },
+                        onShare = { showMore = false; shareCurrent() },
+                        onCopyLink = { showMore = false; copyCurrentLink() },
+                        onIncognito = { browserController.setIncognito(!uiState.incognito) },
+                        onDesktopMode = { browserController.toggleDesktopMode() },
+                        onZoom = { showMore = false; showZoom = true }
+                    )
                 }
                 BrowserBottomToolbar(
                     agentActive = agentStatus.active,
@@ -713,12 +707,12 @@ private fun BrowserTabBar(
                     )
                     IconButton(
                         onClick = { onClose(tab.id) },
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
                             Icons.Rounded.Close,
                             contentDescription = stringResource(R.string.browser_close_tab),
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -736,7 +730,7 @@ private fun BrowserTabBar(
             }
         }
         item {
-            IconButton(onClick = onNewTab, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = onNewTab, modifier = Modifier.size(40.dp)) {
                 Icon(
                     Icons.Rounded.Add,
                     contentDescription = stringResource(R.string.browser_new_tab),
@@ -811,6 +805,7 @@ private fun ToolbarButton(
 ) {
     Column(
         modifier = modifier
+            .fillMaxHeight()
             .clickable(onClick = onClick)
             .padding(vertical = Spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -851,6 +846,7 @@ private fun AiToolbarButton(
     )
     Column(
         modifier = modifier
+            .fillMaxHeight()
             .clickable(onClick = onClick)
             .padding(vertical = Spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -891,9 +887,170 @@ private fun AiToolbarButton(
     }
 }
 
+// ===== 地址栏（可放置于顶部或底部） =====
+
+/**
+ * 浏览器地址栏：后退/前进 + 地址输入框（含锁图标、停止/刷新） + 更多菜单 + 底部加载进度线。
+ * 可在 topBar（标签栏下方）或 bottomBar（工具栏上方）中条件性放置。
+ */
+@Composable
+private fun BrowserAddressBar(
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    currentUrl: String,
+    isLoading: Boolean,
+    progress: Int,
+    addressText: String,
+    onAddressTextChange: (String) -> Unit,
+    onNavigate: () -> Unit,
+    onGoBack: () -> Unit,
+    onNavigateBack: () -> Unit,
+    onGoForward: () -> Unit,
+    onStopLoading: () -> Unit,
+    onReload: () -> Unit,
+    showMore: Boolean,
+    onShowMoreChange: (Boolean) -> Unit,
+    bookmarked: Boolean,
+    incognito: Boolean,
+    desktopMode: Boolean,
+    addressBarAtBottom: Boolean,
+    onToggleAddressBar: () -> Unit,
+    onFind: () -> Unit,
+    onToggleBookmark: () -> Unit,
+    onCredentials: () -> Unit,
+    onShare: () -> Unit,
+    onCopyLink: () -> Unit,
+    onIncognito: () -> Unit,
+    onDesktopMode: () -> Unit,
+    onZoom: () -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .padding(horizontal = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+        ) {
+            // 后退按钮：可后退则 goBack，否则退出浏览器页
+            IconButton(
+                onClick = { if (canGoBack) onGoBack() else onNavigateBack() },
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = stringResource(R.string.common_back),
+                    tint = if (canGoBack) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            IconButton(
+                onClick = onGoForward,
+                enabled = canGoForward,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowForward,
+                    contentDescription = stringResource(R.string.browser_forward),
+                    tint = if (canGoForward) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            // 地址 pill（48dp 高）：左侧锁图标 + 右侧 停止/刷新 二合一
+            val isHttps = currentUrl.startsWith("https://")
+            OutlinedTextField(
+                value = addressText,
+                onValueChange = onAddressTextChange,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                singleLine = true,
+                placeholder = { Text(stringResource(R.string.browser_address_hint)) },
+                leadingIcon = {
+                    Icon(
+                        if (isHttps) Icons.Rounded.Lock else Icons.Rounded.Public,
+                        contentDescription = null,
+                        tint = if (isHttps) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                trailingIcon = {
+                    IconButton(
+                        onClick = { if (isLoading) onStopLoading() else onReload() }
+                    ) {
+                        Icon(
+                            if (isLoading) Icons.Rounded.Close else Icons.Rounded.Refresh,
+                            contentDescription = if (isLoading)
+                                stringResource(R.string.browser_stop_loading)
+                            else stringResource(R.string.browser_refresh),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Uri,
+                    imeAction = ImeAction.Go
+                ),
+                keyboardActions = KeyboardActions(onGo = { onNavigate() }),
+                shape = RoundedCornerShape(LocalCornerRadius.current.lg),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp)
+            )
+            // 「更多」菜单入口
+            Box {
+                IconButton(
+                    onClick = { onShowMoreChange(true) },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.MoreVert,
+                        contentDescription = stringResource(R.string.browser_more),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                BrowserMoreMenu(
+                    expanded = showMore,
+                    onDismiss = { onShowMoreChange(false) },
+                    bookmarked = bookmarked,
+                    incognito = incognito,
+                    desktopMode = desktopMode,
+                    addressBarAtBottom = addressBarAtBottom,
+                    onToggleAddressBar = onToggleAddressBar,
+                    onFind = onFind,
+                    onToggleBookmark = onToggleBookmark,
+                    onCredentials = onCredentials,
+                    onShare = onShare,
+                    onCopyLink = onCopyLink,
+                    onIncognito = onIncognito,
+                    onDesktopMode = onDesktopMode,
+                    onZoom = onZoom
+                )
+            }
+        }
+        // 2dp 加载进度线（不占额外高度）
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+        ) {
+            if (isLoading) {
+                LinearProgressIndicator(
+                    progress = { (progress.coerceIn(0, 100)) / 100f },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+}
+
 // ===== 更多菜单（精简为 8 项） =====
 
-/** 地址栏「更多」下拉菜单：页内查找 / 收藏本页 / 凭据 / 分享 / 复制链接 / 无痕 / 桌面版 / 缩放。 */
+/** 地址栏「更多」下拉菜单：页内查找 / 收藏本页 / 凭据 / 分享 / 复制链接 / 无痕 / 桌面版 / 缩放 / 地址栏位置。 */
 @Composable
 private fun BrowserMoreMenu(
     expanded: Boolean,
@@ -901,6 +1058,8 @@ private fun BrowserMoreMenu(
     bookmarked: Boolean,
     incognito: Boolean,
     desktopMode: Boolean,
+    addressBarAtBottom: Boolean,
+    onToggleAddressBar: () -> Unit,
     onFind: () -> Unit,
     onToggleBookmark: () -> Unit,
     onCredentials: () -> Unit,
@@ -969,6 +1128,20 @@ private fun BrowserMoreMenu(
             onClick = onZoom,
             leadingIcon = { Icon(Icons.Rounded.ZoomIn, null) }
         )
+        HorizontalDivider()
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.browser_address_bar_position)) },
+            onClick = onToggleAddressBar,
+            leadingIcon = { Icon(Icons.Rounded.SwapVert, null) },
+            trailingIcon = {
+                Text(
+                    if (addressBarAtBottom) stringResource(R.string.browser_address_bar_bottom)
+                    else stringResource(R.string.browser_address_bar_top),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        )
     }
 }
 
@@ -1000,19 +1173,19 @@ private fun FindOnPageBar(
             shape = RoundedCornerShape(LocalCornerRadius.current.lg),
             textStyle = MaterialTheme.typography.bodySmall
         )
-        IconButton(onClick = onPrev, modifier = Modifier.size(36.dp)) {
+        IconButton(onClick = onPrev, modifier = Modifier.size(40.dp)) {
             Icon(
                 Icons.Rounded.KeyboardArrowUp,
                 contentDescription = stringResource(R.string.browser_find_prev)
             )
         }
-        IconButton(onClick = onNext, modifier = Modifier.size(36.dp)) {
+        IconButton(onClick = onNext, modifier = Modifier.size(40.dp)) {
             Icon(
                 Icons.Rounded.KeyboardArrowDown,
                 contentDescription = stringResource(R.string.browser_find_next)
             )
         }
-        IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+        IconButton(onClick = onClose, modifier = Modifier.size(40.dp)) {
             Icon(
                 Icons.Rounded.Close,
                 contentDescription = stringResource(R.string.browser_find_close)
