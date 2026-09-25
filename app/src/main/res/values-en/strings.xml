@@ -528,7 +528,7 @@
 
     <!-- Browser -->
     <string name="browser_title">Built-in Browser</string>
-    <string name="browser_address_hint">Enter a URL or container service address (e.g. http://localhost:8080)</string>
+    <string name="browser_address_hint">Search or type URL</string>
     <string name="browser_go">Go</string>
     <string name="browser_back">Back</string>
     <string name="browser_forward">Forward</string>
@@ -585,6 +585,97 @@
     <string name="browser_credentials_delete_confirm">Delete the saved credentials for %1$s?</string>
     <string name="browser_credential_username">Username: %1$s</string>
     <string name="browser_credential_detail">Username: %1$s   Password: %2$s</string>
+
+    <!-- F4.1 Tab management -->
+    <string name="browser_tab_close_others">Close other tabs</string>
+    <string name="browser_tab_close_right">Close tabs to the right</string>
+    <string name="browser_tab_close_all">Close all tabs</string>
+    <string name="browser_tab_manager_title">Tabs</string>
+    <string name="browser_tab_overview">Manage tabs</string>
+    <string name="browser_tab_incognito_tag">Incognito</string>
+    <string name="browser_tab_close_all_confirm">Close all %1$d tabs?</string>
+    <string name="browser_tab_close_others_confirm">Close all tabs except the current one?</string>
+
+    <!-- F4.2 Download manager -->
+    <string name="browser_notif_channel_name">Downloads</string>
+    <string name="browser_notif_channel_desc">Show browser download progress and completion</string>
+    <string name="browser_notif_done">Download complete</string>
+    <string name="browser_notif_failed">Download failed</string>
+    <string name="browser_download_pause">Pause</string>
+    <string name="browser_download_resume">Resume</string>
+    <string name="browser_download_cancel">Cancel</string>
+    <string name="browser_download_share">Share</string>
+    <string name="browser_download_delete">Delete</string>
+    <string name="browser_download_view">View</string>
+    <string name="browser_download_status_downloading">Downloading</string>
+    <string name="browser_download_status_paused">Paused</string>
+    <string name="browser_download_status_done">Complete</string>
+    <string name="browser_download_status_failed">Failed</string>
+    <string name="browser_download_status_cancelled">Cancelled</string>
+    <string name="browser_download_settings">Download settings</string>
+    <string name="browser_download_ask">Ask where to save before download</string>
+    <string name="browser_download_wifi_only">Download over Wi-Fi only</string>
+    <string name="browser_download_notify">Download complete notification</string>
+    <string name="browser_download_speed">%1$s/s</string>
+    <string name="browser_download_size_of">%1$s / %2$s</string>
+
+    <!-- F4.3 Password manager -->
+    <string name="browser_pwm_title">Passwords</string>
+    <string name="browser_pwm_locked_title">Password vault locked</string>
+    <string name="browser_pwm_locked_hint">Authenticate with biometrics or master password to view saved passwords</string>
+    <string name="browser_pwm_unlock">Unlock</string>
+    <string name="browser_pwm_empty">No saved passwords</string>
+    <string name="browser_pwm_search_hint">Search site or username…</string>
+    <string name="browser_pwm_copy">Copy password</string>
+    <string name="browser_pwm_copied">Password copied</string>
+    <string name="browser_pwm_fill">Autofill</string>
+    <string name="browser_pwm_delete">Delete password</string>
+    <string name="browser_pwm_delete_confirm">Delete saved password for %1$s?</string>
+
+    <!-- F4.4 Reader mode -->
+    <string name="browser_reader_enter">Reader mode</string>
+    <string name="browser_reader_exit">Exit reader mode</string>
+    <string name="browser_reader_font_smaller">Decrease font size</string>
+    <string name="browser_reader_font_larger">Increase font size</string>
+    <string name="browser_reader_theme_light">Light</string>
+    <string name="browser_reader_theme_dark">Dark</string>
+    <string name="browser_reader_theme_sepia">Sepia</string>
+    <string name="browser_reader_prev">Prev</string>
+    <string name="browser_reader_next">Next</string>
+    <string name="browser_reader_empty">Couldn\'t extract article text</string>
+
+    <!-- F4.5 Ad blocking & privacy -->
+    <string name="browser_privacy_title">Privacy &amp; Security</string>
+    <string name="browser_privacy_blocked_count">Blocked %1$d ads/trackers on this page</string>
+    <string name="browser_privacy_adblock">Ad blocking</string>
+    <string name="browser_privacy_tracker">Tracker blocking</string>
+    <string name="browser_privacy_popup">Popup blocking</string>
+    <string name="browser_privacy_dnt">Send Do Not Track</string>
+    <string name="browser_privacy_3p_cookie">Block third-party cookies</string>
+
+    <!-- F4.6 Web translation -->
+    <string name="browser_translate_title">Translate</string>
+    <string name="browser_translate_prompt">Detected %1$s page. Translate to Chinese?</string>
+    <string name="browser_translate_go">Translate</string>
+    <string name="browser_translate_page">Translate page</string>
+    <string name="browser_translate_selection">Translate selection</string>
+    <string name="browser_translating">Translating…</string>
+
+    <!-- F4.7 DevTools -->
+    <string name="browser_devtools_title">Developer tools</string>
+    <string name="browser_devtools_eval">Run</string>
+    <string name="browser_devtools_clear">Clear</string>
+    <string name="browser_devtools_net_empty">No network requests recorded</string>
+    <string name="browser_devtools_inspect">Inspect element</string>
+
+    <!-- F4.8 Gestures -->
+    <string name="browser_gesture_title">Gestures</string>
+    <string name="browser_gesture_edge">Edge swipe back/forward</string>
+    <string name="browser_gesture_pull">Pull to refresh</string>
+    <string name="browser_gesture_sensitivity">Sensitivity</string>
+    <string name="browser_gesture_sens_low">Low</string>
+    <string name="browser_gesture_sens_mid">Medium</string>
+    <string name="browser_gesture_sens_high">High</string>
 
     <!-- Browser bottom toolbar / AI panel / home (R3 refactor) -->
     <string name="browser_bottom_home">Home</string>
@@ -646,6 +737,102 @@
     <!-- Chat Message Bubbles -->
     <string name="chat_copied">Copied</string>
     <string name="chat_copy">Copy</string>
+
+    <!-- MiniMe Markdown rendering (F2.1) -->
+    <string name="md_code_expand">Expand code</string>
+    <string name="md_code_collapse">Collapse code</string>
+    <string name="md_code_lines">%1$d lines</string>
+    <string name="md_image_failed">Failed to load image</string>
+
+    <!-- In-chat search (F2.2) -->
+    <string name="chat_search_open">Search conversation</string>
+    <string name="chat_search_hint">Search messages…</string>
+    <string name="chat_search_prev">Previous match</string>
+    <string name="chat_search_next">Next match</string>
+    <string name="chat_search_clear">Clear search</string>
+    <string name="chat_search_close">Close search</string>
+    <string name="chat_search_no_result">No matches found</string>
+    <string name="chat_search_history_title">Recent searches</string>
+    <string name="chat_search_history_clear">Clear history</string>
+
+    <!-- Message quick actions (F2.3) -->
+    <string name="chat_action_copy_all">Copy text</string>
+    <string name="chat_action_copy_code">Copy code block</string>
+    <string name="chat_action_copy_code_item">Code block %1$d</string>
+    <string name="chat_action_regenerate">Regenerate</string>
+    <string name="chat_action_edit_resend">Edit &amp; resend</string>
+    <string name="chat_action_bookmark">Bookmark</string>
+    <string name="chat_action_share">Share</string>
+    <string name="chat_action_read_aloud">Read aloud</string>
+    <string name="chat_action_delete">Delete message</string>
+    <string name="chat_action_delete_title">Delete this message?</string>
+    <string name="chat_action_delete_text">This message and all replies after it will be deleted. This cannot be undone.</string>
+    <string name="chat_action_cancel">Cancel</string>
+    <string name="chat_action_confirm_delete">Delete</string>
+
+    <!-- Streaming output (F2.4) -->
+    <string name="chat_stopped">Generation stopped</string>
+
+    <!-- Model switch context strategy (F2.5) -->
+    <string name="model_switch_title">Switch model</string>
+    <string name="model_switch_current_to_new">%1$s → %2$s</string>
+    <string name="model_switch_context_tokens">Conversation uses about %1$s tokens</string>
+    <string name="model_switch_keep">Keep context</string>
+    <string name="model_switch_keep_desc">Continue this conversation with the new model, history kept</string>
+    <string name="model_switch_clear">Start new conversation</string>
+    <string name="model_switch_clear_desc">Start a new session without history</string>
+    <string name="model_switch_warning">Context is long, consider compacting or starting fresh</string>
+    <string name="model_switch_compact_prompt">Context reached %1$d%% of the window. Compact history?</string>
+    <string name="model_compacted_system">Context compacted; a summary of the conversation is kept</string>
+    <string name="model_switch_compact">Compact context</string>
+
+    <!-- Token usage visualization (F2.6) -->
+    <string name="token_usage_title">Token usage</string>
+    <string name="token_usage_input">Input %1$s</string>
+    <string name="token_usage_output">Output %1$s</string>
+    <string name="token_usage_cache">Cache hit %1$s</string>
+    <string name="token_usage_cost">Est. cost $%1$s</string>
+    <string name="token_usage_estimated">est.</string>
+    <string name="token_usage_this_turn">This turn %1$s</string>
+
+    <!-- Chat templates (F2.7) -->
+    <string name="template_open">Templates</string>
+    <string name="template_search_hint">Search templates…</string>
+    <string name="template_new">+ New template</string>
+    <string name="template_cat_programming">Coding</string>
+    <string name="template_cat_writing">Writing</string>
+    <string name="template_cat_analysis">Analysis</string>
+    <string name="template_cat_creative">Creative</string>
+    <string name="template_cat_custom">My templates</string>
+    <string name="template_edit">Edit</string>
+    <string name="template_delete">Delete</string>
+    <string name="template_use">Use</string>
+    <string name="template_name_hint">Template name</string>
+    <string name="template_content_hint">Prompt content</string>
+    <string name="template_save">Save</string>
+
+    <!-- Chat export (F2.8) -->
+    <string name="export_title">Export conversation</string>
+    <string name="export_format_md">Markdown</string>
+    <string name="export_format_text">Plain text</string>
+    <string name="export_format_json">JSON</string>
+    <string name="export_include_tokens">Include token stats</string>
+    <string name="export_include_system">Include system messages</string>
+    <string name="export_share">Share</string>
+    <string name="export_save_file">Save to file</string>
+    <string name="export_copy">Copy to clipboard</string>
+    <string name="export_copied">Export copied</string>
+    <string name="export_done">Exported</string>
+    <string name="export_share_title">Share conversation</string>
+
+    <!-- Multi-model compare (F2.9) -->
+    <string name="compare_mode">Compare mode</string>
+    <string name="compare_exit">Exit compare</string>
+    <string name="compare_sync_scroll">Sync scroll</string>
+    <string name="compare_use_answer">Use this answer</string>
+    <string name="compare_score_hint">Rate this answer</string>
+    <string name="compare_select_models">Select models to compare (up to 3)</string>
+    <string name="compare_waiting">Waiting for response…</string>
     <string name="chat_bg_command_done">Background command finished</string>
     <string name="chat_bg_commands_done">%1$d background tasks finished: %2$s</string>
     <string name="chat_bg_commands_partial_failed">%1$d background tasks finished, %2$d failed: %3$s</string>
@@ -1922,6 +2109,21 @@
     <string name="tc_delete_active_warning">Deleting the active image will switch to built-in Alpine automatically.</string>
     <string name="tc_delete_free_space">Free up ~%1$d MB</string>
     <string name="tc_new_profile_hint">New image added. Tap to switch and initialize.</string>
+    <string name="tc_reset_confirm_message">This will erase all container data, installed packages and settings, restoring the image to its initial state. This cannot be undone.</string>
+    <string name="tc_reset_confirm_button">Confirm Reset</string>
+    <string name="tc_pick_image_title">Switch Image</string>
+    <string name="tc_current_image_using">This image is currently in use</string>
+    <string name="tc_no_other_images">No other images available</string>
+    <string name="tc_image_picker_active_tag">In use</string>
+    <string name="tc_mirror_custom_label">Custom mirror URL</string>
+    <string name="tc_mirror_custom_placeholder">https://…</string>
+    <string name="tc_mirror_custom_option">Custom</string>
+    <string name="tc_subtab_status">Status</string>
+    <string name="tc_subtab_files">Files</string>
+    <string name="tc_mirror_aliyun">Aliyun Mirror (default)</string>
+    <string name="tc_mirror_tuna">Tsinghua TUNA</string>
+    <string name="tc_mirror_ustc">USTC</string>
+    <string name="tc_mirror_official">Official dl-cdn</string>
     <string name="tc_advanced">Advanced</string>
     <string name="tc_container_remote_mode">Remote Mode</string>
     <string name="tc_bindings_hint">Extra Bindings</string>

@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,11 +32,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -181,13 +185,70 @@ fun AIChatPanel(
     var fileDiffsForSheet by remember { mutableStateOf<TaskChangesSheetData?>(null) }
     // 对话技能面板（D5/D10）：输入栏「技能」按钮唤出，管理对话级添加/禁用。
     var showConversationSkills by remember { mutableStateOf(false) }
+    // F2.7：对话模板面板
+    var showTemplatePanel by remember { mutableStateOf(false) }
+    // F2.8：导出对话
+    var showExportDialog by remember { mutableStateOf(false) }
+    // F2.9：多模型对比模式
+    var compareMode by remember { mutableStateOf(false) }
     val conversationSkillsViewModel: ConversationSkillsViewModel = hiltViewModel()
     val listState = rememberLazyListState()
     val markdownCache = remember { MarkdownRenderCache() }
+    // F2.1：MiniMe 自研 Markdown 渲染器的解析缓存（LRU 50 条，按内容 hash）
+    val miniMeMarkdownCache = remember { com.mini.me_core.feature.agent.presentation.component.markdown.MiniMeMarkdownCache() }
+
+    // F2.2：对话内搜索状态
+    var showSearch by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchHistory by remember { mutableStateOf<List<String>>(emptyList()) }
+    var searchMatchIndex by remember { mutableStateOf(0) }
+    // F2.5：待确认的模型切换 (providerId, modelName)
+    var pendingModelSwitch by remember { mutableStateOf<Pair<String, String>?>(null) }
+    // 匹配到的消息 id 列表（多关键词空格 AND，不区分大小写）
+    val searchMatchIds by remember(searchQuery, messages) {
+        derivedStateOf {
+            val kws = searchQuery.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
+            if (kws.isEmpty()) return@derivedStateOf emptyList()
+            messages.filter { m ->
+                val c = m.content.lowercase()
+                kws.all { c.contains(it) }
+            }.map { it.id }
+        }
+    }
+    // 消息 id -> 所属 taskGroup 在 LazyColumn 中的下标，用于定位滚动
+    val messageGroupIndex by remember(taskGroups) {
+        derivedStateOf {
+            val map = mutableMapOf<String, Int>()
+            taskGroups.forEachIndexed { idx, g ->
+                g.subGroups.forEach { sg -> sg.messages.forEach { m -> map[m.id] = idx } }
+            }
+            map
+        }
+    }
+    // 匹配结果变化时重置当前下标
+    LaunchedEffect(searchMatchIds.size) { searchMatchIndex = 0 }
+
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+
+    // 定位到第 [pos] 个匹配：滚动到所属 taskGroup（300ms 平滑滚动），并记录到搜索历史
+    fun navigateToMatch(pos: Int) {
+        val id = searchMatchIds.getOrNull(pos) ?: return
+        searchMatchIndex = pos
+        // 记录搜索历史（去重、最多 10 条）
+        if (searchQuery.isNotBlank()) {
+            searchHistory = (listOf(searchQuery.trim()) + searchHistory.filter { it != searchQuery.trim() }).take(10)
+        }
+        val groupIdx = messageGroupIndex[id] ?: return
+        scope.launch {
+            listState.animateScrollToItem(groupIdx, scrollOffset = 0)
+        }
+    }
+    fun onSelectSearchHistory(item: String) {
+        searchQuery = item
+    }
 
     val isBusy = agentState is AgentUIState.Loading || agentState is AgentUIState.Streaming
     val activeModel = activeProvider?.effectiveModel.orEmpty()
@@ -295,6 +356,11 @@ fun AIChatPanel(
     // 自动滚动跟随
     var positionedSession by remember { mutableStateOf<String?>(null) }
     var followBottom by remember { mutableStateOf(true) }
+    // F2.4：用户上滑后新到达的消息数（用于浮动按钮红色未读角标）
+    var scrolledUpBaseline by remember { mutableStateOf(0) }
+    val unreadCount by remember(followBottom, messages.size, scrolledUpBaseline) {
+        derivedStateOf { if (followBottom) 0 else (messages.size - scrolledUpBaseline).coerceAtLeast(0) }
+    }
 
     val isAtBottom by remember {
         derivedStateOf {
@@ -334,7 +400,10 @@ fun AIChatPanel(
     LaunchedEffect(listState) {
         listState.interactionSource.interactions.collect { interaction ->
             when (interaction) {
-                is DragInteraction.Start -> followBottom = false
+                is DragInteraction.Start -> {
+                    followBottom = false
+                    scrolledUpBaseline = messages.size
+                }
                 is DragInteraction.Stop, is DragInteraction.Cancel -> followBottom = isAtBottom
             }
         }
@@ -481,6 +550,11 @@ fun AIChatPanel(
                 onNavigateToTerminal = onNavigateToTerminal,
                 onNavigateToGit = onNavigateToGit,
                 onNavigateToBrowser = onNavigateToBrowser,
+                onSearch = { showSearch = true },
+                onExport = { showExportDialog = true },
+                compareMode = compareMode,
+                onToggleCompare = { compareMode = !compareMode },
+                contextWindow = activeModelMetadata?.contextTokens ?: 0,
                 connectionState = connectionState?.takeIf { isRemote }
             )
         }
@@ -490,12 +564,38 @@ fun AIChatPanel(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // F2.2：顶部滑入式搜索栏
+            ChatSearchBar(
+                visible = showSearch,
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                resultIndex = searchMatchIndex,
+                resultCount = searchMatchIds.size,
+                onPrev = { if (searchMatchIds.isNotEmpty()) navigateToMatch((searchMatchIndex - 1 + searchMatchIds.size) % searchMatchIds.size) },
+                onNext = { if (searchMatchIds.isNotEmpty()) navigateToMatch((searchMatchIndex + 1) % searchMatchIds.size) },
+                onClose = { showSearch = false; searchQuery = "" },
+                history = searchHistory,
+                onClearHistory = { searchHistory = emptyList() },
+                onSelectHistory = ::onSelectSearchHistory,
+            )
             Box(modifier = Modifier.weight(1f)) {
                 if (!messagesReady) {
                     // 远程模式连接未就绪时显示连接状态占位，避免空白或旧工作区记录闪烁
                     if (isRemote && connectionState != null && connectionState != com.mini.me_core.feature.agent.domain.container.ConnectionState.CONNECTED) {
                         RemoteConnectingPlaceholder(state = connectionState)
                     }
+                } else if (compareMode) {
+                    // F2.9：多模型对比分屏视图
+                    ChatCompareView(
+                        panels = listOf(
+                            ComparePanel(activeModel, messages.filter { it.role == MessageRole.ASSISTANT }.lastOrNull()?.content ?: ""),
+                            ComparePanel(stringResource(R.string.chat_no_model_selected), messages.filter { it.role == MessageRole.ASSISTANT }.getOrNull(messages.count { it.role == MessageRole.ASSISTANT } - 2)?.content ?: ""),
+                        ),
+                        onExitCompare = { compareMode = false },
+                        onClosePanel = { },
+                        onUseAnswer = { compareMode = false },
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 } else if (messages.isEmpty()) {
                     WelcomeState(modifier = Modifier.fillMaxSize())
                 } else {
@@ -532,6 +632,7 @@ fun AIChatPanel(
                                 TaskAccordion(
                                     group = group,
                                     markdownCache = markdownCache,
+                                    miniMeMarkdownCache = miniMeMarkdownCache,
                                     onToggleTask = { viewModel.toggleTask(it) },
                                     onToggleSubGroup = { taskId, subGroupId -> viewModel.toggleSubGroup(taskId, subGroupId) },
                                     onEditClick = { message -> startEditMessage(message) },
@@ -585,15 +686,16 @@ fun AIChatPanel(
                     }
                 }
 
-                // 问题18：回到底部浮动按钮——不在底部时显示，点击平滑滚到底部并恢复跟随
+                // F2.4：「↓ 新消息」浮动按钮——用户上滑暂停跟随时显示，48dp 圆形 primary 背景；
+                // 有新消息到达时右上角红色未读角标。
                 if (showScrollToBottom) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(end = Spacing.md, bottom = Spacing.sm)
-                            .size(40.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                            .background(MaterialTheme.colorScheme.primary)
                             .clickable {
                                 followBottom = true
                                 scope.launch {
@@ -605,9 +707,26 @@ fun AIChatPanel(
                         Icon(
                             Icons.Rounded.KeyboardArrowDown,
                             contentDescription = stringResource(R.string.chat_scroll_to_bottom),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(24.dp)
                         )
+                        // 未读角标
+                        if (unreadCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.error),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (unreadCount > 99) "99" else unreadCount.toString(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onError,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -685,12 +804,17 @@ fun AIChatPanel(
                 value = inputText,
                 onValueChange = { inputText = it; viewModel.updateInputDraft(it) },
                 onSend = sendMessage,
-                onStop = { viewModel.stopAgent() },
+                onStop = {
+                    viewModel.stopAgent()
+                    Toast.makeText(context, com.mini.me_core.R.string.chat_stopped, Toast.LENGTH_SHORT).show()
+                },
                 isBusy = isBusy,
                 activeProvider = activeProvider,
                 providers = providers,
                 onSelectModel = { p, m ->
-                    viewModel.setSessionProviderModel(p, m)
+                    // F2.5：切换模型前弹出确认对话框，选择保留上下文 / 清空上下文
+                    if (m != activeModel) pendingModelSwitch = p to m
+                    else viewModel.setSessionProviderModel(p, m)
                 },
                 onNavigateToSettings = onNavigateToSettings,
                 currentMode = currentMode,
@@ -713,7 +837,8 @@ fun AIChatPanel(
                         sessionLastInputTokens.toFloat() / contextLimit
                     } else 0f
                 },
-                onOpenSkills = { showConversationSkills = true }
+                onOpenSkills = { showConversationSkills = true },
+                onOpenTemplates = { showTemplatePanel = true }
             )
 
             val skillsSessionId = currentSessionId
@@ -722,6 +847,76 @@ fun AIChatPanel(
                     viewModel = conversationSkillsViewModel,
                     sessionId = skillsSessionId,
                     onDismiss = { showConversationSkills = false }
+                )
+            }
+
+            // F2.7：对话模板面板（点击模板填入输入框，不自动发送）
+            if (showTemplatePanel) {
+                ChatTemplatePanel(
+                    onDismiss = { showTemplatePanel = false },
+                    onUseTemplate = { content ->
+                        inputText = content
+                        viewModel.updateInputDraft(content)
+                    }
+                )
+            }
+
+            // F2.8：导出对话对话框
+            if (showExportDialog) {
+                ChatExportDialog(
+                    messages = messages,
+                    sessionTitle = currentSession?.title ?: stringResource(R.string.export_title),
+                    onDismiss = { showExportDialog = false }
+                )
+            }
+
+            // F2.5：模型切换确认对话框
+            pendingModelSwitch?.let { (p, m) ->
+                val contextLimit = activeModelMetadata?.contextTokens ?: 0
+                val usageRatio = if (contextLimit > 0) sessionLastInputTokens.toFloat() / contextLimit else 0f
+                val overLong = usageRatio > 0.8f
+                AlertDialog(
+                    onDismissRequest = { pendingModelSwitch = null },
+                    title = { Text(stringResource(R.string.model_switch_title)) },
+                    text = {
+                        Column {
+                            Text(
+                                stringResource(R.string.model_switch_current_to_new, activeModel.ifBlank { "—" }, m),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                stringResource(R.string.model_switch_context_tokens, formatTokenCount(sessionLastInputTokens)),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (overLong) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (overLong) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    stringResource(R.string.model_switch_warning),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Column {
+                            TextButton(onClick = {
+                                viewModel.setSessionProviderModel(p, m)
+                                pendingModelSwitch = null
+                            }) { Text(stringResource(R.string.model_switch_keep)) }
+                            TextButton(onClick = {
+                                viewModel.setSessionProviderModel(p, m)
+                                viewModel.newSession()
+                                pendingModelSwitch = null
+                            }) { Text(stringResource(R.string.model_switch_clear)) }
+                            TextButton(onClick = { pendingModelSwitch = null }) {
+                                Text(stringResource(R.string.chat_action_cancel))
+                            }
+                        }
+                    },
+                    dismissButton = null
                 )
             }
 

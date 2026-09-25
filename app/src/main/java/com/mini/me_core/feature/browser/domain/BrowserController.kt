@@ -37,6 +37,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -80,7 +81,10 @@ class BrowserController @Inject constructor(
     private val proxyManager: ClashProxyManager,
     private val okHttp: OkHttpClient,
     private val historyStore: BrowserHistoryStore,
-    private val bookmarkStore: BrowserBookmarkStore
+    private val bookmarkStore: BrowserBookmarkStore,
+    private val downloadManager: BrowserDownloadManager,
+    private val adBlocker: AdBlocker,
+    private val webTranslator: WebTranslator
 ) {
     private companion object {
         const val TAG = "BrowserController"
@@ -1290,6 +1294,40 @@ class BrowserController @Inject constructor(
     private val _uiState = MutableStateFlow(BrowserUiState())
     val uiState: StateFlow<BrowserUiState> = _uiState.asStateFlow()
 
+    /** F4.4 当前页是否为可阅读文章。 */
+    private val _readerAvailable = MutableStateFlow(false)
+    val readerAvailable: StateFlow<Boolean> = _readerAvailable.asStateFlow()
+
+    /** F4.5 当前页已拦截的广告/跟踪器数量。 */
+    val blockedCount: StateFlow<Int> = adBlocker.blockedCount
+
+    /** F4.6 当前页面语言（document.lang）。 */
+    private val _pageLang = MutableStateFlow("")
+    val pageLang: StateFlow<String> = _pageLang.asStateFlow()
+
+    /** F4.7 开发者工具：Console 日志（最近 200 条）。 */
+    private val _consoleLogs = MutableStateFlow<List<String>>(emptyList())
+    val consoleLogs: StateFlow<List<String>> = _consoleLogs.asStateFlow()
+
+    /** F4.8 手势操作设置。 */
+    data class GestureSettings(
+        val edgeSwipe: Boolean = true,
+        val pullToRefresh: Boolean = true,
+        val doubleTapZoom: Boolean = true,
+        /** 0=低 1=中 2=高 */
+        val sensitivity: Int = 1
+    )
+    private val _gestureSettings = MutableStateFlow(GestureSettings())
+    val gestureSettings: StateFlow<GestureSettings> = _gestureSettings.asStateFlow()
+
+    fun setGestureSettings(s: GestureSettings) { _gestureSettings.value = s }
+
+    /** F4.8 当前可见 WebView 的纵向滚动偏移（用于下拉刷新判断是否在顶部）。 */
+    fun activeWebViewScrollY(): Int = activeWebView()?.scrollY ?: 0
+
+    /** F4.5 广告拦截与隐私设置（UI 读取/开关用）。 */
+    fun privacy(): AdBlocker = adBlocker
+
     private val _tabsState = MutableStateFlow<List<BrowserTabInfo>>(emptyList())
     /** 标签列表（UI 标签栏与 list_tabs 工具共用）。 */
     val tabsState: StateFlow<List<BrowserTabInfo>> = _tabsState.asStateFlow()
@@ -1320,9 +1358,11 @@ class BrowserController @Inject constructor(
         _agentActionHistory.value = emptyList()
     }
 
-    private val _downloads = MutableStateFlow<List<BrowserDownloadInfo>>(emptyList())
-    /** 最近下载任务（供 downloads 工具 / 模型查询）。 */
-    val downloads: StateFlow<List<BrowserDownloadInfo>> = _downloads.asStateFlow()
+    /** 下载任务列表（F4.2 委托给 [BrowserDownloadManager]）。 */
+    val downloads: StateFlow<List<BrowserDownloadInfo>> = downloadManager.downloads
+
+    /** 未完成下载数（F4.2 底栏角标）。 */
+    val activeDownloadCount: StateFlow<Int> = downloadManager.activeCount
 
     private val _pendingDialog = MutableStateFlow<PendingBrowserDialog?>(null)
     val pendingDialog: StateFlow<PendingBrowserDialog?> = _pendingDialog.asStateFlow()
@@ -1446,23 +1486,26 @@ class BrowserController @Inject constructor(
     /** 取消收藏指定 URL（R1.1）。 */
     fun removeBookmark(url: String) = bookmarkStore.remove(url)
 
-    /** 清除下载列表（R1.2 下载管理 UI）。 */
-    fun clearDownloads() {
-        mainHandler.post { _downloads.value = emptyList() }
-    }
+    /** 清除下载列表（R1.2 / F4.2 下载管理 UI）。 */
+    fun clearDownloads() = downloadManager.clear()
 
     /** 下载任务的宿主文件（供 UI「打开」下载文件用）；未完成或路径无效返回 null。 */
-    fun downloadHostFile(info: BrowserDownloadInfo): File? {
-        if (info.status != "done" || info.path.isBlank()) return null
-        return runCatching { pathMapper.toHostFile(info.path) }.getOrNull()?.takeIf { it.exists() }
-    }
+    fun downloadHostFile(info: BrowserDownloadInfo): File? = downloadManager.hostFile(info)
 
-    /** 重试下载（R1.2 下载管理 UI）：按原 URL 重新发起下载任务。 */
-    suspend fun retryDownload(info: BrowserDownloadInfo) {
-        scope.launch {
-            downloadToWorkspace(info.url, null, null, null)
-        }.join()
-    }
+    /** 暂停下载（F4.2）。 */
+    fun pauseDownload(id: String) = downloadManager.pause(id)
+
+    /** 继续下载（F4.2）。 */
+    fun resumeDownload(id: String) = downloadManager.resume(id)
+
+    /** 取消下载（F4.2）。 */
+    fun cancelDownload(id: String) = downloadManager.cancel(id)
+
+    /** 删除下载记录与文件（F4.2）。 */
+    fun deleteDownload(id: String) = downloadManager.delete(id)
+
+    /** 重试下载（R1.2 / F4.2）：按原 URL 重新发起下载任务。 */
+    fun retryDownload(info: BrowserDownloadInfo) = downloadManager.retry(info)
 
     /**
      * 无痕模式（R1.3 无痕模式）：会话级开关。
@@ -1524,6 +1567,144 @@ class BrowserController @Inject constructor(
     /** 页内查找（R1.1）：清除高亮。 */
     fun clearFindOnPage() {
         mainHandler.post { activeWebView()?.clearMatches() }
+    }
+
+    /** F4.4 阅读模式：提取当前页正文，回调主线程。 */
+    fun extractReaderContent(onResult: (ReaderArticle) -> Unit) {
+        mainHandler.post {
+            val wv = activeWebView() ?: run { onResult(ReaderArticle()); return@post }
+            wv.evaluateJavascript(ReaderMode.JS_EXTRACT) { raw ->
+                onResult(ReaderMode.parse(raw))
+            }
+        }
+    }
+
+    /** F4.4 阅读模式：重新检测当前页是否可阅读。 */
+    fun detectReaderAvailable() {
+        mainHandler.post {
+            val wv = activeWebView() ?: run { _readerAvailable.value = false; return@post }
+            wv.evaluateJavascript(ReaderMode.JS_DETECT) { raw ->
+                _readerAvailable.value = raw?.trim() == "true"
+            }
+        }
+    }
+
+    /** F4.6 翻译整页正文：提取正文后逐段翻译，回调译文（纯文本拼接）。 */
+    fun translateCurrentPage(targetLang: String, onResult: (String) -> Unit) {
+        mainHandler.post {
+            val wv = activeWebView() ?: run { onResult(""); return@post }
+            wv.evaluateJavascript(ReaderMode.JS_EXTRACT) { raw ->
+                val article = ReaderMode.parse(raw)
+                scope.launch {
+                    val sb = StringBuilder()
+                    article.blocks.filter { it.type == "p" }.forEach { block ->
+                        val t = webTranslator.translate(block.text, targetLang)
+                        sb.append(t).append("\n\n")
+                    }
+                    onResult(sb.toString().trim())
+                }
+            }
+        }
+    }
+
+    /** F4.6 划词翻译：读取当前选中文字并翻译，回调 (原文, 译文)。 */
+    fun translateSelection(targetLang: String, onResult: (String, String) -> Unit) {
+        mainHandler.post {
+            val wv = activeWebView() ?: run { onResult("", ""); return@post }
+            wv.evaluateJavascript("(function(){return window.getSelection().toString();})();") { raw ->
+                val sel = raw?.trim()?.removePrefix("\"")?.removeSuffix("\"")?.replace("\\\"", "\"").orEmpty()
+                if (sel.isBlank()) { onResult("", ""); return@evaluateJavascript }
+                scope.launch {
+                    val translated = webTranslator.translate(sel, targetLang)
+                    onResult(sel, translated)
+                }
+            }
+        }
+    }
+
+    // ─────────────────────── F4.7 开发者工具 ───────────────────────
+
+    /** 清空 Console 日志。 */
+    fun clearConsole() { _consoleLogs.value = emptyList() }
+
+    /** Console 执行 JS（eval），回传结果。 */
+    fun evalJs(code: String, onResult: (String) -> Unit) {
+        mainHandler.post {
+            val wv = activeWebView() ?: run { onResult(""); return@post }
+            // 回显执行的命令到 Console
+            _consoleLogs.update { (it + "> $code").takeLast(200) }
+            wv.evaluateJavascript("(function(){try{return eval(${JsonPrimitive(code)});}catch(e){return 'Error: '+e.message;}})();") { raw ->
+                val out = raw ?: "undefined"
+                _consoleLogs.update { (it + out).takeLast(200) }
+                onResult(out)
+            }
+        }
+    }
+
+    /** Network 记录：从页面 window.__rcb_net 读取最近请求，回调列表。 */
+    fun networkRecords(onResult: (List<BrowserNetworkRecord>) -> Unit) {
+        val js = "JSON.stringify((window.__rcb_net || []).slice(-50).reverse())"
+        mainHandler.post {
+            activeWebView()?.evaluateJavascript(js) { raw ->
+                onResult(decodeNetworkList(raw ?: "[]"))
+            } ?: onResult(emptyList())
+        }
+    }
+
+    /** DOM 树摘要（标签统计 + 顶层结构概览）。 */
+    fun domSummary(onResult: (String) -> Unit) {
+        val js = """
+            (function() {
+              var counts = {};
+              document.querySelectorAll('*').forEach(function(el){ counts[el.tagName]=(counts[el.tagName]||0)+1; });
+              var arr = Object.keys(counts).map(function(k){return k+':'+counts[k];}).sort();
+              return JSON.stringify({title: document.title, total: document.querySelectorAll('*').length, tags: arr});
+            })();
+        """.trimIndent()
+        mainHandler.post {
+            activeWebView()?.evaluateJavascript(js) { onResult(it?.trim().orEmpty()) } ?: onResult("")
+        }
+    }
+
+    /** Cookie + LocalStorage 概览。 */
+    fun storageDump(onResult: (String) -> Unit) {
+        val js = """
+            (function() {
+              var ls = [];
+              for (var i=0;i<localStorage.length;i++){var k=localStorage.key(i);ls.push(k+'='+localStorage.getItem(k));}
+              return JSON.stringify({cookie: document.cookie || '(none)', localStorage: ls});
+            })();
+        """.trimIndent()
+        mainHandler.post {
+            activeWebView()?.evaluateJavascript(js) { onResult(it?.trim().orEmpty()) } ?: onResult("")
+        }
+    }
+
+    /**
+     * F4.3 自动填充：在当前页面注入 JS，把用户名/密码填入匹配的输入框。
+     * 按常见选择器找用户名框（email/tel/user/account）与密码框（type=password）。
+     */
+    fun autoFillCredentials(username: String, password: String) {
+        mainHandler.post {
+            val wv = activeWebView() ?: return@post
+            val js = """
+                (function() {
+                  function setVal(el, v) {
+                    var proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+                    var setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+                    setter.call(el, v);
+                    el.dispatchEvent(new Event('input', {bubbles:true}));
+                    el.dispatchEvent(new Event('change', {bubbles:true}));
+                  }
+                  var pass = document.querySelector('input[type=password]');
+                  var user = document.querySelector('input[type=email], input[type=tel], input[name*="user" i], input[name*="email" i], input[name*="account" i], input[id*="user" i], input[id*="email" i]');
+                  if (user) setVal(user, ${JsonPrimitive(username)});
+                  if (pass) setVal(pass, ${JsonPrimitive(password)});
+                  return JSON.stringify({user: !!user, pass: !!pass});
+                })();
+            """.trimIndent()
+            wv.evaluateJavascript(js, null)
+        }
     }
 
     // ─────────────────────── 模型/工具操作（suspend） ───────────────────────
@@ -2313,70 +2494,63 @@ class BrowserController @Inject constructor(
     /** 列出所有标签页（供 list_tabs 工具与 UI 使用）。 */
     fun listTabs(): List<BrowserTabInfo> = tabsState.value
 
-    // ─────────────────────────── 下载 ───────────────────────────
-
-    /** 列出最近下载任务（供 downloads 工具查询）。 */
-    fun listDownloads(): List<BrowserDownloadInfo> = _downloads.value
-
-    /**
-     * 下载到工作区 downloads 目录（在 IO 协程执行，携带当前会话 Cookie）。
-     *
-     * @param url              下载地址
-     * @param userAgent        页面 UA（用于请求头）
-     * @param contentDisposition 响应 Content-Disposition（用于猜文件名）
-     * @param mimetype         响应 MIME 类型（用于猜文件名）
-     */
-    private suspend fun downloadToWorkspace(
-        url: String,
-        userAgent: String?,
-        contentDisposition: String?,
-        mimetype: String?
-    ) {
-        val id = UUID.randomUUID().toString()
-        val fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
-        val info = BrowserDownloadInfo(id = id, url = url, fileName = fileName, status = "downloading")
-        upsertDownload(info)
-
-        try {
-            val cookies = runCatching { CookieManager.getInstance().getCookie(url) }.getOrNull().orEmpty()
-            val downloadsDir = pathMapper.toHostFile("~/workspace/downloads")
-            downloadsDir.mkdirs()
-            val outFile = File(downloadsDir, fileName)
-
-            // 共享 OkHttp 下载（代理启用时经 mihomo 出口）；旧实现 HttpURLConnection 直连会绕过代理。
-            val req = Request.Builder()
-                .url(url)
-                .header("User-Agent", userAgent ?: "MiniMe-core-Browser")
-                .apply { if (cookies.isNotBlank()) header("Cookie", cookies) }
-                .build()
-            okHttp.newCall(req).execute().use { resp ->
-                if (resp.code !in 200..299) {
-                    throw IllegalStateException("下载失败（HTTP ${resp.code}）")
-                }
-                resp.body!!.byteStream().use { input -> outFile.outputStream().use { input.copyTo(it) } }
+    /** 关闭除 [keepId] 外的全部标签（F4.1 标签管理）。返回 null 成功，否则错误说明。 */
+    suspend fun closeOtherTabs(keepId: String): String? = mutex.withLock {
+        withContext(Dispatchers.Main) {
+            val keep = findTab(keepId) ?: return@withContext "标签不存在：$keepId"
+            val toClose = tabs.filter { it.id != keepId }
+            toClose.forEach { t ->
+                tabs.remove(t)
+                detachAndDestroy(t.webView)
             }
-
-            upsertDownload(
-                info.copy(
-                    status = "done",
-                    path = pathMapper.toContainerPath(outFile.absolutePath)
-                )
-            )
-            FileLogger.i(TAG, "下载完成: ${outFile.absolutePath}")
-        } catch (e: Exception) {
-            FileLogger.w(TAG, "下载失败: $url", e)
-            upsertDownload(info.copy(status = "error", error = e.message ?: "下载失败"))
+            activeTabId = keep.id
+            applyActiveTab(keep)
+            publishTabs()
+            null
         }
     }
 
-    /** 插入或更新下载任务（保留最多 50 条）。 */
-    private fun upsertDownload(info: BrowserDownloadInfo) {
-        val list = _downloads.value.toMutableList()
-        val idx = list.indexOfFirst { it.id == info.id }
-        if (idx >= 0) list[idx] = info else list.add(info)
-        if (list.size > 50) list.removeAt(0)
-        _downloads.value = list
+    /** 关闭 [fromId] 右侧（不含自身）的所有标签（F4.1）。 */
+    suspend fun closeRightTabs(fromId: String): String? = mutex.withLock {
+        withContext(Dispatchers.Main) {
+            val idx = tabs.indexOfFirst { it.id == fromId }
+            if (idx < 0) return@withContext "标签不存在：$fromId"
+            val toClose = tabs.drop(idx + 1)
+            val activeDropped = toClose.any { it.id == activeTabId }
+            toClose.forEach { t ->
+                tabs.remove(t)
+                detachAndDestroy(t.webView)
+            }
+            if (activeDropped) {
+                val target = findTab(fromId)
+                activeTabId = target?.id
+                target?.let(::applyActiveTab)
+            }
+            publishTabs()
+            null
+        }
     }
+
+    /** 关闭全部标签（F4.1）：至少保留当前激活标签，避免 WebView 为空。 */
+    suspend fun closeAllTabs(): String? = mutex.withLock {
+        withContext(Dispatchers.Main) {
+            val keep = activeTab() ?: tabs.firstOrNull() ?: return@withContext null
+            val toClose = tabs.filter { it.id != keep.id }
+            toClose.forEach { t ->
+                tabs.remove(t)
+                detachAndDestroy(t.webView)
+            }
+            activeTabId = keep.id
+            applyActiveTab(keep)
+            publishTabs()
+            null
+        }
+    }
+
+    // ─────────────────────────── 下载 ───────────────────────────
+
+    /** 列出最近下载任务（供 downloads 工具查询）。 */
+    fun listDownloads(): List<BrowserDownloadInfo> = downloadManager.downloads.value
 
     // ─────────────────────────── 内部实现 ───────────────────────────
 
@@ -2461,6 +2635,10 @@ class BrowserController @Inject constructor(
             allowFileAccess = true
             loadsImagesAutomatically = true
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            // F4.8 双指捏合缩放 + 双击缩放（系统默认手势）
+            builtInZoomControls = true
+            displayZoomControls = false
+            setSupportZoom(true)
             // 首次创建时记录原始移动 UA（去 wv 标记），供桌面版切换关闭后恢复
             if (originalUserAgent == null) originalUserAgent = userAgentString.replaceFirst("; wv", "")
             userAgentString = if (_uiState.value.desktopMode) DESKTOP_UA else (originalUserAgent ?: userAgentString.replaceFirst("; wv", ""))
@@ -2470,7 +2648,18 @@ class BrowserController @Inject constructor(
                 view.loadUrl(request.url.toString())
                 return true
             }
+            override fun shouldInterceptRequest(
+                view: WebView?,
+                request: WebResourceRequest?
+            ): android.webkit.WebResourceResponse? {
+                val url = request?.url?.toString() ?: return null
+                return if (adBlocker.shouldBlock(url)) {
+                    // 返回空响应以阻断广告/跟踪器请求
+                    android.webkit.WebResourceResponse("text/plain", "utf-8", null)
+                } else null
+            }
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                adBlocker.reset()
                 onTabLoading(tabId, true)
             }
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -2490,6 +2679,11 @@ class BrowserController @Inject constructor(
             }
             override fun onReceivedTitle(view: WebView?, title: String?) {
                 onTabTitle(tabId, title)
+            }
+            override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage): Boolean {
+                val line = "[${consoleMessage.messageLevel()}] ${consoleMessage.sourceId()}:${consoleMessage.lineNumber()} ${consoleMessage.message()}"
+                _consoleLogs.update { (it + line).takeLast(200) }
+                return true
             }
             override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
                 handleDialog("alert", message ?: "", result)
@@ -2518,9 +2712,9 @@ class BrowserController @Inject constructor(
                 return false
             }
         }
-        // 下载监听：把下载任务异步落到工作区 downloads 目录（携带 Cookie 保持登录态）
+        // 下载监听：F4.2 委托给 BrowserDownloadManager（进度/暂停/续传/通知）
         wv.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
-            scope.launch { downloadToWorkspace(url, userAgent, contentDisposition, mimetype) }
+            downloadManager.enqueue(url, userAgent, contentDisposition, mimetype)
         }
         // 动态数据捕获插桩：在 document-start 注入（比任何页面脚本早），抓取 fetch/XHR/WS/SSE 请求。
         try {
@@ -2571,6 +2765,11 @@ class BrowserController @Inject constructor(
                 canGoForward = view?.canGoForward() ?: false,
                 title = tab?.title ?: _uiState.value.title
             )
+            detectReaderAvailable()
+            // F4.6 检测页面语言
+            activeWebView()?.evaluateJavascript("(function(){return (document.documentElement.lang||'').toLowerCase();})();") { l ->
+                _pageLang.value = l?.trim()?.removePrefix("\"")?.removeSuffix("\"").orEmpty()
+            }
         }
     }
 

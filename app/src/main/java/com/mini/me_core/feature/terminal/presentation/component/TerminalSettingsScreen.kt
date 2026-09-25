@@ -221,6 +221,7 @@ fun TerminalSettingsScreen(
                         TerminalTheme.FOLLOW_APP -> stringResource(R.string.ui______40b081ab)
                         TerminalTheme.PURE_BLACK -> stringResource(R.string.ui______f5242d83)
                         TerminalTheme.PURE_WHITE -> stringResource(R.string.ui______c68108f0)
+                        else -> theme.stableKey
                     },
                     onClick = { showThemePicker = true },
                     showDivider = true

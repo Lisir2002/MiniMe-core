@@ -1,6 +1,8 @@
 package com.mini.me_core.feature.agent.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.feature.agent.presentation.component.markdown.MiniMeMarkdown
+import com.mini.me_core.feature.agent.presentation.component.markdown.MiniMeMarkdownCache
 
 import android.content.ClipData
 import androidx.compose.foundation.BorderStroke
@@ -23,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -79,12 +82,16 @@ internal fun AgentMessageItem(
     message: AgentUIMessage,
     liveOutput: String? = null,
     markdownCache: MarkdownRenderCache? = null,
+    miniMeMarkdownCache: MiniMeMarkdownCache? = null,
     onEditClick: ((AgentUIMessage) -> Unit)? = null,
     onNewChatClick: ((AgentUIMessage) -> Unit)? = null,
     initiallyExpanded: Boolean = true,
     environmentSnapshots: Map<String, EnvironmentSnapshot> = emptyMap(),
     agentState: AgentUIState = AgentUIState.Idle,
     onRetryTool: ((messageId: String) -> Unit)? = null,
+    // F2.3：消息快捷操作回调
+    onRegenerate: ((AgentUIMessage) -> Unit)? = null,
+    onDeleteMessage: ((AgentUIMessage) -> Unit)? = null,
     // Stage 4：连续同角色消息视觉分组（默认 null 保持向后兼容：单条消息四角大圆角）
     previousRole: MessageRole? = null,
     nextRole: MessageRole? = null
@@ -122,6 +129,8 @@ internal fun AgentMessageItem(
     // 混合模式：AI 回复左对齐限宽 95% 屏宽（无气泡，透明背景）
     val maxAssistantBubbleWidth = remember(screenWidthDp) { (screenWidthDp * 0.95).dp }
     var copied by remember { mutableStateOf(false) }
+    // F2.3：长按弹出快捷操作面板
+    var showActions by remember { mutableStateOf(false) }
     val clipboard = LocalClipboard.current
     val copyScope = rememberCoroutineScope()
 
@@ -201,6 +210,11 @@ internal fun AgentMessageItem(
                                 isAssistant -> Modifier.widthIn(max = maxAssistantBubbleWidth)
                                 else -> Modifier.fillMaxWidth()
                             }
+                                // F2.3：长按弹出快捷操作面板
+                                .combinedClickable(
+                                    onClick = {},
+                                    onLongClick = { showActions = true },
+                                )
                         ) {
                         if (message.role == MessageRole.TOOL) {
                             // Agent-First ToolCallCard：feature flag 控制，默认 false 走旧 ToolMessageBody（行为完全不变）
@@ -255,12 +269,12 @@ internal fun AgentMessageItem(
                                             modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm)
                                         )
                                     } else {
-                                        MarkdownContent(
+                                        // F2.1：接入 MiniMe 自研 Markdown 渲染器（代码块语法高亮+复制、表格、列表、引用、图片缩略图）
+                                        MiniMeMarkdown(
                                             text = message.content,
-                                            color = textColor,
-                                            // 混合模式：AI 回复内边距（左侧竖线已有 12dp 间距，start=0；右侧 16dp；垂直 4dp）
+                                            contentColor = textColor,
                                             modifier = Modifier.padding(start = 0.dp, end = Spacing.lg, top = Spacing.xs, bottom = Spacing.xs),
-                                            cache = markdownCache
+                                            cache = miniMeMarkdownCache,
                                         )
                                     }
                                 }
@@ -348,6 +362,25 @@ internal fun AgentMessageItem(
                 }
             }
         }
+    }
+
+    // F2.3：长按消息弹出快捷操作面板
+    if (showActions) {
+        ChatMessageActionsSheet(
+            message = message,
+            onDismiss = { showActions = false },
+            onCopyText = {
+                copyScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("message", message.content))) }
+                copied = true
+            },
+            onCopyCodeBlock = { code ->
+                copyScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("message", code))) }
+                copied = true
+            },
+            onRegenerate = { onRegenerate?.invoke(message) },
+            onEditResend = { onEditClick?.invoke(message) },
+            onDelete = { onDeleteMessage?.invoke(message) },
+        )
     }
 }
 

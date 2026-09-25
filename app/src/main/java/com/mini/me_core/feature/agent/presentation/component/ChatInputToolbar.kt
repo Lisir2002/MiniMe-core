@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Construction
 import androidx.compose.material.icons.rounded.Map
 import androidx.compose.material.icons.rounded.MoreHoriz
@@ -76,6 +77,7 @@ internal fun ChatInputToolbar(
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
     isBusy: Boolean,
     onOpenSkills: () -> Unit,
+    onOpenTemplates: () -> Unit = {},
     onOpenAttachmentSheet: () -> Unit,
     canSend: Boolean,
     tokenProgress: Float,
@@ -114,6 +116,14 @@ internal fun ChatInputToolbar(
                     contentDescription = stringResource(R.string.skill_conversation_entry),
                     tint = ChatAccent.Skill.resolve(),
                     onClick = onOpenSkills
+                )
+                // F2.7：模板按钮
+                UploadIconButton(
+                    enabled = !isBusy,
+                    icon = Icons.Rounded.Description,
+                    contentDescription = stringResource(R.string.template_open),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    onClick = onOpenTemplates
                 )
             }
         }

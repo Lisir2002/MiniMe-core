@@ -158,10 +158,34 @@ internal fun StreamingBubble(text: String) {
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(Spacing.xs))
-                TypingDots(color = MaterialTheme.colorScheme.primary, dotSize = 5.dp)
+                // F2.4：末尾闪烁打字光标「|」，primary 色，500ms 周期
+                BlinkingCursor(color = MaterialTheme.colorScheme.primary)
             }
         }
     }
+}
+
+/**
+ * F2.4 打字光标：AI 流式回复末尾闪烁的竖线「|」，primary 色，500ms 亮 / 500ms 灭。
+ */
+@Composable
+internal fun BlinkingCursor(color: androidx.compose.ui.graphics.Color) {
+    val transition = rememberInfiniteTransition(label = "cursor")
+    val alpha by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes { durationMillis = 1000 },
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "cursorAlpha"
+    )
+    Box(
+        modifier = Modifier
+            .height(16.dp)
+            .width(2.dp)
+            .background(color.copy(alpha = alpha))
+    )
 }
 
 /** 思维链折叠阈值：超过此行数视为过长，自动折叠为前 N 行 + 「展开剩余 X 行」。 */

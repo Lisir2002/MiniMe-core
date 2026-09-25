@@ -112,14 +112,22 @@ data class BrowserTabInfo(
     val url: String = ""
 )
 
-/** 下载任务状态（供 downloads 工具 / 模型查询）。 */
+/** 下载任务状态（供 downloads 工具 / 模型查询 / 下载管理 UI）。 */
 data class BrowserDownloadInfo(
     val id: String,
     val url: String,
     val fileName: String = "",
     val path: String = "",
-    val status: String = "downloading", // downloading / done / error
-    val error: String = ""
+    val status: String = "downloading", // downloading / paused / done / error / cancelled
+    val error: String = "",
+    /** 总字节数（未知为 -1）。 */
+    val totalBytes: Long = -1L,
+    /** 已下载字节数。 */
+    val downloadedBytes: Long = 0L,
+    /** 瞬时下载速度（字节/秒）。 */
+    val speedBps: Long = 0L,
+    /** 入队时间（epoch millis）。 */
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 /** 浏览器当前状态（UI 观察）。 */

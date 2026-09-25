@@ -47,6 +47,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -65,11 +66,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
@@ -80,6 +87,7 @@ import com.mini.me_core.core.theme.components.AppSectionHeader
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
+import com.mini.me_core.feature.agent.domain.container.ContainerArch
 import com.mini.me_core.feature.agent.domain.container.ContainerProfile
 import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
@@ -148,6 +156,7 @@ fun TerminalContainerScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     var showResetConfirm by remember { mutableStateOf(false) }
     var showMirrorPicker by remember { mutableStateOf(false) }
+    var showImagePicker by remember { mutableStateOf(false) }
     var showHeartbeatPicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
     var showProfileSheet by remember { mutableStateOf(false) }
@@ -160,6 +169,8 @@ fun TerminalContainerScreen(
     // 每个 Tab 独立的滚动状态
     val containerScrollState = rememberScrollState()
     val terminalScrollState = rememberScrollState()
+    // F3.1：容器 Tab 内子切换（0=状态/镜像 1=文件管理器）
+    var containerSubTab by remember { mutableIntStateOf(0) }
 
     // 新添加 profile 后高亮闪烁
     LaunchedEffect(highlightedProfileId) {
@@ -229,38 +240,73 @@ fun TerminalContainerScreen(
             // ── Tab 内容 ──
             Box(modifier = Modifier.weight(1f)) {
                 when (selectedTab) {
-                    0 -> ContainerTabContent(
-                        scrollState = containerScrollState,
-                        viewModel = viewModel,
-                        containerInit = containerInit,
-                        containerInstalled = containerInstalled,
-                        storageUsedMb = storageUsedMb,
-                        profiles = profiles,
-                        activeProfile = activeProfile,
-                        activeProfileId = activeProfileId,
-                        storageShareEnabled = storageShareEnabled,
-                        remoteConnections = remoteConnections,
-                        isRemoteMode = isRemoteMode,
-                        highlightedProfileId = highlightedProfileId,
-                        onInit = viewModel::ensureContainerInstalled,
-                        onRestart = viewModel::restartContainer,
-                        onReset = { showResetConfirm = true },
-                        onPickMirror = { showMirrorPicker = true },
-                        onSwitchImage = { scope.launch { containerScrollState.animateScrollTo(500) } },
-                        onStorageShareChange = viewModel::setStorageShareEnabled,
-                        onSelectProfile = { profile ->
-                            // 检查运行中的会话
-                            if (runningSessionCount > 0 && profile.id != activeProfileId) {
-                                pendingSwitchProfile = profile
-                            } else {
-                                viewModel.setActiveContainerProfile(profile.id)
+                    0 -> Column(modifier = Modifier.fillMaxSize()) {
+                        // F3.1：容器子切换 [状态] [文件]
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        ) {
+                            listOf(
+                                stringResource(R.string.tc_subtab_status) to 0,
+                                stringResource(R.string.tc_subtab_files) to 1
+                            ).forEach { (label, idx) ->
+                                val isSel = containerSubTab == idx
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
+                                        .background(if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
+                                        .clickable { containerSubTab = idx }
+                                        .padding(horizontal = Spacing.md, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        label,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = if (isSel) MaterialTheme.colorScheme.onPrimaryContainer
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
-                        },
-                        onEditProfile = { editingProfile = it },
-                        onDeleteProfile = { deletingProfile = it },
-                        onResetBuiltin = { pendingResetBuiltin = it },
-                        onAddProfile = { showProfileSheet = true },
-                    )
+                        }
+                        when (containerSubTab) {
+                            1 -> ContainerFileManager(
+                                access = viewModel.fileAccess,
+                                modifier = Modifier.weight(1f)
+                            )
+                            else -> ContainerTabContent(
+                                scrollState = containerScrollState,
+                                viewModel = viewModel,
+                                containerInit = containerInit,
+                                containerInstalled = containerInstalled,
+                                storageUsedMb = storageUsedMb,
+                                profiles = profiles,
+                                activeProfile = activeProfile,
+                                activeProfileId = activeProfileId,
+                                storageShareEnabled = storageShareEnabled,
+                                remoteConnections = remoteConnections,
+                                isRemoteMode = isRemoteMode,
+                                highlightedProfileId = highlightedProfileId,
+                                onInit = viewModel::ensureContainerInstalled,
+                                onRestart = viewModel::restartContainer,
+                                onReset = { showResetConfirm = true },
+                                onPickMirror = { showMirrorPicker = true },
+                                onSwitchImage = { showImagePicker = true },
+                                onStorageShareChange = viewModel::setStorageShareEnabled,
+                                onSelectProfile = { profile ->
+                                    if (runningSessionCount > 0 && profile.id != activeProfileId) {
+                                        pendingSwitchProfile = profile
+                                    } else {
+                                        viewModel.setActiveContainerProfile(profile.id)
+                                    }
+                                },
+                                onEditProfile = { editingProfile = it },
+                                onDeleteProfile = { deletingProfile = it },
+                                onResetBuiltin = { pendingResetBuiltin = it },
+                                onAddProfile = { showProfileSheet = true },
+                            )
+                        }
+                    }
                     1 -> TerminalTabContent(
                         scrollState = terminalScrollState,
                         fontSizeSp = fontSizeSp,
@@ -379,16 +425,13 @@ fun TerminalContainerScreen(
             onDismissRequest = { showResetConfirm = false },
             title = { Text(stringResource(R.string.ui______8415b836)) },
             text = {
-                Text(
-                    stringResource(R.string.ui_______f68e836c) +
-                        stringResource(R.string.ui_app_d6e3250f)
-                )
+                Text(stringResource(R.string.tc_reset_confirm_message))
             },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.resetContainer { showResetConfirm = false }
                 }) {
-                    Text("确认重置", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.tc_reset_confirm_button), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
@@ -429,6 +472,38 @@ fun TerminalContainerScreen(
             onConfirm = { mirror ->
                 viewModel.setMirrorAndRefresh(mirror)
                 showMirrorPicker = false
+            }
+        )
+    }
+
+    // 切换镜像选择
+    if (showImagePicker) {
+        ImagePickerDialogInternal(
+            profiles = profiles,
+            activeProfileId = activeProfileId,
+            onDismiss = { showImagePicker = false },
+            onPick = { profile ->
+                showImagePicker = false
+                when {
+                    profile.id == activeProfileId -> {
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                message = context.getString(R.string.tc_current_image_using),
+                                duration = SnackbarDuration.Short
+                            )
+                        }
+                    }
+                    profiles.size <= 1 -> {
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                message = context.getString(R.string.tc_no_other_images),
+                                duration = SnackbarDuration.Short
+                            )
+                        }
+                    }
+                    runningSessionCount > 0 -> pendingSwitchProfile = profile
+                    else -> viewModel.setActiveContainerProfile(profile.id)
+                }
             }
         )
     }
@@ -677,6 +752,7 @@ private fun TerminalTabContent(
                     TerminalTheme.FOLLOW_APP -> stringResource(R.string.ui______40b081ab)
                     TerminalTheme.PURE_BLACK -> stringResource(R.string.ui______f5242d83)
                     TerminalTheme.PURE_WHITE -> stringResource(R.string.ui______c68108f0)
+                    else -> theme.stableKey
                 },
                 onViewClick = onThemeClick,
                 showDivider = true
@@ -862,33 +938,108 @@ internal fun StepperRow(
 // ================================================================
 // Dialogs (internal, copied from TerminalSettingsScreen)
 // ================================================================
+
+@Composable
+internal fun ImagePickerDialogInternal(
+    profiles: List<ContainerProfile>,
+    activeProfileId: String,
+    onDismiss: () -> Unit,
+    onPick: (ContainerProfile) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.tc_pick_image_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                profiles.forEach { profile ->
+                    val isActive = profile.id == activeProfileId
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+                            .clickable { onPick(profile) }
+                            .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = profile.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = when (profile.arch) {
+                                    ContainerArch.X86_64 -> "x86_64"
+                                    ContainerArch.ARM64 -> "aarch64"
+                                } + if (profile.mode == ExecutionMode.REMOTE_SSH)
+                                    " · " + stringResource(R.string.tc_profile_ssh)
+                                else " · " + stringResource(R.string.tc_profile_local),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (isActive) {
+                            Text(
+                                text = stringResource(R.string.tc_image_picker_active_tag),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        }
+    )
+}
+
 @Composable
 internal fun MirrorPickerDialogInternal(
     current: String,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
-    val options = remember {
-        listOf(
-            "阿里云镜像（默认）" to "https://mirrors.aliyun.com/alpine",
-            "清华 TUNA" to "https://mirrors.tuna.tsinghua.edu.cn/alpine",
-            "中科大 USTC" to "https://mirrors.ustc.edu.cn/alpine",
-            "官方 dl-cdn" to "https://dl-cdn.alpinelinux.org/alpine",
-            "自定义（保留当前）" to current
-        )
+    // 预设镜像：label 走 strings.xml，url 为固定值。
+    val presets = listOf(
+        stringResource(R.string.tc_mirror_aliyun) to "https://mirrors.aliyun.com/alpine",
+        stringResource(R.string.tc_mirror_tuna) to "https://mirrors.tuna.tsinghua.edu.cn/alpine",
+        stringResource(R.string.tc_mirror_ustc) to "https://mirrors.ustc.edu.cn/alpine",
+        stringResource(R.string.tc_mirror_official) to "https://dl-cdn.alpinelinux.org/alpine",
+    )
+    val customLabel = stringResource(R.string.tc_mirror_custom_option)
+    // 选中项：要么是某个预设 url，要么是 CUSTOM 标记。
+    val customTag = "__custom__"
+    val initialSelection = presets.firstOrNull { it.second == current }?.second ?: customTag
+    var selected by remember { mutableStateOf(initialSelection) }
+    var customUrl by remember { mutableStateOf(current) }
+    val customFocusRequester = remember { FocusRequester() }
+
+    // 选中"自定义"时自动聚焦输入框。
+    LaunchedEffect(selected) {
+        if (selected == customTag) {
+            runCatching { customFocusRequester.requestFocus() }
+        }
     }
-    var selected by remember {
-        mutableStateOf(options.firstOrNull { it.second == current }?.first ?: options[0].first)
-    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.ui____1d3311a8)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                options.forEach { (label, url) ->
+                presets.forEach { (label, url) ->
                     FilterChip(
-                        selected = label == selected,
-                        onClick = { selected = label },
+                        selected = selected == url,
+                        onClick = { selected = url },
                         label = {
                             Column {
                                 Text(label)
@@ -902,10 +1053,42 @@ internal fun MirrorPickerDialogInternal(
                         }
                     )
                 }
+                // 自定义选项
+                FilterChip(
+                    selected = selected == customTag,
+                    onClick = { selected = customTag },
+                    label = { Text(customLabel) }
+                )
+                // 自定义输入框：仅在选中"自定义"时展示。
+                if (selected == customTag) {
+                    OutlinedTextField(
+                        value = customUrl,
+                        onValueChange = { customUrl = it },
+                        label = { Text(stringResource(R.string.tc_mirror_custom_label)) },
+                        placeholder = { Text(stringResource(R.string.tc_mirror_custom_placeholder)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Uri,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                val value = customUrl.trim()
+                                if (value.isNotBlank()) onConfirm(value)
+                            }
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(customFocusRequester)
+                    )
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(options.first { it.first == selected }.second) }) {
+            TextButton(onClick = {
+                val value = if (selected == customTag) customUrl.trim() else selected
+                if (value.isNotBlank()) onConfirm(value)
+            }) {
                 Text(stringResource(R.string.ui____e83a256e))
             }
         },

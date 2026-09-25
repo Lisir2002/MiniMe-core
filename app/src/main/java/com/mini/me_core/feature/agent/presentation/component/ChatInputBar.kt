@@ -71,7 +71,8 @@ internal fun ChatInputBar(
     queuedRequests: List<QueuedRequest> = emptyList(),
     onRemoveQueued: (String) -> Unit = {},
     tokenProgress: Float = 0f,
-    onOpenSkills: () -> Unit = {}
+    onOpenSkills: () -> Unit = {},
+    onOpenTemplates: () -> Unit = {}
 ) {
     val canSend = (value.isNotBlank() || pendingAttachments.isNotEmpty()) && !isBusy
     var showAttachmentSheet by remember { mutableStateOf(false) }
@@ -184,6 +185,7 @@ internal fun ChatInputBar(
                         onReasoningEffortChange = onReasoningEffortChange,
                         isBusy = isBusy,
                         onOpenSkills = onOpenSkills,
+                        onOpenTemplates = onOpenTemplates,
                         onOpenAttachmentSheet = { showAttachmentSheet = true },
                         canSend = canSend,
                         tokenProgress = tokenProgress,

@@ -41,6 +41,9 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.CompareArrows
+import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material.icons.rounded.Terminal
 
 /**
@@ -65,6 +68,11 @@ internal fun ChatHeader(
     onNavigateToTerminal: () -> Unit,
     onNavigateToGit: () -> Unit,
     onNavigateToBrowser: () -> Unit = {},
+    onSearch: () -> Unit = {},
+    onExport: () -> Unit = {},
+    compareMode: Boolean = false,
+    onToggleCompare: () -> Unit = {},
+    contextWindow: Int = 0,
     connectionState: com.mini.me_core.feature.agent.domain.container.ConnectionState? = null
 ) {
     Surface(
@@ -113,7 +121,46 @@ internal fun ChatHeader(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        // F2.6：Token 消耗指示器（紧邻模型名）
+                        if (contextWindow > 0 && inputTokens > 0) {
+                            TokenUsageIndicator(
+                                inputTokens = inputTokens,
+                                outputTokens = outputTokens,
+                                contextWindow = contextWindow,
+                            )
+                        }
                     }
+                }
+                IconButton(
+                    onClick = onSearch,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Search,
+                        contentDescription = stringResource(R.string.chat_search_open),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp))
+                }
+                IconButton(
+                    onClick = onExport,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Upload,
+                        contentDescription = stringResource(R.string.export_title),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp))
+                }
+                IconButton(
+                    onClick = onToggleCompare,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.CompareArrows,
+                        contentDescription = stringResource(R.string.compare_mode),
+                        tint = if (compareMode) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp))
                 }
                 IconButton(
                     onClick = onNewChat,

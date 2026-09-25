@@ -1,7 +1,6 @@
 package com.mini.me_core.feature.terminal.presentation.component
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,8 +73,6 @@ fun ContainerStatusCard(
     onPickMirror: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-
     // 状态徽章
     val (statusText, statusColor) = when (initProgress) {
         is ContainerInitState.Failed -> stringResource(R.string.tc_status_error) to MaterialTheme.colorScheme.error
@@ -104,13 +101,11 @@ fun ContainerStatusCard(
     } else null
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .border(1.dp, borderColor, RoundedCornerShape(LocalCornerRadius.current.lg)),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         shape = RoundedCornerShape(LocalCornerRadius.current.lg)
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {

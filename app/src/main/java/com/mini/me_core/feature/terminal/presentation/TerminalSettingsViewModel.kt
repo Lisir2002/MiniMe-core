@@ -25,6 +25,7 @@ import com.mini.me_core.feature.terminal.data.repository.SshHeartbeatSeconds
 import com.mini.me_core.feature.terminal.data.repository.TerminalBundleRepository
 import com.mini.me_core.feature.terminal.data.repository.TerminalSettingsRepository
 import com.mini.me_core.feature.terminal.data.repository.TerminalTheme
+import com.mini.me_core.feature.terminal.domain.ContainerFileAccess
 import com.mini.me_core.feature.terminal.domain.TerminalSessionManager
 import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
 import com.mini.me_core.feature.workspace.domain.remote.RemoteAuth
@@ -66,9 +67,13 @@ class TerminalSettingsViewModel @Inject constructor(
     private val containerInstaller: ContainerInstaller,
     private val executionModeHolder: ExecutionModeHolder,
     private val remoteSshConnection: RemoteSshConnection,
+    private val containerFileAccess: ContainerFileAccess,
 ) : AndroidViewModel(application) {
 
     private val appContext get() = getApplication<Application>().applicationContext
+
+    /** 容器文件访问层（F3.1 文件管理器用）。 */
+    val fileAccess: ContainerFileAccess get() = containerFileAccess
 
     private companion object { const val TAG = "TerminalSettingsVM" }
 
@@ -435,14 +440,14 @@ class TerminalSettingsViewModel @Inject constructor(
         }
     }
 
-    /** 重启容器：resetContainer 后 ensureInstalled（如果容器已安装）。 */
+    /**
+     * 重启容器：杀掉当前 proot 进程并重新就绪，**保留所有数据与配置**（不删除 rootfs、
+     * 不重新解压、不清空已安装的包）。与 [resetContainer]（清除全部数据恢复镜像初始态）明确区分。
+     */
     fun restartContainer() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            runCatching { containerEngine.resetContainer() }
+            runCatching { containerEngine.restartContainerKeepData() }
                 .onFailure { postError(it.message ?: "重启容器失败") }
-            // resetContainer 后容器会回到未安装状态，这里重新初始化
-            runCatching { containerEngine.ensureInstalled() }
-                .onFailure { postError(it.message ?: "重启后初始化失败") }
             refreshStorageUsed()
         }
     }

@@ -7,11 +7,16 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 终端内容区配色：仅两套 + 跟随系统。 */
+/** 终端内容区配色：跟随系统 + 纯黑/纯白 + F3.6 内置 6 主题。 */
 enum class TerminalTheme(val stableKey: String) {
     FOLLOW_APP("system"),
     PURE_BLACK("pure_black"),
     PURE_WHITE("pure_white"),
+    DRACULA("dracula"),
+    SOLARIZED_DARK("solarized_dark"),
+    SOLARIZED_LIGHT("solarized_light"),
+    MONOKAI("monokai"),
+    GITHUB_DARK("github_dark"),
 }
 
 /** SSH 心跳间隔枚举。 */

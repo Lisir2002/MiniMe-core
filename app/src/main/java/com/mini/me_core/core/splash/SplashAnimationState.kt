@@ -1,13 +1,12 @@
 package com.mini.me_core.core.splash
 
 /**
- * Splash animation stage timeline (total 6000ms).
+ * Splash animation stage timeline.
  *
- * 0.0-1.5s  EXPLODE     mixed particles burst outward from center with trails
- * 1.5-3.5s  CONVERGE    all particles fly to form the "MiniMe-core" text shape
- * 3.5-4.5s  HOLD        text fully formed, breathing scale + shimmer sweep
- * 4.5-5.5s  SHATTER     text particles explode + screen glass shatters in 3D
- * 5.5-6.0s  FADE_OUT    shards fade, main screen fades in underneath
+ * Timing scales by quality level:
+ * HIGH:  6.0s total (1.5 explode / 2.0 converge / 1.0 hold / 1.0 shatter / 0.5 fade)
+ * MEDIUM: 5.0s total (1.25 / 1.75 / 0.75 / 0.75 / 0.5)
+ * LOW:    4.0s total (1.0 / 1.5 / 0.5 / 0.75 / 0.25)
  */
 enum class SplashStage {
     EXPLODE,
@@ -18,35 +17,60 @@ enum class SplashStage {
     COMPLETE;
 
     companion object {
-        const val TOTAL_DURATION_MS = 6_000L
-        const val EXPLODE_END_MS = 1_500L
-        const val CONVERGE_END_MS = 3_500L
-        const val HOLD_END_MS = 4_500L
-        const val SHATTER_END_MS = 5_500L
+        fun totalDurationMs(quality: SplashQualityLevel): Long = quality.durationMs
 
-        fun fromElapsed(elapsedMs: Long): SplashStage = when {
-            elapsedMs < EXPLODE_END_MS -> EXPLODE
-            elapsedMs < CONVERGE_END_MS -> CONVERGE
-            elapsedMs < HOLD_END_MS -> HOLD
-            elapsedMs < SHATTER_END_MS -> SHATTER
-            elapsedMs < TOTAL_DURATION_MS -> FADE_OUT
+        fun explodeEndMs(quality: SplashQualityLevel): Long = when (quality) {
+            SplashQualityLevel.HIGH -> 1_500L
+            SplashQualityLevel.MEDIUM -> 1_250L
+            SplashQualityLevel.LOW -> 1_000L
+        }
+
+        fun convergeEndMs(quality: SplashQualityLevel): Long = when (quality) {
+            SplashQualityLevel.HIGH -> 3_500L
+            SplashQualityLevel.MEDIUM -> 3_000L
+            SplashQualityLevel.LOW -> 2_500L
+        }
+
+        fun holdEndMs(quality: SplashQualityLevel): Long = when (quality) {
+            SplashQualityLevel.HIGH -> 4_500L
+            SplashQualityLevel.MEDIUM -> 3_750L
+            SplashQualityLevel.LOW -> 3_000L
+        }
+
+        fun shatterEndMs(quality: SplashQualityLevel): Long = when (quality) {
+            SplashQualityLevel.HIGH -> 5_500L
+            SplashQualityLevel.MEDIUM -> 4_500L
+            SplashQualityLevel.LOW -> 3_750L
+        }
+
+        fun fromElapsed(elapsedMs: Long, quality: SplashQualityLevel): SplashStage = when {
+            elapsedMs < explodeEndMs(quality) -> EXPLODE
+            elapsedMs < convergeEndMs(quality) -> CONVERGE
+            elapsedMs < holdEndMs(quality) -> HOLD
+            elapsedMs < shatterEndMs(quality) -> SHATTER
+            elapsedMs < totalDurationMs(quality) -> FADE_OUT
             else -> COMPLETE
         }
 
-        /** Progress within the current stage, 0..1 */
-        fun stageProgress(elapsedMs: Long): Float = when (fromElapsed(elapsedMs)) {
-            EXPLODE -> elapsedMs.toFloat() / EXPLODE_END_MS
-            CONVERGE -> (elapsedMs - EXPLODE_END_MS).toFloat() / (CONVERGE_END_MS - EXPLODE_END_MS)
-            HOLD -> (elapsedMs - CONVERGE_END_MS).toFloat() / (HOLD_END_MS - CONVERGE_END_MS)
-            SHATTER -> (elapsedMs - HOLD_END_MS).toFloat() / (SHATTER_END_MS - HOLD_END_MS)
-            FADE_OUT -> (elapsedMs - SHATTER_END_MS).toFloat() / (TOTAL_DURATION_MS - SHATTER_END_MS)
-            COMPLETE -> 1f
+        fun stageProgress(elapsedMs: Long, quality: SplashQualityLevel): Float {
+            val eEnd = explodeEndMs(quality)
+            val cEnd = convergeEndMs(quality)
+            val hEnd = holdEndMs(quality)
+            val sEnd = shatterEndMs(quality)
+            val total = totalDurationMs(quality)
+            return when (fromElapsed(elapsedMs, quality)) {
+                EXPLODE -> elapsedMs.toFloat() / eEnd
+                CONVERGE -> (elapsedMs - eEnd).toFloat() / (cEnd - eEnd)
+                HOLD -> (elapsedMs - cEnd).toFloat() / (hEnd - cEnd)
+                SHATTER -> (elapsedMs - hEnd).toFloat() / (sEnd - hEnd)
+                FADE_OUT -> (elapsedMs - sEnd).toFloat() / (total - sEnd)
+                COMPLETE -> 1f
+            }
         }
 
-        /** Remaining seconds for the skip button countdown, 6..0 */
-        fun remainingSeconds(elapsedMs: Long): Int {
+        fun remainingSeconds(elapsedMs: Long, quality: SplashQualityLevel): Int {
             val secs = elapsedMs / 1000L
-            return (TOTAL_DURATION_MS / 1000L - secs).toInt().coerceAtLeast(0)
+            return (totalDurationMs(quality) / 1000L - secs).toInt().coerceAtLeast(0)
         }
     }
 }

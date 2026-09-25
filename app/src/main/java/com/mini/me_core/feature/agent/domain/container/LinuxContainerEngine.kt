@@ -952,6 +952,53 @@ class LinuxContainerEngine @Inject constructor(
         _initProgress.value = ContainerInitState.Idle
     }
 
+    /**
+     * 重启容器（保留所有数据与配置）：
+     *
+     * 与 [resetContainer] 的区别——**不删除 rootfs、不清空已安装的包/配置**，只做：
+     *  1. 杀掉所有仍在运行的 proot 子进程（终端会话 / AI 命令进程 / MCP 进程），让它们干净退出；
+     *  2. 重新校验 rootfs 与 proot 是否就位（已就位则直接置 Ready，不重新解压）；
+     *  3. 刷新容器内 $HOME 缓存。
+     *
+     * 适用于"容器卡住了 / 环境异常但不想丢数据"的场景。下次新开终端会话会以全新 proot
+     * 进程启动，挂载的 rootfs 与用户安装的包全部保留。
+     */
+    suspend fun restartContainerKeepData() = withContext(Dispatchers.IO) {
+        // 1) 杀掉本 app 进程树下的 proot / qemu 子进程。
+        //    宿主 shell 下用 pkill 按可执行文件名匹配；proot 跑在本 app UID 下，权限足够。
+        //    忽略一切失败（无权限 / 无匹配进程都是正常情况）。
+        runCatching {
+            val prootNames = buildList {
+                add(containerInstaller.prootBin.name)
+                containerInstaller.prootX86Bin.name.let { if (it.isNotBlank()) add(it) }
+                containerInstaller.qemuX86Bin.name.let { if (it.isNotBlank()) add(it) }
+            }.distinct()
+            val killScript = prootNames.joinToString(" ") { "pkill -9 -x '$it' 2>/dev/null || true" }
+            val pb = ProcessBuilder("/system/bin/sh", "-c", killScript)
+                .redirectErrorStream(true)
+            val p = pb.start()
+            runCatching { p.inputStream.readBytes() }
+            runCatching { p.waitFor() }
+        }.onFailure { FileLogger.w(TAG, "杀掉 proot 进程失败（不阻塞重启）", it) }
+
+        // 2) 等待一小段时间让进程真正退出，避免 ETXTBSY / 句柄占用。
+        delay(300)
+
+        // 3) 重新校验 rootfs/proot 是否就位（不删除任何文件）。
+        val profile = currentProfile
+        if (containerInstaller.isInstalledFor(profile)) {
+            bundleRepository.updateRootfsDir(containerInstaller.rootfsDirFor(profile))
+            val migrated = bundleRepository.migrateIfNeededAfterBoot()
+            _initProgress.value = ContainerInitState.Ready(migratedFromLegacyProvisioned = migrated)
+            refreshContainerHome()
+            FileLogger.i(TAG, "容器已重启（保留数据）：rootfs=${containerInstaller.rootfsDirFor(profile).absolutePath}")
+        } else {
+            // rootfs 居然没了（被外部删了），回到 Idle 等用户重新初始化。
+            _initProgress.value = ContainerInitState.Idle
+            FileLogger.w(TAG, "重启时发现 rootfs 不存在，回到 Idle")
+        }
+    }
+
     /** 切换 Alpine 镜像源并立刻 apk update 让其生效。成功返回 true。 */
     suspend fun setApkMirrorAndUpdate(mirror: String = ContainerInstaller.ALPINE_MIRROR): Boolean {
         if (!containerInstaller.isInstalledFor(currentProfile)) return false
@@ -1360,6 +1407,19 @@ class LinuxContainerEngine @Inject constructor(
                 argv.add("${external.absolutePath}:/root/storage/shared")
             } else {
                 FileLogger.w(TAG, "存储共享已开启但外存路径不可用（${external?.absolutePath}），跳过绑定")
+            }
+        }
+
+        // F3.5：自动挂载宿主 Download 目录到容器 /mnt/shared，实现容器与宿主快速互传。
+        // 与存储共享同走 legacy storage；源目录不存在时跳过（与外存共享一致）。
+        runCatching {
+            val download = android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DOWNLOADS
+            )
+            if (download != null && download.exists()) {
+                java.io.File("$rootfs/mnt").mkdirs()
+                argv.add("-b")
+                argv.add("${download.absolutePath}:/mnt/shared")
             }
         }
 

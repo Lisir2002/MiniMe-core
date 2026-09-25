@@ -18,6 +18,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,8 +32,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -57,7 +60,12 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.DesktopWindows
+import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.HourglassEmpty
@@ -71,6 +79,7 @@ import androidx.compose.material.icons.rounded.OpenInBrowser
 import androidx.compose.material.icons.rounded.OpenWith
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PrivacyTip
+import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Replay
@@ -124,7 +133,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.FilterChip
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -197,6 +212,16 @@ fun ServiceBrowserScreen(
     val pendingLoginPrompt by loginPromptManager.pendingPrompt.collectAsStateWithLifecycle()
     val pendingTakeover by takeoverManager.pending.collectAsStateWithLifecycle()
     val downloads by browserController.downloads.collectAsStateWithLifecycle()
+    val activeDownloadCount by browserController.activeDownloadCount.collectAsStateWithLifecycle()
+
+    // F4.3 密码管理器（在现有加密凭据存储之上）
+    val passwordManager = remember(credentialStore) {
+        com.mini.me_core.feature.browser.domain.BrowserPasswordManager(credentialStore)
+    }
+    val pwmLocked by passwordManager.locked.collectAsStateWithLifecycle()
+    val blockedCount by browserController.blockedCount.collectAsStateWithLifecycle()
+    val consoleLogs by browserController.consoleLogs.collectAsStateWithLifecycle()
+    val gestureSettings by browserController.gestureSettings.collectAsStateWithLifecycle()
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -214,6 +239,14 @@ fun ServiceBrowserScreen(
     var showZoom by remember { mutableStateOf(false) }
     var showAiPanel by remember { mutableStateOf(false) }
     var aiPaused by remember { mutableStateOf(false) }
+    var showTabManager by remember { mutableStateOf(false) }
+    var confirmCloseAll by remember { mutableStateOf(false) }
+    var confirmCloseOthers by remember { mutableStateOf(false) }
+    var showPrivacy by remember { mutableStateOf(false) }
+    var showDevTools by remember { mutableStateOf(false) }
+    var devNetwork by remember { mutableStateOf(listOf<com.mini.me_core.feature.browser.domain.BrowserNetworkRecord>()) }
+    var devDom by remember { mutableStateOf("") }
+    var devStorage by remember { mutableStateOf("") }
 
     // 地址栏位置偏好（SharedPreferences 持久化）
     var addressBarAtBottom by remember {
@@ -270,6 +303,18 @@ fun ServiceBrowserScreen(
         scope.launch { browserController.newTab(null) }
     }
 
+    fun closeOthersTabs(keepId: String) {
+        scope.launch { browserController.closeOtherTabs(keepId) }
+    }
+
+    fun closeRightTabs(fromId: String) {
+        scope.launch { browserController.closeRightTabs(fromId) }
+    }
+
+    fun closeAllTabs() {
+        scope.launch { browserController.closeAllTabs() }
+    }
+
     fun shareCurrent() {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
@@ -301,7 +346,21 @@ fun ServiceBrowserScreen(
     }
 
     fun retryDownload(info: BrowserDownloadInfo) {
-        scope.launch { browserController.retryDownload(info) }
+        browserController.retryDownload(info)
+    }
+
+    fun shareDownload(info: BrowserDownloadInfo) {
+        val file = browserController.downloadHostFile(info) ?: return
+        val uri = runCatching {
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        }.getOrNull() ?: return
+        val mime = MimeTypeMap.getSingleton()
+            .getMimeTypeFromExtension(file.extension.lowercase()) ?: "*/*"
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            setDataAndType(uri, mime)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        runCatching { context.startActivity(Intent.createChooser(intent, null)) }
     }
 
     // ===== 顶部栏（标签栏 + 地址栏） =====
@@ -309,14 +368,19 @@ fun ServiceBrowserScreen(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            Column {
+            Column(modifier = Modifier.statusBarsPadding()) {
                 // 第1层：标签栏（40dp），始终在顶部
                 BrowserTabBar(
                     tabs = tabs,
                     activeTabId = uiState.activeTabId,
+                    incognito = uiState.incognito,
                     onSelect = { switchTab(it) },
                     onClose = { closeTab(it) },
-                    onNewTab = { newTab() }
+                    onCloseOthers = { closeOthersTabs(it) },
+                    onCloseRight = { closeRightTabs(it) },
+                    onCloseAll = { confirmCloseAll = true },
+                    onNewTab = { newTab() },
+                    onOpenManager = { showTabManager = true }
                 )
                 // 地址栏：顶部模式时显示在标签栏下方，底部模式时隐藏（移至 bottomBar）
                 AnimatedVisibility(
@@ -361,7 +425,8 @@ fun ServiceBrowserScreen(
                         onCopyLink = { showMore = false; copyCurrentLink() },
                         onIncognito = { browserController.setIncognito(!uiState.incognito) },
                         onDesktopMode = { browserController.toggleDesktopMode() },
-                        onZoom = { showMore = false; showZoom = true }
+                        onZoom = { showMore = false; showZoom = true },
+                        onInspect = { showMore = false; showDevTools = true }
                     )
                 }
                 // 页内查找条：始终在顶部区域，动画展开/收起
@@ -382,7 +447,7 @@ fun ServiceBrowserScreen(
         },
         // ===== 底部工具栏（56dp） + 可选底部地址栏 =====
         bottomBar = {
-            Column {
+            Column(modifier = Modifier.navigationBarsPadding()) {
                 // 模型操作状态条（AI 操作中时顶部细条提示）
                 AnimatedVisibility(
                     visible = agentStatus.active,
@@ -457,11 +522,13 @@ fun ServiceBrowserScreen(
                         onCopyLink = { showMore = false; copyCurrentLink() },
                         onIncognito = { browserController.setIncognito(!uiState.incognito) },
                         onDesktopMode = { browserController.toggleDesktopMode() },
-                        onZoom = { showMore = false; showZoom = true }
+                        onZoom = { showMore = false; showZoom = true },
+                        onInspect = { showMore = false; showDevTools = true }
                     )
                 }
                 BrowserBottomToolbar(
                     agentActive = agentStatus.active,
+                    activeDownloadCount = activeDownloadCount,
                     onHome = { newTab() },
                     onBookmarks = { showBookmarks = true },
                     onHistory = { showHistory = true },
@@ -491,6 +558,18 @@ fun ServiceBrowserScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .browserEdgeGesture(
+                                    enabled = gestureSettings.edgeSwipe,
+                                    sensitivity = gestureSettings.sensitivity,
+                                    onBack = { browserController.goBack() },
+                                    onForward = { browserController.goForward() }
+                                )
+                                .pullToRefreshGesture(
+                                    enabled = gestureSettings.pullToRefresh,
+                                    sensitivity = gestureSettings.sensitivity,
+                                    atTop = { browserController.activeWebViewScrollY() == 0 },
+                                    onRefresh = { browserController.reload() }
+                                )
                                 .background(MaterialTheme.colorScheme.surface)
                         ) {
                             AndroidView(
@@ -505,6 +584,43 @@ fun ServiceBrowserScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     CircularProgressIndicator()
+                                }
+                            }
+                        }
+                        // F4.4 阅读模式入口 + F4.5 隐私盾牌（右上角悬浮）
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(Spacing.sm),
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surface,
+                                shadowElevation = 4.dp,
+                                modifier = Modifier
+                            ) {
+                                Box(contentAlignment = Alignment.TopEnd) {
+                                    IconButton(onClick = { showPrivacy = true }) {
+                                        Icon(
+                                            Icons.Rounded.Shield,
+                                            contentDescription = stringResource(R.string.browser_privacy_title),
+                                            tint = if (blockedCount > 0) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                    if (blockedCount > 0) {
+                                        Text(
+                                            text = blockedCount.toString(),
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier
+                                                .padding(top = 4.dp, end = 4.dp)
+                                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                                .padding(horizontal = 3.dp, vertical = 1.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -602,14 +718,75 @@ fun ServiceBrowserScreen(
         )
     }
 
-    // ── 下载管理面板（BottomSheet） ──
+    // ── 下载管理面板（F4.2） ──
     if (showDownloads) {
         DownloadsBottomSheet(
             downloads = downloads,
             onOpen = { openDownload(it) },
+            onShare = { shareDownload(it) },
             onRetry = { retryDownload(it) },
+            onPause = { browserController.pauseDownload(it.id) },
+            onResume = { browserController.resumeDownload(it.id) },
+            onCancel = { browserController.cancelDownload(it.id) },
+            onDelete = { browserController.deleteDownload(it.id) },
             onClear = { browserController.clearDownloads() },
             onDismiss = { showDownloads = false }
+        )
+    }
+
+    // ── 标签管理面板（F4.1：网格缩略图 + 批量操作） ──
+    if (showTabManager) {
+        TabManagerSheet(
+            tabs = tabs,
+            activeTabId = uiState.activeTabId,
+            incognito = uiState.incognito,
+            onSelect = { id -> showTabManager = false; switchTab(id) },
+            onClose = { closeTab(it) },
+            onCloseOthers = { showTabManager = false; closeOthersTabs(it) },
+            onCloseAll = { confirmCloseAll = true },
+            onDismiss = { showTabManager = false }
+        )
+    }
+
+    // ── 全部关闭 / 关闭其他 确认对话框（F4.1） ──
+    if (confirmCloseAll) {
+        AlertDialog(
+            onDismissRequest = { confirmCloseAll = false },
+            title = { Text(stringResource(R.string.browser_tab_close_all)) },
+            text = { Text(stringResource(R.string.browser_tab_close_all_confirm, tabs.size)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmCloseAll = false
+                    closeAllTabs()
+                }) {
+                    Text(stringResource(R.string.workspace_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmCloseAll = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
+    }
+    if (confirmCloseOthers) {
+        AlertDialog(
+            onDismissRequest = { confirmCloseOthers = false },
+            title = { Text(stringResource(R.string.browser_tab_close_others)) },
+            text = { Text(stringResource(R.string.browser_tab_close_others_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmCloseOthers = false
+                    closeOthersTabs(uiState.activeTabId)
+                }) {
+                    Text(stringResource(R.string.workspace_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmCloseOthers = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
         )
     }
 
@@ -631,10 +808,44 @@ fun ServiceBrowserScreen(
         )
     }
 
-    // ── 凭据管理面板（保留 AlertDialog） ──
+    // ── 开发者工具面板（F4.7） ──
+    if (showDevTools) {
+        DevToolsPanel(
+            consoleLogs = consoleLogs,
+            network = devNetwork,
+            domSummary = devDom,
+            storageDump = devStorage,
+            onEval = { browserController.evalJs(it) {} },
+            onRefreshNetwork = { browserController.networkRecords { devNetwork = it } },
+            onRefreshDom = { browserController.domSummary { devDom = it } },
+            onRefreshStorage = { browserController.storageDump { devStorage = it } },
+            onClearConsole = { browserController.clearConsole() },
+            onDismiss = { showDevTools = false }
+        )
+    }
+
+    // ── 隐私与广告拦截面板（F4.5） ──
+    if (showPrivacy) {
+        PrivacySettingsSheet(
+            privacy = browserController.privacy(),
+            blockedCount = blockedCount,
+            gesture = gestureSettings,
+            onGesture = { browserController.setGestureSettings(it) },
+            onDismiss = { showPrivacy = false }
+        )
+    }
+
+    // ── 密码管理面板（F4.3） ──
     if (showCredentials) {
-        CredentialsDialog(
-            credentialStore = credentialStore,
+        PasswordListScreen(
+            passwords = remember(showCredentials, pwmLocked) { passwordManager.all() },
+            locked = pwmLocked,
+            onUnlock = { passwordManager.unlock() },
+            onFill = { sp ->
+                browserController.autoFillCredentials(sp.username, sp.password)
+                showCredentials = false
+            },
+            onDelete = { host -> passwordManager.delete(host) },
             onDismiss = { showCredentials = false }
         )
     }
@@ -653,101 +864,196 @@ fun ServiceBrowserScreen(
 
 // ===== 顶部标签栏（第1层） =====
 
-/** 浏览器标签栏：40dp 高，横向滚动，标签固定 120dp，可切换 / 关闭 / 新建。 */
+/** 浏览器标签栏：40dp 高，横向滚动，标签可切换 / 关闭 / 新建；长按弹出批量操作；>5 个标签显示管理入口。 */
 @Composable
 private fun BrowserTabBar(
     tabs: List<BrowserTabInfo>,
     activeTabId: String,
+    incognito: Boolean,
     onSelect: (String) -> Unit,
     onClose: (String) -> Unit,
-    onNewTab: () -> Unit
+    onCloseOthers: (String) -> Unit,
+    onCloseRight: (String) -> Unit,
+    onCloseAll: () -> Unit,
+    onNewTab: () -> Unit,
+    onOpenManager: () -> Unit
 ) {
-    LazyRow(
+    var menuTabId by remember { mutableStateOf<String?>(null) }
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(40.dp)
             .background(MaterialTheme.colorScheme.surfaceVariant),
-        contentPadding = PaddingValues(horizontal = Spacing.sm),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        items(tabs, key = { it.id }) { tab ->
-            val active = tab.id == activeTabId
-            Column(
-                modifier = Modifier
-                    .width(120.dp)
-                    .height(40.dp)
-                    .background(
-                        if (active) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surfaceVariant
-                    )
-                    .clickable { onSelect(tab.id) }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Rounded.Public,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text(
-                        text = tab.title.ifBlank { tab.url.ifBlank { stringResource(R.string.browser_tab_empty) } },
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = if (active) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(
-                        onClick = { onClose(tab.id) },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            Icons.Rounded.Close,
-                            contentDescription = stringResource(R.string.browser_close_tab),
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                // 激活标签底部 2dp 主色指示条
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .background(
-                            if (active) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant
-                        )
+        LazyRow(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = Spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items(tabs, key = { it.id }) { tab ->
+                TabChip(
+                    tab = tab,
+                    active = tab.id == activeTabId,
+                    incognito = incognito,
+                    menuExpanded = menuTabId == tab.id,
+                    onMenuDismiss = { menuTabId = null },
+                    onClick = { onSelect(tab.id) },
+                    onLongClick = { menuTabId = tab.id },
+                    onClose = { onClose(tab.id) },
+                    onCloseOthers = { menuTabId = null; onCloseOthers(tab.id) },
+                    onCloseRight = { menuTabId = null; onCloseRight(tab.id) },
+                    onCloseAll = { menuTabId = null; onCloseAll() }
                 )
             }
         }
-        item {
-            IconButton(onClick = onNewTab, modifier = Modifier.size(40.dp)) {
-                Icon(
-                    Icons.Rounded.Add,
-                    contentDescription = stringResource(R.string.browser_new_tab),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
+        // 标签数量 >5 时显示标签管理入口（数字角标）
+        if (tabs.size > 5) {
+            Box(contentAlignment = Alignment.TopEnd) {
+                IconButton(onClick = onOpenManager, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.Rounded.GridView,
+                        contentDescription = stringResource(R.string.browser_tab_overview),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .padding(top = 6.dp, end = 6.dp)
+                        .size(16.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = tabs.size.toString(),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
             }
+        }
+        IconButton(onClick = onNewTab, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.Rounded.Add,
+                contentDescription = stringResource(R.string.browser_new_tab),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
 
+/** 单个标签胶囊：激活高亮 + 底部指示条；支持单击切换 / 长按菜单。 */
+@Composable
+private fun TabChip(
+    tab: BrowserTabInfo,
+    active: Boolean,
+    incognito: Boolean,
+    menuExpanded: Boolean,
+    onMenuDismiss: () -> Unit,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onClose: () -> Unit,
+    onCloseOthers: () -> Unit,
+    onCloseRight: () -> Unit,
+    onCloseAll: () -> Unit
+) {
+    Box {
+        Column(
+            modifier = Modifier
+                .width(120.dp)
+                .height(40.dp)
+                .background(
+                    if (active) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant
+                )
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    if (incognito) Icons.Rounded.PrivacyTip else Icons.Rounded.Public,
+                    contentDescription = null,
+                    tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(Spacing.xs))
+                Text(
+                    text = tab.title.ifBlank { hostOf(tab.url).ifBlank { stringResource(R.string.browser_tab_empty) } },
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (active) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Close,
+                        contentDescription = stringResource(R.string.browser_close_tab),
+                        modifier = Modifier.size(16.dp),
+                        tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            // 激活标签底部 2dp 主色指示条
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .background(
+                        if (active) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    )
+            )
+        }
+        DropdownMenu(expanded = menuExpanded, onDismissRequest = onMenuDismiss) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.browser_close_tab)) },
+                onClick = onClose
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.browser_tab_close_others)) },
+                onClick = onCloseOthers
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.browser_tab_close_right)) },
+                onClick = onCloseRight
+            )
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.browser_tab_close_all)) },
+                onClick = onCloseAll
+            )
+        }
+    }
+}
+
+/** 从 URL 中提取 host（用于标签/列表展示）。 */
+private fun hostOf(url: String): String = runCatching {
+    val u = url.trim()
+    val start = if (u.startsWith("http://")) 7 else if (u.startsWith("https://")) 8 else 0
+    u.substring(start).substringBefore('/').substringBefore(':').ifBlank { u }
+}.getOrDefault(url)
+
 // ===== 底部工具栏 =====
 
-/** 底部工具栏：56dp，5 个等分按钮。AI 操作中时图标外圈脉冲 + 底部圆点。 */
+/** 底部工具栏：56dp，5 个等分按钮。AI 操作中时图标外圈脉冲 + 底部圆点。下载按钮带未完成数角标。 */
 @Composable
 private fun BrowserBottomToolbar(
     agentActive: Boolean,
+    activeDownloadCount: Int,
     onHome: () -> Unit,
     onBookmarks: () -> Unit,
     onHistory: () -> Unit,
@@ -784,6 +1090,7 @@ private fun BrowserBottomToolbar(
                 icon = Icons.Rounded.Download,
                 label = stringResource(R.string.browser_bottom_downloads),
                 onClick = onDownloads,
+                badgeCount = activeDownloadCount,
                 modifier = Modifier.weight(1f)
             )
             AiToolbarButton(
@@ -801,7 +1108,8 @@ private fun ToolbarButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    badgeCount: Int = 0
 ) {
     Column(
         modifier = modifier
@@ -811,12 +1119,28 @@ private fun ToolbarButton(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            icon,
-            contentDescription = label,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp)
-        )
+        Box(contentAlignment = Alignment.TopEnd) {
+            Icon(
+                icon,
+                contentDescription = label,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp)
+            )
+            if (badgeCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(15.dp)
+                        .background(MaterialTheme.colorScheme.error, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (badgeCount > 99) "99+" else badgeCount.toString(),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                        color = MaterialTheme.colorScheme.onError
+                    )
+                }
+            }
+        }
         Spacer(Modifier.height(2.dp))
         Text(
             text = label,
@@ -922,7 +1246,8 @@ private fun BrowserAddressBar(
     onCopyLink: () -> Unit,
     onIncognito: () -> Unit,
     onDesktopMode: () -> Unit,
-    onZoom: () -> Unit
+    onZoom: () -> Unit,
+    onInspect: () -> Unit
 ) {
     Column {
         Row(
@@ -1028,7 +1353,8 @@ private fun BrowserAddressBar(
                     onCopyLink = onCopyLink,
                     onIncognito = onIncognito,
                     onDesktopMode = onDesktopMode,
-                    onZoom = onZoom
+                    onZoom = onZoom,
+                    onInspect = onInspect
                 )
             }
         }
@@ -1067,13 +1393,19 @@ private fun BrowserMoreMenu(
     onCopyLink: () -> Unit,
     onIncognito: () -> Unit,
     onDesktopMode: () -> Unit,
-    onZoom: () -> Unit
+    onZoom: () -> Unit,
+    onInspect: () -> Unit
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(
             text = { Text(stringResource(R.string.browser_find)) },
             onClick = onFind,
             leadingIcon = { Icon(Icons.Rounded.Search, null) }
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.browser_devtools_inspect)) },
+            onClick = onInspect,
+            leadingIcon = { Icon(Icons.Rounded.Article, null) }
         )
         DropdownMenuItem(
             text = {
@@ -1677,17 +2009,26 @@ private fun BookmarksBottomSheet(
     }
 }
 
-/** 下载管理面板：列表 / 打开 / 重试 / 清除。 */
+/** 下载管理面板（F4.2）：分组列表 + 进度/速度 + 暂停/继续/取消/打开/分享/删除。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DownloadsBottomSheet(
     downloads: List<BrowserDownloadInfo>,
     onOpen: (BrowserDownloadInfo) -> Unit,
+    onShare: (BrowserDownloadInfo) -> Unit,
     onRetry: (BrowserDownloadInfo) -> Unit,
+    onPause: (BrowserDownloadInfo) -> Unit,
+    onResume: (BrowserDownloadInfo) -> Unit,
+    onCancel: (BrowserDownloadInfo) -> Unit,
+    onDelete: (BrowserDownloadInfo) -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    // 分组：0 进行中（下载中/暂停） 1 已完成 2 失败/取消
+    val active = downloads.filter { it.status == "downloading" || it.status == "paused" }
+    val done = downloads.filter { it.status == "done" }
+    val failed = downloads.filter { it.status == "error" || it.status == "cancelled" }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(modifier = Modifier.padding(bottom = Spacing.lg)) {
@@ -1717,54 +2058,321 @@ private fun DownloadsBottomSheet(
                     modifier = Modifier.padding(Spacing.lg)
                 )
             } else {
-                LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
-                    items(downloads, key = { it.id }) { info ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = info.fileName.ifBlank { info.url },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = when (info.status) {
-                                        "done" -> info.path
-                                        "error" -> info.error.ifBlank { info.url }
-                                        else -> info.url
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = when (info.status) {
-                                        "error" -> MaterialTheme.colorScheme.error
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            when (info.status) {
-                                "done" -> TextButton(onClick = { onOpen(info) }) {
-                                    Text(stringResource(R.string.browser_open))
-                                }
-                                "error" -> IconButton(onClick = { onRetry(info) }) {
-                                    Icon(
-                                        Icons.Rounded.Replay,
-                                        contentDescription = stringResource(R.string.browser_retry)
-                                    )
-                                }
-                                else -> CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp
-                                )
-                            }
+                LazyColumn(modifier = Modifier.heightIn(max = 460.dp)) {
+                    if (active.isNotEmpty()) {
+                        item(key = "h_active") {
+                            SectionHeader(stringResource(R.string.browser_download_status_downloading))
+                        }
+                        items(active, key = { it.id }) { info ->
+                            ActiveDownloadRow(
+                                info = info,
+                                onPause = { onPause(info) },
+                                onResume = { onResume(info) },
+                                onCancel = { onCancel(info) },
+                                onDelete = { onDelete(info) }
+                            )
+                        }
+                    }
+                    if (done.isNotEmpty()) {
+                        item(key = "h_done") {
+                            SectionHeader(stringResource(R.string.browser_download_status_done))
+                        }
+                        items(done, key = { it.id }) { info ->
+                            DoneDownloadRow(
+                                info = info,
+                                onOpen = { onOpen(info) },
+                                onShare = { onShare(info) },
+                                onDelete = { onDelete(info) }
+                            )
+                        }
+                    }
+                    if (failed.isNotEmpty()) {
+                        item(key = "h_failed") {
+                            SectionHeader(stringResource(R.string.browser_download_status_failed))
+                        }
+                        items(failed, key = { it.id }) { info ->
+                            FailedDownloadRow(
+                                info = info,
+                                onRetry = { onRetry(info) },
+                                onDelete = { onDelete(info) }
+                            )
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.xs)
+    )
+}
+
+/** 进行中下载行：文件名 + 进度条 + 速度 + 暂停/取消。 */
+@Composable
+private fun ActiveDownloadRow(
+    info: BrowserDownloadInfo,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val isPaused = info.status == "paused"
+    val fraction = if (info.totalBytes > 0) (info.downloadedBytes.toFloat() / info.totalBytes).coerceIn(0f, 1f) else 0f
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = info.fileName.ifBlank { info.url },
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.browser_download_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            }
+        }
+        Spacer(Modifier.height(Spacing.xs))
+        LinearProgressIndicator(
+            progress = { if (isPaused) fraction else fraction },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val sizeText = if (info.totalBytes > 0) {
+                stringResource(R.string.browser_download_size_of, formatBytes(info.downloadedBytes), formatBytes(info.totalBytes))
+            } else formatBytes(info.downloadedBytes)
+            Text(
+                text = if (isPaused) stringResource(R.string.browser_download_status_paused)
+                else "$sizeText  " + stringResource(R.string.browser_download_speed, formatBytes(info.speedBps)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            if (isPaused) {
+                TextButton(onClick = onResume) { Text(stringResource(R.string.browser_download_resume)) }
+            } else {
+                TextButton(onClick = onPause) { Text(stringResource(R.string.browser_download_pause)) }
+            }
+            TextButton(onClick = onCancel) { Text(stringResource(R.string.browser_download_cancel)) }
+        }
+    }
+}
+
+/** 已完成下载行：文件名 + 大小 + 打开/分享/删除。 */
+@Composable
+private fun DoneDownloadRow(
+    info: BrowserDownloadInfo,
+    onOpen: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = info.fileName.ifBlank { info.url },
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = formatBytes(info.downloadedBytes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        TextButton(onClick = onOpen) { Text(stringResource(R.string.browser_open)) }
+        IconButton(onClick = onShare) {
+            Icon(Icons.Rounded.Share, contentDescription = stringResource(R.string.browser_download_share), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+        }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.browser_download_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/** 失败下载行：错误原因 + 重试/删除。 */
+@Composable
+private fun FailedDownloadRow(
+    info: BrowserDownloadInfo,
+    onRetry: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = info.fileName.ifBlank { info.url },
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = info.error.ifBlank { stringResource(R.string.browser_download_status_failed) },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        IconButton(onClick = onRetry) {
+            Icon(Icons.Rounded.Replay, contentDescription = stringResource(R.string.browser_retry), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.browser_download_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/** 字节大小格式化。 */
+private fun formatBytes(bytes: Long): String {
+    if (bytes < 1024) return "$bytes B"
+    val kb = bytes / 1024.0
+    if (kb < 1024) return "%.1f KB".format(kb)
+    val mb = kb / 1024.0
+    if (mb < 1024) return "%.1f MB".format(mb)
+    return "%.2f GB".format(mb / 1024.0)
+}
+
+// ===== 标签管理面板（F4.1） =====
+
+/** 标签管理面板：2 列网格缩略图，显示标题/域名/关闭；顶部批量操作。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TabManagerSheet(
+    tabs: List<BrowserTabInfo>,
+    activeTabId: String,
+    incognito: Boolean,
+    onSelect: (String) -> Unit,
+    onClose: (String) -> Unit,
+    onCloseOthers: (String) -> Unit,
+    onCloseAll: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(modifier = Modifier.padding(bottom = Spacing.lg)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    stringResource(R.string.browser_tab_manager_title) + " (${tabs.size})",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = { onCloseOthers(activeTabId) }) {
+                    Text(stringResource(R.string.browser_tab_close_others))
+                }
+                TextButton(onClick = onCloseAll) {
+                    Text(stringResource(R.string.browser_tab_close_all))
+                }
+            }
+            Spacer(Modifier.height(Spacing.sm))
+            LazyColumn(modifier = Modifier.heightIn(max = 480.dp)) {
+                tabs.chunked(2).forEach { rowItems ->
+                    item(key = "row_${rowItems.first().id}") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        ) {
+                            rowItems.forEach { tab ->
+                                TabGridCard(
+                                    tab = tab,
+                                    active = tab.id == activeTabId,
+                                    incognito = incognito,
+                                    onClick = { onSelect(tab.id) },
+                                    onClose = { onClose(tab.id) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 标签管理网格卡片：surface 背景，favicon + 标题 + 域名 + 关闭。 */
+@Composable
+private fun TabGridCard(
+    tab: BrowserTabInfo,
+    active: Boolean,
+    incognito: Boolean,
+    onClick: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(LocalCornerRadius.current.md),
+        color = if (active) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.surfaceVariant,
+        modifier = modifier.clickable(onClick = onClick)
+    ) {
+        Box {
+            Column(modifier = Modifier.padding(Spacing.sm)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (incognito) Icons.Rounded.PrivacyTip else Icons.Rounded.Public,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text(
+                        text = tab.title.ifBlank { stringResource(R.string.browser_tab_empty) },
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    text = hostOf(tab.url),
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier.align(Alignment.TopEnd).size(24.dp)
+            ) {
+                Icon(
+                    Icons.Rounded.Close,
+                    contentDescription = stringResource(R.string.browser_close_tab),
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -2047,6 +2655,113 @@ private fun ZoomDialog(
     )
 }
 
+// ===== 隐私与广告拦截面板（F4.5） =====
+
+/** 隐私设置面板：显示本页拦截数 + 各拦截开关。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PrivacySettingsSheet(
+    privacy: com.mini.me_core.feature.browser.domain.AdBlocker,
+    blockedCount: Int,
+    gesture: com.mini.me_core.feature.browser.domain.BrowserController.GestureSettings,
+    onGesture: (com.mini.me_core.feature.browser.domain.BrowserController.GestureSettings) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    var adBlock by remember { mutableStateOf(privacy.adBlockEnabled) }
+    var tracker by remember { mutableStateOf(privacy.trackerBlockEnabled) }
+    var popup by remember { mutableStateOf(privacy.popupBlockEnabled) }
+    var dnt by remember { mutableStateOf(privacy.doNotTrack) }
+    var thirdCookie by remember { mutableStateOf(privacy.blockThirdPartyCookies) }
+    var edgeSwipe by remember { mutableStateOf(gesture.edgeSwipe) }
+    var pullRefresh by remember { mutableStateOf(gesture.pullToRefresh) }
+    var sensitivity by remember { mutableStateOf(gesture.sensitivity) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(modifier = Modifier.padding(bottom = Spacing.lg)) {
+            Text(
+                stringResource(R.string.browser_privacy_title),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = Spacing.lg)
+            )
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                stringResource(R.string.browser_privacy_blocked_count, blockedCount),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = Spacing.lg)
+            )
+            Spacer(Modifier.height(Spacing.sm))
+            PrivacySwitch(stringResource(R.string.browser_privacy_adblock), adBlock) {
+                adBlock = it; privacy.adBlockEnabled = it
+            }
+            PrivacySwitch(stringResource(R.string.browser_privacy_tracker), tracker) {
+                tracker = it; privacy.trackerBlockEnabled = it
+            }
+            PrivacySwitch(stringResource(R.string.browser_privacy_popup), popup) {
+                popup = it; privacy.popupBlockEnabled = it
+            }
+            PrivacySwitch(stringResource(R.string.browser_privacy_dnt), dnt) {
+                dnt = it; privacy.doNotTrack = it
+            }
+            PrivacySwitch(stringResource(R.string.browser_privacy_3p_cookie), thirdCookie) {
+                thirdCookie = it; privacy.blockThirdPartyCookies = it
+            }
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                stringResource(R.string.browser_gesture_title),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(horizontal = Spacing.lg)
+            )
+            PrivacySwitch(stringResource(R.string.browser_gesture_edge), edgeSwipe) {
+                edgeSwipe = it; onGesture(gesture.copy(edgeSwipe = it))
+            }
+            PrivacySwitch(stringResource(R.string.browser_gesture_pull), pullRefresh) {
+                pullRefresh = it; onGesture(gesture.copy(pullToRefresh = it))
+            }
+            // 灵敏度三段选择
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(stringResource(R.string.browser_gesture_sensitivity), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                FilterChip(
+                    selected = sensitivity == 0,
+                    onClick = { sensitivity = 0; onGesture(gesture.copy(sensitivity = 0)) },
+                    label = { Text(stringResource(R.string.browser_gesture_sens_low)) }
+                )
+                Spacer(Modifier.width(Spacing.xs))
+                FilterChip(
+                    selected = sensitivity == 1,
+                    onClick = { sensitivity = 1; onGesture(gesture.copy(sensitivity = 1)) },
+                    label = { Text(stringResource(R.string.browser_gesture_sens_mid)) }
+                )
+                Spacer(Modifier.width(Spacing.xs))
+                FilterChip(
+                    selected = sensitivity == 2,
+                    onClick = { sensitivity = 2; onGesture(gesture.copy(sensitivity = 2)) },
+                    label = { Text(stringResource(R.string.browser_gesture_sens_high)) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrivacySwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
 /** 登录凭据输入对话框。 */
 @Composable
 private fun LoginCredentialDialog(
@@ -2099,4 +2814,78 @@ private fun LoginCredentialDialog(
             }
         }
     )
+}
+
+// ===== F4.8 手势操作 =====
+
+/**
+ * 边缘滑动手势：从左边缘右滑前进、从右边缘左滑后退。
+ * 仅在触摸起始点落在屏幕左右边缘带内时才识别，避免与页面横向滚动冲突。
+ */
+private fun Modifier.browserEdgeGesture(
+    enabled: Boolean,
+    sensitivity: Int,
+    onBack: () -> Unit,
+    onForward: () -> Unit
+): Modifier = this.pointerInput(enabled, sensitivity) {
+    if (!enabled) return@pointerInput
+    val edgeWidth = when (sensitivity) { 0 -> 56.dp.toPx(); 2 -> 20.dp.toPx(); else -> 36.dp.toPx() }
+    val threshold = when (sensitivity) { 0 -> 140.dp.toPx(); 2 -> 50.dp.toPx(); else -> 90.dp.toPx() }
+    awaitPointerEventScope {
+        while (true) {
+            val down = awaitFirstDown()
+            val startX = down.position.x
+            val fromLeft = startX < edgeWidth
+            val fromRight = startX > size.width - edgeWidth
+            if (!fromLeft && !fromRight) { waitForUpOrCancellation(); continue }
+            var accumulated = 0f
+            var fired = false
+            while (true) {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull() ?: break
+                if (change.changedToUp()) break
+                accumulated += change.positionChange().x
+                if (!fired && kotlin.math.abs(accumulated) > threshold) {
+                    fired = true
+                    if (fromLeft && accumulated > 0) onForward()
+                    else if (fromRight && accumulated < 0) onBack()
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 下拉刷新手势：仅当页面滚动到顶部（atTop 为真）时，向下拖动超过阈值触发刷新。
+ */
+private fun Modifier.pullToRefreshGesture(
+    enabled: Boolean,
+    sensitivity: Int,
+    atTop: () -> Boolean,
+    onRefresh: () -> Unit
+): Modifier = this.pointerInput(enabled, sensitivity) {
+    if (!enabled) return@pointerInput
+    val threshold = when (sensitivity) { 0 -> 160.dp.toPx(); 2 -> 70.dp.toPx(); else -> 110.dp.toPx() }
+    awaitPointerEventScope {
+        while (true) {
+            val down = awaitFirstDown()
+            val startY = down.position.y
+            var accumulated = 0f
+            var armed = false
+            while (true) {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull() ?: break
+                if (change.changedToUp()) {
+                    if (armed && accumulated > threshold) onRefresh()
+                    break
+                }
+                val dy = change.positionChange().y
+                accumulated += dy
+                // 仅在页面处于顶部且向下拉时武装
+                if (!armed && startY < size.height * 0.4 && atTop() && accumulated > threshold * 0.4f && dy > 0) {
+                    armed = true
+                }
+            }
+        }
+    }
 }

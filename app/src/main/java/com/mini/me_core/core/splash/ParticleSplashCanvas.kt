@@ -15,8 +15,8 @@ import androidx.compose.ui.graphics.toArgb
  * Canvas layer that renders the particle splash animation.
  *
  * Draws:
- * 1. Radial gradient background (brighter in center)
- * 2. Particles (glowing dots + rotating shards)
+ * 1. Solid background fill + radial gradient overlay
+ * 2. Particle dots (inner core + outer glow)
  * 3. Glass shatter effect overlay
  * 4. White flash at shatter moment
  */
@@ -30,32 +30,34 @@ fun ParticleSplashCanvas(
     primaryColor: Color,
     onBackgroundColor: Color,
     density: Float,
+    quality: SplashQualityLevel = SplashQualityLevel.HIGH,
 ) {
-    val stage = SplashStage.fromElapsed(elapsedMs)
-    val stageProgress = SplashStage.stageProgress(elapsedMs)
+    val stage = SplashStage.fromElapsed(elapsedMs, quality)
+    val stageProgress = SplashStage.stageProgress(elapsedMs, quality)
 
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
         val cx = w / 2f
-        val cy = h / 2f
+        val cy = h * 0.4f
 
         drawIntoCanvas { canvas ->
             val native = canvas.nativeCanvas
 
-            // ── Background: base color ──
+            // Solid background fill first
             native.drawColor(backgroundColor.toArgb())
 
-            // ── Radial gradient overlay ──
+            // Radial gradient overlay — radius 1.2x max dimension for seamless coverage
             val centerGlowAlpha = when (stage) {
-                SplashStage.CONVERGE -> 0.15f
-                SplashStage.HOLD -> 0.15f
-                SplashStage.EXPLODE -> 0.08f + stageProgress * 0.07f
-                else -> 0.08f
+                SplashStage.CONVERGE -> 0.12f
+                SplashStage.HOLD -> 0.12f
+                SplashStage.EXPLODE -> 0.06f + stageProgress * 0.06f
+                else -> 0.06f
             }
+            val gradientRadius = kotlin.math.max(w, h) * 1.2f
             val gradient = RadialGradient(
                 cx, cy,
-                kotlin.math.max(w, h) * 0.6f,
+                gradientRadius,
                 primaryColor.copy(alpha = centerGlowAlpha).toArgb(),
                 backgroundColor.toArgb(),
                 Shader.TileMode.CLAMP
@@ -64,62 +66,63 @@ fun ParticleSplashCanvas(
             bgPaint.shader = gradient
             native.drawRect(0f, 0f, w, h, bgPaint)
 
-            // ── Draw particles ──
+            // Draw particles (round dots only)
             val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            val shardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            shardPaint.style = Paint.Style.FILL
 
             val mix = particleSystem.colorMix
-            val explosionColor = primaryColor.toArgb()
-            val targetColor = onBackgroundColor.toArgb()
+            val explosionArgb = primaryColor.toArgb()
+            val onBgArgb = onBackgroundColor.toArgb()
+
+            val exR = explosionArgb shr 16 and 0xFF
+            val exG = explosionArgb shr 8 and 0xFF
+            val exB = explosionArgb and 0xFF
+            val obR = onBgArgb shr 16 and 0xFF
+            val obG = onBgArgb shr 8 and 0xFF
+            val obB = onBgArgb and 0xFF
 
             for (i in 0 until particleSystem.count) {
                 val px = particleSystem.x[i]
                 val py = particleSystem.y[i]
                 val sz = particleSystem.size[i]
+                val accent = particleSystem.isAccent[i]
 
-                // Interpolate color between explosion color and target color
-                val r = ((explosionColor shr 16 and 0xFF) * (1 - mix) + (targetColor shr 16 and 0xFF) * mix).toInt()
-                val g = ((explosionColor shr 8 and 0xFF) * (1 - mix) + (targetColor shr 8 and 0xFF) * mix).toInt()
-                val b = ((explosionColor and 0xFF) * (1 - mix) + (targetColor and 0xFF) * mix).toInt()
-                val a = (255 * (0.7f + 0.3f * mix)).toInt()
-                val color = (a shl 24) or (r shl 16) or (g shl 8) or b
+                val targetR = if (accent) exR else obR
+                val targetG = if (accent) exG else obG
+                val targetB = if (accent) exB else obB
 
-                if (particleSystem.type[i] == 0) {
-                    // Glowing dot: outer glow + inner core
-                    dotPaint.color = color
-                    dotPaint.alpha = (a * 0.3f).toInt()
-                    native.drawCircle(px, py, sz * 2f, dotPaint)
-                    dotPaint.alpha = a
-                    native.drawCircle(px, py, sz, dotPaint)
-                } else {
-                    // Rotating square shard
-                    shardPaint.color = color
-                    shardPaint.alpha = a
-                    native.save()
-                    native.rotate(particleSystem.rotation[i], px, py)
-                    native.drawRect(px - sz, py - sz, px + sz, py + sz, shardPaint)
-                    native.restore()
-                }
+                val r = (exR * (1 - mix) + targetR * mix).toInt()
+                val g = (exG * (1 - mix) + targetG * mix).toInt()
+                val b = (exB * (1 - mix) + targetB * mix).toInt()
+
+                val alpha = (255 * (0.65f + 0.35f * mix)).toInt()
+                val color = (alpha shl 24) or (r shl 16) or (g shl 8) or b
+
+                // Outer glow
+                dotPaint.color = color
+                dotPaint.alpha = (alpha * 0.3f).toInt()
+                native.drawCircle(px, py, sz * 2f, dotPaint)
+                // Inner core
+                dotPaint.alpha = alpha
+                native.drawCircle(px, py, sz, dotPaint)
             }
 
-            // ── Shimmer sweep during HOLD ──
-            if (stage == SplashStage.HOLD) {
+            // Shimmer sweep during HOLD
+            if (stage == SplashStage.HOLD && quality.enableCracks) {
                 val sweepX = cx - w * 0.5f + (w * 1.5f) * stageProgress
                 val shimmerPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-                shimmerPaint.color = Color.White.copy(alpha = 0.08f).toArgb()
+                shimmerPaint.color = Color.White.copy(alpha = 0.06f).toArgb()
                 native.save()
                 native.clipRect(sweepX - 80f * density, 0f, sweepX + 80f * density, h)
                 native.drawColor(shimmerPaint.color)
                 native.restore()
             }
 
-            // ── Glass shatter effect ──
-            if (stage == SplashStage.SHATTER || stage == SplashStage.FADE_OUT) {
+            // Glass shatter effect (skipped on LOW quality)
+            if ((stage == SplashStage.SHATTER || stage == SplashStage.FADE_OUT) && quality.enable3D) {
                 val shatterProgress = if (stage == SplashStage.SHATTER) stageProgress else 1f
-                val crackProgress = if (stage == SplashStage.SHATTER) {
+                val crackProgress = if (quality.enableCracks && stage == SplashStage.SHATTER) {
                     (stageProgress / 0.2f).coerceAtMost(1f)
-                } else 1f
+                } else if (quality.enableCracks) 1f else 0f
 
                 glassShatter?.draw(
                     canvas = native,
@@ -130,9 +133,9 @@ fun ParticleSplashCanvas(
                 )
             }
 
-            // ── White flash at shatter start ──
-            if (stage == SplashStage.SHATTER && stageProgress < 0.05f) {
-                val flashAlpha = (1f - stageProgress / 0.05f) * 0.6f
+            // White flash at shatter start (100ms fade)
+            if (stage == SplashStage.SHATTER && stageProgress < 0.1f) {
+                val flashAlpha = (1f - stageProgress / 0.1f) * 0.5f
                 val flashPaint = Paint()
                 flashPaint.color = Color.White.copy(alpha = flashAlpha).toArgb()
                 native.drawRect(0f, 0f, w, h, flashPaint)

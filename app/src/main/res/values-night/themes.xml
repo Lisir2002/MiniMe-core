@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 启动画面主题（深色） -->
-    <style name="Theme.MiniMeCore.Splash" parent="Theme.SplashScreen">
-        <item name="android:windowBackground">@drawable/splash_bg_dark</item>
-        <item name="windowSplashScreenBackground">@android:color/transparent</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_animated</item>
-        <item name="postSplashScreenTheme">@style/Theme.MiniMeCore</item>
+    <!-- 深色模式冷启动窗口背景：纯深色填充，与粒子动画背景一致 -->
+    <style name="Theme.MiniMeCore" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
     </style>
 </resources>

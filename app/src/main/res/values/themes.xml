@@ -1,14 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 启动画面主题（浅色）：系统预览窗口 = 启动画面，无缝衔接无白屏 -->
-    <style name="Theme.MiniMeCore.Splash" parent="Theme.SplashScreen">
-        <!-- 系统预览窗口背景：浅色渐变，点击图标瞬间即显示 -->
-        <item name="android:windowBackground">@drawable/splash_bg_light</item>
-        <!-- SplashScreen 库自身视图背景：透明，透出 windowBackground 的渐变 -->
-        <item name="windowSplashScreenBackground">@android:color/transparent</item>
-        <!-- 中心动画图标：渐入 + 呼吸 -->
-        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_animated</item>
-        <!-- 启动画面退出后切换到正式主题 -->
-        <item name="postSplashScreenTheme">@style/Theme.MiniMeCore</item>
+    <!--
+        冷启动窗口背景：纯色填充，与粒子动画背景一致，避免白屏闪烁。
+        不再使用 SplashScreen 主题/图标——粒子动画直接在 Compose 中作为覆盖层显示。
+    -->
+    <style name="Theme.MiniMeCore" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
     </style>
 </resources>

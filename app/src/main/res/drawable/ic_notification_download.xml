@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- F4.2 下载通知小图标：向下箭头 + 托盘（白色剪影，状态栏规范） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,3 L12,13 M12,13 L7,8 M12,13 L17,8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5,18 L19,18 L19,21 L5,21 Z" />
+</vector>

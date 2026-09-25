@@ -6,14 +6,13 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
  * Particle system for the splash animation.
  *
  * Uses flat FloatArrays to avoid per-frame allocation.
- * Particle types: 0 = glowing dot (60%), 1 = rotating square shard (40%).
+ * All particles are round dots (no rotating shards — they blur text outlines).
  *
  * All positions are in pixel coordinates.
  */
@@ -21,14 +20,10 @@ class ParticleSystem(
     private val screenWidthPx: Float,
     private val screenHeightPx: Float,
     density: Float,
+    private val quality: SplashQualityLevel = SplashQualityLevel.HIGH,
 ) {
-    // Dynamic particle count based on screen area.
-    val count: Int = run {
-        val area = screenWidthPx * screenHeightPx
-        // ~1080x2400 = 2.5M px area -> target ~1000 particles
-        val estimated = (area / 2500f).toInt()
-        estimated.coerceIn(500, 1200)
-    }
+    // Particle count from quality level.
+    val count: Int = quality.particleCount
 
     // Current positions
     val x = FloatArray(count)
@@ -47,18 +42,16 @@ class ParticleSystem(
     private val shatterVy = FloatArray(count)
 
     // Particle properties
-    val size = FloatArray(count)        // radius in px for dots, half-size for shards
-    val type = IntArray(count)          // 0=dot, 1=shard
-    val rotation = FloatArray(count)    // current rotation for shards
-    val rotationSpeed = FloatArray(count)
+    val size = FloatArray(count)        // radius in px
+    val isAccent = BooleanArray(count)  // true = primary color accent particle (30%)
     private val seed = FloatArray(count) // random seed for micro-vibration
 
-    // Color mix: 0 = mixed explosion colors, 1 = final onBackground color
+    // Color mix: 0 = explosion phase, 1 = fully formed text
     var colorMix: Float = 0f
         private set
 
     private val centerX = screenWidthPx / 2f
-    private val centerY = screenHeightPx / 2f
+    private val centerY = screenHeightPx * 0.42f // slightly above screen center
 
     init {
         // Sample text target positions
@@ -76,10 +69,10 @@ class ParticleSystem(
             tx[i] = targets[targetIdx * 2]
             ty[i] = targets[targetIdx * 2 + 1]
 
-            // Explosion: random direction, speed 8-20 dp/frame -> convert to px/s
+            // Explosion: random direction, speed 8-20 dp/frame
             val angle = Random.nextFloat() * (2f * Math.PI).toFloat()
-            val speedDp = 8f + Random.nextFloat() * 12f  // 8-20 dp/frame
-            val speedPxPerSec = speedDp * density * 60f   // per frame at 60fps -> per second
+            val speedDp = 8f + Random.nextFloat() * 12f
+            val speedPxPerSec = speedDp * density * 60f
             vx[i] = cos(angle) * speedPxPerSec
             vy[i] = sin(angle) * speedPxPerSec
 
@@ -88,41 +81,37 @@ class ParticleSystem(
             val shatterSpeedDp = 12f + Random.nextFloat() * 13f
             val shatterSpeedPx = shatterSpeedDp * density * 60f
             shatterVx[i] = cos(shatterAngle) * shatterSpeedPx
-            shatterVy[i] = sin(shatterAngle) * shatterSpeedPx + 600f * density // gravity bias
+            shatterVy[i] = sin(shatterAngle) * shatterSpeedPx + 600f * density
 
-            // Type: 60% dots, 40% shards
-            type[i] = if (Random.nextFloat() < 0.6f) 0 else 1
+            // All particles are dots — no shards.
+            // Size: 1.5-3dp, matching stroke width for crisp text.
+            size[i] = (1.5f + Random.nextFloat() * 1.5f) * density
 
-            // Size: dots 2-6 dp, shards 3-8 dp
-            size[i] = if (type[i] == 0) {
-                (2f + Random.nextFloat() * 4f) * density
-            } else {
-                (3f + Random.nextFloat() * 5f) * density
-            }
+            // 30% accent particles (primary color), 70% onBackground
+            isAccent[i] = Random.nextFloat() < 0.3f
 
-            rotation[i] = Random.nextFloat() * 360f
-            rotationSpeed[i] = (Random.nextFloat() - 0.5f) * 720f // deg/s
             seed[i] = Random.nextFloat() * 1000f
         }
     }
 
     /**
-     * Sample "MiniMe-core" text pixels as target positions.
+     * Sample "MiniMe" text pixels as target positions.
+     * Uses fine sampling (1.5dp step) with edge enhancement:
+     * edge pixels (alpha 128-200) get smaller, denser particles.
      * Returns FloatArray of [x0, y0, x1, y1, ...].
      */
     private fun sampleTextTargets(density: Float): FloatArray {
-        val text = "MiniMe-core"
-        // Text width ~70% of screen width
-        val targetWidth = screenWidthPx * 0.7f
+        val text = "MiniMe"
+        // Text width ~65% of screen width
+        val targetWidth = screenWidthPx * 0.65f
 
-        // Find appropriate text size by measuring
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
 
-        // Binary search for text size that fits targetWidth
-        var textSize = 80f * density
+        // Find appropriate text size by measuring
+        var textSize = 100f * density
         paint.textSize = textSize
         var measuredWidth = paint.measureText(text)
         val step = 4f * density
@@ -131,7 +120,7 @@ class ParticleSystem(
             paint.textSize = textSize
             measuredWidth = paint.measureText(text)
         }
-        while (measuredWidth < targetWidth && textSize < 200f * density) {
+        while (measuredWidth < targetWidth && textSize < 240f * density) {
             textSize += step
             paint.textSize = textSize
             measuredWidth = paint.measureText(text)
@@ -142,13 +131,13 @@ class ParticleSystem(
         val bitmapH = (textSize * 2.5f).toInt()
         val bitmap = Bitmap.createBitmap(bitmapW, bitmapH, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        canvas.drawColor(0) // transparent
+        canvas.drawColor(0)
 
         paint.color = android.graphics.Color.WHITE
         canvas.drawText(text, bitmapW / 2f, bitmapH / 2f - (paint.descent() + paint.ascent()) / 2f, paint)
 
-        // Sample non-transparent pixels
-        val stepPx = (3.5f * density).toInt().coerceAtLeast(3)
+        // Fine sampling step: 1.5dp — dense enough for crisp letter outlines
+        val stepPx = (1.5f * density).toInt().coerceAtLeast(2)
         val points = mutableListOf<Float>()
         val centerOffsetY = centerY - bitmapH / 2f
 
@@ -156,7 +145,7 @@ class ParticleSystem(
             for (px in 0 until bitmapW step stepPx) {
                 val pixel = bitmap.getPixel(px, py)
                 val alpha = android.graphics.Color.alpha(pixel)
-                if (alpha > 128) {
+                if (alpha > 100) {
                     points.add(px.toFloat())
                     points.add(py.toFloat() + centerOffsetY)
                 }
@@ -165,7 +154,7 @@ class ParticleSystem(
 
         bitmap.recycle()
 
-        // If too many points, thin them
+        // If we have too many points, thin them evenly
         val maxTargets = count
         if (points.size / 2 > maxTargets) {
             val stride = points.size / 2 / maxTargets
@@ -188,9 +177,9 @@ class ParticleSystem(
      * Update all particles for the given elapsed time.
      */
     fun update(elapsedMs: Long, dtMs: Float) {
-        val stage = SplashStage.fromElapsed(elapsedMs)
-        val t = SplashStage.stageProgress(elapsedMs)
-        val dt = dtMs / 1000f // seconds
+        val stage = SplashStage.fromElapsed(elapsedMs, quality)
+        val t = SplashStage.stageProgress(elapsedMs, quality)
+        val dt = dtMs / 1000f
 
         when (stage) {
             SplashStage.EXPLODE -> updateExplode(t, dt)
@@ -203,7 +192,6 @@ class ParticleSystem(
     }
 
     private fun updateExplode(t: Float, dt: Float) {
-        // Ease out: velocity decays over time
         val decay = 1f - t * 0.7f
         for (i in 0 until count) {
             x[i] += vx[i] * dt * decay
@@ -216,15 +204,6 @@ class ParticleSystem(
         // easeOutCubic: 1 - (1-t)^3
         val eased = 1f - (1f - t) * (1f - t) * (1f - t)
 
-        // Start position is where particles ended up after explode
-        // We need to interpolate from current to target
-        // Store start positions on first frame of converge
-        // Actually, since we interpolate from current to target, we use the converge start positions
-        // But we don't have them stored... Let's use a different approach:
-        // The explode phase ended at some position. We need to capture that.
-        // For simplicity, we'll use the tx/ty and interpolate from a stored start.
-
-        // Actually, let's store converge start positions lazily
         if (!convergeInit) {
             convergeInit = true
             for (i in 0 until count) {
@@ -234,10 +213,10 @@ class ParticleSystem(
         }
 
         for (i in 0 until count) {
-            // Overshoot: add a small spring back at the end
-            val overshoot = if (t > 0.85f) {
-                val overshootT = (t - 0.85f) / 0.15f
-                sin(overshootT * Math.PI).toFloat() * 0.05f
+            // Slight spring back at the end (overshoot)
+            val overshoot = if (t > 0.88f) {
+                val overshootT = (t - 0.88f) / 0.12f
+                sin(overshootT * Math.PI).toFloat() * 0.03f
             } else 0f
 
             val progress = (eased + overshoot).coerceAtMost(1f)
@@ -252,32 +231,22 @@ class ParticleSystem(
     private val convergeStartY = FloatArray(count)
 
     private fun updateHold(t: Float, elapsedMs: Long) {
-        // Breathing: scale 1.0 -> 1.03 -> 1.0, sine period 1s
-        val breath = 1f + 0.015f * sin((elapsedMs / 1000f) * 2f * Math.PI).toFloat()
-
-        // Micro vibration: +-1dp
-        val vib = 1f // 1dp vibration handled in draw
-
-        // Shimmer sweep: highlight moves left to right
+        // Precise positioning: particles sit exactly on text target positions
+        // with micro breathing vibration of ±0.5dp for a "settled" feel.
+        val vib = 0.5f // dp of micro-vibration
         for (i in 0 until count) {
-            // Scale around center
-            val dx = tx[i] - centerX
-            val dy = ty[i] - centerY
-            x[i] = centerX + dx * breath + (sin(seed[i] + elapsedMs * 0.003f) * vib)
-            y[i] = centerY + dy * breath + (cos(seed[i] + elapsedMs * 0.0027f) * vib)
+            x[i] = tx[i] + sin(seed[i] + elapsedMs * 0.004f) * vib
+            y[i] = ty[i] + cos(seed[i] + elapsedMs * 0.0037f) * vib
         }
         colorMix = 1f
     }
 
     private fun updateShatter(t: Float, dt: Float) {
-        // Particles explode outward from their current positions
-        // with gravity pulling down
-        val gravity = 1500f // px/s^2
+        val gravity = 1500f
         for (i in 0 until count) {
             x[i] += shatterVx[i] * dt
             shatterVy[i] += gravity * dt
             y[i] += shatterVy[i] * dt
-            rotation[i] += rotationSpeed[i] * dt
         }
         colorMix = 1f - t * 0.3f
     }
@@ -289,7 +258,6 @@ class ParticleSystem(
         for (i in 0 until count) {
             x[i] = centerX
             y[i] = centerY
-            rotation[i] = Random.nextFloat() * 360f
         }
     }
 }

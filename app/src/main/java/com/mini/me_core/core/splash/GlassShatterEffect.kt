@@ -4,7 +4,6 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.RectF
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
@@ -12,37 +11,43 @@ import kotlin.random.Random
 /**
  * A single glass shard from the Voronoi tessellation.
  *
- * Each shard is a polygon that starts as part of the screen, then during shatter:
- * 1. Translates outward along its normal direction
- * 2. Rotates in 3D around its own center (X/Y axis)
- * 3. Falls under gravity
+ * Each shard belongs to a depth layer:
+ * - FOREGROUND: large rotation, far displacement, flies first
+ * - MID: medium rotation and displacement
+ * - BACKGROUND: small rotation, near displacement, flies last
  */
+enum class ShardLayer(val rotationRange: ClosedFloatingPointRange<Float>, val displacementDp: ClosedFloatingPointRange<Float>) {
+    FOREGROUND(45f..90f, 100f..200f),
+    MID(20f..45f, 50f..100f),
+    BACKGROUND(0f..20f, 20f..50f);
+}
+
 class GlassShard(
-    val polygon: FloatArray, // flat [x0,y0, x1,y1, ...]
+    val polygon: FloatArray,
     val centerX: Float,
     val centerY: Float,
-    val outwardX: Float, // normalized direction from screen center
+    val outwardX: Float,
     val outwardY: Float,
-    val distanceFromCenter: Float, // for scaling motion magnitude
+    val layer: ShardLayer,
     val rotateXDeg: Float,
     val rotateYDeg: Float,
-    val zDepth: Float, // for Z-sorting (far = larger)
+    val zDepth: Float,
 )
 
 /**
  * Glass shatter effect using Voronoi tessellation + Camera 3D transforms.
  *
- * Voronoi cells are precomputed once at initialization (not per frame).
- * During animation, each shard gets a 3D rotation matrix via android.graphics.Camera.
+ * Shards are split into 3 depth layers for parallax.
+ * Camera position = 1.5x screen height, perspective strength 0.8.
+ * Vanishing point at screen center shifted up by 10%.
  */
 class GlassShatterEffect(
     private val screenWidthPx: Float,
     private val screenHeightPx: Float,
     density: Float,
+    private val targetShardCount: Int = 35,
 ) {
-    val shardCount: Int
     val shards: List<GlassShard>
-    val crackLines: List<Pair<FloatArray, FloatArray>> // pairs of (start, end) points
 
     private val camera = Camera()
     private val matrix = Matrix()
@@ -54,17 +59,19 @@ class GlassShatterEffect(
         strokeWidth = 1.5f * density
         alpha = 100
     }
+    // Edge highlight: 1px white, alpha 0.6 — glass fracture reflection
     private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 1f * density
-        alpha = 60
+        color = android.graphics.Color.WHITE
+        alpha = 153 // 0.6 * 255
     }
 
     init {
-        camera.setLocation(0f, 0f, -8f)
+        // Camera distance = 1.5x screen height (in z-units; Android Camera uses ~72 dpi units)
+        camera.setLocation(0f, 0f, -(screenHeightPx / density / 72f * 1.5f))
 
-        // Generate random seed points
-        val seedCount = 30 + Random.nextInt(11) // 30-40
+        val seedCount = targetShardCount
         val seedsX = FloatArray(seedCount)
         val seedsY = FloatArray(seedCount)
         for (i in 0 until seedCount) {
@@ -72,10 +79,9 @@ class GlassShatterEffect(
             seedsY[i] = Random.nextFloat() * screenHeightPx
         }
 
-        // Compute Voronoi cells via Sutherland-Hodgman clipping
-        val shardList = mutableListOf<GlassShard>()
         val screenCx = screenWidthPx / 2f
-        val screenCy = screenHeightPx / 2f
+        val screenCy = screenHeightPx * 0.4f // vanishing point: center + 10% up
+        val shardList = mutableListOf<GlassShard>()
 
         for (i in 0 until seedCount) {
             var polyX = floatArrayOf(0f, 0f, screenWidthPx, screenWidthPx, 0f)
@@ -83,55 +89,49 @@ class GlassShatterEffect(
 
             for (j in 0 until seedCount) {
                 if (i == j) continue
-                // Clip to half-plane: points closer to seed i than seed j
-                val ax = seedsX[i]
-                val ay = seedsY[i]
-                val bx = seedsX[j]
-                val by = seedsY[j]
-                // Half-plane: (x - ax)*(bx-ax) + (y - ay)*(by-ay) <= (bx-ax)^2/2 + (by-ay)^2/2
-                // Simplified: keep points on the i side of the perpendicular bisector
-                val dx = bx - ax
-                val dy = by - ay
-                val cx = (ax + bx) / 2f
-                val cy = (ay + by) / 2f
-                // Clip: dot((p - c), d) <= 0 (i side)
+                val ax = seedsX[i]; val ay = seedsY[i]
+                val bx = seedsX[j]; val by = seedsY[j]
+                val dx = bx - ax; val dy = by - ay
+                val cx = (ax + bx) / 2f; val cy = (ay + by) / 2f
                 val (newX, newY) = clipHalfPlane(polyX, polyY, dx, dy, cx, cy)
                 if (newX.size < 3) break
-                polyX = newX
-                polyY = newY
+                polyX = newX; polyY = newY
             }
 
-            if (polyX.size < 6) continue // need at least triangle
+            if (polyX.size < 6) continue
 
-            // Compute shard center
-            var sumX = 0f
-            var sumY = 0f
+            // Shard center
+            var sumX = 0f; var sumY = 0f
             val n = polyX.size
-            for (k in 0 until n) {
-                sumX += polyX[k]
-                sumY += polyY[k]
-            }
-            val scx = sumX / n
-            val scy = sumY / n
+            for (k in 0 until n) { sumX += polyX[k]; sumY += polyY[k] }
+            val scx = sumX / n; val scy = sumY / n
 
-            // Outward direction from screen center
+            // Outward direction from vanishing point
             var ox = scx - screenCx
             var oy = scy - screenCy
             val len = kotlin.math.sqrt(ox * ox + oy * oy)
-            if (len > 0.001f) {
-                ox /= len
-                oy /= len
-            } else {
-                ox = 0f
-                oy = 1f
+            if (len > 0.001f) { ox /= len; oy /= len } else { ox = 0f; oy = 1f }
+
+            // Assign depth layer by random: 30% foreground, 40% mid, 30% background
+            val layerRoll = Random.nextFloat()
+            val layer = when {
+                layerRoll < 0.30f -> ShardLayer.FOREGROUND
+                layerRoll < 0.70f -> ShardLayer.MID
+                else -> ShardLayer.BACKGROUND
             }
 
-            val dist = len / kotlin.math.sqrt(screenWidthPx * screenWidthPx + screenHeightPx * screenHeightPx)
+            // Rotation from layer range
+            val rotRange = layer.rotationRange
+            val rotMag = rotRange.start + Random.nextFloat() * (rotRange.endInclusive - rotRange.start)
+            val rotX = (Random.nextFloat() - 0.5f) * 2f * rotMag
+            val rotY = (Random.nextFloat() - 0.5f) * 2f * rotMag
 
-            // Random 3D rotation, scaled by distance
-            val baseRot = 20f + dist * 60f
-            val rotX = (Random.nextFloat() - 0.5f) * 2f * baseRot
-            val rotY = (Random.nextFloat() - 0.5f) * 2f * baseRot
+            // Z-depth: foreground = closest to viewer (smaller z), background = farther
+            val zDepth = when (layer) {
+                ShardLayer.FOREGROUND -> 0f
+                ShardLayer.MID -> 1f
+                ShardLayer.BACKGROUND -> 2f
+            } + Random.nextFloat() * 0.3f
 
             val flatPoly = FloatArray(n * 2)
             for (k in 0 until n) {
@@ -146,37 +146,19 @@ class GlassShatterEffect(
                     centerY = scy,
                     outwardX = ox,
                     outwardY = oy,
-                    distanceFromCenter = dist,
+                    layer = layer,
                     rotateXDeg = rotX,
                     rotateYDeg = rotY,
-                    zDepth = dist, // farther from center = "closer" to viewer for drama
+                    zDepth = zDepth,
                 )
             )
         }
 
-        // Sort by z-depth (draw far first, near last)
+        // Sort by z-depth: far (background) first, near (foreground) last
         shardList.sortByDescending { it.zDepth }
         shards = shardList
-        shardCount = shards.size
-
-        // Crack lines: from center to each seed (subset for performance)
-        crackLines = mutableListOf()
-        val crackSeedCount = (seedCount / 2).coerceAtLeast(8)
-        for (i in 0 until crackSeedCount) {
-            val idx = (i * seedCount / crackSeedCount).coerceAtMost(seedCount - 1)
-            crackLines.add(
-                Pair(
-                    floatArrayOf(screenCx, screenCy),
-                    floatArrayOf(seedsX[idx], seedsY[idx])
-                )
-            )
-        }
     }
 
-    /**
-     * Sutherland-Hodgman half-plane clipping.
-     * Keeps points where (p - c) dot d <= 0.
-     */
     private fun clipHalfPlane(
         polyX: FloatArray, polyY: FloatArray,
         dx: Float, dy: Float,
@@ -186,22 +168,16 @@ class GlassShatterEffect(
         val outY = mutableListOf<Float>()
         val n = polyX.size
 
-        fun inside(x: Float, y: Float): Boolean {
-            return (x - cx) * dx + (y - cy) * dy <= 0
-        }
+        fun inside(x: Float, y: Float) = (x - cx) * dx + (y - cy) * dy <= 0
 
         for (i in 0 until n) {
             val j = (i + 1) % n
             val xi = polyX[i]; val yi = polyY[i]
             val xj = polyX[j]; val yj = polyY[j]
-            val iInside = inside(xi, yi)
-            val jInside = inside(xj, yj)
-
-            if (iInside) {
-                outX.add(xi); outY.add(yi)
-            }
-            if (iInside != jInside) {
-                // Compute intersection
+            val iIn = inside(xi, yi)
+            val jIn = inside(xj, yj)
+            if (iIn) { outX.add(xi); outY.add(yi) }
+            if (iIn != jIn) {
                 val t = ((cx - xi) * dx + (cy - yi) * dy) / ((xj - xi) * dx + (yj - yi) * dy)
                 outX.add(xi + t * (xj - xi))
                 outY.add(yi + t * (yj - yi))
@@ -210,15 +186,6 @@ class GlassShatterEffect(
         return Pair(outX.toFloatArray(), outY.toFloatArray())
     }
 
-    /**
-     * Draw the shattered shards.
-     *
-     * @param canvas Native Android canvas
-     * @param shatterProgress 0..1 progress of the shatter animation
-     * @param contentBitmap The screen content bitmap (drawn into shards)
-     * @param crackProgress 0..1 how far crack lines have spread
-     * @param alpha overall alpha for fade out
-     */
     fun draw(
         canvas: android.graphics.Canvas,
         shatterProgress: Float,
@@ -231,25 +198,14 @@ class GlassShatterEffect(
         val easeOut = 1f - (1f - shatterProgress) * (1f - shatterProgress)
         val gravity = 800f * easeOut * easeOut
 
-        // Draw crack lines first (under shards)
-        if (crackProgress > 0f) {
-            crackPaint.alpha = (100 * crackProgress * alpha).toInt().coerceIn(0, 255)
-            for ((start, end) in crackLines) {
-                // Crack grows from center outward
-                val ex = start[0] + (end[0] - start[0]) * crackProgress
-                val ey = start[1] + (end[1] - start[1]) * crackProgress
-                canvas.drawLine(start[0], start[1], ex, ey, crackPaint)
-            }
-        }
-
-        // Draw shards (sorted far to near)
         for (shard in shards) {
-            // Outward displacement
-            val displace = easeOut * (200f + shard.distanceFromCenter * 400f)
+            // Displacement based on layer
+            val dispRange = shard.layer.displacementDp
+            val dispDp = dispRange.start + Random.nextFloat() * (dispRange.endInclusive - dispRange.start)
+            val displace = easeOut * dispDp
             val tx = shard.outwardX * displace
             val ty = shard.outwardY * displace + gravity
 
-            // 3D rotation
             camera.save()
             camera.rotateX(shard.rotateXDeg * easeOut)
             camera.rotateY(shard.rotateYDeg * easeOut)
@@ -262,7 +218,6 @@ class GlassShatterEffect(
             matrix.postTranslate(cx + tx, cy + ty)
             camera.restore()
 
-            // Build path from polygon
             val path = Path()
             path.moveTo(shard.polygon[0], shard.polygon[1])
             for (k in 1 until shard.polygon.size / 2) {
@@ -273,10 +228,8 @@ class GlassShatterEffect(
             canvas.save()
             canvas.concat(matrix)
 
-            // Draw shard content (screenshot of underlying screen)
             if (contentBitmap != null) {
                 shardPaint.alpha = (200 * alpha).toInt().coerceIn(0, 255)
-                // Clip to shard path and draw the bitmap
                 canvas.clipPath(path)
                 canvas.drawBitmap(contentBitmap, 0f, 0f, shardPaint)
             } else {
@@ -285,8 +238,8 @@ class GlassShatterEffect(
                 canvas.drawPath(path, shardPaint)
             }
 
-            // Edge highlight
-            edgePaint.alpha = (80 * alpha).toInt().coerceIn(0, 255)
+            // Edge highlight: white fracture reflection
+            edgePaint.alpha = (153 * alpha).toInt().coerceIn(0, 255)
             canvas.drawPath(path, edgePaint)
 
             canvas.restore()

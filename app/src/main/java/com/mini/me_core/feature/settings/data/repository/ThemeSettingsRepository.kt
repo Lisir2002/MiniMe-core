@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.settings.data.repository
 
 import com.mini.me_core.R
+import com.mini.me_core.core.splash.SplashStyle
 import com.mini.me_core.datalayer.store.KVStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -27,12 +28,22 @@ class ThemeSettingsRepository @Inject constructor(
         const val NS = "settings"
         const val THEME_MODE_KEY = "theme_mode"
         const val DARK_THEME_KEY = "dark_theme_enabled"
+        const val SPLASH_STYLE_KEY = "splash_style"
     }
 
     val themeModeFlow: Flow<AppThemeMode> = kv.observeString(NS, THEME_MODE_KEY).map { stored ->
         stored?.let { AppThemeMode.fromPersisted(it) }
             ?: kv.getBool(NS, DARK_THEME_KEY)?.let { if (it) AppThemeMode.DARK else AppThemeMode.LIGHT }
             ?: AppThemeMode.AUTO
+    }
+
+    /** User-selected splash animation style (default PARTICLE). */
+    val splashStyleFlow: Flow<SplashStyle> = kv.observeString(NS, SPLASH_STYLE_KEY).map { stored ->
+        SplashStyle.fromPersisted(stored)
+    }
+
+    suspend fun setSplashStyle(style: SplashStyle) {
+        kv.putString(NS, SPLASH_STYLE_KEY, style.name)
     }
 
     suspend fun setThemeMode(mode: AppThemeMode) {
