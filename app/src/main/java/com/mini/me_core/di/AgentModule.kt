@@ -426,6 +426,7 @@ object AgentModule {
         toolGuards: Set<@JvmSuppressWildcards com.mini.me_core.feature.agent.domain.guard.ToolGuard>,
         fileObservationGuard: com.mini.me_core.feature.agent.domain.guard.FileObservationGuard,
         normFlowSettingsRepository: com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository,
+        guardLogRepository: com.mini.me_core.feature.agent.domain.guard.GuardLogRepository,
         trajectoryService: com.mini.me_core.feature.agent.domain.trajectory.TrajectoryService,
         playbookExecutor: com.mini.me_core.feature.agent.domain.playbook.PlaybookExecutor
     ): AgentWorkflow {
@@ -463,6 +464,7 @@ object AgentModule {
             toolGuards,
             fileObservationGuard,
             normFlowSettingsRepository,
+            guardLogRepository,
             trajectoryService,
             playbookExecutor
         )

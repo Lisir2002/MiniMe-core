@@ -50,11 +50,23 @@ class RuleRegistry @Inject constructor(
         listModuleDirs = { projectRoot -> listModuleDirs(projectRoot) }
     )
 
+    /** P3：内存禁用覆盖集合（rule name）。 */
+    private val disabledRuleNames = mutableSetOf<String>()
+
+    fun disableRule(name: String) { disabledRuleNames.add(name) }
+    fun enableRule(name: String) { disabledRuleNames.remove(name) }
+    fun isRuleDisabled(name: String): Boolean = name in disabledRuleNames
+
+    private fun List<RuleAsset>.applyFilter(): List<RuleAsset> = filter { it.name !in disabledRuleNames }
+
     /** 全部四级规则（全局/项目/工作区/模块），按 priority 降序合并拼接（数值大优先）。 */
-    fun all(projectRoot: String): List<RuleAsset> = core.all(projectRoot)
+    fun all(projectRoot: String): List<RuleAsset> = core.all(projectRoot).applyFilter()
 
     /** 三级常驻（全局/项目/工作区），按 priority 降序；模块级需显式 [moduleRules] 命中判断。 */
-    fun resident(projectRoot: String): List<RuleAsset> = core.resident(projectRoot)
+    fun resident(projectRoot: String): List<RuleAsset> = core.resident(projectRoot).applyFilter()
+
+    /** 全部规则不过滤（管理页面用）。 */
+    fun allIncludingDisabled(projectRoot: String): List<RuleAsset> = core.all(projectRoot)
 
     /** 命中的模块规则（本会话/任务触碰过该模块文件）：按 priority 降序。 */
     fun moduleRules(projectRoot: String): List<RuleAsset> {

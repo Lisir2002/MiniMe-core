@@ -160,6 +160,8 @@ class StatefulAgentWorkflow @Inject constructor(
     private val fileObservationGuard: FileObservationGuard,
     /** D1-7 规范流程统一开关：总开关 norm_flow_enabled + 子开关 step_inject / tool_guard（对齐 norm-chain §3.5）。 */
     private val normFlowSettingsRepository: com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository,
+    /** P2：护栏拦截日志（Block / Advisory 记录到内存环形缓冲）。 */
+    private val guardLogRepository: com.mini.me_core.feature.agent.domain.guard.GuardLogRepository,
     /** D2-3/5 运行轨迹服务：工具执行完成追加 tool 轨迹、turn 边界轻量标记；空转收敛/阶段总结/审计的数据源。 */
     private val trajectoryService: TrajectoryService,
     /** D5-8 Playbook 完成判定护栏：workflow 每轮按实质工具动作上报（recordSubstantiveAction / recordIdleRound）。 */
@@ -825,7 +827,12 @@ class StatefulAgentWorkflow @Inject constructor(
                             FileLogger.w(TAG, "读取空转收敛开关失败，按默认关闭处理", e)
                             false
                         }
-                        if (idleConvergeActive && idleRounds >= IDLE_CONVERGE_ROUNDS) {
+                        val idleConvergeThreshold = try {
+                            normFlowSettingsRepository.getIdleConvergeRounds()
+                        } catch (e: Exception) {
+                            IDLE_CONVERGE_ROUNDS
+                        }
+                        if (idleConvergeActive && idleRounds >= idleConvergeThreshold) {
                             val actionSummary = try {
                                 trajectoryService.buildActionSummary(currentContext.sessionId)
                             } catch (e: CancellationException) {
@@ -907,7 +914,10 @@ class StatefulAgentWorkflow @Inject constructor(
                         // （reasoningEffort，默认 MEDIUM）透传给 provider；关闭则禁用推理参数
                         // （对齐 norm-chain §3.7.2「新增推理预算配置，开启后按 provider 能力传 reasoning 参数」）。
                         val reasoningEffortForRound = if (normFlowSettingsRepository.isReasoningBudgetActive()) {
-                            currentContext.reasoningEffort
+                            // P1：会话级 reasoningEffort 优先；未设置时回退到全局 reasoning_budget_level
+                            currentContext.reasoningEffort?.takeIf { it.isNotBlank() }
+                                ?: try { normFlowSettingsRepository.getReasoningBudgetLevel() }
+                                catch (e: Exception) { "medium" }
                         } else {
                             null
                         }
@@ -1854,7 +1864,10 @@ class StatefulAgentWorkflow @Inject constructor(
         toolCall: ToolCall,
         context: AgentContext
     ): ToolResult.Error? {
+        val fileObservationActive = normFlowSettingsRepository.isFileObservationActive()
         for (guard in toolGuards) {
+            // P0：文件观察护栏独立开关关闭时跳过该护栏
+            if (guard.id == "file-observation" && !fileObservationActive) continue
             val verdict = try {
                 guard.guard(
                     ToolGuardContext(
@@ -1873,10 +1886,29 @@ class StatefulAgentWorkflow @Inject constructor(
             when (verdict) {
                 is ToolGuardResult.Block -> {
                     FileLogger.w(TAG, "护栏 ${guard.id} 拦截 $name: ${verdict.code} ${verdict.message}")
+                    guardLogRepository.log(
+                        com.mini.me_core.feature.agent.domain.guard.GuardLogEntry(
+                            timestamp = System.currentTimeMillis(),
+                            toolName = name,
+                            guardId = guard.id,
+                            code = verdict.code,
+                            message = verdict.message
+                        )
+                    )
                     return ToolResult.Error(verdict.message, verdict.code)
                 }
-                is ToolGuardResult.Advisory ->
+                is ToolGuardResult.Advisory -> {
                     FileLogger.w(TAG, "护栏 ${guard.id} 提醒 $name: ${verdict.code} ${verdict.message}")
+                    guardLogRepository.log(
+                        com.mini.me_core.feature.agent.domain.guard.GuardLogEntry(
+                            timestamp = System.currentTimeMillis(),
+                            toolName = name,
+                            guardId = guard.id,
+                            code = verdict.code,
+                            message = verdict.message
+                        )
+                    )
+                }
                 ToolGuardResult.Pass -> Unit
             }
         }

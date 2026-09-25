@@ -19,4 +19,16 @@ abstract class GuardModule {
     @Binds
     @IntoSet
     abstract fun bindFileObservationGuard(guard: FileObservationGuard): ToolGuard
+
+    @Binds
+    @IntoSet
+    abstract fun bindDangerousCommandGuard(guard: DangerousCommandGuard): ToolGuard
+
+    @Binds
+    @IntoSet
+    abstract fun bindLargeFileGuard(guard: LargeFileGuard): ToolGuard
+
+    @Binds
+    @IntoSet
+    abstract fun bindPathBoundaryGuard(guard: PathBoundaryGuard): ToolGuard
 }

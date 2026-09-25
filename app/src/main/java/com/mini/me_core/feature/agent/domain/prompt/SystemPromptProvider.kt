@@ -293,13 +293,36 @@ class SystemPromptProvider @Inject constructor(
     private val rulesSource = RulesSource()
     private val sopSource = SopSource()
 
+    // step 前注入子开关状态缓存（buildStepInjections 每轮更新，build() 基线读取）
+    @Volatile private var staticRulesEnabled = true
+    @Volatile private var projectAgentsEnabled = true
+    @Volatile private var goalInjectEnabled = true
+    @Volatile private var layeredRulesEnabled = true
+
+    // P1：注入诊断面板（最近一次 step 注入的源级诊断）
+    data class SourceDiagnosis(
+        val name: String,
+        val chars: Int,
+        val importance: String,
+        val kept: Boolean,
+        val reason: String
+    )
+
+    @Volatile private var _lastDiagnosis: List<SourceDiagnosis> = emptyList()
+    @Volatile private var _lastInjectionContent: String? = null
+    @Volatile private var _lastBudgetUsed: Int = 0
+
+    fun getLastInjectionDiagnosis(): List<SourceDiagnosis> = _lastDiagnosis
+    fun getLastInjectionContent(): String? = _lastInjectionContent
+    fun getLastBudgetUsed(): Int = _lastBudgetUsed
+
     fun build(agentContext: AgentContext): String {
         // 1. 获取各个 Source 的基线快照。
         // PLAN/AUTO 模式提示词由 StaticRuleSource 按 mode 字段注入（R04 起），紧随静态规则之后，确保模型优先注意到模式约束
-        val staticContent = staticRuleSource.build(agentContext)
+        val staticContent = if (staticRulesEnabled) staticRuleSource.build(agentContext) else ""
         val skillsContent = activeSkillsSource.build(agentContext)
         val memoriesContent = memoryListSource.build(agentContext)
-        val projectRules = projectRuleSource.build(agentContext)
+        val projectRules = if (projectAgentsEnabled) projectRuleSource.build(agentContext) else null
         
         // 2. 增量 Diff 处理 (仅针对高频变化的 Workspace)
         val currentWorkspaceContext = workspaceSource.build(agentContext)
@@ -418,6 +441,11 @@ class SystemPromptProvider @Inject constructor(
      * 避免 Playbook 阶段目标与 goal 维护信号互相干扰（对齐 norm-chain §3.3 阶段注入审计定稿）。
      */
     suspend fun buildStepInjections(ctx: AgentContext): String? {
+        // P0 拆分：读取 step 前注入子开关状态，存入 volatile 缓存供 build() 基线部分使用
+        staticRulesEnabled = normFlowSettingsRepository.isStepInjectStaticRulesActive()
+        projectAgentsEnabled = normFlowSettingsRepository.isStepInjectProjectAgentsActive()
+        goalInjectEnabled = normFlowSettingsRepository.isStepInjectGoalActive()
+        layeredRulesEnabled = normFlowSettingsRepository.isStepInjectLayeredRulesActive()
         sopSource.setSummaryEnabled(normFlowSettingsRepository.isSopSummaryActive())
         // D5-5：查询当前阶段（失败静默降级为无阶段），喂入 PlaybookStageSource。
         val sessionId = ctx.sessionId
@@ -432,20 +460,84 @@ class SystemPromptProvider @Inject constructor(
         }
         playbookStageSource.feed(sessionId, stageView)
         val playbookActive = stageView != null
-        val entries = stepSources.mapNotNull { step ->
-            // 挂起双信号：playbook 运行期间 GoalStale / GoalAdjustEvent 不注入（§3.3 审计定稿）。
+
+        // P2：构建诊断列表（逐源记录过滤/空/保留状态）
+        val diagnosis = mutableListOf<SourceDiagnosis>()
+        val candidateEntries = mutableListOf<Triple<StepInjectionAssembler.Entry, String, Boolean>>()
+
+        stepSources.forEach { step ->
+            val sourceName = sourceDisplayName(step.source)
+            // 开关过滤
+            val isGoalSource = step.source === goalHintSource ||
+                step.source === planPendingHintSource ||
+                step.source === goalAdjustEventSource ||
+                step.source === goalStaleSource
+            if (isGoalSource && !goalInjectEnabled) {
+                diagnosis.add(SourceDiagnosis(sourceName, 0, step.importance.name, kept = false, reason = "disabled by toggle (goal)"))
+                return@forEach
+            }
+            if (step.source === rulesSource && !layeredRulesEnabled) {
+                diagnosis.add(SourceDiagnosis(sourceName, 0, step.importance.name, kept = false, reason = "disabled by toggle (layered rules)"))
+                return@forEach
+            }
+            // playbook 挂起双信号
             if (playbookActive && (step.source === goalStaleSource || step.source === goalAdjustEventSource)) {
-                return@mapNotNull null
+                diagnosis.add(SourceDiagnosis(sourceName, 0, step.importance.name, kept = false, reason = "suspended during playbook"))
+                return@forEach
             }
             val text = try {
                 step.source.build(ctx)
             } catch (e: Exception) {
                 null
             }?.takeIf { it.isNotBlank() }
-                ?: return@mapNotNull null
-            StepInjectionAssembler.Entry(step.importance, step.order, text)
+            if (text == null) {
+                diagnosis.add(SourceDiagnosis(sourceName, 0, step.importance.name, kept = false, reason = "empty"))
+                return@forEach
+            }
+            candidateEntries.add(Triple(
+                StepInjectionAssembler.Entry(step.importance, step.order, text),
+                sourceName,
+                true
+            ))
         }
-        return stepAssembler.assemble(entries)
+
+        val entries = candidateEntries.map { it.first }
+        val result = stepAssembler.assemble(entries)
+
+        // P2：判定预算裁剪——对比最终输出中包含哪些候选条目
+        val keptContents = result?.split("\n\n")?.toSet() ?: emptySet()
+        candidateEntries.forEach { (entry, name, _) ->
+            val isKept = result != null && entry.content in keptContents
+            diagnosis.add(
+                SourceDiagnosis(
+                    name = name,
+                    chars = entry.content.length,
+                    importance = entry.importance.name,
+                    kept = isKept,
+                    reason = if (isKept) "kept" else "budget trimmed"
+                )
+            )
+        }
+        // 按 importance + order 排序诊断
+        _lastDiagnosis = diagnosis.sortedWith(compareBy({ it.importance }, { it.name }))
+        _lastInjectionContent = result
+        _lastBudgetUsed = result?.length ?: 0
+        return result
+    }
+
+    /** 为 step 注入源提供友好显示名（诊断面板用）。 */
+    private fun sourceDisplayName(source: PromptSource): String = when (source) {
+        goalHintSource -> "goalHint"
+        intentAskSource -> "intentAsk"
+        behaviorModeSource -> "behaviorMode"
+        planPendingHintSource -> "planPending"
+        playbookStageSource -> "playbookStage"
+        goalAdjustEventSource -> "goalAdjustEvent"
+        rulesSource -> "layeredRules"
+        sopSource -> "sopSummary"
+        goalStaleSource -> "goalStale"
+        loopAdvisorySource -> "loopAdvisory"
+        else -> source.javaClass.simpleName
     }
 
     private companion object {
