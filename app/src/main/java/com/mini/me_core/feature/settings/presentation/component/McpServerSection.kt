@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import com.mini.me_core.core.theme.components.AppDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -368,23 +368,12 @@ internal fun McpServerSection(
     }
 
     if (showRegenerateConfirm) {
-        AlertDialog(
-            onDismissRequest = { showRegenerateConfirm = false },
-            title = { Text(stringResource(R.string.mcp_regenerate_confirm_title)) },
-            text = { Text(stringResource(R.string.mcp_regenerate_confirm_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showRegenerateConfirm = false
-                    onRegenerateToken()
-                }) {
-                    Text(stringResource(R.string.mcp_regenerate_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRegenerateConfirm = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            }
+        AppDialog(
+            title = stringResource(R.string.mcp_regenerate_confirm_title),
+            message = stringResource(R.string.mcp_regenerate_confirm_message),
+            confirmText = stringResource(R.string.mcp_regenerate_confirm),
+            onDismiss = { showRegenerateConfirm = false },
+            onConfirm = { onRegenerateToken() },
         )
     }
 }

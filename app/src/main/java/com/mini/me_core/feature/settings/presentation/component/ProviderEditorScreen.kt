@@ -53,6 +53,8 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
+import com.mini.me_core.core.theme.components.AppDialog
+import com.mini.me_core.core.theme.components.AppDialogType
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -926,23 +928,13 @@ fun ProviderEditorScreen(
 
     // 删除确认对话框
     if (showDeleteConfirm && initialProvider != null) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("删除供应商") },
-            text = { Text("删除后 API Key、模型列表等配置将全部丢失，不可恢复。确认删除？") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDeleteConfirm = false
-                    onDelete(initialProvider.id)
-                }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-                    Text("删除")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("取消")
-                }
-            }
+        AppDialog(
+            title = "删除供应商",
+            message = "删除后 API Key、模型列表等配置将全部丢失，不可恢复。确认删除？",
+            type = AppDialogType.Destructive,
+            confirmText = "删除",
+            onDismiss = { showDeleteConfirm = false },
+            onConfirm = { onDelete(initialProvider.id) },
         )
     }
 }

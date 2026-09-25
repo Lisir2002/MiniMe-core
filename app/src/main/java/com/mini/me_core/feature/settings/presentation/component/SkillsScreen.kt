@@ -20,6 +20,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import com.mini.me_core.core.theme.components.AppDialog
+import com.mini.me_core.core.theme.components.AppDialogType
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -211,19 +213,13 @@ fun SkillsScreen(
 
     // ── 卸载确认 ──
     pendingDelete?.let { skill ->
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text(stringResource(R.string.skill_uninstall)) },
-            text = { Text(stringResource(R.string.skill_uninstall_confirm, skill.name, skill.version)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.uninstall(skill)
-                    pendingDelete = null
-                }) { Text(stringResource(R.string.skill_confirm)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.skill_cancel)) }
-            }
+        AppDialog(
+            title = stringResource(R.string.skill_uninstall),
+            message = stringResource(R.string.skill_uninstall_confirm, skill.name, skill.version),
+            type = AppDialogType.Destructive,
+            confirmText = stringResource(R.string.skill_confirm),
+            onDismiss = { pendingDelete = null },
+            onConfirm = { viewModel.uninstall(skill) },
         )
     }
 
@@ -280,13 +276,11 @@ fun SkillsScreen(
                 TextButton(onClick = { viewModel.cancelImport() }) { Text(stringResource(R.string.skill_cancel)) }
             }
         )
-        is SkillsViewModel.ImportUiState.Done -> AlertDialog(
-            onDismissRequest = { viewModel.consumeImportDone() },
-            title = { Text(stringResource(R.string.skill_import_success)) },
-            text = { Text(state.message) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.consumeImportDone() }) { Text(stringResource(R.string.skill_confirm)) }
-            }
+        is SkillsViewModel.ImportUiState.Done -> AppDialog(
+            title = stringResource(R.string.skill_import_success),
+            message = state.message,
+            confirmText = stringResource(R.string.skill_confirm),
+            onDismiss = { viewModel.consumeImportDone() },
         )
         SkillsViewModel.ImportUiState.Idle -> Unit
     }

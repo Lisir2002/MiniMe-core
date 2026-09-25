@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import com.mini.me_core.core.theme.components.AppDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -386,30 +387,13 @@ fun SecuritySettingsScreen(
 
         // ── 生物识别确认弹窗 ──
         if (showBiometricConfirm) {
-            AlertDialog(
-                onDismissRequest = { showBiometricConfirm = false },
-                title = { Text(stringResource(R.string.ui____________d49c5da2)) },
-                text = {
-                    Text(
-                        "开启后，30 秒内首次访问 SSH 密码/私钥需验证指纹或面容。\n\n" +
-                            stringResource(R.string.ui_____________1d8bcba0)
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showBiometricConfirm = false
-                            viewModel.toggleBiometric(true)
-                        }
-                    ) {
-                        Text(stringResource(R.string.ui______38f75a54))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showBiometricConfirm = false }) {
-                        Text(stringResource(R.string.ui____625fb26b_4))
-                    }
-                }
+            AppDialog(
+                title = stringResource(R.string.ui____________d49c5da2),
+                message = "开启后，30 秒内首次访问 SSH 密码/私钥需验证指纹或面容。\n\n" +
+                    stringResource(R.string.ui_____________1d8bcba0),
+                confirmText = stringResource(R.string.ui______38f75a54),
+                onDismiss = { showBiometricConfirm = false },
+                onConfirm = { viewModel.toggleBiometric(true) },
             )
         }
     }

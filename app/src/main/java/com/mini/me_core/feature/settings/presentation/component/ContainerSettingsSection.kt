@@ -20,7 +20,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import com.mini.me_core.core.theme.components.AppDialog
+import com.mini.me_core.core.theme.components.AppDialogType
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -247,48 +249,37 @@ internal fun ContainerSection(
     }
 
     deletingProfile?.let { deleting ->
-        AlertDialog(
-            onDismissRequest = { deletingProfile = null },
-            title = { Text(stringResource(R.string.container_delete_config)) },
-            text = { Text(stringResource(R.string.container_delete_confirm, deleting.name, if (deleting.mode == ExecutionMode.LOCAL_PROOT && !deleting.isBuiltin) stringResource(R.string.container_rootfs_will_be_cleared) else "")) },
-            confirmButton = {
-                TextButton(onClick = {
-                    onDeleteCustom(deleting)
-                    deletingProfile = null
-                }) { Text(stringResource(R.string.common_delete)) }
-            },
-            dismissButton = { TextButton(onClick = { deletingProfile = null }) { Text(stringResource(R.string.common_cancel)) } }
+        AppDialog(
+            title = stringResource(R.string.container_delete_config),
+            message = stringResource(R.string.container_delete_confirm, deleting.name, if (deleting.mode == ExecutionMode.LOCAL_PROOT && !deleting.isBuiltin) stringResource(R.string.container_rootfs_will_be_cleared) else ""),
+            type = AppDialogType.Destructive,
+            confirmText = stringResource(R.string.common_delete),
+            onDismiss = { deletingProfile = null },
+            onConfirm = { onDeleteCustom(deleting) },
         )
     }
 
     pendingSwitch?.let { target ->
-        AlertDialog(
-            onDismissRequest = { pendingSwitch = null },
-            title = { Text(stringResource(R.string.container_switch_image)) },
-            text = { Text(stringResource(R.string.container_switch_confirm, target.name)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    onSwitchConfirmed()
-                    onSelect(target.id)
-                    pendingSwitch = null
-                }) { Text(stringResource(R.string.common_switch)) }
+        AppDialog(
+            title = stringResource(R.string.container_switch_image),
+            message = stringResource(R.string.container_switch_confirm, target.name),
+            confirmText = stringResource(R.string.common_switch),
+            onDismiss = { pendingSwitch = null },
+            onConfirm = {
+                onSwitchConfirmed()
+                onSelect(target.id)
             },
-            dismissButton = { TextButton(onClick = { pendingSwitch = null }) { Text(stringResource(R.string.common_cancel)) } }
         )
     }
 
     pendingReset?.let { resetting ->
-        AlertDialog(
-            onDismissRequest = { pendingReset = null },
-            title = { Text(stringResource(R.string.container_reset_builtin)) },
-            text = { Text(stringResource(R.string.container_reset_confirm, resetting.name)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    onResetBuiltin(resetting)
-                    pendingReset = null
-                }) { Text(stringResource(R.string.container_reset)) }
-            },
-            dismissButton = { TextButton(onClick = { pendingReset = null }) { Text(stringResource(R.string.common_cancel)) } }
+        AppDialog(
+            title = stringResource(R.string.container_reset_builtin),
+            message = stringResource(R.string.container_reset_confirm, resetting.name),
+            type = AppDialogType.Destructive,
+            confirmText = stringResource(R.string.container_reset),
+            onDismiss = { pendingReset = null },
+            onConfirm = { onResetBuiltin(resetting) },
         )
     }
 }

@@ -33,6 +33,8 @@ import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.BrightnessAuto
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.AlertDialog
+import com.mini.me_core.core.theme.components.AppDialog
+import com.mini.me_core.core.theme.components.AppDialogType
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -180,23 +182,13 @@ fun ThemeSettingsScreen(
 
     // 恢复出厂确认 Dialog
     if (showResetConfirm) {
-        AlertDialog(
-            onDismissRequest = { showResetConfirm = false },
-            title = { Text("恢复出厂主题？") },
-            text = { Text("将清除所有自定义颜色和显示偏好，恢复到默认预设和外观模式。") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.resetToDefaults()
-                    showResetConfirm = false
-                }) {
-                    Text("确认恢复", color = colors.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetConfirm = false }) {
-                    Text("取消")
-                }
-            }
+        AppDialog(
+            title = "恢复出厂主题？",
+            message = "将清除所有自定义颜色和显示偏好，恢复到默认预设和外观模式。",
+            type = AppDialogType.Destructive,
+            confirmText = "确认恢复",
+            onDismiss = { showResetConfirm = false },
+            onConfirm = { viewModel.resetToDefaults() },
         )
     }
 }
