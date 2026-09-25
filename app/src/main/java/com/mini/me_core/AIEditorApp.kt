@@ -209,6 +209,10 @@ class AIEditorApp : Application() {
         mcpManager.start()
         FileLogger.d(TAG, "核心服务：凭据桥接 + MCP 已启动")
 
+        // 启动画面门闩：数据层 + 核心服务就绪，放行 Splash Screen 退出。
+        // 异步预热（阶段3）不阻塞首帧。
+        com.mini.me_core.core.splash.AppInitState.markReady()
+
         // ── [启动/3/3] 异步预热（不阻塞首帧，后台并行）──
         FileLogger.i(TAG, "[启动/3/3] 异步预热")
         // 内置文档 + 提示词提取（覆盖式，随 App 升级更新）

@@ -1,11 +1,15 @@
 package com.mini.me_core
 
 import android.Manifest
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ObjectAnimator
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.content.pm.PackageManager
 import android.view.WindowManager
+import android.view.animation.AccelerateInterpolator
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -40,6 +44,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -150,6 +155,34 @@ class MainActivity : ComponentActivity() {
         // 早于 super 调用时，基类内部的 mSavedStateRegistry / mConfigChangeTracker 尚未初始化，
         // 会在低版本 AndroidX Activity 上触发 NPE 或警告，导致冷启动偶发 1-2s 秒退。
         super.onCreate(savedInstanceState)
+
+        // Splash Screen：必须在 super.onCreate 之后、setContent 之前调用。
+        // 保持启动画面直到 AppInitState.isReady（数据层+核心服务就绪或1.5s超时）。
+        val splashScreen = installSplashScreen()
+        splashScreen.setKeepOnScreenCondition { !com.mini.me_core.core.splash.AppInitState.isReady }
+        // 自定义退出动画：Logo 渐隐缩小（500ms），完成后移除 SplashScreenView 避免内存泄漏。
+        @Suppress("SENSELESS_COMPARISON") // iconView 运行时可能为 null（厂商 ROM 差异），防御性判空
+        splashScreen.setOnExitAnimationListener { splashScreenView ->
+            val iconView = splashScreenView.iconView
+            if (iconView == null) {
+                splashScreenView.remove()
+                return@setOnExitAnimationListener
+            }
+            val fadeOut = ObjectAnimator.ofFloat(iconView, "alpha", 1f, 0f)
+            val scaleDownX = ObjectAnimator.ofFloat(iconView, "scaleX", 1f, 0.6f)
+            val scaleDownY = ObjectAnimator.ofFloat(iconView, "scaleY", 1f, 0.6f)
+            val exitSet = android.animation.AnimatorSet()
+            exitSet.playTogether(fadeOut, scaleDownX, scaleDownY)
+            exitSet.duration = 500
+            exitSet.interpolator = AccelerateInterpolator()
+            exitSet.addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    splashScreenView.remove()
+                }
+            })
+            exitSet.start()
+        }
+
         enableEdgeToEdge()
         requestLegacyStoragePermissionIfNeeded()
         // API 30+：全局切到 ADJUST_NOTHING，由 rememberImeBottomInset() 接管键盘内边距。

@@ -423,6 +423,8 @@ dependencies {
 
     // Core Android
     implementation("androidx.core:core:1.16.0")
+    // 启动画面（Splash Screen）：AndroidX 官方库，兼容 API 26+
+    implementation("androidx.core:core-splashscreen:1.0.1")
     // WebView 文档起始注入（addDocumentStartJavaScript，用于内置浏览器动态数据捕获的 fetch/XHR/WS/SSE 插桩）
     implementation("androidx.webkit:webkit:1.13.0")
     // Testing
