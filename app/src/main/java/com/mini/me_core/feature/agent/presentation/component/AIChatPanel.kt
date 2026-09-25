@@ -111,6 +111,7 @@ private data class AutoScrollSignal(
 fun AIChatPanel(
     viewModel: AIAgentViewModel,
     onNavigateToSettings: () -> Unit,
+    onNavigateToNormFlow: () -> Unit = {},
     onNavigateToTerminal: () -> Unit = {},
     onNavigateToGit: () -> Unit = {},
     onNavigateToBrowser: () -> Unit = {},
@@ -678,7 +679,7 @@ fun AIChatPanel(
                 }
             }
 
-            NormFlowIndicatorBar(onClick = onNavigateToSettings)
+            NormFlowIndicatorBar(onNavigateToNormFlow = onNavigateToNormFlow)
 
             ChatInputBar(
                 value = inputText,

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -36,8 +37,9 @@ import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
  * 统一列表项组件。
  *
  * 基于现有 CyberMenuRow 设计，支持图标块、标题、副标题、搜索高亮、尾随组件、分割线。
+ * 支持 Switch 开关（checked != null 时）和查看入口箭头（onViewClick != null 时）。
  *
- * 替换目标：CyberMenuRow（4处）+ 各模块自定义列表项。
+ * 替换目标：CyberMenuRow（4处）+ 各模块自定义列表项 + SwitchRow/GroupSwitchRow。
  *
  * @param icon 图标
  * @param title 标题
@@ -46,8 +48,11 @@ import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
  * @param modifier 修饰符
  * @param showDivider 是否显示底部分割线
  * @param highlightQuery 搜索高亮关键词
- * @param trailing 尾随组件（null 时默认显示箭头）
+ * @param trailing 尾随组件（null 时根据 checked/onViewClick 自动选择）
  * @param iconBg 图标块背景色（null 时使用默认灰色，图标为灰色；非 null 时图标为白色）
+ * @param checked 非空时 trailing 显示 Switch，与 trailing/onViewClick 互斥
+ * @param onCheckedChange Switch 状态变化回调
+ * @param onViewClick 查看入口（显示箭头），与 checked 互斥
  */
 @Composable
 fun AppListItem(
@@ -60,6 +65,9 @@ fun AppListItem(
     highlightQuery: String = "",
     trailing: (@Composable () -> Unit)? = null,
     iconBg: Color? = null,
+    checked: Boolean? = null,
+    onCheckedChange: ((Boolean) -> Unit)? = null,
+    onViewClick: (() -> Unit)? = null,
 ) {
     val colors = LocalAppTheme.current.colors
 
@@ -69,12 +77,33 @@ fun AppListItem(
     val subtitleColor = colors.textSecondary
     val dividerColor = colors.borderMuted
 
-    val effectiveTrailing: @Composable () -> Unit = trailing ?: {
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-            contentDescription = null,
-            tint = colors.textTertiary,
-        )
+    val effectiveTrailing: @Composable () -> Unit = trailing ?: when {
+        checked != null -> {
+            {
+                Switch(
+                    checked = checked,
+                    onCheckedChange = onCheckedChange,
+                )
+            }
+        }
+        onViewClick != null -> {
+            {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = colors.textTertiary,
+                )
+            }
+        }
+        else -> {
+            {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = colors.textTertiary,
+                )
+            }
+        }
     }
 
     val highlightedTitle = remember(title, highlightQuery) {

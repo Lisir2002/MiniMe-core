@@ -101,7 +101,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
-import com.mini.me_core.core.theme.AppTopAppBar
+import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing

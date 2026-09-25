@@ -26,7 +26,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
-import com.mini.me_core.core.theme.AppTopAppBar
+import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.workspace.presentation.FileReaderViewModel
 

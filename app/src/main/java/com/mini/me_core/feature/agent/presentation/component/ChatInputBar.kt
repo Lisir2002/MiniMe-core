@@ -160,9 +160,8 @@ internal fun ChatInputBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         // v2 混合模式：容器内边距 14dp 水平 / 0dp 垂直（字段和工具栏自带内部 padding）
-                        .padding(horizontal = 14.dp, vertical = 0.dp),
-                    // v2 混合模式：输入框与工具栏之间间距 4dp
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                        .padding(horizontal = 14.dp, vertical = 0.dp)
+                    // 收紧：移除 spacedBy，输入框底部 padding 与工具栏直接相邻
                 ) {
                     ChatInputField(
                         value = value,

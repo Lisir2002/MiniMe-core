@@ -91,8 +91,8 @@ internal fun ChatInputField(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // 问题15：输入框内部上下 padding 10dp→6dp，收紧文本区与工具栏间距
-                .padding(vertical = 6.dp),
+                // 收紧：输入框内部上下 padding 6dp→4dp
+                .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {

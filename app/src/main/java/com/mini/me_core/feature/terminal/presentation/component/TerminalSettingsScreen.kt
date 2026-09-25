@@ -80,9 +80,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
-import com.mini.me_core.core.theme.AppSectionGroup
-import com.mini.me_core.core.theme.AppSectionHeader
-import com.mini.me_core.core.theme.AppTopAppBar
+import com.mini.me_core.core.theme.components.AppSectionGroup
+import com.mini.me_core.core.theme.components.AppSectionHeader
+import com.mini.me_core.core.theme.components.AppListItem
+import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Elevation
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
@@ -182,7 +183,7 @@ fun TerminalSettingsScreen(
                 onPickMirror = { showMirrorPicker = true }
             )
 
-            AppSectionHeader(text = stringResource(R.string.ui_______b37d4c61))
+            AppSectionHeader(title = stringResource(R.string.ui_______b37d4c61))
             AppSectionGroup {
                 val installedBundleCount = bundleStates.count { it.value is BundleInstallState.Installed }
                 _MenuRow(
@@ -195,7 +196,7 @@ fun TerminalSettingsScreen(
             }
 
             // G1 外观
-            AppSectionHeader(text = stringResource(R.string.settings_category_appearance))
+            AppSectionHeader(title = stringResource(R.string.settings_category_appearance))
             AppSectionGroup {
                 _StepperRow(
                     icon = Icons.Rounded.TextFields,
@@ -224,7 +225,7 @@ fun TerminalSettingsScreen(
                     onClick = { showThemePicker = true },
                     showDivider = true
                 )
-                _SwitchRow(
+                AppListItem(
                     icon = Icons.Rounded.ViewColumn,
                     title = stringResource(R.string.ui____caa23c17),
                     subtitle = stringResource(R.string.ui______________aeee5eb0),
@@ -235,9 +236,9 @@ fun TerminalSettingsScreen(
             }
 
             // G2 键盘 & 交互
-            AppSectionHeader(text = stringResource(R.string.ui____e1dd53a4))
+            AppSectionHeader(title = stringResource(R.string.ui____e1dd53a4))
             AppSectionGroup {
-                _SwitchRow(
+                AppListItem(
                     icon = Icons.Rounded.Dashboard,
                     title = stringResource(R.string.ui________bd4b33a0),
                     subtitle = "关闭为精简布局（仅 Ctrl/Alt/Fn/方向）",
@@ -245,7 +246,7 @@ fun TerminalSettingsScreen(
                     onCheckedChange = viewModel::setFullExtraKeys,
                     showDivider = true
                 )
-                _SwitchRow(
+                AppListItem(
                     icon = Icons.Rounded.ZoomIn,
                     title = stringResource(R.string.ui___________19a36c2d),
                     subtitle = stringResource(R.string.ui______________82f9dac5),
@@ -253,7 +254,7 @@ fun TerminalSettingsScreen(
                     onCheckedChange = viewModel::setScaleGesturePersists,
                     showDivider = true
                 )
-                _SwitchRow(
+                AppListItem(
                     icon = Icons.Rounded.Terminal,
                     title = stringResource(R.string.ui__________a6cbf757),
                     subtitle = stringResource(R.string.ui______________05546ade),
@@ -271,9 +272,9 @@ fun TerminalSettingsScreen(
             }
 
             // G3 行为
-            AppSectionHeader(text = stringResource(R.string.ui____a0496123))
+            AppSectionHeader(title = stringResource(R.string.ui____a0496123))
             AppSectionGroup {
-                _SwitchRow(
+                AppListItem(
                     icon = Icons.Rounded.Notifications,
                     title = stringResource(R.string.ui_____________996140c5),
                     subtitle = stringResource(R.string.ui_____46f74d41),
@@ -281,7 +282,7 @@ fun TerminalSettingsScreen(
                     onCheckedChange = viewModel::setNewOutputIndicator,
                     showDivider = true
                 )
-                _SwitchRow(
+                AppListItem(
                     icon = Icons.Rounded.Add,
                     title = stringResource(R.string.ui_____________0184da1b),
                     subtitle = stringResource(R.string.ui_____________73b957c1),
@@ -289,7 +290,7 @@ fun TerminalSettingsScreen(
                     onCheckedChange = viewModel::setAutoNewTabOnCloseLast,
                     showDivider = true
                 )
-                _SwitchRow(
+                AppListItem(
                     icon = Icons.Rounded.Archive,
                     title = stringResource(R.string.ui___________37172e85),
                     subtitle = stringResource(R.string.ui______________427e9b33),
@@ -297,7 +298,7 @@ fun TerminalSettingsScreen(
                     onCheckedChange = viewModel::setKeepSessionWhenLeave,
                     showDivider = true
                 )
-                _SwitchRow(
+                AppListItem(
                     icon = Icons.Rounded.ContentPaste,
                     title = stringResource(R.string.ui________52007b14),
                     subtitle = stringResource(R.string.ui______________eb6dcb95),
@@ -308,9 +309,9 @@ fun TerminalSettingsScreen(
             }
 
             // G4 SSH 常用
-            AppSectionHeader(text = stringResource(R.string.ui_ssh_ac7515bd))
+            AppSectionHeader(title = stringResource(R.string.ui_ssh_ac7515bd))
             AppSectionGroup {
-                _SwitchRow(
+                AppListItem(
                     icon = Icons.Rounded.Refresh,
                     title = stringResource(R.string.ui________66d1f9aa),
                     subtitle = stringResource(R.string.ui______f096b834),
@@ -318,7 +319,7 @@ fun TerminalSettingsScreen(
                     onCheckedChange = viewModel::setSshAutoReconnect,
                     showDivider = true
                 )
-                _SwitchRow(
+                AppListItem(
                     icon = Icons.Rounded.Dns,
                     title = "TCP KeepAlive",
                     subtitle = stringResource(R.string.ui______________8a0ba94d),
@@ -447,52 +448,6 @@ private fun _MenuRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
             )
-        }
-        if (showDivider) {
-            HorizontalDivider(
-                modifier = Modifier.padding(start = 56.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun _SwitchRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    showDivider: Boolean = true
-) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.lg),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(Modifier.width(Spacing.md))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
         }
         if (showDivider) {
             HorizontalDivider(

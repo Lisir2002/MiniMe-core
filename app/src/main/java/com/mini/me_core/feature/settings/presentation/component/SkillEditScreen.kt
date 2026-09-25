@@ -45,7 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
-import com.mini.me_core.core.theme.AppTopAppBar
+import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.agent.domain.skill.SkillScope
 import com.mini.me_core.feature.agent.domain.skill.SkillType

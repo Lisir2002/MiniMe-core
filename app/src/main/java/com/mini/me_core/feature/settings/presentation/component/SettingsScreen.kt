@@ -45,16 +45,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
-import com.mini.me_core.core.theme.AppTopAppBar
-import com.mini.me_core.core.theme.AppSectionHeader
-import com.mini.me_core.core.theme.AppSectionGroup
-import com.mini.me_core.core.theme.CyberColors
-import com.mini.me_core.core.theme.CyberCard
-import com.mini.me_core.core.theme.CyberSectionHeader
-import com.mini.me_core.core.theme.CyberMenuRow
-import com.mini.me_core.core.theme.CyberSearchBar
+import com.mini.me_core.core.theme.components.AppTopAppBar
+import com.mini.me_core.core.theme.components.AppSectionHeader
+import com.mini.me_core.core.theme.components.AppSectionGroup
+import com.mini.me_core.core.theme.components.AppListItem
+import com.mini.me_core.core.theme.components.AppCard
 import com.mini.me_core.core.theme.LocalAppDarkMode
-import com.mini.me_core.core.theme.cyberColor
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -978,11 +974,11 @@ internal fun SettingsMenu(
                     SearchResultCountRow(count = searchResultCount ?: 0)
                     for (groupName in groupOrder) {
                         val items = filteredGroups[groupName] ?: continue
-                        CyberSectionHeader(text = groupName)
-                        CyberCard {
+                        AppSectionHeader(title = groupName)
+                        AppCard {
                             Column {
                                 items.forEachIndexed { index, item ->
-                                    CyberMenuRow(
+                                    AppListItem(
                                         icon = item.icon,
                                         title = item.title,
                                         subtitle = item.subtitle,
@@ -1013,11 +1009,11 @@ internal fun SettingsMenu(
                 else -> {
                     for (groupName in groupOrder) {
                         val items = filteredGroups[groupName] ?: continue
-                        CyberSectionHeader(text = groupName)
-                        CyberCard {
+                        AppSectionHeader(title = groupName)
+                        AppCard {
                             Column {
                                 items.forEachIndexed { index, item ->
-                                    CyberMenuRow(
+                                    AppListItem(
                                         icon = item.icon,
                                         title = item.title,
                                         subtitle = item.subtitle,
@@ -1194,69 +1190,51 @@ internal fun GroupSwitchRow(
     isChild: Boolean = false,
     valueSummary: String? = null
 ) {
-    val startPadding = if (isChild) Spacing.lg + 54.dp else Spacing.lg
-    Column(
-        modifier = Modifier.then(
-            if (!enabled) Modifier.alpha(0.4f) else Modifier
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = startPadding, end = Spacing.lg)
-                .padding(top = Spacing.sm, bottom = Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val iconSize = if (isChild) 18.dp else 22.dp
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(iconSize)
-            )
-            Spacer(Modifier.width(Spacing.md))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = if (isChild) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = subtitle,
-                    style = if (isChild) MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
-                    else MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (valueSummary != null) {
-                    Text(
-                        text = valueSummary,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+    val alphaModifier = if (!enabled) Modifier.alpha(0.4f) else Modifier
+    val startPadding = if (isChild) Spacing.lg + 54.dp else 0.dp
+
+    AppListItem(
+        icon = icon,
+        title = title,
+        subtitle = subtitle,
+        modifier = alphaModifier.padding(start = startPadding),
+        showDivider = true,
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        trailing = when {
+            valueSummary != null || onViewClick != null -> {
+                {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
+                        if (valueSummary != null) {
+                            Text(
+                                text = valueSummary,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        if (onViewClick != null) {
+                            IconButton(onClick = onViewClick, enabled = enabled) {
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                                    contentDescription = stringResource(R.string.norm_flow_asset_view),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = checked,
+                            onCheckedChange = onCheckedChange,
+                            enabled = enabled,
+                        )
+                    }
                 }
             }
-            if (onViewClick != null) {
-                IconButton(
-                    onClick = onViewClick,
-                    enabled = enabled
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                        contentDescription = stringResource(R.string.norm_flow_asset_view),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                enabled = enabled
-            )
-        }
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        )
-    }
+            else -> null
+        },
+    )
 }
 
 /** 二级菜单入口行：图标 + 标题 + 摘要 + 右箭头。 */

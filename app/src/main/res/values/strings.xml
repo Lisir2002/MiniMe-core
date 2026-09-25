@@ -220,6 +220,9 @@
     <string name="norm_flow_import_success">配置导入成功</string>
     <string name="norm_flow_import_failed">配置导入失败，格式错误</string>
     <string name="norm_flow_indicator_running">规范运行中</string>
+    <string name="norm_flow_indicator_running_with_count">规范运行中 · %1$d/%2$d 项</string>
+    <string name="norm_flow_indicator_sheet_title">规范概览</string>
+    <string name="norm_flow_indicator_go_settings">前往详细设置</string>
     <string name="norm_flow_indicator_trimmed">注入已裁剪</string>
     <string name="norm_flow_indicator_disabled">规范已停用</string>
     <string name="norm_flow_manage">管理</string>

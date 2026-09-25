@@ -68,9 +68,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.flowWithLifecycle
 import com.mini.me_core.R
-import com.mini.me_core.core.theme.AppEmptyState
-import com.mini.me_core.core.theme.AppLoadingState
-import com.mini.me_core.core.theme.AppTopAppBar
+import com.mini.me_core.core.theme.components.AppEmptyState
+import com.mini.me_core.core.theme.components.AppLoadingState
+import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Elevation
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius

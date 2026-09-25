@@ -456,6 +456,12 @@ fun AppNavigation(
                     workspaceViewModel = workspaceViewModel,
                     drawerState = drawerState,
                     onNavigateToSettings = { navController.navigate("settings") },
+                    onNavigateToNormFlow = {
+                        settingsViewModel.openSection(
+                            com.mini.me_core.feature.settings.presentation.component.SettingsSection.NormFlow
+                        )
+                        navController.navigate("settings")
+                    },
                     onNavigateToTerminal = { navController.navigate("terminal") },
                     onNavigateToGit = { navController.navigate("git") },
                     onNavigateToBrowser = { navController.navigate("browser") }

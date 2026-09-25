@@ -198,6 +198,9 @@
     <string name="norm_flow_import_success">Config imported successfully</string>
     <string name="norm_flow_import_failed">Import failed, invalid format</string>
     <string name="norm_flow_indicator_running">Norm flow active</string>
+    <string name="norm_flow_indicator_running_with_count">Norm flow active · %1$d/%2$d rules</string>
+    <string name="norm_flow_indicator_sheet_title">Norm flow overview</string>
+    <string name="norm_flow_indicator_go_settings">Open settings</string>
     <string name="norm_flow_indicator_trimmed">Injection trimmed</string>
     <string name="norm_flow_indicator_disabled">Norm flow off</string>
     <string name="norm_flow_manage">Manage</string>

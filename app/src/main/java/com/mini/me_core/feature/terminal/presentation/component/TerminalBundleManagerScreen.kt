@@ -62,8 +62,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
-import com.mini.me_core.core.theme.AppSectionHeader
-import com.mini.me_core.core.theme.AppTopAppBar
+import com.mini.me_core.core.theme.components.AppSectionHeader
+import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.components.AppSegmentedControl
@@ -178,14 +178,14 @@ fun TerminalBundleManagerScreen(
                 when (selectedTab) {
                 0 -> {
                     // ── Tab 1：预设独立功能包（原功能包管理页内容） ──────────
-                    AppSectionHeader(text = stringResource(R.string.ui_ai_5dcf4fe7))
+                    AppSectionHeader(title = stringResource(R.string.ui_ai_5dcf4fe7))
                     SharedAiRecommendationStrip(
                         allInstalled = aiAllInstalled,
                         containerReady = containerInstalled,
                         onInstallAll = viewModel::installAiRecommended
                     )
 
-                    AppSectionHeader(text = stringResource(R.string.ui_______15dd3f3e))
+                    AppSectionHeader(title = stringResource(R.string.ui_______15dd3f3e))
                     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                         var openDialogFor by remember { mutableStateOf<TerminalBundleId?>(null) }
                         val agg by viewModel.aggregateProgress.collectAsStateWithLifecycle()
@@ -238,7 +238,7 @@ fun TerminalBundleManagerScreen(
 
                 1 -> {
                     // ── Tab 2：自定义功能包（原自定义 APK 包页内容整合） ─────
-                    AppSectionHeader(text = "常用快捷包")
+                    AppSectionHeader(title = "常用快捷包")
                     QuickPacksChipRow(
                         containerReady = containerInstalled,
                         customInstallState = customInstallState,
@@ -248,7 +248,7 @@ fun TerminalBundleManagerScreen(
                         }
                     )
 
-                    AppSectionHeader(text = "自定义包名安装")
+                    AppSectionHeader(title = "自定义包名安装")
                     CustomInstallCard(
                         customInstallInput = customInstallInput,
                         onInputChange = { customInstallInput = it },
@@ -261,7 +261,7 @@ fun TerminalBundleManagerScreen(
                         customInstallState = customInstallState
                     )
 
-                    AppSectionHeader(text = "已安装自定义包")
+                    AppSectionHeader(title = "已安装自定义包")
                     run {
                         val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = TerminalCardsSpec.BorderAlpha)
                         Card(

@@ -169,24 +169,25 @@ fun ProviderItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.lg),
+                .padding(horizontal = Spacing.md, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ProviderLogoIcon(
                 provider = provider,
-                size = 36.dp,
-                modifier = Modifier.padding(end = Spacing.md)
+                size = 32.dp,
+                modifier = Modifier.padding(end = Spacing.sm)
             )
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = provider.name,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
                     )
                     if (isActive) {
-                        Spacer(Modifier.width(Spacing.sm))
+                        Spacer(Modifier.width(Spacing.xs))
                         Surface(
                             shape = RoundedCornerShape(LocalCornerRadius.current.sm),
                             color = MaterialTheme.colorScheme.primaryContainer
@@ -195,7 +196,7 @@ fun ProviderItem(
                                 "使用中",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
                             )
                         }
                     }
@@ -208,35 +209,54 @@ fun ProviderItem(
                 Text(
                     "${provider.effectiveModel.ifBlank { "未选模型" }} · $typeLabel · ${extractHost(provider.baseUrl)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
             }
-            Column(horizontalAlignment = Alignment.End) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
                 Switch(
                     checked = provider.isEnabled,
                     onCheckedChange = onToggleEnabled
                 )
-                Row {
-                    IconButton(onClick = onSetActive) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    IconButton(
+                        onClick = onSetActive,
+                        modifier = Modifier.size(32.dp)
+                    ) {
                         Icon(
                             if (isActive) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
                             contentDescription = if (isActive) "当前使用中" else "设为当前",
-                            tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
-                    IconButton(onClick = onEdit) {
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(32.dp)
+                    ) {
                         Icon(
                             Icons.Rounded.Edit,
                             contentDescription = stringResource(R.string.common_edit),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                     Box {
-                        IconButton(onClick = { menuExpanded = true }) {
+                        IconButton(
+                            onClick = { menuExpanded = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
                             Icon(
                                 Icons.Rounded.MoreVert,
                                 contentDescription = "更多操作",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                         DropdownMenu(

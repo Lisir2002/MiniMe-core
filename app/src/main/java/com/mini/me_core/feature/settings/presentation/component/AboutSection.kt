@@ -88,13 +88,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mini.me_core.BuildConfig
 import com.mini.me_core.R
-import com.mini.me_core.core.theme.CyberColors
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.core.theme.CyberCard
-import com.mini.me_core.core.theme.CyberSectionHeader
-import com.mini.me_core.core.theme.CyberMenuRow
+import com.mini.me_core.core.theme.components.AppCard
+import com.mini.me_core.core.theme.components.AppSectionHeader
+import com.mini.me_core.core.theme.components.AppListItem
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
 import com.mini.me_core.feature.settings.presentation.AboutStatsViewModel
 import com.mini.me_core.feature.settings.presentation.UsageStats
@@ -248,7 +247,7 @@ internal fun AboutSection() {
         UsageStatsSection(stats = stats, ac = ac)
 
         // ===== 模块 4：版本更新（独立卡片） =====
-        CyberSectionHeader(text = stringResource(R.string.about_check_update))
+        AppSectionHeader(title = stringResource(R.string.about_check_update))
         CheckUpdateOnlyCard(
             appInfo = appInfo,
             onCheckUpdate = {
@@ -335,7 +334,7 @@ private fun HeroCard(
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg)
     ) {
-        CyberCard {
+        AppCard {
             Column {
                 Spacer(Modifier.height(Spacing.lg))
 
@@ -593,7 +592,7 @@ private fun CoreComponentsSection(
         modifier = Modifier.padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
-        CyberSectionHeader(text = stringResource(R.string.about_core_components))
+        AppSectionHeader(title = stringResource(R.string.about_core_components))
         Text(
             text = stringResource(R.string.about_core_components_subtitle),
             style = MaterialTheme.typography.bodySmall,
@@ -756,7 +755,7 @@ private fun UsageStatsSection(stats: UsageStats, ac: AboutColors) {
         modifier = Modifier.padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
-        CyberSectionHeader(text = stringResource(R.string.about_stats))
+        AppSectionHeader(title = stringResource(R.string.about_stats))
         Text(
             text = stringResource(R.string.about_stats_subtitle),
             style = MaterialTheme.typography.bodySmall,
@@ -764,7 +763,7 @@ private fun UsageStatsSection(stats: UsageStats, ac: AboutColors) {
             modifier = Modifier.padding(start = Spacing.lg + 4.dp, bottom = Spacing.xs)
         )
 
-        CyberCard {
+        AppCard {
             Column(
                 modifier = Modifier.padding(Spacing.md),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm)
@@ -955,8 +954,8 @@ private fun CheckUpdateOnlyCard(
         modifier = Modifier.padding(horizontal = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
-        CyberCard {
-            CyberMenuRow(
+        AppCard {
+            AppListItem(
                 icon = Icons.Rounded.Refresh,
                 title = stringResource(R.string.about_check_update),
                 subtitle = stringResource(R.string.about_check_update_subtitle, appInfo.name),
@@ -973,7 +972,7 @@ private fun CheckUpdateOnlyCard(
 
 @Composable
 private fun OpenSourceCreditsSection(ac: AboutColors) {
-    CyberSectionHeader(text = stringResource(R.string.about_credits))
+    AppSectionHeader(title = stringResource(R.string.about_credits))
 
     Column(
         modifier = Modifier.padding(horizontal = Spacing.lg),
@@ -997,7 +996,7 @@ private fun OpenSourceCreditsSection(ac: AboutColors) {
             R.string.about_credit_ktor to "JetBrains"
         )
 
-        CyberCard {
+        AppCard {
             FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()

@@ -121,7 +121,8 @@ internal fun ChatInputToolbar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.xs, vertical = Spacing.xs),
+                .padding(horizontal = Spacing.xs)
+                .padding(top = 0.dp, bottom = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
