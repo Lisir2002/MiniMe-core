@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -50,6 +48,7 @@ import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Search
@@ -220,13 +219,14 @@ internal fun SearchResultCountRow(count: Int) {
 
 /**
  * 搜索历史区：空输入时展示。
- * 标题「最近搜索」+ 清空按钮 + 横向 Chip 列表。
+ * 标题「最近搜索」+ 清空按钮 + 纵向 Chip 列表（支持单条删除）。
  */
 @Composable
 internal fun SearchHistorySection(
     history: List<String>,
     onHistoryClick: (String) -> Unit,
     onClearHistory: () -> Unit,
+    onRemoveHistoryItem: (String) -> Unit = {},
 ) {
     val tokens = LocalComponentTokens.current
     Column(
@@ -269,37 +269,32 @@ internal fun SearchHistorySection(
                 ),
             )
         } else {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(PrimitiveSpacing.Sm),
-            ) {
-                items(history) { item ->
-                    HistoryChip(
-                        label = item,
-                        onClick = { onHistoryClick(item) },
-                    )
-                }
+            // F5.1：纵向列表展示历史（最多 20 条），每条带删除按钮
+            history.take(5).forEach { item ->
+                HistoryRow(
+                    label = item,
+                    onClick = { onHistoryClick(item) },
+                    onRemove = { onRemoveHistoryItem(item) },
+                )
             }
         }
     }
 }
 
-/** 单个历史搜索词 Chip。 */
+/** 单个历史搜索词行：历史图标 + 词 + 删除按钮。 */
 @Composable
-private fun HistoryChip(
+private fun HistoryRow(
     label: String,
     onClick: () -> Unit,
+    onRemove: () -> Unit,
 ) {
     val tokens = LocalComponentTokens.current
-    val chipShape = RoundedCornerShape(LocalCornerRadius.current.map(tokens.chip.cornerRadius))
     Row(
         modifier = Modifier
-            .clip(chipShape)
-            .background(tokens.chip.defaultContainerColor)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(LocalCornerRadius.current.map(tokens.chip.cornerRadius)))
             .clickable { onClick() }
-            .padding(
-                horizontal = tokens.chip.paddingHorizontal,
-                vertical = tokens.chip.paddingVertical,
-            ),
+            .padding(vertical = PrimitiveSpacing.SmPlus, horizontal = PrimitiveSpacing.Sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -308,14 +303,96 @@ private fun HistoryChip(
             tint = tokens.chip.defaultContentColor,
             modifier = Modifier.size(tokens.chip.iconSize),
         )
-        Spacer(Modifier.width(PrimitiveSpacing.Xs))
+        Spacer(Modifier.width(PrimitiveSpacing.SmPlus))
         Text(
             text = label,
             style = TextStyle(
                 fontSize = tokens.chip.fontSize,
-                fontWeight = tokens.chip.fontWeight,
-                color = tokens.chip.defaultContentColor,
+                color = tokens.text.titleMediumColor,
             ),
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = Icons.Rounded.Close,
+            contentDescription = stringResource(R.string.settings_search_remove_content_desc),
+            tint = tokens.text.labelSmallColor,
+            modifier = Modifier
+                .size(tokens.chip.iconSize)
+                .clickable { onRemove() },
         )
     }
 }
+
+/**
+ * 热门设置推荐区：搜索框聚焦或无结果时展示。
+ * 传入热门设置项列表，点击直接跳转。
+ */
+@Composable
+internal fun HotSettingsSection(
+    items: List<HotSettingEntry>,
+    onItemClick: (HotSettingEntry) -> Unit,
+) {
+    val tokens = LocalComponentTokens.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = PrimitiveSpacing.Lg, vertical = PrimitiveSpacing.Md),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_search_hot_title),
+            style = TextStyle(
+                fontSize = tokens.text.titleSmallFontSize,
+                fontWeight = tokens.text.titleSmallFontWeight,
+                color = tokens.text.titleSmallColor,
+            ),
+        )
+        Spacer(Modifier.height(PrimitiveSpacing.Xs))
+        Text(
+            text = stringResource(R.string.settings_search_hot_subtitle),
+            style = TextStyle(
+                fontSize = tokens.text.bodySmallFontSize,
+                color = tokens.text.bodySmallColor,
+            ),
+        )
+        Spacer(Modifier.height(PrimitiveSpacing.MdPlus))
+        items.forEach { entry ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.map(tokens.chip.cornerRadius)))
+                    .clickable { onItemClick(entry) }
+                    .padding(vertical = PrimitiveSpacing.SmPlus, horizontal = PrimitiveSpacing.Sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = entry.icon,
+                    contentDescription = null,
+                    tint = tokens.text.labelSmallColor,
+                    modifier = Modifier.size(tokens.chip.iconSize),
+                )
+                Spacer(Modifier.width(PrimitiveSpacing.SmPlus))
+                Text(
+                    text = entry.title,
+                    style = TextStyle(
+                        fontSize = tokens.chip.fontSize,
+                        color = tokens.text.titleMediumColor,
+                    ),
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = tokens.text.labelSmallColor,
+                    modifier = Modifier.size(tokens.chip.iconSize),
+                )
+            }
+        }
+    }
+}
+
+/** 热门设置条目：标题 + 图标 + 点击动作。 */
+internal data class HotSettingEntry(
+    val title: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val action: () -> Unit,
+)

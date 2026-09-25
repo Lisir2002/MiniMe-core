@@ -1,45 +1,55 @@
 package com.mini.me_core.core.splash
 
 import android.graphics.Camera
+import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * A single glass shard from the Voronoi tessellation.
+ * A single glass shard.
  *
- * Each shard belongs to a depth layer:
- * - FOREGROUND: large rotation, far displacement, flies first
- * - MID: medium rotation and displacement
- * - BACKGROUND: small rotation, near displacement, flies last
+ * Properties:
+ * - polygon: Voronoi cell vertices
+ * - centerX/centerY: centroid for rotation pivot
+ * - outwardX/outwardY: explosion direction
+ * - rotateXDeg/rotateYDeg: target 3D rotation
+ * - speedX/speedY: initial explosion velocity (dp/s)
+ * - scale: target scale during flight
+ * - baseAlpha: base transparency (0.5-0.8)
  */
-enum class ShardLayer(val rotationRange: ClosedFloatingPointRange<Float>, val displacementDp: ClosedFloatingPointRange<Float>) {
-    FOREGROUND(45f..90f, 100f..200f),
-    MID(20f..45f, 50f..100f),
-    BACKGROUND(0f..20f, 20f..50f);
-}
-
 class GlassShard(
     val polygon: FloatArray,
     val centerX: Float,
     val centerY: Float,
     val outwardX: Float,
     val outwardY: Float,
-    val layer: ShardLayer,
     val rotateXDeg: Float,
     val rotateYDeg: Float,
-    val zDepth: Float,
+    val speedDp: Float,
+    val scaleTarget: Float,
+    val baseAlpha: Float,
+    val specularX: Float, // relative offset for specular highlight (0-1)
+    val specularY: Float,
 )
 
 /**
- * Glass shatter effect using Voronoi tessellation + Camera 3D transforms.
+ * Glass shatter effect — real glass material look.
  *
- * Shards are split into 3 depth layers for parallax.
- * Camera position = 1.5x screen height, perspective strength 0.8.
- * Vanishing point at screen center shifted up by 10%.
+ * Each shard:
+ * 1. Draws a soft shadow offset below
+ * 2. Semi-transparent white fill (alpha 0.5-0.75)
+ * 3. LinearGradient overlay: top bright → bottom transparent (refraction)
+ * 4. 1.5px edge highlight (white, alpha 0.7)
+ * 5. Small specular highlight (radial gradient at shard corner)
+ *
+ * 3D: Camera.rotateX/rotateY with back-face dimming.
  */
 class GlassShatterEffect(
     private val screenWidthPx: Float,
@@ -51,25 +61,25 @@ class GlassShatterEffect(
 
     private val camera = Camera()
     private val matrix = Matrix()
-    private val shardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+
+    // Shard fill paint — semi-transparent glass
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
-    private val crackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 1.5f * density
-        alpha = 100
-    }
-    // Edge highlight: 1px white, alpha 0.6 — glass fracture reflection
+    // Edge highlight — bright glass edge reflection
     private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 1f * density
-        color = android.graphics.Color.WHITE
-        alpha = 153 // 0.6 * 255
+        strokeWidth = 1.5f * density
+        color = Color.WHITE
+    }
+    // Shadow paint
+    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.BLACK
     }
 
     init {
-        // Camera distance = 1.5x screen height (in z-units; Android Camera uses ~72 dpi units)
-        camera.setLocation(0f, 0f, -(screenHeightPx / density / 72f * 1.5f))
+        camera.setLocation(0f, 0f, -(screenHeightPx / density / 72f * 2f))
 
         val seedCount = targetShardCount
         val seedsX = FloatArray(seedCount)
@@ -80,7 +90,7 @@ class GlassShatterEffect(
         }
 
         val screenCx = screenWidthPx / 2f
-        val screenCy = screenHeightPx * 0.4f // vanishing point: center + 10% up
+        val screenCy = screenHeightPx * 0.4f
         val shardList = mutableListOf<GlassShard>()
 
         for (i in 0 until seedCount) {
@@ -92,46 +102,39 @@ class GlassShatterEffect(
                 val ax = seedsX[i]; val ay = seedsY[i]
                 val bx = seedsX[j]; val by = seedsY[j]
                 val dx = bx - ax; val dy = by - ay
-                val cx = (ax + bx) / 2f; val cy = (ay + by) / 2f
-                val (newX, newY) = clipHalfPlane(polyX, polyY, dx, dy, cx, cy)
+                val pcx = (ax + bx) / 2f; val pcy = (ay + by) / 2f
+                val (newX, newY) = clipHalfPlane(polyX, polyY, dx, dy, pcx, pcy)
                 if (newX.size < 3) break
                 polyX = newX; polyY = newY
             }
 
             if (polyX.size < 6) continue
 
-            // Shard center
             var sumX = 0f; var sumY = 0f
             val n = polyX.size
             for (k in 0 until n) { sumX += polyX[k]; sumY += polyY[k] }
             val scx = sumX / n; val scy = sumY / n
 
-            // Outward direction from vanishing point
             var ox = scx - screenCx
             var oy = scy - screenCy
             val len = kotlin.math.sqrt(ox * ox + oy * oy)
             if (len > 0.001f) { ox /= len; oy /= len } else { ox = 0f; oy = 1f }
 
-            // Assign depth layer by random: 30% foreground, 40% mid, 30% background
-            val layerRoll = Random.nextFloat()
-            val layer = when {
-                layerRoll < 0.30f -> ShardLayer.FOREGROUND
-                layerRoll < 0.70f -> ShardLayer.MID
-                else -> ShardLayer.BACKGROUND
-            }
-
-            // Rotation from layer range
-            val rotRange = layer.rotationRange
-            val rotMag = rotRange.start + Random.nextFloat() * (rotRange.endInclusive - rotRange.start)
+            // Random 3D rotation per shard
+            val rotMag = 30f + Random.nextFloat() * 60f
             val rotX = (Random.nextFloat() - 0.5f) * 2f * rotMag
             val rotY = (Random.nextFloat() - 0.5f) * 2f * rotMag
 
-            // Z-depth: foreground = closest to viewer (smaller z), background = farther
-            val zDepth = when (layer) {
-                ShardLayer.FOREGROUND -> 0f
-                ShardLayer.MID -> 1f
-                ShardLayer.BACKGROUND -> 2f
-            } + Random.nextFloat() * 0.3f
+            // Explosion speed: foreground faster
+            val speedDp = 120f + Random.nextFloat() * 180f
+            // Scale down during flight
+            val scaleTarget = 0.6f + Random.nextFloat() * 0.3f
+            // Glass transparency: varies per shard
+            val baseAlpha = 0.5f + Random.nextFloat() * 0.25f
+
+            // Specular highlight position (random corner of shard)
+            val specX = Random.nextFloat()
+            val specY = Random.nextFloat()
 
             val flatPoly = FloatArray(n * 2)
             for (k in 0 until n) {
@@ -146,16 +149,18 @@ class GlassShatterEffect(
                     centerY = scy,
                     outwardX = ox,
                     outwardY = oy,
-                    layer = layer,
                     rotateXDeg = rotX,
                     rotateYDeg = rotY,
-                    zDepth = zDepth,
+                    speedDp = speedDp,
+                    scaleTarget = scaleTarget,
+                    baseAlpha = baseAlpha,
+                    specularX = specX,
+                    specularY = specY,
                 )
             )
         }
 
-        // Sort by z-depth: far (background) first, near (foreground) last
-        shardList.sortByDescending { it.zDepth }
+        shardList.shuffle()
         shards = shardList
     }
 
@@ -189,33 +194,36 @@ class GlassShatterEffect(
     fun draw(
         canvas: android.graphics.Canvas,
         shatterProgress: Float,
-        contentBitmap: android.graphics.Bitmap?,
-        crackProgress: Float,
         alpha: Float,
     ) {
-        if (shatterProgress <= 0f && crackProgress <= 0f) return
+        if (shatterProgress <= 0f) return
 
-        val easeOut = 1f - (1f - shatterProgress) * (1f - shatterProgress)
-        val gravity = 800f * easeOut * easeOut
+        // Ease out cubic for motion
+        val ease = 1f - (1f - shatterProgress) * (1f - shatterProgress) * (1f - shatterProgress)
+        // Gravity increases over time
+        val gravity = 1200f * ease
 
         for (shard in shards) {
-            // Displacement based on layer
-            val dispRange = shard.layer.displacementDp
-            val dispDp = dispRange.start + Random.nextFloat() * (dispRange.endInclusive - dispRange.start)
-            val displace = easeOut * dispDp
+            // Displacement: damped velocity
+            val displace = ease * shard.speedDp
             val tx = shard.outwardX * displace
-            val ty = shard.outwardY * displace + gravity
+            val ty = shard.outwardY * displace + gravity * 0.3f
 
+            // Scale: shrink from 1.0 to scaleTarget
+            val scale = 1f + (shard.scaleTarget - 1f) * ease
+
+            // 3D rotation
             camera.save()
-            camera.rotateX(shard.rotateXDeg * easeOut)
-            camera.rotateY(shard.rotateYDeg * easeOut)
+            camera.rotateX(shard.rotateXDeg * ease)
+            camera.rotateY(shard.rotateYDeg * ease)
 
-            val cx = shard.centerX
-            val cy = shard.centerY
+            val scx = shard.centerX
+            val scy = shard.centerY
             matrix.reset()
             camera.getMatrix(matrix)
-            matrix.preTranslate(-cx, -cy)
-            matrix.postTranslate(cx + tx, cy + ty)
+            matrix.preScale(scale, scale, scx, scy)
+            matrix.preTranslate(-scx, -scy)
+            matrix.postTranslate(scx + tx, scy + ty)
             camera.restore()
 
             val path = Path()
@@ -228,18 +236,40 @@ class GlassShatterEffect(
             canvas.save()
             canvas.concat(matrix)
 
-            if (contentBitmap != null) {
-                shardPaint.alpha = (200 * alpha).toInt().coerceIn(0, 255)
-                canvas.clipPath(path)
-                canvas.drawBitmap(contentBitmap, 0f, 0f, shardPaint)
-            } else {
-                shardPaint.alpha = (120 * alpha).toInt().coerceIn(0, 255)
-                shardPaint.color = android.graphics.Color.WHITE
-                canvas.drawPath(path, shardPaint)
-            }
+            // Back-face dimming: when rotated past 90°, shard "back" is darker
+            val backFace = (kotlin.math.abs(shard.rotateXDeg * ease) > 89f ||
+                    kotlin.math.abs(shard.rotateYDeg * ease) > 89f)
+            val faceDim = if (backFace) 0.4f else 1f
 
-            // Edge highlight: white fracture reflection
-            edgePaint.alpha = (153 * alpha).toInt().coerceIn(0, 255)
+            // Shadow (offset down-right, dark translucent)
+            shadowPaint.alpha = (40 * alpha * (1f - shatterProgress)).toInt().coerceIn(0, 255)
+            canvas.save()
+            canvas.translate(6f, 10f)
+            canvas.drawPath(path, shadowPaint)
+            canvas.restore()
+
+            // Glass fill: semi-transparent white
+            fillPaint.alpha = (shard.baseAlpha * 255 * alpha * faceDim).toInt().coerceIn(0, 255)
+            fillPaint.color = Color.WHITE
+            canvas.drawPath(path, fillPaint)
+
+            // LinearGradient overlay on shard: top bright → bottom transparent
+            // Simulates glass refraction / light passing through
+            val polyTop = shard.polygon.minByOrNull { it } ?: 0f
+            val polyBottom = shard.polygon.maxByOrNull { it } ?: 100f
+            val gradient = LinearGradient(
+                scx, polyTop, scx, polyBottom,
+                Color.argb((80 * faceDim).toInt(), 255, 255, 255).toInt(),
+                Color.argb(0, 255, 255, 255).toInt(),
+                Shader.TileMode.CLAMP
+            )
+            fillPaint.shader = gradient
+            fillPaint.alpha = (shard.baseAlpha * 200 * alpha * faceDim).toInt().coerceIn(0, 255)
+            canvas.drawPath(path, fillPaint)
+            fillPaint.shader = null
+
+            // Edge highlight: bright white glass edge
+            edgePaint.alpha = (180 * alpha * faceDim).toInt().coerceIn(0, 255)
             canvas.drawPath(path, edgePaint)
 
             canvas.restore()

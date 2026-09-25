@@ -187,68 +187,19 @@ fun AIChatPanel(
     var showConversationSkills by remember { mutableStateOf(false) }
     // F2.7：对话模板面板
     var showTemplatePanel by remember { mutableStateOf(false) }
-    // F2.8：导出对话
-    var showExportDialog by remember { mutableStateOf(false) }
-    // F2.9：多模型对比模式
-    var compareMode by remember { mutableStateOf(false) }
     val conversationSkillsViewModel: ConversationSkillsViewModel = hiltViewModel()
     val listState = rememberLazyListState()
     val markdownCache = remember { MarkdownRenderCache() }
     // F2.1：MiniMe 自研 Markdown 渲染器的解析缓存（LRU 50 条，按内容 hash）
     val miniMeMarkdownCache = remember { com.mini.me_core.feature.agent.presentation.component.markdown.MiniMeMarkdownCache() }
 
-    // F2.2：对话内搜索状态
-    var showSearch by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    var searchHistory by remember { mutableStateOf<List<String>>(emptyList()) }
-    var searchMatchIndex by remember { mutableStateOf(0) }
     // F2.5：待确认的模型切换 (providerId, modelName)
     var pendingModelSwitch by remember { mutableStateOf<Pair<String, String>?>(null) }
-    // 匹配到的消息 id 列表（多关键词空格 AND，不区分大小写）
-    val searchMatchIds by remember(searchQuery, messages) {
-        derivedStateOf {
-            val kws = searchQuery.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
-            if (kws.isEmpty()) return@derivedStateOf emptyList()
-            messages.filter { m ->
-                val c = m.content.lowercase()
-                kws.all { c.contains(it) }
-            }.map { it.id }
-        }
-    }
-    // 消息 id -> 所属 taskGroup 在 LazyColumn 中的下标，用于定位滚动
-    val messageGroupIndex by remember(taskGroups) {
-        derivedStateOf {
-            val map = mutableMapOf<String, Int>()
-            taskGroups.forEachIndexed { idx, g ->
-                g.subGroups.forEach { sg -> sg.messages.forEach { m -> map[m.id] = idx } }
-            }
-            map
-        }
-    }
-    // 匹配结果变化时重置当前下标
-    LaunchedEffect(searchMatchIds.size) { searchMatchIndex = 0 }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
-
-    // 定位到第 [pos] 个匹配：滚动到所属 taskGroup（300ms 平滑滚动），并记录到搜索历史
-    fun navigateToMatch(pos: Int) {
-        val id = searchMatchIds.getOrNull(pos) ?: return
-        searchMatchIndex = pos
-        // 记录搜索历史（去重、最多 10 条）
-        if (searchQuery.isNotBlank()) {
-            searchHistory = (listOf(searchQuery.trim()) + searchHistory.filter { it != searchQuery.trim() }).take(10)
-        }
-        val groupIdx = messageGroupIndex[id] ?: return
-        scope.launch {
-            listState.animateScrollToItem(groupIdx, scrollOffset = 0)
-        }
-    }
-    fun onSelectSearchHistory(item: String) {
-        searchQuery = item
-    }
 
     val isBusy = agentState is AgentUIState.Loading || agentState is AgentUIState.Streaming
     val activeModel = activeProvider?.effectiveModel.orEmpty()
@@ -550,10 +501,6 @@ fun AIChatPanel(
                 onNavigateToTerminal = onNavigateToTerminal,
                 onNavigateToGit = onNavigateToGit,
                 onNavigateToBrowser = onNavigateToBrowser,
-                onSearch = { showSearch = true },
-                onExport = { showExportDialog = true },
-                compareMode = compareMode,
-                onToggleCompare = { compareMode = !compareMode },
                 contextWindow = activeModelMetadata?.contextTokens ?: 0,
                 connectionState = connectionState?.takeIf { isRemote }
             )
@@ -564,38 +511,12 @@ fun AIChatPanel(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // F2.2：顶部滑入式搜索栏
-            ChatSearchBar(
-                visible = showSearch,
-                query = searchQuery,
-                onQueryChange = { searchQuery = it },
-                resultIndex = searchMatchIndex,
-                resultCount = searchMatchIds.size,
-                onPrev = { if (searchMatchIds.isNotEmpty()) navigateToMatch((searchMatchIndex - 1 + searchMatchIds.size) % searchMatchIds.size) },
-                onNext = { if (searchMatchIds.isNotEmpty()) navigateToMatch((searchMatchIndex + 1) % searchMatchIds.size) },
-                onClose = { showSearch = false; searchQuery = "" },
-                history = searchHistory,
-                onClearHistory = { searchHistory = emptyList() },
-                onSelectHistory = ::onSelectSearchHistory,
-            )
             Box(modifier = Modifier.weight(1f)) {
                 if (!messagesReady) {
                     // 远程模式连接未就绪时显示连接状态占位，避免空白或旧工作区记录闪烁
                     if (isRemote && connectionState != null && connectionState != com.mini.me_core.feature.agent.domain.container.ConnectionState.CONNECTED) {
                         RemoteConnectingPlaceholder(state = connectionState)
                     }
-                } else if (compareMode) {
-                    // F2.9：多模型对比分屏视图
-                    ChatCompareView(
-                        panels = listOf(
-                            ComparePanel(activeModel, messages.filter { it.role == MessageRole.ASSISTANT }.lastOrNull()?.content ?: ""),
-                            ComparePanel(stringResource(R.string.chat_no_model_selected), messages.filter { it.role == MessageRole.ASSISTANT }.getOrNull(messages.count { it.role == MessageRole.ASSISTANT } - 2)?.content ?: ""),
-                        ),
-                        onExitCompare = { compareMode = false },
-                        onClosePanel = { },
-                        onUseAnswer = { compareMode = false },
-                        modifier = Modifier.fillMaxSize(),
-                    )
                 } else if (messages.isEmpty()) {
                     WelcomeState(modifier = Modifier.fillMaxSize())
                 } else {
@@ -858,15 +779,6 @@ fun AIChatPanel(
                         inputText = content
                         viewModel.updateInputDraft(content)
                     }
-                )
-            }
-
-            // F2.8：导出对话对话框
-            if (showExportDialog) {
-                ChatExportDialog(
-                    messages = messages,
-                    sessionTitle = currentSession?.title ?: stringResource(R.string.export_title),
-                    onDismiss = { showExportDialog = false }
                 )
             }
 

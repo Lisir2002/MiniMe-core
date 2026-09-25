@@ -27,6 +27,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,6 +67,7 @@ import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -175,13 +177,24 @@ private fun aboutColors(): AboutColors {
 }
 
 @Composable
-internal fun AboutSection() {
+internal fun AboutSection(
+    onOpenDevOptions: () -> Unit = {},
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val aboutVM: AboutStatsViewModel = hiltViewModel()
     val stats by aboutVM.stats.collectAsStateWithLifecycle()
     val proxyState by aboutVM.proxyState.collectAsStateWithLifecycle()
     val terminalReady by aboutVM.terminalReady.collectAsStateWithLifecycle()
+
+    // F5.6：连续点击版本号 7 次解锁开发者选项
+    var versionTaps by remember { mutableStateOf(0) }
+    LaunchedEffect(versionTaps) {
+        if (versionTaps >= 7) {
+            onOpenDevOptions()
+            versionTaps = 0
+        }
+    }
 
     val appInfo = remember {
         runCatching {
@@ -230,6 +243,7 @@ internal fun AboutSection() {
             appIcon = appIcon,
             appInfo = appInfo,
             isDebug = BuildConfig.DEBUG,
+            onVersionTap = { versionTaps++ },
             ac = ac
         )
 
@@ -327,6 +341,7 @@ private fun HeroCard(
     appIcon: ImageBitmap?,
     appInfo: AppInfo,
     isDebug: Boolean,
+    onVersionTap: () -> Unit,
     ac: AboutColors
 ) {
     Box(
@@ -390,7 +405,10 @@ private fun HeroCard(
                             fontWeight = FontWeight.Medium
                         )
                         Spacer(Modifier.height(2.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                            modifier = Modifier.clickable { onVersionTap() }
+                        ) {
                             VersionPill(text = "v${appInfo.name}", ac = ac)
                             VersionPill(text = "#${appInfo.code}", outline = true, ac = ac)
                             VariantPill(isDebug = isDebug, ac = ac)

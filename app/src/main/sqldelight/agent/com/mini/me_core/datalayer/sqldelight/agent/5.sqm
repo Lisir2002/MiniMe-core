@@ -1,0 +1,4 @@
+-- v5 → v6 迁移（F6.5 数据库性能优化）：
+-- 为会话列表排序补索引。会话列表按 updated_at 倒序渲染，无索引时每次启动全表扫描。
+-- 使用 CREATE INDEX IF NOT EXISTS，对已迁移库幂等。
+CREATE INDEX IF NOT EXISTS agent_session_updated_idx ON agent_session (updated_at);

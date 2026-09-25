@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -106,8 +107,7 @@ fun NormFlowAssetViewerScreen(
                     EmptyState()
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(staticRules.size) { index ->
-                            val asset = staticRules[index]
+                        items(staticRules, key = { it.name }) { asset ->
                             AssetRow(
                                 title = asset.name,
                                 subtitle = asset.description,
@@ -122,8 +122,7 @@ fun NormFlowAssetViewerScreen(
                     EmptyState()
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(sopList.size) { index ->
-                            val sop = sopList[index]
+                        items(sopList, key = { it.name }) { sop ->
                             AssetRow(
                                 title = sop.name,
                                 subtitle = sop.whenToUse,

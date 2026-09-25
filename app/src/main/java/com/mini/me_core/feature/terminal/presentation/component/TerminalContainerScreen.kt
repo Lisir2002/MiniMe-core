@@ -272,7 +272,11 @@ fun TerminalContainerScreen(
                         when (containerSubTab) {
                             1 -> ContainerFileManager(
                                 access = viewModel.fileAccess,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                clipboardPaths = viewModel.fileClipboard.first,
+                                clipboardCut = viewModel.fileClipboard.second,
+                                onClipboard = { paths, cut -> viewModel.setFileClipboard(paths, cut) },
+                                onClearClipboard = { viewModel.clearFileClipboard() }
                             )
                             else -> ContainerTabContent(
                                 scrollState = containerScrollState,

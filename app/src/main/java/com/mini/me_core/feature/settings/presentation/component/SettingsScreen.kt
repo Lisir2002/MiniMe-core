@@ -5,12 +5,19 @@ import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,7 +60,12 @@ import com.mini.me_core.core.theme.components.AppCard
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +89,7 @@ import com.mini.me_core.feature.settings.data.repository.AppThemeMode
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.presentation.SecuritySettingsViewModel
+import com.mini.me_core.feature.settings.presentation.SettingsExportImportScreen
 import com.mini.me_core.feature.settings.presentation.SettingsViewModel
 import com.mini.me_core.feature.settings.presentation.components.RemoteAuditLogsScreen
 import com.mini.me_core.feature.settings.presentation.components.SecuritySettingsScreen
@@ -92,6 +105,7 @@ import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.FactCheck
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
@@ -104,6 +118,7 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Terminal
 
 /** 设置页内部二级菜单分区。Menu 为首页菜单，其余为各自的二级页。 */
@@ -121,6 +136,9 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     RemoteAuditLogs(R.string.settings_remote_audit_logs),
     About(R.string.settings_about),
     Theme(R.string.settings_theme_title),
+    ExportImport(R.string.settings_export_import),
+    ChangeHistory(R.string.settings_history_title),
+    DevOptions(R.string.dev_options_title),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -265,10 +283,42 @@ fun SettingsScreen(
         return
     }
 
+    // F5.5：变更生效即时反馈 Snackbar
+    val snackbarHostState = remember { SnackbarHostState() }
+    val screenContext = LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.settingEffect.collect { effect ->
+            when (effect) {
+                is SettingsViewModel.SettingEffect.Applied -> {
+                    snackbarHostState.showSnackbar(
+                        message = screenContext.getString(R.string.settings_effect_applied),
+                        duration = SnackbarDuration.Short,
+                    )
+                }
+                is SettingsViewModel.SettingEffect.NeedsRestart -> {
+                    snackbarHostState.showSnackbar(
+                        message = screenContext.getString(R.string.settings_effect_needs_restart),
+                        actionLabel = screenContext.getString(R.string.settings_effect_restart_now),
+                        duration = SnackbarDuration.Long,
+                    ).let { result ->
+                        if (result == SnackbarResult.ActionPerformed) {
+                            val intent = screenContext.packageManager.getLaunchIntentForPackage(screenContext.packageName)
+                            intent?.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                            screenContext.startActivity(intent)
+                            (screenContext as? android.app.Activity)?.finish()
+                            Runtime.getRuntime().exit(0)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             // 模型管理页（Providers section）自带 Scaffold 顶栏，外层不显示顶栏以避免双重顶栏
             if (section != SettingsSection.Providers) {
@@ -347,7 +397,20 @@ fun SettingsScreen(
                 .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
         ) {
-            when (section) {
+            // F5.4：页面切换动画——目标页右侧滑入、旧页左侧滑出
+            val sectionAnimDur = (250 * com.mini.me_core.core.theme.LocalAnimationScale.current).toInt().coerceAtLeast(0)
+            AnimatedContent(
+                targetState = section,
+                transitionSpec = {
+                    val enter = slideInHorizontally(tween(sectionAnimDur)) { it / 4 } +
+                        fadeIn(tween(sectionAnimDur))
+                    val exit = slideOutHorizontally(tween(sectionAnimDur)) { -it / 4 } +
+                        fadeOut(tween(sectionAnimDur))
+                    enter togetherWith exit
+                },
+                label = "settingsSection",
+            ) { targetSection ->
+                when (targetSection) {
                 SettingsSection.Logs -> Unit // Logs 已在 Scaffold 前 early return 为独立全屏页
                 SettingsSection.Menu -> SettingsMenu(
                     providerCount = providers.size,
@@ -384,6 +447,7 @@ fun SettingsScreen(
                         viewModel.recordSearch(word)
                     },
                     onClearSearchHistory = { viewModel.clearSearchHistory() },
+                    onRemoveHistoryItem = { word -> viewModel.removeSearchHistoryItem(word) },
                     onExitSearchMode = {
                         isSearchMode = false
                         searchQuery = ""
@@ -513,6 +577,17 @@ fun SettingsScreen(
                         onNavigateBack = { section = SettingsSection.Menu }
                     )
                 }
+                SettingsSection.ExportImport -> SettingsExportImportScreen(
+                    onNavigateBack = { section = SettingsSection.Menu }
+                )
+                SettingsSection.ChangeHistory -> com.mini.me_core.feature.settings.presentation.ChangeHistoryScreen(
+                    onNavigateBack = { section = SettingsSection.Menu }
+                )
+                SettingsSection.DevOptions -> com.mini.me_core.feature.settings.presentation.DevOptionsScreen(
+                    onNavigateBack = { section = SettingsSection.Menu },
+                    onOpenLogViewer = { section = SettingsSection.Logs },
+                )
+                }
             }
         }
     }
@@ -635,6 +710,7 @@ internal fun SettingsMenu(
     searchHistory: List<String> = emptyList(),
     onHistoryClick: (String) -> Unit = {},
     onClearSearchHistory: () -> Unit = {},
+    onRemoveHistoryItem: (String) -> Unit = {},
     onExitSearchMode: () -> Unit = {},
 ) {
     val themeLabel = stringResource(themeMode.labelRes)
@@ -800,6 +876,28 @@ internal fun SettingsMenu(
             keywords = listOf("backup", stringResource(R.string.ui____664b37da), stringResource(R.string.ui____69de8d7f), "export", stringResource(R.string.ui____55405ea6), stringResource(R.string.ui____8d9a071e), stringResource(R.string.ui____56563edf)),
             action = { onOpen(SettingsSection.Backup) }
         ),
+        // F5.2 导出/导入设置
+        MenuItem(
+            section = SettingsSection.ExportImport,
+            group = groupData,
+            title = stringResource(R.string.settings_export_import),
+            subtitle = stringResource(R.string.settings_export_import_subtitle),
+            icon = Icons.Rounded.SwapHoriz,
+            iconBgLight = Color(0xFF10B981),
+            iconBgDark = Color(0xFF065F46),
+            keywords = listOf("export", "import", "backup", "restore", stringResource(R.string.ui____55405ea6), stringResource(R.string.ui____8d9a071e), "json"),
+            action = { onOpen(SettingsSection.ExportImport) }
+        ),
+        // F5.3 变更历史与回滚
+        MenuItem(
+            section = SettingsSection.ChangeHistory,
+            group = groupData,
+            title = stringResource(R.string.settings_history_title),
+            subtitle = stringResource(R.string.settings_history_subtitle),
+            icon = Icons.Rounded.History,
+            keywords = listOf("history", "rollback", "undo", stringResource(R.string.settings_history_title), stringResource(R.string.settings_history_rollback)),
+            action = { onOpen(SettingsSection.ChangeHistory) }
+        ),
         MenuItem(
             section = SettingsSection.Security,
             group = groupData,
@@ -848,7 +946,7 @@ internal fun SettingsMenu(
             section = null,
             group = groupSystem,
             title = stringResource(R.string.settings_keepalive_title),
-            subtitle = stringResource(R.string.settings_keepalive_subtitle),
+            subtitle = stringResource(R.string.settings_keepalive_subtitle) + " · " + stringResource(R.string.settings_needs_restart_label),
             icon = Icons.Rounded.Favorite,
             iconBgLight = Color(0xFF2DD4BF),
             iconBgDark = Color(0xFF115E59),
@@ -900,6 +998,29 @@ internal fun SettingsMenu(
 
     val hasSearchQuery = searchQuery.isNotBlank()
 
+    // F5.1：热门设置推荐（固定选取 5 个常用设置项，聚焦/无结果时展示）
+    val hotSettings = remember(menuItems) {
+        val preferredSections = setOf(
+            SettingsSection.Theme,
+            SettingsSection.Providers,
+            SettingsSection.McpCenter,
+            SettingsSection.Backup,
+            SettingsSection.About,
+        )
+        menuItems.filter { it.section in preferredSections }
+            .take(5)
+            .map { item ->
+                HotSettingEntry(
+                    title = item.title,
+                    icon = item.icon,
+                    action = {
+                        if (isSearchMode) onExitSearchMode()
+                        item.action()
+                    },
+                )
+            }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -917,17 +1038,30 @@ internal fun SettingsMenu(
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
             when {
-                // 搜索模式 + 空输入：展示搜索历史
+                // 搜索模式 + 空输入：展示最近搜索(5条) + 热门设置(5条)
                 isSearchMode && searchQuery.isBlank() -> {
                     SearchHistorySection(
                         history = searchHistory,
                         onHistoryClick = onHistoryClick,
                         onClearHistory = onClearSearchHistory,
+                        onRemoveHistoryItem = onRemoveHistoryItem,
                     )
+                    if (hotSettings.isNotEmpty()) {
+                        HotSettingsSection(
+                            items = hotSettings,
+                            onItemClick = { it.action() },
+                        )
+                    }
                 }
-                // 搜索模式 + 有输入 + 无结果：空状态
+                // 搜索模式 + 有输入 + 无结果：空状态 + 推荐热门设置
                 hasSearchQuery && searchResultCount == 0 -> {
                     EmptySearchResult(query = searchQuery)
+                    if (hotSettings.isNotEmpty()) {
+                        HotSettingsSection(
+                            items = hotSettings,
+                            onItemClick = { it.action() },
+                        )
+                    }
                 }
                 // 搜索模式 + 有输入 + 有结果：计数行 + 分组结果
                 hasSearchQuery -> {
@@ -967,6 +1101,29 @@ internal fun SettingsMenu(
                 }
                 // 非搜索模式：展示全部分组
                 else -> {
+                    // F5.4：常用设置置顶（横向滚动卡片，最多 6 项）
+                    val commonItems = remember(menuItems) {
+                        val preferred = listOf(
+                            SettingsSection.Theme, SettingsSection.Providers, SettingsSection.ExportImport,
+                            SettingsSection.Backup, SettingsSection.ChangeHistory, SettingsSection.Security,
+                        )
+                        preferred.mapNotNull { sec -> menuItems.firstOrNull { it.section == sec } }.take(6)
+                    }
+                    if (commonItems.isNotEmpty()) {
+                        AppSectionHeader(title = stringResource(R.string.settings_common_title))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(vertical = Spacing.xs),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            commonItems.forEach { item ->
+                                CommonSettingCard(item = item)
+                            }
+                        }
+                        Spacer(Modifier.height(Spacing.sm))
+                    }
                     for (groupName in groupOrder) {
                         val items = filteredGroups[groupName] ?: continue
                         AppSectionHeader(title = groupName)
@@ -1004,9 +1161,38 @@ internal fun SettingsMenu(
 }
 
 /**
- * 空搜索结果状态：图标 + 标题 + 副标题。
- * 视觉走 ComponentTokens.emptyState 令牌。
+ * F5.4 常用设置横向卡片：24dp primary 图标 + 标题，surfaceVariant 底色，圆角。
  */
+@Composable
+private fun CommonSettingCard(item: MenuItem) {
+    Surface(
+        shape = RoundedCornerShape(Spacing.md),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier
+            .width(96.dp)
+            .clickable { item.action() },
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.md),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                imageVector = item.icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+            )
+        }
+    }
+}
 @Composable
 private fun EmptySearchResult(query: String) {
     val tokens = LocalComponentTokens.current

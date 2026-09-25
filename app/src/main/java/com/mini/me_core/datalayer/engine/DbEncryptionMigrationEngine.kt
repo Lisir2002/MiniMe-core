@@ -2,9 +2,7 @@ package com.mini.me_core.datalayer.engine
 
 import android.content.Context
 import app.cash.sqldelight.db.QueryResult
-import app.cash.sqldelight.db.SqlCursor
 import app.cash.sqldelight.db.SqlDriver
-import app.cash.sqldelight.db.SqlPreparedStatement
 import app.cash.sqldelight.db.SqlSchema
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
@@ -18,6 +16,7 @@ import com.mini.mecore.datalayer.sqldelight.WorkspaceDb
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import net.sqlcipher.database.SQLiteDatabase
 import net.sqlcipher.database.SupportFactory
 import java.io.File
 
@@ -58,6 +57,13 @@ class DbEncryptionMigrationEngine(
 
         /** 系统表前缀（不需要迁移）。 */
         val SYSTEM_TABLE_PREFIXES = listOf("sqlite_", "android_metadata")
+
+        /**
+         * 迁移逻辑版本。修复迁移代码缺陷（SQL 执行方式、校验逻辑等）时递增。
+         * 设备上记录的版本低于当前值时，重置历史失败/重试计数，让迁移用新逻辑重新尝试，
+         * 避免因旧版本 bug 永久卡在"重试耗尽"。
+         */
+        const val MIGRATION_LOGIC_VERSION = 2
     }
 
     // ── 公开 API ──
@@ -73,7 +79,23 @@ class DbEncryptionMigrationEngine(
      * @throws MigrationException 迁移失败且重试耗尽时
      */
     suspend fun migrateToEncrypted(lib: LibName): MigrationResult = withContext(Dispatchers.IO) {
-        val state = stateStore.getState(lib)
+        var state = stateStore.getState(lib)
+
+        // 迁移逻辑版本检查：新版本修复了历史缺陷（如 PRAGMA 返回行未消费），
+        // 重置旧版本累积的失败/重试计数，让该库用新逻辑重新尝试。
+        // 已成功加密的库不受影响。
+        if (stateStore.getLogicVersion() < MIGRATION_LOGIC_VERSION) {
+            if (state.encryptionStatus != EncryptionStatus.ENCRYPTED) {
+                FileLogger.i(
+                    TAG,
+                    "迁移逻辑已更新至 v$MIGRATION_LOGIC_VERSION，重置 ${lib.name} 历史失败状态",
+                )
+                stateStore.clearState(lib)
+                state = stateStore.getState(lib)
+            }
+            stateStore.setLogicVersion(MIGRATION_LOGIC_VERSION)
+        }
+
         if (state.encryptionStatus == EncryptionStatus.ENCRYPTED) {
             return@withContext MigrationResult.ALREADY_ENCRYPTED
         }
@@ -191,11 +213,12 @@ class DbEncryptionMigrationEngine(
     // ── Step 2: 数据拷贝（明文 → 加密）──
 
     /**
-     * 数据拷贝：逐表将明文库数据拷贝到加密临时库（设计文档 §6.3 Phase 3，方式 A）。
+     * 数据拷贝（明文 → 加密）：使用 SQLCipher 原生 `sqlcipher_export()` 整库导出。
      *
-     * 使用类型感知的拷贝（根据列类型选择 getString/getLong/getDouble/getBytes），
-     * 避免 BLOB 列被按字符串读取导致数据损坏。
-     * 每表开启事务批量插入（每批 1000 行），保证性能和原子性。
+     * 打开明文主库，ATTACH 加密临时库，调用 sqlcipher_export 复制全部数据库对象
+     * （schema、索引、触发器、虚拟表、所有数据），再同步 user_version。
+     * 相比逐表拷贝，原生实现更快更完整，并避免对全新 SQLCipher 库执行
+     * schema.create 时的连接状态错误（"another row available"）。
      */
     private fun stepMigrateData(lib: LibName): File {
         stateStore.updateState(lib) {
@@ -208,64 +231,49 @@ class DbEncryptionMigrationEngine(
         tempEncrypted.takeIf { it.exists() }?.delete()
         deleteSidecarFiles(tempEncrypted)
 
-        // 获取所有用户表名
-        val plainDriver = createPlainDriver(lib)
-        val tableNames = getUserTableNames(plainDriver)
-        val schema = getSchema(lib)
-
         stateStore.updateState(lib) {
-            it.copy(
-                tempEncryptedPath = tempEncrypted.absolutePath,
-                tablesTotal = tableNames.size,
-                tablesCompleted = 0,
-            )
+            it.copy(tempEncryptedPath = tempEncrypted.absolutePath)
         }
 
-        // 获取 passphrase 并创建加密临时库
+        // passphrase 与 CipherDriverFactory 保持一致（Base64 编码的 DEK）
         val dek = runBlocking { keyProvider.getPassphrase(lib) }
-        val passphrase = AndroidDatabaseKeyProvider.encodePassphrase(dek).toByteArray(Charsets.UTF_8)
+        val passphrase = AndroidDatabaseKeyProvider.encodePassphrase(dek)
         dek.fill(0)
 
-        val encryptedDriver = try {
-            AndroidSqliteDriver(
-                schema = schema,
-                context = context,
-                name = tempEncrypted.name,
-                factory = SupportFactory(passphrase),
-            )
-        } finally {
-            passphrase.fill(0)
-        }
-
+        SQLiteDatabase.loadLibs(context)
+        // 以空密码打开明文主库
+        val db = SQLiteDatabase.openDatabase(
+            mainDb.absolutePath,
+            "",
+            null,
+            SQLiteDatabase.OPEN_READWRITE,
+        )
         try {
-            // 临时加密库用 DELETE 模式（无 WAL sidecar，简化替换）
-            encryptedDriver.execute(null, "PRAGMA journal_mode = DELETE", 0, null)
-
-            for ((index, table) in tableNames.withIndex()) {
-                stateStore.updateState(lib) {
-                    it.copy(currentTable = table, tablesCompleted = index)
-                }
-
-                copyTableData(plainDriver, encryptedDriver, table)
-
-                val progress = ((index + 1).toDouble() / tableNames.size * 100).toInt()
-                stateStore.updateState(lib) { it.copy(progressPercent = progress) }
-                FileLogger.i(TAG, "${lib.name} 表 $table 迁移完成 (${index + 1}/${tableNames.size})")
-            }
-
-            stateStore.updateState(lib) {
-                it.copy(tablesCompleted = tableNames.size, currentTable = null)
-            }
+            val targetPath = sqlEscape(tempEncrypted.absolutePath)
+            val keySql = sqlEscape(passphrase)
+            // ATTACH 加密临时库
+            db.rawExecSQL("ATTACH DATABASE '$targetPath' AS encrypted KEY '$keySql'")
+            // 整库导出（schema/触发器/虚拟表/数据）
+            db.rawExecSQL("SELECT sqlcipher_export('encrypted')")
+            // sqlcipher_export 不复制 user_version，手动同步 schema 版本
+            val version = db.version
+            db.rawExecSQL("PRAGMA encrypted.user_version = $version")
+            db.rawExecSQL("DETACH DATABASE encrypted")
         } finally {
-            runCatching { plainDriver.close() }
-            runCatching { encryptedDriver.close() }
+            db.close()
         }
 
+        stateStore.updateState(lib) { it.copy(progressPercent = 100) }
+        FileLogger.i(TAG, "${lib.name} 整库加密导出完成")
         return tempEncrypted
     }
 
     // ── Step 2b: 数据拷贝（加密 → 明文，反向迁移用）──
 
+    /**
+     * 数据拷贝（加密 → 明文）：打开加密主库，ATTACH 明文临时库（空 key），
+     * 调用 sqlcipher_export 整库导出，再同步 user_version。
+     */
     private fun stepMigrateDataToPlain(lib: LibName): File {
         stateStore.updateState(lib) {
             it.copy(encryptionStatus = EncryptionStatus.MIGRATING)
@@ -276,40 +284,31 @@ class DbEncryptionMigrationEngine(
         tempPlain.takeIf { it.exists() }?.delete()
         deleteSidecarFiles(tempPlain)
 
-        val schema = getSchema(lib)
-        val plainDriver = AndroidSqliteDriver(
-            schema = schema,
-            context = context,
-            name = tempPlain.name,
-            factory = FrameworkSQLiteOpenHelperFactory(),
-        )
-
         val dek = runBlocking { keyProvider.getPassphrase(lib) }
-        val passphrase = AndroidDatabaseKeyProvider.encodePassphrase(dek).toByteArray(Charsets.UTF_8)
+        val passphrase = AndroidDatabaseKeyProvider.encodePassphrase(dek)
         dek.fill(0)
-        val encryptedDriver = try {
-            createEncryptedDriver(lib, passphrase)
+
+        SQLiteDatabase.loadLibs(context)
+        // 打开加密主库
+        val db = SQLiteDatabase.openDatabase(
+            mainDb.absolutePath,
+            passphrase,
+            null,
+            SQLiteDatabase.OPEN_READWRITE,
+        )
+        try {
+            val targetPath = sqlEscape(tempPlain.absolutePath)
+            // ATTACH 明文临时库（空 key）
+            db.rawExecSQL("ATTACH DATABASE '$targetPath' AS plain KEY ''")
+            db.rawExecSQL("SELECT sqlcipher_export('plain')")
+            val version = db.version
+            db.rawExecSQL("PRAGMA plain.user_version = $version")
+            db.rawExecSQL("DETACH DATABASE plain")
         } finally {
-            passphrase.fill(0)
+            db.close()
         }
 
-        try {
-            plainDriver.execute(null, "PRAGMA journal_mode = DELETE", 0, null)
-            val tableNames = getUserTableNames(encryptedDriver)
-            stateStore.updateState(lib) {
-                it.copy(tempEncryptedPath = tempPlain.absolutePath, tablesTotal = tableNames.size)
-            }
-            for ((index, table) in tableNames.withIndex()) {
-                stateStore.updateState(lib) { it.copy(currentTable = table, tablesCompleted = index) }
-                copyTableData(encryptedDriver, plainDriver, table)
-                val progress = ((index + 1).toDouble() / tableNames.size * 100).toInt()
-                stateStore.updateState(lib) { it.copy(progressPercent = progress) }
-            }
-            stateStore.updateState(lib) { it.copy(tablesCompleted = tableNames.size, currentTable = null) }
-        } finally {
-            runCatching { plainDriver.close() }
-            runCatching { encryptedDriver.close() }
-        }
+        FileLogger.i(TAG, "${lib.name} 整库明文导出完成")
         return tempPlain
     }
 
@@ -587,96 +586,6 @@ class DbEncryptionMigrationEngine(
 
     private data class ColumnInfo(val name: String, val type: String)
 
-    // ── 辅助方法：类型感知的数据拷贝 ──
-
-    /**
-     * 类型感知的单表数据拷贝。
-     *
-     * 根据列类型选择合适的读取/绑定方法：
-     * - INTEGER → getLong / bindLong
-     * - REAL/FLOAT/DOUBLE → getDouble / bindDouble
-     * - BLOB → getBytes / bindBytes
-     * - TEXT/其他 → getString / bindString
-     *
-     * 每批 BATCH_SIZE 行，每表一个事务。
-     */
-    private fun copyTableData(sourceDriver: SqlDriver, targetDriver: SqlDriver, table: String) {
-        val columns = getTableColumns(sourceDriver, table)
-        if (columns.isEmpty()) return
-
-        val columnList = columns.joinToString(", ") { "\"${it.name}\"" }
-        val placeholders = columns.joinToString(", ") { "?" }
-
-        targetDriver.execute(null, "BEGIN TRANSACTION", 0, null)
-        try {
-            var offset = 0L
-            while (true) {
-                val rows = sourceDriver.executeQuery(
-                    null,
-                    "SELECT $columnList FROM \"$table\" LIMIT ? OFFSET ?",
-                    { cursor ->
-                        val batch = mutableListOf<Array<Any?>>()
-                        while (cursor.next().value) {
-                            val row = Array<Any?>(columns.size) { idx ->
-                                readColumnByType(cursor, idx, columns[idx].type)
-                            }
-                            batch.add(row)
-                        }
-                        app.cash.sqldelight.db.QueryResult.Value(batch)
-                    },
-                    2,
-                ) {
-                    bindLong(0, BATCH_SIZE.toLong())
-                    bindLong(1, offset)
-                }.value
-
-                if (rows.isEmpty()) break
-
-                for (row in rows) {
-                    targetDriver.execute(
-                        null,
-                        "INSERT OR REPLACE INTO \"$table\" ($columnList) VALUES ($placeholders)",
-                        columns.size,
-                    ) {
-                        for (i in columns.indices) {
-                            bindColumnByType(this, i, row[i], columns[i].type)
-                        }
-                    }
-                }
-                offset += BATCH_SIZE
-            }
-            targetDriver.execute(null, "COMMIT", 0, null)
-        } catch (e: Exception) {
-            targetDriver.execute(null, "ROLLBACK", 0, null)
-            throw e
-        }
-    }
-
-    /** 根据列类型从 cursor 读取值。 */
-    private fun readColumnByType(cursor: SqlCursor, index: Int, type: String): Any? {
-        val upperType = type.uppercase()
-        return when {
-            upperType == "INTEGER" || upperType.contains("INT") -> cursor.getLong(index)
-            upperType.contains("REAL") || upperType.contains("FLOAT") || upperType.contains("DOUBLE") ->
-                cursor.getDouble(index)
-            upperType == "BLOB" -> cursor.getBytes(index)
-            else -> cursor.getString(index)
-        }
-    }
-
-    /** 根据列类型绑定值到 prepared statement。 */
-    private fun bindColumnByType(stmt: SqlPreparedStatement, index: Int, value: Any?, type: String) {
-        val upperType = type.uppercase()
-        when {
-            upperType == "INTEGER" || upperType.contains("INT") ->
-                stmt.bindLong(index, (value as? Number)?.toLong())
-            upperType.contains("REAL") || upperType.contains("FLOAT") || upperType.contains("DOUBLE") ->
-                stmt.bindDouble(index, (value as? Number)?.toDouble())
-            upperType == "BLOB" -> stmt.bindBytes(index, value as? ByteArray)
-            else -> stmt.bindString(index, value?.toString())
-        }
-    }
-
     // ── 辅助方法：校验查询 ──
 
     private fun queryCount(driver: SqlDriver, table: String): Long =
@@ -765,6 +674,12 @@ class DbEncryptionMigrationEngine(
     }
 
     // ── 辅助方法：文件操作 ──
+
+    /**
+     * 转义 SQL 单引号字符串中的内容（单引号翻倍），用于 ATTACH 的文件路径和 KEY 子句，
+     * 防止特殊字符破坏 SQL 或造成注入。Base64 passphrase 不含单引号，路径可能包含。
+     */
+    private fun sqlEscape(value: String): String = value.replace("'", "''")
 
     private fun copySidecar(source: File, target: File, suffix: String) {
         val sourceSidecar = File(source.parentFile, "${source.name}-$suffix")

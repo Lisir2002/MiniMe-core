@@ -28,8 +28,8 @@ class SettingsSearchHistoryManager @Inject constructor(
         private const val NAMESPACE = "settings_search"
         private const val KEY_HISTORY = "history"
 
-        /** 最多保留的历史条数 */
-        const val MAX_HISTORY_SIZE = 10
+        /** 最多保留的历史条数（F5.1：20 条） */
+        const val MAX_HISTORY_SIZE = 20
 
         /**
          * 纯函数：根据当前历史列表和新搜索词，计算新的历史列表。
@@ -67,6 +67,15 @@ class SettingsSearchHistoryManager @Inject constructor(
     /** 清空全部搜索历史。 */
     suspend fun clearHistory() {
         persist(emptyList())
+    }
+
+    /** 删除单条搜索历史（忽略大小写）。 */
+    suspend fun removeHistoryItem(query: String) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return
+        val newList = _history.value.filterNot { it.equals(trimmed, ignoreCase = true) }
+        if (newList == _history.value) return
+        persist(newList)
     }
 
     private fun loadFromKv(): List<String> {

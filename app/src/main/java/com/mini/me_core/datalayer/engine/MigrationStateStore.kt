@@ -120,6 +120,22 @@ interface MigrationStateStore {
      * @param lib 数据库标识
      */
     fun clearState(lib: LibName)
+
+    /**
+     * 读取已安装的迁移逻辑版本（全局，不区分数据库）。
+     *
+     * 用于在迁移代码缺陷修复后识别并重置历史失败状态。
+     *
+     * @return 上次写入的逻辑版本，从未写入返回 0
+     */
+    fun getLogicVersion(): Int
+
+    /**
+     * 写入当前迁移逻辑版本（全局）。
+     *
+     * @param version 迁移逻辑版本
+     */
+    fun setLogicVersion(version: Int)
 }
 
 /**
@@ -153,6 +169,9 @@ class SharedPreferencesMigrationStateStore(
         private const val FIELD_TABLES_COMPLETED = "tables_completed"
         private const val FIELD_LAST_ERROR = "last_error"
         private const val FIELD_RETRY_COUNT = "retry_count"
+
+        // 全局迁移逻辑版本 key（不区分数据库）
+        private const val KEY_LOGIC_VERSION = "migration_logic_version"
     }
 
     private val prefs: SharedPreferences =
@@ -245,5 +264,11 @@ class SharedPreferencesMigrationStateStore(
         editor.remove("$prefix$FIELD_LAST_ERROR")
         editor.remove("$prefix$FIELD_RETRY_COUNT")
         editor.commit()
+    }
+
+    override fun getLogicVersion(): Int = prefs.getInt(KEY_LOGIC_VERSION, 0)
+
+    override fun setLogicVersion(version: Int) {
+        prefs.edit().putInt(KEY_LOGIC_VERSION, version).commit()
     }
 }

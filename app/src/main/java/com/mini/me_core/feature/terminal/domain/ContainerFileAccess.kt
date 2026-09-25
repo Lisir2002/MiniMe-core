@@ -138,6 +138,33 @@ class ContainerFileAccess @Inject constructor(
         return out.ifBlank { "/root" }
     }
 
+    /** 目录直接子项数量（用于文件夹行显示 "N 项"）。非目录返回 -1。 */
+    suspend fun countChildren(path: String, isDir: Boolean): Int {
+        if (!isDir) return -1
+        val out = run("ls -1A ${shellQuote(path)} 2>/dev/null | wc -l", LS_TIMEOUT)
+        return out.trim().toIntOrNull() ?: 0
+    }
+
+    /**
+     * 批量统计当前列表中每个目录的子项数（一次执行，避免逐目录 stat 拖慢列表）。
+     * 返回 Map<path, count>，文件不在 map 中。
+     */
+    suspend fun countDirChildren(paths: List<String>): Map<String, Int> {
+        if (paths.isEmpty()) return emptyMap()
+        val script = paths.joinToString("; ") { p ->
+            "printf '%s\\t' '${p.removePrefix("'").removeSuffix("'")}'; ls -1A ${shellQuote(p)} 2>/dev/null | wc -l"
+        }
+        val out = run(script, LS_TIMEOUT * (1 + paths.size / 8))
+        val result = HashMap<String, Int>()
+        out.lines().forEach { line ->
+            val parts = line.split('\t')
+            if (parts.size == 2) {
+                result[parts[0]] = parts[1].trim().toIntOrNull() ?: 0
+            }
+        }
+        return result
+    }
+
     private suspend fun runOp(cmd: String, timeoutMs: Long = OP_TIMEOUT): Result<Unit> {
         val full = "($cmd) > /tmp/mm_fm_op.log 2>&1; echo EXIT=\\$?"
         val out = run(full, timeoutMs)

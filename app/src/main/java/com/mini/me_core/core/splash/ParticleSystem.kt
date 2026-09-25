@@ -84,8 +84,8 @@ class ParticleSystem(
             shatterVy[i] = sin(shatterAngle) * shatterSpeedPx + 600f * density
 
             // All particles are dots — no shards.
-            // Size: 1.5-3dp, matching stroke width for crisp text.
-            size[i] = (1.5f + Random.nextFloat() * 1.5f) * density
+            // Size: 1.2-2.5dp, small and crisp for fine text detail.
+            size[i] = (1.2f + Random.nextFloat() * 1.3f) * density
 
             // 30% accent particles (primary color), 70% onBackground
             isAccent[i] = Random.nextFloat() < 0.3f
@@ -136,8 +136,8 @@ class ParticleSystem(
         paint.color = android.graphics.Color.WHITE
         canvas.drawText(text, bitmapW / 2f, bitmapH / 2f - (paint.descent() + paint.ascent()) / 2f, paint)
 
-        // Fine sampling step: 1.5dp — dense enough for crisp letter outlines
-        val stepPx = (1.5f * density).toInt().coerceAtLeast(2)
+        // Fine sampling step: 1.1dp — very dense for crisp letter outlines
+        val stepPx = (1.1f * density).toInt().coerceAtLeast(2)
         val points = mutableListOf<Float>()
         val centerOffsetY = centerY - bitmapH / 2f
 

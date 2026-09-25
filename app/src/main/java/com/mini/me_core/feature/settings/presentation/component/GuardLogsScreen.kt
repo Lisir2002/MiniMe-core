@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Card
@@ -73,8 +74,7 @@ fun GuardLogsScreen(
                     .padding(padding)
                     .fillMaxSize()
             ) {
-                items(logs.size) { index ->
-                    val entry = logs[index]
+                items(logs, key = { "${it.timestamp}_${it.guardId}_${it.toolName}" }) { entry ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()

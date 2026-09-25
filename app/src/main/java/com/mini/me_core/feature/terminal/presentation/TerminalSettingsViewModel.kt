@@ -1,6 +1,9 @@
 package com.mini.me_core.feature.terminal.presentation
 
 import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.core.util.FileLogger
@@ -74,6 +77,18 @@ class TerminalSettingsViewModel @Inject constructor(
 
     /** 容器文件访问层（F3.1 文件管理器用）。 */
     val fileAccess: ContainerFileAccess get() = containerFileAccess
+
+    /** P1 模块10：文件管理器剪切板状态（提升到 ViewModel，切换子 tab 不丢失）。 */
+    var fileClipboard: Triple<List<String>, Boolean, Int> by mutableStateOf(Triple(emptyList(), false, 0))
+        private set
+
+    fun setFileClipboard(paths: List<String>, cut: Boolean) {
+        fileClipboard = Triple(paths, cut, paths.size)
+    }
+
+    fun clearFileClipboard() {
+        fileClipboard = Triple(emptyList(), false, 0)
+    }
 
     private companion object { const val TAG = "TerminalSettingsVM" }
 

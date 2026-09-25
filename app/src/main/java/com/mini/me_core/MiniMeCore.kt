@@ -61,11 +61,15 @@ class MiniMeCore : Application() {
     }
 
     override fun attachBaseContext(base: android.content.Context) {
+        // F6.1：最早锚定冷启动 T0（必须在任何业务/DI 之前）。
+        com.mini.me_core.core.performance.StartupTracer.onAttachBaseContext()
         // 最早入口：在任何 Hilt 注入/业务初始化之前就绪日志与崩溃落盘。
         // 启动早期（如 Hilt 注入链实例化 @Singleton 工具）的崩溃若发生在 FileLogger 初始化之前
         // 会不留任何痕迹，故把日志与全局崩溃处理器提到 attachBaseContext 最前。
         FileLogger.init(base)
         AILogger.init(base)
+        // F6.4：崩溃报告本地持久化（早于 Hilt，attachBaseContext 阶段可用）。
+        com.mini.me_core.core.performance.CrashReporter.init(base)
         installCrashHandler()
         super.attachBaseContext(base)
     }
@@ -160,6 +164,18 @@ class MiniMeCore : Application() {
     @Inject
     lateinit var crashRecovery: com.mini.me_core.datalayer.engine.CrashRecovery
 
+    /** F6.2 内存监控：周期采样堆使用，>=80% 记录 GC 建议（仅 debug 真正采样）。 */
+    @Inject
+    lateinit var memoryMonitor: com.mini.me_core.core.performance.MemoryMonitor
+
+    /** F6.5 数据库维护：后台清理过期崩溃报告与临时缓存。 */
+    @Inject
+    lateinit var databaseMaintenance: com.mini.me_core.core.performance.DatabaseMaintenance
+
+    /** F6.7 电池优化：监听省电模式/低电量，结合用户开关决定是否进入省电模式。 */
+    @Inject
+    lateinit var batteryOptimizer: com.mini.me_core.core.performance.BatteryOptimizer
+
     /** 长驻作用域：持续把持久化的日志等级同步到 FileLogger。
      * RC61b：附加 [CoroutineExceptionHandler]，任何子协程未捕获的异常都兜底记日志，
      * 避免 scope 内一个子协程崩把 scope.job 整个 cancel。 */
@@ -172,6 +188,9 @@ class MiniMeCore : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // F6.1：super.onCreate() 返回即 Hilt 字段注入完成。
+        com.mini.me_core.core.performance.StartupTracer.mark("on_create_start", "Application.onCreate 开始")
+        com.mini.me_core.core.performance.StartupTracer.mark("hilt_injected", "Hilt 依赖注入完成")
         FileLogger.i(TAG, "=== 应用启动 ===")
 
         // ── [启动/1/3] 数据层初始化（同步，必须先于任何 UI 查询）──
@@ -195,6 +214,7 @@ class MiniMeCore : Application() {
         // 正常库只是两次 PRAGMA 幂等检查（毫秒级），缺失才重建。
         val agentDriver = connectionPool.driver(LibName.AGENT)
         agentPreheatCompleted.set(true)
+        com.mini.me_core.core.performance.StartupTracer.mark("db_ready", "数据库初始化完成")
         FileLogger.d(TAG, "数据层：AGENT 库预热完成")
 
         // 启动自检/冒烟测试：表结构校验 + SQL 冒烟 + 连接可用性。
@@ -210,6 +230,7 @@ class MiniMeCore : Application() {
 
         // 启动画面门闩：数据层 + 核心服务就绪，放行 Splash Screen 退出。
         // 异步预热（阶段3）不阻塞首帧。
+        com.mini.me_core.core.performance.StartupTracer.mark("core_services_ready", "核心服务/主题就绪")
         com.mini.me_core.core.splash.AppInitState.markReady()
 
         // ── [启动/3/3] 异步预热（不阻塞首帧，后台并行）──
@@ -349,6 +370,22 @@ class MiniMeCore : Application() {
             runCatching { dataSafetyNotifier.run() }
                 .onFailure { FileLogger.w(TAG, "数据保全（哨兵/自动备份/通知）失败，不影响启动", it) }
         }
+        // F6.2：启动内存周期采样（仅 debug 真正采样，release 空操作）。
+        runCatching { memoryMonitor.start() }
+            .onFailure { FileLogger.w(TAG, "MemoryMonitor 启动失败（忽略）", it) }
+        // F6.4：启动 ANR 看门狗（仅 debug）。
+        runCatching { com.mini.me_core.core.performance.AnrMonitor.start() }
+            .onFailure { FileLogger.w(TAG, "AnrMonitor 启动失败（忽略）", it) }
+        // F6.7：注册电池状态监听（省电模式/低电量）。
+        runCatching { batteryOptimizer.start() }
+            .onFailure { FileLogger.w(TAG, "BatteryOptimizer 启动失败（忽略）", it) }
+
+        // F6.5：后台执行一次存储维护（清理过期崩溃报告/临时缓存）。
+        appScope.launch {
+            runCatching { databaseMaintenance.run() }
+                .onFailure { FileLogger.w(TAG, "DatabaseMaintenance 失败（忽略）", it) }
+        }
+
         // 定时提醒调度循环：启动即轮询扫描到点的 schedule 项（内部异常隔离，失败不影响启动）。
         scheduleScheduler.start(appScope)
     }
@@ -406,6 +443,12 @@ class MiniMeCore : Application() {
                 FileLogger.flushSync("FATAL", "CRASH", summary, throwable)
             }.onFailure {
                 android.util.Log.e("CRASH", "⚠️ 连同步落盘都失败了，此时只能靠上面 logcat 追溯", it)
+            }
+            // F6.4：结构化崩溃报告落盘（设备信息/版本/堆栈/全部线程），最多保留 10 条，供下次启动查看。
+            runCatching {
+                com.mini.me_core.core.performance.CrashReporter.record(thread, throwable)
+            }.onFailure {
+                android.util.Log.e("CRASH", "崩溃报告写入失败（忽略）", it)
             }
             // Step 2.5: 崩溃日志同步导出到公共外部存储 Download/MiniMe-core/logs/。
             //   私有目录（Android/data/...）在 Android 11+ 文件管理器不可见，用户拿不到日志；

@@ -106,7 +106,10 @@ fun AppListItem(
         }
     }
 
-    val highlightedTitle = remember(title, highlightQuery) {
+    // F5.1：匹配文字用 primaryContainer 背景高亮
+    val highlightBg = MaterialTheme.colorScheme.primaryContainer
+
+    val highlightedTitle = remember(title, highlightQuery, highlightBg) {
         if (highlightQuery.isBlank()) {
             AnnotatedString(title)
         } else {
@@ -119,7 +122,7 @@ fun AppListItem(
                     while (start >= 0) {
                         val end = start + token.length
                         addStyle(
-                            style = SpanStyle(background = colors.brandPrimary.copy(alpha = 0.2f)),
+                            style = SpanStyle(background = highlightBg),
                             start = start,
                             end = end,
                         )

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Card
@@ -75,8 +76,7 @@ fun RuleManagerScreen(
                 modifier = Modifier.padding(padding).fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = Spacing.sm)
             ) {
-                items(rules.size) { index ->
-                    val rule = rules[index]
+                items(rules, key = { it.name }) { rule ->
                     val disabled = rule.name in disabledNames
                     Card(
                         modifier = Modifier

@@ -153,6 +153,13 @@ class MainActivity : ComponentActivity() {
         // 会在低版本 AndroidX Activity 上触发 NPE 或警告，导致冷启动偶发 1-2s 秒退。
         super.onCreate(savedInstanceState)
 
+        // F6.1：T5 MainActivity.onCreate 开始；T6 下一帧回调即首帧绘制完成。
+        com.mini.me_core.core.performance.StartupTracer.mark("activity_create", "MainActivity.onCreate")
+        android.view.Choreographer.getInstance().postFrameCallback {
+            com.mini.me_core.core.performance.StartupTracer.mark("first_frame", "首帧绘制完成")
+            com.mini.me_core.core.performance.StartupTracer.report("cold_start")
+        }
+
         enableEdgeToEdge()
         requestLegacyStoragePermissionIfNeeded()
         // API 30+：全局切到 ADJUST_NOTHING，由 rememberImeBottomInset() 接管键盘内边距。
@@ -244,6 +251,28 @@ class MainActivity : ComponentActivity() {
                         com.mini.me_core.core.ui.GlobalHttpWarningDialogHost(
                             bridge = httpWarningBridge
                         )
+
+                        // F6.4：上次异常退出提示。仅检测一次，提供查看报告入口（详情走开发者选项）。
+                        var showCrashPrompt by remember {
+                            mutableStateOf(com.mini.me_core.core.performance.CrashReporter.consumePendingCrash() != null)
+                        }
+                        if (showCrashPrompt) {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { showCrashPrompt = false },
+                                title = { androidx.compose.material3.Text(stringResource(R.string.crash_dialog_title)) },
+                                text = { androidx.compose.material3.Text(stringResource(R.string.crash_dialog_message)) },
+                                confirmButton = {
+                                    androidx.compose.material3.TextButton(onClick = { showCrashPrompt = false }) {
+                                        androidx.compose.material3.Text(stringResource(R.string.crash_view))
+                                    }
+                                },
+                                dismissButton = {
+                                    androidx.compose.material3.TextButton(onClick = { showCrashPrompt = false }) {
+                                        androidx.compose.material3.Text(stringResource(R.string.crash_dismiss))
+                                    }
+                                },
+                            )
+                        }
 
                         // 启动动画（覆盖在最上层，动画结束后自动移除）
                         // F1.8: 根据用户选择的 splash style 渲染不同动画风格

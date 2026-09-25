@@ -454,6 +454,10 @@ dependencies {
     androidTestImplementation(composeBom)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    // F6.2 内存泄漏检测：仅 debug 构建包含，release 零影响。
+    // LeakCanary 自动在 Activity/Fragment 销毁后检测泄漏并在通知栏给出引用链。
+    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
 }
 
 // ── 新数据层（data-layer-redesign）─ SQLDelight 6 库拓扑（设计文档 §4 / §12）──

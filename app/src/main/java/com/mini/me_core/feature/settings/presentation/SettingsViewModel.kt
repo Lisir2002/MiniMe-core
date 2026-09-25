@@ -38,6 +38,7 @@ import com.mini.me_core.core.util.LogLineParser
 import com.mini.me_core.feature.settings.data.repository.LogFilterSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.LogSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.SettingsSearchHistoryManager
+import com.mini.me_core.feature.settings.data.repository.SettingsChangeHistory
 import com.mini.me_core.feature.settings.data.repository.ThemeSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.VisionModelSettingsRepository
 import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
@@ -53,6 +54,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -63,6 +65,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import com.mini.me_core.feature.settings.presentation.component.SettingsSection
+import com.mini.me_core.R
 
 sealed class FetchState {
     object Idle : FetchState()
@@ -168,6 +171,9 @@ class SettingsViewModel @Inject constructor(
     private val searchHistoryManager: SettingsSearchHistoryManager,
     /** 防截图录屏开关。 */
     private val secureScreenRepository: SecureScreenRepository,
+    /** F5.3 设置变更历史与回滚。 */
+    private val changeHistory: SettingsChangeHistory,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
@@ -213,6 +219,17 @@ class SettingsViewModel @Inject constructor(
     val secureScreenEnabled: StateFlow<Boolean> = secureScreenRepository.enabledFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
+    // ── F5.5 变更生效即时反馈 ──
+    /** 设置变更效果事件：立即生效提示 / 需重启提示。 */
+    sealed interface SettingEffect {
+        /** 变更已即时生效（Snackbar 提示）。 */
+        data object Applied : SettingEffect
+        /** 变更需重启应用后生效（Snackbar 带「立即重启」）。 */
+        data object NeedsRestart : SettingEffect
+    }
+    private val _settingEffect = kotlinx.coroutines.flow.MutableSharedFlow<SettingEffect>(extraBufferCapacity = 4)
+    val settingEffect: kotlinx.coroutines.flow.SharedFlow<SettingEffect> = _settingEffect.asSharedFlow()
+
     /** 记录一次搜索词（在 IME Search / 点击结果时调用）。 */
     fun recordSearch(query: String) {
         viewModelScope.launch { searchHistoryManager.recordSearch(query) }
@@ -221,6 +238,11 @@ class SettingsViewModel @Inject constructor(
     /** 清空搜索历史。 */
     fun clearSearchHistory() {
         viewModelScope.launch { searchHistoryManager.clearHistory() }
+    }
+
+    /** 删除单条搜索历史（F5.1）。 */
+    fun removeSearchHistoryItem(query: String) {
+        viewModelScope.launch { searchHistoryManager.removeHistoryItem(query) }
     }
 
     // ── 缓存：所有已读入的行（供局部过滤使用，避免重复读文件） ──
@@ -1287,8 +1309,17 @@ class SettingsViewModel @Inject constructor(
 
     // 仅持久化标志位——启停 Service 由 MiniMeCore 监听 enabledFlow 统一完成。
     fun setKeepaliveEnabled(enabled: Boolean) {
+        val old = _keepaliveEnabled.value
         viewModelScope.launch {
             keepaliveSettingsRepository.setEnabled(enabled)
+            changeHistory.recordChange(
+                key = "keepalive_enabled",
+                displayName = appContext.getString(R.string.settings_keepalive_title),
+                type = "bool",
+                oldValue = old.toString(),
+                newValue = enabled.toString(),
+            )
+            _settingEffect.tryEmit(SettingEffect.NeedsRestart)
         }
     }
 
@@ -1449,8 +1480,17 @@ class SettingsViewModel @Inject constructor(
     fun importConfig(json: String): Boolean = normFlowSettingsRepository.importConfig(json)
 
     fun setThemeMode(mode: AppThemeMode) {
+        val old = _themeMode.value
         viewModelScope.launch {
             themeSettingsRepository.setThemeMode(mode)
+            changeHistory.recordChange(
+                key = "theme_mode",
+                displayName = appContext.getString(R.string.settings_theme_title),
+                type = "string",
+                oldValue = old.name,
+                newValue = mode.name,
+            )
+            _settingEffect.tryEmit(SettingEffect.Applied)
         }
     }
 

@@ -100,6 +100,13 @@ object AgentModule {
             .writeTimeout(120, TimeUnit.SECONDS)
             // 安全审计 P2-7：探测非回环明文 http:// 请求并全局弹窗提示改用 HTTPS（仅上报不阻断）。
             .addInterceptor(com.mini.me_core.core.network.HttpWarningInterceptor(httpWarningBridge))
+            // F6.6：仅 debug 构建加入网络监控拦截器（记录 URL/状态/耗时/大小，敏感头脱敏）；
+            // release 不加入，零开销、零隐私泄漏。
+            .apply {
+                if (com.mini.me_core.BuildConfig.DEBUG) {
+                    addInterceptor(com.mini.me_core.core.performance.NetworkMonitorInterceptor())
+                }
+            }
             // 网络代理（§4.2）：注入 ProxyRouteHolder 的路由选择器，启用时代理走 mihomo mixed-port，
             // 未启用直连；以 @Singleton 无依赖 Holder 避免与 ClashProxyManager 成环。
             .proxySelector(proxyRouteHolder.selector)
