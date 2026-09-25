@@ -49,6 +49,7 @@ jobs:
           mkdir -p dist
           cp "$src" "$out"
           echo "apk=$out" >> "$GITHUB_OUTPUT"
+          echo "LOGVIEWER_VER=$ver" >> "$GITHUB_ENV"
           ls -lh "$out"
 
       - name: Verify signature
@@ -64,6 +65,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+          # 标题基础格式「MiniMe Logs v{版本号}」，发版后必须手动补充「— 更新内容概括」（≤20字，用户语言）
+          name: MiniMe Logs v${{ env.LOGVIEWER_VER }}
           files: |
             ${{ steps.rename.outputs.apk }}
         env:
