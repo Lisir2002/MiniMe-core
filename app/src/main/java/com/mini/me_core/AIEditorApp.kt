@@ -211,6 +211,8 @@ class AIEditorApp : Application() {
         credentialRequestBridge.start()
         mcpManager.start()
         FileLogger.i(TAG, "核心服务：凭据桥接 + MCP 已启动")
+        // ── 阶段3：异步预热（不阻塞首帧，后台并行）──
+        FileLogger.i(TAG, "异步预热：文档/提示词/日志导出/凭据同步/模型元数据/连接预热")
         // 启动即把最新的内置指南手册提取到私有配置目录
         appScope.launch {
             ContainerInstaller.extractDocs(this@AIEditorApp)
