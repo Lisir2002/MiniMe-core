@@ -8,7 +8,7 @@
 // ⚠️ 边界 — 以下参数刻意不进本文件，由既有纪律保护（改它们会触发构建/测试/CI 三重阻断或造成事故）：
 //   - 应用包名 applicationId：数据保全三重防线（app/build.gradle.kts 白名单硬校验 +
 //     ApplicationIdStabilityTest 单测 + CI 发版门禁）锁定 com.mini.me_core(.debug)。
-//     包名变更在 Android 上是"全新安装"，会导致用户历史对话不可见（历史已因此多次数据丢失）。
+//     包名变更在 Android 上是"全新安装"，会导致用户历史对话不可见（历史已因此多次数据丢失，见 AGENTS.md 包名稳定性条款）。
 //   - 发版版本 versionName/versionCode：由 git tag 四段版本动态推导（gitVersionName()/
 //     gitVersionCode()），纪律明确禁止手写。发版只需在 main 打 tag（v0.0.0.1-rcN / v0.0.0.1）。
 
