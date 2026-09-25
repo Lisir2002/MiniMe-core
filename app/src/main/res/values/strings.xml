@@ -123,6 +123,105 @@
     <string name="settings_norm_flow_playbook_auto_desc">允许模型自主调用 playbook_start 启动剧本；/playbook 命令不受影响</string>
     <string name="settings_norm_flow_idle_converge">空转收敛</string>
     <string name="settings_norm_flow_idle_converge_desc">连续多轮无实质产出时自动结束回合（默认关闭，按需开启）</string>
+
+    <!-- 规范流程三段式 UI（P0 重组） -->
+    <string name="norm_flow_status_card">运行状态</string>
+    <string name="norm_flow_preset">预设方案</string>
+    <string name="norm_flow_preset_strict">严格</string>
+    <string name="norm_flow_preset_standard">标准</string>
+    <string name="norm_flow_preset_minimal">极简</string>
+    <string name="norm_flow_preset_custom">自定义</string>
+    <string name="norm_flow_group_injection">注入纪律</string>
+    <string name="norm_flow_group_guard">执行护栏</string>
+    <string name="norm_flow_group_runtime">运行参数</string>
+    <string name="norm_flow_step_inject_goal">目标与计划注入</string>
+    <string name="norm_flow_step_inject_goal_desc">每轮注入当前目标、待批计划、目标失配与调整事件</string>
+    <string name="norm_flow_step_inject_static_rules">静态规则</string>
+    <string name="norm_flow_step_inject_static_rules_desc">内置 12 篇规范文档常驻注入</string>
+    <string name="norm_flow_step_inject_sop_summary">SOP摘要</string>
+    <string name="norm_flow_step_inject_sop_summary_desc">6 篇标准作业流程清单摘要常驻注入</string>
+    <string name="norm_flow_step_inject_layered_rules">分层规则</string>
+    <string name="norm_flow_step_inject_layered_rules_desc">全局/项目/工作区/模块四级规则摘要注入</string>
+    <string name="norm_flow_step_inject_project_agents">项目规则</string>
+    <string name="norm_flow_step_inject_project_agents_desc">项目 AGENTS.md / CLAUDE.md 注入</string>
+    <string name="norm_flow_guard_file_observation">文件观察</string>
+    <string name="norm_flow_guard_file_observation_desc">编辑文件前必须先读取，防止覆盖未观察的改动</string>
+    <string name="norm_flow_status_preset">预设</string>
+    <string name="norm_flow_status_inject_tokens">注入token</string>
+    <string name="norm_flow_status_guard_blocks">护栏拦截</string>
+    <string name="norm_flow_status_idle_rounds">空转轮数</string>
+
+    <!-- P1：推理预算强度 / 空转阈值 / 规范查看器 -->
+    <string name="norm_flow_reasoning_level_low">低</string>
+    <string name="norm_flow_reasoning_level_medium">中</string>
+    <string name="norm_flow_reasoning_level_high">高</string>
+    <string name="norm_flow_idle_rounds_3">3轮</string>
+    <string name="norm_flow_idle_rounds_6">6轮</string>
+    <string name="norm_flow_idle_rounds_10">10轮</string>
+    <string name="norm_flow_asset_viewer">规范查看器</string>
+    <string name="norm_flow_asset_static_rules">静态规则</string>
+    <string name="norm_flow_asset_sop">标准作业</string>
+    <string name="norm_flow_asset_view">查看</string>
+    <string name="norm_flow_asset_word_count">字数</string>
+    <string name="norm_flow_asset_steps">步骤</string>
+    <string name="norm_flow_asset_back">返回</string>
+    <string name="norm_flow_asset_empty">暂无内容</string>
+
+    <!-- P2：新增护栏 / 用量项 / 诊断 / 日志 -->
+    <string name="norm_flow_guard_dangerous_command">危险命令</string>
+    <string name="norm_flow_guard_dangerous_command_desc">拦截 rm -rf /、mkfs、dd 等破坏性命令</string>
+    <string name="norm_flow_guard_large_file">大文件警告</string>
+    <string name="norm_flow_guard_large_file_desc">写入超过 500KB 时警告，不阻断</string>
+    <string name="norm_flow_guard_path_boundary">路径边界</string>
+    <string name="norm_flow_guard_path_boundary_desc">禁止写入工作区根目录之外的路径</string>
+    <string name="norm_flow_usage_item_token">Token</string>
+    <string name="norm_flow_usage_item_calls">调用数</string>
+    <string name="norm_flow_usage_item_tools">工具数</string>
+    <string name="norm_flow_usage_item_duration">耗时</string>
+    <string name="norm_flow_diagnosis">注入诊断</string>
+    <string name="norm_flow_diagnosis_content">注入内容</string>
+    <string name="norm_flow_diagnosis_sources">注入源</string>
+    <string name="norm_flow_diagnosis_budget">预算使用</string>
+    <string name="norm_flow_diagnosis_kept">已注入</string>
+    <string name="norm_flow_diagnosis_trimmed">已裁剪</string>
+    <string name="norm_flow_diagnosis_copy">复制</string>
+    <string name="norm_flow_diagnosis_copied">已复制</string>
+    <string name="norm_flow_guard_logs">护栏日志</string>
+    <string name="norm_flow_guard_logs_empty">暂无拦截记录</string>
+    <string name="norm_flow_guard_logs_view">日志</string>
+
+    <!-- 布局重构新增 -->
+    <string name="norm_flow_status_running">运行中</string>
+    <string name="norm_flow_status_disabled">已停用</string>
+    <string name="norm_flow_group_injection_desc">控制每轮注入的目标、规则与摘要</string>
+    <string name="norm_flow_group_guard_desc">工具执行前的安全拦截与提醒</string>
+    <string name="norm_flow_group_runtime_desc">推理强度、用量与收敛参数</string>
+    <string name="norm_flow_preset_current">当前</string>
+    <string name="norm_flow_reasoning_level_label">强度：%1$s</string>
+    <string name="norm_flow_idle_rounds_label">阈值：%1$d轮</string>
+
+    <!-- P3 -->
+    <string name="norm_flow_rule_manager">规则管理</string>
+    <string name="norm_flow_rule_manager_title">分层规则管理</string>
+    <string name="norm_flow_rule_layer_global">全局</string>
+    <string name="norm_flow_rule_layer_project">项目</string>
+    <string name="norm_flow_rule_layer_workspace">工作区</string>
+    <string name="norm_flow_rule_layer_module">模块</string>
+    <string name="norm_flow_rule_priority">优先级</string>
+    <string name="norm_flow_rule_disable">禁用</string>
+    <string name="norm_flow_rule_enable">启用</string>
+    <string name="norm_flow_rule_disabled">已禁用</string>
+    <string name="norm_flow_rule_empty">暂无规则</string>
+    <string name="norm_flow_export_config">导出配置</string>
+    <string name="norm_flow_import_config">导入配置</string>
+    <string name="norm_flow_export_copied">配置已复制到剪贴板</string>
+    <string name="norm_flow_import_hint">粘贴配置 JSON</string>
+    <string name="norm_flow_import_success">配置导入成功</string>
+    <string name="norm_flow_import_failed">配置导入失败，格式错误</string>
+    <string name="norm_flow_indicator_running">规范运行中</string>
+    <string name="norm_flow_indicator_trimmed">注入已裁剪</string>
+    <string name="norm_flow_indicator_disabled">规范已停用</string>
+    <string name="norm_flow_manage">管理</string>
     <string name="settings_backup_subtitle">加密导出/导入配置、聊天历史与凭据</string>
     <string name="settings_about_subtitle">核心组件 · 使用统计 · 版本检查</string>
     <string name="settings_design_gallery_subtitle">新 UI 令牌 · 组件族 · 槽位模型 · 运行态演示</string>

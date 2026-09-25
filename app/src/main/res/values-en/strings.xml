@@ -101,6 +101,105 @@
     <string name="settings_norm_flow_playbook_auto_desc">Allow the model to start a playbook via playbook_start; the /playbook command is unaffected</string>
     <string name="settings_norm_flow_idle_converge">Idle Convergence</string>
     <string name="settings_norm_flow_idle_converge_desc">End the turn automatically after consecutive rounds with no real output (off by default)</string>
+
+    <!-- Norm flow three-section UI (P0 restructure) -->
+    <string name="norm_flow_status_card">Runtime Status</string>
+    <string name="norm_flow_preset">Preset</string>
+    <string name="norm_flow_preset_strict">Strict</string>
+    <string name="norm_flow_preset_standard">Standard</string>
+    <string name="norm_flow_preset_minimal">Minimal</string>
+    <string name="norm_flow_preset_custom">Custom</string>
+    <string name="norm_flow_group_injection">Injection Discipline</string>
+    <string name="norm_flow_group_guard">Execution Guards</string>
+    <string name="norm_flow_group_runtime">Runtime Parameters</string>
+    <string name="norm_flow_step_inject_goal">Goal &amp; Plan Injection</string>
+    <string name="norm_flow_step_inject_goal_desc">Inject current goal, pending plan, goal drift and adjustment events each turn</string>
+    <string name="norm_flow_step_inject_static_rules">Static Rules</string>
+    <string name="norm_flow_step_inject_static_rules_desc">12 built-in spec documents always injected</string>
+    <string name="norm_flow_step_inject_sop_summary">SOP Summary</string>
+    <string name="norm_flow_step_inject_sop_summary_desc">6 standard operating procedure checklists always injected</string>
+    <string name="norm_flow_step_inject_layered_rules">Layered Rules</string>
+    <string name="norm_flow_step_inject_layered_rules_desc">Global/project/workspace/module four-level rule summary injection</string>
+    <string name="norm_flow_step_inject_project_agents">Project Rules</string>
+    <string name="norm_flow_step_inject_project_agents_desc">Project AGENTS.md / CLAUDE.md injection</string>
+    <string name="norm_flow_guard_file_observation">File Observation</string>
+    <string name="norm_flow_guard_file_observation_desc">Must read a file before editing to prevent overwriting unobserved changes</string>
+    <string name="norm_flow_status_preset">Preset</string>
+    <string name="norm_flow_status_inject_tokens">Injected Tokens</string>
+    <string name="norm_flow_status_guard_blocks">Guard Blocks</string>
+    <string name="norm_flow_status_idle_rounds">Idle Rounds</string>
+
+    <!-- P1: reasoning level / idle rounds / asset viewer -->
+    <string name="norm_flow_reasoning_level_low">Low</string>
+    <string name="norm_flow_reasoning_level_medium">Medium</string>
+    <string name="norm_flow_reasoning_level_high">High</string>
+    <string name="norm_flow_idle_rounds_3">3 rounds</string>
+    <string name="norm_flow_idle_rounds_6">6 rounds</string>
+    <string name="norm_flow_idle_rounds_10">10 rounds</string>
+    <string name="norm_flow_asset_viewer">Spec Viewer</string>
+    <string name="norm_flow_asset_static_rules">Static Rules</string>
+    <string name="norm_flow_asset_sop">SOP</string>
+    <string name="norm_flow_asset_view">View</string>
+    <string name="norm_flow_asset_word_count">Words</string>
+    <string name="norm_flow_asset_steps">Steps</string>
+    <string name="norm_flow_asset_back">Back</string>
+    <string name="norm_flow_asset_empty">No content</string>
+
+    <!-- P2: new guards / usage items / diagnosis / logs -->
+    <string name="norm_flow_guard_dangerous_command">Dangerous Command</string>
+    <string name="norm_flow_guard_dangerous_command_desc">Block destructive commands like rm -rf /, mkfs, dd</string>
+    <string name="norm_flow_guard_large_file">Large File Warning</string>
+    <string name="norm_flow_guard_large_file_desc">Warn when writing over 500KB (non-blocking)</string>
+    <string name="norm_flow_guard_path_boundary">Path Boundary</string>
+    <string name="norm_flow_guard_path_boundary_desc">Prevent writing outside the workspace root</string>
+    <string name="norm_flow_usage_item_token">Tokens</string>
+    <string name="norm_flow_usage_item_calls">Calls</string>
+    <string name="norm_flow_usage_item_tools">Tools</string>
+    <string name="norm_flow_usage_item_duration">Duration</string>
+    <string name="norm_flow_diagnosis">Injection Diagnosis</string>
+    <string name="norm_flow_diagnosis_content">Injection Content</string>
+    <string name="norm_flow_diagnosis_sources">Sources</string>
+    <string name="norm_flow_diagnosis_budget">Budget Usage</string>
+    <string name="norm_flow_diagnosis_kept">Kept</string>
+    <string name="norm_flow_diagnosis_trimmed">Trimmed</string>
+    <string name="norm_flow_diagnosis_copy">Copy</string>
+    <string name="norm_flow_diagnosis_copied">Copied</string>
+    <string name="norm_flow_guard_logs">Guard Logs</string>
+    <string name="norm_flow_guard_logs_empty">No interception records</string>
+    <string name="norm_flow_guard_logs_view">Logs</string>
+
+    <!-- Layout refactor -->
+    <string name="norm_flow_status_running">Running</string>
+    <string name="norm_flow_status_disabled">Disabled</string>
+    <string name="norm_flow_group_injection_desc">Control per-turn injections of goals, rules and summaries</string>
+    <string name="norm_flow_group_guard_desc">Pre-execution safety interception and advisory</string>
+    <string name="norm_flow_group_runtime_desc">Reasoning effort, usage and convergence params</string>
+    <string name="norm_flow_preset_current">Current</string>
+    <string name="norm_flow_reasoning_level_label">Level: %1$s</string>
+    <string name="norm_flow_idle_rounds_label">Threshold: %1$d rounds</string>
+
+    <!-- P3 -->
+    <string name="norm_flow_rule_manager">Rule Manager</string>
+    <string name="norm_flow_rule_manager_title">Layered Rule Manager</string>
+    <string name="norm_flow_rule_layer_global">Global</string>
+    <string name="norm_flow_rule_layer_project">Project</string>
+    <string name="norm_flow_rule_layer_workspace">Workspace</string>
+    <string name="norm_flow_rule_layer_module">Module</string>
+    <string name="norm_flow_rule_priority">Priority</string>
+    <string name="norm_flow_rule_disable">Disable</string>
+    <string name="norm_flow_rule_enable">Enable</string>
+    <string name="norm_flow_rule_disabled">Disabled</string>
+    <string name="norm_flow_rule_empty">No rules</string>
+    <string name="norm_flow_export_config">Export Config</string>
+    <string name="norm_flow_import_config">Import Config</string>
+    <string name="norm_flow_export_copied">Config copied to clipboard</string>
+    <string name="norm_flow_import_hint">Paste config JSON</string>
+    <string name="norm_flow_import_success">Config imported successfully</string>
+    <string name="norm_flow_import_failed">Import failed, invalid format</string>
+    <string name="norm_flow_indicator_running">Norm flow active</string>
+    <string name="norm_flow_indicator_trimmed">Injection trimmed</string>
+    <string name="norm_flow_indicator_disabled">Norm flow off</string>
+    <string name="norm_flow_manage">Manage</string>
     <string name="settings_backup_subtitle">Encrypted export/import of config, chat history and credentials</string>
     <string name="settings_about_subtitle">Core components · Usage stats · Version check</string>
     <string name="settings_design_gallery_subtitle">New UI tokens · component families · slot model · runtime demos</string>
