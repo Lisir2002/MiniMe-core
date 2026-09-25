@@ -79,7 +79,17 @@ class PermissionRulesRepository @Inject constructor(
         if (globalState.value != null) return
         mutex.withLock {
             if (globalState.value != null) return
-            globalState.value = loadFromFile(globalFile)
+            val loaded = loadFromFile(globalFile)
+            globalState.value = loaded
+            // 一次性清理：ShellCommandParser 旧版不识别 fd 重定向，产生 pattern 为纯数字的垃圾授权规则（如 Bash(1)）。
+            // 幂等过滤：pattern 为纯数字的规则一律移除，不误删正常规则（apk/git/cd 等均非纯数字）。
+            val junk = loaded.filter { it.pattern.all { ch -> ch.isDigit() } && it.pattern.isNotEmpty() }
+            if (junk.isNotEmpty()) {
+                val cleaned = loaded - junk.toSet()
+                withContext(Dispatchers.IO) { writeToFile(globalFile, cleaned) }
+                globalState.value = cleaned
+                FileLogger.i(TAG, "清理垃圾授权规则 ${junk.size} 条（fd 重定向解析缺陷产生的纯数字 pattern）")
+            }
         }
     }
 

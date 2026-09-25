@@ -104,11 +104,55 @@ object ShellCommandParser {
                         }
                         // 顶层段分隔符。
                         c == '\n' || c == ';' -> { flushSegment(); i++ }
-                        c == '&' -> { flushSegment(); i += if (i + 1 < n && command[i + 1] == '&') 2 else 1 }
+                        c == '&' -> {
+                            // &> / &>> 合并重定向（bash 语法）：开头的 & 紧跟 >，属于重定向算子，不是后台/段分隔符。
+                            if (i + 1 < n && command[i + 1] == '>') {
+                                flushToken()
+                                var adv = 2
+                                if (i + 2 < n && command[i + 2] == '>') adv = 3
+                                expectRedirectTarget = true
+                                i += adv
+                            } else {
+                                flushSegment()
+                                i += if (i + 1 < n && command[i + 1] == '&') 2 else 1
+                            }
+                        }
                         c == '|' -> { flushSegment(); i += if (i + 1 < n && command[i + 1] == '|') 2 else 1 }
-                        // 重定向：算子本身不入 token；输出重定向标记，待目标 token 判定是否绝对路径。
-                        c == '>' -> { flushToken(); i += if (i + 1 < n && command[i + 1] == '>') 2 else 1; expectRedirectTarget = true }
-                        c == '<' -> { flushToken(); i++ }
+                        // 输出重定向：算子本身不入 token；fd 数字（紧邻 > 前的纯数字 token）也不入 token。
+                        c == '>' -> {
+                            flushToken()
+                            // 吸收紧邻的 fd 数字（如 2> 中的 2）：刚 flush 的 token 若为纯数字则是 fd，移除。
+                            if (current.isNotEmpty() && current.last().all { it.isDigit() }) {
+                                current.removeAt(current.size - 1)
+                            }
+                            var adv = 1
+                            if (i + 1 < n && command[i + 1] == '>') adv = 2       // >> 追加
+                            if (i + adv < n && command[i + adv] == '|') adv++      // >| 强制覆盖
+                            // >&M / >>&M  dup-fd：M 为数字或 -（关闭 fd），不触发目标路径判定。
+                            if (i + adv < n && command[i + adv] == '&') {
+                                adv++
+                                while (i + adv < n && (command[i + adv].isDigit() || command[i + adv] == '-')) adv++
+                                expectRedirectTarget = false
+                            } else {
+                                expectRedirectTarget = true
+                            }
+                            i += adv
+                        }
+                        // 输入重定向：算子与 fd 数字不入 token。
+                        c == '<' -> {
+                            flushToken()
+                            if (current.isNotEmpty() && current.last().all { it.isDigit() }) {
+                                current.removeAt(current.size - 1)
+                            }
+                            var adv = 1
+                            if (i + 1 < n && command[i + 1] == '<') { adv = 2; analyzable = false } // << here-doc 不可静态判定
+                            // <&M  dup-fd
+                            if (i + adv < n && command[i + adv] == '&') {
+                                adv++
+                                while (i + adv < n && (command[i + adv].isDigit() || command[i + adv] == '-')) adv++
+                            }
+                            i += adv
+                        }
                         c.isWhitespace() -> { flushToken(); i++ }
                         else -> { token.append(c); tokenStarted = true; i++ }
                     }

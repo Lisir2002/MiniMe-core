@@ -39,11 +39,12 @@ class SettingsSearchHistoryManagerTest {
     @Test
     fun `超过最大条数截断尾部`() {
         var list = emptyList<String>()
-        for (i in 1..12) {
+        val maxSize = SettingsSearchHistoryManager.MAX_HISTORY_SIZE
+        for (i in 1..(maxSize + 2)) {
             list = SettingsSearchHistoryManager.buildNewHistory(list, "keyword$i")
         }
-        assertEquals(SettingsSearchHistoryManager.MAX_HISTORY_SIZE, list.size)
-        assertEquals("keyword12", list[0])
+        assertEquals(maxSize, list.size)
+        assertEquals("keyword${maxSize + 2}", list[0])
         assertEquals("keyword3", list.last())
     }
 

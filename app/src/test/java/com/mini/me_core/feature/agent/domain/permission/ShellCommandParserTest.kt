@@ -125,4 +125,88 @@ class ShellCommandParserTest {
         val noTarget = ShellCommandParser.analyze("rm --help").segments[0]
         assertEquals(null, ShellCommandParser.rememberablePrefix(noTarget))
     }
+
+    @Test
+    fun fdRedirect_stderrMerge_isSingleSegment() {
+        // 2>&1：fd 数字与 dup 算子均不入 token，不被切分为多段
+        val a = ShellCommandParser.analyze("ls -la 2>&1")
+        assertTrue(a.analyzable)
+        assertEquals(1, a.segments.size)
+        assertEquals(listOf("ls", "-la"), a.segments[0])
+        assertEquals("ls", ShellCommandParser.programPrefix(a.segments[0]))
+    }
+
+    @Test
+    fun fdRedirect_absoluteTarget_isNotAnalyzable() {
+        // 1>/dev/null：fd 数字不入 token，目标为绝对路径则不可静态判定
+        val a = ShellCommandParser.analyze("echo hi 1>/dev/null")
+        assertFalse(a.analyzable)
+        assertEquals(1, a.segments.size)
+        // fd 数字 1 被吸收，目标文件 /dev/null 仍入 token（现有行为）
+        assertFalse(a.segments[0].contains("1"))
+        assertTrue(a.segments[0].contains("/dev/null"))
+        assertEquals("echo", ShellCommandParser.programPrefix(a.segments[0]))
+    }
+
+    @Test
+    fun fdRedirect_relativeTarget_isAnalyzable() {
+        val a = ShellCommandParser.analyze("echo hi 1>out.txt")
+        assertTrue(a.analyzable)
+        assertEquals(1, a.segments.size)
+        assertFalse(a.segments[0].contains("1"))
+        assertTrue(a.segments[0].contains("out.txt"))
+    }
+
+    @Test
+    fun fdRedirect_stderrToFile_isAnalyzable() {
+        val a = ShellCommandParser.analyze("cat f 2>err.log")
+        assertTrue(a.analyzable)
+        assertEquals(1, a.segments.size)
+        assertFalse(a.segments[0].contains("2"))
+        assertTrue(a.segments[0].contains("err.log"))
+    }
+
+    @Test
+    fun fdRedirect_multipleRedirects_noNumericTokens() {
+        val a = ShellCommandParser.analyze("cmd 2>&1 1>out.txt")
+        assertTrue(a.analyzable)
+        assertEquals(1, a.segments.size)
+        assertTrue(a.segments[0].none { it.all { ch -> ch.isDigit() } })
+    }
+
+    @Test
+    fun fdRedirect_mergeAmpersand_relativeTarget() {
+        // &> 合并重定向：开头的 & 不是后台算子，目标文件入 token
+        val a = ShellCommandParser.analyze("cmd &>all.log")
+        assertTrue(a.analyzable)
+        assertEquals(1, a.segments.size)
+        assertEquals(listOf("cmd", "all.log"), a.segments[0])
+    }
+
+    @Test
+    fun fdRedirect_closeFd_isSingleSegment() {
+        // 3>&-：关闭 fd，- 不入 token
+        val a = ShellCommandParser.analyze("cmd 3>&-")
+        assertTrue(a.analyzable)
+        assertEquals(1, a.segments.size)
+        assertEquals(listOf("cmd"), a.segments[0])
+    }
+
+    @Test
+    fun fdRedirect_dupToStderr_isSingleSegment() {
+        // >&2：dup 到 stderr，数字 2 不入 token
+        val a = ShellCommandParser.analyze("cmd >&2")
+        assertTrue(a.analyzable)
+        assertEquals(1, a.segments.size)
+        assertEquals(listOf("cmd"), a.segments[0])
+    }
+
+    @Test
+    fun fdRedirect_insideQuotes_notTreatedAsOperator() {
+        // 引号内的 2>&1 不被当作重定向算子
+        val a = ShellCommandParser.analyze("echo \"2>&1\"")
+        assertTrue(a.analyzable)
+        assertEquals(1, a.segments.size)
+        assertEquals(listOf("echo", "2>&1"), a.segments[0])
+    }
 }
