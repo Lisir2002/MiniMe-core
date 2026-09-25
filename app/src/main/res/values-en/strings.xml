@@ -10,6 +10,7 @@
     <string name="settings_providers">Model Providers</string>
     <string name="settings_provider_editor">Provider</string>
     <string name="settings_default_models">Default Models</string>
+    <string name="model_management_tab_providers">Providers</string>
     <string name="settings_default_models_subtitle">Configure default preferences like the vision (multimodal) model</string>
     <string name="settings_vision_model">Vision model (multimodal)</string>
     <string name="settings_compaction_model">Compaction model</string>

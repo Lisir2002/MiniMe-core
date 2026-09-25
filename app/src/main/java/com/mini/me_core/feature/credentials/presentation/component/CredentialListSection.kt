@@ -21,8 +21,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.feature.credentials.domain.model.GitCredential
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Edit
@@ -61,18 +60,14 @@ internal fun CredentialListSection(
     var selectedTab by remember { mutableIntStateOf(0) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        PrimaryTabRow(selectedTabIndex = selectedTab) {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
-                text = { Text(stringResource(R.string.git_tab_identity)) }
-            )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
-                text = { Text(stringResource(R.string.git_tab_credentials)) }
-            )
-        }
+        AppSegmentedControl(
+            tabs = listOf(
+                stringResource(R.string.git_tab_identity),
+                stringResource(R.string.git_tab_credentials)
+            ),
+            selectedIndex = selectedTab,
+            onSelect = { selectedTab = it }
+        )
 
         when (selectedTab) {
             0 -> {

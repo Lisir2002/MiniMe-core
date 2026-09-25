@@ -23,12 +23,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.mini.me_core.core.theme.AppTopAppBar
@@ -49,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.feature.credentials.domain.model.GitCredential
 import com.mini.me_core.feature.credentials.presentation.CredentialViewModel
 import com.mini.me_core.feature.credentials.presentation.component.CredentialEditorSheet
@@ -150,23 +149,19 @@ fun GitScreen(
                 )
                 return@Column
             }
-            PrimaryTabRow(selectedTabIndex = state.tab.ordinal) {
-                GitTab.entries.forEach { tab ->
-                    Tab(
-                        selected = state.tab == tab,
-                        onClick = { viewModel.setTab(tab) },
-                        text = {
-                            Text(
-                                when (tab) {
-                                    GitTab.STATUS -> stringResource(R.string.git_tab_status)
-                                    GitTab.BRANCHES -> stringResource(R.string.git_tab_branches)
-                                    GitTab.LOG -> stringResource(R.string.git_tab_commits)
-                                }
-                            )
+            AppSegmentedControl(
+                tabs = GitTab.entries.map { tab ->
+                    stringResource(
+                        when (tab) {
+                            GitTab.STATUS -> R.string.git_tab_status
+                            GitTab.BRANCHES -> R.string.git_tab_branches
+                            GitTab.LOG -> R.string.git_tab_commits
                         }
                     )
-                }
-            }
+                },
+                selectedIndex = state.tab.ordinal,
+                onSelect = { viewModel.setTab(GitTab.entries[it]) }
+            )
 
             when {
                 state.diffLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

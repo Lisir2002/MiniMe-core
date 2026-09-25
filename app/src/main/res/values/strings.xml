@@ -16,6 +16,7 @@
     <string name="settings_providers">模型服务商</string>
     <string name="settings_provider_editor">提供商</string>
     <string name="settings_default_models">默认模型</string>
+    <string name="model_management_tab_providers">服务商</string>
     <string name="settings_default_models_subtitle">配置识图模型（多模态识图 Vision）等默认偏好</string>
     <string name="settings_vision_model">识图模型（多模态识图 Vision）</string>
     <string name="settings_compaction_model">压缩模型</string>

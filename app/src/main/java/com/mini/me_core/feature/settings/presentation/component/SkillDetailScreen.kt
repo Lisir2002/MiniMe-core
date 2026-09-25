@@ -30,12 +30,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -71,6 +69,7 @@ import com.mini.me_core.core.theme.AppLoadingState
 import com.mini.me_core.core.theme.AppTopAppBar
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.feature.agent.domain.skill.Skill
 import com.mini.me_core.feature.agent.domain.skill.SkillScope
 import com.mini.me_core.feature.agent.domain.skill.SkillSourceType
@@ -193,18 +192,14 @@ fun SkillDetailScreen(
                 .padding(padding)
         ) {
             // ── 页内 Tab 导航：文件 / 详情 ──
-            PrimaryTabRow(selectedTabIndex = selectedTab) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text(stringResource(R.string.skill_tab_files)) }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text(stringResource(R.string.skill_tab_detail)) }
-                )
-            }
+            AppSegmentedControl(
+                tabs = listOf(
+                    stringResource(R.string.skill_tab_files),
+                    stringResource(R.string.skill_tab_detail)
+                ),
+                selectedIndex = selectedTab,
+                onSelect = { selectedTab = it }
+            )
             when (selectedTab) {
                 0 -> FilesTab(
                     skill = skill,

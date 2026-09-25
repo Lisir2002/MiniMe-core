@@ -17,9 +17,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.presentation.SettingsViewModel
 
@@ -113,23 +112,15 @@ internal fun ModelManagementScreen(
                     }
                 }
 
-                // ── TabRow：服务商 / 默认模型 ──
-                PrimaryTabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text("服务商") }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text("默认模型") }
-                    )
-                }
+                // ── 顶栏 Tab：服务商 / 默认模型 ──
+                AppSegmentedControl(
+                    tabs = listOf(
+                        stringResource(R.string.model_management_tab_providers),
+                        stringResource(R.string.settings_default_models)
+                    ),
+                    selectedIndex = selectedTab,
+                    onSelect = { selectedTab = it }
+                )
             }
         }
     ) { padding ->

@@ -1,5 +1,4 @@
 package com.mini.me_core.feature.terminal.presentation.component
-import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.ClipData
@@ -67,6 +66,7 @@ import com.mini.me_core.core.theme.AppSectionHeader
 import com.mini.me_core.core.theme.AppTopAppBar
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.feature.agent.domain.container.ContainerInitState
 import com.mini.me_core.feature.agent.domain.container.GlobalInstallArchiveStore
 import com.mini.me_core.feature.terminal.data.bundle.BundleInstallState
@@ -163,22 +163,15 @@ fun TerminalBundleManagerScreen(
 
             // Tab 菜单吸附顶部：上滑时容器卡片滚走，Tab 吸顶不随内容滚动
             stickyHeader {
-                TabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text(stringResource(R.string.ui_________b6349a50), fontSize = LocalComponentTokens.current.text.bodyMediumFontSize) }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text(stringResource(R.string.ui________2d661dab), fontSize = LocalComponentTokens.current.text.bodyMediumFontSize) }
-                    )
-                }
+                AppSegmentedControl(
+                    tabs = listOf(
+                        stringResource(R.string.ui_________b6349a50),
+                        stringResource(R.string.ui________2d661dab)
+                    ),
+                    selectedIndex = selectedTab,
+                    onSelect = { selectedTab = it },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.background)
+                )
             }
 
             item {

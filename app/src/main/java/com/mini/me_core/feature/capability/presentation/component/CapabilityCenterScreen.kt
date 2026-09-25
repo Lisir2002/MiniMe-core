@@ -22,9 +22,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,6 +44,7 @@ import com.mini.me_core.core.theme.AppEmptyState
 import com.mini.me_core.core.theme.AppTopAppBar
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.feature.agent.domain.model.AgentMode
 import com.mini.me_core.feature.agent.domain.tool.ToolCapability
 import com.mini.me_core.feature.agent.domain.tool.ToolPermissionPolicy
@@ -105,15 +104,11 @@ fun CapabilityCenterScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
-                CapabilityTab.entries.forEach { tab ->
-                    Tab(
-                        selected = selectedTab == tab,
-                        onClick = { selectedTab = tab },
-                        text = { Text(stringResource(tab.titleRes)) }
-                    )
-                }
-            }
+            AppSegmentedControl(
+                tabs = CapabilityTab.entries.map { stringResource(it.titleRes) },
+                selectedIndex = selectedTab.ordinal,
+                onSelect = { selectedTab = CapabilityTab.entries[it] }
+            )
             when (selectedTab) {
                 CapabilityTab.TOOLS -> ToolsTab(tools = viewModel.tools)
                 CapabilityTab.AGENT -> AgentTab(

@@ -22,8 +22,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -39,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
+import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.feature.agent.domain.prompt.AgentAsset
 import com.mini.me_core.feature.agent.domain.sop.SopAsset
 import com.mini.me_core.core.theme.Spacing
@@ -93,18 +92,14 @@ fun NormFlowAssetViewerScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
-            TabRow(selectedTabIndex = selectedTab) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text(stringResource(R.string.norm_flow_asset_static_rules)) }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text(stringResource(R.string.norm_flow_asset_sop)) }
-                )
-            }
+            AppSegmentedControl(
+                tabs = listOf(
+                    stringResource(R.string.norm_flow_asset_static_rules),
+                    stringResource(R.string.norm_flow_asset_sop)
+                ),
+                selectedIndex = selectedTab,
+                onSelect = { selectedTab = it }
+            )
             if (selectedTab == 0) {
                 if (staticRules.isEmpty()) {
                     EmptyState()

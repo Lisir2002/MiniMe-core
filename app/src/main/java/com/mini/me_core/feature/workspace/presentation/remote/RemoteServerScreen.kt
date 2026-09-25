@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
+import com.mini.me_core.core.theme.components.AppSegmentedControl
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,28 +50,16 @@ fun RemoteServerScreen(
                         }
                     }
                 )
-                PrimaryTabRow(selectedTabIndex = selectedTab) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text(stringResource(R.string.remote_tab_connections)) }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text(stringResource(R.string.common_workspace)) }
-                    )
-                    Tab(
-                        selected = selectedTab == 2,
-                        onClick = { selectedTab = 2 },
-                        text = { Text(stringResource(R.string.remote_tab_ftp)) }
-                    )
-                    Tab(
-                        selected = selectedTab == 3,
-                        onClick = { selectedTab = 3 },
-                        text = { Text(stringResource(R.string.remote_tab_sync)) }
-                    )
-                }
+                AppSegmentedControl(
+                    tabs = listOf(
+                        stringResource(R.string.remote_tab_connections),
+                        stringResource(R.string.common_workspace),
+                        stringResource(R.string.remote_tab_ftp),
+                        stringResource(R.string.remote_tab_sync)
+                    ),
+                    selectedIndex = selectedTab,
+                    onSelect = { selectedTab = it }
+                )
             }
         },
         floatingActionButton = {
