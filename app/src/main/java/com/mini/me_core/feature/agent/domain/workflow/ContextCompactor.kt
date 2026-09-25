@@ -50,7 +50,10 @@ class ContextCompactor @Inject constructor(
     ): List<AgentMessage> {
         val totalTokens = estimateTokens(messages)
         val metadata = modelMetadataService.resolve(inferProviderType(aiProvider), aiProvider.model)
-        val contextLimit = metadata.contextTokens.takeIf { it > 0 } ?: ModelContextPolicy.DEFAULT_CONTEXT_TOKENS
+        // 上下文窗口取模型原生总窗口与用户自定义输入上限的较小值，确保不超过用户设置的输入限制。
+        val modelContextLimit = metadata.contextTokens.takeIf { it > 0 } ?: ModelContextPolicy.DEFAULT_CONTEXT_TOKENS
+        val effectiveInputLimit = metadata.inputTokens?.takeIf { it > 0 } ?: modelContextLimit
+        val contextLimit = minOf(modelContextLimit, effectiveInputLimit)
         val triggerThreshold = (contextLimit * 0.9f).toInt()
         if (messages.size <= 2 || (!force && totalTokens < triggerThreshold)) {
             return messages.toList()

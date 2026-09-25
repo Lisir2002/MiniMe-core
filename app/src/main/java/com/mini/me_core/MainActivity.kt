@@ -257,6 +257,7 @@ class MainActivity : ComponentActivity() {
                         // 透明 Surface 不会导致视觉问题。
                         color = androidx.compose.ui.graphics.Color.Transparent
                     ) {
+                        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
                         AppNavigation(
                             browserController = browserController,
                             browserLoginPromptManager = browserLoginPromptManager,
@@ -274,6 +275,15 @@ class MainActivity : ComponentActivity() {
                         com.mini.me_core.core.ui.GlobalHttpWarningDialogHost(
                             bridge = httpWarningBridge
                         )
+
+                        // 粒子聚合与玻璃破碎启动动画（覆盖在最上层，动画结束后自动移除）
+                        var showParticleSplash by remember { mutableStateOf(true) }
+                        if (showParticleSplash) {
+                            com.mini.me_core.core.splash.ParticleSplashScreen(
+                                onDismiss = { showParticleSplash = false }
+                            )
+                        }
+                        }
                     }
                 }
             }

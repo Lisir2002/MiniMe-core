@@ -913,6 +913,8 @@ fun ProviderEditorScreen(
                 fetchState = fetchState,
                 modelMetadata = modelMetadata,
                 existingModels = models,
+                testingModels = testing,
+                testResults = testResults,
                 onFetchModels = { viewModel.fetchModels(currentConfig()) },
                 onAddModel = { m ->
                     if (m !in models) {
@@ -920,6 +922,7 @@ fun ProviderEditorScreen(
                         saveCurrent()
                     }
                 },
+                onTestModel = { m -> viewModel.testModel(currentConfig(), m) },
                 onDismiss = {
                     showFetchDialog = false
                     viewModel.resetFetchState()
@@ -1018,8 +1021,11 @@ private fun FetchModelsDialog(
     fetchState: FetchState,
     modelMetadata: Map<String, ModelMetadata>,
     existingModels: List<String>,
+    testingModels: Set<String>,
+    testResults: Map<String, ModelTestResult>,
     onFetchModels: () -> Unit,
     onAddModel: (String) -> Unit,
+    onTestModel: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -1040,40 +1046,28 @@ private fun FetchModelsDialog(
         onDismiss = onDismiss,
         sheetState = sheetState,
         sheetGesturesEnabled = true,
-        containerColor = Color.Transparent,
+        containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         dragHandle = null
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(),
-            contentAlignment = Alignment.BottomCenter
+                .heightIn(max = screenHeight * 0.85f)
+                .padding(Spacing.lg)
+                .padding(bottom = Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(screenHeight * 0.85f),
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(topStart = LocalCornerRadius.current.map(28.dp), topEnd = LocalCornerRadius.current.map(28.dp))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(Spacing.lg)
-                        .padding(bottom = Spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
-                ) {
-                    AppTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text(stringResource(R.string.provider_filter_models_hint)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(50)
-                    )
+            AppTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text(stringResource(R.string.provider_filter_models_hint)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(50)
+            )
 
-                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         when (fetchState) {
                             is FetchState.Loading -> {
                                 Row(
@@ -1139,7 +1133,10 @@ private fun FetchModelsDialog(
                                                     FetchModelRow(
                                                         model = m,
                                                         metadata = modelMetadata[m],
-                                                        onAdd = { onAddModel(m) }
+                                                        onAdd = { onAddModel(m) },
+                                                        testing = m in testingModels,
+                                                        testResult = testResults[m],
+                                                        onTest = { onTestModel(m) }
                                                     )
                                                 }
                                             }
@@ -1156,8 +1153,6 @@ private fun FetchModelsDialog(
                     }
                 }
             }
-        }
-    }
 }
 
 internal fun defaultProviderBaseUrl(type: ProviderType): String = when (type) {

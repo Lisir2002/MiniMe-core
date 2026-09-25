@@ -382,7 +382,9 @@ class ModelMetadataService @Inject constructor(
         if (customConfig != null) {
             val finalInputTokens = customConfig.customInputTokens ?: afterOverride.inputTokens ?: afterOverride.contextTokens
             val finalOutputTokens = customConfig.customOutputTokens ?: afterOverride.outputTokens
-            val finalContextTokens = customConfig.customInputTokens ?: afterOverride.contextTokens
+            // contextTokens 保持模型原生总上下文窗口，不被用户自定义输入上限覆盖。
+            // 用户输入上限由 inputTokens 承载，上下文压缩阈值在 ContextCompactor 中取 min(contextTokens, inputTokens)。
+            val finalContextTokens = afterOverride.contextTokens
             return afterOverride.copy(
                 inputTokens = finalInputTokens,
                 outputTokens = finalOutputTokens,

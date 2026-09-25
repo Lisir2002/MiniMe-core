@@ -43,6 +43,7 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Output
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
@@ -659,12 +660,14 @@ private fun String.trimDecimal(): String =
 internal fun FetchModelRow(
     model: String,
     metadata: ModelMetadata?,
-    onAdd: () -> Unit
+    onAdd: () -> Unit,
+    testing: Boolean = false,
+    testResult: ModelTestResult? = null,
+    onTest: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onAdd() }
             .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -684,6 +687,33 @@ internal fun FetchModelRow(
             }
             Spacer(Modifier.height(4.dp))
             ModelMetadataTags(metadata = metadata, hasOverride = false)
+        }
+        // 测速按钮 + 结果
+        IconButton(
+            onClick = { if (!testing) onTest() },
+            enabled = !testing,
+            modifier = Modifier.size(32.dp)
+        ) {
+            if (testing) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(
+                    Icons.Rounded.Speed,
+                    contentDescription = "测速",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+        // 测速结果
+        testResult?.let { r ->
+            Text(
+                text = if (r.success) "${r.latencyMs}ms" else "失败",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (r.success) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                modifier = Modifier.width(40.dp)
+            )
+            Spacer(Modifier.width(Spacing.xs))
         }
         IconButton(onClick = onAdd, modifier = Modifier.size(32.dp)) {
             Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.common_add), tint = MaterialTheme.colorScheme.onSurfaceVariant)
