@@ -331,9 +331,9 @@ jobs:
         id: gh_release
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          # 标题基础格式「{APP_NAME} v{版本号}」，发版后必须手动补充「— 更新内容概括」（≤20字，用户语言）
+          # 标题基础格式「{APP_NAME} {版本号}」，APK_BASE_VER 自带 v 前缀（如 v0.0.0.18），发版后必须手动补充「— 更新内容概括」
           # APP_NAME 来自 branding.gradle.kts（当前为 MiniMe-core），禁止在此处硬编码品牌名
-          name: ${{ env.APP_NAME }} v${{ env.APK_BASE_VER }}
+          name: ${{ env.APP_NAME }} ${{ env.APK_BASE_VER }}
           body: ${{ steps.changelog.outputs.body }}
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           fail_on_unmatched_files: true
