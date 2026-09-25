@@ -21,6 +21,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.mini.me_core.core.theme.components.AppTextField
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -174,14 +175,14 @@ fun SkillEditScreen(
                 FormField(stringResource(R.string.skill_name), name) { viewModel.name.value = it }
                 FormField(stringResource(R.string.skill_description), description, minLines = 2) { viewModel.description.value = it }
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = version,
                         onValueChange = { viewModel.version.value = it },
                         label = { Text(stringResource(R.string.skill_version)) },
                         singleLine = true,
                         modifier = Modifier.width(120.dp)
                     )
-                    OutlinedTextField(
+                    AppTextField(
                         value = author,
                         onValueChange = { viewModel.author.value = it },
                         label = { Text(stringResource(R.string.skill_edit_author)) },
@@ -305,7 +306,7 @@ fun SkillEditScreen(
             onDismissRequest = { showAddFile = false },
             title = { Text(stringResource(R.string.skill_edit_new_file)) },
             text = {
-                OutlinedTextField(
+                AppTextField(
                     value = newFileName,
                     onValueChange = { newFileName = it },
                     label = { Text(stringResource(R.string.skill_edit_file_name)) },
@@ -343,7 +344,7 @@ private fun SectionTitle(title: String) {
 
 @Composable
 private fun FormField(label: String, value: String, minLines: Int = 1, onValueChange: (String) -> Unit) {
-    OutlinedTextField(
+    AppTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },

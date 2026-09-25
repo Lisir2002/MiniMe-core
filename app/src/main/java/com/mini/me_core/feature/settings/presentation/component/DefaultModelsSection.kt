@@ -38,7 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import com.mini.me_core.core.theme.components.AppBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import com.mini.me_core.core.theme.components.AppTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -397,7 +397,7 @@ private fun ModelSelectionSheet(
                         }
                     }
 
-                    OutlinedTextField(
+                    AppTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         placeholder = { Text(stringResource(R.string.provider_filter_models_hint)) },

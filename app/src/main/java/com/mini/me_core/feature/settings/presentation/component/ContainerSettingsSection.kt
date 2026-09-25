@@ -35,7 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import com.mini.me_core.core.theme.components.AppBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import com.mini.me_core.core.theme.components.AppTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -368,7 +368,7 @@ private fun ProfileEditSheet(
                 ) { Text(stringResource(R.string.container_remote_ssh)) }
             }
 
-            OutlinedTextField(
+            AppTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text(stringResource(R.string.common_name)) },
@@ -377,21 +377,21 @@ private fun ProfileEditSheet(
             )
 
             if (mode == ExecutionMode.LOCAL_PROOT) {
-                OutlinedTextField(
+                AppTextField(
                     value = shellPath,
                     onValueChange = { shellPath = it },
                     label = { Text(stringResource(R.string.container_shell_path)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
+                AppTextField(
                     value = bindingsText,
                     onValueChange = { bindingsText = it },
                     label = { Text(stringResource(R.string.container_extra_bindings)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
+                AppTextField(
                     value = argsText,
                     onValueChange = { argsText = it },
                     label = { Text(stringResource(R.string.container_extra_proot_args)) },
@@ -422,7 +422,7 @@ private fun ProfileEditSheet(
                     ) {
                         val selectedName = sshConnections.firstOrNull { it.id == selectedConnId }?.name
                             ?: stringResource(R.string.container_select_ssh_channel)
-                        OutlinedTextField(
+                        AppTextField(
                             value = selectedName,
                             onValueChange = {},
                             readOnly = true,
@@ -450,7 +450,7 @@ private fun ProfileEditSheet(
                             }
                         }
                     }
-                    OutlinedTextField(
+                    AppTextField(
                         value = remotePath,
                         onValueChange = { remotePath = it },
                         label = { Text(stringResource(R.string.container_remote_workspace_path)) },

@@ -30,7 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.mini.me_core.core.theme.components.AppTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -247,7 +247,7 @@ internal fun McpServerSection(
                     )
                     Spacer(Modifier.height(Spacing.sm))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
+                        AppTextField(
                             value = portText,
                             onValueChange = { input ->
                                 portText = input.filter { it.isDigit() }.take(5)

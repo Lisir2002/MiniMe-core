@@ -16,7 +16,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.mini.me_core.core.theme.components.AppTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -99,7 +99,7 @@ fun SecurityEmergencyChannelSection(
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(Modifier.height(Spacing.sm))
-                    OutlinedTextField(
+                    AppTextField(
                         value = host,
                         onValueChange = { host = it; localError = null },
                         label = { Text(stringResource(R.string.ui____65227369)) },
@@ -108,7 +108,7 @@ fun SecurityEmergencyChannelSection(
                     )
                     Spacer(Modifier.height(Spacing.xs))
                     Row {
-                        OutlinedTextField(
+                        AppTextField(
                             value = portText,
                             onValueChange = { portText = it; localError = null },
                             label = { Text(stringResource(R.string.ui____c76cfefe)) },
@@ -116,7 +116,7 @@ fun SecurityEmergencyChannelSection(
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(Modifier.width(Spacing.sm))
-                        OutlinedTextField(
+                        AppTextField(
                             value = username,
                             onValueChange = { username = it; localError = null },
                             label = { Text(stringResource(R.string.ui_____819767ad)) },
@@ -125,7 +125,7 @@ fun SecurityEmergencyChannelSection(
                         )
                     }
                     Spacer(Modifier.height(Spacing.xs))
-                    OutlinedTextField(
+                    AppTextField(
                         value = password,
                         onValueChange = { password = it; localError = null },
                         label = { Text(stringResource(R.string.ui____a8105204)) },

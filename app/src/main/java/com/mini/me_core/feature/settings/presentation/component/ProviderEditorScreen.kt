@@ -54,6 +54,7 @@ import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import com.mini.me_core.core.theme.components.AppBottomSheet
+import com.mini.me_core.core.theme.components.AppTextField
 import com.mini.me_core.core.theme.components.AppDialog
 import com.mini.me_core.core.theme.components.AppDialogType
 import androidx.compose.material3.AssistChip
@@ -387,7 +388,7 @@ fun ProviderEditorScreen(
                         modifier = Modifier.padding(top = Spacing.xs)
                     )
                     HorizontalDivider()
-                    OutlinedTextField(
+                    AppTextField(
                         value = name,
                         onValueChange = { name = it },
                         label = { Text(stringResource(R.string.common_name)) },
@@ -460,7 +461,7 @@ fun ProviderEditorScreen(
                     )
                     HorizontalDivider()
                     val baseUrlError = baseUrl.isNotBlank() && !baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")
-                    OutlinedTextField(
+                    AppTextField(
                         value = apiKey,
                         onValueChange = { apiKey = it },
                         label = { Text("API Key") },
@@ -487,7 +488,7 @@ fun ProviderEditorScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    OutlinedTextField(
+                    AppTextField(
                         value = baseUrl,
                         onValueChange = { baseUrl = it },
                         label = { Text("Base URL") },
@@ -559,7 +560,7 @@ fun ProviderEditorScreen(
                     }
                     if (useCustomApiPath && !useFullUrl) {
                         Spacer(Modifier.height(Spacing.xs))
-                        OutlinedTextField(
+                        AppTextField(
                             value = apiPath,
                             onValueChange = {
                                 apiPath = it
@@ -717,7 +718,7 @@ fun ProviderEditorScreen(
                             )
 
                             // ── Max Tokens ──
-                            OutlinedTextField(
+                            AppTextField(
                                 value = maxTokensText,
                                 onValueChange = { maxTokensText = it.filter { c -> c.isDigit() } },
                                 label = { Text("Max Tokens（最大输出）") },
@@ -728,7 +729,7 @@ fun ProviderEditorScreen(
                             )
 
                             // ── 请求超时 ──
-                            OutlinedTextField(
+                            AppTextField(
                                 value = requestTimeoutText,
                                 onValueChange = { requestTimeoutText = it.filter { c -> c.isDigit() } },
                                 label = { Text("请求超时（秒）") },
@@ -739,7 +740,7 @@ fun ProviderEditorScreen(
                             )
 
                             // ── 重试次数 ──
-                            OutlinedTextField(
+                            AppTextField(
                                 value = retryCountText,
                                 onValueChange = { retryCountText = it.filter { c -> c.isDigit() } },
                                 label = { Text("重试次数") },
@@ -971,7 +972,7 @@ private fun AddModelSheet(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            OutlinedTextField(
+            AppTextField(
                 value = modelName,
                 onValueChange = { modelName = it },
                 label = { Text(stringResource(R.string.provider_model_name)) },
@@ -1063,7 +1064,7 @@ private fun FetchModelsDialog(
                         .padding(bottom = Spacing.md),
                     verticalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         placeholder = { Text(stringResource(R.string.provider_filter_models_hint)) },
@@ -1228,7 +1229,7 @@ private fun CompatibilityPolicyDropdown(
         expanded = expanded,
         onExpandedChange = { expanded = it }
     ) {
-        OutlinedTextField(
+        AppTextField(
             value = policyDisplayName(currentPolicy),
             onValueChange = { },
             readOnly = true,
@@ -1276,7 +1277,7 @@ private fun ViewImageGuardDropdown(
         expanded = expanded,
         onExpandedChange = { expanded = it }
     ) {
-        OutlinedTextField(
+        AppTextField(
             value = viewImageGuardDisplayName(current),
             onValueChange = { },
             readOnly = true,
@@ -1325,7 +1326,7 @@ private fun FallbackProviderDropdown(
         expanded = expanded,
         onExpandedChange = { expanded = it }
     ) {
-        OutlinedTextField(
+        AppTextField(
             value = selectedName,
             onValueChange = { },
             readOnly = true,

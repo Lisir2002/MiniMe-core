@@ -31,7 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.mini.me_core.core.theme.components.AppTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -524,13 +524,13 @@ private fun ImportSourceSheet(
                     ImportOption(stringResource(R.string.skill_import_url)) { mode = ImportMode.URL }
                 }
                 ImportMode.PASTE -> Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = pasteName,
                         onValueChange = { pasteName = it },
                         label = { Text(stringResource(R.string.skill_paste_name)) },
                         singleLine = true
                     )
-                    OutlinedTextField(
+                    AppTextField(
                         value = pasteContent,
                         onValueChange = { pasteContent = it },
                         label = { Text(stringResource(R.string.skill_paste_content)) },
@@ -546,7 +546,7 @@ private fun ImportSourceSheet(
                     ) { Text(stringResource(R.string.skill_confirm)) }
                 }
                 ImportMode.URL -> Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = urlText,
                         onValueChange = { urlText = it },
                         label = { Text(stringResource(R.string.skill_url_hint)) },

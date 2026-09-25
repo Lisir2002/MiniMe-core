@@ -27,7 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import com.mini.me_core.core.theme.components.AppBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.mini.me_core.core.theme.components.AppTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -357,7 +357,7 @@ private fun CustomProviderContent(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                OutlinedTextField(
+                AppTextField(
                     value = name,
                     onValueChange = onNameChange,
                     label = { Text(stringResource(R.string.common_name)) },
@@ -373,7 +373,7 @@ private fun CustomProviderContent(
                         )
                     }
                 }
-                OutlinedTextField(
+                AppTextField(
                     value = apiKey,
                     onValueChange = onApiKeyChange,
                     label = { Text("API Key") },
@@ -390,7 +390,7 @@ private fun CustomProviderContent(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                OutlinedTextField(
+                AppTextField(
                     value = baseUrl,
                     onValueChange = onBaseUrlChange,
                     label = { Text("Base URL") },
@@ -452,7 +452,7 @@ private fun CustomProviderContent(
                     )
                 }
                 if (useCustomApiPath) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = apiPath,
                         onValueChange = onApiPathChange,
                         label = { Text("API Path") },
@@ -645,7 +645,7 @@ private fun CustomModelFetchList(
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
+            AppTextField(
                 value = newModelName,
                 onValueChange = { newModelName = it },
                 label = { Text(stringResource(R.string.provider_model_name)) },

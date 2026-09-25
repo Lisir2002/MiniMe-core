@@ -18,7 +18,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.mini.me_core.core.theme.components.AppTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -90,7 +90,7 @@ fun LogSearchTopBar(
                 IconButton(onClick = { onToggleSearch(false) }, modifier = Modifier.size(40.dp)) {
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = colors.textSecondary)
                 }
-                OutlinedTextField(
+                AppTextField(
                     value = searchQuery,
                     onValueChange = onSearchQuery,
                     modifier = Modifier.weight(1f),

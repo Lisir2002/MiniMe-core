@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -49,23 +50,29 @@ fun AppTextField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    label: String? = null,
-    placeholder: String? = null,
-    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    label: @Composable (() -> Unit)? = null,
+    placeholder: @Composable (() -> Unit)? = null,
+    leadingIcon: @Composable (() -> Unit)? = null,
     trailingIcon: @Composable (() -> Unit)? = null,
     isPassword: Boolean = false,
+    isError: Boolean = false,
     errorMessage: String? = null,
     singleLine: Boolean = true,
+    minLines: Int = 1,
     enabled: Boolean = true,
+    readOnly: Boolean = false,
+    shape: Shape? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
+    supportingText: @Composable (() -> Unit)? = null,
 ) {
     val colors = LocalAppTheme.current.colors
     var passwordVisible by remember { mutableStateOf(false) }
 
-    val visualTransformation = when {
+    val effectiveVisualTransformation = when {
         isPassword && !passwordVisible -> PasswordVisualTransformation()
-        else -> VisualTransformation.None
+        else -> visualTransformation
     }
 
     val effectiveTrailing: (@Composable () -> Unit)? = when {
@@ -88,25 +95,19 @@ fun AppTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
-        label = label?.let { { Text(it) } },
-        placeholder = placeholder?.let { { Text(it) } },
-        leadingIcon = leadingIcon?.let { icon ->
-            {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = colors.textSecondary,
-                )
-            }
-        },
+        label = label,
+        placeholder = placeholder,
+        leadingIcon = leadingIcon,
         trailingIcon = effectiveTrailing,
-        isError = errorMessage != null,
-        visualTransformation = visualTransformation,
+        isError = isError || errorMessage != null,
+        visualTransformation = effectiveVisualTransformation,
         singleLine = singleLine,
+        minLines = minLines,
         enabled = enabled,
+        readOnly = readOnly,
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(LocalCornerRadius.current.md),
+        shape = shape ?: androidx.compose.foundation.shape.RoundedCornerShape(LocalCornerRadius.current.md),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = colors.brandPrimary,
             unfocusedBorderColor = colors.borderDefault,
@@ -116,7 +117,7 @@ fun AppTextField(
             unfocusedContainerColor = colors.surfaceCard,
             errorBorderColor = colors.error,
         ),
-        supportingText = errorMessage?.let { { Text(it, color = colors.error) } },
+        supportingText = supportingText ?: errorMessage?.let { { Text(it, color = colors.error) } },
     )
 }
 
@@ -136,13 +137,13 @@ private fun AppTextFieldPreview() {
             AppTextField(
                 value = "",
                 onValueChange = {},
-                label = "API Key",
-                placeholder = "请输入 API Key",
+                label = { Text("API Key") },
+                placeholder = { Text("请输入 API Key") },
             )
             AppTextField(
                 value = "secret123",
                 onValueChange = {},
-                label = "密码",
+                label = { Text("密码") },
                 isPassword = true,
             )
         }

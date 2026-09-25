@@ -29,7 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import com.mini.me_core.core.theme.components.AppBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import com.mini.me_core.core.theme.components.AppTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -263,7 +263,7 @@ fun McpServerEditDialog(
                                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                OutlinedTextField(
+                                AppTextField(
                                     value = name,
                                     onValueChange = { name = it },
                                     placeholder = { Text(stringResource(R.string.mcp_name_hint)) },

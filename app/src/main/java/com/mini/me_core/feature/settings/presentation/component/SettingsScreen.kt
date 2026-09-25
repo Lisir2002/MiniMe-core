@@ -38,7 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.mini.me_core.core.theme.components.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
@@ -551,7 +551,7 @@ fun SettingsScreen(
             title = { Text(stringResource(R.string.norm_flow_import_config)) },
             text = {
                 Column {
-                    androidx.compose.material3.OutlinedTextField(
+                    AppTextField(
                         value = importText,
                         onValueChange = { importText = it },
                         label = { Text(stringResource(R.string.norm_flow_import_hint)) },

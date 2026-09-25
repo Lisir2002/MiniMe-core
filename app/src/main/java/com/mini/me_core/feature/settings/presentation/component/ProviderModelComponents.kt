@@ -64,7 +64,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import com.mini.me_core.core.theme.components.AppBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import com.mini.me_core.core.theme.components.AppTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -967,7 +967,7 @@ internal fun ModelSettingsSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
-                OutlinedTextField(
+                AppTextField(
                     value = draftInputTokens,
                     onValueChange = { newValue ->
                         // 只允许输入正整数
@@ -992,7 +992,7 @@ internal fun ModelSettingsSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
-                OutlinedTextField(
+                AppTextField(
                     value = draftOutputTokens,
                     onValueChange = { newValue ->
                         draftOutputTokens = newValue.filter { it.isDigit() }
@@ -1100,7 +1100,7 @@ internal fun ModelSettingsSheet(
             val draftMaxTokensInt = draftMaxTokens?.toIntOrNull()
             val maxTokensExceedsLimit = draftMaxTokensInt != null && modelOutputLimit != null && draftMaxTokensInt > modelOutputLimit
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
+                AppTextField(
                     value = draftMaxTokens ?: "",
                     onValueChange = { newValue ->
                         draftMaxTokens = newValue.filter { it.isDigit() }.ifEmpty { null }
