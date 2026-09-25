@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.browser.domain
 
 import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +17,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class AdBlocker @Inject constructor(
-    private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     private val prefs = context.getSharedPreferences("browser_privacy_prefs", Context.MODE_PRIVATE)
 
