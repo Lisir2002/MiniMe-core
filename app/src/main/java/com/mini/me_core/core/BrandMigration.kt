@@ -43,6 +43,13 @@ object BrandMigration {
      */
     fun migrateIfNeeded(context: Context) {
         val appDir = context.filesDir.parentFile ?: return
+
+        // 快速路径：如果所有新数据库和新容器目录都已存在，说明迁移早已完成，直接跳过
+        if (isMigrationAlreadyComplete(context, appDir)) {
+            FileLogger.v(TAG, "品牌迁移已完成，跳过检查")
+            return
+        }
+
         FileLogger.i(TAG, "=== 品牌迁移检查（DeepCore-Code → MiniMe-core）===")
 
         // 1. 数据库文件迁移（6 个库）
@@ -52,6 +59,20 @@ object BrandMigration {
         migrateContainerDir(context)
 
         FileLogger.i(TAG, "=== 品牌迁移检查完成 ===")
+    }
+
+    /**
+     * 快速判断迁移是否已完成：所有新数据库文件 + 新容器目录都存在。
+     * 避免每次启动都输出一堆"已存在，跳过"的噪音日志。
+     */
+    private fun isMigrationAlreadyComplete(context: Context, appDir: File): Boolean {
+        val dbDir = File(appDir, "databases")
+        if (!dbDir.isDirectory) return false
+        for (lib in LibName.entries) {
+            if (!File(dbDir, lib.fileName).exists()) return false
+        }
+        val newContainerDir = File(context.filesDir, NEW_CONTAINER_DIR)
+        return newContainerDir.exists()
     }
 
     // ────────────────────────────────────────────────
@@ -71,11 +92,11 @@ object BrandMigration {
             val legacyFile = File(dbDir, lib.legacyFileName())
 
             if (newFile.exists()) {
-                FileLogger.d(TAG, "数据库 ${lib.fileName} 已存在，跳过")
+                FileLogger.v(TAG, "数据库 ${lib.fileName} 已存在，跳过")
                 continue
             }
             if (!legacyFile.exists()) {
-                FileLogger.d(TAG, "旧数据库 ${legacyFile.name} 不存在，跳过")
+                FileLogger.v(TAG, "旧数据库 ${legacyFile.name} 不存在，跳过")
                 continue
             }
 
@@ -139,11 +160,11 @@ object BrandMigration {
         val legacyDir = File(context.filesDir, LEGACY_CONTAINER_DIR)
 
         if (newDir.exists()) {
-            FileLogger.d(TAG, "容器目录 $NEW_CONTAINER_DIR 已存在，跳过")
+            FileLogger.v(TAG, "容器目录 $NEW_CONTAINER_DIR 已存在，跳过")
             return
         }
         if (!legacyDir.exists()) {
-            FileLogger.d(TAG, "旧容器目录 $LEGACY_CONTAINER_DIR 不存在，跳过")
+            FileLogger.v(TAG, "旧容器目录 $LEGACY_CONTAINER_DIR 不存在，跳过")
             return
         }
 

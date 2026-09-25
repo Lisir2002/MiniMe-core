@@ -196,25 +196,25 @@ class NormFlowSettingsRepository @Inject constructor(
     fun exportConfig(): String {
         val sb = StringBuilder("{")
         val entries = mutableListOf<String>()
-        kv.getString(NS, NORM_FLOW_ENABLED_KEY)?.let { entries.add("\"norm_flow_enabled\":$it") }
-        kv.getString(NS, STEP_INJECT_ENABLED_KEY)?.let { entries.add("\"step_inject_enabled\":$it") }
-        kv.getString(NS, TOOL_GUARD_ENABLED_KEY)?.let { entries.add("\"tool_guard_enabled\":$it") }
-        kv.getString(NS, STEP_INJECT_GOAL_ENABLED_KEY)?.let { entries.add("\"step_inject_goal_enabled\":$it") }
-        kv.getString(NS, STEP_INJECT_STATIC_RULES_ENABLED_KEY)?.let { entries.add("\"step_inject_static_rules_enabled\":$it") }
-        kv.getString(NS, SOP_SUMMARY_ENABLED_KEY)?.let { entries.add("\"sop_summary_enabled\":$it") }
-        kv.getString(NS, STEP_INJECT_LAYERED_RULES_ENABLED_KEY)?.let { entries.add("\"step_inject_layered_rules_enabled\":$it") }
-        kv.getString(NS, STEP_INJECT_PROJECT_AGENTS_ENABLED_KEY)?.let { entries.add("\"step_inject_project_agents_enabled\":$it") }
-        kv.getString(NS, FILE_OBSERVATION_ENABLED_KEY)?.let { entries.add("\"file_observation_enabled\":$it") }
-        kv.getString(NS, GUARD_DANGEROUS_COMMAND_ENABLED_KEY)?.let { entries.add("\"guard_dangerous_command_enabled\":$it") }
-        kv.getString(NS, GUARD_LARGE_FILE_ENABLED_KEY)?.let { entries.add("\"guard_large_file_enabled\":$it") }
-        kv.getString(NS, GUARD_PATH_BOUNDARY_ENABLED_KEY)?.let { entries.add("\"guard_path_boundary_enabled\":$it") }
-        kv.getString(NS, REASONING_BUDGET_ENABLED_KEY)?.let { entries.add("\"reasoning_budget_enabled\":$it") }
+        kv.getBool(NS, NORM_FLOW_ENABLED_KEY)?.let { entries.add("\"norm_flow_enabled\":$it") }
+        kv.getBool(NS, STEP_INJECT_ENABLED_KEY)?.let { entries.add("\"step_inject_enabled\":$it") }
+        kv.getBool(NS, TOOL_GUARD_ENABLED_KEY)?.let { entries.add("\"tool_guard_enabled\":$it") }
+        kv.getBool(NS, STEP_INJECT_GOAL_ENABLED_KEY)?.let { entries.add("\"step_inject_goal_enabled\":$it") }
+        kv.getBool(NS, STEP_INJECT_STATIC_RULES_ENABLED_KEY)?.let { entries.add("\"step_inject_static_rules_enabled\":$it") }
+        kv.getBool(NS, SOP_SUMMARY_ENABLED_KEY)?.let { entries.add("\"sop_summary_enabled\":$it") }
+        kv.getBool(NS, STEP_INJECT_LAYERED_RULES_ENABLED_KEY)?.let { entries.add("\"step_inject_layered_rules_enabled\":$it") }
+        kv.getBool(NS, STEP_INJECT_PROJECT_AGENTS_ENABLED_KEY)?.let { entries.add("\"step_inject_project_agents_enabled\":$it") }
+        kv.getBool(NS, FILE_OBSERVATION_ENABLED_KEY)?.let { entries.add("\"file_observation_enabled\":$it") }
+        kv.getBool(NS, GUARD_DANGEROUS_COMMAND_ENABLED_KEY)?.let { entries.add("\"guard_dangerous_command_enabled\":$it") }
+        kv.getBool(NS, GUARD_LARGE_FILE_ENABLED_KEY)?.let { entries.add("\"guard_large_file_enabled\":$it") }
+        kv.getBool(NS, GUARD_PATH_BOUNDARY_ENABLED_KEY)?.let { entries.add("\"guard_path_boundary_enabled\":$it") }
+        kv.getBool(NS, REASONING_BUDGET_ENABLED_KEY)?.let { entries.add("\"reasoning_budget_enabled\":$it") }
         kv.getString(NS, REASONING_BUDGET_LEVEL_KEY)?.let { entries.add("\"reasoning_budget_level\":\"$it\"") }
-        kv.getString(NS, USAGE_CARD_ENABLED_KEY)?.let { entries.add("\"usage_card_enabled\":$it") }
+        kv.getBool(NS, USAGE_CARD_ENABLED_KEY)?.let { entries.add("\"usage_card_enabled\":$it") }
         kv.getString(NS, USAGE_CARD_ITEMS_KEY)?.let { entries.add("\"usage_card_items\":\"$it\"") }
-        kv.getString(NS, IDLE_CONVERGE_ENABLED_KEY)?.let { entries.add("\"idle_converge_enabled\":$it") }
-        kv.getString(NS, IDLE_CONVERGE_ROUNDS_KEY)?.let { entries.add("\"idle_converge_rounds\":$it") }
-        kv.getString(NS, PLAYBOOK_AUTO_ENABLED_KEY)?.let { entries.add("\"playbook_auto_enabled\":$it") }
+        kv.getBool(NS, IDLE_CONVERGE_ENABLED_KEY)?.let { entries.add("\"idle_converge_enabled\":$it") }
+        kv.getInt(NS, IDLE_CONVERGE_ROUNDS_KEY)?.let { entries.add("\"idle_converge_rounds\":$it") }
+        kv.getBool(NS, PLAYBOOK_AUTO_ENABLED_KEY)?.let { entries.add("\"playbook_auto_enabled\":$it") }
         kv.getString(NS, ACTIVE_PRESET_KEY)?.let { entries.add("\"active_preset\":\"$it\"") }
         sb.append(entries.joinToString(","))
         sb.append("}")

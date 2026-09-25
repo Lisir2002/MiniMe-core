@@ -70,7 +70,7 @@ class SettingsSearchHistoryManager @Inject constructor(
     }
 
     private fun loadFromKv(): List<String> {
-        val raw = kv.getString(NAMESPACE, KEY_HISTORY)
+        val raw = kv.getJson(NAMESPACE, KEY_HISTORY)
         if (raw.isNullOrBlank()) return emptyList()
         return runCatching {
             @Suppress("USELESS_ELVIS")

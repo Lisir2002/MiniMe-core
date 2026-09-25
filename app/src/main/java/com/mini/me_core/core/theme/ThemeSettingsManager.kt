@@ -243,8 +243,17 @@ class ThemeSettingsManager @Inject constructor(
     }
 
     private fun loadFromKv(): ThemeSettings {
-        val raw = kv.getString(NS, KEY_SETTINGS)
+        val raw = kv.getJson(NS, KEY_SETTINGS)
         val parsed = ThemeSettings.fromJson(raw)
+        // 数据迁移：如果新格式不存在，从旧版 theme_mode 键迁移
+        if (raw.isNullOrBlank()) {
+            val legacyMode = kv.getString(LEGACY_NS, LEGACY_THEME_MODE_KEY)
+            if (!legacyMode.isNullOrBlank()) {
+                val migrated = ThemeSettings.DEFAULT.copy(mode = legacyMode)
+                Log.d(TAG, "Migrated theme settings from legacy: mode=$legacyMode")
+                return migrated
+            }
+        }
         Log.d(TAG, "Loaded theme settings: mode=${parsed.mode}, preset=${parsed.presetId}, " +
             "overrides=${parsed.customOverrides.size}, bgImage=${parsed.backgroundImage != null}")
         return parsed

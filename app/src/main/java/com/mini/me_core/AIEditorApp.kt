@@ -8,7 +8,6 @@ import android.content.ComponentCallbacks2
 import android.content.SharedPreferences
 import android.os.Build
 import app.cash.sqldelight.db.QueryResult
-import com.mini.me_core.core.BrandMigration
 import com.mini.me_core.core.util.AILogger
 import com.mini.me_core.core.util.FileLogger
 import net.schmizz.sshj.common.SecurityUtils
@@ -173,80 +172,45 @@ class AIEditorApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // ============== 品牌迁移：DeepCore-Code → MiniMe-core ==============
-        // 必须在任何数据库连接池 / 容器目录 / KeyStore 访问之前执行，
-        // 确保旧用户的数据路径（数据库文件 / 容器持久化目录）先被迁移到新品牌名下。
-        BrandMigration.migrateIfNeeded(this)
+        FileLogger.i(TAG, "=== 应用启动 ===")
 
-        // ============== 数据库加密迁移崩溃恢复（P1）==============
-        // 必须在任何数据库访问之前调用。扫描 6 库的迁移状态，对 PRE_SNAPSHOT/MIGRATING/
-        // VALIDATING/REPLACING 等非稳定状态执行回滚（删除临时文件、回到 PLAIN/ENCRYPTED）。
-        // 操作仅限文件系统 + SharedPreferences，不打开数据库，主线程 < 100ms（设计文档 §7）。
-        // P1 阶段默认所有库为 PLAIN，此调用为幂等空操作（仅清理可能残留的临时文件）。
-        FileLogger.i(TAG, "启动：数据库加密迁移崩溃恢复检查")
+        // ── 阶段1：数据层初始化（同步，必须先于任何 UI 查询）──
+        // 数据库加密迁移崩溃恢复：扫描 6 库迁移状态，回滚非稳定状态。
+        // 正常情况下为幂等空操作，仅清理可能残留的临时文件。
         crashRecovery.recoverAll()
-        FileLogger.i(TAG, "启动：数据库加密迁移崩溃恢复检查完成")
+        FileLogger.i(TAG, "数据层：崩溃恢复检查完成")
 
         registerBouncyCastle()
         createNotificationChannels()
-        // ============== rc5 关键修复：启动无条件预热 AGENT 库，铁定先于任何 UI 查询 ==============
-        // 此前 AGENT 库的 ensureSchema + SchemaSelfHealer 依赖 ViewModel / DataRegistry 的「懒加载触发」，
-        // 理论上存在「首个 UI 数据查询先于自愈」的竞态窗口，表现为启动后一打开会话页就
-        // no such column: agent_message.id。
-        // 这里在 Application 层**同步、无条件**触发 ConnectionPool.onOpened——其内部对 AGENT 库
-        // 先跑 ensureSchema，再跑 SchemaSelfHealer 幂等自愈（缺列即无损重建）。确保自愈铁定先于
-        // 任何页面/查询完成。正常库只是两次 PRAGMA 幂等检查（毫秒级），缺失才重建。
-        // 若自愈仍异常，让其向上冒泡 → 由 installCrashHandler 落**语义明确**的崩溃日志
-        // （自愈自定义错误），而非毫无信息的 "no such column"，便于继续定位。
-        FileLogger.i(TAG, "启动：无条件预热 AGENT 数据层（触发结构自愈）")
+
+        // AGENT 库预热：同步触发 ensureSchema + 结构自愈，确保先于任何 UI 查询。
+        // 正常库只是两次 PRAGMA 幂等检查（毫秒级），缺失才重建。
         val agentDriver = connectionPool.driver(LibName.AGENT)
         agentPreheatCompleted.set(true)
-        FileLogger.i(TAG, "启动预热 AGENT 数据层完成（agent_message / agent_session 结构已就绪）")
 
-        // ── rc7 诊断：在同一 driver 上立刻做一次真实查询 ──
-        // 如果这次就报 no such column，说明 schema.create 本身有问题（而不是查询路径绕过）。
+        // 启动期冒烟测试：直接调用 SQLDelight 生成的查询，与线上崩溃路径 100% 同构。
+        // 任何 SQL 编译/列绑定失败都会在启动阶段就地暴露，而不是等用户进会话页才炸。
+        // 正常通过时仅输出 Verbose，失败时输出 Error。
         runCatching {
-            agentDriver.executeQuery(
-                null,
-                "PRAGMA table_info(agent_message)",
-                { cursor ->
-                    val cols = mutableListOf<String>()
-                    while (cursor.next().value) {
-                        val name: String? = cursor.getString(1)
-                        if (name != null) cols.add(name)
-                    }
-                    FileLogger.i(TAG, "【rc8 诊断】agent_message 真实列: ${cols.joinToString()}")
-                    QueryResult.Unit
-                },
-                0,
-                null,
-            ).value
-            // 冒烟测试：直接调用 SQLDelight **生成的那条查询**，而不是手写一段「看起来像」的 SQL。
-            //
-            // rc8 事故教训：此前这里手写 "SELECT agent_message.id FROM agent_message LIMIT 1"，
-            // 其形态（FROM 真实表）与真实生成 SQL（FROM 匿名嵌套子查询）**不同**——
-            // 手写版编译通过并打出「✅」，业务侧却照崩，诊断给出假阳性绿灯，
-            // 直接误导 rc1~rc7 把 7 轮精力投在「表结构缺列」的错误方向上。
-            //
-            // 改为直接构造 AgentDb 调 agentQueries.selectMessagesBySessionPaged：
-            // 与线上崩溃路径 100% 同构，且随 .sq 变更自动同步，永不漂移。
-            // 任何「生成的 SQL 编译不过 / 列绑定失败」都会在启动阶段就地暴露，
-            // 而不是等用户在主线程收集 Flow 时才炸。
+            agentDriver.executeQuery(null, "PRAGMA table_info(agent_message)", { cursor ->
+                val cols = mutableListOf<String>()
+                while (cursor.next().value) { cursor.getString(1)?.let { cols.add(it) } }
+                FileLogger.v(TAG, "AGENT 表结构: ${cols.joinToString()}")
+                QueryResult.Unit
+            }, 0, null).value
             AgentDb(agentDriver).agentQueries
                 .selectMessagesBySessionPaged("__startup_smoke__", 1L)
                 .executeAsList()
-            FileLogger.i(TAG, "【rc9 冒烟】selectMessagesBySessionPaged 启动期执行成功 ✅")
+            FileLogger.v(TAG, "AGENT 数据层冒烟测试通过")
         }.onFailure { e ->
-            // 冒烟失败说明生成的 SQL 本身就不可编译/绑定——不要放行到 UI，
-            // 否则就是 rc8 那种「启动灯全绿、一进会话页就崩」。
-            FileLogger.e(TAG, "【rc9 冒烟】selectMessagesBySessionPaged 启动期执行失败（生成 SQL 有问题，非表结构问题）", e)
+            FileLogger.e(TAG, "AGENT 数据层冒烟测试失败（生成 SQL 有问题，非表结构问题）", e)
         }
-        // 数据层重构：前 DataStore（settings_prefs / workspace_prefs / terminal_prefs / proxy_prefs /
-        // mcp_server_prefs / app_run_meta / ftp_server_prefs）全部迁移到 SQLDelight InfraDb.kv_store，
-        // 启动期不再需要 DataStore 收敛搬迁器，首次打开 SQLite 自动走 KVStore observe。
-        // 主线程启动凭据请求监听（FileObserver 必须主线程创建与 startWatching），
-        // 监听容器内 credential helper 写来的 cred-req-* → 全局弹窗回填 → 回喂 git 续跑。
+        FileLogger.i(TAG, "数据层：AGENT 库预热完成")
+
+        // ── 阶段2：核心服务启动（同步）──
         credentialRequestBridge.start()
+        mcpManager.start()
+        FileLogger.i(TAG, "核心服务：凭据桥接 + MCP 已启动")
         // 启动即把最新的内置指南手册提取到私有配置目录
         appScope.launch {
             ContainerInstaller.extractDocs(this@AIEditorApp)
@@ -361,9 +325,6 @@ class AIEditorApp : Application() {
                 last = enabled
             }
         }
-        // 连接已配置的 MCP server，把其工具注册进 ToolRegistry（内部自有 scope，失败不影响启动）。
-        mcpManager.start()
-
         // 数据保全（D4/D5/D8b）：启动即跑数据完整性哨兵（区分全新安装/正常升级/数据丢失/包名被改），
         // 判定为「正常升级」时自动双保险备份（本机私有 + 外部公共目录）；判定结果发布给
         // MainActivity，数据疑似丢失/包名变更时弹启动级全局告警（用户第一眼就能看到，不再静默）。

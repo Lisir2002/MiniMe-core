@@ -46,6 +46,7 @@ class KVStore(private val db: InfraDb) {
     fun getString(namespace: String, key: String): String? = get(namespace, key)?.stringVal
     fun getInt(namespace: String, key: String): Long? = get(namespace, key)?.intVal
     fun getBool(namespace: String, key: String): Boolean? = get(namespace, key)?.boolVal?.let { it != 0L }
+    fun getJson(namespace: String, key: String): String? = get(namespace, key)?.jsonVal
 
     /** 响应式观察（替代 DataStore.data）。 */
     fun observe(namespace: String, key: String): Flow<KvEntry?> =
