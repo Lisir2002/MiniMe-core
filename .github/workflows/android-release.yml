@@ -303,6 +303,58 @@ jobs:
             echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
 
+      # 保留已更新的 Release 内容：重新打 tag 触发 CI 时，如果 Release 已存在且正文/标题已人工补充完整，
+      # 不用新草稿覆盖。只有 Release 不存在或内容仍为草稿占位符时才使用新生成的草稿。
+      - name: Preserve existing release content
+        id: preserve
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          cur_tag="${GITHUB_REF_NAME}"
+          delimiter="EOF_$(date +%s)"
+
+          # 查询现有 Release
+          existing=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${cur_tag}" || echo "")
+
+          final_body="${{ steps.changelog.outputs.body }}"
+          final_name="${APP_NAME} ${APK_BASE_VER}"
+
+          if echo "$existing" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('id') else 1)" 2>/dev/null; then
+            echo "现有 Release 存在，检查内容是否已人工更新"
+
+            # 提取现有正文和标题
+            existing_body=$(echo "$existing" | python3 -c "import json,sys; print(json.load(sys.stdin).get('body',''))")
+            existing_name=$(echo "$existing" | python3 -c "import json,sys; print(json.load(sys.stdin).get('name',''))")
+
+            # 正文不含占位符 → 保留现有正文
+            if ! echo "$existing_body" | grep -qE "请补充|请提炼|_（"; then
+              echo "现有正文已完整，保留不覆盖"
+              final_body="$existing_body"
+            else
+              echo "现有正文仍为草稿，使用新生成内容"
+            fi
+
+            # 标题包含「—」→ 已补充概括，保留现有标题
+            if echo "$existing_name" | grep -q "—"; then
+              echo "现有标题已补充概括，保留"
+              final_name="$existing_name"
+            fi
+          else
+            echo "Release 不存在，使用新生成内容"
+          fi
+
+          {
+            echo "body<<${delimiter}"
+            echo "$final_body"
+            echo "${delimiter}"
+            echo "name<<${delimiter}"
+            echo "$final_name"
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
+
       # 发版格式硬校验门禁（CI层）：检查草稿中的硬错误，阻止明显违规的 Release 创建。
       # 完整格式校验（占位符、条目字数等）由发版后 scripts/gitops/check-release-format.py 负责，
       # 因为 CI 生成的是草稿，简介和小标题仍需人工补充。
@@ -310,7 +362,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           set -e
-          body="${{ steps.changelog.outputs.body }}"
+          body="${{ steps.preserve.outputs.body }}"
           echo "--- 硬校验：emoji ---"
           if echo "$body" | grep -qP '[\x{1F300}-\x{1F9FF}]|[\x{2600}-\x{27BF}]'; then
             echo "::error::Release 正文包含 emoji，违反发版规范"
@@ -333,8 +385,8 @@ jobs:
           tag_name: ${{ steps.release.outputs.tag }}
           # 标题基础格式「{APP_NAME} {版本号}」，APK_BASE_VER 自带 v 前缀（如 v0.0.0.18），发版后必须手动补充「— 更新内容概括」
           # APP_NAME 来自 branding.gradle.kts（当前为 MiniMe-core），禁止在此处硬编码品牌名
-          name: ${{ env.APP_NAME }} ${{ env.APK_BASE_VER }}
-          body: ${{ steps.changelog.outputs.body }}
+          name: ${{ steps.preserve.outputs.name }}
+          body: ${{ steps.preserve.outputs.body }}
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           fail_on_unmatched_files: true
           generate_release_notes: false
