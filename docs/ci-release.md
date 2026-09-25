@@ -15,7 +15,7 @@
 1. **variables** → `Display release tag info` + `Verify versionCode monotonic`（versionCode 单调递增校验）+ `Determine release name`（手动触发用 `manual-<run_number>`）+ `Determine prerelease flag`（tag 含 `-rc/-dev/-beta/-alpha` 后缀自动标记 prerelease）
 2. **build** → `:app:testReleaseUnitTest`（发版质量门禁）→ `:app:assembleRelease` → 正式签名构建 APK 到 `app/build/outputs/apk/release/app-release.apk` → `Rename APK` 重命名为 `dist/MiniMe-<版本号>-<变体>.apk`（如 `MiniMe-v0.0.15-release.apk`，**双 ABI 通用包**，重命名同时做 ABI 校验：`lib/` 必须同时含 `arm64-v8a` 与 `x86_64`）
 3. **upload-mapping** → `Upload R8 mapping`（`actions/upload-artifact@v4`，artifact 名 `r8-mapping-<tag>`，90 天保留，`if-no-files-found: ignore` 不阻塞）
-4. **create-release** → `Generate release notes (user layer)` + `Create GitHub Release & Upload assets`（`softprops/action-gh-release@v2`，prerelease 取决于 tag 是否含预发布后缀；标题基础格式 `MiniMe <版本号>`，AI/维护者发版后补充「— 更新内容概括」）
+4. **create-release** → `Generate release notes` + `Create GitHub Release & Upload assets`（`softprops/action-gh-release@v2`，prerelease 取决于 tag 是否含预发布后缀；标题基础格式 `MiniMe <版本号>`，AI/维护者发版后补充「— 更新内容概括」；正文遵循 AGENTS.md「发版说明格式」统一规约，条目为「**4-9字小标题**：20-40字说明」结构）
 5. **upload-apk** → 与 create-release 同 step 完成（`files: dist/MiniMe-*.apk` 挂到 Release Assets）
 6. **summary** → `Write download URLs to Run Summary`（写入 Tag / Prerelease / APK 文件名 / SHA256 / Release 页面 / mapping artifact 名到 `$GITHUB_STEP_SUMMARY`）
 

@@ -289,19 +289,19 @@ jobs:
           fi
 
       # GitHub 的 generate_release_notes 只列 merged PR，直接 push 的 commit 不会出现。
-      # 本仓库在 main 上直接 commit，不走 PR 流程，所以手动用 release-log.py 生成用户层 Release 正文。
-      # 发版规范见 AGENTS.md「发版规范（最高优先级）」——只保留用户层，CI 自动生成正文基础结构，
-      #   AI/维护者发版后需补充「更新内容概括」到 Release 标题，并核对写作铁律。
-      - name: Generate release notes (user layer)
+      # 本仓库在 main 上直接 commit，不走 PR 流程，所以手动用 release-log.py 生成 Release 正文草稿。
+      # 发版规范见 AGENTS.md「发版说明格式（硬性约束）」——统一格式，CHANGELOG/独立文档/Release正文三处一致。
+      #   AI/维护者发版后需补充「更新内容概括」到 Release 标题，并把条目润色为「**4-9字小标题**：20-40字说明」格式。
+      - name: Generate release notes
         id: changelog
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           cur_tag="${GITHUB_REF_NAME}"
           prev_tag=$(git tag --sort=-creatordate | grep -vE "^${cur_tag}$" | head -1)
           version="${cur_tag#v}"
-          # 多行输出用 EOF 分隔符；release-log.py 直接产出用户层 GitHub Release 正文草稿
+          # 多行输出用 EOF 分隔符；release-log.py 直接产出 Release 正文草稿
           delimiter="EOF_$(date +%s)"
-          # 多行输出：必须把 python 产出的用户层正文「整体重定向」进 GITHUB_OUTPUT，
+          # 多行输出：必须把 python 产出的正文「整体重定向」进 GITHUB_OUTPUT，
           #   不能分开 append（python 的 stdout 默认不会进文件，只进步骤日志）。
           {
             echo "body<<${delimiter}"
@@ -311,7 +311,6 @@ jobs:
               --version "$version" \
               --date "$(date +%Y-%m-%d)"
             echo ""
-            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${prev_tag}...${cur_tag}"
             echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
 

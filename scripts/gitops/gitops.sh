@@ -10,14 +10,14 @@
 #   hooks-status            本地 git hooks 启用状态
 #   release-check <version> 发版前体检 + RC 判定
 #   release-tag <version>   本地打 tag（推送交给外部 `git push origin <tag>`）
-#   changelog [prev-tag]    从 git log 自动生成开发者层版本日志草稿（Keep a Changelog 六类）
-#   release-log [--layer user|dev|ai] [--prev tag] [--cur head] [--version vX]
-#                           三层版本日志生成器：user=GitHub Release / dev=CHANGELOG / ai=AGENTS 结构化
+#   changelog [prev-tag]    从 git log 自动生成版本日志草稿（统一分类：新功能/改进/移除/修复/安全）
+#   release-log [--prev tag] [--cur head] [--version vX]
+#                           版本日志生成器：产出 GitHub Release 正文草稿，统一格式
 #
 # 经验来源：
 #   - 提交规范：.githooks/commit-msg
 #   - 发版流程：AGENTS.md「发版流程（RC 判定）」+ docs/ci-release.md
-#   - 版本日志：AGENTS.md「版本日志（发版必做 · 三层写法规约）」→ release-log.py
+#   - 版本日志：AGENTS.md「发版说明格式（硬性约束）」→ release-log.py
 #
 # 退出码：0=通过/OK；1=失败；2=参数错误。
 
@@ -292,36 +292,26 @@ cmd_release_tag() {
 
 cmd_changelog() {
   local prev_tag="${1:-}"
-  local layer="${2:-dev}"
-  if [[ "$layer" != "dev" ]]; then
-    echo "changelog 仅输出开发者层（dev）；如需 user/ai 层请用：gitops release-log --layer user|ai" >&2
-    exit 2
-  fi
-  cmd_release_log --layer dev --prev "$prev_tag"
+  cmd_release_log --prev "$prev_tag"
 }
 
-# 三层版本日志生成器（对接 release-log.py，见 AGENTS.md「版本日志（三层写法规约）」）
+# 版本日志生成器（对接 release-log.py，见 AGENTS.md「发版说明格式（硬性约束）」）
 cmd_release_log() {
-  local layer="dev" prev_tag="" cur_tag="HEAD" version=""
+  local prev_tag="" cur_tag="HEAD" version=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --layer) layer="$2"; shift 2 ;;
       --prev) prev_tag="$2"; shift 2 ;;
       --cur) cur_tag="$2"; shift 2 ;;
       --version) version="$2"; shift 2 ;;
       *) echo "release-log 未知参数: $1" >&2; exit 2 ;;
     esac
   done
-  if [[ "$layer" != "user" && "$layer" != "dev" && "$layer" != "ai" ]]; then
-    echo "release-log --layer 需为 user|dev|ai（当前: $layer）" >&2
-    exit 2
-  fi
   local script="$ROOT/scripts/gitops/release-log.py"
   if [[ ! -f "$script" ]]; then
     echo "错误：缺少 $script" >&2
     exit 1
   fi
-  local -a args=(--layer "$layer")
+  local -a args=()
   [[ -n "$prev_tag" ]] && args+=(--prev "$prev_tag")
   [[ "$cur_tag" != "HEAD" ]] && args+=(--cur "$cur_tag")
   [[ -n "$version" ]] && args+=(--version "$version")
@@ -338,18 +328,16 @@ gitops：MiniMe-core Git 工程化 CLI
   gitops hooks-status            本地 git hooks 启用状态
   gitops release-check <version> 发版前体检 + RC 判定（如 v1.2.3 / v1.2.3-rc1）
   gitops release-tag <version>   本地打 tag（推送交给外部）
-  gitops changelog [prev-tag]    自动生成开发者层版本日志草稿
-  gitops release-log [--layer user|dev|ai] [--prev tag] [--cur head] [--version vX]
-                                 三层版本日志生成器（AGENTS.md 三层写法规约）
+  gitops changelog [prev-tag]    自动生成版本日志草稿（统一格式）
+  gitops release-log [--prev tag] [--cur head] [--version vX]
+                                 版本日志生成器（AGENTS.md 发版说明格式硬性约束）
 
 示例：
   gitops check-commit "feat(agent): 新增流式工具调用"
   gitops suggest-commit
   gitops release-check v1.2.3-rc1
   gitops changelog v1.2.0
-  gitops release-log --layer user --version v1.2.3      # GitHub Release 正文
-  gitops release-log --layer dev  --version v1.2.3      # CHANGELOG.md 六类草稿
-  gitops release-log --layer ai   --version v1.2.3      # AGENTS 结构化（AI 工作流影响）
+  gitops release-log --version v1.2.3      # Release 正文草稿
 
 退出码：0=OK  1=失败  2=参数错误
 EOF

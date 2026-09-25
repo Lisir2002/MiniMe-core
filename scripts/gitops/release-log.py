@@ -1,32 +1,34 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-release-log.py — MiniMe-core 用户层发版说明自动生成器。
+release-log.py — MiniMe-core 发版说明自动生成器。
 
-依据 AGENTS.md「发版规范（最高优先级）」第3条，从 Conventional Commits
-（git log <prev_tag>..<cur_tag>）生成用户面向的 GitHub Release 正文草稿。
+依据 AGENTS.md「发版说明格式（用户面向 · 唯一规约 · 硬性约束）」，
+从 Conventional Commits（git log <prev_tag>..<cur_tag>）生成用户面向的
+GitHub Release 正文草稿。
 
-只保留用户层：叙事、价值导向、无内部术语。开发者层（Keep a Changelog 六类）
-和大模型层（AGENTS.md 登记）已废弃，不再维护。
+统一格式：CHANGELOG.md、独立版本文档、GitHub Release 正文三处格式一致。
 
-输出结构（严格按此顺序）：
-  # MiniMe {版本号}（{YYYY-MM-DD}）
+输出结构（严格按此顺序，无内容的分类省略）：
   > {100字以内简介 —— 由 AI/维护者补充，脚本生成占位提示}
-  ## 新功能
-  ## 改进
-  ## 修复
-  ## 已知问题
-  ## 安装包
-  **完整更新历史**：{compare 链接}
+  ### 新功能
+  ### 改进
+  ### 移除
+  ### 修复
+  ### 安全
+  ### 已知问题
+
+条目格式：- **{4-9字小标题}**：{20-40字简练说明}。
 
 用法（仓库根执行）：
   python3 scripts/gitops/release-log.py --prev v0.0.0.14 --cur v0.0.0.15
   python3 scripts/gitops/release-log.py --version 0.0.0.15 --date 2026-09-25
 
 设计约束：
-  - 仅为用户层正文草稿，永不替代人工复核：简介价值化润色、已知问题补充仍需人工完成。
+  - 仅为正文草稿，永不替代人工复核：简介价值化润色、条目小标题提炼仍需人工完成。
   - 自动过滤 ci/test/style/docs/chore/build 等非用户可见噪音。
   - 每条一个变更，禁止模糊表述；描述症状而非代码。
+  - 禁止 emoji，禁止安装包链接，禁止完整更新历史链接（GitHub 自动展示）。
 """
 
 from __future__ import annotations
@@ -136,49 +138,43 @@ def user_layer(commits, version, date_str):
             breaking.append(formatted)
         categories[cat].append(formatted)
 
-    lines = [f"# MiniMe {version}（{date_str}）", ""]
+    lines = []
     # 简介占位符（AI/维护者补充，≤100字）
     lines.append("> _（请补充 100 字以内简介：一句话说清本次更新的核心价值，用户语言，无内部术语）_")
     lines.append("")
 
     # 破坏性变更醒目标注
     if breaking:
-        lines.append("## 破坏性变更")
+        lines.append("### 破坏性变更")
         lines.append("")
         lines.extend(f"- 注意：{b}" for b in breaking)
         lines.append("")
 
     # 新功能
     if categories["new"]:
-        lines.append("## 新功能")
+        lines.append("### 新功能")
         lines.append("")
-        lines.extend(f"- {item}" for item in categories["new"])
+        lines.extend(f"- _（请提炼4-9字小标题）_：{item}" for item in categories["new"])
         lines.append("")
 
     # 改进
     if categories["improve"]:
-        lines.append("## 改进")
+        lines.append("### 改进")
         lines.append("")
-        lines.extend(f"- {item}" for item in categories["improve"])
+        lines.extend(f"- _（请提炼4-9字小标题）_：{item}" for item in categories["improve"])
         lines.append("")
 
     # 修复
     if categories["fix"]:
-        lines.append("## 修复")
+        lines.append("### 修复")
         lines.append("")
-        lines.extend(f"- {item}" for item in categories["fix"])
+        lines.extend(f"- _（请提炼4-9字小标题）_：{item}" for item in categories["fix"])
         lines.append("")
 
     # 已知问题（占位）
-    lines.append("## 已知问题")
+    lines.append("### 已知问题")
     lines.append("")
     lines.append("_（无已知问题则写「无」；如有请描述症状+临时规避方法+预计修复版本）_")
-    lines.append("")
-
-    # 安装包（占位，CI 会替换实际文件名和大小）
-    lines.append("## 安装包")
-    lines.append("")
-    lines.append("_（CI 构建完成后自动补充 APK 下载链接与大小）_")
     lines.append("")
 
     return "\n".join(lines)
@@ -222,7 +218,7 @@ def _recent(repo, n):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="MiniMe-core 用户层发版说明生成器（见 AGENTS.md「发版规范」）"
+        description="MiniMe-core 发版说明生成器（见 AGENTS.md「发版说明格式」）"
     )
     parser.add_argument("--prev", default=None, help="起始 tag（默认取最近一个 tag）")
     parser.add_argument("--cur", default="HEAD", help="结束 tag/提交（默认 HEAD）")
@@ -257,10 +253,6 @@ def main():
         commits = get_commits(repo, prev, args.cur)
 
     body = user_layer(commits, version, date_str)
-
-    # 追加完整更新历史链接
-    if prev:
-        body += f"\n**完整更新历史**：{_compare_url(repo, prev, args.cur)}\n"
 
     print(body)
 

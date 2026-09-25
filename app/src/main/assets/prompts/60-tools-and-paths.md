@@ -114,12 +114,12 @@ includes: []
   - `action="hooks_status"`：读取 `core.hooksPath`，检查 `commit-msg` / `pre-commit` hooks 是否启用，未启用时返回启用指引。
   - `action="release_check"` + `version="vX.Y.Z[-rcN]"`：发版前体检——必须在 main 分支 + 工作区干净 + tag 名合法；按 AGENTS.md「发版流程（RC 判定）」规则自动判定 RC/正式发版（tag 含 rc/beta/alpha/dev 后缀、改动触及启动/容器/构建链路、含功能代码改动 任一命中 → 建议 RC；纯文档/资源文案改动 → 可直接正式）。
   - `action="release_tag"` + `version="vX.Y.Z[-rcN]"`：在**本地**创建轻量 tag（推送由外部 Bash `git push origin <tag>` 完成，凭据由 `credential.helper=store` 自动注入）。仅允许在 main 分支 + 工作区干净 + tag 不存在。
-  - `action="changelog"` + `prev_tag?="..."`：从 `git log <prev_tag>..HEAD` 拉 Conventional Commits，按 Keep a Changelog 六类（Added/Changed/Deprecated/Removed/Fixed/Security）归类生成**开发者层**版本日志草稿，供 `CHANGELOG.md` 润色（等价 `release-log --layer dev`）。`prev_tag` 缺省时自动取历史最新 tag。
-  - `action="release_log"` + `layer="user|dev|ai"` + `prev_tag?` + `version?`：三层版本日志生成器（遵循 AGENTS.md「版本日志 · 三层写法规约」）。`layer=user` 产出 GitHub Release 用户层正文；`layer=dev` 产出 CHANGELOG.md 开发者层草稿；`layer=ai` 产出 AI 工作流影响的结构化摘要（工具/prompt/schema 变更登记，供发版时同步 AGENTS.md）。
+  - `action="changelog"` + `prev_tag?="..."`：从 `git log <prev_tag>..HEAD` 拉 Conventional Commits，按统一分类（新功能/改进/移除/修复/安全）归类生成版本日志草稿，供 `CHANGELOG.md` 润色。`prev_tag` 缺省时自动取历史最新 tag。
+  - `action="release_log"` + `prev_tag?` + `version?`：版本日志生成器（遵循 AGENTS.md「发版说明格式」统一规约）。产出 GitHub Release 正文与 CHANGELOG.md 一致格式，条目为「**4-9字小标题**：20-40字简练说明」结构。
 - 使用建议：
   - 提交前：`gitops(action="suggest_commit")` → 按建议生成提交 → `gitops(action="check_commit", message="...")` 二次校验。
   - 发版前：`gitops(action="release_check", version="vX.Y.Z-rc1")` 取 RC 判定建议 → 若建议 RC 则先发 RC → 真机验证 AI 对话/终端/容器三条主线 → `gitops(action="release_tag", version="vX.Y.Z-rc1")` 本地打 tag → 外部 Bash `git push origin vX.Y.Z-rc1` 推送触发 CI。
-  - 版本日志：`gitops(action="changelog", prev_tag="vX.Y.Z")` 自动生成草稿 → 润色后写入 CHANGELOG.md 的 `[Unreleased]` / 新版本节（开发者层）；用户在 GitHub Release 正文（用户层）；AI 工作流相关变更写入 AGENTS.md（大模型层）。
+  - 版本日志：`gitops(action="changelog", prev_tag="vX.Y.Z")` 自动生成草稿 → 按统一格式（**4-9字小标题**：20-40字说明）润色后写入 CHANGELOG.md 和独立版本文档 → GitHub Release 正文使用相同内容。
   - 本工具只读为主（仅 `release_tag` 创建本地 tag）；推送/拉取交给 Bash，凭据由统一 helper 兜底。
 
 ## 网络与搜索工具
