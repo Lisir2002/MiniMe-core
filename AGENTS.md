@@ -382,35 +382,29 @@ python3 scripts/check-persistence.py
 - `@Singleton` 类的 `MutableStateFlow` 初始值是否硬编码默认值（需人工确认是否已从磁盘恢复）
 - `exportConfig`/`snapshot` 方法中读取类型是否与写入一致
 
-## 品牌名规范（强制约束 · 禁止旧品牌名残留）
+## 命名规范（强制约束 · 统一 MiniMecore 命名体系）
 
-本项目已完全独立，**禁止在任何代码、配置、文档、注释中出现旧品牌名**。新增或修改代码时必须遵守：
+本项目已完全独立，**新增代码统一使用 MiniMecore 命名，不得使用与项目不相关的字段命名**。所有类名、函数名、常量名、字符串、注释、文档必须遵守：
 
-### 禁止使用的旧品牌名（黑名单）
+### 正确命名体系
 
-| 旧品牌名 | 说明 |
+| 类别 | 命名 |
 |---|---|
-| `AIEditorApp` / `AIEditorTheme` / `AIEditor` | 旧 Application 类名、旧主题类名、旧品牌前缀 |
-| `DeepCore` / `DeepCore-Code` / `deepcode` | 旧品牌名、旧容器目录名、旧数据库前缀 |
-| `deepcode-R` | 旧 GitHub 仓库名 |
-| `com.aicodeeditor` / `com.aicode` / `com.deep.rcode` / `com.R.codecore` / `com.core.deepcode` | 历史包名（CI 白名单除外） |
-
-### 正确命名
-
-- Application 入口类：`MiniMeCore`
-- 主题 Composable：`MiniMeTheme`
-- GitHub 仓库：`Lisir2002/MiniMe-core`
-- 包名（applicationId）：`com.mini.me_core`
-- 应用显示名：`MiniMe-core`
+| Application 入口类 | `MiniMeCore`（已有，保持不变） |
+| 主题 Composable | `MiniMeTheme`（已有，保持不变） |
+| GitHub 仓库 | `Lisir2002/MiniMe-core` |
+| 包名（applicationId） | `com.mini.me_core` |
+| 应用显示名 | `MiniMe-core` |
+| 新增代码通用前缀 | `MiniMecore` / `minimecore` / `mini_me_core` |
 
 ### 约束规则
 
-1. **新增代码**：禁止引入任何旧品牌名，类名、函数名、常量名、字符串、注释统一使用 MiniMe 命名体系。
-2. **修改代码**：触及含旧品牌名的文件时，必须同步清理该文件内所有旧品牌名残留，不得只改局部。
-3. **文档/注释**：KDoc、行注释、README、docs/ 中禁止出现旧品牌名，历史背景说明改用中性描述（如"历史版本"而非具体旧品牌名）。
-4. **CI/测试例外**：`android-release.yml` 和 `ApplicationIdStabilityTest.kt` 中不得出现历史包名白名单，包名稳定性检查只锁定当前包名 `com.mini.me_core`。
-5. **数据迁移例外**：如确需检测旧版本数据（极端情况），旧目录名/旧包名只能作为内部检测常量，不得出现在用户可见的 UI、日志、文档中。
-6. **审计要求**：每次发版前必须执行全项目旧品牌名扫描（`grep -rni "AIEditor\|DeepCore\|deepcode\|aicodeeditor\|deep.rcode\|codecore"`），确认零残留后方可打 tag。
+1. **新增代码**：类名、函数名、常量名、变量名统一使用 MiniMecore 命名体系，不得使用与项目无关的名称（如其他品牌名、缩写、临时命名）。
+2. **修改代码**：触及含非 MiniMecore 命名的文件时，必须同步清理该文件内所有不规范命名，不得只改局部。
+3. **文档/注释**：KDoc、行注释、README、docs/ 中统一使用 MiniMecore 命名，历史背景说明改用中性描述（如"历史版本"而非具体旧名称）。
+4. **字符串/资源**：用户可见的字符串、资源文件名、资源 ID 统一使用 MiniMecore 相关命名，不得出现无关品牌名。
+5. **包名稳定性**：`com.mini.me_core` 为唯一合法包名，CI 门禁和单元测试锁定此值，禁止任何形式的包名变更。
+6. **审计要求**：每次发版前必须执行全项目命名规范扫描，确认无非 MiniMecore 命名残留后方可打 tag。
 
 ## 常见坑
 
