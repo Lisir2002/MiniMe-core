@@ -130,12 +130,34 @@ class LinuxContainerEngine @Inject constructor(
     fun isStorageShareEnabled(): Boolean = storageShareEnabled
 
     init {
+        // 冷启动首帧：基于默认 profile（宿主架构对应内置容器）检查磁盘安装状态，
+        // 避免 _initProgress 停留在 Idle 导致 UI 误判"容器未初始化"。
+        // 已安装则直接设为 Ready，用户无需再次点击"初始化环境"。
+        runCatching {
+            if (containerInstaller.isInstalledFor(currentProfile)) {
+                bundleRepository.updateRootfsDir(containerInstaller.rootfsDirFor(currentProfile))
+                val migrated = bundleRepository.migrateIfNeededAfterBoot()
+                _initProgress.value = ContainerInitState.Ready(migratedFromLegacyProvisioned = migrated)
+            }
+        }.onFailure { FileLogger.w("LinuxContainerEngine", "初始化时检查容器安装状态失败", it) }
+
         CoroutineScope(Dispatchers.IO).launch {
             containerSettingsRepository.activeProfileIdFlow.collect { id ->
                 currentProfile = resolveProfile(id)
                 // Bundle 标记目录跟随当前 profile（x86_64 / 自定义容器各用各的 rootfs），
                 // 目录变化时仓库会重扫磁盘标记，避免状态与实际容器脱节。
                 bundleRepository.updateRootfsDir(containerInstaller.rootfsDirFor(currentProfile))
+                // profile 切换后同步更新 initProgress：已安装则 Ready，未安装则 Idle（等待用户初始化）。
+                // 只在非 Installing/Uninstalling 状态时覆盖，避免打断进行中的安装流程。
+                val cur = _initProgress.value
+                if (cur !is ContainerInitState.BundleInstalling && cur !is ContainerInitState.BundleUninstalling) {
+                    if (containerInstaller.isInstalledFor(currentProfile)) {
+                        val migrated = bundleRepository.migrateIfNeededAfterBoot()
+                        _initProgress.value = ContainerInitState.Ready(migratedFromLegacyProvisioned = migrated)
+                    } else {
+                        _initProgress.value = ContainerInitState.Idle
+                    }
+                }
             }
         }
         // 存储共享开关缓存：buildBaseProotArgv 是同步方法，不能在它内部挂起读 DataStore，故用 flow 预热。
