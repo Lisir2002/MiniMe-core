@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
@@ -36,17 +37,23 @@ import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
  * @param skipPartiallyExpanded 是否跳过部分展开状态（默认 true）
  * @param containerColor 自定义容器色（默认使用 surfaceOverlay）
  * @param sheetState 自定义 SheetState（可选）
+ * @param dragHandle 自定义 dragHandle（默认统一样式；传 null 隐藏）
+ * @param sheetGesturesEnabled 是否启用手势（默认 true）
+ * @param tonalElevation 色调高度（默认 0.dp）
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppBottomSheet(
     onDismiss: () -> Unit,
-    content: @Composable () -> Unit,
     skipPartiallyExpanded: Boolean = true,
     containerColor: Color? = null,
     sheetState: SheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = skipPartiallyExpanded,
     ),
+    dragHandle: @Composable (() -> Unit)? = { DefaultDragHandle() },
+    sheetGesturesEnabled: Boolean = true,
+    tonalElevation: Dp = 0.dp,
+    content: @Composable () -> Unit,
 ) {
     val colors = LocalAppTheme.current.colors
     val shape = RoundedCornerShape(
@@ -59,22 +66,9 @@ fun AppBottomSheet(
         sheetState = sheetState,
         shape = shape,
         containerColor = containerColor ?: colors.surfaceOverlay,
-        dragHandle = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = PrimitiveSpacing.Sm),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(32.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(colors.textTertiary),
-                )
-            }
-        },
+        dragHandle = dragHandle,
+        sheetGesturesEnabled = sheetGesturesEnabled,
+        tonalElevation = tonalElevation,
     ) {
         Column(
             modifier = Modifier
@@ -83,6 +77,26 @@ fun AppBottomSheet(
         ) {
             content()
         }
+    }
+}
+
+/** 默认统一 dragHandle。 */
+@Composable
+private fun DefaultDragHandle() {
+    val colors = LocalAppTheme.current.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = PrimitiveSpacing.Sm),
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(32.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(colors.textTertiary),
+        )
     }
 }
 

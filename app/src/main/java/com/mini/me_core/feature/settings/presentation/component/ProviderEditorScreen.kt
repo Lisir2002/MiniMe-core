@@ -53,6 +53,7 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
+import com.mini.me_core.core.theme.components.AppBottomSheet
 import com.mini.me_core.core.theme.components.AppDialog
 import com.mini.me_core.core.theme.components.AppDialogType
 import androidx.compose.material3.AssistChip
@@ -952,8 +953,8 @@ private fun AddModelSheet(
     val duplicate = existingModels.any { it == trimmedModel }
     val canAdd = trimmedModel.isNotEmpty() && !duplicate
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
+    AppBottomSheet(
+        onDismiss = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         dragHandle = null
@@ -1034,8 +1035,8 @@ private fun FetchModelsDialog(
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
     
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
+    AppBottomSheet(
+        onDismiss = onDismiss,
         sheetState = sheetState,
         sheetGesturesEnabled = true,
         containerColor = Color.Transparent,

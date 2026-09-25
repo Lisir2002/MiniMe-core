@@ -37,7 +37,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import com.mini.me_core.core.theme.components.AppBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -349,8 +349,8 @@ private fun ModelSelectionSheet(
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
+    AppBottomSheet(
+        onDismiss = onDismiss,
         sheetState = sheetState,
         sheetGesturesEnabled = true,
         containerColor = Color.Transparent,

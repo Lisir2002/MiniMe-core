@@ -62,7 +62,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.ModalBottomSheet
+import com.mini.me_core.core.theme.components.AppBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -297,7 +297,7 @@ private fun CapabilityFlowTag(
             Popup(
                 alignment = Alignment.BottomCenter,
                 offset = with(density) { IntOffset(0, (-30).dp.roundToPx()) },
-                onDismissRequest = { showTip = false },
+                onDismiss = { showTip = false },
                 properties = PopupProperties(focusable = false, dismissOnClickOutside = true)
             ) {
                 Surface(
@@ -592,8 +592,8 @@ internal fun ProviderModelRow(
             }
         }
 
-        ModalBottomSheet(
-            onDismissRequest = { showErrorDetail = false },
+        AppBottomSheet(
+            onDismiss = { showErrorDetail = false },
             sheetState = sheetState,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
@@ -828,8 +828,8 @@ internal fun ModelSettingsSheet(
         scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
+    AppBottomSheet(
+        onDismiss = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         dragHandle = null
