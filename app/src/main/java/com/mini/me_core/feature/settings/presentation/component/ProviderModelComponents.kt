@@ -297,7 +297,7 @@ private fun CapabilityFlowTag(
             Popup(
                 alignment = Alignment.BottomCenter,
                 offset = with(density) { IntOffset(0, (-30).dp.roundToPx()) },
-                onDismiss = { showTip = false },
+                onDismissRequest = { showTip = false },
                 properties = PopupProperties(focusable = false, dismissOnClickOutside = true)
             ) {
                 Surface(
