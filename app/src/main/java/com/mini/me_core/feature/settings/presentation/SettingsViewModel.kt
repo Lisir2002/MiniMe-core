@@ -38,7 +38,6 @@ import com.mini.me_core.core.util.LogLineParser
 import com.mini.me_core.feature.settings.data.repository.LogFilterSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.LogSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.SettingsSearchHistoryManager
-import com.mini.me_core.feature.settings.data.repository.SettingsChangeHistory
 import com.mini.me_core.feature.settings.data.repository.ThemeSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.VisionModelSettingsRepository
 import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
@@ -171,9 +170,6 @@ class SettingsViewModel @Inject constructor(
     private val searchHistoryManager: SettingsSearchHistoryManager,
     /** 防截图录屏开关。 */
     private val secureScreenRepository: SecureScreenRepository,
-    /** F5.3 设置变更历史与回滚。 */
-    private val changeHistory: SettingsChangeHistory,
-    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
@@ -1312,13 +1308,6 @@ class SettingsViewModel @Inject constructor(
         val old = _keepaliveEnabled.value
         viewModelScope.launch {
             keepaliveSettingsRepository.setEnabled(enabled)
-            changeHistory.recordChange(
-                key = "keepalive_enabled",
-                displayName = appContext.getString(R.string.settings_keepalive_title),
-                type = "bool",
-                oldValue = old.toString(),
-                newValue = enabled.toString(),
-            )
             _settingEffect.tryEmit(SettingEffect.NeedsRestart)
         }
     }
@@ -1483,13 +1472,6 @@ class SettingsViewModel @Inject constructor(
         val old = _themeMode.value
         viewModelScope.launch {
             themeSettingsRepository.setThemeMode(mode)
-            changeHistory.recordChange(
-                key = "theme_mode",
-                displayName = appContext.getString(R.string.settings_theme_title),
-                type = "string",
-                oldValue = old.name,
-                newValue = mode.name,
-            )
             _settingEffect.tryEmit(SettingEffect.Applied)
         }
     }

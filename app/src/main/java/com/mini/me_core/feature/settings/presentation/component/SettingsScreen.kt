@@ -137,7 +137,6 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     About(R.string.settings_about),
     Theme(R.string.settings_theme_title),
     ExportImport(R.string.settings_export_import),
-    ChangeHistory(R.string.settings_history_title),
     DevOptions(R.string.dev_options_title),
 }
 
@@ -580,9 +579,6 @@ fun SettingsScreen(
                 SettingsSection.ExportImport -> SettingsExportImportScreen(
                     onNavigateBack = { section = SettingsSection.Menu }
                 )
-                SettingsSection.ChangeHistory -> com.mini.me_core.feature.settings.presentation.ChangeHistoryScreen(
-                    onNavigateBack = { section = SettingsSection.Menu }
-                )
                 SettingsSection.DevOptions -> com.mini.me_core.feature.settings.presentation.DevOptionsScreen(
                     onNavigateBack = { section = SettingsSection.Menu },
                     onOpenLogViewer = { section = SettingsSection.Logs },
@@ -888,16 +884,6 @@ internal fun SettingsMenu(
             keywords = listOf("export", "import", "backup", "restore", stringResource(R.string.ui____55405ea6), stringResource(R.string.ui____8d9a071e), "json"),
             action = { onOpen(SettingsSection.ExportImport) }
         ),
-        // F5.3 变更历史与回滚
-        MenuItem(
-            section = SettingsSection.ChangeHistory,
-            group = groupData,
-            title = stringResource(R.string.settings_history_title),
-            subtitle = stringResource(R.string.settings_history_subtitle),
-            icon = Icons.Rounded.History,
-            keywords = listOf("history", "rollback", "undo", stringResource(R.string.settings_history_title), stringResource(R.string.settings_history_rollback)),
-            action = { onOpen(SettingsSection.ChangeHistory) }
-        ),
         MenuItem(
             section = SettingsSection.Security,
             group = groupData,
@@ -1105,7 +1091,7 @@ internal fun SettingsMenu(
                     val commonItems = remember(menuItems) {
                         val preferred = listOf(
                             SettingsSection.Theme, SettingsSection.Providers, SettingsSection.ExportImport,
-                            SettingsSection.Backup, SettingsSection.ChangeHistory, SettingsSection.Security,
+                            SettingsSection.Backup, SettingsSection.Security,
                         )
                         preferred.mapNotNull { sec -> menuItems.firstOrNull { it.section == sec } }.take(6)
                     }

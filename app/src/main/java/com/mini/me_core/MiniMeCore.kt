@@ -5,6 +5,7 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.ComponentCallbacks2
+import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
 import com.mini.me_core.core.migration.MigrationRunner
@@ -77,6 +78,10 @@ class MiniMeCore : Application() {
     /** Hilt 字段注入：在 [onCreate] 的 super 调用后即可用。 */
     @Inject
     lateinit var logSettings: LogSettingsRepository
+
+    /** KVStore：用于启动期一次性清理已删除功能的残留数据。 */
+    @Inject
+    lateinit var kvStore: com.mini.me_core.datalayer.store.KVStore
 
     /** 后台保活开关持久化。 */
     @Inject
@@ -254,6 +259,17 @@ class MiniMeCore : Application() {
             runCatching { gitCredentialsFileSync.syncAll() }
                 .onFailure { FileLogger.w(TAG, "Git 凭据同步失败", it) }
             FileLogger.v(TAG, "异步预热：Git 凭据同步完成")
+        }
+        // 一次性清理：已删除的 F5.3 变更历史功能残留的 KVStore 数据（namespace=settings_history）。
+        appScope.launch {
+            runCatching {
+                val prefs = getSharedPreferences("minime_cleanup_flags", Context.MODE_PRIVATE)
+                if (!prefs.getBoolean("settings_history_cleared", false)) {
+                    kvStore.delete("settings_history", "changes")
+                    prefs.edit().putBoolean("settings_history_cleared", true).apply()
+                    FileLogger.i(TAG, "已清理已删除功能的残留数据：settings_history/changes")
+                }
+            }.onFailure { FileLogger.w(TAG, "清理 settings_history 残留数据失败", it) }
         }
         // 模型元数据刷新（24h 缓存，失败静默兜底内置数据）
         appScope.launch {
