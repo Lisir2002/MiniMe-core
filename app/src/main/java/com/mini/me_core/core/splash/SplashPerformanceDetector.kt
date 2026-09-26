@@ -21,9 +21,9 @@ enum class SplashQualityLevel(
     val enable3D: Boolean,
     val enableCracks: Boolean,
 ) {
-    HIGH(1200, 40, 6000L, true, true),
-    MEDIUM(800, 25, 5000L, true, true),
-    LOW(400, 12, 4000L, false, false);
+    HIGH(1800, 40, 6000L, true, true),
+    MEDIUM(1200, 25, 5000L, true, true),
+    LOW(600, 12, 4000L, false, false);
 
     companion object {
         @Volatile

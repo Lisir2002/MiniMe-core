@@ -146,18 +146,18 @@ fun ParticleSplashCanvas(
                 // As mix→1: normal particles fade to onBackground, accents stay primary.
                 val usePrimaryGlow = accent || mix < 0.5f
 
-                // Glow radius: 3x larger than v1 for nebula-like bloom.
+                // Glow radius: tuned for fine luminous dots.
                 // Subtler when settled (HOLD), puffier during flight.
-                val glowMul = if (stage == SplashStage.HOLD) 6f else 10f
+                val glowMul = if (stage == SplashStage.HOLD) 4.5f else 7f
                 val glowRadius = sz * glowMul
                 val glowBmp = if (usePrimaryGlow) primaryGlow else onBgGlow
 
-                // Glow alpha: stronger during explode, softer when formed.
+                // Glow alpha: stronger bloom for luminous dot look.
                 val glowAlpha = when (stage) {
-                    SplashStage.HOLD -> (0.18f + 0.08f * kotlin.math.sin(elapsedMs * 0.005f)).coerceIn(0.1f, 0.3f)
-                    SplashStage.EXPLODE -> 0.45f
-                    SplashStage.CONVERGE -> 0.45f - 0.15f * mix
-                    else -> 0.3f
+                    SplashStage.HOLD -> (0.38f + 0.12f * kotlin.math.sin(elapsedMs * 0.005f)).coerceIn(0.3f, 0.5f)
+                    SplashStage.EXPLODE -> 0.55f
+                    SplashStage.CONVERGE -> 0.55f - 0.15f * mix
+                    else -> 0.4f
                 }
                 glowPaint.alpha = (glowAlpha * 255).toInt().coerceIn(0, 255)
                 dstRect.set(px - glowRadius, py - glowRadius, px + glowRadius, py + glowRadius)

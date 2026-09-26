@@ -104,8 +104,9 @@ class ParticleSystem(
             shatterVy[i] = sin(shatterAngle) * shatterSpeedPx + 600f * density
 
             // All particles are dots — no shards.
-            // Size: 1.2-2.5dp, small and crisp for fine text detail.
-            size[i] = (1.2f + Random.nextFloat() * 1.3f) * density
+            // Size: 0.5-1.2dp radius (1-2.4dp diameter), fine and luminous
+            // for crisp text detail without coarse mosaic look.
+            size[i] = (0.5f + Random.nextFloat() * 0.7f) * density
 
             // 30% accent particles (primary color), 70% onBackground
             isAccent[i] = Random.nextFloat() < 0.3f
@@ -300,8 +301,8 @@ class ParticleSystem(
 
     private fun updateHold(t: Float, elapsedMs: Long) {
         // Precise positioning: particles sit exactly on text target positions
-        // with micro breathing vibration of ±0.5dp for a "settled" feel.
-        val vib = 0.5f // dp of micro-vibration
+        // with micro breathing vibration for a "settled" feel.
+        val vib = 0.3f // dp of micro-vibration (tuned for fine particles)
         for (i in 0 until count) {
             x[i] = tx[i] + sin(seed[i] + elapsedMs * 0.004f) * vib
             y[i] = ty[i] + cos(seed[i] + elapsedMs * 0.0037f) * vib
