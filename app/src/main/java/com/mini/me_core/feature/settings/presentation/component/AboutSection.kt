@@ -31,13 +31,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.CloudUpload
-import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.FolderZip
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Language
@@ -140,6 +140,8 @@ internal fun AboutSection(
 
     // 本地导航 / 弹窗状态
     var showCodeBrowser by remember { mutableStateOf(false) }
+    // 本地文档查看器（用户协议 / 隐私政策 / 开源协议）
+    var docViewerDoc by remember { mutableStateOf<LegalDoc?>(null) }
     var showResetConfirm by remember { mutableStateOf(false) }
     var showResetMenu by remember { mutableStateOf(false) }
     var pendingDialog by remember { mutableStateOf<PendingDialog?>(null) }
@@ -207,6 +209,17 @@ internal fun AboutSection(
         return
     }
 
+    // 本地法律文档全屏覆盖（用户协议 / 隐私政策 / 开源协议）
+    val currentDoc = docViewerDoc
+    if (currentDoc != null) {
+        DocViewerScreen(
+            title = stringResource(currentDoc.titleRes),
+            assetPath = currentDoc.assetPath,
+            onBack = { docViewerDoc = null },
+        )
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -261,16 +274,15 @@ internal fun AboutSection(
         // 5. DeviceInfoSection（新增）
         DeviceInfoSection(appInfo = appInfo, webViewVersion = webViewVersion)
 
-        // 6. LegalFeedbackSection（新增）
-        val licenseUrl = stringResource(R.string.about_license_url)
+        // 6. LegalDocsSection（本地文档：用户协议 / 隐私政策 / 开源协议）
+        LegalDocsSection(onOpenDoc = { docViewerDoc = it })
+
+        // 6b. LegalFeedbackSection（反馈 / 分享 / 贡献指南）
         val contributingUrl = stringResource(R.string.about_contributing_url)
         val issuesUrl = stringResource(R.string.about_issues_url)
         LegalFeedbackSection(
-            onOpenUserAgreement = { openUrl(context, licenseUrl) },
-            onOpenPrivacy = { openUrl(context, licenseUrl) },
             onFeedback = { openFeedbackEmail(context) },
             onShare = { shareApp(context) },
-            onOpenLicense = { openUrl(context, licenseUrl) },
             onOpenContributing = { openUrl(context, contributingUrl) },
         )
 
@@ -278,7 +290,7 @@ internal fun AboutSection(
         OpenSourceInfoSection(
             onBrowseSource = { showCodeBrowser = true },
             onSubmitIssue = { openUrl(context, issuesUrl) },
-            onDownloadSource = { codeBrowserVM.downloadZip() },
+            onDownloadSource = { codeBrowserVM.requestDownloadZip() },
         )
 
         // 7. OpenSourceCreditsSection（可展开）
@@ -862,33 +874,57 @@ private fun DeviceRow(label: String, value: String, showDivider: Boolean = true,
 }
 
 // ============================================================
-// 6. 法律与反馈（新增）
+// 6. 法律文档（用户协议 / 隐私政策 / 开源协议，本地 assets）
+// ============================================================
+
+/** 本地法律文档条目。 */
+private data class LegalDoc(
+    val titleRes: Int,
+    val descRes: Int,
+    val assetPath: String,
+)
+
+private val legalDocs = listOf(
+    LegalDoc(R.string.about_user_agreement, R.string.about_user_agreement_desc, "docs/user-agreement.md"),
+    LegalDoc(R.string.about_privacy_policy, R.string.about_privacy_policy_desc, "docs/privacy-policy.md"),
+    LegalDoc(R.string.about_open_source_license, R.string.about_open_source_license_desc, "docs/license-gpl3.md"),
+)
+
+@Composable
+private fun LegalDocsSection(onOpenDoc: (LegalDoc) -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = Spacing.lg)) {
+        AppSectionHeader(title = stringResource(R.string.about_legal_title))
+        AppCard {
+            legalDocs.forEachIndexed { index, doc ->
+                AppListItem(
+                    icon = when (index) {
+                        0 -> Icons.AutoMirrored.Rounded.Article
+                        1 -> Icons.Rounded.Policy
+                        else -> Icons.Rounded.Balance
+                    },
+                    title = stringResource(doc.titleRes),
+                    subtitle = stringResource(doc.descRes),
+                    onClick = { onOpenDoc(doc) },
+                    showDivider = index < legalDocs.size - 1,
+                )
+            }
+        }
+    }
+}
+
+// ============================================================
+// 6b. 反馈与分享
 // ============================================================
 
 @Composable
 private fun LegalFeedbackSection(
-    onOpenUserAgreement: () -> Unit,
-    onOpenPrivacy: () -> Unit,
     onFeedback: () -> Unit,
     onShare: () -> Unit,
-    onOpenLicense: () -> Unit,
     onOpenContributing: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(horizontal = Spacing.lg)) {
         AppSectionHeader(title = stringResource(R.string.about_legal_feedback))
         AppCard {
-            AppListItem(
-                icon = Icons.Rounded.Description,
-                title = stringResource(R.string.about_user_agreement),
-                onClick = onOpenUserAgreement,
-                showDivider = true,
-            )
-            AppListItem(
-                icon = Icons.Rounded.Policy,
-                title = stringResource(R.string.about_privacy_policy),
-                onClick = onOpenPrivacy,
-                showDivider = true,
-            )
             AppListItem(
                 icon = Icons.Rounded.MailOutline,
                 title = stringResource(R.string.about_feedback_entry),
@@ -899,13 +935,6 @@ private fun LegalFeedbackSection(
                 icon = Icons.Rounded.Share,
                 title = stringResource(R.string.about_share_app),
                 onClick = onShare,
-                showDivider = true,
-            )
-            AppListItem(
-                icon = Icons.Rounded.Balance,
-                title = stringResource(R.string.about_license_entry),
-                subtitle = stringResource(R.string.about_license_gpl),
-                onClick = onOpenLicense,
                 showDivider = true,
             )
             AppListItem(
