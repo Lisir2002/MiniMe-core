@@ -145,6 +145,21 @@ class TerminalSettingsViewModel @Inject constructor(
     val sshKeepalive: StateFlow<Boolean> = settingsRepo.sshKeepaliveFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
+    // ── G1 外观新增 ───────────────────────────────────────────────
+    val cursorStyle: StateFlow<com.mini.me_core.feature.terminal.data.repository.CursorStyle> =
+        settingsRepo.cursorStyleFlow
+            .stateIn(viewModelScope, SharingStarted.Eagerly, com.mini.me_core.feature.terminal.data.repository.CursorStyle.BLOCK)
+
+    val cursorBlink: StateFlow<Boolean> = settingsRepo.cursorBlinkFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    // ── G3 行为新增 ───────────────────────────────────────────────
+    val scrollbackLines: StateFlow<Int> = settingsRepo.scrollbackLinesFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, com.mini.me_core.feature.terminal.data.repository.ScrollbackLines.DEFAULT)
+
+    val exitConfirm: StateFlow<Boolean> = settingsRepo.exitConfirmFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     // ── 容器环境卡片 ──────────────────────────────────────────────
     /** 容器初始化进度（与终端页 AppLoadingState 同源）。 */
     val containerInit: StateFlow<com.mini.me_core.feature.agent.domain.container.ContainerInitState> =
@@ -544,6 +559,10 @@ class TerminalSettingsViewModel @Inject constructor(
     fun setFontSizeSp(sp: Int) { viewModelScope.launch { settingsRepo.saveFontSize(sp) } }
     fun setTheme(theme: TerminalTheme) { viewModelScope.launch { settingsRepo.saveTheme(theme) } }
     fun setShowTabBar(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveShowTabBar(enabled) } }
+    fun setCursorStyle(style: com.mini.me_core.feature.terminal.data.repository.CursorStyle) {
+        viewModelScope.launch { settingsRepo.saveCursorStyle(style) }
+    }
+    fun setCursorBlink(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveCursorBlink(enabled) } }
 
     // ─────────── 动作：G2 键盘 & 交互 ─────────────────────────────
 
@@ -558,6 +577,19 @@ class TerminalSettingsViewModel @Inject constructor(
     fun setAutoNewTabOnCloseLast(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveAutoNewTabOnCloseLast(enabled) } }
     fun setKeepSessionWhenLeave(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveKeepSessionWhenLeave(enabled) } }
     fun setPasteAsPlainText(enabled: Boolean) { viewModelScope.launch { settingsRepo.savePasteAsPlainText(enabled) } }
+    fun setScrollbackLines(lines: Int) { viewModelScope.launch { settingsRepo.saveScrollbackLines(lines) } }
+    fun setExitConfirm(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveExitConfirm(enabled) } }
+
+    // ─────────── 动作：恢复默认终端设置 ──────────────────────────
+
+    /** 恢复所有终端偏好为默认值（不影响容器/SSH主机/凭据）。 */
+    fun resetAllTerminalSettings(onDone: () -> Unit = {}) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { settingsRepo.resetAllTerminalPreferences() }
+                .onFailure { postError(it.message ?: "恢复默认失败") }
+            onDone()
+        }
+    }
 
     // ─────────── 动作：G4 SSH 常用 ────────────────────────────────
 

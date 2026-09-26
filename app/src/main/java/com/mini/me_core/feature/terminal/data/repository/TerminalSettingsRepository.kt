@@ -7,16 +7,36 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 终端内容区配色：跟随系统 + 纯黑/纯白 + F3.6 内置 6 主题。 */
+/** 终端内容区配色：跟随系统 + 纯黑/纯白/AMOLED黑 + F3.6 内置 6 主题。 */
 enum class TerminalTheme(val stableKey: String) {
     FOLLOW_APP("system"),
     PURE_BLACK("pure_black"),
     PURE_WHITE("pure_white"),
+    AMOLED_BLACK("amoled_black"),
     DRACULA("dracula"),
     SOLARIZED_DARK("solarized_dark"),
     SOLARIZED_LIGHT("solarized_light"),
     MONOKAI("monokai"),
     GITHUB_DARK("github_dark"),
+}
+
+/** 终端光标样式：方块 / 下划线 / 竖线。 */
+enum class CursorStyle(val stableKey: String, val display: String) {
+    BLOCK("block", "方块"),
+    UNDERLINE("underline", "下划线"),
+    BAR("bar", "竖线"),
+    ;
+    companion object {
+        fun fromKey(key: String?): CursorStyle =
+            entries.firstOrNull { it.stableKey == key } ?: BLOCK
+    }
+}
+
+/** 滚动缓冲行数选项：0 表示无限制。 */
+object ScrollbackLines {
+    const val UNLIMITED = 0
+    val OPTIONS = listOf(1000, 5000, 10000, UNLIMITED)
+    const val DEFAULT = 5000
 }
 
 /** SSH 心跳间隔枚举。 */
@@ -49,6 +69,10 @@ const val SSH_AUTO_RECONNECT_KEY = "ssh_auto_reconnect"
 const val SSH_HEARTBEAT_SECONDS_KEY = "ssh_heartbeat_seconds"
 const val SSH_KEEPALIVE_KEY = "ssh_keepalive"
 const val LAST_CWD_KEY = "last_cwd"
+const val CURSOR_STYLE_KEY = "cursor_style"
+const val CURSOR_BLINK_KEY = "cursor_blink"
+const val SCROLLBACK_LINES_KEY = "scrollback_lines"
+const val EXIT_CONFIRM_KEY = "exit_confirm"
 
 /** 终端体验偏好：外观 / 键盘 & 交互 / 行为 / SSH 常用 4 分组，共 15+ 项。 */
 @Singleton
@@ -85,8 +109,15 @@ class TerminalSettingsRepository @Inject constructor(
     val sshKeepaliveFlow: Flow<Boolean> = kv.observeBool(TERMINAL_NS, SSH_KEEPALIVE_KEY).map { it ?: true }
     val lastCwdFlow: Flow<String> = kv.observeString(TERMINAL_NS, LAST_CWD_KEY).map { it ?: "" }
 
+    val cursorStyleFlow: Flow<CursorStyle> = kv.observeString(TERMINAL_NS, CURSOR_STYLE_KEY)
+        .map { CursorStyle.fromKey(it) }
+    val cursorBlinkFlow: Flow<Boolean> = kv.observeBool(TERMINAL_NS, CURSOR_BLINK_KEY).map { it ?: true }
+    val scrollbackLinesFlow: Flow<Int> = kv.observeInt(TERMINAL_NS, SCROLLBACK_LINES_KEY)
+        .map { (it ?: ScrollbackLines.DEFAULT.toLong()).toInt() }
+    val exitConfirmFlow: Flow<Boolean> = kv.observeBool(TERMINAL_NS, EXIT_CONFIRM_KEY).map { it ?: false }
+
     // ── 写入 ──
-    suspend fun saveFontSize(sp: Int) { kv.putInt(TERMINAL_NS, FONT_SIZE_SP_KEY, sp.coerceIn(8, 20).toLong()) }
+    suspend fun saveFontSize(sp: Int) { kv.putInt(TERMINAL_NS, FONT_SIZE_SP_KEY, sp.coerceIn(10, 24).toLong()) }
     suspend fun saveTheme(theme: TerminalTheme) { kv.putString(TERMINAL_NS, THEME_KEY, theme.name) }
     suspend fun saveShowTabBar(enabled: Boolean) { kv.putBool(TERMINAL_NS, SHOW_TAB_BAR_KEY, enabled) }
     suspend fun saveFullExtraKeys(full: Boolean) { kv.putBool(TERMINAL_NS, FULL_EXTRA_KEYS_KEY, full) }
@@ -103,6 +134,34 @@ class TerminalSettingsRepository @Inject constructor(
     suspend fun saveSshHeartbeatSeconds(seconds: Int) { kv.putInt(TERMINAL_NS, SSH_HEARTBEAT_SECONDS_KEY, seconds.toLong()) }
     suspend fun saveSshKeepalive(enabled: Boolean) { kv.putBool(TERMINAL_NS, SSH_KEEPALIVE_KEY, enabled) }
     suspend fun saveLastCwd(cwd: String) { kv.putString(TERMINAL_NS, LAST_CWD_KEY, cwd) }
+    suspend fun saveCursorStyle(style: CursorStyle) { kv.putString(TERMINAL_NS, CURSOR_STYLE_KEY, style.stableKey) }
+    suspend fun saveCursorBlink(enabled: Boolean) { kv.putBool(TERMINAL_NS, CURSOR_BLINK_KEY, enabled) }
+    suspend fun saveScrollbackLines(lines: Int) { kv.putInt(TERMINAL_NS, SCROLLBACK_LINES_KEY, lines.toLong()) }
+    suspend fun saveExitConfirm(enabled: Boolean) { kv.putBool(TERMINAL_NS, EXIT_CONFIRM_KEY, enabled) }
+
+    /**
+     * 恢复默认终端设置：把所有终端偏好写回默认值。
+     * 不触碰 last_cwd / first_run_banner 等运行态键。
+     */
+    suspend fun resetAllTerminalPreferences() {
+        kv.putInt(TERMINAL_NS, FONT_SIZE_SP_KEY, TerminalFontSizes.DEFAULT.toLong())
+        kv.putString(TERMINAL_NS, THEME_KEY, TerminalTheme.FOLLOW_APP.name)
+        kv.putBool(TERMINAL_NS, SHOW_TAB_BAR_KEY, true)
+        kv.putBool(TERMINAL_NS, FULL_EXTRA_KEYS_KEY, false)
+        kv.putBool(TERMINAL_NS, SCALE_GESTURE_PERSISTS_KEY, true)
+        kv.putBool(TERMINAL_NS, AUTO_POP_IME_ON_SWITCH_KEY, true)
+        kv.putBool(TERMINAL_NS, NEW_OUTPUT_INDICATOR_KEY, true)
+        kv.putBool(TERMINAL_NS, AUTO_NEW_TAB_ON_CLOSE_LAST_KEY, true)
+        kv.putBool(TERMINAL_NS, KEEP_SESSION_WHEN_LEAVE_KEY, true)
+        kv.putBool(TERMINAL_NS, PASTE_AS_PLAIN_TEXT_KEY, true)
+        kv.putBool(TERMINAL_NS, SSH_AUTO_RECONNECT_KEY, true)
+        kv.putInt(TERMINAL_NS, SSH_HEARTBEAT_SECONDS_KEY, SshHeartbeatSeconds.S60.seconds.toLong())
+        kv.putBool(TERMINAL_NS, SSH_KEEPALIVE_KEY, true)
+        kv.putString(TERMINAL_NS, CURSOR_STYLE_KEY, CursorStyle.BLOCK.stableKey)
+        kv.putBool(TERMINAL_NS, CURSOR_BLINK_KEY, true)
+        kv.putInt(TERMINAL_NS, SCROLLBACK_LINES_KEY, ScrollbackLines.DEFAULT.toLong())
+        kv.putBool(TERMINAL_NS, EXIT_CONFIRM_KEY, false)
+    }
 
     // ── 快照读 ──
     suspend fun readFontSize(): Int = fontSizeFlow.first()
@@ -117,6 +176,8 @@ class TerminalSettingsRepository @Inject constructor(
 }
 
 object TerminalFontSizes {
+    const val MIN = 10
+    const val MAX = 24
     val STEPS = listOf(8, 10, 11, 12, 13, 14, 15, 16, 18, 20)
-    val DEFAULT = 12
+    const val DEFAULT = 12
 }

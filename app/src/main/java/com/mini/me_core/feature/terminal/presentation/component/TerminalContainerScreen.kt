@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -28,12 +29,17 @@ import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Restore
+import androidx.compose.material.icons.rounded.SettingsEthernet
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.TextFields
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.ViewColumn
 import androidx.compose.material.icons.rounded.ZoomIn
 import androidx.compose.material3.AlertDialog
@@ -48,7 +54,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -81,6 +89,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppButton
+import com.mini.me_core.core.theme.components.AppButtonColor
+import com.mini.me_core.core.theme.components.AppButtonVariant
 import com.mini.me_core.core.theme.components.AppListItem
 import com.mini.me_core.core.theme.components.AppSectionGroup
 import com.mini.me_core.core.theme.components.AppSectionHeader
@@ -91,6 +102,8 @@ import com.mini.me_core.feature.agent.domain.container.ContainerArch
 import com.mini.me_core.feature.agent.domain.container.ContainerProfile
 import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
+import com.mini.me_core.feature.terminal.data.repository.CursorStyle
+import com.mini.me_core.feature.terminal.data.repository.ScrollbackLines
 import com.mini.me_core.feature.terminal.data.repository.SshHeartbeatSeconds
 import com.mini.me_core.feature.terminal.data.repository.TerminalFontSizes
 import com.mini.me_core.feature.terminal.data.repository.TerminalTheme
@@ -129,14 +142,18 @@ fun TerminalContainerScreen(
 
     val fontSizeSp by viewModel.fontSizeSp.collectAsStateWithLifecycle()
     val theme by viewModel.terminalTheme.collectAsStateWithLifecycle()
+    val cursorStyle by viewModel.cursorStyle.collectAsStateWithLifecycle()
+    val cursorBlink by viewModel.cursorBlink.collectAsStateWithLifecycle()
     val showTabBar by viewModel.showTabBar.collectAsStateWithLifecycle()
     val fullExtraKeys by viewModel.fullExtraKeys.collectAsStateWithLifecycle()
     val scalePersists by viewModel.scaleGesturePersists.collectAsStateWithLifecycle()
     val autoPopIme by viewModel.autoPopImeOnSwitch.collectAsStateWithLifecycle()
+    val pasteAsPlain by viewModel.pasteAsPlainText.collectAsStateWithLifecycle()
     val newOutputIndicator by viewModel.newOutputIndicator.collectAsStateWithLifecycle()
     val autoNewTabOnCloseLast by viewModel.autoNewTabOnCloseLast.collectAsStateWithLifecycle()
     val keepSession by viewModel.keepSessionWhenLeave.collectAsStateWithLifecycle()
-    val pasteAsPlain by viewModel.pasteAsPlainText.collectAsStateWithLifecycle()
+    val scrollbackLines by viewModel.scrollbackLines.collectAsStateWithLifecycle()
+    val exitConfirm by viewModel.exitConfirm.collectAsStateWithLifecycle()
     val sshAutoReconnect by viewModel.sshAutoReconnect.collectAsStateWithLifecycle()
     val sshHeartbeat by viewModel.sshHeartbeatSeconds.collectAsStateWithLifecycle()
     val sshKeepalive by viewModel.sshKeepalive.collectAsStateWithLifecycle()
@@ -159,6 +176,9 @@ fun TerminalContainerScreen(
     var showImagePicker by remember { mutableStateOf(false) }
     var showHeartbeatPicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
+    var showCursorPicker by remember { mutableStateOf(false) }
+    var showScrollbackPicker by remember { mutableStateOf(false) }
+    var showRestoreDefaultsConfirm by remember { mutableStateOf(false) }
     var showProfileSheet by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf<ContainerProfile?>(null) }
     var deletingProfile by remember { mutableStateOf<ContainerProfile?>(null) }
@@ -315,41 +335,49 @@ fun TerminalContainerScreen(
                         scrollState = terminalScrollState,
                         fontSizeSp = fontSizeSp,
                         theme = theme,
+                        cursorStyle = cursorStyle,
+                        cursorBlink = cursorBlink,
                         showTabBar = showTabBar,
                         fullExtraKeys = fullExtraKeys,
                         scalePersists = scalePersists,
                         autoPopIme = autoPopIme,
+                        pasteAsPlain = pasteAsPlain,
                         newOutputIndicator = newOutputIndicator,
                         autoNewTabOnCloseLast = autoNewTabOnCloseLast,
                         keepSession = keepSession,
-                        pasteAsPlain = pasteAsPlain,
+                        scrollbackLines = scrollbackLines,
+                        exitConfirm = exitConfirm,
                         sshAutoReconnect = sshAutoReconnect,
                         sshHeartbeat = sshHeartbeat,
                         sshKeepalive = sshKeepalive,
-                        onFontSizeDecrease = {
-                            val steps = TerminalFontSizes.STEPS
-                            val idx = steps.binarySearch(fontSizeSp).let { if (it < 0) -it - 1 else it }
-                            if (idx - 1 >= 0) viewModel.setFontSizeSp(steps[idx - 1])
-                        },
-                        onFontSizeIncrease = {
-                            val steps = TerminalFontSizes.STEPS
-                            val idx = steps.binarySearch(fontSizeSp).let { if (it < 0) -it - 1 else it }
-                            if (idx + 1 <= steps.lastIndex) viewModel.setFontSizeSp(steps[idx + 1])
-                        },
+                        onFontSizeChange = viewModel::setFontSizeSp,
                         onThemeClick = { showThemePicker = true },
+                        onCursorStyleClick = { showCursorPicker = true },
+                        onCursorBlinkChange = viewModel::setCursorBlink,
                         onShowTabBarChange = viewModel::setShowTabBar,
                         onFullExtraKeysChange = viewModel::setFullExtraKeys,
                         onScalePersistsChange = viewModel::setScaleGesturePersists,
                         onAutoPopImeChange = viewModel::setAutoPopImeOnSwitch,
-                        onResetCtrlHint = viewModel::resetCtrlHint,
+                        onPasteAsPlainChange = viewModel::setPasteAsPlainText,
+                        onResetCtrlHint = {
+                            viewModel.resetCtrlHint()
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    context.getString(R.string.terminal_reset_ctrl_hint_done),
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
+                        },
                         onNewOutputIndicatorChange = viewModel::setNewOutputIndicator,
                         onAutoNewTabChange = viewModel::setAutoNewTabOnCloseLast,
                         onKeepSessionChange = viewModel::setKeepSessionWhenLeave,
-                        onPasteAsPlainChange = viewModel::setPasteAsPlainText,
+                        onScrollbackClick = { showScrollbackPicker = true },
+                        onExitConfirmChange = viewModel::setExitConfirm,
                         onSshAutoReconnectChange = viewModel::setSshAutoReconnect,
                         onSshKeepaliveChange = viewModel::setSshKeepalive,
                         onHeartbeatClick = { showHeartbeatPicker = true },
                         onSshHostsClick = onNavigateToSshHosts,
+                        onRestoreDefaultsClick = { showRestoreDefaultsConfirm = true },
                     )
                 }
             }
@@ -514,7 +542,7 @@ fun TerminalContainerScreen(
 
     // 主题选择
     if (showThemePicker) {
-        ThemePickerDialogInternal(
+        ColorSchemePickerDialogInternal(
             current = theme,
             onDismiss = { showThemePicker = false },
             onConfirm = { t ->
@@ -532,6 +560,59 @@ fun TerminalContainerScreen(
             onConfirm = { s ->
                 viewModel.setSshHeartbeatSeconds(s)
                 showHeartbeatPicker = false
+            }
+        )
+    }
+
+    // 光标样式选择
+    if (showCursorPicker) {
+        CursorStylePickerDialogInternal(
+            current = cursorStyle,
+            onDismiss = { showCursorPicker = false },
+            onConfirm = { s ->
+                viewModel.setCursorStyle(s)
+                showCursorPicker = false
+            }
+        )
+    }
+
+    // 滚动缓冲行数选择
+    if (showScrollbackPicker) {
+        ScrollbackPickerDialogInternal(
+            current = scrollbackLines,
+            onDismiss = { showScrollbackPicker = false },
+            onConfirm = { lines ->
+                viewModel.setScrollbackLines(lines)
+                showScrollbackPicker = false
+            }
+        )
+    }
+
+    // 恢复默认终端设置确认
+    if (showRestoreDefaultsConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRestoreDefaultsConfirm = false },
+            title = { Text(stringResource(R.string.terminal_restore_defaults_confirm_title)) },
+            text = { Text(stringResource(R.string.terminal_restore_defaults_confirm_msg)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRestoreDefaultsConfirm = false
+                    viewModel.resetAllTerminalSettings {
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                context.getString(R.string.terminal_restore_defaults_done),
+                                duration = SnackbarDuration.Short
+                            )
+                        }
+                    }
+                }) {
+                    Text(stringResource(R.string.common_confirm), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRestoreDefaultsConfirm = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
             }
         )
     }
@@ -703,33 +784,41 @@ private fun TerminalTabContent(
     scrollState: androidx.compose.foundation.ScrollState,
     fontSizeSp: Int,
     theme: TerminalTheme,
+    cursorStyle: CursorStyle,
+    cursorBlink: Boolean,
     showTabBar: Boolean,
     fullExtraKeys: Boolean,
     scalePersists: Boolean,
     autoPopIme: Boolean,
+    pasteAsPlain: Boolean,
     newOutputIndicator: Boolean,
     autoNewTabOnCloseLast: Boolean,
     keepSession: Boolean,
-    pasteAsPlain: Boolean,
+    scrollbackLines: Int,
+    exitConfirm: Boolean,
     sshAutoReconnect: Boolean,
     sshHeartbeat: Int,
     sshKeepalive: Boolean,
-    onFontSizeDecrease: () -> Unit,
-    onFontSizeIncrease: () -> Unit,
+    onFontSizeChange: (Int) -> Unit,
     onThemeClick: () -> Unit,
+    onCursorStyleClick: () -> Unit,
+    onCursorBlinkChange: (Boolean) -> Unit,
     onShowTabBarChange: (Boolean) -> Unit,
     onFullExtraKeysChange: (Boolean) -> Unit,
     onScalePersistsChange: (Boolean) -> Unit,
     onAutoPopImeChange: (Boolean) -> Unit,
+    onPasteAsPlainChange: (Boolean) -> Unit,
     onResetCtrlHint: () -> Unit,
     onNewOutputIndicatorChange: (Boolean) -> Unit,
     onAutoNewTabChange: (Boolean) -> Unit,
     onKeepSessionChange: (Boolean) -> Unit,
-    onPasteAsPlainChange: (Boolean) -> Unit,
+    onScrollbackClick: () -> Unit,
+    onExitConfirmChange: (Boolean) -> Unit,
     onSshAutoReconnectChange: (Boolean) -> Unit,
     onSshKeepaliveChange: (Boolean) -> Unit,
     onHeartbeatClick: () -> Unit,
     onSshHostsClick: () -> Unit,
+    onRestoreDefaultsClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -739,32 +828,41 @@ private fun TerminalTabContent(
         verticalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
         // G1 外观
-        AppSectionHeader(title = stringResource(R.string.settings_category_appearance))
+        AppSectionHeader(title = stringResource(R.string.terminal_appearance))
         AppSectionGroup {
-            StepperRow(
-                icon = Icons.Rounded.TextFields,
-                title = stringResource(R.string.ui______58a3ff82),
-                subtitle = "${fontSizeSp} sp（推荐 11-14 sp）",
-                onDecrease = onFontSizeDecrease,
-                onIncrease = onFontSizeIncrease,
+            FontSizeRow(
+                fontSizeSp = fontSizeSp,
+                onValueChange = onFontSizeChange,
+                onDecrease = { onFontSizeChange((fontSizeSp - 1).coerceIn(TerminalFontSizes.MIN, TerminalFontSizes.MAX)) },
+                onIncrease = { onFontSizeChange((fontSizeSp + 1).coerceIn(TerminalFontSizes.MIN, TerminalFontSizes.MAX)) },
                 showDivider = true
             )
             AppListItem(
                 icon = Icons.Rounded.DarkMode,
-                title = stringResource(R.string.ui________48cee970),
-                subtitle = when (theme) {
-                    TerminalTheme.FOLLOW_APP -> stringResource(R.string.ui______40b081ab)
-                    TerminalTheme.PURE_BLACK -> stringResource(R.string.ui______f5242d83)
-                    TerminalTheme.PURE_WHITE -> stringResource(R.string.ui______c68108f0)
-                    else -> theme.stableKey
-                },
+                title = stringResource(R.string.terminal_color_scheme),
+                subtitle = themeLabel(theme),
                 onViewClick = onThemeClick,
                 showDivider = true
             )
             AppListItem(
+                icon = Icons.Rounded.Edit,
+                title = stringResource(R.string.terminal_cursor_style),
+                subtitle = cursorStyleLabel(cursorStyle),
+                onViewClick = onCursorStyleClick,
+                showDivider = true
+            )
+            AppListItem(
+                icon = Icons.Rounded.Visibility,
+                title = stringResource(R.string.terminal_cursor_blink),
+                subtitle = stringResource(R.string.terminal_cursor_blink_sub),
+                checked = cursorBlink,
+                onCheckedChange = onCursorBlinkChange,
+                showDivider = true
+            )
+            AppListItem(
                 icon = Icons.Rounded.ViewColumn,
-                title = stringResource(R.string.ui____caa23c17),
-                subtitle = stringResource(R.string.ui______________aeee5eb0),
+                title = stringResource(R.string.terminal_show_tab_bar),
+                subtitle = stringResource(R.string.terminal_show_tab_bar_sub),
                 checked = showTabBar,
                 onCheckedChange = onShowTabBarChange,
                 showDivider = false
@@ -772,125 +870,182 @@ private fun TerminalTabContent(
         }
 
         // G2 键盘 & 交互
-        AppSectionHeader(title = stringResource(R.string.ui____e1dd53a4))
+        AppSectionHeader(title = stringResource(R.string.terminal_keyboard))
         AppSectionGroup {
             AppListItem(
                 icon = Icons.Rounded.Dashboard,
-                title = stringResource(R.string.ui________bd4b33a0),
-                subtitle = "关闭为精简布局（仅 Ctrl/Alt/Fn/方向）",
+                title = stringResource(R.string.terminal_full_extra_keys),
+                subtitle = stringResource(R.string.terminal_full_extra_keys_sub),
                 checked = fullExtraKeys,
                 onCheckedChange = onFullExtraKeysChange,
                 showDivider = true
             )
             AppListItem(
                 icon = Icons.Rounded.ZoomIn,
-                title = stringResource(R.string.ui___________19a36c2d),
-                subtitle = stringResource(R.string.ui______________82f9dac5),
+                title = stringResource(R.string.terminal_scale_persists),
+                subtitle = stringResource(R.string.terminal_scale_persists_sub),
                 checked = scalePersists,
                 onCheckedChange = onScalePersistsChange,
                 showDivider = true
             )
             AppListItem(
                 icon = Icons.Rounded.Terminal,
-                title = stringResource(R.string.ui__________a6cbf757),
-                subtitle = stringResource(R.string.ui______________05546ade),
+                title = stringResource(R.string.terminal_auto_pop_ime),
+                subtitle = stringResource(R.string.terminal_auto_pop_ime_sub),
                 checked = autoPopIme,
                 onCheckedChange = onAutoPopImeChange,
                 showDivider = true
             )
             AppListItem(
-                icon = Icons.Rounded.Info,
-                title = stringResource(R.string.ui____2959acd6),
-                subtitle = stringResource(R.string.ui_____18a3cbe4),
-                onClick = onResetCtrlHint,
+                icon = Icons.Rounded.ContentPaste,
+                title = stringResource(R.string.terminal_paste_plain),
+                subtitle = stringResource(R.string.terminal_paste_plain_sub),
+                checked = pasteAsPlain,
+                onCheckedChange = onPasteAsPlainChange,
                 showDivider = false
+            )
+            // 重置 Ctrl 提示：独立 TonalButton，不与开关混排
+            AppButton(
+                text = stringResource(R.string.terminal_reset_ctrl_hint),
+                onClick = onResetCtrlHint,
+                variant = AppButtonVariant.Tonal,
+                buttonColor = AppButtonColor.Neutral,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
             )
         }
 
         // G3 行为
-        AppSectionHeader(title = stringResource(R.string.ui____a0496123))
+        AppSectionHeader(title = stringResource(R.string.terminal_behavior))
         AppSectionGroup {
             AppListItem(
                 icon = Icons.Rounded.Notifications,
-                title = stringResource(R.string.ui_____________996140c5),
-                subtitle = stringResource(R.string.ui_____46f74d41),
+                title = stringResource(R.string.terminal_new_output_indicator),
+                subtitle = stringResource(R.string.terminal_new_output_indicator_sub),
                 checked = newOutputIndicator,
                 onCheckedChange = onNewOutputIndicatorChange,
                 showDivider = true
             )
             AppListItem(
                 icon = Icons.Default.Add,
-                title = stringResource(R.string.ui_____________0184da1b),
-                subtitle = stringResource(R.string.ui_____________73b957c1),
+                title = stringResource(R.string.terminal_auto_new_tab),
+                subtitle = stringResource(R.string.terminal_auto_new_tab_sub),
                 checked = autoNewTabOnCloseLast,
                 onCheckedChange = onAutoNewTabChange,
                 showDivider = true
             )
             AppListItem(
                 icon = Icons.Rounded.Archive,
-                title = stringResource(R.string.ui___________37172e85),
-                subtitle = stringResource(R.string.ui______________427e9b33),
+                title = stringResource(R.string.terminal_keep_session),
+                subtitle = stringResource(R.string.terminal_keep_session_sub),
                 checked = keepSession,
                 onCheckedChange = onKeepSessionChange,
                 showDivider = true
             )
             AppListItem(
-                icon = Icons.Rounded.ContentPaste,
-                title = stringResource(R.string.ui________52007b14),
-                subtitle = stringResource(R.string.ui______________eb6dcb95),
-                checked = pasteAsPlain,
-                onCheckedChange = onPasteAsPlainChange,
+                icon = Icons.Rounded.History,
+                title = stringResource(R.string.terminal_scrollback),
+                subtitle = scrollbackLabel(scrollbackLines),
+                onViewClick = onScrollbackClick,
+                showDivider = true
+            )
+            AppListItem(
+                icon = Icons.AutoMirrored.Rounded.ExitToApp,
+                title = stringResource(R.string.terminal_exit_confirm),
+                subtitle = stringResource(R.string.terminal_exit_confirm_sub),
+                checked = exitConfirm,
+                onCheckedChange = onExitConfirmChange,
                 showDivider = false
             )
         }
 
-        // G4 SSH 常用
-        AppSectionHeader(title = stringResource(R.string.ui_ssh_ac7515bd))
+        // G4 SSH 连接
+        AppSectionHeader(title = stringResource(R.string.terminal_ssh_section))
         AppSectionGroup {
             AppListItem(
                 icon = Icons.Rounded.Refresh,
-                title = stringResource(R.string.ui________66d1f9aa),
-                subtitle = stringResource(R.string.ui______f096b834),
+                title = stringResource(R.string.terminal_ssh_auto_reconnect),
+                subtitle = stringResource(R.string.terminal_ssh_auto_reconnect_sub),
                 checked = sshAutoReconnect,
                 onCheckedChange = onSshAutoReconnectChange,
                 showDivider = true
             )
             AppListItem(
-                icon = Icons.Rounded.Dns,
-                title = "TCP KeepAlive",
-                subtitle = stringResource(R.string.ui______________8a0ba94d),
+                icon = Icons.Rounded.SettingsEthernet,
+                title = stringResource(R.string.terminal_ssh_tcp_keepalive),
+                subtitle = stringResource(R.string.terminal_ssh_tcp_keepalive_sub),
                 checked = sshKeepalive,
                 onCheckedChange = onSshKeepaliveChange,
                 showDivider = true
             )
             AppListItem(
                 icon = Icons.Rounded.MonitorHeart,
-                title = stringResource(R.string.ui______9901e9b6),
+                title = stringResource(R.string.terminal_ssh_heartbeat),
                 subtitle = SshHeartbeatSeconds.fromSeconds(sshHeartbeat).display,
                 onViewClick = onHeartbeatClick,
                 showDivider = true
             )
             AppListItem(
                 icon = Icons.Rounded.Dns,
-                title = stringResource(R.string.ui____9c828e97),
-                subtitle = "新增/编辑/删除 SSH 主机和密钥",
+                title = stringResource(R.string.terminal_ssh_hosts),
+                subtitle = stringResource(R.string.terminal_ssh_hosts_sub),
                 onViewClick = onSshHostsClick,
                 showDivider = false
             )
         }
 
+        // G5 底部操作区
+        AppButton(
+            text = stringResource(R.string.terminal_restore_defaults),
+            onClick = onRestoreDefaultsClick,
+            variant = AppButtonVariant.Tonal,
+            buttonColor = AppButtonColor.Neutral,
+            icon = Icons.Rounded.Restore,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg)
+        )
+
         Spacer(modifier = Modifier.height(Spacing.xl))
     }
 }
 
+@Composable
+private fun themeLabel(theme: TerminalTheme): String = when (theme) {
+    TerminalTheme.FOLLOW_APP -> stringResource(R.string.terminal_color_follow)
+    TerminalTheme.PURE_BLACK -> stringResource(R.string.terminal_color_pure_black)
+    TerminalTheme.PURE_WHITE -> stringResource(R.string.terminal_color_pure_white)
+    TerminalTheme.AMOLED_BLACK -> stringResource(R.string.terminal_color_amoled)
+    else -> theme.stableKey
+}
+
+@Composable
+private fun cursorStyleLabel(style: CursorStyle): String = when (style) {
+    CursorStyle.BLOCK -> stringResource(R.string.terminal_cursor_block)
+    CursorStyle.UNDERLINE -> stringResource(R.string.terminal_cursor_underline)
+    CursorStyle.BAR -> stringResource(R.string.terminal_cursor_bar)
+}
+
+@Composable
+private fun scrollbackLabel(lines: Int): String =
+    if (lines == ScrollbackLines.UNLIMITED) stringResource(R.string.terminal_scrollback_unlimited)
+    else stringResource(R.string.terminal_scrollback_lines, lines)
+
+@Composable
+private fun cursorGlyph(style: CursorStyle): String = when (style) {
+    CursorStyle.BLOCK -> "█"
+    CursorStyle.UNDERLINE -> "_"
+    CursorStyle.BAR -> "|"
+}
+
 // ================================================================
-// Stepper Row (internal, reused from TerminalSettingsScreen)
+// 字号行：图标 + 标题/数值 + -/+ 按钮，下方通栏 Slider（10-24 sp）
 // ================================================================
 @Composable
-internal fun StepperRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
+private fun FontSizeRow(
+    fontSizeSp: Int,
+    onValueChange: (Int) -> Unit,
     onDecrease: () -> Unit,
     onIncrease: () -> Unit,
     showDivider: Boolean = true
@@ -899,40 +1054,58 @@ internal fun StepperRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(PrimitiveSpacing.Lg),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(Modifier.width(PrimitiveSpacing.Md))
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.TextFields,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = stringResource(R.string.terminal_font_size),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    text = stringResource(R.string.terminal_font_size_hint),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onDecrease, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Remove, null, modifier = Modifier.size(18.dp))
-                }
-                IconButton(onClick = onIncrease, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                }
+            Text(
+                text = stringResource(R.string.terminal_font_size_value, fontSizeSp),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            IconButton(onClick = onDecrease, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Remove, null, modifier = Modifier.size(18.dp))
+            }
+            IconButton(onClick = onIncrease, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
             }
         }
+        Slider(
+            value = fontSizeSp.toFloat(),
+            onValueChange = { onValueChange(it.toInt()) },
+            valueRange = TerminalFontSizes.MIN.toFloat()..TerminalFontSizes.MAX.toFloat(),
+            modifier = Modifier.padding(horizontal = Spacing.lg)
+        )
         if (showDivider) {
             HorizontalDivider(
-                modifier = Modifier.padding(start = 56.dp),
+                modifier = Modifier.padding(start = Spacing.lg + 38.dp + Spacing.md),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
         }
@@ -1101,33 +1274,162 @@ internal fun MirrorPickerDialogInternal(
 }
 
 @Composable
-internal fun ThemePickerDialogInternal(
+internal fun ColorSchemePickerDialogInternal(
     current: TerminalTheme,
     onDismiss: () -> Unit,
     onConfirm: (TerminalTheme) -> Unit
 ) {
     val options = listOf(
-        TerminalTheme.FOLLOW_APP to stringResource(R.string.ui______40b081ab_2),
-        TerminalTheme.PURE_BLACK to stringResource(R.string.ui______27771d06),
-        TerminalTheme.PURE_WHITE to stringResource(R.string.ui______909e0e94)
+        TerminalTheme.FOLLOW_APP,
+        TerminalTheme.PURE_BLACK,
+        TerminalTheme.PURE_WHITE,
+        TerminalTheme.AMOLED_BLACK,
     )
     var selected by remember { mutableStateOf(current) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.ui________48cee970_2)) },
+        title = { Text(stringResource(R.string.terminal_color_scheme)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                options.forEach { (v, label) ->
-                    FilterChip(
-                        selected = selected == v,
-                        onClick = { selected = v },
-                        label = { Text(label) }
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                options.forEach { t ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+                            .clickable { selected = t }
+                            .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ColorSwatch(theme = t)
+                        Spacer(Modifier.width(Spacing.md))
+                        Text(
+                            text = themeLabel(t),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (selected == t) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(selected) }) { Text(stringResource(R.string.ui____e83a256e_2)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui____625fb26b_5)) } }
+        confirmButton = { TextButton(onClick = { onConfirm(selected) }) { Text(stringResource(R.string.common_confirm)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
+    )
+}
+
+/**
+ * 配色预览色块：16dp 方块展示对应背景色 + 前景字符色。
+ * 纯黑/纯白/AMOLED黑为终端真实主题色（功能性预览），跟随程序取 colorScheme。
+ */
+@Composable
+private fun ColorSwatch(theme: TerminalTheme) {
+    val (bg, fg) = when (theme) {
+        TerminalTheme.FOLLOW_APP -> MaterialTheme.colorScheme.background to MaterialTheme.colorScheme.onBackground
+        TerminalTheme.PURE_BLACK -> Color(0xFF0D0D0D) to Color.White
+        TerminalTheme.PURE_WHITE -> Color(0xFFF5F5F5) to Color.Black
+        TerminalTheme.AMOLED_BLACK -> Color(0xFF000000) to Color.White
+        else -> MaterialTheme.colorScheme.surface to MaterialTheme.colorScheme.onSurface
+    }
+    Box(
+        modifier = Modifier
+            .size(20.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(bg),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "Aa",
+            color = fg,
+            style = MaterialTheme.typography.labelSmall
+        )
+    }
+}
+
+@Composable
+internal fun CursorStylePickerDialogInternal(
+    current: CursorStyle,
+    onDismiss: () -> Unit,
+    onConfirm: (CursorStyle) -> Unit
+) {
+    var selected by remember { mutableStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.terminal_cursor_style)) },
+        text = {
+            Column {
+                CursorStyle.entries.forEach { s ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+                            .clickable { selected = s }
+                            .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = selected == s, onClick = { selected = s })
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(
+                            text = cursorGlyph(s),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.width(28.dp)
+                        )
+                        Text(
+                            text = cursorStyleLabel(s),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(selected) }) { Text(stringResource(R.string.common_confirm)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
+    )
+}
+
+@Composable
+internal fun ScrollbackPickerDialogInternal(
+    current: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit
+) {
+    var selected by remember { mutableStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.terminal_scrollback)) },
+        text = {
+            Column {
+                ScrollbackLines.OPTIONS.forEach { opt ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+                            .clickable { selected = opt }
+                            .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = selected == opt, onClick = { selected = opt })
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(
+                            text = scrollbackLabel(opt),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(selected) }) { Text(stringResource(R.string.common_confirm)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     )
 }
 

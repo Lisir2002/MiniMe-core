@@ -17,6 +17,7 @@ object TerminalThemeManager {
         TerminalTheme.FOLLOW_APP -> if (appDark) darkDefault() else lightDefault()
         TerminalTheme.PURE_BLACK -> darkDefault()
         TerminalTheme.PURE_WHITE -> lightDefault()
+        TerminalTheme.AMOLED_BLACK -> darkDefault()
         TerminalTheme.DRACULA -> ThemeColors(Color(0xFF282A36), Color(0xFFF8F8F2), Color(0xFFBD93F9))
         TerminalTheme.SOLARIZED_DARK -> ThemeColors(Color(0xFF002B36), Color(0xFF93A1A1), Color(0xFF93A1A1))
         TerminalTheme.SOLARIZED_LIGHT -> ThemeColors(Color(0xFFFDF6E3), Color(0xFF657B83), Color(0xFF657B83))

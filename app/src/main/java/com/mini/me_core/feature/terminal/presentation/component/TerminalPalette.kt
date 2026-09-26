@@ -160,6 +160,7 @@ fun rememberTerminalPalette(
         TerminalTheme.PURE_BLACK -> PureBlackPalette
         TerminalTheme.PURE_WHITE -> PureWhitePalette
         TerminalTheme.FOLLOW_APP -> if (appDarkMode) PureBlackPalette else PureWhitePalette
+        TerminalTheme.AMOLED_BLACK -> PureBlackPalette
         // F3.6 新增主题：暂用黑白底，后续可接入完整 ANSI 16 色
         TerminalTheme.DRACULA,
         TerminalTheme.SOLARIZED_DARK,
