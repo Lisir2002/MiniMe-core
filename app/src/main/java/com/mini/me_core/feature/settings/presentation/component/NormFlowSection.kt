@@ -23,8 +23,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.FactCheck
+import androidx.compose.material.icons.automirrored.rounded.Input
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.ListAlt
+import androidx.compose.material.icons.automirrored.rounded.Rule
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Book
@@ -32,15 +36,11 @@ import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.FactCheck
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.FolderZip
-import androidx.compose.material.icons.rounded.Input
-import androidx.compose.material.icons.rounded.ListAlt
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Pin
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Rule
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.Card
@@ -184,7 +184,7 @@ internal fun NormFlowSection(
         item {
             ThemedCollapsibleGroup(
                 themeColor = MaterialTheme.colorScheme.primary,
-                icon = Icons.Rounded.Input,
+                icon = Icons.AutoMirrored.Rounded.Input,
                 title = stringResource(R.string.norm_flow_group_injection),
                 subtitle = stringResource(R.string.norm_flow_group_injection_desc),
                 enabledCount = listOf(
@@ -196,7 +196,7 @@ internal fun NormFlowSection(
                 onToggleExpand = { injectionExpanded = !injectionExpanded }
             ) {
                 GroupSwitchRow(
-                    icon = Icons.Rounded.Input,
+                    icon = Icons.AutoMirrored.Rounded.Input,
                     title = stringResource(R.string.settings_norm_flow_step_inject),
                     subtitle = stringResource(R.string.settings_norm_flow_step_inject_desc),
                     checked = stepInjectEnabled,
@@ -204,7 +204,7 @@ internal fun NormFlowSection(
                     enabled = normFlowEnabled
                 )
                 GroupSwitchRow(
-                    icon = Icons.Rounded.FactCheck,
+                    icon = Icons.AutoMirrored.Rounded.FactCheck,
                     title = stringResource(R.string.norm_flow_step_inject_goal),
                     subtitle = stringResource(R.string.norm_flow_step_inject_goal_desc),
                     checked = stepInjectGoalEnabled,
@@ -223,7 +223,7 @@ internal fun NormFlowSection(
                     onViewClick = onViewStaticRules
                 )
                 GroupSwitchRow(
-                    icon = Icons.Rounded.ListAlt,
+                    icon = Icons.AutoMirrored.Rounded.ListAlt,
                     title = stringResource(R.string.norm_flow_step_inject_sop_summary),
                     subtitle = stringResource(R.string.norm_flow_step_inject_sop_summary_desc),
                     checked = sopSummaryEnabled,
@@ -233,7 +233,7 @@ internal fun NormFlowSection(
                     onViewClick = onViewSop
                 )
                 GroupSwitchRow(
-                    icon = Icons.Rounded.Rule,
+                    icon = Icons.AutoMirrored.Rounded.Rule,
                     title = stringResource(R.string.norm_flow_step_inject_layered_rules),
                     subtitle = stringResource(R.string.norm_flow_step_inject_layered_rules_desc),
                     checked = stepInjectLayeredRulesEnabled,
@@ -591,7 +591,7 @@ private fun ChainStep(label: String, active: Boolean) {
 @Composable
 private fun ChainArrow() {
     Icon(
-        Icons.Rounded.ArrowForward,
+        Icons.AutoMirrored.Rounded.ArrowForward,
         contentDescription = null,
         modifier = Modifier.size(12.dp).padding(horizontal = 2.dp),
         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
@@ -656,6 +656,7 @@ private fun PresetCardsRow(
         PresetCard(
             modifier = Modifier.weight(1f),
             title = stringResource(R.string.norm_flow_preset_strict),
+            desc = stringResource(R.string.norm_flow_preset_strict_desc),
             icon = Icons.Rounded.Shield,
             isActive = activePreset == "strict",
             onClick = { onApplyPreset("strict") }
@@ -663,6 +664,7 @@ private fun PresetCardsRow(
         PresetCard(
             modifier = Modifier.weight(1f),
             title = stringResource(R.string.norm_flow_preset_standard),
+            desc = stringResource(R.string.norm_flow_preset_standard_desc),
             icon = Icons.Rounded.CheckCircle,
             isActive = activePreset == "standard",
             onClick = { onApplyPreset("standard") }
@@ -670,6 +672,7 @@ private fun PresetCardsRow(
         PresetCard(
             modifier = Modifier.weight(1f),
             title = stringResource(R.string.norm_flow_preset_minimal),
+            desc = stringResource(R.string.norm_flow_preset_minimal_desc),
             icon = Icons.Rounded.Bolt,
             isActive = activePreset == "minimal",
             onClick = { onApplyPreset("minimal") }
@@ -681,6 +684,7 @@ private fun PresetCardsRow(
 private fun PresetCard(
     modifier: Modifier = Modifier,
     title: String,
+    desc: String,
     icon: ImageVector,
     isActive: Boolean,
     onClick: () -> Unit
@@ -711,7 +715,15 @@ private fun PresetCard(
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal
             )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = desc,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
             if (isActive) {
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = stringResource(R.string.norm_flow_preset_current),
                     style = MaterialTheme.typography.labelSmall,

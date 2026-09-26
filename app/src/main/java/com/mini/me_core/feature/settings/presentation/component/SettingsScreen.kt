@@ -202,6 +202,10 @@ fun SettingsScreen(
     val largeFileEnabled by viewModel.guardLargeFileEnabled.collectAsStateWithLifecycle()
     val pathBoundaryEnabled by viewModel.guardPathBoundaryEnabled.collectAsStateWithLifecycle()
     val usageCardItems by viewModel.usageCardItems.collectAsStateWithLifecycle()
+    // 仪表盘真实统计
+    val injectTokenCount by viewModel.injectTokenCount.collectAsStateWithLifecycle()
+    val guardBlockCount by viewModel.guardBlockCount.collectAsStateWithLifecycle()
+    val idleRoundCount by viewModel.idleRoundCount.collectAsStateWithLifecycle()
 
     var section by remember { mutableStateOf(SettingsSection.Menu) }
     var logReturnSection by remember { mutableStateOf(SettingsSection.Menu) }
@@ -530,6 +534,9 @@ fun SettingsScreen(
                             largeFileEnabled = largeFileEnabled,
                             pathBoundaryEnabled = pathBoundaryEnabled,
                             usageCardItems = usageCardItems,
+                            injectTokenCount = injectTokenCount,
+                            guardBlockCount = guardBlockCount,
+                            idleRoundCount = idleRoundCount,
                             onToggleNormFlow = { viewModel.setNormFlowEnabled(it) },
                             onToggleStepInject = { viewModel.setStepInjectEnabled(it) },
                             onToggleToolGuard = { viewModel.setToolGuardEnabled(it) },
@@ -560,7 +567,8 @@ fun SettingsScreen(
                                 val cm = clipboardContext.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                 cm.setPrimaryClip(android.content.ClipData.newPlainText("norm_flow_config", json))
                             },
-                            onImportConfig = { showImportDialog = true }
+                            onImportConfig = { showImportDialog = true },
+                            onResetStats = { viewModel.resetNormFlowStats() }
                         )
                     }
                 }
