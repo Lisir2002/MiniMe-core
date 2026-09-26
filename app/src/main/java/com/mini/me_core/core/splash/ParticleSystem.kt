@@ -15,6 +15,12 @@ import kotlin.random.Random
  * All particles are round dots (no rotating shards — they blur text outlines).
  *
  * All positions are in pixel coordinates.
+ *
+ * Enhancements over v1:
+ * - Per-particle sizeScale: starts at 1.5x during explode, shrinks to 1.0x on converge
+ *   → creates a "suction/inhale" feel rather than uniform movement.
+ * - Per-particle color brightness/saturation jitter (±15%) for depth layering.
+ * - Pre-computed tinted color arrays filled once per MaterialTheme change.
  */
 class ParticleSystem(
     private val screenWidthPx: Float,
@@ -42,9 +48,23 @@ class ParticleSystem(
     private val shatterVy = FloatArray(count)
 
     // Particle properties
-    val size = FloatArray(count)        // radius in px
+    val size = FloatArray(count)        // base radius in px
     val isAccent = BooleanArray(count)  // true = primary color accent particle (30%)
     private val seed = FloatArray(count) // random seed for micro-vibration
+
+    // Size scale: 1.5x at explode → 1.0x when fully converged (inhale effect)
+    val sizeScale = FloatArray(count).apply { fill(1.5f) }
+
+    // Color jitter per particle: brightness multiplier 0.85–1.15
+    val brightFactor = FloatArray(count)
+    // Color jitter: saturation multiplier 0.85–1.15
+    val satFactor = FloatArray(count)
+
+    // Pre-computed tinted colors (filled by precomputeColors()).
+    // primaryTinted[i] = primaryColor adjusted by bright/sat factor.
+    // onBgTinted[i]    = onBackgroundColor adjusted by bright/sat factor.
+    val primaryTinted = IntArray(count)
+    val onBgTinted = IntArray(count)
 
     // Color mix: 0 = explosion phase, 1 = fully formed text
     var colorMix: Float = 0f
@@ -90,14 +110,53 @@ class ParticleSystem(
             // 30% accent particles (primary color), 70% onBackground
             isAccent[i] = Random.nextFloat() < 0.3f
 
+            // Color jitter: ±15% brightness and saturation
+            brightFactor[i] = 0.85f + Random.nextFloat() * 0.3f
+            satFactor[i] = 0.85f + Random.nextFloat() * 0.3f
+
             seed[i] = Random.nextFloat() * 1000f
         }
     }
 
     /**
+     * Pre-compute per-particle tinted colors from the given base ARGB colors.
+     * Applies brightness and saturation jitter. Call once per theme change.
+     */
+    fun precomputeColors(primaryArgb: Int, onBgArgb: Int) {
+        for (i in 0 until count) {
+            primaryTinted[i] = adjustColor(primaryArgb, brightFactor[i], satFactor[i])
+            onBgTinted[i] = adjustColor(onBgArgb, brightFactor[i], satFactor[i])
+        }
+    }
+
+    /** Adjust brightness (r,g,b multiply) and saturation toward/away from gray. */
+    private fun adjustColor(argb: Int, bright: Float, sat: Float): Int {
+        val a = (argb ushr 24) and 0xFF
+        val r = (argb ushr 16) and 0xFF
+        val g = (argb ushr 8) and 0xFF
+        val b = argb and 0xFF
+
+        // Brightness: scale RGB around mid-gray
+        val mid = 128f
+        var nr = mid + (r - mid) * bright
+        var ng = mid + (g - mid) * bright
+        var nb = mid + (b - mid) * bright
+
+        // Saturation: blend toward gray by (1 - sat)
+        val gray = (nr + ng + nb) / 3f
+        nr = gray + (nr - gray) * sat
+        ng = gray + (ng - gray) * sat
+        nb = gray + (nb - gray) * sat
+
+        val cr = nr.toInt().coerceIn(0, 255)
+        val cg = ng.toInt().coerceIn(0, 255)
+        val cb = nb.toInt().coerceIn(0, 255)
+        return (a shl 24) or (cr shl 16) or (cg shl 8) or cb
+    }
+
+    /**
      * Sample "MiniMe" text pixels as target positions.
-     * Uses fine sampling (1.5dp step) with edge enhancement:
-     * edge pixels (alpha 128-200) get smaller, denser particles.
+     * Uses fine sampling (1.1dp step) with edge enhancement.
      * Returns FloatArray of [x0, y0, x1, y1, ...].
      */
     private fun sampleTextTargets(density: Float): FloatArray {
@@ -196,6 +255,8 @@ class ParticleSystem(
         for (i in 0 until count) {
             x[i] += vx[i] * dt * decay
             y[i] += vy[i] * dt * decay
+            // Stay puffy during explosion
+            sizeScale[i] = 1.5f
         }
         colorMix = 0f
     }
@@ -212,6 +273,11 @@ class ParticleSystem(
             }
         }
 
+        // Size shrink factor: 1.5x → 1.0x, slightly delayed so particles
+        // feel "pulled in" before condensing to crisp dots.
+        val sizeEase = 1f - (1f - t) * (1f - t)  // easeOutQuad
+        val targetScale = 1.5f - 0.5f * sizeEase
+
         for (i in 0 until count) {
             // Slight spring back at the end (overshoot)
             val overshoot = if (t > 0.88f) {
@@ -222,6 +288,8 @@ class ParticleSystem(
             val progress = (eased + overshoot).coerceAtMost(1f)
             x[i] = convergeStartX[i] + (tx[i] - convergeStartX[i]) * progress
             y[i] = convergeStartY[i] + (ty[i] - convergeStartY[i]) * progress
+            // Shrink toward target size
+            sizeScale[i] = targetScale
         }
         colorMix = eased
     }
@@ -237,6 +305,7 @@ class ParticleSystem(
         for (i in 0 until count) {
             x[i] = tx[i] + sin(seed[i] + elapsedMs * 0.004f) * vib
             y[i] = ty[i] + cos(seed[i] + elapsedMs * 0.0037f) * vib
+            sizeScale[i] = 1f
         }
         colorMix = 1f
     }
@@ -247,6 +316,8 @@ class ParticleSystem(
             x[i] += shatterVx[i] * dt
             shatterVy[i] += gravity * dt
             y[i] += shatterVy[i] * dt
+            // Slight growth as shards fly (like perspective)
+            sizeScale[i] = 1f + t * 0.2f
         }
         colorMix = 1f - t * 0.3f
     }
@@ -258,6 +329,7 @@ class ParticleSystem(
         for (i in 0 until count) {
             x[i] = centerX
             y[i] = centerY
+            sizeScale[i] = 1.5f
         }
     }
 }

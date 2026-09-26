@@ -1,5 +1,8 @@
 package com.mini.me_core.core.splash
 
+import android.graphics.RenderEffect
+import android.graphics.Shader
+import android.os.Build
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
@@ -37,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -156,8 +161,30 @@ fun ParticleSplashScreen(
         // Canvas layer
         val ps = particleSystem
         if (ps != null) {
+            // Background refraction blur (API 31+): during the first 400ms of SHATTER,
+            // blur the canvas layer to simulate glass fracture refraction.
+            // Low versions fall back to the frost overlay drawn inside ParticleSplashCanvas.
+            val shatterStartMs = SplashStage.holdEndMs(quality)
+            val blurWindowMs = 400L
+            val inBlurWindow = elapsedMs in shatterStartMs..(shatterStartMs + blurWindowMs)
+            val blurT = if (inBlurWindow && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (elapsedMs - shatterStartMs).toFloat() / blurWindowMs
+            } else 1f
+
             ParticleSplashCanvas(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        if (inBlurWindow && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            // Blur ramps from 8f → 0 over 400ms
+                            val radius = 8f * (1f - blurT)
+                            renderEffect = RenderEffect
+                                .createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
+                                .asComposeRenderEffect()
+                        } else {
+                            renderEffect = null
+                        }
+                    },
                 particleSystem = ps,
                 glassShatter = glassShatter,
                 elapsedMs = elapsedMs,

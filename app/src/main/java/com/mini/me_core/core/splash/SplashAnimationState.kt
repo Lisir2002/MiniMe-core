@@ -3,10 +3,15 @@ package com.mini.me_core.core.splash
 /**
  * Splash animation stage timeline.
  *
+ * NEW rhythm: aggregate 2.5s → hold/flash 0.5s → shatter 3s = 6.0s total.
+ *
  * Timing scales by quality level:
- * HIGH:  6.0s total (1.5 explode / 2.0 converge / 1.0 hold / 1.0 shatter / 0.5 fade)
- * MEDIUM: 5.0s total (1.25 / 1.75 / 0.75 / 0.75 / 0.5)
- * LOW:    4.0s total (1.0 / 1.5 / 0.5 / 0.75 / 0.25)
+ * HIGH:   6.0s total (0.7 explode / 1.8 converge / 0.5 hold / 3.0 shatter)
+ * MEDIUM: 5.0s total (0.6 / 1.5 / 0.4 / 2.5)
+ * LOW:    4.0s total (0.5 / 1.2 / 0.3 / 2.0)
+ *
+ * The Compose cross-fade (overlayAlpha → 0) handles the final dismissal,
+ * so no separate FADE_OUT window is needed.
  */
 enum class SplashStage {
     EXPLODE,
@@ -20,27 +25,30 @@ enum class SplashStage {
         fun totalDurationMs(quality: SplashQualityLevel): Long = quality.durationMs
 
         fun explodeEndMs(quality: SplashQualityLevel): Long = when (quality) {
-            SplashQualityLevel.HIGH -> 1_500L
-            SplashQualityLevel.MEDIUM -> 1_250L
-            SplashQualityLevel.LOW -> 1_000L
+            SplashQualityLevel.HIGH -> 700L
+            SplashQualityLevel.MEDIUM -> 600L
+            SplashQualityLevel.LOW -> 500L
         }
 
         fun convergeEndMs(quality: SplashQualityLevel): Long = when (quality) {
-            SplashQualityLevel.HIGH -> 3_500L
-            SplashQualityLevel.MEDIUM -> 3_000L
-            SplashQualityLevel.LOW -> 2_500L
+            // Text fully formed around 2.3-2.5s → aggregation flash triggers here
+            SplashQualityLevel.HIGH -> 2_500L
+            SplashQualityLevel.MEDIUM -> 2_100L
+            SplashQualityLevel.LOW -> 1_700L
         }
 
         fun holdEndMs(quality: SplashQualityLevel): Long = when (quality) {
-            SplashQualityLevel.HIGH -> 4_500L
-            SplashQualityLevel.MEDIUM -> 3_750L
-            SplashQualityLevel.LOW -> 3_000L
+            // 0.5s hold: aggregation pulse spreads 300ms then settles
+            SplashQualityLevel.HIGH -> 3_000L
+            SplashQualityLevel.MEDIUM -> 2_500L
+            SplashQualityLevel.LOW -> 2_000L
         }
 
         fun shatterEndMs(quality: SplashQualityLevel): Long = when (quality) {
-            SplashQualityLevel.HIGH -> 5_500L
-            SplashQualityLevel.MEDIUM -> 4_500L
-            SplashQualityLevel.LOW -> 3_750L
+            // 3s shatter flight
+            SplashQualityLevel.HIGH -> 6_000L
+            SplashQualityLevel.MEDIUM -> 5_000L
+            SplashQualityLevel.LOW -> 4_000L
         }
 
         fun fromElapsed(elapsedMs: Long, quality: SplashQualityLevel): SplashStage = when {

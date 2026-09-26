@@ -1,12 +1,12 @@
 package com.mini.me_core.core.splash
 
+import android.graphics.BlurMaskFilter
 import android.graphics.Camera
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.RadialGradient
 import android.graphics.Shader
 import kotlin.math.cos
 import kotlin.math.sin
@@ -14,15 +14,6 @@ import kotlin.random.Random
 
 /**
  * A single glass shard.
- *
- * Properties:
- * - polygon: Voronoi cell vertices
- * - centerX/centerY: centroid for rotation pivot
- * - outwardX/outwardY: explosion direction
- * - rotateXDeg/rotateYDeg: target 3D rotation
- * - speedX/speedY: initial explosion velocity (dp/s)
- * - scale: target scale during flight
- * - baseAlpha: base transparency (0.5-0.8)
  */
 class GlassShard(
     val polygon: FloatArray,
@@ -37,17 +28,20 @@ class GlassShard(
     val baseAlpha: Float,
     val specularX: Float, // relative offset for specular highlight (0-1)
     val specularY: Float,
+    val tailLengthDp: Float, // length of flying light trail behind shard
 )
 
 /**
- * Glass shatter effect — real glass material look.
+ * Glass shatter effect — realistic glass material.
  *
- * Each shard:
- * 1. Draws a soft shadow offset below
- * 2. Semi-transparent white fill (alpha 0.5-0.75)
- * 3. LinearGradient overlay: top bright → bottom transparent (refraction)
- * 4. 1.5px edge highlight (white, alpha 0.7)
- * 5. Small specular highlight (radial gradient at shard corner)
+ * Each shard renders 5 layers:
+ * 1. Soft blurred shadow (BlurMaskFilter, offset 4dp x 6dp, alpha 0.15)
+ * 2. High-transparency fill (alpha 0.12–0.25) — see-through glass
+ * 3. Edge stroke with LinearGradient: top bright white (0.9) → bottom dark gray (0.3)
+ *    — simulates glass thickness / beveled edge
+ * 4. Diagonal specular band: LinearGradient from corner to opposite corner,
+ *    white 0.6 → transparent — light reflection
+ * 5. Flying light tail: gradient trail along motion direction (20–40dp, 0.4→0)
  *
  * 3D: Camera.rotateX/rotateY with back-face dimming.
  */
@@ -62,21 +56,32 @@ class GlassShatterEffect(
     private val camera = Camera()
     private val matrix = Matrix()
 
-    // Shard fill paint — semi-transparent glass
+    // Glass fill paint — high transparency
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
-    // Edge highlight — bright glass edge reflection
+    // Edge stroke — gradient bevel (shader set per shard)
     private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 1.5f * density
-        color = Color.WHITE
+        strokeWidth = 1.2f * density
     }
-    // Shadow paint
+    // Soft shadow — blurred, low alpha
     private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
         color = Color.BLACK
+        maskFilter = BlurMaskFilter(6f * density, BlurMaskFilter.Blur.NORMAL)
     }
+    // Specular / tail paint
+    private val specPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    // Shadow offset in px
+    private val shadowDx = 4f * density
+    private val shadowDy = 6f * density
+
+    // Reusable path (cleared per shard)
+    private val path = Path()
 
     init {
         camera.setLocation(0f, 0f, -(screenHeightPx / density / 72f * 2f))
@@ -129,12 +134,15 @@ class GlassShatterEffect(
             val speedDp = 120f + Random.nextFloat() * 180f
             // Scale down during flight
             val scaleTarget = 0.6f + Random.nextFloat() * 0.3f
-            // Glass transparency: varies per shard
-            val baseAlpha = 0.5f + Random.nextFloat() * 0.25f
+            // Glass transparency: HIGH transparency (0.12–0.25) — real see-through glass
+            val baseAlpha = 0.12f + Random.nextFloat() * 0.13f
 
             // Specular highlight position (random corner of shard)
             val specX = Random.nextFloat()
             val specY = Random.nextFloat()
+
+            // Flying tail length: 20–40dp
+            val tailLen = 20f + Random.nextFloat() * 20f
 
             val flatPoly = FloatArray(n * 2)
             for (k in 0 until n) {
@@ -156,6 +164,7 @@ class GlassShatterEffect(
                     baseAlpha = baseAlpha,
                     specularX = specX,
                     specularY = specY,
+                    tailLengthDp = tailLen,
                 )
             )
         }
@@ -212,6 +221,30 @@ class GlassShatterEffect(
             // Scale: shrink from 1.0 to scaleTarget
             val scale = 1f + (shard.scaleTarget - 1f) * ease
 
+            // ── Flying light tail: gradient trail behind shard along motion direction ──
+            // Drawn before the shard (so shard sits on top of tail).
+            val tailLen = shard.tailLengthDp * ease * 3f
+            if (tailLen > 1f) {
+                val tailStartX = shard.centerX + tx
+                val tailStartY = shard.centerY + ty
+                val tailEndX = tailStartX - shard.outwardX * tailLen
+                val tailEndY = tailStartY - shard.outwardY * tailLen
+                val tailGradient = LinearGradient(
+                    tailStartX, tailStartY, tailEndX, tailEndY,
+                    Color.argb((100 * alpha * (1f - shatterProgress)).toInt().coerceIn(0, 255), 255, 255, 255),
+                    Color.argb(0, 255, 255, 255),
+                    Shader.TileMode.CLAMP
+                )
+                specPaint.shader = tailGradient
+                specPaint.strokeWidth = 2f
+                specPaint.style = Paint.Style.STROKE
+                val tailPath = Path()
+                tailPath.moveTo(tailStartX, tailStartY)
+                tailPath.lineTo(tailEndX, tailEndY)
+                canvas.drawPath(tailPath, specPaint)
+                specPaint.shader = null
+            }
+
             // 3D rotation
             camera.save()
             camera.rotateX(shard.rotateXDeg * ease)
@@ -226,7 +259,8 @@ class GlassShatterEffect(
             matrix.postTranslate(scx + tx, scy + ty)
             camera.restore()
 
-            val path = Path()
+            // Build path from polygon vertices
+            path.reset()
             path.moveTo(shard.polygon[0], shard.polygon[1])
             for (k in 1 until shard.polygon.size / 2) {
                 path.lineTo(shard.polygon[k * 2], shard.polygon[k * 2 + 1])
@@ -241,36 +275,61 @@ class GlassShatterEffect(
                     kotlin.math.abs(shard.rotateYDeg * ease) > 89f)
             val faceDim = if (backFace) 0.4f else 1f
 
-            // Shadow (offset down-right, dark translucent)
-            shadowPaint.alpha = (40 * alpha * (1f - shatterProgress)).toInt().coerceIn(0, 255)
+            // ── 1. Soft blurred shadow ──
+            shadowPaint.alpha = (38 * alpha * (1f - shatterProgress * 0.7f)).toInt().coerceIn(0, 255)
             canvas.save()
-            canvas.translate(6f, 10f)
+            canvas.translate(shadowDx, shadowDy)
             canvas.drawPath(path, shadowPaint)
             canvas.restore()
 
-            // Glass fill: semi-transparent white
+            // ── 2. High-transparency glass fill ──
             fillPaint.alpha = (shard.baseAlpha * 255 * alpha * faceDim).toInt().coerceIn(0, 255)
             fillPaint.color = Color.WHITE
             canvas.drawPath(path, fillPaint)
 
-            // LinearGradient overlay on shard: top bright → bottom transparent
-            // Simulates glass refraction / light passing through
-            val polyTop = shard.polygon.minByOrNull { it } ?: 0f
-            val polyBottom = shard.polygon.maxByOrNull { it } ?: 100f
-            val gradient = LinearGradient(
+            // ── 3. Beveled edge stroke: LinearGradient top bright → bottom dark ──
+            // Find polygon bounds in local (matrix-applied) space for gradient.
+            var polyTop = Float.MAX_VALUE
+            var polyBottom = -Float.MAX_VALUE
+            var polyLeft = Float.MAX_VALUE
+            var polyRight = -Float.MAX_VALUE
+            for (k in 0 until shard.polygon.size / 2) {
+                val vx = shard.polygon[k * 2]
+                val vy = shard.polygon[k * 2 + 1]
+                if (vy < polyTop) polyTop = vy
+                if (vy > polyBottom) polyBottom = vy
+                if (vx < polyLeft) polyLeft = vx
+                if (vx > polyRight) polyRight = vx
+            }
+            // Edge gradient: bright white top (0.9 alpha) → dark gray bottom (0.3 alpha)
+            val edgeGradient = LinearGradient(
                 scx, polyTop, scx, polyBottom,
-                Color.argb((80 * faceDim).toInt(), 255, 255, 255).toInt(),
-                Color.argb(0, 255, 255, 255).toInt(),
+                Color.argb((230 * faceDim).toInt().coerceIn(0, 255), 255, 255, 255),
+                Color.argb((76 * faceDim).toInt().coerceIn(0, 255), 60, 60, 60),
                 Shader.TileMode.CLAMP
             )
-            fillPaint.shader = gradient
-            fillPaint.alpha = (shard.baseAlpha * 200 * alpha * faceDim).toInt().coerceIn(0, 255)
-            canvas.drawPath(path, fillPaint)
-            fillPaint.shader = null
-
-            // Edge highlight: bright white glass edge
-            edgePaint.alpha = (180 * alpha * faceDim).toInt().coerceIn(0, 255)
+            edgePaint.shader = edgeGradient
+            edgePaint.alpha = (255 * alpha * faceDim).toInt().coerceIn(0, 255)
             canvas.drawPath(path, edgePaint)
+            edgePaint.shader = null
+
+            // ── 4. Diagonal specular highlight band ──
+            // From one corner (based on specularX/Y) to opposite corner.
+            val sx = polyLeft + (polyRight - polyLeft) * shard.specularX
+            val sy = polyTop + (polyBottom - polyTop) * shard.specularY
+            val ex = polyLeft + (polyRight - polyLeft) * (1f - shard.specularX)
+            val ey = polyTop + (polyBottom - polyTop) * (1f - shard.specularY)
+            val specGradient = LinearGradient(
+                sx, sy, ex, ey,
+                Color.argb((150 * faceDim).toInt().coerceIn(0, 255), 255, 255, 255),
+                Color.argb(0, 255, 255, 255),
+                Shader.TileMode.CLAMP
+            )
+            specPaint.shader = specGradient
+            specPaint.alpha = (200 * alpha * faceDim).toInt().coerceIn(0, 255)
+            specPaint.style = Paint.Style.FILL
+            canvas.drawPath(path, specPaint)
+            specPaint.shader = null
 
             canvas.restore()
         }
