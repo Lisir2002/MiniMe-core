@@ -3,6 +3,7 @@ package com.mini.me_core.feature.credentials.presentation.component
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -22,6 +23,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.tokens.LocalAppTheme
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -53,6 +56,8 @@ fun CredentialPromptDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
+        containerColor = LocalAppTheme.current.colors.surfaceOverlay,
         title = { Text(stringResource(R.string.credential_prompt_title, host)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
