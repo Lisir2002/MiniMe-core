@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
+import com.mini.me_core.datalayer.store.KVStore
 import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
 import com.mini.me_core.feature.proxy.domain.ProxyRuntimeState
@@ -31,8 +32,14 @@ internal data class UsageStats(
 internal class AboutStatsViewModel @Inject constructor(
     private val v2Agent: V2AgentRepository,
     private val proxyManager: ClashProxyManager,
-    private val containerInstaller: ContainerInstaller
+    private val containerInstaller: ContainerInstaller,
+    private val kv: KVStore,
 ) : ViewModel() {
+
+    private companion object {
+        const val NS = "about"
+        const val KEY_STATS_RESET_EPOCH = "stats_reset_epoch_ms"
+    }
 
     private val _stats = MutableStateFlow(
         UsageStats(
@@ -66,28 +73,30 @@ internal class AboutStatsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 重置使用统计：记录当前时间为重置纪元。重置后统计仅统计该时间之后创建的会话。
+     * 不删除任何业务数据。
+     */
+    fun resetStats() {
+        viewModelScope.launch(Dispatchers.IO) {
+            kv.putInt(NS, KEY_STATS_RESET_EPOCH, System.currentTimeMillis())
+            refresh()
+        }
+    }
+
     private suspend fun load(): UsageStats = withContext(Dispatchers.IO) {
-        val sessions = v2Agent.getAllOnce().map { it.toEntity() }
-        val messages = v2Agent.getAllMessagesOnce().map { it.toEntity() }
+        val resetEpoch = kv.getInt(NS, KEY_STATS_RESET_EPOCH) ?: 0L
+        val sessions = v2Agent.getAllOnce()
+            .map { it.toEntity() }
+            .filter { it.createdAtMs >= resetEpoch }
+        val messageCount = v2Agent.getAllMessagesOnce().size
 
-        val totalSessions = sessions.size
-        val totalMessages = messages.size
-        val totalInputTokens = sessions.sumOf { it.totalInputTokens.toLong() }
-        val totalOutputTokens = sessions.sumOf { it.totalOutputTokens.toLong() }
-        val firstUsedMs = sessions.minOfOrNull { it.createdAtMs } ?: 0L
-
-        val dayBuckets = sessions.mapNotNull { session ->
-            utcDayBucket(session.createdAtMs)
-        }.toSet()
-        val activeDays = dayBuckets.size
-
-        UsageStats(
-            totalSessions = totalSessions,
-            totalMessages = totalMessages,
-            totalInputTokens = totalInputTokens,
-            totalOutputTokens = totalOutputTokens,
-            firstUsedMs = firstUsedMs,
-            activeDays = activeDays
+        computeUsageStats(
+            sessions = sessions.map {
+                SessionCountInput(it.createdAtMs, it.totalInputTokens.toLong(), it.totalOutputTokens.toLong())
+            },
+            messageCount = messageCount,
+            resetEpochMs = resetEpoch,
         )
     }
 
@@ -141,4 +150,51 @@ internal class AboutStatsViewModel @Inject constructor(
         cal.set(Calendar.MILLISECOND, 0)
         return cal.timeInMillis
     }
+}
+
+/** 统计计算的纯输入（与 DB 实体解耦，便于单测）。 */
+internal data class SessionCountInput(
+    val createdAtMs: Long,
+    val inputTokens: Long,
+    val outputTokens: Long,
+)
+
+/**
+ * 由已过滤的会话列表计算使用统计。纯函数，便于单元测试。
+ *
+ * @param sessions 已按 resetEpoch 过滤的会话列表
+ * @param messageCount 消息总数
+ * @param resetEpochMs 统计重置纪元（早于此时间的会话应已在上层过滤）
+ */
+internal fun computeUsageStats(
+    sessions: List<SessionCountInput>,
+    messageCount: Int,
+    resetEpochMs: Long,
+): UsageStats {
+    val totalSessions = sessions.size
+    val totalInputTokens = sessions.sumOf { it.inputTokens }
+    val totalOutputTokens = sessions.sumOf { it.outputTokens }
+    val firstUsedMs = sessions.minOfOrNull { it.createdAtMs } ?: 0L
+
+    val dayBuckets = sessions.map { utcDayBucket(it.createdAtMs) }.toSet()
+    val activeDays = dayBuckets.size
+
+    return UsageStats(
+        totalSessions = totalSessions,
+        totalMessages = messageCount,
+        totalInputTokens = totalInputTokens,
+        totalOutputTokens = totalOutputTokens,
+        firstUsedMs = firstUsedMs,
+        activeDays = activeDays,
+    )
+}
+
+private fun utcDayBucket(ms: Long): Long {
+    val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+    cal.timeInMillis = ms
+    cal.set(Calendar.HOUR_OF_DAY, 0)
+    cal.set(Calendar.MINUTE, 0)
+    cal.set(Calendar.SECOND, 0)
+    cal.set(Calendar.MILLISECOND, 0)
+    return cal.timeInMillis
 }

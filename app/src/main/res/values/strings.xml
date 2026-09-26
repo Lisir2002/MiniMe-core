@@ -1600,6 +1600,98 @@
     <!-- About - Copyright -->
     <string name="about_copyright">© 2025 Lisir2002 · Made with ❤ for mobile developers</string>
 
+    <!-- About - Hero 功能亮点标签 -->
+    <string name="about_feature_ai">AI 对话</string>
+    <string name="about_feature_terminal">容器终端</string>
+    <string name="about_feature_browser">内置浏览器</string>
+    <string name="about_feature_mcp">MCP 工具</string>
+    <string name="about_dev_unlock_toast">再点 %1$d 次解锁开发者选项</string>
+    <string name="about_dev_unlocked_toast">开发者选项已解锁</string>
+    <string name="about_dev_options_label">开发者选项</string>
+
+    <!-- About - 开源信息 -->
+    <string name="about_opensource">开源信息</string>
+    <string name="about_opensource_desc">本项目基于 GPL-3.0 协议开源，欢迎贡献代码与反馈问题</string>
+    <string name="about_license_gpl">GPL-3.0</string>
+    <string name="about_source_code">查看源码</string>
+    <string name="about_submit_issue">提交 Issue</string>
+    <string name="about_contributing">贡献指南</string>
+    <string name="about_download_source">下载源码</string>
+    <string name="about_repo_url">https://github.com/Lisir2002/MiniMe-core</string>
+    <string name="about_issues_url">https://github.com/Lisir2002/MiniMe-core/issues</string>
+    <string name="about_license_url">https://github.com/Lisir2002/MiniMe-core/blob/main/LICENSE</string>
+    <string name="about_contributing_url">https://github.com/Lisir2002/MiniMe-core</string>
+    <string name="about_open_failed">无法打开链接</string>
+
+    <!-- About - 设备与应用信息 -->
+    <string name="about_device_info">设备与应用信息</string>
+    <string name="about_device_android_version">Android 版本</string>
+    <string name="about_device_model">设备型号</string>
+    <string name="about_device_storage">可用存储空间</string>
+    <string name="about_device_long_press_copy">长按可复制</string>
+    <string name="about_device_copied">已复制到剪贴板</string>
+
+    <!-- About - 法律与反馈 -->
+    <string name="about_legal_feedback">法律与反馈</string>
+    <string name="about_user_agreement">用户协议</string>
+    <string name="about_privacy_policy">隐私政策</string>
+    <string name="about_feedback_entry">意见反馈</string>
+    <string name="about_share_app">分享应用</string>
+    <string name="about_license_entry">开源协议</string>
+    <string name="about_contributing_entry">贡献指南</string>
+    <string name="about_share_text_fallback">MiniMe-core - Android 上的 AI 代码编辑器</string>
+
+    <!-- About - 核心组件交互 -->
+    <string name="about_terminal_not_ready_title">终端容器未初始化</string>
+    <string name="about_terminal_not_ready_msg">终端容器尚未安装，前往设置初始化？</string>
+    <string name="about_go_init">前往初始化</string>
+    <string name="about_proxy_not_running_msg">代理内核未运行，前往代理设置？</string>
+    <string name="about_host_info_dialog_title">宿主架构</string>
+    <string name="about_host_info_abi">架构 ABI</string>
+    <string name="about_host_info_sdk">系统 SDK</string>
+    <string name="about_webview_dialog_title">浏览器内核详情</string>
+    <string name="about_webview_version_label">WebView 版本</string>
+
+    <!-- About - 统计重置 -->
+    <string name="about_reset_stats">重置统计</string>
+    <string name="about_reset_stats_title">重置使用统计？</string>
+    <string name="about_reset_stats_msg">将清空所有会话与消息的累计统计，此操作不可撤销。</string>
+    <string name="about_reset_stats_confirm">确认重置</string>
+    <string name="about_reset_stats_done">统计已重置</string>
+
+    <!-- About - 开源致谢展开 -->
+    <string name="about_credit_version_label">版本</string>
+    <string name="about_credit_license_label">协议</string>
+    <string name="about_credit_website_label">官网</string>
+    <string name="about_credit_sqlcipher">SQLCipher</string>
+    <string name="about_credit_coil">Coil</string>
+    <string name="about_credit_accompanist">Accompanist</string>
+    <string name="about_credit_treesitter">tree-sitter</string>
+    <string name="about_credit_sqlite">SQLDelight</string>
+    <string name="about_credit_ssh">SSHJ</string>
+    <string name="about_credit_terminal">Termux Terminal</string>
+
+    <!-- About - 版本更新入口状态 -->
+    <string name="about_update_status_latest">已是最新版本</string>
+    <string name="about_update_status_new">发现新版本 v%1$s</string>
+    <string name="about_update_button">更新</string>
+
+    <!-- Code Browser -->
+    <string name="code_browser_title">浏览源码</string>
+    <string name="code_browser_download">下载源码</string>
+    <string name="code_browser_downloading">正在下载源码… %1$d%%</string>
+    <string name="code_browser_download_done">源码下载完成</string>
+    <string name="code_browser_open">打开</string>
+    <string name="code_browser_share">分享</string>
+    <string name="code_browser_error">加载失败：%1$s</string>
+    <string name="code_browser_loading">加载中…</string>
+    <string name="code_browser_empty">空目录</string>
+    <string name="code_browser_items">%1$d 项</string>
+    <string name="code_browser_root">根目录</string>
+    <string name="code_browser_repo_label">仓库</string>
+    <string name="code_browser_bytes">%1$s</string>
+    <string name="code_browser_branch_main">main</string>
+
     <!-- Update (feature/update) -->
     <string name="update_title">版本更新</string>
     <string name="update_tab_latest">最新版本</string>

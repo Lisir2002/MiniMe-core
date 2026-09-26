@@ -1583,6 +1583,98 @@
     <!-- About - Copyright -->
     <string name="about_copyright">© 2025 Lisir2002 · Made with ❤ for mobile developers</string>
 
+    <!-- About - Hero feature chips -->
+    <string name="about_feature_ai">AI Chat</string>
+    <string name="about_feature_terminal">Container Terminal</string>
+    <string name="about_feature_browser">Built-in Browser</string>
+    <string name="about_feature_mcp">MCP Tools</string>
+    <string name="about_dev_unlock_toast">Tap %1$d more times to unlock developer options</string>
+    <string name="about_dev_unlocked_toast">Developer options unlocked</string>
+    <string name="about_dev_options_label">Dev Options</string>
+
+    <!-- About - Open source -->
+    <string name="about_opensource">Open Source</string>
+    <string name="about_opensource_desc">Released under GPL-3.0. Contributions and issue reports are welcome.</string>
+    <string name="about_license_gpl">GPL-3.0</string>
+    <string name="about_source_code">Browse Source</string>
+    <string name="about_submit_issue">Submit Issue</string>
+    <string name="about_contributing">Contributing</string>
+    <string name="about_download_source">Download Source</string>
+    <string name="about_repo_url">https://github.com/Lisir2002/MiniMe-core</string>
+    <string name="about_issues_url">https://github.com/Lisir2002/MiniMe-core/issues</string>
+    <string name="about_license_url">https://github.com/Lisir2002/MiniMe-core/blob/main/LICENSE</string>
+    <string name="about_contributing_url">https://github.com/Lisir2002/MiniMe-core</string>
+    <string name="about_open_failed">Unable to open link</string>
+
+    <!-- About - Device & app info -->
+    <string name="about_device_info">Device &amp; App Info</string>
+    <string name="about_device_android_version">Android Version</string>
+    <string name="about_device_model">Device Model</string>
+    <string name="about_device_storage">Free Storage</string>
+    <string name="about_device_long_press_copy">Long press to copy</string>
+    <string name="about_device_copied">Copied to clipboard</string>
+
+    <!-- About - Legal & feedback -->
+    <string name="about_legal_feedback">Legal &amp; Feedback</string>
+    <string name="about_user_agreement">User Agreement</string>
+    <string name="about_privacy_policy">Privacy Policy</string>
+    <string name="about_feedback_entry">Feedback</string>
+    <string name="about_share_app">Share App</string>
+    <string name="about_license_entry">Open Source License</string>
+    <string name="about_contributing_entry">Contributing Guide</string>
+    <string name="about_share_text_fallback">MiniMe-core - AI code editor on Android</string>
+
+    <!-- About - Core component interactions -->
+    <string name="about_terminal_not_ready_title">Terminal Container Not Initialized</string>
+    <string name="about_terminal_not_ready_msg">The terminal container is not installed yet. Go to settings to initialize it?</string>
+    <string name="about_go_init">Initialize</string>
+    <string name="about_proxy_not_running_msg">Proxy engine is not running. Go to proxy settings?</string>
+    <string name="about_host_info_dialog_title">Host Architecture</string>
+    <string name="about_host_info_abi">ABI</string>
+    <string name="about_host_info_sdk">System SDK</string>
+    <string name="about_webview_dialog_title">Browser Engine Details</string>
+    <string name="about_webview_version_label">WebView Version</string>
+
+    <!-- About - Stats reset -->
+    <string name="about_reset_stats">Reset Stats</string>
+    <string name="about_reset_stats_title">Reset usage stats?</string>
+    <string name="about_reset_stats_msg">This clears all accumulated session and message counts. This cannot be undone.</string>
+    <string name="about_reset_stats_confirm">Confirm Reset</string>
+    <string name="about_reset_stats_done">Stats reset</string>
+
+    <!-- About - Expandable credits -->
+    <string name="about_credit_version_label">Version</string>
+    <string name="about_credit_license_label">License</string>
+    <string name="about_credit_website_label">Website</string>
+    <string name="about_credit_sqlcipher">SQLCipher</string>
+    <string name="about_credit_coil">Coil</string>
+    <string name="about_credit_accompanist">Accompanist</string>
+    <string name="about_credit_treesitter">tree-sitter</string>
+    <string name="about_credit_sqlite">SQLDelight</string>
+    <string name="about_credit_ssh">SSHJ</string>
+    <string name="about_credit_terminal">Termux Terminal</string>
+
+    <!-- About - Update entry status -->
+    <string name="about_update_status_latest">You are up to date</string>
+    <string name="about_update_status_new">New version v%1$s available</string>
+    <string name="about_update_button">Update</string>
+
+    <!-- Code Browser -->
+    <string name="code_browser_title">Browse Source</string>
+    <string name="code_browser_download">Download Source</string>
+    <string name="code_browser_downloading">Downloading source… %1$d%%</string>
+    <string name="code_browser_download_done">Source download complete</string>
+    <string name="code_browser_open">Open</string>
+    <string name="code_browser_share">Share</string>
+    <string name="code_browser_error">Load failed: %1$s</string>
+    <string name="code_browser_loading">Loading…</string>
+    <string name="code_browser_empty">Empty directory</string>
+    <string name="code_browser_items">%1$d items</string>
+    <string name="code_browser_root">Root</string>
+    <string name="code_browser_repo_label">Repository</string>
+    <string name="code_browser_bytes">%1$s</string>
+    <string name="code_browser_branch_main">main</string>
+
     <!-- Update (feature/update) -->
     <string name="update_title">Software Update</string>
     <string name="update_tab_latest">Latest</string>

@@ -595,7 +595,9 @@ fun SettingsScreen(
                 SettingsSection.Update -> {} // 已在上方 early return 处理
                 SettingsSection.About -> AboutSection(
                     onOpenDevOptions = { section = SettingsSection.DevOptions },
-                    onOpenUpdate = { section = SettingsSection.Update }
+                    onOpenUpdate = { section = SettingsSection.Update },
+                    onOpenContainerSettings = onNavigateToTerminalSettings,
+                    onOpenProxySettings = onNavigateToNetProxy,
                 )
                 SettingsSection.Theme -> {
                     com.mini.me_core.feature.settings.presentation.ThemeSettingsScreen(
