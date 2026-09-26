@@ -1913,11 +1913,11 @@
     <string name="ui_ai_8049975d">AI 代码运行需要 Python</string>
 
     <string name="ui___6435a24f">输入任一有效 SSH 连接的认证信息验证身份，验证通过后系统将生成新主密钥，所有凭据需要重新录入。</string>
-    <string name="ui____0f215ee0">档位（幻觉敏感度）</string>
+    <string name="settings_zth_section_tier">档位选择（幻觉敏感度）</string>
     <string name="ui____132c5cdc">重试</string>
     <string name="ui____21df949d">超时</string>
     <string name="ui____21df949d_2">超时</string>
-    <string name="ui____2e6ca1c3">⚠ 档位 BALANCED/STRICT（C.4.8）：必须滑动确认；设置已强制为 ON。</string>
+    <string name="settings_zth_swipe_forced_warning">平衡/严格档位必须开启滑动确认，已阻止关闭。</string>
     <string name="ui____2f4aaddd">删除</string>
     <string name="ui____31a39df2">识图（Vision）</string>
     <string name="ui____31a39df2_2">识图（Vision）</string>
@@ -1928,7 +1928,7 @@
     <string name="ui____5f411223_2">返回</string>
     <string name="ui____65227369">主机</string>
     <string name="ui____694fc5ef">刷新</string>
-    <string name="ui____6f309ebf">严格（3）—— 30 全规则 + 幻觉阈值=2；禁止取消 + 禁止关滑动 + 自动熔断 2 次开</string>
+    <string name="settings_zth_tier_disabled">仅 Plan 原生审批，无额外幻觉约束，永不熔断，可关闭滑动确认</string>
     <string name="ui____701515e9">从文件导入</string>
     <string name="ui____7bf54e28">已选</string>
     <string name="ui____7bf54e28_2">已选</string>
@@ -2047,7 +2047,7 @@
     <string name="ui______c1fbcbfb">实时流量</string>
     <string name="ui______cb5ff350">保存覆盖</string>
     <string name="ui______cbb46593">取消编辑</string>
-    <string name="ui______cd9f5bd3">滑动确认（SwipeToConfirm，C.4.8 方案 C）</string>
+    <string name="settings_zth_swipe_title">滑动确认（SwipeToConfirm）</string>
     <string name="ui______ce9e92bd">分组 · 流量</string>
     <string name="ui______cfd4afc8">全量加密（推荐）</string>
     <string name="ui______d0034676">兼容端点 · 能力判定默认策略</string>
@@ -2056,12 +2056,12 @@
     <string name="proxy_ai_hosts_direct">模型接口直连（跳过代理）</string>
     <string name="proxy_ai_hosts_direct_desc">开启后 OpenAI / Anthropic / Gemini 官方接口直连，省去代理一跳延迟；若直连不通（依赖代理才能访问），请关闭以回退代理。</string>
     <string name="ui______d8195afb">✅ 开启</string>
-    <string name="ui______e17b4696">性能等级（低端机是否跳过 LLM 终检）</string>
+    <string name="settings_zth_section_perf">性能等级（低端机是否跳过 LLM 终检）</string>
     <string name="ui______ee92cd5e">复制命令</string>
     <string name="ui______f0aacd4f">加密范围</string>
     <string name="ui______f388b5eb">手动粘贴 Clash YAML</string>
     <string name="ui______f5c9f705">停止尾随</string>
-    <string name="ui_____a5d93376">高端—— 2 阶段都跑，预算 ≤ 30s（默认）</string>
+    <string name="settings_zth_perf_low">仅跑启发式规则，跳过 LLM 终检，响应最快</string>
     <string name="ui_____d496aef9">（无描述）</string>
     <string name="ui_____d496aef9_2">（无描述）</string>
     <string name="ui_____da42892f">已覆盖（Manual）</string>
@@ -2109,7 +2109,7 @@
     <string name="ui____41e8e8b9">外观</string>
     <string name="ui____456d29ef">日志</string>
     <string name="ui____4722bc0c">终端</string>
-    <string name="ui____485bd1f1">高端—— 2 阶段都跑，预算 ≤ 30s（默认）</string>
+    <string name="settings_zth_perf_high">启发式+LLM终检两阶段全跑，预算≤30s（默认）</string>
     <string name="ui____48d0a09b">外观</string>
     <string name="ui____4dbd9aec">服务端</string>
     <string name="ui____55405ea6">备份</string>
@@ -2117,7 +2117,7 @@
     <string name="ui____56563edf_2">加密</string>
     <string name="ui____5660bcd2">保活</string>
     <string name="ui____56a3f798">通义</string>
-    <string name="ui____5c5c0db9">严格（3）—— 30 全规则 + 幻觉阈值=2；禁止取消 + 禁止关滑动 + 自动熔断 2 次开</string>
+    <string name="settings_zth_tier_minimal">熔断阈值5次，幻觉置信度阈值0.9，可关闭滑动确认，跳过 LLM 终检</string>
     <string name="ui____5f15d40d">✅ 开启</string>
     <string name="ui____5f811dd8">加密</string>
     <string name="ui____601a29b5">从文件导入</string>
@@ -2181,9 +2181,9 @@
     <string name="ui____a7d3091f">服务器</string>
     <string name="ui____afcde261">外观</string>
     <string name="ui____b0fae043">授权</string>
-    <string name="ui____b59f6788">严格（3）—— 30 全规则 + 幻觉阈值=2；禁止取消 + 禁止关滑动 + 自动熔断 2 次开</string>
-    <string name="ui____b6f5f134">严格（3）—— 30 全规则 + 幻觉阈值=2；禁止取消 + 禁止关滑动 + 自动熔断 2 次开</string>
-    <string name="ui____b87596cc">高端—— 2 阶段都跑，预算 ≤ 30s（默认）</string>
+    <string name="settings_zth_tier_strict">熔断阈值2次，幻觉置信度阈值0.5，强制滑动确认，禁止取消确认，自动熔断</string>
+    <string name="settings_zth_tier_balanced">熔断阈值3次，幻觉置信度阈值0.7，强制滑动确认，启用 LLM 计划审批</string>
+    <string name="settings_zth_perf_mid">启发式全跑，LLM终检按需触发（预算≤20s）</string>
     <string name="ui____bc28072c">保活</string>
     <string name="ui____c7f8d9cc">测速中…</string>
     <string name="ui____d934fb06">当前未启用：可查看节点与测速，切换需先启用代理</string>
@@ -2494,6 +2494,81 @@
     <!-- ── 安全设置重构（Security Settings Refactor）── -->
     <string name="settings_zth_title">零幻觉容忍</string>
     <string name="settings_zth_subtitle">AI 行为确认档位</string>
+
+    <!-- 档位显示名 -->
+    <string name="settings_zth_tier_name_disabled">关闭（0）</string>
+    <string name="settings_zth_tier_name_minimal">轻度（1）</string>
+    <string name="settings_zth_tier_name_balanced">平衡（2）</string>
+    <string name="settings_zth_tier_name_strict">严格（3）</string>
+
+    <!-- 性能等级显示名 -->
+    <string name="settings_zth_perf_name_high">高端</string>
+    <string name="settings_zth_perf_name_mid">中端</string>
+    <string name="settings_zth_perf_name_low">低端</string>
+
+    <!-- 状态摘要卡片 -->
+    <string name="settings_zth_status_title">当前生效状态</string>
+    <string name="settings_zth_status_row_tier">当前档位</string>
+    <string name="settings_zth_status_row_circuit">熔断阈值</string>
+    <string name="settings_zth_status_circuit_never">永不熔断</string>
+    <string name="settings_zth_status_circuit_times">%1$d 次失败触发</string>
+    <string name="settings_zth_status_row_threshold">幻觉阈值</string>
+    <string name="settings_zth_status_row_swipe">滑动确认</string>
+    <string name="settings_zth_status_swipe_forced">强制开启</string>
+    <string name="settings_zth_status_swipe_optional">可选</string>
+    <string name="settings_zth_status_swipe_off">已关闭</string>
+    <string name="settings_zth_status_row_llm">LLM 终检</string>
+    <string name="settings_zth_status_llm_on">启用</string>
+    <string name="settings_zth_status_llm_off">跳过</string>
+
+    <!-- 档位对比表 -->
+    <string name="settings_zth_compare_title">档位对比</string>
+    <string name="settings_zth_compare_param">参数</string>
+    <string name="settings_zth_compare_circuit">熔断阈值</string>
+    <string name="settings_zth_compare_threshold">幻觉阈值</string>
+    <string name="settings_zth_compare_swipe">滑动确认</string>
+    <string name="settings_zth_compare_cancel">允许取消</string>
+    <string name="settings_zth_compare_llm">LLM终检</string>
+    <string name="settings_zth_compare_never">永不</string>
+    <string name="settings_zth_compare_times">%1$d次</string>
+    <string name="settings_zth_compare_optional">可选</string>
+    <string name="settings_zth_compare_forced">强制</string>
+    <string name="settings_zth_compare_yes">是</string>
+    <string name="settings_zth_compare_no">否</string>
+    <string name="settings_zth_compare_dash">—</string>
+
+    <!-- 功能说明卡片 -->
+    <string name="settings_zth_info_title">这是什么</string>
+    <string name="settings_zth_info_body">ZTH（零幻觉容忍）是 AI 行为安全机制。越严格的档位，AI 执行工具/计划前越频繁要求用户确认。幻觉触发（工具输出/计划/技能正文）无论档位都先弹卡确认。性能等级影响是否调用 LLM 做终检，低端机可关闭以提升速度。</string>
+
+    <!-- 滑动确认常驻提示 -->
+    <string name="settings_zth_swipe_hint">平衡/严格档位强制开启，无法关闭</string>
+
+    <!-- 恢复默认 -->
+    <string name="settings_zth_reset">恢复默认</string>
+    <string name="settings_zth_reset_confirm_title">恢复默认设置</string>
+    <string name="settings_zth_reset_confirm_message">将恢复为平衡（2）+ 高端 + 滑动确认开启，是否继续？</string>
+
+    <!-- 降级确认 -->
+    <string name="settings_zth_downgrade_title">降低安全档位</string>
+    <string name="settings_zth_downgrade_message">降低档位会减少安全确认，可能增加幻觉风险，是否继续？</string>
+
+    <!-- 档位展开详情 -->
+    <string name="settings_zth_detail_circuit">熔断阈值</string>
+    <string name="settings_zth_detail_threshold">幻觉置信度阈值</string>
+    <string name="settings_zth_detail_swipe">滑动确认</string>
+    <string name="settings_zth_detail_cancel">允许取消确认</string>
+    <string name="settings_zth_detail_llm">LLM 终检</string>
+    <string name="settings_zth_detail_auto_break">自动熔断</string>
+
+    <!-- ViewModel 消息 -->
+    <string name="settings_zth_msg_tier_set">ZTH 档位已设置为：%1$s</string>
+    <string name="settings_zth_msg_perf_set">ZTH 性能等级已设置为：%1$s</string>
+    <string name="settings_zth_msg_swipe_on">ZTH 滑动确认已开启</string>
+    <string name="settings_zth_msg_swipe_off">ZTH 滑动确认已关闭</string>
+    <string name="settings_zth_msg_set_fail">设置失败：%1$s</string>
+    <string name="settings_zth_msg_swipe_forced">平衡/严格档位必须开启滑动确认，已阻止关闭</string>
+    <string name="settings_zth_msg_reset_done">已恢复默认设置</string>
 
     <string name="security_overview_title">安全概览</string>
     <string name="security_overview_score">%d 分</string>

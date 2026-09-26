@@ -1891,11 +1891,11 @@
     <string name="ui_ai_8049975d">AI code running requires Python</string>
 
     <string name="ui___6435a24f">Enter the credentials of any valid SSH connection to verify identity. After verification, a new master key is generated and all credentials must be re-entered.</string>
-    <string name="ui____0f215ee0">Level (hallucination sensitivity)</string>
+    <string name="settings_zth_section_tier">Tier (hallucination sensitivity)</string>
     <string name="ui____132c5cdc">Retry</string>
     <string name="ui____21df949d">Timeout</string>
     <string name="ui____21df949d_2">Timeout</string>
-    <string name="ui____2e6ca1c3">⚠ Level BALANCED/STRICT (C.4.8): swipe confirmation required; the setting is forced ON.</string>
+    <string name="settings_zth_swipe_forced_warning">Balanced/Strict tier requires swipe confirmation; disable blocked.</string>
     <string name="ui____2f4aaddd">Delete</string>
     <string name="ui____31a39df2">Vision</string>
     <string name="ui____31a39df2_2">Vision</string>
@@ -1906,7 +1906,7 @@
     <string name="ui____5f411223_2">Back</string>
     <string name="ui____65227369">Host</string>
     <string name="ui____694fc5ef">Refresh</string>
-    <string name="ui____6f309ebf">Strict (3) — 30 full rules + hallucination threshold=2; no cancel + no disable swipe + auto circuit-breaker after 2</string>
+    <string name="settings_zth_tier_disabled">Plan-native approval only, no extra hallucination constraints, never circuit-breaks, swipe can be off</string>
     <string name="ui____701515e9">Import from file</string>
     <string name="ui____7bf54e28">Selected</string>
     <string name="ui____7bf54e28_2">Selected</string>
@@ -2025,7 +2025,7 @@
     <string name="ui______c1fbcbfb">Live traffic</string>
     <string name="ui______cb5ff350">Save override</string>
     <string name="ui______cbb46593">Cancel editing</string>
-    <string name="ui______cd9f5bd3">Swipe to confirm (SwipeToConfirm, C.4.8 option C)</string>
+    <string name="settings_zth_swipe_title">Swipe to confirm (SwipeToConfirm)</string>
     <string name="ui______ce9e92bd">Groups · Traffic</string>
     <string name="ui______cfd4afc8">Full encryption (recommended)</string>
     <string name="ui______d0034676">Compatible endpoints · default capability policy</string>
@@ -2034,12 +2034,12 @@
     <string name="proxy_ai_hosts_direct">Direct model API (skip proxy)</string>
     <string name="proxy_ai_hosts_direct_desc">When enabled, OpenAI / Anthropic / Gemini official APIs connect directly, saving one proxy hop of latency; if direct connection fails (requires the proxy), disable it to fall back to the proxy.</string>
     <string name="ui______d8195afb">✅ On</string>
-    <string name="ui______e17b4696">Performance tier (whether low-end devices skip LLM final check)</string>
+    <string name="settings_zth_section_perf">Performance tier (whether low-end devices skip LLM final check)</string>
     <string name="ui______ee92cd5e">Copy command</string>
     <string name="ui______f0aacd4f">Encryption scope</string>
     <string name="ui______f388b5eb">Paste Clash YAML manually</string>
     <string name="ui______f5c9f705">Stop following</string>
-    <string name="ui_____a5d93376">High-end — both stages run, budget ≤ 30s (default)</string>
+    <string name="settings_zth_perf_low">Heuristics only, skip LLM final check, fastest response</string>
     <string name="ui_____d496aef9">(No description)</string>
     <string name="ui_____d496aef9_2">(No description)</string>
     <string name="ui_____da42892f">Overridden (Manual)</string>
@@ -2087,7 +2087,7 @@
     <string name="ui____41e8e8b9">Appearance</string>
     <string name="ui____456d29ef">Logs</string>
     <string name="ui____4722bc0c">Terminal</string>
-    <string name="ui____485bd1f1">High-end — both stages run, budget ≤ 30s (default)</string>
+    <string name="settings_zth_perf_high">Heuristics + LLM final check both run, budget ≤ 30s (default)</string>
     <string name="ui____48d0a09b">Appearance</string>
     <string name="ui____4dbd9aec">Server</string>
     <string name="ui____55405ea6">Backup</string>
@@ -2095,7 +2095,7 @@
     <string name="ui____56563edf_2">Encryption</string>
     <string name="ui____5660bcd2">Keep-alive</string>
     <string name="ui____56a3f798">Tongyi</string>
-    <string name="ui____5c5c0db9">Strict (3) — 30 full rules + hallucination threshold=2; no cancel + no disable swipe + auto circuit-breaker after 2</string>
+    <string name="settings_zth_tier_minimal">Circuit-break after 5 fails, hallucination threshold 0.9, swipe can be off, skip LLM final check</string>
     <string name="ui____5f15d40d">✅ On</string>
     <string name="ui____5f811dd8">Encryption</string>
     <string name="ui____601a29b5">Import from file</string>
@@ -2159,9 +2159,9 @@
     <string name="ui____a7d3091f">Servers</string>
     <string name="ui____afcde261">Appearance</string>
     <string name="ui____b0fae043">Permissions</string>
-    <string name="ui____b59f6788">Strict (3) — 30 full rules + hallucination threshold=2; no cancel + no disable swipe + auto circuit-breaker after 2</string>
-    <string name="ui____b6f5f134">Strict (3) — 30 full rules + hallucination threshold=2; no cancel + no disable swipe + auto circuit-breaker after 2</string>
-    <string name="ui____b87596cc">High-end — both stages run, budget ≤ 30s (default)</string>
+    <string name="settings_zth_tier_strict">Circuit-break after 2 fails, hallucination threshold 0.5, forced swipe, cancel disabled, auto circuit-break</string>
+    <string name="settings_zth_tier_balanced">Circuit-break after 3 fails, hallucination threshold 0.7, forced swipe, LLM plan approval on</string>
+    <string name="settings_zth_perf_mid">Heuristics all run, LLM final check on-demand (budget ≤ 20s)</string>
     <string name="ui____bc28072c">Keep-alive</string>
     <string name="ui____c7f8d9cc">Testing speed…</string>
     <string name="ui____d934fb06">Currently disabled: you can view nodes and test speed, switching requires enabling the proxy</string>
@@ -2463,6 +2463,81 @@
     <!-- Security Settings Refactor -->
     <string name="settings_zth_title">Zero Hallucination Tolerance</string>
     <string name="settings_zth_subtitle">AI behavior confirmation tier</string>
+
+    <!-- Tier display names -->
+    <string name="settings_zth_tier_name_disabled">Disabled (0)</string>
+    <string name="settings_zth_tier_name_minimal">Minimal (1)</string>
+    <string name="settings_zth_tier_name_balanced">Balanced (2)</string>
+    <string name="settings_zth_tier_name_strict">Strict (3)</string>
+
+    <!-- Performance display names -->
+    <string name="settings_zth_perf_name_high">High-end</string>
+    <string name="settings_zth_perf_name_mid">Mid-range</string>
+    <string name="settings_zth_perf_name_low">Low-end</string>
+
+    <!-- Status summary card -->
+    <string name="settings_zth_status_title">Current active settings</string>
+    <string name="settings_zth_status_row_tier">Current tier</string>
+    <string name="settings_zth_status_row_circuit">Circuit-break threshold</string>
+    <string name="settings_zth_status_circuit_never">Never</string>
+    <string name="settings_zth_status_circuit_times">After %1$d fails</string>
+    <string name="settings_zth_status_row_threshold">Hallucination threshold</string>
+    <string name="settings_zth_status_row_swipe">Swipe confirmation</string>
+    <string name="settings_zth_status_swipe_forced">Forced on</string>
+    <string name="settings_zth_status_swipe_optional">Optional</string>
+    <string name="settings_zth_status_swipe_off">Off</string>
+    <string name="settings_zth_status_row_llm">LLM final check</string>
+    <string name="settings_zth_status_llm_on">Enabled</string>
+    <string name="settings_zth_status_llm_off">Skipped</string>
+
+    <!-- Tier comparison table -->
+    <string name="settings_zth_compare_title">Tier comparison</string>
+    <string name="settings_zth_compare_param">Parameter</string>
+    <string name="settings_zth_compare_circuit">Circuit-break</string>
+    <string name="settings_zth_compare_threshold">Hallucination</string>
+    <string name="settings_zth_compare_swipe">Swipe</string>
+    <string name="settings_zth_compare_cancel">Cancel allowed</string>
+    <string name="settings_zth_compare_llm">LLM check</string>
+    <string name="settings_zth_compare_never">Never</string>
+    <string name="settings_zth_compare_times">%1$d fails</string>
+    <string name="settings_zth_compare_optional">Optional</string>
+    <string name="settings_zth_compare_forced">Forced</string>
+    <string name="settings_zth_compare_yes">Yes</string>
+    <string name="settings_zth_compare_no">No</string>
+    <string name="settings_zth_compare_dash">—</string>
+
+    <!-- Info card -->
+    <string name="settings_zth_info_title">What is this</string>
+    <string name="settings_zth_info_body">ZTH (Zero Hallucination Tolerance) is an AI behavior safety mechanism. Stricter tiers require more frequent user confirmation before the AI executes tools or plans. Hallucination triggers (tool output / plan / skill body) always prompt regardless of tier. Performance class controls whether LLM final check runs; low-end devices can disable it for speed.</string>
+
+    <!-- Swipe persistent hint -->
+    <string name="settings_zth_swipe_hint">Forced on at Balanced/Strict, cannot be turned off</string>
+
+    <!-- Reset default -->
+    <string name="settings_zth_reset">Reset to default</string>
+    <string name="settings_zth_reset_confirm_title">Reset settings</string>
+    <string name="settings_zth_reset_confirm_message">This will restore Balanced (2) + High-end + swipe on. Continue?</string>
+
+    <!-- Downgrade confirmation -->
+    <string name="settings_zth_downgrade_title">Lower security tier</string>
+    <string name="settings_zth_downgrade_message">Lowering the tier reduces safety confirmations and may increase hallucination risk. Continue?</string>
+
+    <!-- Tier expanded details -->
+    <string name="settings_zth_detail_circuit">Circuit-break threshold</string>
+    <string name="settings_zth_detail_threshold">Hallucination confidence threshold</string>
+    <string name="settings_zth_detail_swipe">Swipe confirmation</string>
+    <string name="settings_zth_detail_cancel">Cancel confirmation allowed</string>
+    <string name="settings_zth_detail_llm">LLM final check</string>
+    <string name="settings_zth_detail_auto_break">Auto circuit-break</string>
+
+    <!-- ViewModel messages -->
+    <string name="settings_zth_msg_tier_set">ZTH tier set to: %1$s</string>
+    <string name="settings_zth_msg_perf_set">ZTH performance set to: %1$s</string>
+    <string name="settings_zth_msg_swipe_on">ZTH swipe confirmation enabled</string>
+    <string name="settings_zth_msg_swipe_off">ZTH swipe confirmation disabled</string>
+    <string name="settings_zth_msg_set_fail">Set failed: %1$s</string>
+    <string name="settings_zth_msg_swipe_forced">Balanced/Strict requires swipe confirmation; disable blocked</string>
+    <string name="settings_zth_msg_reset_done">Settings restored to default</string>
 
     <string name="security_overview_title">Security Overview</string>
     <string name="security_overview_score">%d pts</string>
