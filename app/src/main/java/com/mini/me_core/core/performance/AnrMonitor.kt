@@ -3,60 +3,97 @@ package com.mini.me_core.core.performance
 import android.os.Handler
 import android.os.Looper
 import com.mini.me_core.BuildConfig
-import com.mini.me_core.core.util.FileLogger
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * F6.4 ANR 监控（轻量主线程看门狗）。
+ * ANR 监控（仅 debug 构建采集）。
  *
- * 原理：向主线程 Looper 周期 post 一个探针任务；若超过 [TIMEOUT_MS] 仍未被主线程执行，
- * 说明主线程被阻塞，判定为 ANR 风险，抓取主线程堆栈并记入崩溃报告目录（与 CrashReporter 同源）。
+ * 机制：主线程 Looper 心跳检测。
+ * - 每隔 1s 向主线程 post 一个心跳 Runnable。
+ * - 后台线程检测心跳是否按时执行，若主线程阻塞超过 [ANR_THRESHOLD_MS]，
+ *   抓取主线程完整堆栈并记录为一条 ANR 事件。
+ * - 记录保存在内存中（[records]），供开发者选项展示；不写磁盘。
  *
- * - 仅 debug 构建启用；release 下为空操作。
- * - 不监控 /data/anr/traces.txt（权限受限），采用应用内自监控。
+ * release 构建下为空操作。
  */
 object AnrMonitor {
 
-    private const val TIMEOUT_MS = 3_000L
-    private const val INTERVAL_MS = 1_000L
+    private const val ANR_THRESHOLD_MS = 5_000L
+    private const val HEARTBEAT_INTERVAL_MS = 1_000L
+    private const val MAX_RECORDS = 20
 
-    private val mainHandler = Handler(Looper.getMainLooper())
+    data class AnrRecord(
+        val timestamp: Long,
+        val blockDurationMs: Long,
+        val mainThreadStack: String,
+    ) {
+        fun formattedTime(): String =
+            SimpleDateFormat("MM-dd HH:mm:ss", Locale.US).format(Date(timestamp))
+    }
+
+    private val records = CopyOnWriteArrayList<AnrRecord>()
 
     @Volatile
     private var started = false
 
-    private val probe = object : Runnable {
-        override fun run() {
-            if (!started) return
-            // 主线程即将执行到此（探针准时），重置 watchdog。
-            watchdog.removeCallbacks(watchdogRunnable)
-            watchdog.postDelayed(watchdogRunnable, TIMEOUT_MS)
-            mainHandler.postDelayed(this, INTERVAL_MS)
-        }
-    }
+    @Volatile
+    private var heartbeatReceived = true
 
-    // 独立 handler 线程用于判定阻塞：探针没在限时内跑完主线程，watchdog 仍在队列里触发。
-    private val watchdog = Handler(Looper.getMainLooper())
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var watcherThread: Thread? = null
 
-    private val watchdogRunnable = Runnable {
-        if (!started) return@Runnable
-        // 走到这里说明探针在 TIMEOUT_MS 内没被主线程处理 → 主线程阻塞。
-        val stack = Looper.getMainLooper().thread.stackTrace
-        FileLogger.w("AnrMonitor", "疑似 ANR：主线程阻塞超过 ${TIMEOUT_MS}ms")
-        val sb = StringBuilder("MiniMe-core ANR Report time=${System.currentTimeMillis()}\n")
-        for (e in stack.take(30)) sb.appendLine("    at $e")
-        FileLogger.w("AnrMonitor", sb.toString())
-    }
+    private val heartbeat = Runnable { heartbeatReceived = true }
 
     fun start() {
-        if (started) return
-        if (!BuildConfig.DEBUG) return
+        if (started || !BuildConfig.DEBUG) return
         started = true
-        mainHandler.post(probe)
+        heartbeatReceived = true
+        watcherThread = Thread({
+            while (started) {
+                heartbeatReceived = false
+                mainHandler.post(heartbeat)
+                try {
+                    Thread.sleep(HEARTBEAT_INTERVAL_MS)
+                } catch (_: InterruptedException) {
+                    break
+                }
+                if (!heartbeatReceived) {
+                    val blockStart = System.currentTimeMillis()
+                    try {
+                        Thread.sleep(HEARTBEAT_INTERVAL_MS)
+                    } catch (_: InterruptedException) {
+                        break
+                    }
+                    if (!heartbeatReceived) {
+                        val blockDuration = System.currentTimeMillis() - blockStart + HEARTBEAT_INTERVAL_MS
+                        val stack = Looper.getMainLooper().thread.stackTrace
+                            .joinToString("\n") { "    at $it" }
+                        addRecord(AnrRecord(
+                            timestamp = System.currentTimeMillis(),
+                            blockDurationMs = blockDuration,
+                            mainThreadStack = stack,
+                        ))
+                    }
+                }
+            }
+        }, "anr-watcher").apply { isDaemon = true; start() }
     }
 
     fun stop() {
         started = false
-        mainHandler.removeCallbacks(probe)
-        watchdog.removeCallbacks(watchdogRunnable)
+        watcherThread?.interrupt()
+        watcherThread = null
     }
+
+    private fun addRecord(record: AnrRecord) {
+        records.add(0, record)
+        while (records.size > MAX_RECORDS) records.removeAt(records.size - 1)
+    }
+
+    fun snapshot(): List<AnrRecord> = records.toList()
+
+    fun clear() = records.clear()
 }

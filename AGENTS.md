@@ -56,7 +56,7 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 ```bash
 # 日常开发冒烟（AI 改完编译型代码默认跑这个；debug buildType 快，不跑 R8）
 ./gradlew :app:assembleDebug
-# Release 链路验证 / 发布包（双 ABI 通用包：arm64-v8a + x86_64，真机与模拟器通用）
+# Release 链路验证 / 发布包（release 仅 arm64-v8a；debug 保留双 ABI 用于模拟器）
 ./gradlew :app:assembleRelease
 # Release AAB
 ./gradlew :app:bundleRelease
@@ -490,7 +490,7 @@ python3 scripts/check-persistence.py
 | 数据库迁移启动即失败 | 迁移 SQL 字面量含 `;` 被切分器误切 | 用 `char(59)` 代替字面量分号 |
 | 构建命令报错/找不到任务 | 误用旧 flavor 命令 | 只用 `assembleDebug/assembleRelease/bundleRelease`（项目无 flavor） |
 | PRoot 容器无法执行 | `targetSdk` 被改高破坏 W^X 绕过 | 保持 `targetSdk = 28`，勿"顺手修复" |
-| APK 装不上/装后崩溃 | ABI 不符 | 通用包含 arm64-v8a + x86_64；若宿主为其它 ABI（少见），走无容器降级（AI 核心仍可用） |
+| APK 装不上/装后崩溃 | ABI 不符 | release 仅 arm64-v8a（debug 含 x86_64 供模拟器）；若宿主为其它 ABI，走无容器降级（AI 核心仍可用） |
 | 版本号对不上 | 手改 `versionName` | 靠 Git Tag 动态推导，代码中勿手写版本号 |
 | 提交被 commit-msg 阻断 | 提交信息不合 Conventional Commits | 按 `type(scope): subject` 重写提交信息 |
 | **设置项重启后丢失** | **KVStore putJson 写 jsonVal 列，但 getString 读 stringVal 列，读写列不匹配** | **putJson 必须配 getJson；putBool 配 getBool；putInt 配 getInt；putString 配 getString** |

@@ -29,24 +29,41 @@
     <string name="settings_needs_restart_label">需重启</string>
     <string name="dev_options_title">开发者选项</string>
     <string name="dev_options_unlocked">开发者选项已解锁</string>
+    <!-- Tab 标签 -->
+    <string name="dev_tab_performance">性能</string>
+    <string name="dev_tab_debug">调试</string>
+    <string name="dev_tab_monitor">监控</string>
+    <string name="dev_tab_data">数据</string>
+    <!-- 性能 Tab -->
     <string name="dev_options_perf">性能监控</string>
     <string name="dev_options_fps">FPS</string>
     <string name="dev_options_memory">内存</string>
-    <string name="dev_options_debug_toggles">调试选项</string>
+    <string name="dev_perf_fps_chart">FPS 实时曲线</string>
+    <string name="dev_perf_memory_chart">内存实时曲线</string>
+    <string name="dev_perf_current_fps">当前</string>
+    <string name="dev_perf_avg_fps">平均</string>
+    <string name="dev_perf_min_fps">最低</string>
+    <string name="dev_perf_used_heap">已用堆</string>
+    <string name="dev_perf_max_heap">最大堆</string>
+    <string name="dev_perf_avail_sys">系统可用</string>
+    <!-- 调试 Tab -->
     <string name="dev_options_keep_screen_on">保持屏幕常亮</string>
-    <string name="dev_options_force_dark">强制深色模式</string>
-    <string name="dev_options_slow_network">模拟慢速网络</string>
-    <string name="dev_options_layout_bounds">显示布局边界</string>
-    <string name="dev_options_gpu_overdraw">GPU 过度绘制</string>
+    <string name="dev_keep_screen_on_subtitle">屏幕保持常亮不自动关闭</string>
+    <string name="dev_debug_display_group">显示</string>
+    <string name="dev_debug_network_group">网络</string>
+    <string name="dev_debug_system_group">系统</string>
+    <string name="dev_debug_compose_layout">Compose 布局检查</string>
+    <string name="dev_debug_compose_layout_subtitle">为所有 Composable 绘制 1dp 边框</string>
+    <string name="dev_debug_strict_mode">严格模式</string>
+    <string name="dev_debug_strict_mode_subtitle">检测主线程磁盘读写与网络违规</string>
+    <string name="dev_debug_webview_debug">WebView 调试</string>
+    <string name="dev_debug_webview_debug_subtitle">启用 chrome://inspect 远程调试</string>
+    <string name="dev_debug_network_log">网络日志</string>
+    <string name="dev_debug_network_log_subtitle">记录 OkHttp 请求详情到日志</string>
     <string name="dev_options_log_viewer">日志查看器</string>
-    <string name="dev_options_db_viewer">数据库查看</string>
-    <string name="dev_options_network_monitor">网络监控</string>
-    <string name="dev_options_network_empty">无最近请求记录（仅 debug 构建采集）</string>
-    <string name="dev_options_kv_store">设置存储浏览</string>
-    <string name="dev_options_empty">暂无数据</string>
     <!-- F6.1 启动耗时追踪 -->
     <string name="dev_options_startup">启动耗时</string>
-    <string name="dev_options_startup_total">冷启动总耗时 %1$d ms（不含动画）</string>
+    <string name="dev_options_startup_total">冷启动总耗时 %1$d ms</string>
     <string name="dev_options_startup_stage">%1$s：累计 %2$d ms / 阶段 %3$d ms</string>
     <!-- F6.2 内存详情 -->
     <string name="dev_options_memory_detail">内存详情</string>
@@ -64,17 +81,56 @@
     <string name="crash_clear">清空崩溃记录</string>
     <string name="crash_detail">崩溃详情</string>
     <string name="crash_item_time">崩溃时间 %1$s</string>
+    <string name="crash_exception_type">异常类型</string>
+    <string name="crash_copy">复制</string>
+    <string name="crash_export">导出</string>
+    <string name="crash_clear_confirm_title">清空崩溃记录</string>
+    <string name="crash_clear_confirm_message">确定要清空所有崩溃报告吗？此操作不可撤销。</string>
     <!-- F6.6 网络监控 -->
+    <string name="dev_options_network_monitor">网络监控</string>
+    <string name="dev_options_network_empty">无最近请求记录（仅 debug 构建采集）</string>
     <string name="net_stats">请求 %1$d · 成功率 %2$d%% · 平均 %3$d ms</string>
     <string name="net_item">%1$s %2$s · %3$d · %4$d ms</string>
-    <string name="net_slowest">最慢 Top5</string>
+    <string name="net_slowest">最慢请求</string>
     <string name="net_clear">清空网络记录</string>
     <string name="net_detail">请求详情</string>
     <string name="net_req_headers">请求头</string>
     <string name="net_resp_headers">响应头</string>
-    <!-- F6.7 电池优化 -->
-    <string name="dev_options_battery_saver">电池优化（降低动画/后台轮询）</string>
-    <string name="dev_options_battery_saver_active">当前已进入省电模式</string>
+    <string name="net_req_body">请求体</string>
+    <string name="net_resp_body">响应体</string>
+    <string name="net_total_requests">总请求</string>
+    <string name="net_success_rate">成功率</string>
+    <string name="net_avg_duration">平均耗时</string>
+    <string name="net_slowest_req">最慢</string>
+    <string name="net_refresh">刷新</string>
+    <string name="net_export">导出</string>
+    <string name="net_export_success">已导出到下载目录</string>
+    <string name="net_clear_confirm_title">清空网络记录</string>
+    <string name="net_clear_confirm_message">确定要清空所有网络请求记录吗？此操作不可撤销。</string>
+    <!-- ANR 监控 -->
+    <string name="dev_monitor_anr">ANR 监控</string>
+    <string name="dev_monitor_anr_empty">暂无 ANR 记录</string>
+    <string name="dev_monitor_anr_block_duration">阻塞 %1$d ms</string>
+    <string name="dev_monitor_anr_detail">ANR 详情</string>
+    <!-- 数据 Tab -->
+    <string name="dev_options_db_viewer">数据库查看</string>
+    <string name="dev_options_kv_store">设置存储浏览</string>
+    <string name="dev_options_empty">暂无数据</string>
+    <string name="dev_data_kv_search_hint">搜索 Key...</string>
+    <string name="dev_data_kv_long_press_copy">长按复制 Value</string>
+    <string name="dev_data_value_copied">已复制到剪贴板</string>
+    <string name="dev_data_db_info">数据库信息</string>
+    <string name="dev_data_db_path">数据库路径</string>
+    <string name="dev_data_db_size">数据库大小</string>
+    <string name="dev_data_db_table_count">表数量</string>
+    <string name="dev_data_db_rows">行数</string>
+    <string name="dev_data_db_todo">TODO：表数据浏览待实现</string>
+    <!-- 通用 -->
+    <string name="common_refresh">刷新</string>
+    <string name="common_copy">复制</string>
+    <string name="common_export">导出</string>
+    <string name="common_search">搜索</string>
+    <string name="common_clear">清空</string>
     <string name="settings_providers">模型服务商</string>
     <string name="settings_provider_editor">提供商</string>
     <string name="settings_default_models">默认模型</string>

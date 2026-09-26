@@ -13,7 +13,7 @@
 > workflow 实际是**单 job 多 step**结构（jobs.build），下述 6 个阶段是按职责划分的逻辑阶段，对应 step 序列。
 
 1. **variables** → `Display release tag info` + `Verify versionCode monotonic`（versionCode 单调递增校验）+ `Determine release name`（手动触发用 `manual-<run_number>`）+ `Determine prerelease flag`（tag 含 `-rc/-dev/-beta/-alpha` 后缀自动标记 prerelease）
-2. **build** → `:app:testReleaseUnitTest`（发版质量门禁）→ `:app:assembleRelease` → 正式签名构建 APK 到 `app/build/outputs/apk/release/app-release.apk` → `Rename APK` 重命名为 `dist/MiniMe-<版本号>-<变体>.apk`（如 `MiniMe-v0.0.15-release.apk`，**双 ABI 通用包**，重命名同时做 ABI 校验：`lib/` 必须同时含 `arm64-v8a` 与 `x86_64`）
+2. **build** → `:app:testReleaseUnitTest`（发版质量门禁）→ `:app:assembleRelease` → 正式签名构建 APK 到 `app/build/outputs/apk/release/app-release.apk` → `Rename APK` 重命名为 `dist/MiniMe-<版本号>-<变体>.apk`（如 `MiniMe-v0.0.15-release.apk`，**release 仅 arm64-v8a**，重命名同时做 ABI 校验：`lib/` 必须含 `arm64-v8a`；debug 变体保留双 ABI 用于模拟器开发）
 3. **upload-mapping** → `Upload R8 mapping`（`actions/upload-artifact@v4`，artifact 名 `r8-mapping-<tag>`，90 天保留，`if-no-files-found: ignore` 不阻塞）
 4. **create-release** → `Generate release notes` + `Create GitHub Release & Upload assets`（`softprops/action-gh-release@v2`，prerelease 取决于 tag 是否含预发布后缀；标题基础格式 `MiniMe <版本号>`，AI/维护者发版后补充「— 更新内容概括」；正文遵循 AGENTS.md「发版说明格式」统一规约，条目为「**4-9字小标题**：20-40字说明」结构）
 5. **upload-apk** → 与 create-release 同 step 完成（`files: dist/MiniMe-*.apk` 挂到 Release Assets）
@@ -41,7 +41,7 @@ curl -s -u "<owner>:<token>" \
 ## 产物校验清单（构建完成后必跑）
 
 1. **下载 APK** → `curl -sL -u "<owner>:<token>" -o MiniMe-<版本号>-<变体>.apk "<browser_download_url>"`
-2. **ABI 校验** → `unzip -l <apk> | grep 'lib/.*\.so'` 必须**同时**含 `lib/arm64-v8a/*.so` 与 `lib/x86_64/*.so`（双 ABI 通用包）；容器资产应含 `assets/container/arm/alpine-rootfs.bin` 与 `assets/container/x86_64/alpine-rootfs-x86_64.bin`
+2. **ABI 校验** → `unzip -l <apk> | grep 'lib/.*\.so'` 必须含 `lib/arm64-v8a/*.so`（release 仅 arm64-v8a）；容器资产应含 `assets/container/arm/alpine-rootfs.bin`
 3. **签名校验** → `keytool -printcert -jarfile <apk>` → Owner 必须为正式签名（非 `CN=Android Debug`）
 4. **SHA256** → `sha256sum <apk>` 记录指纹
 5. **Release 页面** → https://github.com/Lisir2002/MiniMe-core/releases/tag/<tag>

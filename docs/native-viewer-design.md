@@ -1,8 +1,8 @@
 # MiniMe-core Native 查看器/编辑器核心（libminimeviewer）完整实施方案
 
-> 版本：v1.0
-> 日期：2026-09-26
-> 状态：待实施
+> 版本：v1.1
+> 日期：2026-09-27
+> 状态：第一阶段已落地（CMake/JNI/file_loader/tree-sitter/CodeViewer 地基），后续阶段待实施
 > 适用项目：MiniMe-core（applicationId: com.mini.me_core）
 
 ---

@@ -40,7 +40,7 @@
 
 MiniMe-core is an AI-powered coding assistant that runs natively on Android. It integrates large language models with a local Linux development environment. The built-in Alpine Linux container and terminal emulator let the AI directly read/write files, execute shell commands, and run build tools. It also supports remote SSH servers as the execution backend, turning your phone into a mobile workstation for remote projects.
 
-**Latest Release**: [v0.0.0.15](https://github.com/Lisir2002/MiniMe-core/releases/tag/v0.0.0.15) — Per-model sampling parameter override & default model selection experience upgrade
+**Latest Release**: [v0.0.0.24](https://github.com/Lisir2002/MiniMe-core/releases/tag/v0.0.0.24) — Operation audit refactor & advanced settings page
 
 ## Features
 
@@ -75,8 +75,8 @@ MiniMe-core is an AI-powered coding assistant that runs natively on Android. It 
 
 **Prerequisites**
 
-- **Physical device (officially supported)**: Android 8.0+ (API 26) arm64-v8a device (the mainstream ABI for current Android handsets)
-- **Virtual environment (emulator / VM)**: x86_64 or arm64 system images both work — the same universal package installs and runs; the container auto-selects by host architecture (x86_64 native proot, arm64 native execution)
+- **Physical device (officially supported)**: Android 8.0+ (API 26) arm64-v8a device (the mainstream ABI for current Android handsets); release builds are arm64-v8a only
+- **Virtual environment (emulator / VM)**: x86_64 or arm64 system images work with debug builds (dual ABI); release builds are arm64-v8a only
 
 ## Quick Start
 
@@ -94,7 +94,7 @@ For more details, see the in-app help (Settings → Help) and the [Documentation
 A: To support PRoot container execution, targetSdk is locked at 28 to bypass Android 10+ W^X policy — the same trade-off Termux makes. This does not meet Google Play's targetSdk requirement.
 
 **Q: Why is the APK so large?**
-A: The APK is a dual-ABI universal package (arm64-v8a + x86_64) with an embedded Alpine Linux rootfs and 7 built-in bundles, ensuring it works out of the box.
+A: Release builds are arm64-v8a only, with an embedded Alpine Linux rootfs and built-in bundles, ensuring it works out of the box. Debug builds retain dual ABI for emulator development.
 
 **Q: Which AI providers are supported?**
 A: All providers compatible with OpenAI / Anthropic / Gemini API protocols, including but not limited to OpenAI, Anthropic, Google Gemini, DeepSeek, Qwen, Zhipu GLM, Doubao, StepFun, etc.
@@ -119,7 +119,7 @@ A: Use the companion app [MiniMe Logs](https://github.com/Lisir2002/MiniMe-core/
 
 # Release build (signing config required; auto-falls back to debug keystore when missing)
 ./gradlew assembleRelease
-# Output: app/build/outputs/apk/release/app-release.apk (dual-ABI universal package: arm64-v8a + x86_64)
+# Output: app/build/outputs/apk/release/app-release.apk (arm64-v8a only)
 
 # Release AAB
 ./gradlew bundleRelease
@@ -153,9 +153,9 @@ keyPassword=your_key_password
 
 ### Cloud build (GitHub Actions release automation)
 
-Releases are tag-driven: push a `v*` tag on a `main` commit (e.g. `git push origin v0.0.0.16` / `v0.0.0.16-rc1`) and [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) takes over automatically: unit tests → assembleRelease → production signing → dual-ABI artifact validation → upload R8 mapping → create GitHub Release → attach APK → write Run Summary. RC tags (containing `-rc`) are auto-marked as prerelease.
+Releases are tag-driven: push a `v*` tag on a `main` commit (e.g. `git push origin v0.0.0.24` / `v0.0.0.24-rc1`) and [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) takes over automatically: unit tests → assembleRelease → production signing → arm64-v8a artifact validation → upload R8 mapping → create GitHub Release → attach APK → write Run Summary. RC tags (containing `-rc`) are auto-marked as prerelease.
 
-- **Production-signing prerequisite**: the repository `Settings → Secrets → Actions` must define 4 secrets — `AICODE_KEYSTORE_BASE64` / `AICODE_KEYSTORE_PASSWORD` / `AICODE_KEY_ALIAS` / `AICODE_KEY_PASSWORD`. Missing any one silently falls back to the debug keystore, and the artifact cannot be published.
+- **Production-signing**: the official keystore (`app/minime.jks`) and properties (`app/keystore.properties`) are committed to the repository (maintainer-authorized), so CI signs directly without extra secrets.
 - **Real-time monitoring & artifact verification**, full commands, and CI job details: see [docs/ci-release.md](./docs/ci-release.md) (cloud build & release operations manual).
 - **Release conventions**: APK naming, title format, and body format mandatory constraints are in [AGENTS.md Release Conventions](./AGENTS.md#发版规范最高优先级--强制约束--发版前逐条核对).
 
@@ -215,9 +215,10 @@ End-to-end architecture notes around core modules: `agent` (AI Agent & MCP integ
 ## Known Limitations
 
 - `targetSdk` is locked at 28 to bypass Android 10+ W^X policy, enabling PRoot execution; trade-off: ineligible for Google Play (same as Termux).
-- Release artifacts are dual-ABI universal packages (arm64-v8a + x86_64):
-  - Supports all mainstream Android physical devices (Snapdragon/Dimensity/Kirin and other 64-bit ARM chipsets) plus x86_64 / arm64 emulators and VMs;
-  - On an extremely rare host ABI (neither arm64 nor x86_64) the container is unavailable; the AI core (chat / files / remote SSH) still works, while container/terminal show an explicit degradation notice.
+- Release builds are arm64-v8a only:
+  - Supports all mainstream Android physical devices (Snapdragon/Dimensity/Kirin and other 64-bit ARM chipsets);
+  - Debug builds retain x86_64 for emulator development;
+  - On an extremely rare host ABI (not arm64) the container is unavailable; the AI core (chat / files / remote SSH) still works, while container/terminal show an explicit degradation notice.
 
 ## Contributing
 

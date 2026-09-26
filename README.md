@@ -40,7 +40,7 @@
 
 MiniMe-core 是一款在 Android 手机上运行的 AI 编程工具，将大语言模型与本地 Linux 开发环境深度集成。它内置 Alpine Linux 容器和终端模拟器，让 AI 能直接读写文件、执行 Shell 命令、运行构建工具；同时支持远程 SSH 服务器作为执行后端，把手机变成远程项目的移动工作站。
 
-**最新版本**：[v0.0.0.15](https://github.com/Lisir2002/MiniMe-core/releases/tag/v0.0.0.15) — 模型级采样参数独立调节与默认模型选择体验升级
+**最新版本**：[v0.0.0.24](https://github.com/Lisir2002/MiniMe-core/releases/tag/v0.0.0.24) — 操作审计重构与高级设置页
 
 ## 功能特性
 
@@ -94,7 +94,7 @@ MiniMe-core 是一款在 Android 手机上运行的 AI 编程工具，将大语�
 A：为支持 PRoot 容器执行，targetSdk 锁定为 28 以绕过 Android 10+ 的 W^X 策略，与 Termux 采用相同取舍，因此不符合 Google Play 的 targetSdk 要求。
 
 **Q：APK 为什么这么大？**
-A：APK 为双 ABI 通用包（arm64-v8a + x86_64），内置 Alpine Linux rootfs 和 7 个功能包，确保开箱即用。
+A：release 仅 arm64-v8a，内置 Alpine Linux rootfs 和功能包，确保开箱即用；debug 变体保留双 ABI 用于模拟器开发。
 
 **Q：支持哪些 AI 提供商？**
 A：支持所有兼容 OpenAI / Anthropic / Gemini API 协议的自定义供应商，包括但不限于 OpenAI、Anthropic、Google Gemini、DeepSeek、通义千问、智谱 GLM、豆包、阶跃星辰等。
@@ -205,18 +205,24 @@ app/src/main/java/com/mini/me_core/
 
 | 文档 | 说明 |
 |---|---|
+| [PLAN.md](./PLAN.md) | 设计文档总览与引导目录（AI 协同开发首选入口） |
 | [AGENTS.md](./AGENTS.md) | AI 协同开发规范：资产同步纪律、Conventional Commits、分支工作流、发版规范（最高优先级强制约束） |
 | [CHANGELOG.md](./docs/Version%20Log/CHANGELOG.md) | 用户面向版本更新日志（含各版本独立日志） |
 | [docs/ci-release.md](./docs/ci-release.md) | 云端构建发版运维手册：CI 全流程、产物校验、签名策略 |
+| [docs/ui-standards.md](./docs/ui-standards.md) | UI 设计规范：页面槽位、统一组件、颜色间距字体、禁止事项 |
+| [docs/native-viewer-design.md](./docs/native-viewer-design.md) | Native 查看器/编辑器设计：C++ so 核心、tree-sitter、PDFium |
+| [docs/plugin-system-design.md](./docs/plugin-system-design.md) | 插件体系设计：四类插件、通用框架、按需下载瘦身 |
+| [docs/qq-bot-integration-design.md](./docs/qq-bot-integration-design.md) | QQ 机器人对接设计：LLBot + OneBot11、无感容器、进程持久化 |
 | [SECURITY.md](./SECURITY.md) | 安全策略与漏洞报告 |
 | `app/src/main/assets/docs/` | App 内置帮助文档（运行时可在「设置 → 帮助」查看） |
 
 ## 已知限制
 
 - `targetSdk` 锁定为 28 以绕过 Android 10+ W^X 策略，使 PRoot 可执行；代价为无法上架 Google Play（与 Termux 同一取舍）。
-- 发布产物为双 ABI 通用包（arm64-v8a + x86_64）：
-  - 适配所有主流 Android 真机（骁龙/天玑/麒麟等 64 位 ARM 芯片）与 x86_64 / arm64 模拟器、虚拟机；
-  - 极端罕见的主机 ABI（非 arm64/x86_64）下容器不可用，AI 核心（对话/文件/远程 SSH）仍可用，容器/终端走明确降级提示。
+- release 仅 arm64-v8a：
+  - 适配所有主流 Android 真机（骁龙/天玑/麒麟等 64 位 ARM 芯片）；
+  - debug 变体保留 x86_64 供模拟器开发；
+  - 极端罕见的主机 ABI（非 arm64）下容器不可用，AI 核心（对话/文件/远程 SSH）仍可用，容器/终端走明确降级提示。
 
 ## 贡献
 
