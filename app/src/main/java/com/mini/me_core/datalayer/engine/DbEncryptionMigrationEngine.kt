@@ -10,6 +10,7 @@ import com.mini.me_core.core.util.FileLogger
 import com.mini.mecore.datalayer.sqldelight.AgentDb
 import com.mini.mecore.datalayer.sqldelight.CredentialsDb
 import com.mini.mecore.datalayer.sqldelight.InfraDb
+import com.mini.mecore.datalayer.sqldelight.QBotDb
 import com.mini.mecore.datalayer.sqldelight.SettingsDb
 import com.mini.mecore.datalayer.sqldelight.T2iDb
 import com.mini.mecore.datalayer.sqldelight.WorkspaceDb
@@ -548,6 +549,7 @@ class DbEncryptionMigrationEngine(
         LibName.WORKSPACE -> WorkspaceDb.Schema
         LibName.T2I -> T2iDb.Schema
         LibName.INFRA -> InfraDb.Schema
+        LibName.QQBOT -> QBotDb.Schema
     }
 
     // ── 辅助方法：表和列信息 ──

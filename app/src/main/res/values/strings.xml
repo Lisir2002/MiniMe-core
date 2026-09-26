@@ -1766,12 +1766,10 @@
     <string name="about_device_long_press_copy">长按可复制</string>
     <string name="about_device_copied">已复制到剪贴板</string>
 
-    <!-- About - 法律与反馈 -->
-    <string name="about_legal_feedback">法律与反馈</string>
+    <!-- About - 法律与联系 -->
+    <string name="about_legal_contact">法律与联系</string>
     <string name="about_user_agreement">用户协议</string>
     <string name="about_privacy_policy">隐私政策</string>
-    <string name="about_feedback_entry">意见反馈</string>
-    <string name="about_contributing_entry">贡献指南</string>
     <string name="about_qq_group_entry">QQ反馈群</string>
     <string name="about_qq_group_subtitle">群号：434751837</string>
     <string name="about_contact_dev_entry">联系开发者</string>
@@ -2639,6 +2637,7 @@
     <string name="fm_save_failed">保存失败</string>
     <string name="fm_unsaved_changes">有未保存的修改，确定离开？</string>
     <string name="fm_confirm_discard">放弃修改</string>
+    <string name="fm_preview_failed">文件预览失败，可能不支持该格式</string>
     <string name="fm_copy_path">复制路径</string>
     <string name="fm_path_copied">路径已复制</string>
     <string name="fm_navigate_up">上级目录</string>

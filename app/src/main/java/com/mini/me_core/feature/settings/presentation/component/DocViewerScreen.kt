@@ -34,33 +34,49 @@ import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.File
+import java.util.concurrent.TimeUnit
 
 /**
- * 通用本地文档查看器：从 assets 读取 Markdown 文档并用 WebView 渲染。
+ * 通用文档查看器：优先从 GitHub 远程拉取最新 Markdown，失败时回退到本地 assets 缓存。
  *
- * 用于「关于」页的用户协议 / 隐私政策 / 开源协议（GPL-3.0）/ 说明文档等长文档。
+ * 用于「关于」页的用户协议 / 隐私政策 / 说明文档等需要实时跟随仓库更新的长文档。
+ * 开源协议（GPL-3.0）等固定文档可只传 assetPath 不走网络。
  * 顶栏由本页面唯一提供（Scaffold + AppTopAppBar），背景/文字颜色跟随主题。
  *
  * @param title 顶栏标题
- * @param assetPath assets 内的文档相对路径（如 "docs/user-agreement.md"）
+ * @param assetPath assets 内的本地兜底文档路径（如 "docs/user-agreement.md"）
+ * @param remoteUrl 可选的 GitHub raw 地址；非空时优先远程拉取并缓存
  * @param alternateAssetPath 可选的另一语言版本路径；非空时顶栏显示中/EN 切换按钮
+ * @param alternateRemoteUrl 可选的另一语言版本远程地址
  * @param onBack 返回回调
  */
 @Composable
 fun DocViewerScreen(
     title: String,
     assetPath: String,
+    remoteUrl: String? = null,
     alternateAssetPath: String? = null,
+    alternateRemoteUrl: String? = null,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     // 当前实际加载的路径：支持在主/备语言版本间切换。
     var currentPath by remember(assetPath, alternateAssetPath) { mutableStateOf(assetPath) }
-    var state by remember(currentPath) { mutableStateOf<DocLoadState>(DocLoadState.Loading) }
+    var currentRemote by remember(remoteUrl, alternateRemoteUrl) { mutableStateOf(remoteUrl) }
+    var state by remember(currentPath, currentRemote) { mutableStateOf<DocLoadState>(DocLoadState.Loading) }
 
-    LaunchedEffect(currentPath) {
+    LaunchedEffect(currentPath, currentRemote) {
         state = DocLoadState.Loading
         state = withContext(Dispatchers.IO) {
+            // 1. 优先远程拉取（带缓存）
+            if (currentRemote != null) {
+                runCatching { fetchRemoteMarkdown(context, currentRemote!!, currentPath) }
+                    .onSuccess { return@withContext DocLoadState.Success(it) }
+            }
+            // 2. 回退本地 assets
             runCatching {
                 context.assets.open(currentPath).bufferedReader(Charsets.UTF_8).use { it.readText() }
             }.fold(
@@ -81,10 +97,16 @@ fun DocViewerScreen(
                 navigationContentDescription = stringResource(R.string.common_back),
                 actions = {
                     if (alternateAssetPath != null) {
-                        // 切换按钮：显示“将要切换到的语言”。
+                        // 切换按钮：显示"将要切换到的语言"。
                         val switchingToEn = currentPath.contains("-zh", ignoreCase = true)
                         TextButton(onClick = {
-                            currentPath = if (switchingToEn) alternateAssetPath else assetPath
+                            if (switchingToEn) {
+                                currentPath = alternateAssetPath
+                                currentRemote = alternateRemoteUrl
+                            } else {
+                                currentPath = assetPath
+                                currentRemote = remoteUrl
+                            }
                         }) {
                             Text(
                                 text = stringResource(
@@ -146,6 +168,56 @@ private sealed interface DocLoadState {
     data object Loading : DocLoadState
     data object Error : DocLoadState
     data class Success(val markdown: String) : DocLoadState
+}
+
+/** 远程文档缓存目录名。 */
+private const val DOC_CACHE_DIR = "doc_cache"
+
+/** 缓存有效期：12 小时（毫秒）。 */
+private const val CACHE_TTL_MS = 12 * 60 * 60 * 1000L
+
+private val httpClient by lazy {
+    OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
+}
+
+/**
+ * 从 GitHub raw 拉取 Markdown 文档，带本地文件缓存。
+ * 缓存命中且未过期时直接返回缓存；否则网络拉取并写入缓存。
+ * 网络失败时若有缓存则返回缓存，否则抛出异常。
+ */
+private fun fetchRemoteMarkdown(context: android.content.Context, url: String, assetPath: String): String {
+    val cacheDir = File(context.cacheDir, DOC_CACHE_DIR).apply { mkdirs() }
+    val cacheFile = File(cacheDir, assetPath.replace('/', '_'))
+
+    // 1. 缓存命中且未过期
+    if (cacheFile.exists() && System.currentTimeMillis() - cacheFile.lastModified() < CACHE_TTL_MS) {
+        return cacheFile.readText(Charsets.UTF_8)
+    }
+
+    // 2. 网络拉取
+    return try {
+        val req = Request.Builder()
+            .url(url)
+            .header("User-Agent", "MiniMe-core-DocViewer")
+            .build()
+        httpClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) error("HTTP ${resp.code}")
+            val body = resp.body?.string().orEmpty()
+            // 写入缓存
+            cacheFile.writeText(body, Charsets.UTF_8)
+            body
+        }
+    } catch (e: Exception) {
+        // 3. 网络失败，有缓存则返回缓存
+        if (cacheFile.exists()) {
+            cacheFile.readText(Charsets.UTF_8)
+        } else {
+            throw e
+        }
+    }
 }
 
 @Composable

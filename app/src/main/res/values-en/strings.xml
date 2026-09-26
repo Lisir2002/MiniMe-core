@@ -1696,12 +1696,10 @@
     <string name="about_device_long_press_copy">Long press to copy</string>
     <string name="about_device_copied">Copied to clipboard</string>
 
-    <!-- About - Legal & feedback -->
-    <string name="about_legal_feedback">Legal &amp; Feedback</string>
+    <!-- About - Legal & contact -->
+    <string name="about_legal_contact">Legal &amp; Contact</string>
     <string name="about_user_agreement">User Agreement</string>
     <string name="about_privacy_policy">Privacy Policy</string>
-    <string name="about_feedback_entry">Feedback</string>
-    <string name="about_contributing_entry">Contributing Guide</string>
     <string name="about_qq_group_entry">QQ Feedback Group</string>
     <string name="about_qq_group_subtitle">Group: 434751837</string>
     <string name="about_contact_dev_entry">Contact Developer</string>
@@ -2564,6 +2562,7 @@
     <string name="fm_save_failed">Save failed</string>
     <string name="fm_unsaved_changes">You have unsaved changes. Leave anyway?</string>
     <string name="fm_confirm_discard">Discard</string>
+    <string name="fm_preview_failed">File preview failed, format may not be supported</string>
     <string name="fm_copy_path">Copy path</string>
     <string name="fm_path_copied">Path copied</string>
     <string name="fm_navigate_up">Up</string>

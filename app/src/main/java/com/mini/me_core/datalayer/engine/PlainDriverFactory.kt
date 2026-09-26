@@ -7,6 +7,7 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import com.mini.mecore.datalayer.sqldelight.AgentDb
 import com.mini.mecore.datalayer.sqldelight.CredentialsDb
 import com.mini.mecore.datalayer.sqldelight.InfraDb
+import com.mini.mecore.datalayer.sqldelight.QBotDb
 import com.mini.mecore.datalayer.sqldelight.SettingsDb
 import com.mini.mecore.datalayer.sqldelight.T2iDb
 import com.mini.mecore.datalayer.sqldelight.WorkspaceDb
@@ -31,6 +32,7 @@ class PlainDriverFactory(
             LibName.WORKSPACE -> AndroidSqliteDriver(WorkspaceDb.Schema, context, name, helperFactory)
             LibName.T2I -> AndroidSqliteDriver(T2iDb.Schema, context, name, helperFactory)
             LibName.INFRA -> AndroidSqliteDriver(InfraDb.Schema, context, name, helperFactory)
+            LibName.QQBOT -> AndroidSqliteDriver(QBotDb.Schema, context, name, helperFactory)
         }
     }
 }

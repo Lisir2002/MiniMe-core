@@ -43,22 +43,19 @@ import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.FolderZip
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material.icons.rounded.MailOutline
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Policy
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Smartphone
-import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Tag
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Balance
 import androidx.compose.material.icons.rounded.Groups
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Policy
-import androidx.compose.material.icons.rounded.Book
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -126,6 +123,13 @@ private const val DEV_TAP_THRESHOLD = 7
 private const val GH_OWNER = "Lisir2002"
 private const val GH_REPO = "MiniMe-core"
 private const val GH_BRANCH = "main"
+private const val GH_RAW = "https://raw.githubusercontent.com/$GH_OWNER/$GH_REPO/$GH_BRANCH"
+
+/** 远程文档地址。 */
+private const val REMOTE_USER_AGREEMENT = "$GH_RAW/docs/legal/user-agreement.md"
+private const val REMOTE_PRIVACY_POLICY = "$GH_RAW/docs/legal/privacy-policy.md"
+private const val REMOTE_README_ZH = "$GH_RAW/docs/readme-zh.md"
+private const val REMOTE_README_EN = "$GH_RAW/docs/readme-en.md"
 
 /** QQ 反馈群链接。 */
 private const val QQ_GROUP_URL =
@@ -242,7 +246,9 @@ internal fun AboutSection(
         DocViewerScreen(
             title = stringResource(currentDoc.titleRes),
             assetPath = currentDoc.assetPath,
+            remoteUrl = currentDoc.remoteUrl,
             alternateAssetPath = currentDoc.alternateAssetPath,
+            alternateRemoteUrl = currentDoc.alternateRemoteUrl,
             onBack = { docViewerDoc = null },
         )
         return
@@ -377,14 +383,9 @@ internal fun AboutSection(
             onVersionTap = { onVersionTap() },
         )
 
-        // 6. LegalDocsSection（本地文档：用户协议 / 隐私政策）
-        LegalDocsSection(onOpenDoc = { docViewerDoc = it })
-
-        // 6b. LegalFeedbackSection（反馈 / 贡献指南 / QQ反馈群 / 联系开发者）
-        val contributingUrl = stringResource(R.string.about_contributing_url)
-        LegalFeedbackSection(
-            onFeedback = { openFeedbackEmail(context) },
-            onOpenContributing = { openUrl(context, contributingUrl) },
+        // 6. 法律与联系（用户协议 / 隐私政策 / QQ反馈群 / 联系开发者）
+        LegalContactSection(
+            onOpenDoc = { docViewerDoc = it },
             onOpenQqGroup = { showQqGroupSheet = true },
             onOpenDevQq = { showDevQqSheet = true },
         )
@@ -393,6 +394,8 @@ internal fun AboutSection(
         val isZh = Locale.getDefault().language.startsWith("zh")
         val readmePrimary = if (isZh) "docs/readme-zh.md" else "docs/readme-en.md"
         val readmeAlternate = if (isZh) "docs/readme-en.md" else "docs/readme-zh.md"
+        val readmePrimaryRemote = if (isZh) REMOTE_README_ZH else REMOTE_README_EN
+        val readmeAlternateRemote = if (isZh) REMOTE_README_EN else REMOTE_README_ZH
         OpenSourceInfoSection(
             onBrowseSource = { showCodeBrowser = true },
             onOpenLicense = {
@@ -407,7 +410,9 @@ internal fun AboutSection(
                     titleRes = R.string.about_readme_entry,
                     descRes = R.string.about_readme_desc,
                     assetPath = readmePrimary,
+                    remoteUrl = readmePrimaryRemote,
                     alternateAssetPath = readmeAlternate,
+                    alternateRemoteUrl = readmeAlternateRemote,
                 )
             },
         )
@@ -1021,26 +1026,42 @@ private fun DeviceRow(
 }
 
 // ============================================================
-// 6. 法律文档（用户协议 / 隐私政策，本地 assets）
+// 6. 法律与联系（用户协议 / 隐私政策 / QQ反馈群 / 联系开发者）
 // ============================================================
 
-/** 本地法律文档条目。 */
+/** 法律文档条目。 */
 private data class LegalDoc(
     val titleRes: Int,
     val descRes: Int,
     val assetPath: String,
+    val remoteUrl: String? = null,
     val alternateAssetPath: String? = null,
+    val alternateRemoteUrl: String? = null,
 )
 
 private val legalDocs = listOf(
-    LegalDoc(R.string.about_user_agreement, R.string.about_user_agreement_desc, "docs/user-agreement.md"),
-    LegalDoc(R.string.about_privacy_policy, R.string.about_privacy_policy_desc, "docs/privacy-policy.md"),
+    LegalDoc(
+        R.string.about_user_agreement,
+        R.string.about_user_agreement_desc,
+        "docs/user-agreement.md",
+        remoteUrl = REMOTE_USER_AGREEMENT,
+    ),
+    LegalDoc(
+        R.string.about_privacy_policy,
+        R.string.about_privacy_policy_desc,
+        "docs/privacy-policy.md",
+        remoteUrl = REMOTE_PRIVACY_POLICY,
+    ),
 )
 
 @Composable
-private fun LegalDocsSection(onOpenDoc: (LegalDoc) -> Unit) {
+private fun LegalContactSection(
+    onOpenDoc: (LegalDoc) -> Unit,
+    onOpenQqGroup: () -> Unit,
+    onOpenDevQq: () -> Unit,
+) {
     Column(modifier = Modifier.padding(horizontal = Spacing.lg)) {
-        AppSectionHeader(title = stringResource(R.string.about_legal_title))
+        AppSectionHeader(title = stringResource(R.string.about_legal_contact))
         AppCard {
             legalDocs.forEachIndexed { index, doc ->
                 AppListItem(
@@ -1048,39 +1069,9 @@ private fun LegalDocsSection(onOpenDoc: (LegalDoc) -> Unit) {
                     title = stringResource(doc.titleRes),
                     subtitle = stringResource(doc.descRes),
                     onClick = { onOpenDoc(doc) },
-                    showDivider = index < legalDocs.size - 1,
+                    showDivider = true,
                 )
             }
-        }
-    }
-}
-
-// ============================================================
-// 6b. 法律与反馈
-// ============================================================
-
-@Composable
-private fun LegalFeedbackSection(
-    onFeedback: () -> Unit,
-    onOpenContributing: () -> Unit,
-    onOpenQqGroup: () -> Unit,
-    onOpenDevQq: () -> Unit,
-) {
-    Column(modifier = Modifier.padding(horizontal = Spacing.lg)) {
-        AppSectionHeader(title = stringResource(R.string.about_legal_feedback))
-        AppCard {
-            AppListItem(
-                icon = Icons.Rounded.MailOutline,
-                title = stringResource(R.string.about_feedback_entry),
-                onClick = onFeedback,
-                showDivider = true,
-            )
-            AppListItem(
-                icon = Icons.Rounded.Book,
-                title = stringResource(R.string.about_contributing_entry),
-                onClick = onOpenContributing,
-                showDivider = true,
-            )
             AppListItem(
                 icon = Icons.Rounded.Groups,
                 title = stringResource(R.string.about_qq_group_entry),
@@ -1301,19 +1292,6 @@ private fun openUrl(context: Context, url: String) {
         context.startActivity(intent)
     }.onFailure {
         Toast.makeText(context, R.string.about_open_failed, Toast.LENGTH_SHORT).show()
-    }
-}
-
-private fun openFeedbackEmail(context: Context) {
-    runCatching {
-        val intent = Intent(Intent.ACTION_SENDTO).apply {
-            data = Uri.parse("mailto:")
-            putExtra(Intent.EXTRA_EMAIL, arrayOf("lisir2002@users.noreply.github.com"))
-            putExtra(Intent.EXTRA_SUBJECT, "MiniMe-core Feedback")
-        }
-        context.startActivity(Intent.createChooser(intent, null))
-    }.onFailure {
-        openUrl(context, context.getString(R.string.about_issues_url))
     }
 }
 

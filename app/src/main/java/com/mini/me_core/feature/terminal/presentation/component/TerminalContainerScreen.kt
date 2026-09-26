@@ -107,6 +107,7 @@ import com.mini.me_core.feature.terminal.data.repository.ScrollbackLines
 import com.mini.me_core.feature.terminal.data.repository.SshHeartbeatSeconds
 import com.mini.me_core.feature.terminal.data.repository.TerminalFontSizes
 import com.mini.me_core.feature.terminal.data.repository.TerminalTheme
+import com.mini.me_core.feature.terminal.domain.ContainerFileEntry
 import com.mini.me_core.feature.terminal.presentation.TerminalSettingsViewModel
 import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
 import kotlinx.coroutines.delay
@@ -186,6 +187,9 @@ fun TerminalContainerScreen(
     var pendingResetBuiltin by remember { mutableStateOf<ContainerProfile?>(null) }
     var highlightedProfileId by remember { mutableStateOf<String?>(null) }
 
+    // 容器文件预览
+    var previewFile by remember { mutableStateOf<ContainerFileEntry?>(null) }
+
     // 每个 Tab 独立的滚动状态
     val containerScrollState = rememberScrollState()
     val terminalScrollState = rememberScrollState()
@@ -200,6 +204,7 @@ fun TerminalContainerScreen(
         }
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -296,7 +301,8 @@ fun TerminalContainerScreen(
                                 clipboardPaths = viewModel.fileClipboard.first,
                                 clipboardCut = viewModel.fileClipboard.second,
                                 onClipboard = { paths, cut -> viewModel.setFileClipboard(paths, cut) },
-                                onClearClipboard = { viewModel.clearFileClipboard() }
+                                onClearClipboard = { viewModel.clearFileClipboard() },
+                                onOpenEditor = { entry -> previewFile = entry },
                             )
                             else -> ContainerTabContent(
                                 scrollState = containerScrollState,
@@ -382,6 +388,16 @@ fun TerminalContainerScreen(
                 }
             }
         }
+    }
+
+    // 容器文件预览覆盖层
+    previewFile?.let { entry ->
+        ContainerFileViewer(
+            entry = entry,
+            access = viewModel.fileAccess,
+            onDismiss = { previewFile = null },
+        )
+    }
     }
 
     // ── Dialogs ──

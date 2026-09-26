@@ -412,6 +412,7 @@ dependencies {
     // 与项目协程/序列化栈同源。
     implementation("io.ktor:ktor-server-core:2.3.13")
     implementation("io.ktor:ktor-server-cio:2.3.13")
+    implementation("io.ktor:ktor-server-websockets:2.3.13")
 
     // YAML 解析 (用于 Skill Frontmatter)
     implementation("org.yaml:snakeyaml:2.2")
@@ -524,6 +525,11 @@ sqldelight {
         create("InfraDb") {
             packageName.set("com.mini.mecore.datalayer.sqldelight")
             srcDirs("src/main/sqldelight/infra")
+            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
+        }
+        create("QBotDb") {
+            packageName.set("com.mini.mecore.datalayer.sqldelight")
+            srcDirs("src/main/sqldelight/qqbot")
             dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
         }
     }
