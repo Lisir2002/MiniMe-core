@@ -17,13 +17,11 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,9 +35,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppTopAppBar
 
 /** P2：注入诊断面板——显示最近一次 step 注入的源级诊断与完整内容。 */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NormFlowDiagnosisScreen(
     onBack: () -> Unit,
@@ -55,19 +53,17 @@ fun NormFlowDiagnosisScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.norm_flow_diagnosis)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.norm_flow_asset_back))
-                    }
-                },
+            AppTopAppBar(
+                title = stringResource(R.string.norm_flow_diagnosis),
+                onNavigateBack = onBack,
+                navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                navigationContentDescription = stringResource(R.string.norm_flow_asset_back),
                 actions = {
                     if (!content.isNullOrBlank()) {
                         IconButton(onClick = {
                             clipboard.setText(AnnotatedString(content))
                         }) {
-                            Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.norm_flow_diagnosis_copy))
+                            Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.norm_flow_diagnosis_copy), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }

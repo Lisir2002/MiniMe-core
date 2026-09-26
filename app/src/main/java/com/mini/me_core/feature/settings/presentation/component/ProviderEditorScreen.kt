@@ -57,6 +57,7 @@ import com.mini.me_core.core.theme.components.AppBottomSheet
 import com.mini.me_core.core.theme.components.AppTextField
 import com.mini.me_core.core.theme.components.AppDialog
 import com.mini.me_core.core.theme.components.AppDialogType
+import com.mini.me_core.core.theme.components.AppTopAppBar
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -69,8 +70,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -307,17 +306,11 @@ fun ProviderEditorScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(if (initialProvider == null) stringResource(R.string.provider_add) else stringResource(R.string.provider_edit)) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                ),
-                navigationIcon = {
-                    IconButton(onClick = { saveAndNavigateBack() }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
+            AppTopAppBar(
+                title = if (initialProvider == null) stringResource(R.string.provider_add) else stringResource(R.string.provider_edit),
+                onNavigateBack = { saveAndNavigateBack() },
+                navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                navigationContentDescription = stringResource(R.string.common_back),
                 actions = {
                     TextButton(onClick = {
                         saveCurrent()
@@ -334,7 +327,6 @@ fun ProviderEditorScreen(
                             )
                         }
                     }
-                    // B8：移除顶栏「添加模型」按钮——模型 Tab 内已有「拉取模型」+「手动输入」入口，无需重复
                 }
             )
         },

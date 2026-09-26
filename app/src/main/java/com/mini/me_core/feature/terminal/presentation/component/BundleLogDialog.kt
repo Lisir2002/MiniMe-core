@@ -50,8 +50,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,6 +76,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.feature.agent.domain.container.progress.AggregateProgressState
 import com.mini.me_core.feature.agent.domain.container.progress.InstallPhase
 import com.mini.me_core.feature.agent.domain.container.progress.LogLine
@@ -146,8 +145,9 @@ fun BundleLogDialog(
 
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = {
+                AppTopAppBar(
+                    title = "",
+                    titleContent = {
                         Column {
                             Text(
                                 text = buildString {
@@ -174,12 +174,9 @@ fun BundleLogDialog(
                     actions = {
                         val ctx = LocalContext.current
                         IconButton(onClick = { copyAll(ctx, actualState) }) {
-                            Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.ui______2733a243))
+                            Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.ui______2733a243), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    ),
                 )
             },
             containerColor = MaterialTheme.colorScheme.background,

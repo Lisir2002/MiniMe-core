@@ -18,14 +18,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import com.mini.me_core.core.theme.components.AppEmptyState
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,12 +36,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.components.AppSegmentedControl
+import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.feature.agent.domain.prompt.AgentAsset
 import com.mini.me_core.feature.agent.domain.sop.SopAsset
 import com.mini.me_core.core.theme.Spacing
 
 /** P1：规范查看器（只读）：静态规则 / SOP 两个 Tab，点击项查看全文。 */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NormFlowAssetViewerScreen(
     initialTab: Int,
@@ -83,13 +79,11 @@ fun NormFlowAssetViewerScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.norm_flow_asset_viewer)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.norm_flow_asset_back))
-                    }
-                }
+            AppTopAppBar(
+                title = stringResource(R.string.norm_flow_asset_viewer),
+                onNavigateBack = onBack,
+                navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                navigationContentDescription = stringResource(R.string.norm_flow_asset_back),
             )
         }
     ) { padding ->
@@ -169,13 +163,11 @@ private fun AssetRow(title: String, subtitle: String, meta: String, onClick: () 
 private fun AssetDetailView(title: String, meta: String, body: String, onBack: () -> Unit) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(title) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.norm_flow_asset_back))
-                    }
-                }
+            AppTopAppBar(
+                title = title,
+                onNavigateBack = onBack,
+                navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                navigationContentDescription = stringResource(R.string.norm_flow_asset_back),
             )
         }
     ) { padding ->
