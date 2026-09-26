@@ -38,27 +38,31 @@ import kotlinx.coroutines.withContext
 /**
  * 通用本地文档查看器：从 assets 读取 Markdown 文档并用 WebView 渲染。
  *
- * 用于「关于」页的用户协议 / 隐私政策 / 开源协议（GPL-3.0）等长文档。
+ * 用于「关于」页的用户协议 / 隐私政策 / 开源协议（GPL-3.0）/ 说明文档等长文档。
  * 顶栏由本页面唯一提供（Scaffold + AppTopAppBar），背景/文字颜色跟随主题。
  *
  * @param title 顶栏标题
  * @param assetPath assets 内的文档相对路径（如 "docs/user-agreement.md"）
+ * @param alternateAssetPath 可选的另一语言版本路径；非空时顶栏显示中/EN 切换按钮
  * @param onBack 返回回调
  */
 @Composable
 fun DocViewerScreen(
     title: String,
     assetPath: String,
+    alternateAssetPath: String? = null,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    var state by remember(assetPath) { mutableStateOf<DocLoadState>(DocLoadState.Loading) }
+    // 当前实际加载的路径：支持在主/备语言版本间切换。
+    var currentPath by remember(assetPath, alternateAssetPath) { mutableStateOf(assetPath) }
+    var state by remember(currentPath) { mutableStateOf<DocLoadState>(DocLoadState.Loading) }
 
-    LaunchedEffect(assetPath) {
+    LaunchedEffect(currentPath) {
         state = DocLoadState.Loading
         state = withContext(Dispatchers.IO) {
             runCatching {
-                context.assets.open(assetPath).bufferedReader(Charsets.UTF_8).use { it.readText() }
+                context.assets.open(currentPath).bufferedReader(Charsets.UTF_8).use { it.readText() }
             }.fold(
                 onSuccess = { DocLoadState.Success(it) },
                 onFailure = { DocLoadState.Error },
@@ -75,6 +79,23 @@ fun DocViewerScreen(
                 onNavigateBack = onBack,
                 navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
                 navigationContentDescription = stringResource(R.string.common_back),
+                actions = {
+                    if (alternateAssetPath != null) {
+                        // 切换按钮：显示“将要切换到的语言”。
+                        val switchingToEn = currentPath.contains("-zh", ignoreCase = true)
+                        TextButton(onClick = {
+                            currentPath = if (switchingToEn) alternateAssetPath else assetPath
+                        }) {
+                            Text(
+                                text = stringResource(
+                                    if (switchingToEn) R.string.doc_viewer_switch_to_en
+                                    else R.string.doc_viewer_switch_to_zh
+                                ),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                    }
+                },
             )
         },
     ) { padding ->

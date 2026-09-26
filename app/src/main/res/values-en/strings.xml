@@ -1661,8 +1661,7 @@
     <string name="about_http_error">HTTP %1$d error</string>
 
     <!-- About - Share -->
-    <string name="about_share_title">Share MiniMe-core</string>
-    <string name="about_share_text">MiniMe-core - AI code editor on Android:\n%1$s</string>
+    <!-- (share entry removed) -->
 
     <!-- About - Copyright -->
     <string name="about_copyright">© 2025 Lisir2002 · Made with ❤ for mobile developers</string>
@@ -1674,16 +1673,15 @@
     <string name="about_feature_mcp">MCP Tools</string>
     <string name="about_dev_unlock_toast">Tap %1$d more times to unlock developer options</string>
     <string name="about_dev_unlocked_toast">Developer options unlocked</string>
-    <string name="about_dev_options_label">Dev Options</string>
 
     <!-- About - Open source -->
     <string name="about_opensource">Open Source</string>
     <string name="about_opensource_desc">Released under GPL-3.0. Contributions and issue reports are welcome.</string>
     <string name="about_license_gpl">GPL-3.0</string>
     <string name="about_source_code">Browse Source</string>
-    <string name="about_submit_issue">Submit Issue</string>
+    <string name="about_readme_entry">Documentation</string>
+    <string name="about_readme_desc">Project intro and usage guide</string>
     <string name="about_contributing">Contributing</string>
-    <string name="about_download_source">Download Source</string>
     <string name="about_repo_url">https://github.com/Lisir2002/MiniMe-core</string>
     <string name="about_issues_url">https://github.com/Lisir2002/MiniMe-core/issues</string>
     <string name="about_license_url">https://github.com/Lisir2002/MiniMe-core/blob/main/LICENSE</string>
@@ -1703,10 +1701,11 @@
     <string name="about_user_agreement">User Agreement</string>
     <string name="about_privacy_policy">Privacy Policy</string>
     <string name="about_feedback_entry">Feedback</string>
-    <string name="about_share_app">Share App</string>
-    <string name="about_license_entry">Open Source License</string>
     <string name="about_contributing_entry">Contributing Guide</string>
-    <string name="about_share_text_fallback">MiniMe-core - AI code editor on Android</string>
+    <string name="about_qq_group_entry">QQ Feedback Group</string>
+    <string name="about_qq_group_subtitle">Group: 434751837</string>
+    <string name="about_contact_dev_entry">Contact Developer</string>
+    <string name="about_contact_dev_subtitle">QQ: 180142181</string>
 
     <!-- About - Local legal document viewer -->
     <string name="about_legal_title">Legal</string>
@@ -1715,6 +1714,23 @@
     <string name="about_open_source_license">Open Source License</string>
     <string name="about_open_source_license_desc">GNU General Public License v3.0</string>
     <string name="doc_viewer_error">Failed to load document. Please try again later.</string>
+    <string name="doc_viewer_switch_to_en">EN</string>
+    <string name="doc_viewer_switch_to_zh">中</string>
+
+    <!-- About - QQ feedback group / contact developer -->
+    <string name="about_qq_group_sheet_title">MiniMe-Core Feedback</string>
+    <string name="about_qq_group_number_label">Group No.</string>
+    <string name="about_qq_group_number">434751837</string>
+    <string name="about_qq_group_copy_number">Copy Group No.</string>
+    <string name="about_qq_group_join">Join Group</string>
+    <string name="about_contact_dev_sheet_title">Contact Developer</string>
+    <string name="about_contact_dev_nickname_label">Nickname</string>
+    <string name="about_contact_dev_nickname">痞老板偷秘方</string>
+    <string name="about_contact_dev_number_label">QQ No.</string>
+    <string name="about_contact_dev_number">180142181</string>
+    <string name="about_contact_dev_copy_number">Copy QQ No.</string>
+    <string name="about_contact_dev_open_qq">Open QQ to Add</string>
+    <string name="about_qq_not_installed">QQ is not installed. Please install QQ first.</string>
 
     <!-- About - Core component interactions -->
     <string name="about_terminal_not_ready_title">Terminal Container Not Initialized</string>

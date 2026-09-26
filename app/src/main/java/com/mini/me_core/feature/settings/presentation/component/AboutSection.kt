@@ -54,9 +54,9 @@ import androidx.compose.material.icons.rounded.Tag
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Balance
-import androidx.compose.material.icons.rounded.BugReport
-import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Policy
 import androidx.compose.material.icons.rounded.Book
 import androidx.compose.material3.AlertDialog
@@ -80,6 +80,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -88,9 +89,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.mini.me_core.BuildConfig
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppBottomSheet
+import com.mini.me_core.core.theme.components.AppButton
+import com.mini.me_core.core.theme.components.AppButtonVariant
 import com.mini.me_core.core.theme.components.AppCard
 import com.mini.me_core.core.theme.components.AppSectionHeader
 import com.mini.me_core.core.theme.components.AppListItem
+import com.mini.me_core.core.theme.components.AppSheetHeader
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.feature.about.presentation.CodeBrowserScreen
 import com.mini.me_core.feature.about.presentation.CodeBrowserViewModel
@@ -122,6 +127,15 @@ private const val GH_OWNER = "Lisir2002"
 private const val GH_REPO = "MiniMe-core"
 private const val GH_BRANCH = "main"
 
+/** QQ 反馈群链接。 */
+private const val QQ_GROUP_URL =
+    "https://qun.qq.com/universal-share/share?ac=1&authKey=81S2QQFzkqoRe1Ozl3bkFkjgvtoB%2Fcb0AtrXT2p6xXoBY4AX%2BKTGCkqOUOSpalqD&busi_data=eyJncm91cENvZGUiOiI0MzQ3NTE4MzciLCJ0b2tlbiI6ImlMWjRnb2I4RmZ4cmM1dDBwaHo0eTFjSWg2UmJkUnA4eXg3T2doVGxtc3hTMGtIRFpIOFBQWU1iTWtyN0VhY2siLCJ1aW4iOiIxODAxNDIxODEifQ%3D%3D&data=g9bwv8UTAqqQjjG2VPOa7kqvk3_Z_0HVwB21TriR-X9-z4twUfxma7LN6CdX1HWw7evMDLsu-7N5aMQ3FEnx2Q&svctype=4&tempid=h5_group_info"
+
+/** 开发者 QQ 号与添加好友 scheme。 */
+private const val DEV_QQ_UIN = "180142181"
+private const val QQ_ADD_FRIEND_SCHEME =
+    "mqqapi://card/show_pslcard?src_type=internal&version=1&uin=$DEV_QQ_UIN"
+
 @Composable
 internal fun AboutSection(
     onNavigateBack: () -> Unit = {},
@@ -150,7 +164,7 @@ internal fun AboutSection(
 
     // 本地导航 / 弹窗状态
     var showCodeBrowser by remember { mutableStateOf(false) }
-    // 本地文档查看器（用户协议 / 隐私政策 / 开源协议）
+    // 本地文档查看器（用户协议 / 隐私政策 / 开源协议 / 说明文档）
     var docViewerDoc by remember { mutableStateOf<LegalDoc?>(null) }
     var showResetConfirm by remember { mutableStateOf(false) }
     var showResetMenu by remember { mutableStateOf(false) }
@@ -158,6 +172,9 @@ internal fun AboutSection(
     var showHostInfo by remember { mutableStateOf(false) }
     var showWebViewInfo by remember { mutableStateOf(false) }
     var expandedCredit by remember { mutableStateOf<OpenSourceLib?>(null) }
+    // QQ 反馈群 / 联系开发者 BottomSheet
+    var showQqGroupSheet by remember { mutableStateOf(false) }
+    var showDevQqSheet by remember { mutableStateOf(false) }
 
     fun onVersionTap() {
         if (devUnlocked) {
@@ -225,6 +242,7 @@ internal fun AboutSection(
         DocViewerScreen(
             title = stringResource(currentDoc.titleRes),
             assetPath = currentDoc.assetPath,
+            alternateAssetPath = currentDoc.alternateAssetPath,
             onBack = { docViewerDoc = null },
         )
         return
@@ -310,14 +328,12 @@ internal fun AboutSection(
             .padding(vertical = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
-        // 1. HeroCard
+        // 1. HeroCard（版本号纯展示，开发者入口移至设备信息区）
         HeroCard(
             appName = stringResource(R.string.app_name),
             appIcon = appIcon,
             appInfo = appInfo,
             isDebug = BuildConfig.DEBUG,
-            devUnlocked = devUnlocked,
-            onVersionTap = { onVersionTap() },
         )
 
         // 2. UsageStatsSection（2 列，长按重置）
@@ -354,26 +370,46 @@ internal fun AboutSection(
             onClick = onOpenUpdate,
         )
 
-        // 5. DeviceInfoSection（新增）
-        DeviceInfoSection(appInfo = appInfo, webViewVersion = webViewVersion)
-
-        // 6. LegalDocsSection（本地文档：用户协议 / 隐私政策 / 开源协议）
-        LegalDocsSection(onOpenDoc = { docViewerDoc = it })
-
-        // 6b. LegalFeedbackSection（反馈 / 分享 / 贡献指南）
-        val contributingUrl = stringResource(R.string.about_contributing_url)
-        val issuesUrl = stringResource(R.string.about_issues_url)
-        LegalFeedbackSection(
-            onFeedback = { openFeedbackEmail(context) },
-            onShare = { shareApp(context) },
-            onOpenContributing = { openUrl(context, contributingUrl) },
+        // 5. DeviceInfoSection（版本号点击解锁开发者选项）
+        DeviceInfoSection(
+            appInfo = appInfo,
+            webViewVersion = webViewVersion,
+            onVersionTap = { onVersionTap() },
         )
 
-        // 开源信息卡片
+        // 6. LegalDocsSection（本地文档：用户协议 / 隐私政策）
+        LegalDocsSection(onOpenDoc = { docViewerDoc = it })
+
+        // 6b. LegalFeedbackSection（反馈 / 贡献指南 / QQ反馈群 / 联系开发者）
+        val contributingUrl = stringResource(R.string.about_contributing_url)
+        LegalFeedbackSection(
+            onFeedback = { openFeedbackEmail(context) },
+            onOpenContributing = { openUrl(context, contributingUrl) },
+            onOpenQqGroup = { showQqGroupSheet = true },
+            onOpenDevQq = { showDevQqSheet = true },
+        )
+
+        // 开源信息卡片（查看源码 / 开源协议 / 说明文档）
+        val isZh = Locale.getDefault().language.startsWith("zh")
+        val readmePrimary = if (isZh) "docs/readme-zh.md" else "docs/readme-en.md"
+        val readmeAlternate = if (isZh) "docs/readme-en.md" else "docs/readme-zh.md"
         OpenSourceInfoSection(
             onBrowseSource = { showCodeBrowser = true },
-            onSubmitIssue = { openUrl(context, issuesUrl) },
-            onDownloadSource = { codeBrowserVM.requestDownloadZip() },
+            onOpenLicense = {
+                docViewerDoc = LegalDoc(
+                    titleRes = R.string.about_open_source_license,
+                    descRes = R.string.about_open_source_license_desc,
+                    assetPath = "docs/license-gpl3.md",
+                )
+            },
+            onOpenReadme = {
+                docViewerDoc = LegalDoc(
+                    titleRes = R.string.about_readme_entry,
+                    descRes = R.string.about_readme_desc,
+                    assetPath = readmePrimary,
+                    alternateAssetPath = readmeAlternate,
+                )
+            },
         )
 
         // 7. OpenSourceCreditsSection（可展开）
@@ -469,6 +505,28 @@ internal fun AboutSection(
             confirmButton = { TextButton(onClick = { showWebViewInfo = false }) { Text(stringResource(R.string.common_close)) } },
         )
     }
+
+    // QQ 反馈群 BottomSheet
+    if (showQqGroupSheet) {
+        QqGroupBottomSheet(
+            onDismiss = { showQqGroupSheet = false },
+            onCopyNumber = {
+                copyToClipboard(context, "qq_group", context.getString(R.string.about_qq_group_number))
+            },
+            onJoinGroup = { openUrl(context, QQ_GROUP_URL) },
+        )
+    }
+
+    // 联系开发者 BottomSheet
+    if (showDevQqSheet) {
+        DeveloperQqBottomSheet(
+            onDismiss = { showDevQqSheet = false },
+            onCopyNumber = {
+                copyToClipboard(context, "dev_qq", context.getString(R.string.about_contact_dev_number))
+            },
+            onOpenQqAdd = { openQQAddFriend(context) },
+        )
+    }
 }
 
 private enum class PendingDialog { TerminalNotReady, ProxyNotRunning }
@@ -491,8 +549,6 @@ private fun HeroCard(
     appIcon: ImageBitmap?,
     appInfo: AppInfo,
     isDebug: Boolean,
-    devUnlocked: Boolean,
-    onVersionTap: () -> Unit,
 ) {
     Box(modifier = Modifier.padding(horizontal = Spacing.lg)) {
         AppCard {
@@ -525,14 +581,10 @@ private fun HeroCard(
                         Spacer(Modifier.height(2.dp))
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                            modifier = Modifier.clip(MaterialTheme.shapes.small).clickableSafe(onVersionTap),
                         ) {
                             HeroPill(text = "v${appInfo.name}", container = true)
                             HeroPill(text = "#${appInfo.code}")
                             VariantPill(isDebug = isDebug)
-                            if (devUnlocked) {
-                                HeroPill(text = stringResource(R.string.about_dev_options_label))
-                            }
                         }
                     }
                 }
@@ -898,7 +950,7 @@ private fun UpdateEntryCard(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DeviceInfoSection(appInfo: AppInfo, webViewVersion: String) {
+private fun DeviceInfoSection(appInfo: AppInfo, webViewVersion: String, onVersionTap: () -> Unit) {
     val context = LocalContext.current
     val freeStorageMb = remember {
         runCatching {
@@ -923,7 +975,11 @@ private fun DeviceInfoSection(appInfo: AppInfo, webViewVersion: String) {
             DeviceRow(stringResource(R.string.about_device_model), Build.MODEL) { copyText("model", Build.MODEL) }
             DeviceRow(stringResource(R.string.about_device_storage), formatSize(freeStorageMb)) { copyText("storage", formatSize(freeStorageMb)) }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(start = Spacing.lg))
-            DeviceRow(stringResource(R.string.about_version), "v${appInfo.name}") { copyText("version", appInfo.name) }
+            DeviceRow(
+                label = stringResource(R.string.about_version),
+                value = "v${appInfo.name}",
+                onClick = onVersionTap,
+            ) { copyText("version", appInfo.name) }
             DeviceRow(stringResource(R.string.about_build_no), "#${appInfo.code}") { copyText("code", appInfo.code.toString()) }
             DeviceRow(stringResource(R.string.about_package), appInfo.packageName) { copyText("pkg", appInfo.packageName) }
             DeviceRow(stringResource(R.string.about_sdk_min), "API ${appInfo.minSdk}", showDivider = false) { copyText("sdk", appInfo.minSdk.toString()) }
@@ -933,12 +989,18 @@ private fun DeviceInfoSection(appInfo: AppInfo, webViewVersion: String) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DeviceRow(label: String, value: String, showDivider: Boolean = true, onLongCopy: () -> Unit) {
+private fun DeviceRow(
+    label: String,
+    value: String,
+    showDivider: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    onLongCopy: () -> Unit,
+) {
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .combinedClickable(onClick = {}, onLongClick = onLongCopy)
+                .combinedClickable(onClick = { onClick?.invoke() }, onLongClick = onLongCopy)
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -959,7 +1021,7 @@ private fun DeviceRow(label: String, value: String, showDivider: Boolean = true,
 }
 
 // ============================================================
-// 6. 法律文档（用户协议 / 隐私政策 / 开源协议，本地 assets）
+// 6. 法律文档（用户协议 / 隐私政策，本地 assets）
 // ============================================================
 
 /** 本地法律文档条目。 */
@@ -967,12 +1029,12 @@ private data class LegalDoc(
     val titleRes: Int,
     val descRes: Int,
     val assetPath: String,
+    val alternateAssetPath: String? = null,
 )
 
 private val legalDocs = listOf(
     LegalDoc(R.string.about_user_agreement, R.string.about_user_agreement_desc, "docs/user-agreement.md"),
     LegalDoc(R.string.about_privacy_policy, R.string.about_privacy_policy_desc, "docs/privacy-policy.md"),
-    LegalDoc(R.string.about_open_source_license, R.string.about_open_source_license_desc, "docs/license-gpl3.md"),
 )
 
 @Composable
@@ -982,11 +1044,7 @@ private fun LegalDocsSection(onOpenDoc: (LegalDoc) -> Unit) {
         AppCard {
             legalDocs.forEachIndexed { index, doc ->
                 AppListItem(
-                    icon = when (index) {
-                        0 -> Icons.AutoMirrored.Rounded.Article
-                        1 -> Icons.Rounded.Policy
-                        else -> Icons.Rounded.Balance
-                    },
+                    icon = if (index == 0) Icons.AutoMirrored.Rounded.Article else Icons.Rounded.Policy,
                     title = stringResource(doc.titleRes),
                     subtitle = stringResource(doc.descRes),
                     onClick = { onOpenDoc(doc) },
@@ -998,14 +1056,15 @@ private fun LegalDocsSection(onOpenDoc: (LegalDoc) -> Unit) {
 }
 
 // ============================================================
-// 6b. 反馈与分享
+// 6b. 法律与反馈
 // ============================================================
 
 @Composable
 private fun LegalFeedbackSection(
     onFeedback: () -> Unit,
-    onShare: () -> Unit,
     onOpenContributing: () -> Unit,
+    onOpenQqGroup: () -> Unit,
+    onOpenDevQq: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(horizontal = Spacing.lg)) {
         AppSectionHeader(title = stringResource(R.string.about_legal_feedback))
@@ -1017,15 +1076,23 @@ private fun LegalFeedbackSection(
                 showDivider = true,
             )
             AppListItem(
-                icon = Icons.Rounded.Share,
-                title = stringResource(R.string.about_share_app),
-                onClick = onShare,
-                showDivider = true,
-            )
-            AppListItem(
                 icon = Icons.Rounded.Book,
                 title = stringResource(R.string.about_contributing_entry),
                 onClick = onOpenContributing,
+                showDivider = true,
+            )
+            AppListItem(
+                icon = Icons.Rounded.Groups,
+                title = stringResource(R.string.about_qq_group_entry),
+                subtitle = stringResource(R.string.about_qq_group_subtitle),
+                onClick = onOpenQqGroup,
+                showDivider = true,
+            )
+            AppListItem(
+                icon = Icons.Rounded.Person,
+                title = stringResource(R.string.about_contact_dev_entry),
+                subtitle = stringResource(R.string.about_contact_dev_subtitle),
+                onClick = onOpenDevQq,
                 showDivider = false,
             )
         }
@@ -1039,8 +1106,8 @@ private fun LegalFeedbackSection(
 @Composable
 private fun OpenSourceInfoSection(
     onBrowseSource: () -> Unit,
-    onSubmitIssue: () -> Unit,
-    onDownloadSource: () -> Unit,
+    onOpenLicense: () -> Unit,
+    onOpenReadme: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(horizontal = Spacing.lg)) {
         AppSectionHeader(title = stringResource(R.string.about_opensource))
@@ -1075,15 +1142,17 @@ private fun OpenSourceInfoSection(
                 showDivider = true,
             )
             AppListItem(
-                icon = Icons.Rounded.BugReport,
-                title = stringResource(R.string.about_submit_issue),
-                onClick = onSubmitIssue,
+                icon = Icons.Rounded.Balance,
+                title = stringResource(R.string.about_open_source_license),
+                subtitle = stringResource(R.string.about_open_source_license_desc),
+                onClick = onOpenLicense,
                 showDivider = true,
             )
             AppListItem(
-                icon = Icons.Rounded.FolderZip,
-                title = stringResource(R.string.about_download_source),
-                onClick = onDownloadSource,
+                icon = Icons.AutoMirrored.Rounded.Article,
+                title = stringResource(R.string.about_readme_entry),
+                subtitle = stringResource(R.string.about_readme_desc),
+                onClick = onOpenReadme,
                 showDivider = false,
             )
         }
@@ -1248,14 +1317,22 @@ private fun openFeedbackEmail(context: Context) {
     }
 }
 
-private fun shareApp(context: Context) {
+/** 复制文本到剪贴板并 Toast 提示。 */
+private fun copyToClipboard(context: Context, label: String, value: String) {
+    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    cm.setPrimaryClip(ClipData.newPlainText(label, value))
+    Toast.makeText(context, R.string.about_device_copied, Toast.LENGTH_SHORT).show()
+}
+
+/** 打开 QQ 添加好友卡片；未安装 QQ 时 Toast 提示。 */
+private fun openQQAddFriend(context: Context) {
     runCatching {
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.about_share_title))
-            putExtra(Intent.EXTRA_TEXT, context.getString(R.string.about_share_text_fallback))
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(QQ_ADD_FRIEND_SCHEME)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(Intent.createChooser(intent, null))
+        context.startActivity(intent)
+    }.onFailure {
+        Toast.makeText(context, R.string.about_qq_not_installed, Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -1275,6 +1352,168 @@ private fun loadAppIconBitmap(context: Context): ImageBitmap? {
         drawable.draw(canvas)
         bmp.asImageBitmap()
     }.getOrNull()
+}
+
+// ============================================================
+// QQ 反馈群 / 联系开发者 BottomSheet
+// ============================================================
+
+@Composable
+private fun QqGroupBottomSheet(
+    onDismiss: () -> Unit,
+    onCopyNumber: () -> Unit,
+    onJoinGroup: () -> Unit,
+) {
+    AppBottomSheet(onDismiss = onDismiss) {
+        AppSheetHeader(
+            title = stringResource(R.string.about_qq_group_sheet_title),
+            onClose = onDismiss,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            // 群号 + 复制
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Text(
+                    text = stringResource(R.string.about_qq_group_number_label),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(R.string.about_qq_group_number),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onCopyNumber) {
+                    Text(stringResource(R.string.about_qq_group_copy_number))
+                }
+            }
+            // 二维码
+            Image(
+                painter = painterResource(R.drawable.qq_group_qr),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(200.dp)
+                    .clip(MaterialTheme.shapes.medium),
+            )
+            // 底部操作按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                AppButton(
+                    text = stringResource(R.string.about_qq_group_copy_number),
+                    onClick = onCopyNumber,
+                    variant = AppButtonVariant.Tonal,
+                    modifier = Modifier.weight(1f),
+                )
+                AppButton(
+                    text = stringResource(R.string.about_qq_group_join),
+                    onClick = onJoinGroup,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeveloperQqBottomSheet(
+    onDismiss: () -> Unit,
+    onCopyNumber: () -> Unit,
+    onOpenQqAdd: () -> Unit,
+) {
+    AppBottomSheet(onDismiss = onDismiss) {
+        AppSheetHeader(
+            title = stringResource(R.string.about_contact_dev_sheet_title),
+            onClose = onDismiss,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            // 昵称
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Text(
+                    text = stringResource(R.string.about_contact_dev_nickname_label),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(R.string.about_contact_dev_nickname),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            // QQ 号 + 复制
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Text(
+                    text = stringResource(R.string.about_contact_dev_number_label),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(R.string.about_contact_dev_number),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onCopyNumber) {
+                    Text(stringResource(R.string.about_contact_dev_copy_number))
+                }
+            }
+            // 二维码
+            Image(
+                painter = painterResource(R.drawable.qq_developer_qr),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(200.dp)
+                    .clip(MaterialTheme.shapes.medium),
+            )
+            // 底部操作按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                AppButton(
+                    text = stringResource(R.string.about_contact_dev_copy_number),
+                    onClick = onCopyNumber,
+                    variant = AppButtonVariant.Tonal,
+                    modifier = Modifier.weight(1f),
+                )
+                AppButton(
+                    text = stringResource(R.string.about_contact_dev_open_qq),
+                    onClick = onOpenQqAdd,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
 }
 
 // ============================================================

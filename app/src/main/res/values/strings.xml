@@ -1677,10 +1677,6 @@
     <!-- About - HTTP Error -->
     <string name="about_http_error">HTTP %1$d 错误</string>
 
-    <!-- About - Share -->
-    <string name="about_share_title">分享 MiniMe-core</string>
-    <string name="about_share_text">MiniMe-core - Android 上的 AI 代码编辑器：\n%1$s</string>
-
     <!-- About - Copyright -->
     <string name="about_copyright">© 2025 Lisir2002 · Made with ❤ for mobile developers</string>
 
@@ -1691,16 +1687,15 @@
     <string name="about_feature_mcp">MCP 工具</string>
     <string name="about_dev_unlock_toast">再点 %1$d 次解锁开发者选项</string>
     <string name="about_dev_unlocked_toast">开发者选项已解锁</string>
-    <string name="about_dev_options_label">开发者选项</string>
 
     <!-- About - 开源信息 -->
     <string name="about_opensource">开源信息</string>
     <string name="about_opensource_desc">本项目基于 GPL-3.0 协议开源，欢迎贡献代码与反馈问题</string>
     <string name="about_license_gpl">GPL-3.0</string>
     <string name="about_source_code">查看源码</string>
-    <string name="about_submit_issue">提交 Issue</string>
+    <string name="about_readme_entry">说明文档</string>
+    <string name="about_readme_desc">项目简介与使用指南</string>
     <string name="about_contributing">贡献指南</string>
-    <string name="about_download_source">下载源码</string>
     <string name="about_repo_url">https://github.com/Lisir2002/MiniMe-core</string>
     <string name="about_issues_url">https://github.com/Lisir2002/MiniMe-core/issues</string>
     <string name="about_license_url">https://github.com/Lisir2002/MiniMe-core/blob/main/LICENSE</string>
@@ -1720,10 +1715,11 @@
     <string name="about_user_agreement">用户协议</string>
     <string name="about_privacy_policy">隐私政策</string>
     <string name="about_feedback_entry">意见反馈</string>
-    <string name="about_share_app">分享应用</string>
-    <string name="about_license_entry">开源协议</string>
     <string name="about_contributing_entry">贡献指南</string>
-    <string name="about_share_text_fallback">MiniMe-core - Android 上的 AI 代码编辑器</string>
+    <string name="about_qq_group_entry">QQ反馈群</string>
+    <string name="about_qq_group_subtitle">群号：434751837</string>
+    <string name="about_contact_dev_entry">联系开发者</string>
+    <string name="about_contact_dev_subtitle">QQ：180142181</string>
 
     <!-- About - 本地法律文档查看 -->
     <string name="about_legal_title">法律信息</string>
@@ -1732,6 +1728,23 @@
     <string name="about_open_source_license">开源协议</string>
     <string name="about_open_source_license_desc">GNU General Public License v3.0</string>
     <string name="doc_viewer_error">文档加载失败，请稍后重试</string>
+    <string name="doc_viewer_switch_to_en">EN</string>
+    <string name="doc_viewer_switch_to_zh">中</string>
+
+    <!-- About - QQ 反馈群 / 联系开发者 -->
+    <string name="about_qq_group_sheet_title">MiniMe-Core反馈</string>
+    <string name="about_qq_group_number_label">群号</string>
+    <string name="about_qq_group_number">434751837</string>
+    <string name="about_qq_group_copy_number">复制群号</string>
+    <string name="about_qq_group_join">加入群聊</string>
+    <string name="about_contact_dev_sheet_title">联系开发者</string>
+    <string name="about_contact_dev_nickname_label">昵称</string>
+    <string name="about_contact_dev_nickname">痞老板偷秘方</string>
+    <string name="about_contact_dev_number_label">QQ号</string>
+    <string name="about_contact_dev_number">180142181</string>
+    <string name="about_contact_dev_copy_number">复制QQ号</string>
+    <string name="about_contact_dev_open_qq">打开QQ添加</string>
+    <string name="about_qq_not_installed">未安装QQ，请先安装QQ客户端</string>
 
     <!-- About - 核心组件交互 -->
     <string name="about_terminal_not_ready_title">终端容器未初始化</string>
