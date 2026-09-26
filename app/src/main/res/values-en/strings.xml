@@ -2464,6 +2464,12 @@
     <string name="settings_zth_title">Zero Hallucination Tolerance</string>
     <string name="settings_zth_subtitle">AI behavior confirmation tier</string>
 
+    <!-- Advanced Settings -->
+    <string name="settings_advanced_title">Advanced</string>
+    <string name="settings_advanced_subtitle">Zero hallucination tolerance · Experimental · Developer options</string>
+    <string name="settings_advanced_desc">Advanced features requiring careful configuration. Understand the impact before changing.</string>
+    <string name="settings_advanced_menu_subtitle">Zero hallucination tolerance and more</string>
+
     <!-- Tier display names -->
     <string name="settings_zth_tier_name_disabled">Disabled (0)</string>
     <string name="settings_zth_tier_name_minimal">Minimal (1)</string>

@@ -2495,6 +2495,12 @@
     <string name="settings_zth_title">零幻觉容忍</string>
     <string name="settings_zth_subtitle">AI 行为确认档位</string>
 
+    <!-- 高级设置（Advanced Settings） -->
+    <string name="settings_advanced_title">高级设置</string>
+    <string name="settings_advanced_subtitle">零幻觉容忍 · 实验性功能 · 开发者选项</string>
+    <string name="settings_advanced_desc">包含需要谨慎配置的高级功能，修改前请了解影响</string>
+    <string name="settings_advanced_menu_subtitle">零幻觉容忍及更多高级功能</string>
+
     <!-- 档位显示名 -->
     <string name="settings_zth_tier_name_disabled">关闭（0）</string>
     <string name="settings_zth_tier_name_minimal">轻度（1）</string>

@@ -45,22 +45,25 @@ import com.mini.me_core.feature.agent.domain.zth.ZthPresetTier
 import com.mini.me_core.feature.settings.presentation.ZthSettingsViewModel
 
 /**
- * ZTH（零幻觉容忍）独立设置页：
- *  - 顶部：功能说明（可展开）
+ * ZTH（零幻觉容忍）设置内容（无独立页面外壳）。
+ *
+ * 由 AdvancedSettingsScreen 嵌入：顶栏、Scaffold 背景与 SnackbarHost 由外层提供，
+ * 本函数只包含设置卡片与「恢复默认」按钮，不做整页滚动——滚动由外层 LazyColumn 负责。
+ *
+ * 内容组成：
+ *  - 功能说明（可展开）
  *  - 状态摘要卡片：当前生效参数一览
  *  - 卡片1：档位选择（含四档对比表 + 展开详情）
  *  - 卡片2：性能等级
  *  - 卡片3：滑动确认开关
  *  - 底部：恢复默认
- *
- * 顶栏返回与标题由外层 SettingsScreen 的 AppTopAppBar 提供。
  */
 @Composable
-fun ZthSettingsScreen(
+fun ZthSettingsContent(
     viewModel: ZthSettingsViewModel,
+    snackbarHostState: SnackbarHostState,
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.successMessage, uiState.error) {
         uiState.successMessage?.let {
@@ -96,40 +99,30 @@ fun ZthSettingsScreen(
         )
     }
 
-    androidx.compose.material3.Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(Spacing.md),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            ZthInfoCard()
-            ZthStatusCard(uiState.tier, uiState.swipeEnabled, uiState.perfClass)
-            ZthTierCard(
-                selectedTier = uiState.tier,
-                onTierSelected = { viewModel.onTierSelected(it) },
-            )
-            ZthPerfCard(
-                selectedPerf = uiState.perfClass,
-                onPerfSelected = { viewModel.setPerf(it) },
-            )
-            ZthSwipeCard(
-                tier = uiState.tier,
-                swipeEnabled = uiState.swipeEnabled,
-                onSwipeChange = { viewModel.setSwipe(it) },
-            )
-            AppButton(
-                text = stringResource(R.string.settings_zth_reset),
-                onClick = { viewModel.requestResetDefault() },
-                variant = AppButtonVariant.Outlined,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        ZthInfoCard()
+        ZthStatusCard(uiState.tier, uiState.swipeEnabled, uiState.perfClass)
+        ZthTierCard(
+            selectedTier = uiState.tier,
+            onTierSelected = { viewModel.onTierSelected(it) },
+        )
+        ZthPerfCard(
+            selectedPerf = uiState.perfClass,
+            onPerfSelected = { viewModel.setPerf(it) },
+        )
+        ZthSwipeCard(
+            tier = uiState.tier,
+            swipeEnabled = uiState.swipeEnabled,
+            onSwipeChange = { viewModel.setSwipe(it) },
+        )
+        AppButton(
+            text = stringResource(R.string.settings_zth_reset),
+            onClick = { viewModel.requestResetDefault() },
+            variant = AppButtonVariant.Outlined,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

@@ -93,7 +93,7 @@ import com.mini.me_core.feature.settings.presentation.SettingsViewModel
 import com.mini.me_core.feature.settings.presentation.ZthSettingsViewModel
 import com.mini.me_core.feature.settings.presentation.components.RemoteAuditLogsScreen
 import com.mini.me_core.feature.settings.presentation.components.SecuritySettingsScreen
-import com.mini.me_core.feature.settings.presentation.components.ZthSettingsScreen
+import com.mini.me_core.feature.settings.presentation.components.AdvancedSettingsScreen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
@@ -114,6 +114,7 @@ import androidx.compose.material.icons.rounded.Lan
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Notes
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
@@ -135,7 +136,7 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     RemoteServers(R.string.settings_remote_servers),
     Backup(R.string.settings_backup),
     Security(R.string.settings_security),
-    Zth(R.string.settings_zth_title),
+    Advanced(R.string.settings_advanced_title),
     RemoteAuditLogs(R.string.settings_remote_audit_logs),
     About(R.string.settings_about),
     Update(R.string.update_title),
@@ -592,10 +593,10 @@ fun SettingsScreen(
                         androidx.hilt.navigation.compose.hiltViewModel()
                     SecuritySettingsScreen(viewModel = securityViewModel)
                 }
-                SettingsSection.Zth -> {
+                SettingsSection.Advanced -> {
                     val zthViewModel: ZthSettingsViewModel =
                         androidx.hilt.navigation.compose.hiltViewModel()
-                    ZthSettingsScreen(viewModel = zthViewModel)
+                    AdvancedSettingsScreen(zthViewModel = zthViewModel)
                 }
                 SettingsSection.RemoteAuditLogs -> {
                     RemoteAuditLogsScreen()
@@ -909,15 +910,15 @@ internal fun SettingsMenu(
             action = { onOpen(SettingsSection.Security) }
         ),
         MenuItem(
-            section = SettingsSection.Zth,
+            section = SettingsSection.Advanced,
             group = groupData,
-            title = stringResource(R.string.settings_zth_title),
-            subtitle = stringResource(R.string.settings_zth_subtitle),
-            icon = Icons.Rounded.Psychology,
+            title = stringResource(R.string.settings_advanced_title),
+            subtitle = stringResource(R.string.settings_advanced_menu_subtitle),
+            icon = Icons.Rounded.Tune,
             iconBgLight = Color(0xFF8B5CF6),
             iconBgDark = Color(0xFF4C1D95),
-            keywords = listOf("zth", "hallucination", stringResource(R.string.settings_zth_title), "confirm", stringResource(R.string.settings_zth_subtitle)),
-            action = { onOpen(SettingsSection.Zth) }
+            keywords = listOf("advanced", "zth", stringResource(R.string.settings_advanced_title), stringResource(R.string.settings_zth_title), "experimental", stringResource(R.string.settings_advanced_subtitle)),
+            action = { onOpen(SettingsSection.Advanced) }
         ),
         MenuItem(
             section = SettingsSection.RemoteAuditLogs,
