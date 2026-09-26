@@ -71,8 +71,8 @@ class DbEncryptionMigrationEngineTest {
 
     @Test
     fun `migrateToEncrypted - 重试次数耗尽抛 MigrationException`() {
-        // 先设置逻辑版本为2，避免引擎自动重置历史失败状态
-        stateStore.setLogicVersion(2)
+        // 先设置逻辑版本为当前值，避免引擎自动重置历史失败状态
+        stateStore.setLogicVersion(DbEncryptionMigrationEngine.MIGRATION_LOGIC_VERSION)
         stateStore.updateState(LibName.CREDENTIALS) {
             it.copy(retryCount = 3, lastError = "模拟失败")
         }
