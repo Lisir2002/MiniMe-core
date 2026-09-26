@@ -59,7 +59,9 @@ class SystemPromptProvider @Inject constructor(
     private val normFlowSettingsRepository: NormFlowSettingsRepository,
     // D5-5：Playbook 执行器（step 前查询本会话最近 RUNNING 运行的当前阶段喂入 PlaybookStageSource，
     // 并在运行期间挂起 goal 维护双信号——GoalStale / GoalAdjustEvent 不注入）
-    private val playbookExecutor: PlaybookExecutor
+    private val playbookExecutor: PlaybookExecutor,
+    // 仪表盘统计：step 前注入块装配完成后累计注入 token 估算。
+    private val normFlowStatsRepository: NormFlowStatsRepository
 ) {
     // 抽象独立的 Source
     interface PromptSource {
@@ -522,6 +524,10 @@ class SystemPromptProvider @Inject constructor(
         _lastDiagnosis = diagnosis.sortedWith(compareBy({ it.importance }, { it.name }))
         _lastInjectionContent = result
         _lastBudgetUsed = result?.length ?: 0
+        // 仪表盘统计：记录本次实际注入字符数 → 累计 token 估算。
+        if (result != null) {
+            normFlowStatsRepository.recordInjection(result.length)
+        }
         return result
     }
 

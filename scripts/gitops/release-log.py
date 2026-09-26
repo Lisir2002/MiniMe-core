@@ -347,6 +347,57 @@ def extract_from_changelog(repo: Path, version: str) -> str | None:
     return text or None
 
 
+def generate_title_summary(repo: Path, version: str, commits: list[dict]) -> str:
+    """从 CHANGELOG 或 commit 内容生成 10-20 字的标题更新概括。
+
+    逻辑：
+    1. 优先从 CHANGELOG.md 当前版本的条目标题提取关键词
+    2. 按分类优先级（新功能 > 修复 > 改进）取最重要的 1-2 个变更点
+    3. 过滤内部术语，合并为简短概括
+    4. 兜底："应用体验优化与问题修复"
+    """
+    # 优先从 CHANGELOG 提取
+    changelog_body = extract_from_changelog(repo, version)
+    if changelog_body:
+        keywords = []
+        for line in changelog_body.splitlines():
+            m = re.match(r"^-\s+\*\*(.+?)\*\*", line)
+            if m:
+                title = m.group(1).strip()
+                # 过滤纯技术标题
+                if title and not any(skip in title for skip in ["架构", "细节", "内部"]):
+                    keywords.append(title)
+            if len(keywords) >= 3:
+                break
+        if keywords:
+            # 取前 2 个关键词合并
+            summary = "与".join(keywords[:2])
+            if len(summary) > 20:
+                summary = summary[:19] + "…"
+            return summary
+
+    # 从 commit 提取
+    if commits:
+        # 按分类排序：feat > fix > refactor/perf
+        priority = {"feat": 0, "fix": 1, "refactor": 2, "perf": 3}
+        sorted_commits = sorted(
+            [c for c in commits if c["type"] in priority],
+            key=lambda c: priority.get(c["type"], 9)
+        )
+        keywords = []
+        for c in sorted_commits[:3]:
+            title = _extract_title(_format_subject(c))
+            if title and len(title) >= 2:
+                keywords.append(title)
+        if keywords:
+            summary = "与".join(keywords[:2])
+            if len(summary) > 20:
+                summary = summary[:19] + "…"
+            return summary
+
+    return "应用体验优化与问题修复"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="MiniMe-core 发版说明生成器（见 AGENTS.md「发版说明格式」）"
@@ -356,6 +407,8 @@ def main():
     parser.add_argument("--date", default=None, help="发布日期 YYYY-MM-DD（默认今天）")
     parser.add_argument("--version", default=None, help="版本号（默认 cur tag 去 v 前缀）")
     parser.add_argument("--repo", default=None, help="仓库根（默认 git 自动探测）")
+    parser.add_argument("--title-summary", action="store_true",
+                        help="仅输出标题更新概括（10-20字），不输出完整正文")
     args = parser.parse_args()
 
     repo = Path(args.repo) if args.repo else \
@@ -382,6 +435,11 @@ def main():
     # CHANGELOG 未收录该版本时，才回退到 Conventional Commits 生成草稿。
     changelog_body = extract_from_changelog(repo, version)
     if changelog_body is not None:
+        if args.title_summary:
+            # 从 CHANGELOG 正文提取概括
+            summary = generate_title_summary(repo, version, [])
+            print(summary)
+            return
         print(changelog_body)
         return
 
@@ -389,6 +447,12 @@ def main():
         commits = _recent(repo, 30)
     else:
         commits = get_commits(repo, prev, args.cur)
+
+    # --title-summary：仅输出标题概括，不输出完整正文
+    if args.title_summary:
+        summary = generate_title_summary(repo, version, commits)
+        print(summary)
+        return
 
     body = user_layer(commits, version, date_str)
 

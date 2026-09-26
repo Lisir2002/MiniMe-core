@@ -1893,7 +1893,8 @@ class StatefulAgentWorkflow @Inject constructor(
                             guardId = guard.id,
                             code = verdict.code,
                             message = verdict.message
-                        )
+                        ),
+                        isBlock = true
                     )
                     return ToolResult.Error(verdict.message, verdict.code)
                 }

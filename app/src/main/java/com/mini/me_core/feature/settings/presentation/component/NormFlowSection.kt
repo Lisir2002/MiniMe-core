@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.Input
 import androidx.compose.material.icons.rounded.ListAlt
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Pin
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Rule
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Timer
@@ -67,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.feature.agent.presentation.component.formatTokenCountShort
 
 /**
  * 「规范流程」二级页（P0+P1+P2 + 布局重构）：
@@ -94,6 +96,9 @@ internal fun NormFlowSection(
     largeFileEnabled: Boolean,
     pathBoundaryEnabled: Boolean,
     usageCardItems: Set<String>,
+    injectTokenCount: Int,
+    guardBlockCount: Int,
+    idleRoundCount: Int,
     onToggleNormFlow: (Boolean) -> Unit,
     onToggleStepInject: (Boolean) -> Unit,
     onToggleToolGuard: (Boolean) -> Unit,
@@ -120,7 +125,8 @@ internal fun NormFlowSection(
     onOpenGuardLogs: () -> Unit,
     onManageRules: () -> Unit,
     onExportConfig: () -> Unit,
-    onImportConfig: () -> Unit
+    onImportConfig: () -> Unit,
+    onResetStats: () -> Unit
 ) {
     val injectionChildrenEnabled = normFlowEnabled && stepInjectEnabled
     val guardChildrenEnabled = normFlowEnabled && toolGuardEnabled
@@ -150,6 +156,10 @@ internal fun NormFlowSection(
             DashboardCard(
                 normFlowEnabled = normFlowEnabled,
                 presetName = stringResource(presetNameRes),
+                injectTokenCount = injectTokenCount,
+                guardBlockCount = guardBlockCount,
+                idleRoundCount = idleRoundCount,
+                onResetStats = onResetStats,
                 onClick = onOpenDiagnosis
             )
         }
@@ -446,6 +456,10 @@ internal fun NormFlowSection(
 private fun DashboardCard(
     normFlowEnabled: Boolean,
     presetName: String,
+    injectTokenCount: Int,
+    guardBlockCount: Int,
+    idleRoundCount: Int,
+    onResetStats: () -> Unit,
     onClick: () -> Unit
 ) {
     val statusColor = if (normFlowEnabled) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant
@@ -460,7 +474,7 @@ private fun DashboardCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(Spacing.lg)) {
-            // 顶部行：状态指示器 + 预设名
+            // 顶部行：状态指示器 + 预设名 + 重置统计
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
@@ -481,6 +495,16 @@ private fun DashboardCard(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                Spacer(Modifier.width(Spacing.xs))
+                // 重置统计小图标按钮（独立于卡片点击，避免冒泡到诊断页跳转）
+                IconButton(onClick = onResetStats, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        Icons.Rounded.Refresh,
+                        contentDescription = stringResource(R.string.norm_flow_reset_stats),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
             Spacer(Modifier.height(Spacing.md))
             // 三列数据
@@ -488,11 +512,23 @@ private fun DashboardCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                DashboardStat(stringResource(R.string.norm_flow_status_inject_tokens), "--", Modifier.weight(1f))
+                DashboardStat(
+                    stringResource(R.string.norm_flow_status_inject_tokens),
+                    formatTokenCountShort(injectTokenCount),
+                    Modifier.weight(1f)
+                )
                 VerticalDivider()
-                DashboardStat(stringResource(R.string.norm_flow_status_guard_blocks), "0", Modifier.weight(1f))
+                DashboardStat(
+                    stringResource(R.string.norm_flow_status_guard_blocks),
+                    guardBlockCount.toString(),
+                    Modifier.weight(1f)
+                )
                 VerticalDivider()
-                DashboardStat(stringResource(R.string.norm_flow_status_idle_rounds), "0", Modifier.weight(1f))
+                DashboardStat(
+                    stringResource(R.string.norm_flow_status_idle_rounds),
+                    idleRoundCount.toString(),
+                    Modifier.weight(1f)
+                )
             }
             Spacer(Modifier.height(Spacing.md))
             // 链路可视化

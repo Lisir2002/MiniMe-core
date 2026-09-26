@@ -280,7 +280,7 @@ jobs:
       # GitHub 的 generate_release_notes 只列 merged PR，直接 push 的 commit 不会出现。
       # 本仓库在 main 上直接 commit，不走 PR 流程，所以手动用 release-log.py 生成 Release 正文草稿。
       # 发版规范见 AGENTS.md「发版说明格式（硬性约束）」——统一格式，CHANGELOG/独立文档/Release正文三处一致。
-      #   AI/维护者发版后需补充「更新内容概括」到 Release 标题，并把条目润色为「**4-9字小标题**：20-40字说明」格式。
+      #   标题概括由 release-log.py --title-summary 自动生成，不需要手动补充。
       - name: Generate release notes
         id: changelog
         if: startsWith(github.ref, 'refs/tags/v')
@@ -302,6 +302,13 @@ jobs:
             echo ""
             echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
+          # 标题更新概括（10-20字），由 release-log.py 自动生成
+          title_summary=$(python3 scripts/gitops/release-log.py \
+            --title-summary \
+            --prev "$prev_tag" \
+            --cur "$cur_tag" \
+            --version "$version" 2>/dev/null || echo "应用体验优化与问题修复")
+          echo "title_summary=${title_summary}" >> "$GITHUB_OUTPUT"
 
       # 保留已更新的 Release 内容：重新打 tag 触发 CI 时，如果 Release 已存在且正文/标题已人工补充完整，
       # 不用新草稿覆盖。只有 Release 不存在或内容仍为草稿占位符时才使用新生成的草稿。
@@ -320,7 +327,8 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/${cur_tag}" || echo "")
 
           final_body="${{ steps.changelog.outputs.body }}"
-          final_name="${APP_NAME} ${APK_BASE_VER}"
+          # 标题概括由 release-log.py --title-summary 自动生成（格式：软件名 版本号 — 概括）
+          final_name="${APP_NAME} ${APK_BASE_VER} — ${{ steps.changelog.outputs.title_summary }}"
 
           if echo "$existing" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('id') else 1)" 2>/dev/null; then
             echo "现有 Release 存在，检查内容是否已人工更新"

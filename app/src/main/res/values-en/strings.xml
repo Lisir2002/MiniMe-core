@@ -20,7 +20,7 @@
     <string name="settings_category_appearance">Appearance</string>
     <string name="settings_category_ai_provider">AI</string>
     <string name="settings_category_terminal">Terminal</string>
-    <string name="settings_category_norm_flow">Norm Flow</string>
+    <string name="settings_category_norm_flow">AGENT Spec</string>
     <string name="settings_category_system">System</string>
     <string name="settings_common_title">Common</string>
     <string name="settings_effect_applied">Applied</string>
@@ -155,7 +155,7 @@
     <string name="settings_keepalive_title">Background Keep-alive</string>
     <string name="settings_keepalive_subtitle">Show a foreground notification to prevent the system from killing the process in background</string>
     <!-- Norm flow (D1-7, aligned with norm-chain-design.md §3.5) -->
-    <string name="settings_norm_flow">Norm Flow</string>
+    <string name="settings_norm_flow">AGENT Spec</string>
     <string name="settings_norm_flow_subtitle">Master switch for per-step injection discipline and tool guards</string>
     <string name="settings_norm_flow_group">Norm Flow Switches</string>
     <string name="settings_norm_flow_master">Master Switch</string>
@@ -177,8 +177,11 @@
     <string name="norm_flow_status_card">Runtime Status</string>
     <string name="norm_flow_preset">Preset</string>
     <string name="norm_flow_preset_strict">Strict</string>
+    <string name="norm_flow_preset_strict_desc">All rules on, high reasoning budget</string>
     <string name="norm_flow_preset_standard">Standard</string>
+    <string name="norm_flow_preset_standard_desc">Balanced mode, recommended for most users</string>
     <string name="norm_flow_preset_minimal">Minimal</string>
+    <string name="norm_flow_preset_minimal_desc">Core guards only, fastest response</string>
     <string name="norm_flow_preset_custom">Custom</string>
     <string name="norm_flow_group_injection">Injection Discipline</string>
     <string name="norm_flow_group_guard">Execution Guards</string>
@@ -267,6 +270,7 @@
     <string name="norm_flow_import_hint">Paste config JSON</string>
     <string name="norm_flow_import_success">Config imported successfully</string>
     <string name="norm_flow_import_failed">Import failed, invalid format</string>
+    <string name="norm_flow_reset_stats">Reset stats</string>
     <string name="norm_flow_indicator_running">Norm flow active</string>
     <string name="norm_flow_indicator_running_with_count">Norm flow active · %1$d/%2$d rules</string>
     <string name="norm_flow_indicator_sheet_title">Norm flow overview</string>

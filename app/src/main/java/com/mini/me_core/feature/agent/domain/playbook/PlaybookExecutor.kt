@@ -99,7 +99,7 @@ class PlaybookExecutor @Inject constructor(
     suspend fun start(name: String, sessionId: String, skipApproval: Boolean = false): PlaybookOpResult {
         // D5-pa 统一开关：总开关关闭即 Playbook 运行整体停用（§3.5，含 /playbook 显式入口）。
         if (!normFlowSettingsRepository.normFlowEnabledFlow.first()) {
-            return PlaybookOpResult.Error("规范流程已关闭（总开关），Playbook 不可用。请先在设置中开启「规范流程」。", "NORM_FLOW_DISABLED")
+            return PlaybookOpResult.Error("AGENT规范已关闭（总开关），Playbook 不可用。请先在设置中开启「AGENT规范」。", "NORM_FLOW_DISABLED")
         }
         val asset = playbookRegistry.findByName(name)
             ?: return PlaybookOpResult.Error(
@@ -325,6 +325,12 @@ class PlaybookExecutor @Inject constructor(
     fun recordIdleRound(sessionId: String) {
         idleRounds[sessionId] = (idleRounds[sessionId] ?: 0) + 1
     }
+
+    /**
+     * 跨会话空转轮数总和（设置页仪表盘统计用）：当前所有活跃会话的连续空转计数之和。
+     * 非挂起（纯内存）快照，调用方按需定时刷新。
+     */
+    fun getTotalIdleRounds(): Int = idleRounds.values.sum()
 
     // ── 内部推进逻辑 ──
 

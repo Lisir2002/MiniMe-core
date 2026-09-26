@@ -33,6 +33,9 @@ import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeRepository
 import com.mini.me_core.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository
+import com.mini.me_core.feature.agent.domain.guard.GuardLogRepository
+import com.mini.me_core.feature.agent.domain.playbook.PlaybookExecutor
+import com.mini.me_core.feature.agent.domain.prompt.NormFlowStatsRepository
 
 import com.mini.me_core.core.util.LogLineParser
 import com.mini.me_core.feature.settings.data.repository.LogFilterSettingsRepository
@@ -57,9 +60,11 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -170,9 +175,18 @@ class SettingsViewModel @Inject constructor(
     private val searchHistoryManager: SettingsSearchHistoryManager,
     /** 防截图录屏开关。 */
     private val secureScreenRepository: SecureScreenRepository,
+    /** 仪表盘统计：护栏累计拦截次数（Block 级）。 */
+    private val guardLogRepository: GuardLogRepository,
+    /** 仪表盘统计：Playbook 跨会话空转轮数总和。 */
+    private val playbookExecutor: PlaybookExecutor,
+    /** 仪表盘统计：累计注入 token 估算。 */
+    private val normFlowStatsRepository: NormFlowStatsRepository,
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
+
+        /** 仪表盘空转轮数轮询间隔（毫秒）：前台展示足够实时，避免高频刷新。 */
+        const val IDLE_ROUND_POLL_MS = 2_000L
     }
 
     // RC62：跨屏幕设置页跳转的「待打开分区」信号。
@@ -282,6 +296,24 @@ class SettingsViewModel @Inject constructor(
     /** D1-7 规范流程统一开关：总开关 + step_inject/tool_guard 子开关（对齐 norm-chain §3.5）。 */
     private val _normFlowEnabled = MutableStateFlow(true)
     val normFlowEnabled: StateFlow<Boolean> = _normFlowEnabled.asStateFlow()
+
+    // ── 仪表盘真实统计（替代原硬编码 "--"/"0"/"0"）────────────────────────────
+    /** 护栏累计拦截次数（Block 级，Advisory 不计）。 */
+    val guardBlockCount: StateFlow<Int> = guardLogRepository.blockCount
+
+    /** 累计注入 token 估算值（字符数 / 4）。 */
+    val injectTokenCount: StateFlow<Int> = normFlowStatsRepository.injectTokenCount
+
+    /**
+     * 跨会话空转轮数总和：PlaybookExecutor.idleRounds 为非挂起内存快照，
+     * 此处以 2s 轮询定时刷新（仪表盘前台展示足够，避免改造所有 idleRounds 变更点）。
+     */
+    val idleRoundCount: StateFlow<Int> = flow {
+        while (true) {
+            emit(playbookExecutor.getTotalIdleRounds())
+            delay(IDLE_ROUND_POLL_MS)
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     private val _stepInjectEnabled = MutableStateFlow(true)
     val stepInjectEnabled: StateFlow<Boolean> = _stepInjectEnabled.asStateFlow()
@@ -1467,6 +1499,12 @@ class SettingsViewModel @Inject constructor(
 
     // P3：导入配置
     fun importConfig(json: String): Boolean = normFlowSettingsRepository.importConfig(json)
+
+    // 仪表盘「重置统计」：清空累计注入 token 与护栏拦截日志/计数（空转轮数为运行时快照，不在此清空）。
+    fun resetNormFlowStats() {
+        normFlowStatsRepository.clear()
+        guardLogRepository.clear()
+    }
 
     fun setThemeMode(mode: AppThemeMode) {
         val old = _themeMode.value
