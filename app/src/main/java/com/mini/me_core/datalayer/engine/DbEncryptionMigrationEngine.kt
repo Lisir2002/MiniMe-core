@@ -63,7 +63,7 @@ class DbEncryptionMigrationEngine(
          * 设备上记录的版本低于当前值时，重置历史失败/重试计数，让迁移用新逻辑重新尝试，
          * 避免因旧版本 bug 永久卡在"重试耗尽"。
          */
-        const val MIGRATION_LOGIC_VERSION = 5
+        const val MIGRATION_LOGIC_VERSION = 6
     }
 
     // ── 公开 API ──
@@ -250,22 +250,20 @@ class DbEncryptionMigrationEngine(
             SQLiteDatabase.OPEN_READWRITE,
         )
         try {
+            // 防御性：消费任何可能残留的结果行
+            db.executeAndDrain("SELECT 1")
             val targetPath = sqlEscape(tempEncrypted.absolutePath)
             val keySql = sqlEscape(passphrase)
-            // ATTACH 加密临时库
-            db.rawExecSQL("ATTACH DATABASE '$targetPath' AS encrypted KEY '$keySql'")
+            // ATTACH 加密临时库（SQLCipher ATTACH 带 KEY 可能返回结果，必须消费）
+            db.executeAndDrain("ATTACH DATABASE '$targetPath' AS encrypted KEY '$keySql'")
             // 整库导出（schema/触发器/虚拟表/数据）。
-            // sqlcipher_export() 是表值函数，SELECT 会返回一行结果，
-            // 必须用 rawQuery 消费结果行，否则连接残留 "another row available" (error 100)，
-            // 后续 PRAGMA/DETACH 会误报失败。
-            db.rawQuery("SELECT sqlcipher_export('encrypted')", null).use { c -> while (c.moveToNext()) {} }
+            // sqlcipher_export() 是表值函数，SELECT 会返回一行结果，必须消费。
+            db.executeAndDrain("SELECT sqlcipher_export('encrypted')")
             // sqlcipher_export 不复制 user_version，手动同步 schema 版本。
-            // 注意：带 schema 前缀的 PRAGMA 赋值（PRAGMA encrypted.user_version = X）
-            // 在 SQLCipher 中会返回一行结果，必须用 rawQuery 消费，
-            // 否则后续 DETACH 会报 "another row available" (error 100)。
+            // 带 schema 前缀的 PRAGMA 赋值在 SQLCipher 中会返回一行结果，必须消费。
             val version = db.version
-            db.rawQuery("PRAGMA encrypted.user_version = $version", null).use { c -> while (c.moveToNext()) {} }
-            db.rawExecSQL("DETACH DATABASE encrypted")
+            db.executeAndDrain("PRAGMA encrypted.user_version = $version")
+            db.executeAndDrain("DETACH DATABASE encrypted")
         } finally {
             db.close()
         }
@@ -303,15 +301,17 @@ class DbEncryptionMigrationEngine(
             SQLiteDatabase.OPEN_READWRITE,
         )
         try {
+            // 防御性：消费任何可能残留的结果行
+            db.executeAndDrain("SELECT 1")
             val targetPath = sqlEscape(tempPlain.absolutePath)
-            // ATTACH 明文临时库（空 key）
-            db.rawExecSQL("ATTACH DATABASE '$targetPath' AS plain KEY ''")
-            // 同正向迁移：必须 rawQuery 消费 sqlcipher_export 的结果行
-            db.rawQuery("SELECT sqlcipher_export('plain')", null).use { c -> while (c.moveToNext()) {} }
+            // ATTACH 明文临时库（空 key），必须消费结果行
+            db.executeAndDrain("ATTACH DATABASE '$targetPath' AS plain KEY ''")
+            // 同正向迁移：必须消费 sqlcipher_export 的结果行
+            db.executeAndDrain("SELECT sqlcipher_export('plain')")
             val version = db.version
-            // 带 schema 前缀的 PRAGMA 赋值会返回一行结果，必须 rawQuery 消费
-            db.rawQuery("PRAGMA plain.user_version = $version", null).use { c -> while (c.moveToNext()) {} }
-            db.rawExecSQL("DETACH DATABASE plain")
+            // 带 schema 前缀的 PRAGMA 赋值会返回一行结果，必须消费
+            db.executeAndDrain("PRAGMA plain.user_version = $version")
+            db.executeAndDrain("DETACH DATABASE plain")
         } finally {
             db.close()
         }
@@ -688,6 +688,20 @@ class DbEncryptionMigrationEngine(
      * 防止特殊字符破坏 SQL 或造成注入。Base64 passphrase 不含单引号，路径可能包含。
      */
     private fun sqlEscape(value: String): String = value.replace("'", "''")
+
+    /**
+     * 执行 SQL 并完全消费所有结果行。
+     * SQLCipher 中 ATTACH/DETACH/PRAGMA/sqlcipher_export 等语句可能返回结果行，
+     * 必须用 rawQuery 遍历消费，否则后续操作报 "another row available" (error 100)。
+     */
+    private fun net.sqlcipher.database.SQLiteDatabase.executeAndDrain(sql: String) {
+        FileLogger.d(TAG, "执行并消费: ${sql.take(60)}...")
+        rawQuery(sql, null).use { c ->
+            while (c.moveToNext()) {
+                // 消费所有结果行
+            }
+        }
+    }
 
     private fun copySidecar(source: File, target: File, suffix: String) {
         val sourceSidecar = File(source.parentFile, "${source.name}-$suffix")

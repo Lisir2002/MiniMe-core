@@ -72,7 +72,7 @@ class GitHubReleaseRepository @Inject constructor(
         const val API_LATEST =
             "https://api.github.com/repos/Lisir2002/MiniMe-core/releases/latest"
         const val API_LIST =
-            "https://api.github.com/repos/Lisir2002/MiniMe-core/releases?per_page=30"
+            "https://api.github.com/repos/Lisir2002/MiniMe-core/releases?per_page=100"
 
         /**
          * 下载/API 镜像站备用线路（按优先级排序）。
@@ -127,9 +127,19 @@ class GitHubReleaseRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             val releases = requestReleaseList(API_LIST)
             releases.filter { r ->
-                !r.isDraft && (includePrerelease || !r.isPrerelease)
+                !r.isDraft &&
+                (includePrerelease || !r.isPrerelease) &&
+                isMainAppRelease(r.tag)
             }
         }
+
+    /**
+     * 判断是否为主应用版本。
+     * 主应用版本格式：v0.0.0.21、v0.0.0.24 等（v + 四段数字）。
+     * 附属应用格式：logviewer-v0.0.6 等，需过滤。
+     */
+    private fun isMainAppRelease(tag: String): Boolean =
+        tag.matches(Regex("^v\\d+\\.\\d+\\.\\d+\\.\\d+$"))
 
     /**
      * 启动静默检查：后台调一次 /releases/latest，不弹窗。

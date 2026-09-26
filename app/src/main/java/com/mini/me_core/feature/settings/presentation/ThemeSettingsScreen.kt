@@ -27,6 +27,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape as RCS
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.res.stringResource
+import com.mini.me_core.R
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.DarkMode
@@ -762,9 +764,9 @@ private fun DisplayPreferencesSection(
             modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // 圆角风格三选一
+            // 圆角风格三选一（预览用固定中性色，不受主题影响，确保客观对比）
             Text(
-                text = "圆角风格",
+                text = stringResource(R.string.theme_corner_style),
                 fontSize = LocalComponentTokens.current.text.titleSmallFontSize,
                 color = colors.textPrimary,
                 fontWeight = FontWeight.Medium,
@@ -773,36 +775,49 @@ private fun DisplayPreferencesSection(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                val previewShapeColor = Color(0xFF616161)
+                val selectedBorderColor = Color(0xFF2196F3)
+                val unselectedBorderColor = Color(0xFFE0E0E0)
+                val selectedTextColor = Color(0xFF2196F3)
+                val unselectedTextColor = Color(0xFF424242)
                 val styles = listOf(
-                    Triple(CornerStyle.ROUNDED, "圆角", RoundedCornerShape(LocalCornerRadius.current.xl)),
-                    Triple(CornerStyle.Sharp, "直角", RoundedCornerShape(0.dp)),
-                    Triple(CornerStyle.Pill, "胶囊", RoundedCornerShape(999.dp)),
+                    Triple(CornerStyle.ROUNDED, stringResource(R.string.theme_corner_rounded), RoundedCornerShape(LocalCornerRadius.current.xl)),
+                    Triple(CornerStyle.Sharp, stringResource(R.string.theme_corner_sharp), RoundedCornerShape(0.dp)),
+                    Triple(CornerStyle.Pill, stringResource(R.string.theme_corner_pill), RoundedCornerShape(50)),
                 )
                 styles.forEach { (style, label, shape) ->
                     val isSelected = style == cornerStyle
+                    val isPill = style == CornerStyle.Pill
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
-                            .background(if (isSelected) colors.brandContainer else Color.Transparent)
+                            .background(Color.White)
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) selectedBorderColor else unselectedBorderColor,
+                                shape = RoundedCornerShape(LocalCornerRadius.current.lg),
+                            )
                             .clickable { onCornerStyleChange(style) }
                             .padding(vertical = 10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        // 预览形状
+                        // 预览形状（固定深灰色填充，胶囊更宽体现长条形）
                         Box(
                             modifier = Modifier
-                                .size(width = 40.dp, height = 24.dp)
+                                .size(
+                                    width = if (isPill) 64.dp else 56.dp,
+                                    height = 28.dp,
+                                )
                                 .clip(shape)
-                                .background(if (isSelected) colors.onBrandContainer else colors.surfaceSunken)
-                                .border(1.dp, colors.borderDefault, shape),
+                                .background(previewShapeColor),
                         )
                         Text(
                             text = label,
                             fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) colors.onBrandContainer else colors.textSecondary,
+                            color = if (isSelected) selectedTextColor else unselectedTextColor,
                         )
                     }
                 }
