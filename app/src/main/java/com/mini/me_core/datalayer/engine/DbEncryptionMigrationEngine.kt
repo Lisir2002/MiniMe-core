@@ -63,8 +63,12 @@ class DbEncryptionMigrationEngine(
          * 迁移逻辑版本。修复迁移代码缺陷（SQL 执行方式、校验逻辑等）时递增。
          * 设备上记录的版本低于当前值时，重置历史失败/重试计数，让迁移用新逻辑重新尝试，
          * 避免因旧版本 bug 永久卡在"重试耗尽"。
+         *
+         * v7: 移除 db.version getter 调用（SQLCipher 中该 getter 内部 statement 可能
+         *     未完全消费结果行，导致 ATTACH 后后续 PRAGMA 报 "another row available"）。
+         *     改为 ATTACH 前用 rawQuery 手动查询 PRAGMA user_version 并完全消费。
          */
-        const val MIGRATION_LOGIC_VERSION = 6
+        const val MIGRATION_LOGIC_VERSION = 7
     }
 
     // ── 公开 API ──
@@ -253,6 +257,9 @@ class DbEncryptionMigrationEngine(
         try {
             // 防御性：消费任何可能残留的结果行
             db.executeAndDrain("SELECT 1")
+            // v7修复：ATTACH 前用 rawQuery 获取 user_version 并完全消费，
+            // 避免 db.version getter 内部 statement 未消费导致后续 "another row available"。
+            val version = db.queryUserVersion()
             val targetPath = sqlEscape(tempEncrypted.absolutePath)
             val keySql = sqlEscape(passphrase)
             // ATTACH 加密临时库（SQLCipher ATTACH 带 KEY 可能返回结果，必须消费）
@@ -262,7 +269,6 @@ class DbEncryptionMigrationEngine(
             db.executeAndDrain("SELECT sqlcipher_export('encrypted')")
             // sqlcipher_export 不复制 user_version，手动同步 schema 版本。
             // 带 schema 前缀的 PRAGMA 赋值在 SQLCipher 中会返回一行结果，必须消费。
-            val version = db.version
             db.executeAndDrain("PRAGMA encrypted.user_version = $version")
             db.executeAndDrain("DETACH DATABASE encrypted")
         } finally {
@@ -304,12 +310,13 @@ class DbEncryptionMigrationEngine(
         try {
             // 防御性：消费任何可能残留的结果行
             db.executeAndDrain("SELECT 1")
+            // v7修复：ATTACH 前用 rawQuery 获取 user_version 并完全消费
+            val version = db.queryUserVersion()
             val targetPath = sqlEscape(tempPlain.absolutePath)
             // ATTACH 明文临时库（空 key），必须消费结果行
             db.executeAndDrain("ATTACH DATABASE '$targetPath' AS plain KEY ''")
             // 同正向迁移：必须消费 sqlcipher_export 的结果行
             db.executeAndDrain("SELECT sqlcipher_export('plain')")
-            val version = db.version
             // 带 schema 前缀的 PRAGMA 赋值会返回一行结果，必须消费
             db.executeAndDrain("PRAGMA plain.user_version = $version")
             db.executeAndDrain("DETACH DATABASE plain")
@@ -702,6 +709,19 @@ class DbEncryptionMigrationEngine(
             while (c.moveToNext()) {
                 // 消费所有结果行
             }
+        }
+    }
+
+    /**
+     * 用 rawQuery 查询 PRAGMA user_version 并完全消费结果行。
+     *
+     * v7修复：不使用 db.version getter。SQLCipher 的 getVersion() 内部可能用
+     * compileStatement + simpleQueryForLong，在某些状态下 statement 未完全重置，
+     * 导致后续操作报 "another row available"。手动 rawQuery + 消费更安全。
+     */
+    private fun net.sqlcipher.database.SQLiteDatabase.queryUserVersion(): Int {
+        rawQuery("PRAGMA user_version", null).use { c ->
+            return if (c.moveToFirst()) c.getInt(0) else 0
         }
     }
 

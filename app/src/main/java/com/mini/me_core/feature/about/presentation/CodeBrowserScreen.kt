@@ -2,6 +2,7 @@ package com.mini.me_core.feature.about.presentation
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +59,11 @@ fun CodeBrowserScreen(
         viewModel.open(owner, repo, branch)
     }
     val context = LocalContext.current
+
+    // 子目录内按返回键回到上一级目录；根目录时不拦截，交给宿主 AboutSection 退出浏览器。
+    BackHandler(enabled = ui.pathStack.size > 1) {
+        viewModel.breadcrumbClick(ui.pathStack.size - 2)
+    }
 
     Column(
         modifier = Modifier

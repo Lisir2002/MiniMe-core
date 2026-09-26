@@ -1820,7 +1820,7 @@
     <string name="update_entry_subtitle">Current v%1$s · latest &amp; history</string>
     <string name="update_badge_new">Update</string>
 
-    <string name="ui_1fs_960c9b8d">✨ %.1fs · %d packages</string>
+    <string name="ui_1fs_960c9b8d">✨ %1$.1fs · %2$d packages</string>
     <string name="ui___3479daf9"> · empty</string>
     <string name="ui____12a64640">Live (empty)</string>
     <string name="ui____1391cabf">Official dl-cdn</string>
