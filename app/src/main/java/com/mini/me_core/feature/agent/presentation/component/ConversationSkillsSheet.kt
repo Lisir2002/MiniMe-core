@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppBottomSheet
+import com.mini.me_core.core.theme.components.AppSheetHeader
 import com.mini.me_core.feature.agent.domain.skill.Skill
 import com.mini.me_core.feature.agent.domain.skill.SkillScope
 import com.mini.me_core.feature.agent.presentation.ConversationSkillsViewModel
@@ -67,17 +68,14 @@ fun ConversationSkillsSheet(
         viewModel.load(sessionId)
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    AppBottomSheet(onDismiss = onDismiss) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = Spacing.lg)
-                .padding(horizontal = Spacing.md)
         ) {
-            Text(
-                text = stringResource(R.string.skill_conversation_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
+            AppSheetHeader(
+                title = stringResource(R.string.skill_conversation_title),
+                onClose = onDismiss,
             )
 
             Spacer(Modifier.height(Spacing.md))

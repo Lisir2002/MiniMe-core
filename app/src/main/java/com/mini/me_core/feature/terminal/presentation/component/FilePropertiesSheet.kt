@@ -12,13 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +24,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
+import com.mini.me_core.core.theme.components.AppBottomSheet
+import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 import com.mini.me_core.core.ui.components.fileIconVisual
 import com.mini.me_core.feature.terminal.domain.ContainerFileEntry
 import com.mini.me_core.feature.terminal.domain.ContainerFileType
@@ -34,7 +33,6 @@ import com.mini.me_core.feature.terminal.domain.ContainerFileType
 /**
  * P1 模块6：文件属性 BottomSheet。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FilePropertiesSheet(
     entry: ContainerFileEntry,
@@ -43,12 +41,11 @@ fun FilePropertiesSheet(
     onDismiss: () -> Unit,
     onCopyPath: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    AppBottomSheet(onDismiss = onDismiss) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .padding(horizontal = PrimitiveSpacing.Lg),
         ) {
             val visual = fileIconVisual(
                 name = entry.name,
