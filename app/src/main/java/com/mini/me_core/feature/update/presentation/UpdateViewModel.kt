@@ -100,33 +100,58 @@ class UpdateViewModel @Inject constructor(
                     it.copy(latest = latest, lastCheckTime = repository.getLastCheckTime())
                 }
             }.onFailure { e ->
-                _snackbar.emit(e.message ?: app.getString(R.string.update_network_error))
+                _snackbar.emit(mapNetworkError(e))
             }
+            // loadHistory 改为 suspend，等待完成后再重置 checking，
+            // 避免 checking=false 先执行而 historyLoading 仍为 true 导致的竞态。
             loadHistory()
             _state.update { it.copy(checking = false) }
         }
     }
 
-    fun loadHistory() {
-        viewModelScope.launch {
-            _state.update { it.copy(historyLoading = true, historyError = null) }
-            runCatching {
-                val list = repository.fetchHistory(includePrerelease = _state.value.showPrerelease)
-                _state.update { it.copy(history = list, historyLoading = false) }
-            }.onFailure { e ->
-                _state.update {
-                    it.copy(
-                        historyLoading = false,
-                        historyError = e.message ?: app.getString(R.string.update_network_error),
-                    )
-                }
+    /** 加载历史版本列表（suspend，由调用方在协程中调用）。 */
+    private suspend fun loadHistory() {
+        _state.update { it.copy(historyLoading = true, historyError = null) }
+        runCatching {
+            val list = repository.fetchHistory(includePrerelease = _state.value.showPrerelease)
+            _state.update { it.copy(history = list, historyLoading = false) }
+        }.onFailure { e ->
+            _state.update {
+                it.copy(
+                    historyLoading = false,
+                    historyError = mapNetworkError(e),
+                )
             }
+        }
+    }
+
+    /** 将网络异常映射为用户友好的中文提示，避免直接显示 "connection closed" 等原始信息。 */
+    private fun mapNetworkError(e: Throwable): String {
+        val msg = e.message ?: ""
+        return when {
+            msg.contains("connection closed", ignoreCase = true) ||
+                msg.contains("Connection reset", ignoreCase = true) ||
+                e is java.net.SocketException ->
+                app.getString(R.string.update_error_connection_closed)
+            msg.contains("timeout", ignoreCase = true) ||
+                e is java.net.SocketTimeoutException ->
+                app.getString(R.string.update_error_timeout)
+            msg.contains("Unable to resolve host", ignoreCase = true) ||
+                msg.contains("UnknownHost", ignoreCase = true) ||
+                e is java.net.UnknownHostException ->
+                app.getString(R.string.update_error_no_network)
+            msg.contains("SSL", ignoreCase = true) ||
+                msg.contains("certificate", ignoreCase = true) ->
+                app.getString(R.string.update_error_ssl)
+            msg.contains("403") || msg.contains("rate limit", ignoreCase = true) ->
+                app.getString(R.string.update_error_rate_limit)
+            else -> app.getString(R.string.update_network_error)
         }
     }
 
     fun togglePrerelease(show: Boolean) {
         _state.update { it.copy(showPrerelease = show) }
-        loadHistory()
+        viewModelScope.launch { loadHistory() }
     }
 
     fun setAutoCheck(enabled: Boolean) {

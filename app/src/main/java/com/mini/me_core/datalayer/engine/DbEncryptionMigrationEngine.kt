@@ -63,7 +63,7 @@ class DbEncryptionMigrationEngine(
          * 设备上记录的版本低于当前值时，重置历史失败/重试计数，让迁移用新逻辑重新尝试，
          * 避免因旧版本 bug 永久卡在"重试耗尽"。
          */
-        const val MIGRATION_LOGIC_VERSION = 4
+        const val MIGRATION_LOGIC_VERSION = 5
     }
 
     // ── 公开 API ──
@@ -258,10 +258,13 @@ class DbEncryptionMigrationEngine(
             // sqlcipher_export() 是表值函数，SELECT 会返回一行结果，
             // 必须用 rawQuery 消费结果行，否则连接残留 "another row available" (error 100)，
             // 后续 PRAGMA/DETACH 会误报失败。
-            db.rawQuery("SELECT sqlcipher_export('encrypted')", null).use { it.moveToFirst() }
-            // sqlcipher_export 不复制 user_version，手动同步 schema 版本
+            db.rawQuery("SELECT sqlcipher_export('encrypted')", null).use { c -> while (c.moveToNext()) {} }
+            // sqlcipher_export 不复制 user_version，手动同步 schema 版本。
+            // 注意：带 schema 前缀的 PRAGMA 赋值（PRAGMA encrypted.user_version = X）
+            // 在 SQLCipher 中会返回一行结果，必须用 rawQuery 消费，
+            // 否则后续 DETACH 会报 "another row available" (error 100)。
             val version = db.version
-            db.rawExecSQL("PRAGMA encrypted.user_version = $version")
+            db.rawQuery("PRAGMA encrypted.user_version = $version", null).use { c -> while (c.moveToNext()) {} }
             db.rawExecSQL("DETACH DATABASE encrypted")
         } finally {
             db.close()
@@ -304,9 +307,10 @@ class DbEncryptionMigrationEngine(
             // ATTACH 明文临时库（空 key）
             db.rawExecSQL("ATTACH DATABASE '$targetPath' AS plain KEY ''")
             // 同正向迁移：必须 rawQuery 消费 sqlcipher_export 的结果行
-            db.rawQuery("SELECT sqlcipher_export('plain')", null).use { it.moveToFirst() }
+            db.rawQuery("SELECT sqlcipher_export('plain')", null).use { c -> while (c.moveToNext()) {} }
             val version = db.version
-            db.rawExecSQL("PRAGMA plain.user_version = $version")
+            // 带 schema 前缀的 PRAGMA 赋值会返回一行结果，必须 rawQuery 消费
+            db.rawQuery("PRAGMA plain.user_version = $version", null).use { c -> while (c.moveToNext()) {} }
             db.rawExecSQL("DETACH DATABASE plain")
         } finally {
             db.close()

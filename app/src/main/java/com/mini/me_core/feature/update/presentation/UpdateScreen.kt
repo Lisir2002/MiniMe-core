@@ -3,6 +3,8 @@ package com.mini.me_core.feature.update.presentation
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.ExpandLess
@@ -185,6 +188,7 @@ private fun LatestTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
@@ -405,7 +409,7 @@ private fun DetailCard(
                     text = stringResource(R.string.update_open_browser),
                     onClick = { viewModel.openInBrowser(release) },
                     modifier = Modifier.weight(1f),
-                    variant = AppButtonVariant.Outlined,
+                    variant = AppButtonVariant.Tonal,
                     buttonColor = AppButtonColor.Neutral,
                 )
             }
@@ -554,7 +558,8 @@ private fun DownloadFailedCard(
             AppButton(
                 text = stringResource(R.string.update_retry),
                 onClick = onRetry,
-                variant = AppButtonVariant.Outlined,
+                variant = AppButtonVariant.Filled,
+                buttonColor = AppButtonColor.Error,
             )
         }
     }
@@ -592,7 +597,8 @@ private fun HistoryTab(
         }
 
         PullToRefreshBox(
-            isRefreshing = state.historyLoading || state.checking,
+            // 错误状态下不显示刷新动画，避免拦截重试按钮的触摸事件
+            isRefreshing = (state.historyLoading || state.checking) && state.historyError == null,
             onRefresh = onRefresh,
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -652,16 +658,26 @@ private fun ErrorRetryState(message: String, onRetry: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        androidx.compose.material3.Icon(
+            imageVector = androidx.compose.material.icons.Icons.Rounded.ErrorOutline,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.error,
+        )
+        Spacer(Modifier.height(Spacing.md))
         Text(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.error,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        Spacer(Modifier.height(Spacing.md))
+        Spacer(Modifier.height(Spacing.lg))
         AppButton(
             text = stringResource(R.string.update_retry),
             onClick = onRetry,
-            variant = AppButtonVariant.Outlined,
+            variant = AppButtonVariant.Filled,
+            buttonColor = AppButtonColor.Error,
+            enabled = true,
         )
     }
 }
@@ -739,6 +755,8 @@ private fun HistoryItem(
                             text = stringResource(R.string.update_download_now),
                             onClick = { viewModel.download(release) },
                             modifier = Modifier.weight(1f),
+                            variant = AppButtonVariant.Filled,
+                            buttonColor = AppButtonColor.Primary,
                             size = com.mini.me_core.core.theme.components.AppButtonSize.Small,
                         )
                     }
@@ -746,7 +764,8 @@ private fun HistoryItem(
                         text = stringResource(R.string.update_open_browser),
                         onClick = { viewModel.openInBrowser(release) },
                         modifier = Modifier.weight(1f),
-                        variant = AppButtonVariant.Outlined,
+                        variant = AppButtonVariant.Tonal,
+                        buttonColor = AppButtonColor.Neutral,
                         size = com.mini.me_core.core.theme.components.AppButtonSize.Small,
                     )
                 }

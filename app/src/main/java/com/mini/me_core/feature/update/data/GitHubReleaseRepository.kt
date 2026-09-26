@@ -73,6 +73,16 @@ class GitHubReleaseRepository @Inject constructor(
             "https://api.github.com/repos/Lisir2002/MiniMe-core/releases/latest"
         const val API_LIST =
             "https://api.github.com/repos/Lisir2002/MiniMe-core/releases?per_page=30"
+
+        /**
+         * 下载/API 镜像站备用线路（按优先级排序）。
+         * 直连失败后依次尝试，ghproxy 类镜像通过前缀代理原始 URL。
+         */
+        val MIRROR_PREFIXES = listOf(
+            "https://gh-proxy.com/",
+            "https://ghproxy.net/",
+            "https://mirror.ghproxy.com/",
+        )
     }
 
     private val _availability = MutableStateFlow<UpdateAvailability>(UpdateAvailability.Idle)
@@ -208,32 +218,55 @@ class GitHubReleaseRepository @Inject constructor(
     private fun iso(epochMs: Long): String =
         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date(epochMs))
 
-    // ── JSON 解析 ─────────────────────────────────────────────────────
+    // ── JSON 解析（带镜像站备用线路）──────────────────────────────────
 
-    private fun requestRelease(url: String): ReleaseInfo {
-        val req = Request.Builder()
-            .url(url)
-            .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "MiniMe-core-UpdateChecker")
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) error("HTTP ${resp.code}")
-            val body = resp.body?.string().orEmpty()
-            return ReleaseJsonParser.parseOne(body)
-        }
-    }
+    private fun requestRelease(url: String): ReleaseInfo =
+        requestWithMirrors(url) { body -> ReleaseJsonParser.parseOne(body) }
 
-    private fun requestReleaseList(url: String): List<ReleaseInfo> {
-        val req = Request.Builder()
-            .url(url)
-            .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "MiniMe-core-UpdateChecker")
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) error("HTTP ${resp.code}")
-            val body = resp.body?.string().orEmpty()
-            return ReleaseJsonParser.parseList(body)
+    private fun requestReleaseList(url: String): List<ReleaseInfo> =
+        requestWithMirrors(url) { body -> ReleaseJsonParser.parseList(body) }
+
+    /**
+     * 带镜像站备用线路的 HTTP 请求。
+     * 先直连原始 URL，失败后依次尝试 [MIRROR_PREFIXES] 中的镜像前缀，全部失败才抛异常。
+     * 镜像站可能返回 HTML 错误页，校验 Content-Type 为 JSON 才解析，否则继续下一个。
+     */
+    private fun <T> requestWithMirrors(originalUrl: String, parser: (String) -> T): T {
+        val urls = buildList {
+            add(originalUrl)
+            addAll(MIRROR_PREFIXES.map { prefix -> prefix + originalUrl })
         }
+        var lastError: Throwable? = null
+        urls.forEachIndexed { index, url ->
+            val label = if (index == 0) "直连" else "镜像${MIRROR_PREFIXES[index - 1]}"
+            runCatching {
+                val req = Request.Builder()
+                    .url(url)
+                    .header("Accept", "application/vnd.github+json")
+                    .header("User-Agent", "MiniMe-core-UpdateChecker")
+                    .build()
+                client.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) error("HTTP ${resp.code}")
+                    val contentType = resp.header("Content-Type").orEmpty()
+                    val body = resp.body?.string().orEmpty()
+                    // 镜像站可能返回 HTML 错误页，校验为 JSON 才解析
+                    if (!contentType.contains("json", ignoreCase = true) &&
+                        !body.trimStart().startsWith("{") && !body.trimStart().startsWith("[")
+                    ) {
+                        error("非 JSON 响应（Content-Type=$contentType），可能是镜像站错误页")
+                    }
+                    return parser(body)
+                }
+            }.onFailure { e ->
+                lastError = e
+                if (index == 0) {
+                    FileLogger.i(TAG, "直连失败，切换镜像: ${e.message}")
+                } else if (index < urls.size - 1) {
+                    FileLogger.i(TAG, "$label 失败，切换下一个镜像: ${e.message}")
+                }
+            }
+        }
+        throw lastError ?: IllegalStateException("所有线路均失败")
     }
 
     // ── 下载 ─────────────────────────────────────────────────────────
@@ -247,64 +280,87 @@ class GitHubReleaseRepository @Inject constructor(
         release: ReleaseInfo,
         onProgress: (DownloadProgress) -> Unit,
     ): String = withContext(Dispatchers.IO) {
-        val url = release.downloadUrl ?: error("no apk asset")
+        val originalUrl = release.downloadUrl ?: error("no apk asset")
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
             ?: context.filesDir
         val fileName = "MiniMe-core-${release.versionName}.apk"
         val targetFile = File(dir, fileName)
         val filePath = targetFile.absolutePath
 
-        val req = Request.Builder().url(url).build()
-        val call = client.newCall(req)
-        activeCall.set(call)
-        try {
-            call.execute().use { resp ->
-                if (!resp.isSuccessful) error("HTTP ${resp.code}")
-                val body = resp.body ?: error("empty body")
-                val contentLength = body.contentLength()
-                val source = body.source()
-                val sink = targetFile.sink().buffer()
-                var totalRead = 0L
-                val buffer = okio.Buffer()
-                var lastPct = -1
-                var lastTickMs = System.currentTimeMillis()
-                var lastTickBytes = 0L
-                var currentSpeed = 0L
-
-                while (true) {
-                    if (call.isCanceled()) error("download cancelled")
-                    val read = source.read(buffer, 8192L)
-                    if (read == -1L) break
-                    sink.write(buffer, read)
-                    totalRead += read
-                    val pct = if (contentLength > 0) {
-                        ((totalRead * 100) / contentLength).toInt()
-                    } else 0
-
-                    val now = System.currentTimeMillis()
-                    val elapsed = now - lastTickMs
-                    if (elapsed >= 200L) {
-                        val delta = totalRead - lastTickBytes
-                        currentSpeed = if (elapsed > 0) (delta * 1000L) / elapsed else 0L
-                        lastTickMs = now
-                        lastTickBytes = totalRead
-                    }
-
-                    if (pct != lastPct) {
-                        lastPct = pct
-                        onProgress(DownloadProgress(pct, totalRead, contentLength, currentSpeed, filePath))
-                    }
-                }
-                sink.close()
-                source.close()
-                if (contentLength > 0) {
-                    onProgress(DownloadProgress(100, contentLength, contentLength, 0L, filePath))
-                }
-                filePath
-            }
-        } finally {
-            activeCall.compareAndSet(call, null)
+        // 构建下载 URL 列表：直连 + 镜像站备用线路
+        val downloadUrls = buildList {
+            add(originalUrl)
+            addAll(MIRROR_PREFIXES.map { prefix -> prefix + originalUrl })
         }
+
+        var lastError: Throwable? = null
+        downloadUrls.forEachIndexed { index, url ->
+            val label = if (index == 0) "直连" else "镜像${MIRROR_PREFIXES[index - 1]}"
+            runCatching {
+                val req = Request.Builder().url(url).build()
+                val call = client.newCall(req)
+                activeCall.set(call)
+                try {
+                    call.execute().use { resp ->
+                        if (!resp.isSuccessful) error("HTTP ${resp.code}")
+                        val body = resp.body ?: error("empty body")
+                        val contentLength = body.contentLength()
+                        val source = body.source()
+                        val sink = targetFile.sink().buffer()
+                        var totalRead = 0L
+                        val buffer = okio.Buffer()
+                        var lastPct = -1
+                        var lastTickMs = System.currentTimeMillis()
+                        var lastTickBytes = 0L
+                        var currentSpeed = 0L
+
+                        while (true) {
+                            if (call.isCanceled()) error("download cancelled")
+                            val read = source.read(buffer, 8192L)
+                            if (read == -1L) break
+                            sink.write(buffer, read)
+                            totalRead += read
+                            val pct = if (contentLength > 0) {
+                                ((totalRead * 100) / contentLength).toInt()
+                            } else 0
+
+                            val now = System.currentTimeMillis()
+                            val elapsed = now - lastTickMs
+                            if (elapsed >= 200L) {
+                                val delta = totalRead - lastTickBytes
+                                currentSpeed = if (elapsed > 0) (delta * 1000L) / elapsed else 0L
+                                lastTickMs = now
+                                lastTickBytes = totalRead
+                            }
+
+                            if (pct != lastPct) {
+                                lastPct = pct
+                                onProgress(DownloadProgress(pct, totalRead, contentLength, currentSpeed, filePath))
+                            }
+                        }
+                        sink.close()
+                        source.close()
+                        if (contentLength > 0) {
+                            onProgress(DownloadProgress(100, contentLength, contentLength, 0L, filePath))
+                        }
+                        return@withContext filePath
+                    }
+                } finally {
+                    activeCall.compareAndSet(call, null)
+                }
+            }.onFailure { e ->
+                lastError = e
+                if (e.message == "download cancelled") throw e
+                // 删除不完整的下载文件，避免下次恢复时混淆
+                targetFile.delete()
+                if (index == 0) {
+                    FileLogger.i(TAG, "下载直连失败，切换镜像: ${e.message}")
+                } else if (index < downloadUrls.size - 1) {
+                    FileLogger.i(TAG, "下载$label 失败，切换下一个镜像: ${e.message}")
+                }
+            }
+        }
+        throw lastError ?: IllegalStateException("所有下载线路均失败")
     }
 
     /** 取消当前下载（若无进行中下载则无操作）。 */
