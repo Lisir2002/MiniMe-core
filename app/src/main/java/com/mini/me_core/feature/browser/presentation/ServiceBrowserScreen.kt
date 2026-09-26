@@ -213,6 +213,8 @@ fun ServiceBrowserScreen(
     val pendingTakeover by takeoverManager.pending.collectAsStateWithLifecycle()
     val downloads by browserController.downloads.collectAsStateWithLifecycle()
     val activeDownloadCount by browserController.activeDownloadCount.collectAsStateWithLifecycle()
+    val pendingDownload by browserController.pendingDownload.collectAsStateWithLifecycle()
+    val dialogDownloadId by browserController.dialogDownloadId.collectAsStateWithLifecycle()
 
     // F4.3 密码管理器（在现有加密凭据存储之上）
     val passwordManager = remember(credentialStore) {
@@ -693,6 +695,56 @@ fun ServiceBrowserScreen(
                 }
             }
         )
+    }
+
+    // ── 通用下载确认弹窗（WebView 触发下载） ──
+    pendingDownload?.let { pd ->
+        com.mini.me_core.core.download.DownloadConfirmDialog(
+            fileName = pd.fileName,
+            fileSizeText = null,
+            sourceUrl = pd.url,
+            onConfirm = { browserController.confirmPendingDownload() },
+            onDismiss = { browserController.cancelPendingDownload() },
+        )
+    }
+
+    // ── 通用下载进度弹窗 ──
+    dialogDownloadId?.let { id ->
+        val dl = downloads.firstOrNull { it.id == id }
+        if (dl != null) {
+            val status = when (dl.status) {
+                "downloading" -> com.mini.me_core.core.download.DownloadStatus.DOWNLOADING
+                "done" -> com.mini.me_core.core.download.DownloadStatus.COMPLETED
+                "error" -> com.mini.me_core.core.download.DownloadStatus.FAILED
+                "cancelled" -> com.mini.me_core.core.download.DownloadStatus.CANCELLED
+                else -> com.mini.me_core.core.download.DownloadStatus.DOWNLOADING
+            }
+            com.mini.me_core.core.download.DownloadProgressDialog(
+                task = com.mini.me_core.core.download.DownloadTask(
+                    id = dl.id,
+                    title = dl.fileName,
+                    url = dl.url,
+                    totalBytes = dl.totalBytes,
+                    downloadedBytes = dl.downloadedBytes,
+                    speedBytesPerSec = dl.speedBps,
+                    status = status,
+                    errorMessage = dl.error.ifBlank { null },
+                    localPath = dl.path.ifBlank { null },
+                ),
+                onCancel = {
+                    browserController.cancelDownload(dl.id)
+                    browserController.dismissDialogDownload()
+                },
+                onOpen = {
+                    openDownload(dl)
+                    browserController.dismissDialogDownload()
+                },
+                onRetry = {
+                    browserController.retryDownload(dl)
+                },
+                onDismiss = { browserController.dismissDialogDownload() },
+            )
+        }
     }
 
     // ── 历史记录面板（BottomSheet） ──

@@ -1684,6 +1684,14 @@
     <string name="about_contributing_entry">贡献指南</string>
     <string name="about_share_text_fallback">MiniMe-core - Android 上的 AI 代码编辑器</string>
 
+    <!-- About - 本地法律文档查看 -->
+    <string name="about_legal_title">法律信息</string>
+    <string name="about_user_agreement_desc">软件使用条款与免责声明</string>
+    <string name="about_privacy_policy_desc">数据收集、使用与保护说明</string>
+    <string name="about_open_source_license">开源协议</string>
+    <string name="about_open_source_license_desc">GNU General Public License v3.0</string>
+    <string name="doc_viewer_error">文档加载失败，请稍后重试</string>
+
     <!-- About - 核心组件交互 -->
     <string name="about_terminal_not_ready_title">终端容器未初始化</string>
     <string name="about_terminal_not_ready_msg">终端容器尚未安装，前往设置初始化？</string>
@@ -2686,4 +2694,21 @@
     <string name="viewer_search">搜索</string>
     <string name="viewer_outline">大纲</string>
     <string name="viewer_error">错误: %1$s</string>
+
+    <!-- 通用下载组件 -->
+    <string name="download_confirm_title">确认下载</string>
+    <string name="download_confirm_message">文件：%1$s\n大小：%2$s\n来源：%3$s</string>
+    <string name="download_confirm_button">确认下载</string>
+    <string name="download_progress_title">正在下载</string>
+    <string name="download_progress_speed">%1$s/s</string>
+    <string name="download_progress_remaining">剩余约 %1$s</string>
+    <string name="download_progress_cancel">取消下载</string>
+    <string name="download_completed_title">下载完成</string>
+    <string name="download_completed_open">打开文件</string>
+    <string name="download_failed_title">下载失败</string>
+    <string name="download_failed_retry">重试</string>
+    <string name="download_size_unknown">未知</string>
+    <string name="download_close">关闭</string>
+    <string name="download_indeterminate">正在下载，请稍候…</string>
+    <string name="download_confirm_size_unknown">未知大小</string>
 </resources>

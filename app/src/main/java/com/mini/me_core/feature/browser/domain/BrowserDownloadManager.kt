@@ -59,6 +59,19 @@ class BrowserDownloadManager @Inject constructor(
     private val _activeCount = MutableStateFlow(0)
     val activeCount: StateFlow<Int> = _activeCount.asStateFlow()
 
+    /** 待确认下载的临时信息（WebView 触发下载后先弹确认框）。 */
+    private val _pendingDownload = MutableStateFlow<PendingBrowserDownload?>(null)
+    val pendingDownload: StateFlow<PendingBrowserDownload?> = _pendingDownload.asStateFlow()
+
+    /** 需要在进度弹窗中展示的下载任务 ID（确认下载后设置）。 */
+    private val _dialogDownloadId = MutableStateFlow<String?>(null)
+    val dialogDownloadId: StateFlow<String?> = _dialogDownloadId.asStateFlow()
+
+    /** 暂存 WebView 下载回调参数，待用户确认后使用。 */
+    private var pendingUserAgent: String? = null
+    private var pendingContentDisposition: String? = null
+    private var pendingMimetype: String? = null
+
     /** 在途任务的控制句柄（Call + 暂停标记）。 */
     private class JobControl(
         val call: okhttp3.Call,
@@ -94,9 +107,45 @@ class BrowserDownloadManager @Inject constructor(
             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
     }
 
-    /** 入队一个新下载（WebView setDownloadListener 回调）。 */
+    /** 入队一个新下载（WebView setDownloadListener 回调）。
+     *  先弹出确认弹窗，用户确认后才真正开始下载。 */
     fun enqueue(url: String, userAgent: String?, contentDisposition: String?, mimetype: String?) {
-        scope.launch { startDownload(url, userAgent, contentDisposition, mimetype, resumeFrom = 0L, existingId = null) }
+        val fileName = URLUtil.guessFileName(url, contentDisposition, mimetype)
+        pendingUserAgent = userAgent
+        pendingContentDisposition = contentDisposition
+        pendingMimetype = mimetype
+        _pendingDownload.value = PendingBrowserDownload(
+            url = url,
+            fileName = fileName,
+            mimetype = mimetype,
+        )
+    }
+
+    /** 用户在确认弹窗点击「确认下载」。 */
+    fun confirmPendingDownload() {
+        val pending = _pendingDownload.value ?: return
+        _pendingDownload.value = null
+        val newId = UUID.randomUUID().toString()
+        _dialogDownloadId.value = newId
+        scope.launch {
+            startDownload(pending.url, pendingUserAgent, pendingContentDisposition, pendingMimetype, resumeFrom = 0L, existingId = newId)
+        }
+        pendingUserAgent = null
+        pendingContentDisposition = null
+        pendingMimetype = null
+    }
+
+    /** 用户在确认弹窗点击「取消」。 */
+    fun cancelPendingDownload() {
+        _pendingDownload.value = null
+        pendingUserAgent = null
+        pendingContentDisposition = null
+        pendingMimetype = null
+    }
+
+    /** 关闭进度弹窗（清除 dialogDownloadId）。 */
+    fun dismissDialogDownload() {
+        _dialogDownloadId.value = null
     }
 
     /** 暂停下载：取消当前请求，保留分片。 */

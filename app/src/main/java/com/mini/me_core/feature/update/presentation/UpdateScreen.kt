@@ -173,6 +173,69 @@ fun UpdateScreen(
             }
         }
     }
+
+    // ── 通用下载确认弹窗 ──
+    state.pendingConfirmRelease?.let { release ->
+        com.mini.me_core.core.download.DownloadConfirmDialog(
+            fileName = "MiniMe-core-${release.versionName}.apk",
+            fileSizeText = release.fileSizeBytes.takeIf { it > 0L }?.let { viewModel.formatSize(it) },
+            sourceUrl = release.downloadUrl ?: release.htmlUrl,
+            onConfirm = { viewModel.confirmDownload() },
+            onDismiss = { viewModel.dismissConfirm() },
+        )
+    }
+
+    // ── 通用下载进度弹窗 ──
+    when (val dl = state.download) {
+        is DownloadUiState.Downloading -> {
+            val p = dl.progress
+            com.mini.me_core.core.download.DownloadProgressDialog(
+                task = com.mini.me_core.core.download.DownloadTask(
+                    id = "apk",
+                    title = p.filePath.substringAfterLast('/'),
+                    url = state.pendingConfirmRelease?.downloadUrl ?: "",
+                    totalBytes = p.totalBytes,
+                    downloadedBytes = p.downloadedBytes,
+                    speedBytesPerSec = p.speedBytesPerSec,
+                    status = com.mini.me_core.core.download.DownloadStatus.DOWNLOADING,
+                    localPath = p.filePath,
+                ),
+                onCancel = { viewModel.cancelDownload() },
+                onDismiss = { viewModel.cancelDownload() },
+            )
+        }
+        is DownloadUiState.Done -> {
+            com.mini.me_core.core.download.DownloadProgressDialog(
+                task = com.mini.me_core.core.download.DownloadTask(
+                    id = "apk",
+                    title = dl.filePath.substringAfterLast('/'),
+                    url = "",
+                    totalBytes = dl.fileSize,
+                    downloadedBytes = dl.fileSize,
+                    status = com.mini.me_core.core.download.DownloadStatus.COMPLETED,
+                    localPath = dl.filePath,
+                ),
+                onCancel = {},
+                onOpen = { viewModel.install(dl.filePath) },
+                onDismiss = { viewModel.dismissDownload() },
+            )
+        }
+        is DownloadUiState.Failed -> {
+            com.mini.me_core.core.download.DownloadProgressDialog(
+                task = com.mini.me_core.core.download.DownloadTask(
+                    id = "apk",
+                    title = "MiniMe-core APK",
+                    url = "",
+                    status = com.mini.me_core.core.download.DownloadStatus.FAILED,
+                    errorMessage = dl.message,
+                ),
+                onCancel = {},
+                onRetry = { state.latest?.let { viewModel.requestDownload(it) } },
+                onDismiss = { viewModel.dismissDownload() },
+            )
+        }
+        else -> {}
+    }
 }
 
 // ============================================================
@@ -200,25 +263,6 @@ private fun LatestTab(
 
         // 状态卡
         LatestStatusCard(state = state, viewModel = viewModel)
-
-        // 下载进度（页面内，非弹窗）
-        if (state.download is DownloadUiState.Downloading) {
-            DownloadingCard(
-                state = state.download,
-                viewModel = viewModel,
-                onCancel = viewModel::cancelDownload,
-            )
-        } else if (state.download is DownloadUiState.Done) {
-            DownloadDoneCard(
-                state = state.download,
-                onInstall = { viewModel.install(state.downloadedFilePath ?: (state.download as DownloadUiState.Done).filePath) },
-            )
-        } else if (state.download is DownloadUiState.Failed) {
-            DownloadFailedCard(
-                state = state.download,
-                onRetry = { state.latest?.let { viewModel.download(it) } },
-            )
-        }
 
         // 详情卡
         state.latest?.let { latest ->
@@ -400,7 +444,7 @@ private fun DetailCard(
                 if (state.hasUpdate && release.hasApk) {
                     AppButton(
                         text = stringResource(R.string.update_download_now),
-                        onClick = { viewModel.download(release) },
+                        onClick = { viewModel.requestDownload(release) },
                         modifier = Modifier.weight(1f),
                         buttonColor = AppButtonColor.Primary,
                     )
@@ -430,138 +474,6 @@ private fun MetaChip(text: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
         )
-    }
-}
-
-@Composable
-private fun DownloadingCard(
-    state: DownloadUiState.Downloading,
-    viewModel: UpdateViewModel,
-    onCancel: () -> Unit,
-) {
-    val p = state.progress
-    AppCard {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.md),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = stringResource(R.string.update_downloading, p.percent),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                if (p.speedBytesPerSec > 0) {
-                    Text(
-                        text = stringResource(
-                            R.string.update_download_speed,
-                            viewModel.formatSize(p.speedBytesPerSec),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            LinearProgressIndicator(
-                progress = { (p.percent.coerceIn(0, 100)) / 100f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.small),
-            )
-            Text(
-                text = stringResource(
-                    R.string.update_download_progress_detail,
-                    viewModel.formatSize(p.downloadedBytes),
-                    if (p.totalBytes > 0) viewModel.formatSize(p.totalBytes) else stringResource(R.string.update_size_unknown),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                AppButton(
-                    text = stringResource(R.string.update_cancel),
-                    onClick = onCancel,
-                    variant = AppButtonVariant.Text,
-                    buttonColor = AppButtonColor.Error,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DownloadDoneCard(
-    state: DownloadUiState.Done,
-    onInstall: () -> Unit,
-) {
-    AppCard {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.Rounded.CheckCircle,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.tertiary,
-            )
-            Spacer(Modifier.width(Spacing.sm))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.update_downloaded_to),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            AppButton(
-                text = stringResource(R.string.update_install),
-                onClick = onInstall,
-                buttonColor = AppButtonColor.Success,
-            )
-        }
-    }
-}
-
-@Composable
-private fun DownloadFailedCard(
-    state: DownloadUiState.Failed,
-    onRetry: () -> Unit,
-) {
-    AppCard {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.update_download_failed),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                Text(
-                    text = state.message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            AppButton(
-                text = stringResource(R.string.update_retry),
-                onClick = onRetry,
-                variant = AppButtonVariant.Filled,
-                buttonColor = AppButtonColor.Error,
-            )
-        }
     }
 }
 
@@ -753,7 +665,7 @@ private fun HistoryItem(
                     if (release.hasApk) {
                         AppButton(
                             text = stringResource(R.string.update_download_now),
-                            onClick = { viewModel.download(release) },
+                            onClick = { viewModel.requestDownload(release) },
                             modifier = Modifier.weight(1f),
                             variant = AppButtonVariant.Filled,
                             buttonColor = AppButtonColor.Primary,

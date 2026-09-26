@@ -1667,6 +1667,14 @@
     <string name="about_contributing_entry">Contributing Guide</string>
     <string name="about_share_text_fallback">MiniMe-core - AI code editor on Android</string>
 
+    <!-- About - Local legal document viewer -->
+    <string name="about_legal_title">Legal</string>
+    <string name="about_user_agreement_desc">Terms of use and disclaimer</string>
+    <string name="about_privacy_policy_desc">Data collection, usage and protection</string>
+    <string name="about_open_source_license">Open Source License</string>
+    <string name="about_open_source_license_desc">GNU General Public License v3.0</string>
+    <string name="doc_viewer_error">Failed to load document. Please try again later.</string>
+
     <!-- About - Core component interactions -->
     <string name="about_terminal_not_ready_title">Terminal Container Not Initialized</string>
     <string name="about_terminal_not_ready_msg">The terminal container is not installed yet. Go to settings to initialize it?</string>
@@ -2655,4 +2663,21 @@
     <string name="viewer_search">Search</string>
     <string name="viewer_outline">Outline</string>
     <string name="viewer_error">Error: %1$s</string>
+
+    <!-- Generic download components -->
+    <string name="download_confirm_title">Confirm Download</string>
+    <string name="download_confirm_message">File: %1$s\nSize: %2$s\nSource: %3$s</string>
+    <string name="download_confirm_button">Download</string>
+    <string name="download_progress_title">Downloading</string>
+    <string name="download_progress_speed">%1$s/s</string>
+    <string name="download_progress_remaining">About %1$s left</string>
+    <string name="download_progress_cancel">Cancel Download</string>
+    <string name="download_completed_title">Download Complete</string>
+    <string name="download_completed_open">Open File</string>
+    <string name="download_failed_title">Download Failed</string>
+    <string name="download_failed_retry">Retry</string>
+    <string name="download_size_unknown">Unknown</string>
+    <string name="download_close">Close</string>
+    <string name="download_indeterminate">Downloading, please wait…</string>
+    <string name="download_confirm_size_unknown">Unknown size</string>
 </resources>

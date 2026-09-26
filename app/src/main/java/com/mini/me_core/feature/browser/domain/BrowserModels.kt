@@ -130,6 +130,13 @@ data class BrowserDownloadInfo(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+/** WebView 触发下载后待用户确认的临时信息。 */
+data class PendingBrowserDownload(
+    val url: String,
+    val fileName: String,
+    val mimetype: String?,
+)
+
 /** 浏览器当前状态（UI 观察）。 */
 data class BrowserUiState(
     val currentUrl: String = "",

@@ -1364,6 +1364,12 @@ class BrowserController @Inject constructor(
     /** 未完成下载数（F4.2 底栏角标）。 */
     val activeDownloadCount: StateFlow<Int> = downloadManager.activeCount
 
+    /** 待确认下载（WebView 触发后弹确认框）。 */
+    val pendingDownload: StateFlow<com.mini.me_core.feature.browser.domain.PendingBrowserDownload?> = downloadManager.pendingDownload
+
+    /** 进度弹窗中展示的下载任务 ID。 */
+    val dialogDownloadId: StateFlow<String?> = downloadManager.dialogDownloadId
+
     private val _pendingDialog = MutableStateFlow<PendingBrowserDialog?>(null)
     val pendingDialog: StateFlow<PendingBrowserDialog?> = _pendingDialog.asStateFlow()
 
@@ -1506,6 +1512,15 @@ class BrowserController @Inject constructor(
 
     /** 重试下载（R1.2 / F4.2）：按原 URL 重新发起下载任务。 */
     fun retryDownload(info: BrowserDownloadInfo) = downloadManager.retry(info)
+
+    /** 用户确认下载（WebView 触发的下载确认弹窗）。 */
+    fun confirmPendingDownload() = downloadManager.confirmPendingDownload()
+
+    /** 用户取消下载确认弹窗。 */
+    fun cancelPendingDownload() = downloadManager.cancelPendingDownload()
+
+    /** 关闭下载进度弹窗。 */
+    fun dismissDialogDownload() = downloadManager.dismissDialogDownload()
 
     /**
      * 无痕模式（R1.3 无痕模式）：会话级开关。

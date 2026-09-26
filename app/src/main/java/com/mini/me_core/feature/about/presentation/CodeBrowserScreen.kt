@@ -103,7 +103,7 @@ fun CodeBrowserScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.downloadZip() }) {
+                    IconButton(onClick = { viewModel.requestDownloadZip() }) {
                         Icon(Icons.Rounded.FolderZip, contentDescription = stringResource(R.string.code_browser_download))
                     }
                 },
@@ -115,22 +115,6 @@ fun CodeBrowserScreen(
                 .padding(padding)
                 .fillMaxSize(),
         ) {
-            // 下载进度条
-            ui.zipDownload?.let { zip ->
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    LinearProgressIndicator(
-                        progress = { zip.percent / 100f },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(R.string.code_browser_downloading, zip.percent),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
             // 面包屑
             BreadcrumbRow(
                 pathStack = ui.pathStack,
@@ -187,27 +171,62 @@ fun CodeBrowserScreen(
         }
     }
 
-    // 下载完成 -> 打开/分享/取消
+    // ── 通用下载确认弹窗 ──
+    if (ui.showDownloadConfirm) {
+        com.mini.me_core.core.download.DownloadConfirmDialog(
+            fileName = "${ui.repo}-${ui.branch}.zip",
+            fileSizeText = null,
+            sourceUrl = "https://github.com/${ui.owner}/${ui.repo}/archive/refs/heads/${ui.branch}.zip",
+            onConfirm = { viewModel.confirmDownloadZip() },
+            onDismiss = { viewModel.dismissDownloadConfirm() },
+        )
+    }
+
+    // ── 通用下载进度弹窗 ──
+    ui.zipDownload?.let { zip ->
+        com.mini.me_core.core.download.DownloadProgressDialog(
+            task = com.mini.me_core.core.download.DownloadTask(
+                id = "repo-zip",
+                title = "${ui.repo}-${ui.branch}.zip",
+                url = "https://github.com/${ui.owner}/${ui.repo}/archive/refs/heads/${ui.branch}.zip",
+                totalBytes = zip.totalBytes,
+                downloadedBytes = zip.downloadedBytes,
+                speedBytesPerSec = zip.speedBytesPerSec,
+                status = com.mini.me_core.core.download.DownloadStatus.DOWNLOADING,
+            ),
+            onCancel = { viewModel.dismissDownloadResult() },
+            onDismiss = { viewModel.dismissDownloadResult() },
+        )
+    }
     ui.zipReadyPath?.let { path ->
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissZipReady() },
-            title = { Text(stringResource(R.string.code_browser_download_done)) },
-            text = { Text(File(path).name) },
-            confirmButton = {
-                TextButton(onClick = {
-                    openFile(context, path)
-                    viewModel.dismissZipReady()
-                }) { Text(stringResource(R.string.code_browser_open)) }
+        com.mini.me_core.core.download.DownloadProgressDialog(
+            task = com.mini.me_core.core.download.DownloadTask(
+                id = "repo-zip",
+                title = File(path).name,
+                url = "",
+                status = com.mini.me_core.core.download.DownloadStatus.COMPLETED,
+                localPath = path,
+            ),
+            onCancel = {},
+            onOpen = {
+                openFile(context, path)
+                viewModel.dismissDownloadResult()
             },
-            dismissButton = {
-                Row {
-                    TextButton(onClick = {
-                        shareFile(context, path)
-                        viewModel.dismissZipReady()
-                    }) { Text(stringResource(R.string.code_browser_share)) }
-                    TextButton(onClick = { viewModel.dismissZipReady() }) { Text(stringResource(R.string.common_cancel)) }
-                }
-            },
+            onDismiss = { viewModel.dismissDownloadResult() },
+        )
+    }
+    ui.zipDownloadError?.let { err ->
+        com.mini.me_core.core.download.DownloadProgressDialog(
+            task = com.mini.me_core.core.download.DownloadTask(
+                id = "repo-zip",
+                title = "${ui.repo}-${ui.branch}.zip",
+                url = "",
+                status = com.mini.me_core.core.download.DownloadStatus.FAILED,
+                errorMessage = err,
+            ),
+            onCancel = {},
+            onRetry = { viewModel.confirmDownloadZip() },
+            onDismiss = { viewModel.dismissDownloadResult() },
         )
     }
 }

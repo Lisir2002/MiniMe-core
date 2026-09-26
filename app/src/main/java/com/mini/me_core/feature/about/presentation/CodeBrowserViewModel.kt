@@ -25,10 +25,14 @@ data class CodeBrowserUiState(
     val pathStack: List<String> = listOf(""),
     /** 正在打开的本地临时文件路径（非空时触发 CodeViewer）。 */
     val openingLocalPath: String? = null,
-    /** 下载 zip 进度；null 表示未在下载。 */
+    /** 正在下载 zip 进度；null 表示未在下载。 */
     val zipDownload: ZipDownloadUi? = null,
-    /** 下载完成的 zip 路径；非空时弹出操作菜单。 */
+    /** 下载完成的 zip 路径；非空时由进度弹窗显示「下载完成」。 */
     val zipReadyPath: String? = null,
+    /** 下载失败的错误信息；非空时由进度弹窗显示「下载失败」。 */
+    val zipDownloadError: String? = null,
+    /** 是否弹出下载确认弹窗。 */
+    val showDownloadConfirm: Boolean = false,
 )
 
 data class ZipDownloadUi(
@@ -115,9 +119,31 @@ class CodeBrowserViewModel @Inject constructor(
         _ui.value = _ui.value.copy(openingLocalPath = null)
     }
 
-    fun downloadZip() {
+    /** 点击下载按钮：先弹出确认弹窗，不直接开始下载。 */
+    fun requestDownloadZip() {
         if (_ui.value.zipDownload != null) return
+        _ui.value = _ui.value.copy(showDownloadConfirm = true)
+    }
+
+    /** 确认弹窗点击「确认下载」后调用。 */
+    fun confirmDownloadZip() {
+        _ui.value = _ui.value.copy(showDownloadConfirm = false)
+        startZipDownload()
+    }
+
+    /** 取消确认弹窗。 */
+    fun dismissDownloadConfirm() {
+        _ui.value = _ui.value.copy(showDownloadConfirm = false)
+    }
+
+    /** 关闭进度弹窗（完成/失败后点「关闭」）。 */
+    fun dismissDownloadResult() {
+        _ui.value = _ui.value.copy(zipReadyPath = null, zipDownloadError = null, zipDownload = null)
+    }
+
+    private fun startZipDownload() {
         viewModelScope.launch {
+            _ui.value = _ui.value.copy(zipDownloadError = null)
             runCatching {
                 repo.downloadRepoZip(_ui.value.owner, _ui.value.repo, _ui.value.branch) { p: SourceDownloadProgress ->
                     _ui.value = _ui.value.copy(
@@ -127,7 +153,7 @@ class CodeBrowserViewModel @Inject constructor(
             }.onSuccess { path ->
                 _ui.value = _ui.value.copy(zipDownload = null, zipReadyPath = path)
             }.onFailure { e ->
-                _ui.value = _ui.value.copy(zipDownload = null, error = e.message ?: "download failed")
+                _ui.value = _ui.value.copy(zipDownload = null, zipDownloadError = e.message ?: "download failed")
             }
         }
     }

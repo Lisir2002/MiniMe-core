@@ -44,6 +44,8 @@ data class UpdateUiState(
     val showPrerelease: Boolean = false,
     val autoCheck: Boolean = true,
     val download: DownloadUiState = DownloadUiState.Idle,
+    /** 待确认下载的 Release（非空时弹出 DownloadConfirmDialog）。 */
+    val pendingConfirmRelease: ReleaseInfo? = null,
     /** 历史列表中展开完整日志的条目 tag。 */
     val expandedTag: String? = null,
     /** 最近下载完成的文件路径（用于历史条目各自展示安装按钮）。 */
@@ -169,8 +171,30 @@ class UpdateViewModel @Inject constructor(
 
     // ── 下载 ─────────────────────────────────────────────────────────
 
-    fun download(release: ReleaseInfo) {
+    /** 点击「立即下载」：先弹出确认弹窗，不直接开始下载。 */
+    fun requestDownload(release: ReleaseInfo) {
         if (_state.value.download is DownloadUiState.Downloading) return
+        _state.update { it.copy(pendingConfirmRelease = release) }
+    }
+
+    /** 确认弹窗点击「确认下载」后调用：开始实际下载。 */
+    fun confirmDownload() {
+        val release = _state.value.pendingConfirmRelease ?: return
+        _state.update { it.copy(pendingConfirmRelease = null) }
+        startDownload(release)
+    }
+
+    /** 取消确认弹窗。 */
+    fun dismissConfirm() {
+        _state.update { it.copy(pendingConfirmRelease = null) }
+    }
+
+    /** 关闭进度弹窗（下载完成/失败后点「关闭」）。 */
+    fun dismissDownload() {
+        _state.update { it.copy(download = DownloadUiState.Idle) }
+    }
+
+    private fun startDownload(release: ReleaseInfo) {
         downloadJob?.cancel()
         downloadJob = viewModelScope.launch {
             _state.update { it.copy(download = DownloadUiState.Idle) }

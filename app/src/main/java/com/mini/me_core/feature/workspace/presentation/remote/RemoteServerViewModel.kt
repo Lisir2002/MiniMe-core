@@ -109,16 +109,33 @@ class RemoteServerViewModel @Inject constructor(
     }
 
     fun forceDownloadMount(id: String) {
+        // 先弹出确认弹窗，不直接开始下载
+        val mount = _uiState.value.mounts.firstOrNull { it.id == id } ?: return
+        _uiState.value = _uiState.value.copy(pendingDownloadMount = mount)
+    }
+
+    fun confirmDownloadMount() {
+        val mount = _uiState.value.pendingDownloadMount ?: return
+        _uiState.value = _uiState.value.copy(pendingDownloadMount = null, isDownloading = true, downloadResult = null)
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            val result = repository.forceDownloadMount(id)
-            _uiState.value = _uiState.value.copy(isLoading = false)
+            val result = repository.forceDownloadMount(mount.id)
+            _uiState.value = _uiState.value.copy(isDownloading = false)
             if (result.isFailure) {
-                _uiState.value = _uiState.value.copy(error = context.getString(R.string.remote_download_all_failed, result.exceptionOrNull()?.message))
+                _uiState.value = _uiState.value.copy(
+                    downloadResult = context.getString(R.string.remote_download_all_failed, result.exceptionOrNull()?.message)
+                )
             } else {
-                _uiState.value = _uiState.value.copy(error = context.getString(R.string.remote_download_all_success))
+                _uiState.value = _uiState.value.copy(downloadResult = context.getString(R.string.remote_download_all_success))
             }
         }
+    }
+
+    fun dismissDownloadConfirm() {
+        _uiState.value = _uiState.value.copy(pendingDownloadMount = null)
+    }
+
+    fun dismissDownloadResult() {
+        _uiState.value = _uiState.value.copy(downloadResult = null)
     }
 
     fun deleteConnection(id: String) {
@@ -287,5 +304,11 @@ data class RemoteServerUiState(
     val workspaces: List<Workspace> = emptyList(),
     val failedMountIds: Set<String> = emptySet(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    /** 待确认下载的挂载点（非空时弹出确认弹窗）。 */
+    val pendingDownloadMount: RemoteMount? = null,
+    /** 是否正在下载远程工作区（显示不确定进度弹窗）。 */
+    val isDownloading: Boolean = false,
+    /** 下载完成/失败结果消息（非空时由进度弹窗显示）。 */
+    val downloadResult: String? = null,
 )

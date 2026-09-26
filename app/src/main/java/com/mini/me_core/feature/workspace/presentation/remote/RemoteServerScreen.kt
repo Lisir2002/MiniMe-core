@@ -223,4 +223,48 @@ fun RemoteServerScreen(
         }
     }
 
+    // ── 通用下载确认弹窗（远程工作区全量拉取） ──
+    uiState.pendingDownloadMount?.let { mount ->
+        com.mini.me_core.core.download.DownloadConfirmDialog(
+            fileName = mount.remotePath.substringAfterLast('/').ifEmpty { mount.remotePath },
+            fileSizeText = null,
+            sourceUrl = "remote:${mount.remotePath}",
+            onConfirm = { viewModel.confirmDownloadMount() },
+            onDismiss = { viewModel.dismissDownloadConfirm() },
+        )
+    }
+
+    // ── 通用下载进度弹窗（不确定进度，远程同步无逐文件回调） ──
+    if (uiState.isDownloading) {
+        com.mini.me_core.core.download.DownloadProgressDialog(
+            task = com.mini.me_core.core.download.DownloadTask(
+                id = "remote-sync",
+                title = uiState.pendingDownloadMount?.remotePath?.substringAfterLast('/') ?: "Remote Sync",
+                url = "",
+                totalBytes = -1,
+                status = com.mini.me_core.core.download.DownloadStatus.DOWNLOADING,
+            ),
+            onCancel = { viewModel.dismissDownloadResult() },
+            onDismiss = { viewModel.dismissDownloadResult() },
+        )
+    }
+
+    // ── 下载完成/失败结果 ──
+    uiState.downloadResult?.let { result ->
+        com.mini.me_core.core.download.DownloadProgressDialog(
+            task = com.mini.me_core.core.download.DownloadTask(
+                id = "remote-sync",
+                title = "Remote Sync",
+                url = "",
+                status = if (result.contains("成功"))
+                    com.mini.me_core.core.download.DownloadStatus.COMPLETED
+                else
+                    com.mini.me_core.core.download.DownloadStatus.FAILED,
+                errorMessage = result,
+            ),
+            onCancel = {},
+            onDismiss = { viewModel.dismissDownloadResult() },
+        )
+    }
+
 }
