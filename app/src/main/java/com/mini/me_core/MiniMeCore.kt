@@ -169,6 +169,10 @@ class MiniMeCore : Application() {
     @Inject
     lateinit var crashRecovery: com.mini.me_core.datalayer.engine.CrashRecovery
 
+    /** GitHub Releases 仓库：启动时后台静默检查新版本（结果用于关于页红点，不弹窗）。 */
+    @Inject
+    lateinit var updateRepository: com.mini.me_core.feature.update.data.GitHubReleaseRepository
+
     /** F6.2 内存监控：周期采样堆使用，>=80% 记录 GC 建议（仅 debug 真正采样）。 */
     @Inject
     lateinit var memoryMonitor: com.mini.me_core.core.performance.MemoryMonitor
@@ -276,6 +280,12 @@ class MiniMeCore : Application() {
             runCatching { modelMetadataService.refreshFromNetworkIfStale() }
                 .onFailure { FileLogger.w(TAG, "模型元数据刷新失败（兜底内置数据）", it) }
             FileLogger.v(TAG, "异步预热：模型元数据刷新完成")
+        }
+        // 启动静默检查更新（开关默认开，4h 缓存，失败静默不弹窗；结果驱动关于页红点）
+        appScope.launch {
+            runCatching {
+                updateRepository.silentCheckOnStartup(BuildConfig.VERSION_NAME)
+            }.onFailure { FileLogger.w(TAG, "启动静默检查更新失败（忽略）", it) }
         }
         // 三家 AI host 连接预热（DNS+TCP+TLS+HTTP2，降低首字延迟）
         appScope.launch {

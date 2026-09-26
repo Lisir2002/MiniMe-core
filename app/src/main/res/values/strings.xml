@@ -1596,6 +1596,43 @@
     <!-- About - Copyright -->
     <string name="about_copyright">© 2025 Lisir2002 · Made with ❤ for mobile developers</string>
 
+    <!-- Update (feature/update) -->
+    <string name="update_title">版本更新</string>
+    <string name="update_tab_latest">最新版本</string>
+    <string name="update_tab_history">历史版本</string>
+    <string name="update_refresh">检查更新</string>
+    <string name="update_checking">正在检查…</string>
+    <string name="update_up_to_date">已是最新版本</string>
+    <string name="update_up_to_date_detail">当前版本 v%1$s</string>
+    <string name="update_last_check">上次检查：%1$s</string>
+    <string name="update_new_version_found">发现新版本 v%1$s</string>
+    <string name="update_new_version_detail">v%1$s → v%2$s</string>
+    <string name="update_published_at_short">发布于 %1$s</string>
+    <string name="update_version">版本号</string>
+    <string name="update_apk_size">APK 大小</string>
+    <string name="update_release_notes">更新日志</string>
+    <string name="update_download_now">立即下载</string>
+    <string name="update_open_browser">浏览器打开</string>
+    <string name="update_install">安装</string>
+    <string name="update_cancel">取消</string>
+    <string name="update_retry">重试</string>
+    <string name="update_download_failed">下载失败</string>
+    <string name="update_install_failed">安装失败，请手动打开文件安装</string>
+    <string name="update_open_browser_failed">无法打开浏览器</string>
+    <string name="update_network_error">网络错误，请检查网络后重试</string>
+    <string name="update_current_version_badge">当前版本</string>
+    <string name="update_show_prerelease">显示预发布版本</string>
+    <string name="update_auto_check">自动检查更新</string>
+    <string name="update_auto_check_subtitle">应用启动时后台静默检查新版本</string>
+    <string name="update_no_history">暂无历史版本</string>
+    <string name="update_downloading">下载中 %1$d%%</string>
+    <string name="update_download_speed">%1$s/s</string>
+    <string name="update_download_progress_detail">%1$s / %2$s</string>
+    <string name="update_downloaded_to">下载完成</string>
+    <string name="update_size_unknown">未知</string>
+    <string name="update_entry_subtitle">当前 v%1$s · 查看最新版与历史版本</string>
+    <string name="update_badge_new">有更新</string>
+
     <string name="ui_1fs_960c9b8d">✨ %.1fs · %d 包</string>
     <string name="ui___3479daf9"> · 空</string>
     <string name="ui____12a64640">实时 (空)</string>

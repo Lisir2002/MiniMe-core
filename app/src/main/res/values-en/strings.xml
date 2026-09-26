@@ -1579,6 +1579,43 @@
     <!-- About - Copyright -->
     <string name="about_copyright">© 2025 Lisir2002 · Made with ❤ for mobile developers</string>
 
+    <!-- Update (feature/update) -->
+    <string name="update_title">Software Update</string>
+    <string name="update_tab_latest">Latest</string>
+    <string name="update_tab_history">History</string>
+    <string name="update_refresh">Check for updates</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_up_to_date">You are up to date</string>
+    <string name="update_up_to_date_detail">Current version v%1$s</string>
+    <string name="update_last_check">Last checked: %1$s</string>
+    <string name="update_new_version_found">New version v%1$s available</string>
+    <string name="update_new_version_detail">v%1$s → v%2$s</string>
+    <string name="update_published_at_short">Released %1$s</string>
+    <string name="update_version">Version</string>
+    <string name="update_apk_size">APK size</string>
+    <string name="update_release_notes">Release notes</string>
+    <string name="update_download_now">Download</string>
+    <string name="update_open_browser">Open in browser</string>
+    <string name="update_install">Install</string>
+    <string name="update_cancel">Cancel</string>
+    <string name="update_retry">Retry</string>
+    <string name="update_download_failed">Download failed</string>
+    <string name="update_install_failed">Install failed, please open the file manually</string>
+    <string name="update_open_browser_failed">Could not open browser</string>
+    <string name="update_network_error">Network error, please retry</string>
+    <string name="update_current_version_badge">Current</string>
+    <string name="update_show_prerelease">Show pre-releases</string>
+    <string name="update_auto_check">Auto-check updates</string>
+    <string name="update_auto_check_subtitle">Silently check for updates on startup</string>
+    <string name="update_no_history">No release history</string>
+    <string name="update_downloading">Downloading %1$d%%</string>
+    <string name="update_download_speed">%1$s/s</string>
+    <string name="update_download_progress_detail">%1$s / %2$s</string>
+    <string name="update_downloaded_to">Download complete</string>
+    <string name="update_size_unknown">Unknown</string>
+    <string name="update_entry_subtitle">Current v%1$s · latest &amp; history</string>
+    <string name="update_badge_new">Update</string>
+
     <string name="ui_1fs_960c9b8d">✨ %.1fs · %d packages</string>
     <string name="ui___3479daf9"> · empty</string>
     <string name="ui____12a64640">Live (empty)</string>

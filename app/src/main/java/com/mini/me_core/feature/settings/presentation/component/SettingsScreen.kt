@@ -134,6 +134,7 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Security(R.string.settings_security),
     RemoteAuditLogs(R.string.settings_remote_audit_logs),
     About(R.string.settings_about),
+    Update(R.string.update_title),
     Theme(R.string.settings_theme_title),
     DevOptions(R.string.dev_options_title),
 }
@@ -244,8 +245,17 @@ fun SettingsScreen(
         when (section) {
             SettingsSection.ProviderEditor -> section = SettingsSection.Providers
             SettingsSection.Logs -> section = logReturnSection
+            SettingsSection.Update -> section = SettingsSection.About
             else -> section = SettingsSection.Menu
         }
+    }
+
+    // 版本更新页为独立全屏页（自带顶栏：返回/刷新 + 双 Tab）
+    if (section == SettingsSection.Update) {
+        com.mini.me_core.feature.update.presentation.UpdateScreen(
+            onNavigateBack = { section = SettingsSection.About }
+        )
+        return
     }
 
     // 提供商编辑为独立全屏页，直接渲染（不嵌套 Scaffold）
@@ -568,7 +578,11 @@ fun SettingsScreen(
                 }
                 SettingsSection.ProviderEditor -> {} // 已在上方 early return 处理
                 SettingsSection.RemoteServers -> {} // 已在上方 early return 处理
-                SettingsSection.About -> AboutSection()
+                SettingsSection.Update -> {} // 已在上方 early return 处理
+                SettingsSection.About -> AboutSection(
+                    onOpenDevOptions = { section = SettingsSection.DevOptions },
+                    onOpenUpdate = { section = SettingsSection.Update }
+                )
                 SettingsSection.Theme -> {
                     com.mini.me_core.feature.settings.presentation.ThemeSettingsScreen(
                         onNavigateBack = { section = SettingsSection.Menu }
