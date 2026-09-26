@@ -1,6 +1,6 @@
 # MiniMe-core QQ 机器人对接设计文档
 
-> 版本：v1.1
+> 版本：v1.2
 > 状态：设计阶段
 > 最后更新：2026-09-27
 
@@ -111,6 +111,8 @@ MiniMe-core 为 Kotlin/Compose 应用，内置 WebSocket 服务端无技术障�
 | SessionManager | 按 QQ 号/群号维护独立会话上下文 |
 | TriggerEngine | 触发规则判断（@机器人 / 私聊 / 关键词 / 权限） |
 | ReplyFormatter | Agent 回复 → OneBot 消息段格式化 |
+| ChatLogManager | 聊天记录存储与管理（独立数据库，与程序内对话隔离） |
+| QBotToolProvider | Agent 工具接口提供者，暴露机器人管理工具给 Agent 调用 |
 | GroupManager | 群管理功能（禁言/踢人/审批/欢迎/违禁词等） |
 | QBotActivity | 独立管理页面，用户唯一操作入口 |
 
@@ -490,9 +492,230 @@ GroupConfig
 
 ---
 
-## 十一、UI 设计
+## 十一、聊天记录管理
 
-### 11.1 QBot 管理页面（独立页面，第一阶段）
+### 11.1 设计定位
+
+QQ 机器人聊天记录管理页面是 QBot 管理页面下的子页面，与 MiniMe-core 程序内的 AI 对话历史**完全隔离**：
+
+| 维度 | 程序内 AI 对话 | QQ 机器人聊天记录 |
+|------|---------------|------------------|
+| 存储 | 程序内对话数据库 | QQ 机器人独立数据库表（`qqbot_` 前缀） |
+| 会话标识 | conversation_id | qq_session_id（group_id / user_id） |
+| 参与者 | 用户 + AI | QQ 用户 + 机器人 + 其他群成员 |
+| 头像 | 用户头像 + AI 头像 | QQ 用户头像 + 机器人头像 |
+| 入口 | 主界面对话列表 | QBot 管理页 → 聊天记录 |
+
+### 11.2 数据模型
+
+#### 会话表（QQBotSession）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| session_id | String | 主键，`group_{group_id}` 或 `private_{user_id}` |
+| type | Enum | GROUP / PRIVATE |
+| group_id | Long? | 群号（私聊为 null） |
+| user_id | Long? | 对方 QQ 号（群聊为 null） |
+| group_name | String? | 群名称（缓存，定期同步） |
+| user_name | String? | 对方昵称（私聊用） |
+| last_message | String? | 最后一条消息摘要 |
+| last_message_time | Long? | 最后消息时间戳 |
+| unread_count | Int | 未读数 |
+| bot_qq | Long | 机器人 QQ 号（多账号时区分） |
+| created_at | Long | 会话创建时间 |
+| updated_at | Long | 最后更新时间 |
+
+#### 消息表（QQBotMessage）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| message_id | String | 主键，OneBot message_id |
+| session_id | String | 关联会话 |
+| sender_id | Long | 发送者 QQ 号 |
+| sender_name | String | 发送者群名片/昵称（快照） |
+| sender_avatar | String? | 发送者头像 URL（缓存） |
+| sender_role | Enum | OWNER / ADMIN / MEMBER / BOT |
+| content_type | Enum | TEXT / IMAGE / VOICE / VIDEO / SYSTEM / RECALL |
+| content | String | 消息内容 |
+| raw_message | String? | 原始 OneBot JSON |
+| bot_reply_id | String? | 机器人回复关联的用户消息 ID |
+| timestamp | Long | 消息时间 |
+| is_bot | Boolean | 是否机器人发送 |
+
+#### 群成员缓存表（QQBotGroupMember）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| group_id | Long | 群号 |
+| user_id | Long | QQ 号 |
+| card | String | 群名片（优先显示） |
+| nickname | String | QQ 昵称（群名片为空时显示） |
+| avatar | String? | 头像 URL |
+| role | Enum | OWNER / ADMIN / MEMBER |
+| last_active | Long | 最后发言时间 |
+| updated_at | Long | 信息更新时间 |
+
+**头像策略**：QQ 头像通过 `https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=100` 获取，本地缓存（Glide/Coil）。群名片从 `get_group_member_info` 定期同步，消息记录时快照保存，防止后续改名导致历史显示不一致。
+
+### 11.3 页面结构
+
+#### 手机竖屏（两级导航）
+
+**第一级：会话列表**
+```
+┌─────────────────────────┐
+│ 聊天记录    [搜索] [筛选] │
+├─────────────────────────┤
+│ [全部] [群聊] [私聊]     │
+├─────────────────────────┤
+│ [群头像] 群A             │
+│          最后消息摘要... 99+│
+├─────────────────────────┤
+│ [群头像] 群B             │
+│          最后消息摘要...  3 │
+├─────────────────────────┤
+│ [用户头像] 张三          │
+│          你好啊          1 │
+└─────────────────────────┘
+```
+
+**第二级：聊天窗口**
+```
+┌─────────────────────────┐
+│ ← 群A            [更多]  │
+├─────────────────────────┤
+│ [用户A头像] 用户A(群名片)│
+│            你好啊        │
+│                         │
+│        [机器人头像] 机器人│
+│                你好！    │
+│                我是AI助手│
+│                         │
+│ [用户B头像] 用户B(群名片)│
+│            帮我写代码    │
+├─────────────────────────┤
+│ [输入框........]  [发送] │
+└─────────────────────────┘
+```
+
+#### 大屏/横屏（双栏式）
+
+左侧会话列表（固定宽度 320dp），右侧聊天窗口，同时显示。
+
+### 11.4 消息气泡设计
+
+| 发送者 | 气泡样式 | 头像位置 |
+|--------|---------|---------|
+| QQ 用户 | 左侧，浅色背景 | 左侧圆形头像 + 昵称（群聊显示群名片） |
+| 机器人 | 右侧，主题色背景 | 右侧圆形头像 + "机器人"标签 |
+| 系统消息 | 居中，灰色小字 | 无头像（如"XXX 加入了群聊"、"消息已撤回"） |
+
+群聊中管理员/群主用小徽章标识（群主皇冠、管理员绿色标）。
+
+### 11.5 管理功能
+
+| 功能 | 说明 |
+|------|------|
+| 搜索 | 全局搜索（群名/用户名/消息内容）+ 会话内搜索，结果高亮 |
+| 筛选 | 按类型（全部/群聊/私聊）、按时间、按未读 |
+| 导出 | 纯文本(.txt) / JSON，范围可选（当前会话/全部/时间范围） |
+| 删除 | 单条删除（长按）、清空会话、删除会话（需确认） |
+| 批量清理 | 设置中清理 N 天前的聊天记录 |
+| 跳转 QQ | 调用 mqqapi 跳转到对应 QQ 会话 |
+
+### 11.6 隔离机制
+
+- QQ 聊天记录使用独立数据库表，与程序内对话表完全分离
+- 不共享 conversation_id，使用独立的 `qq_session_id`
+- Agent 处理 QQ 消息产生的对话，只写入 QQ 聊天记录表
+- 程序内对话列表不显示 QQ 会话，QQ 聊天记录页不显示程序内对话
+
+---
+
+## 十二、Agent 工具接口
+
+### 12.1 设计定位
+
+QQ 机器人模块对外暴露一套工具接口，注册到 MiniMe-core 工具系统中，Agent 可以像调用终端/浏览器一样调用这些工具，实现智能化管理：
+
+```
+用户自然语言指令 → Agent 理解意图 → 调用 QQBot 工具 → 执行操作 → 返回结果 → Agent 总结回复
+```
+
+### 12.2 工具分层（按安全等级）
+
+#### 只读查询层（Level 0：自动执行）
+
+| 工具名 | 功能 | 参数 |
+|--------|------|------|
+| `qqbot_get_status` | 获取运行状态 | 无 |
+| `qqbot_get_config` | 获取当前配置 | group_id(可选) |
+| `qqbot_list_groups` | 获取已加入群列表 | 无 |
+| `qqbot_get_group_info` | 获取群详情 | group_id |
+| `qqbot_list_sessions` | 获取活跃会话列表 | 无 |
+| `qqbot_get_session_history` | 获取会话历史 | session_id, limit |
+| `qqbot_get_logs` | 获取机器人日志 | lines(默认50) |
+| `qqbot_get_stats` | 获取统计数据 | group_id(可选), period |
+| `qqbot_list_blacklist` | 获取黑名单 | 无 |
+| `qqbot_get_pending_approvals` | 获取待审批加群请求 | 无 |
+
+#### 消息操作层（Level 1：需确认）
+
+| 工具名 | 功能 | 参数 |
+|--------|------|------|
+| `qqbot_send_message` | 发送消息 | target_type, target_id, message |
+| `qqbot_broadcast` | 群发消息 | group_ids[], message |
+| `qqbot_recall_message` | 撤回消息 | message_id |
+
+#### 群管理层（Level 1-2：需确认/二次确认）
+
+| 工具名 | 功能 | 参数 | 等级 |
+|--------|------|------|------|
+| `qqbot_ban_user` | 禁言用户 | group_id, user_id, duration | L1 |
+| `qqbot_unban_user` | 解除禁言 | group_id, user_id | L1 |
+| `qqbot_kick_user` | 踢人 | group_id, user_id, reject_add | L2 |
+| `qqbot_set_group_card` | 修改群名片 | group_id, user_id, card | L1 |
+| `qqbot_set_admin` | 设置/取消管理员 | group_id, user_id, enable | L2 |
+| `qqbot_whole_ban` | 全员禁言 | group_id, enable | L2 |
+| `qqbot_approve_join` | 审批加群 | request_id, approve, reason | L1 |
+| `qqbot_set_essence` | 设置精华 | message_id, enable | L0 |
+| `qqbot_leave_group` | 退群 | group_id | L2 |
+
+#### 配置与生命周期层（Level 1-2）
+
+| 工具名 | 功能 | 参数 | 等级 |
+|--------|------|------|------|
+| `qqbot_start` | 启动机器人 | 无 | L1 |
+| `qqbot_stop` | 停止机器人 | 无 | L1 |
+| `qqbot_restart` | 重启机器人 | 无 | L1 |
+| `qqbot_update_config` | 更新配置 | config_json | L1 |
+| `qqbot_set_group_config` | 更新群配置 | group_id, config_json | L1 |
+| `qqbot_add_blacklist` | 添加黑名单 | user_id, reason | L1 |
+| `qqbot_remove_blacklist` | 移除黑名单 | user_id | L1 |
+| `qqbot_reset_session` | 重置会话 | session_id | L0 |
+| `qqbot_clear_all_sessions` | 清空所有会话 | 无 | L2 |
+| `qqbot_switch_model` | 切换默认模型 | model_id, group_id(可选) | L1 |
+| `qqbot_login_qr` | 获取登录二维码 | 无 | L0 |
+| `qqbot_logout` | 退出登录 | 无 | L2 |
+
+### 12.3 安全控制
+
+- **三级确认**：L0 自动执行 / L1 单次确认 / L2 二次确认
+- **工具权限配置**：每个工具可设为 禁用 / 需确认 / 自动执行
+- **操作审计**：所有 Agent 工具调用记录审计日志（时间、操作、参数、结果、用户确认状态）
+
+### 12.4 第一阶段工具范围
+
+与 QQ 机器人第一阶段对齐，只暴露：
+- `qqbot_get_status`、`qqbot_get_config`、`qqbot_get_logs`（只读）
+- `qqbot_start`、`qqbot_stop`、`qqbot_restart`（生命周期）
+- `qqbot_send_message`（私聊测试用，需确认）
+
+---
+
+## 十三、UI 设计
+
+### 13.1 QBot 管理页面（独立页面，第一阶段）
 
 与内置浏览器同级，作为独立 Activity/Compose 页面，从导航入口进入。
 
@@ -519,7 +742,7 @@ QBot 管理页
     └── 显示最近消息/事件，自动滚动
 ```
 
-### 11.2 群管理总览页面（第四阶段）
+### 13.2 群管理总览页面（第四阶段）
 
 ```
 群管理总览
@@ -535,7 +758,7 @@ QBot 管理页
     └── 全局定时消息
 ```
 
-### 11.3 群详情页面（第四阶段）
+### 13.3 群详情页面（第四阶段）
 
 ```
 群详情
@@ -549,19 +772,19 @@ QBot 管理页
 
 ---
 
-## 十二、阶段划分与实施路线
+## 十四、阶段划分与实施路线
 
-### 12.1 阶段总览
+### 14.1 阶段总览
 
 | 阶段 | 目标 | 核心交付 |
 |------|------|---------|
-| **第一阶段** | 机器人可登录 + 简单回复可用 | 能在 QQ 上和 Agent 对话 |
-| 第二阶段 | 群聊完善 + 权限体系 | 群聊@触发、黑白名单、图片消息、开机自启 |
+| **第一阶段** | 机器人可登录 + 简单回复 + 聊天记录管理 + 基础工具接口 | 能在 QQ 上和 Agent 对话，App 内可查看管理 QQ 聊天记录，Agent 可查询/启停机器人 |
+| 第二阶段 | 群聊完善 + 权限体系 | 群聊@触发、黑白名单、图片消息、开机自启、群成员头像群名片完善 |
 | 第三阶段 | LLBot 深度集成 | 外部 LLBot 模式、配置热重载、一键下载更新 |
 | 第四阶段 | 群管理自动化 | 欢迎、审批、禁言踢人、违禁词、定时消息、群统计 |
-| 第五阶段 | 高级功能 + 生态 | 工具调用授权、多QQ号、Satori协议、Agent辅助管理 |
+| 第五阶段 | 高级功能 + 生态 | 完整工具调用授权、多QQ号、Satori协议、Agent辅助管理 |
 
-### 12.2 第一阶段详细范围
+### 14.2 第一阶段详细范围
 
 #### 目标
 用户在 MiniMe-core 内配置 QQ 号 → LLBot 登录 → QQ 私聊/群聊@机器人 → Agent 回复文本
@@ -580,21 +803,24 @@ QBot 管理页
 | LLBot 集成 | 内置容器 | 检测/启动/停止，扫码登录，自动生成配置 |
 | 基础日志 | 日志显示 | 内存环形缓冲500行，页面可查看 |
 | 进程保活 | 多层防护 | 前台服务+Watchdog+WakeLock+START_STICKY |
+| **聊天记录管理** | **会话列表+聊天窗口** | **独立数据库，与程序内对话隔离；群聊/私聊会话列表，文本消息气泡展示，QQ头像+群名片显示** |
+| **Agent 工具接口** | **基础工具集** | **qqbot_get_status/config/logs（只读）+ qqbot_start/stop/restart（生命周期）+ qqbot_send_message（需确认），注册到工具系统供 Agent 调用** |
 
 #### 第一阶段不包含
 
 - 图片/语音/视频消息
 - 群管理功能（禁言/踢人/欢迎/审批）
 - 权限体系（黑白名单/信任用户）
-- 工具调用（终端/浏览器/MCP）
+- Agent 工具在 QQ 场景下的调用（终端/浏览器/MCP，默认禁用）
 - 触发规则自定义（关键词/斜杠指令）
 - 指令系统（/help /reset 等）
 - 多 QQ 号
 - 定时消息、违禁词检测
-- 群统计、会话管理页面
+- 群统计
 - 开机自启
 - 外部 LLBot 模式
 - 配置热重载
+- 完整工具接口（仅基础查询+启停，群管理/配置等工具后续阶段）
 
 #### 第一阶段技术要点
 
@@ -607,10 +833,13 @@ QBot 管理页
 | 会话存储 | 内存 Map（第一阶段不持久化，重启清空） |
 | LLBot 启动 | 通过 ContainerBridge 在终端容器执行命令 |
 | 页面入口 | 独立 QBotActivity / Compose 页面，与浏览器同级 |
+| 聊天记录存储 | 独立数据库表（qqbot_session / qqbot_message / qqbot_group_member），与程序内对话隔离 |
+| 头像加载 | QQ 头像 URL + Glide/Coil 本地缓存 |
+| 工具接口 | 注册到 MiniMe-core 现有工具系统，与终端/浏览器并列 |
 
 ---
 
-## 十三、风险与挑战
+## 十五、风险与挑战
 
 | 风险 | 严重度 | 应对措施 |
 |------|--------|---------|
