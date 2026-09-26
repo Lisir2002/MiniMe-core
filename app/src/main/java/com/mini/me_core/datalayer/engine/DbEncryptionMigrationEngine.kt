@@ -63,7 +63,7 @@ class DbEncryptionMigrationEngine(
          * 设备上记录的版本低于当前值时，重置历史失败/重试计数，让迁移用新逻辑重新尝试，
          * 避免因旧版本 bug 永久卡在"重试耗尽"。
          */
-        const val MIGRATION_LOGIC_VERSION = 3
+        const val MIGRATION_LOGIC_VERSION = 4
     }
 
     // ── 公开 API ──
@@ -227,9 +227,10 @@ class DbEncryptionMigrationEngine(
 
         val mainDb = pathProvider.mainDb(lib)
         val tempEncrypted = File(mainDb.parentFile, "${mainDb.name}$TEMP_ENCRYPTED_SUFFIX")
-        // 清理上次残留的临时文件
-        tempEncrypted.takeIf { it.exists() }?.delete()
-        deleteSidecarFiles(tempEncrypted)
+        // 强制清理上次残留的临时文件及 sidecar（-wal/-shm/-journal）。
+        // 旧版本迁移失败可能留下损坏的 .enc.tmp 或 sidecar，导致 ATTACH 时
+        // "unable to open database"。必须确保文件及所有 sidecar 彻底删除。
+        forceCleanTempFile(tempEncrypted, lib.name)
 
         stateStore.updateState(lib) {
             it.copy(tempEncryptedPath = tempEncrypted.absolutePath)
@@ -284,8 +285,7 @@ class DbEncryptionMigrationEngine(
 
         val mainDb = pathProvider.mainDb(lib)
         val tempPlain = File(mainDb.parentFile, "${mainDb.name}$TEMP_PLAIN_SUFFIX")
-        tempPlain.takeIf { it.exists() }?.delete()
-        deleteSidecarFiles(tempPlain)
+        forceCleanTempFile(tempPlain, lib.name)
 
         val dek = runBlocking { keyProvider.getPassphrase(lib) }
         val passphrase = AndroidDatabaseKeyProvider.encodePassphrase(dek)
@@ -690,6 +690,40 @@ class DbEncryptionMigrationEngine(
         if (sourceSidecar.exists()) {
             sourceSidecar.copyTo(File(target.parentFile, "${target.name}-$suffix"), overwrite = true)
         }
+    }
+
+    /**
+     * 强制清理临时迁移文件及所有 sidecar（-wal/-shm/-journal）。
+     *
+     * 旧版本迁移失败可能留下损坏的 .enc.tmp / .plain.tmp 或 sidecar，
+     * 导致后续 ATTACH / openDatabase 时报 "unable to open database"。
+     * 本函数确保文件及 sidecar 彻底删除，删除失败时记录警告并尝试
+     * rename 兜底，避免静默残留。
+     */
+    private fun forceCleanTempFile(file: File, libName: String) {
+        // 先删 sidecar（SQLite 在文件被占用时可能仍持有 sidecar）
+        deleteSidecarFiles(file)
+        // 删主文件，检查返回值
+        if (file.exists()) {
+            val deleted = file.delete()
+            if (!deleted) {
+                FileLogger.w(TAG, "$libName 临时文件删除失败: ${file.absolutePath}，尝试 rename 兜底")
+                // 兜底：重命名为 .bak 后再删（极端情况下文件被锁定时 rename 可能成功）
+                val backup = File(file.parentFile, "${file.name}.bak")
+                runCatching {
+                    if (backup.exists()) backup.delete()
+                    file.renameTo(backup)
+                    backup.delete()
+                }.onFailure {
+                    FileLogger.w(TAG, "$libName 临时文件 rename 兜底也失败: ${it.message}")
+                }
+            }
+        }
+        // 最终验证：文件及 sidecar 不应存在
+        if (file.exists()) {
+            FileLogger.w(TAG, "$libName 临时文件清理后仍存在: ${file.absolutePath}")
+        }
+        deleteSidecarFiles(file)
     }
 
     private fun deleteSidecarFiles(base: File) {

@@ -80,7 +80,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.core.util.LogLevel
 import com.mini.me_core.R
 import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
 import com.mini.me_core.feature.agent.domain.mcp.McpServerStatus
@@ -152,7 +151,6 @@ fun SettingsScreen(
 ) {
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val activeProvider by viewModel.activeProvider.collectAsStateWithLifecycle()
-    val logLevel by viewModel.logLevel.collectAsStateWithLifecycle()
     val mcpServers by viewModel.mcpServers.collectAsStateWithLifecycle()
     val mcpStatuses by viewModel.mcpStatuses.collectAsStateWithLifecycle()
     val mcpReloading by viewModel.mcpReloading.collectAsStateWithLifecycle()
@@ -429,7 +427,6 @@ fun SettingsScreen(
                     mcpCount = mcpServers.size,
                     mcpConnected = mcpStatuses.count { it.state == McpServerStatus.State.CONNECTED },
                     mcpServerRunning = mcpServerIsRunning,
-                    logLevel = logLevel,
                     permissionRuleCount = projectRules.size + globalRules.size,
                     themeMode = themeMode,
                     onOpenThemeSheet = { showThemeSheet = true },
@@ -699,7 +696,6 @@ internal fun SettingsMenu(
     mcpCount: Int,
     mcpConnected: Int,
     mcpServerRunning: Boolean,
-    logLevel: LogLevel,
     permissionRuleCount: Int,
     themeMode: AppThemeMode,
     onOpenThemeSheet: () -> Unit,
@@ -727,16 +723,6 @@ internal fun SettingsMenu(
     val groupSystem = stringResource(R.string.settings_category_system_app)
     // 固定分组顺序（必须用上面 i18n 后的 group key，与 filteredGroups 对齐）
     val groupOrder = listOf(groupAI, groupEnv, groupData, groupSystem)
-    val logLevelLabel = stringResource(
-        when (logLevel) {
-            LogLevel.VERBOSE -> R.string.log_level_verbose
-            LogLevel.DEBUG -> R.string.log_level_debug
-            LogLevel.INFO -> R.string.log_level_info
-            LogLevel.WARN -> R.string.log_level_warn
-            LogLevel.ERROR, LogLevel.FATAL -> R.string.log_level_error
-            LogLevel.NONE -> R.string.log_level_none
-        }
-    )
 
     // section=null 的菜单项，title 用独立的 i18n 资源
     val menuItems: List<MenuItem> = listOf(
@@ -902,17 +888,6 @@ internal fun SettingsMenu(
             iconBgDark = Color(0xFF475569),
             keywords = listOf("audit", stringResource(R.string.ui____771dc11a), "log", stringResource(R.string.ui____30f7dd4e), stringResource(R.string.ui____10b2761d), "ssh", stringResource(R.string.ui____664b37da_2)),
             action = { onOpen(SettingsSection.RemoteAuditLogs) }
-        ),
-        MenuItem(
-            section = SettingsSection.Logs,
-            group = groupData,
-            title = stringResource(SettingsSection.Logs.titleRes),
-            subtitle = stringResource(R.string.settings_log_subtitle, logLevelLabel),
-            icon = Icons.Rounded.Notes,
-            iconBgLight = Color(0xFFF97316),
-            iconBgDark = Color(0xFF9A3412),
-            keywords = listOf("log", stringResource(R.string.ui____456d29ef), "debug", "trace", stringResource(R.string.ui____7030ff64), "bug", "filter"),
-            action = { onOpen(SettingsSection.Logs) }
         ),
         MenuItem(
             section = SettingsSection.Theme,
