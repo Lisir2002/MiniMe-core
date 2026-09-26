@@ -2862,6 +2862,8 @@
     <string name="viewer_error">错误: %1$s</string>
     <string name="viewer_error_title">代码查看加载失败</string>
     <string name="viewer_error_message">代码查看器加载失败，请重启应用或更新到最新版本。</string>
+    <string name="viewer_loading">正在加载文件…</string>
+    <string name="viewer_empty">文件内容为空</string>
 
     <!-- 通用下载组件 -->
     <string name="download_confirm_title">确认下载</string>

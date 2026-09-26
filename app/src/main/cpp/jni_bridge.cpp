@@ -65,6 +65,13 @@ CodeViewerSession* asViewer(jlong handle) {
     return static_cast<CodeViewerSession*>(ref);
 }
 
+// 从任意 handle 解析 FileLoader*：支持 FILE_LOADER 和 CODE_VIEWER（聚合了 loader）。
+minime::FileLoader* resolveFileLoader(jlong handle) {
+    if (auto* l = asFileLoader(handle)) return l;
+    if (auto* s = asViewer(handle)) return &s->loader;
+    return nullptr;
+}
+
 }  // namespace
 
 extern "C" {
@@ -131,7 +138,7 @@ JNIEXPORT jstring JNICALL
 Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeGetFileInfo(
         JNIEnv* env, jclass /*clazz*/, jlong handle) {
     MINIME_TRY();
-    minime::FileLoader* loader = asFileLoader(handle);
+    minime::FileLoader* loader = resolveFileLoader(handle);
     if (!loader) {
         return env->NewStringUTF("{}");
     }
@@ -151,7 +158,7 @@ JNIEXPORT jlong JNICALL
 Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeGetLineCount(
         JNIEnv* env, jclass /*clazz*/, jlong handle) {
     MINIME_TRY();
-    minime::FileLoader* loader = asFileLoader(handle);
+    minime::FileLoader* loader = resolveFileLoader(handle);
     if (!loader) return 0;
     return loader->info().lineCount;
     MINIME_JNI_CATCH(env, 0);
@@ -161,7 +168,7 @@ JNIEXPORT jobjectArray JNICALL
 Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeReadLines(
         JNIEnv* env, jclass /*clazz*/, jlong handle, jlong start, jlong end) {
     MINIME_TRY();
-    minime::FileLoader* loader = asFileLoader(handle);
+    minime::FileLoader* loader = resolveFileLoader(handle);
     if (!loader) return nullptr;
     std::vector<std::string> lines = loader->readLines(start, end);
     jclass stringClass = env->FindClass("java/lang/String");
@@ -189,7 +196,7 @@ Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeReadLinesDire
         JNIEnv* env, jclass /*clazz*/, jlong handle, jlong start, jlong end,
         jobject buffer) {
     MINIME_TRY();
-    minime::FileLoader* loader = asFileLoader(handle);
+    minime::FileLoader* loader = resolveFileLoader(handle);
     if (!loader) return 0;
     char* addr = static_cast<char*>(env->GetDirectBufferAddress(buffer));
     jlong cap = env->GetDirectBufferCapacity(buffer);
@@ -209,7 +216,7 @@ JNIEXPORT jboolean JNICALL
 Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeSetEncoding(
         JNIEnv* env, jclass /*clazz*/, jlong handle, jint encoding) {
     MINIME_TRY();
-    minime::FileLoader* loader = asFileLoader(handle);
+    minime::FileLoader* loader = resolveFileLoader(handle);
     if (!loader) return JNI_FALSE;
     minime::Status st = loader->setEncoding(static_cast<minime::Encoding>(encoding));
     return st == minime::Status::OK ? JNI_TRUE : JNI_FALSE;
