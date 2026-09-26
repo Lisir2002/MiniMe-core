@@ -89,7 +89,6 @@ import com.mini.me_core.feature.settings.data.repository.AppThemeMode
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.presentation.SecuritySettingsViewModel
-import com.mini.me_core.feature.settings.presentation.SettingsExportImportScreen
 import com.mini.me_core.feature.settings.presentation.SettingsViewModel
 import com.mini.me_core.feature.settings.presentation.components.RemoteAuditLogsScreen
 import com.mini.me_core.feature.settings.presentation.components.SecuritySettingsScreen
@@ -136,7 +135,6 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     RemoteAuditLogs(R.string.settings_remote_audit_logs),
     About(R.string.settings_about),
     Theme(R.string.settings_theme_title),
-    ExportImport(R.string.settings_export_import),
     DevOptions(R.string.dev_options_title),
 }
 
@@ -576,9 +574,6 @@ fun SettingsScreen(
                         onNavigateBack = { section = SettingsSection.Menu }
                     )
                 }
-                SettingsSection.ExportImport -> SettingsExportImportScreen(
-                    onNavigateBack = { section = SettingsSection.Menu }
-                )
                 SettingsSection.DevOptions -> com.mini.me_core.feature.settings.presentation.DevOptionsScreen(
                     onNavigateBack = { section = SettingsSection.Menu },
                     onOpenLogViewer = { section = SettingsSection.Logs },
@@ -872,18 +867,6 @@ internal fun SettingsMenu(
             keywords = listOf("backup", stringResource(R.string.ui____664b37da), stringResource(R.string.ui____69de8d7f), "export", stringResource(R.string.ui____55405ea6), stringResource(R.string.ui____8d9a071e), stringResource(R.string.ui____56563edf)),
             action = { onOpen(SettingsSection.Backup) }
         ),
-        // F5.2 导出/导入设置
-        MenuItem(
-            section = SettingsSection.ExportImport,
-            group = groupData,
-            title = stringResource(R.string.settings_export_import),
-            subtitle = stringResource(R.string.settings_export_import_subtitle),
-            icon = Icons.Rounded.SwapHoriz,
-            iconBgLight = Color(0xFF10B981),
-            iconBgDark = Color(0xFF065F46),
-            keywords = listOf("export", "import", "backup", "restore", stringResource(R.string.ui____55405ea6), stringResource(R.string.ui____8d9a071e), "json"),
-            action = { onOpen(SettingsSection.ExportImport) }
-        ),
         MenuItem(
             section = SettingsSection.Security,
             group = groupData,
@@ -1090,7 +1073,7 @@ internal fun SettingsMenu(
                     // F5.4：常用设置置顶（横向滚动卡片，最多 6 项）
                     val commonItems = remember(menuItems) {
                         val preferred = listOf(
-                            SettingsSection.Theme, SettingsSection.Providers, SettingsSection.ExportImport,
+                            SettingsSection.Theme, SettingsSection.Providers,
                             SettingsSection.Backup, SettingsSection.Security,
                         )
                         preferred.mapNotNull { sec -> menuItems.firstOrNull { it.section == sec } }.take(6)
