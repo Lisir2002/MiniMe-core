@@ -105,7 +105,7 @@
     <string name="settings_terminal_container_subtitle">容器镜像、终端外观、键盘、SSH</string>
     <string name="settings_backup">备份与还原</string>
     <string name="settings_security">安全设置</string>
-    <string name="settings_remote_audit_logs">远程连接审计</string>
+    <string name="settings_remote_audit_logs">操作审计</string>
     <string name="settings_about">关于应用</string>
     <string name="settings_design_gallery">UI 组件样板</string>
 
@@ -338,7 +338,34 @@
     <string name="settings_category_tools">工具与权限（工具调用 Tools / Function Calling）</string>
     <string name="settings_category_other">其他</string>
     <string name="settings_security_subtitle">凭据加密 · 生物识别 · 紧急通道</string>
-    <string name="settings_remote_audit_subtitle">SSH 连接 · 凭据操作 · 备份事件</string>
+    <string name="settings_remote_audit_subtitle">连接 · 凭据 · 备份 · 安全 · 技能事件</string>
+    <!-- 操作审计页面（MiniMe） -->
+    <string name="audit_stats_total">总事件</string>
+    <string name="audit_stats_failed">失败事件</string>
+    <string name="audit_stats_today">今日事件</string>
+    <string name="audit_retention_hint">保留 10000 条 / 90 天</string>
+    <string name="audit_tab_all">全部</string>
+    <string name="audit_tab_connect">连接</string>
+    <string name="audit_tab_credential">凭据</string>
+    <string name="audit_tab_backup">备份</string>
+    <string name="audit_tab_security">安全</string>
+    <string name="audit_tab_skill">技能</string>
+    <string name="audit_search_hint">搜索动作 / 连接名 / 主机</string>
+    <string name="audit_export">导出日志</string>
+    <string name="audit_clear_all">清空全部</string>
+    <string name="audit_clear_title">清空审计日志？</string>
+    <string name="audit_clear_message">将删除所有审计日志，不可恢复</string>
+    <string name="audit_confirm">确认</string>
+    <string name="audit_cancel">取消</string>
+    <string name="audit_empty_title">暂无审计记录</string>
+    <string name="audit_empty_subtitle">操作记录将自动显示在这里</string>
+    <string name="audit_load_error">加载失败</string>
+    <string name="audit_retry">重试</string>
+    <string name="audit_export_done">已导出到下载目录</string>
+    <string name="audit_export_failed">导出失败</string>
+    <string name="audit_more">加载更多</string>
+    <string name="audit_search_cd">搜索</string>
+    <string name="audit_more_cd">更多操作</string>
     <string name="security_http_warning_title">检测到明文 HTTP 请求</string>
     <string name="security_http_warning_desc">应用正在通过未加密的明文 HTTP 与 %1$s 通信，数据存在被窃听或篡改风险。请优先改用 HTTPS 地址，或确认该服务位于可信的本地网络。</string>
 

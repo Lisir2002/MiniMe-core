@@ -194,6 +194,41 @@ SELECT COUNT(1) FROM remote_audit_logs;
 selectAuditCategories:
 SELECT DISTINCT category FROM remote_audit_logs ORDER BY category;
 
+-- 操作审计页面重构（MiniMe）：统计 / 分类分页 / 全局搜索 / 清空 ──
+
+-- 失败事件总数（success = 0）。
+selectAuditLogFailedCount:
+SELECT COUNT(1) FROM remote_audit_logs WHERE success = 0;
+
+-- 指定时间戳之后的事件数（今日统计用）。
+selectAuditLogCountSince:
+SELECT COUNT(1) FROM remote_audit_logs WHERE created_at >= ?;
+
+-- 按分类集合分页（连接 Tab 可一次传入 CONNECT/SYNC/RECONNECT_FAIL）。
+selectAuditLogsByCategoriesPage:
+SELECT * FROM remote_audit_logs
+WHERE category IN ?
+ORDER BY created_at DESC
+LIMIT ? OFFSET ?;
+
+-- 按动作集合分页（技能 Tab：SKILL_EXEC_OK/FAIL 历史上以 SECURITY 分类写入，按动作过滤更准确）。
+selectAuditLogsByActionsPage:
+SELECT * FROM remote_audit_logs
+WHERE action IN ?
+ORDER BY created_at DESC
+LIMIT ? OFFSET ?;
+
+-- 全局搜索：动作 / 连接名 / 主机 / 消息（LIKE，调用方拼 %kw%）。
+selectAuditLogsSearchPage:
+SELECT * FROM remote_audit_logs
+WHERE action LIKE ? OR connection_name LIKE ? OR remote_host LIKE ? OR message LIKE ?
+ORDER BY created_at DESC
+LIMIT ? OFFSET ?;
+
+-- 清空全部审计日志。
+deleteAllAuditLogs:
+DELETE FROM remote_audit_logs;
+
 selectEncryptionState:
 SELECT * FROM credential_encryption_state WHERE id = 1;
 

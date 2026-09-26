@@ -105,7 +105,7 @@
     <string name="settings_terminal_container_subtitle">Container images, terminal appearance, keyboard, SSH</string>
     <string name="settings_backup">Backup &amp; Restore</string>
     <string name="settings_security">Security Settings</string>
-    <string name="settings_remote_audit_logs">Remote Connection Audit</string>
+    <string name="settings_remote_audit_logs">Operation Audit</string>
     <string name="settings_about">About</string>
     <string name="settings_design_gallery">UI Component Gallery</string>
 
@@ -322,7 +322,34 @@
     <string name="settings_category_tools">Tools &amp; Permissions (Function Calling)</string>
     <string name="settings_category_other">Other</string>
     <string name="settings_security_subtitle">Credential encryption · Biometrics · Emergency channel</string>
-    <string name="settings_remote_audit_subtitle">SSH connections · Credential ops · Backup events</string>
+    <string name="settings_remote_audit_subtitle">Connections · Credentials · Backups · Security · Skills</string>
+    <!-- Operation audit screen (MiniMe) -->
+    <string name="audit_stats_total">Total</string>
+    <string name="audit_stats_failed">Failed</string>
+    <string name="audit_stats_today">Today</string>
+    <string name="audit_retention_hint">Retain 10,000 entries / 90 days</string>
+    <string name="audit_tab_all">All</string>
+    <string name="audit_tab_connect">Connections</string>
+    <string name="audit_tab_credential">Credentials</string>
+    <string name="audit_tab_backup">Backups</string>
+    <string name="audit_tab_security">Security</string>
+    <string name="audit_tab_skill">Skills</string>
+    <string name="audit_search_hint">Search action / connection / host</string>
+    <string name="audit_export">Export logs</string>
+    <string name="audit_clear_all">Clear all</string>
+    <string name="audit_clear_title">Clear audit logs?</string>
+    <string name="audit_clear_message">This deletes ALL audit logs and cannot be undone.</string>
+    <string name="audit_confirm">Confirm</string>
+    <string name="audit_cancel">Cancel</string>
+    <string name="audit_empty_title">No audit records</string>
+    <string name="audit_empty_subtitle">Operation records will appear here automatically</string>
+    <string name="audit_load_error">Failed to load</string>
+    <string name="audit_retry">Retry</string>
+    <string name="audit_export_done">Exported to Downloads</string>
+    <string name="audit_export_failed">Export failed</string>
+    <string name="audit_more">Load more</string>
+    <string name="audit_search_cd">Search</string>
+    <string name="audit_more_cd">More actions</string>
     <string name="security_http_warning_title">Cleartext HTTP request detected</string>
     <string name="security_http_warning_desc">The app is communicating with %1$s over unencrypted HTTP; data may be intercepted or tampered with. Prefer an HTTPS address, or make sure this service is on a trusted local network.</string>
 

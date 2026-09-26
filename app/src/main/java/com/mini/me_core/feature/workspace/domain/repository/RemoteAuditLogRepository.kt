@@ -3,6 +3,8 @@ package com.mini.me_core.feature.workspace.domain.repository
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.WorkspaceRepository as V2WorkspaceRepository
 import com.mini.me_core.feature.workspace.data.local.entity.RemoteAuditLogEntity
+import com.mini.me_core.feature.workspace.domain.RemoteAuditAction
+import com.mini.me_core.feature.workspace.domain.RemoteAuditCategory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -21,11 +23,19 @@ import kotlinx.serialization.encodeToString
 class RemoteAuditLogRepository @Inject constructor(
     private val v2Workspace: V2WorkspaceRepository,
 ) {
-    private companion object {
-        const val TAG = "RemoteAuditLogRepo"
-        const val MAX_MESSAGE_LENGTH = 500
-        const val RETENTION_MAX_COUNT = 10_000L
-        const val RETENTION_DAYS = 90L
+    companion object {
+        private const val TAG = "RemoteAuditLogRepo"
+        private const val MAX_MESSAGE_LENGTH = 500
+        private const val RETENTION_MAX_COUNT = 10_000L
+        private const val RETENTION_DAYS = 90L
+
+        // 操作审计页面分类 Tab 键（表现层与 Repository 共用）。
+        const val TAB_ALL = "ALL"
+        const val TAB_CONNECT = "CONNECT"
+        const val TAB_CREDENTIAL = "CREDENTIAL"
+        const val TAB_BACKUP = "BACKUP"
+        const val TAB_SECURITY = "SECURITY"
+        const val TAB_SKILL = "SKILL"
     }
 
     /**
@@ -70,6 +80,73 @@ class RemoteAuditLogRepository @Inject constructor(
             v2Workspace.pageAuditLogs(offset = page * pageSize.toLong(), limit = pageSize.toLong())
                 .map { it.toEntity() }
         }
+
+    // ============== 操作审计页面重构（MiniMe）==============
+
+    /** 总事件数。 */
+    suspend fun countAll(): Int = withContext(Dispatchers.IO) {
+        v2Workspace.countAuditLogs().toInt()
+    }
+
+    /** 失败事件数（success=false）。 */
+    suspend fun countFailed(): Int = withContext(Dispatchers.IO) {
+        v2Workspace.countAuditLogsFailed().toInt()
+    }
+
+    /** [timestampMs]（今天 0 点）之后的事件数。 */
+    suspend fun countSince(timestampMs: Long): Int = withContext(Dispatchers.IO) {
+        v2Workspace.countAuditLogsSince(timestampMs).toInt()
+    }
+
+    /**
+     * 按分类 Tab 分页。[category] 为 null 或 [TAB_ALL] 时返回全部；
+     * SYNC / RECONNECT_FAIL 归入「连接」；技能按动作集合过滤（历史上技能事件以 SECURITY 分类写入）。
+     */
+    suspend fun pageDescByCategory(
+        category: String?,
+        page: Int,
+        pageSize: Int = 50,
+    ): List<RemoteAuditLogEntity> = withContext(Dispatchers.IO) {
+        val offset = page * pageSize.toLong()
+        val limit = pageSize.toLong()
+        val rows = when (category) {
+            TAB_CONNECT -> v2Workspace.pageAuditLogsByCategories(
+                listOf(RemoteAuditCategory.CONNECT, RemoteAuditCategory.SYNC, RemoteAuditCategory.RECONNECT_FAIL),
+                offset, limit,
+            )
+            TAB_CREDENTIAL -> v2Workspace.pageAuditLogsByCategories(
+                listOf(RemoteAuditCategory.CREDENTIAL), offset, limit,
+            )
+            TAB_BACKUP -> v2Workspace.pageAuditLogsByCategories(
+                listOf(RemoteAuditCategory.BACKUP), offset, limit,
+            )
+            TAB_SECURITY -> v2Workspace.pageAuditLogsByCategories(
+                listOf(RemoteAuditCategory.SECURITY), offset, limit,
+            )
+            TAB_SKILL -> v2Workspace.pageAuditLogsByActions(
+                listOf(RemoteAuditAction.SKILL_EXEC_OK, RemoteAuditAction.SKILL_EXEC_FAIL),
+                offset, limit,
+            )
+            else -> v2Workspace.pageAuditLogs(offset, limit)
+        }
+        rows.map { it.toEntity() }
+    }
+
+    /**
+     * 全局搜索（忽略分类 Tab）：在连接名 / 主机 / 消息 / 原始动作上做 LIKE 匹配，降序分页。
+     * 中文动作名匹配由表现层配合 AuditActionMapper 二次过滤。
+     */
+    suspend fun search(query: String, page: Int, pageSize: Int = 50): List<RemoteAuditLogEntity> =
+        withContext(Dispatchers.IO) {
+            val kw = "%${query.trim()}%"
+            v2Workspace.searchAuditLogs(kw, page * pageSize.toLong(), pageSize.toLong())
+                .map { it.toEntity() }
+        }
+
+    /** 清空全部审计日志，返回删除条数。 */
+    suspend fun clearAll(): Int = withContext(Dispatchers.IO) {
+        v2Workspace.deleteAllAuditLogs()
+    }
 
     suspend fun listByConnection(connectionId: String, limit: Int = 200): List<RemoteAuditLogEntity> =
         withContext(Dispatchers.IO) {

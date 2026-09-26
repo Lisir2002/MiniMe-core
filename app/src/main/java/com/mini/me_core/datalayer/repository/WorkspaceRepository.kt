@@ -131,6 +131,47 @@ class WorkspaceRepository(private val db: WorkspaceDb) {
     suspend fun deleteAuditLogsOlderThan(createdAt: Long) =
         withContext(Dispatchers.IO) { q.deleteAuditLogsOlderThan(createdAt) }
 
+    // ── 操作审计页面重构（MiniMe）：统计 / 分类分页 / 搜索 / 清空 ──
+
+    /** 失败事件总数。 */
+    suspend fun countAuditLogsFailed(): Long =
+        withContext(Dispatchers.IO) { q.selectAuditLogFailedCount().executeAsOne() }
+
+    /** [sinceMs] 之后的事件数。 */
+    suspend fun countAuditLogsSince(sinceMs: Long): Long =
+        withContext(Dispatchers.IO) { q.selectAuditLogCountSince(sinceMs).executeAsOne() }
+
+    /** 按分类集合分页（offset/limit 降序）。 */
+    suspend fun pageAuditLogsByCategories(
+        categories: List<String>, offset: Long, limit: Long,
+    ): List<com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs> =
+        withContext(Dispatchers.IO) {
+            q.selectAuditLogsByCategoriesPage(categories, limit, offset).executeAsList()
+        }
+
+    /** 按动作集合分页（用于技能 Tab）。 */
+    suspend fun pageAuditLogsByActions(
+        actions: List<String>, offset: Long, limit: Long,
+    ): List<com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs> =
+        withContext(Dispatchers.IO) {
+            q.selectAuditLogsByActionsPage(actions, limit, offset).executeAsList()
+        }
+
+    /** 全局搜索分页（kwLike 已含 % 通配）。 */
+    suspend fun searchAuditLogs(
+        kwLike: String, offset: Long, limit: Long,
+    ): List<com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs> =
+        withContext(Dispatchers.IO) {
+            q.selectAuditLogsSearchPage(kwLike, kwLike, kwLike, kwLike, limit, offset).executeAsList()
+        }
+
+    /** 清空全部审计日志，返回删除前总数。 */
+    suspend fun deleteAllAuditLogs(): Int = withContext(Dispatchers.IO) {
+        val before = q.selectAuditLogCount().executeAsOne()
+        q.deleteAllAuditLogs()
+        before.toInt()
+    }
+
     suspend fun getEncryptionState(): com.mini.mecore.datalayer.sqldelight.workspace.Credential_encryption_state? =
         withContext(Dispatchers.IO) { q.selectEncryptionState().executeAsOneOrNull() }
 

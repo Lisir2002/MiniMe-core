@@ -598,7 +598,7 @@ fun SettingsScreen(
                     ZthSettingsScreen(viewModel = zthViewModel)
                 }
                 SettingsSection.RemoteAuditLogs -> {
-                    RemoteAuditLogsScreen(auditLogRepo = viewModel.auditLogRepository)
+                    RemoteAuditLogsScreen()
                 }
                 SettingsSection.ProviderEditor -> {} // 已在上方 early return 处理
                 SettingsSection.RemoteServers -> {} // 已在上方 early return 处理
