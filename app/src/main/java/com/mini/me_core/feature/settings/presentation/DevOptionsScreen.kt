@@ -21,7 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Article
+import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.DeleteSweep
@@ -689,11 +689,11 @@ private fun DebugTab(
         item {
             AppSectionHeader(
                 title = stringResource(R.string.dev_options_log_viewer),
-                icon = Icons.Rounded.Article,
+                icon = Icons.AutoMirrored.Rounded.Article,
             )
             AppCard {
                 AppListItem(
-                    icon = Icons.Rounded.Article,
+                    icon = Icons.AutoMirrored.Rounded.Article,
                     title = stringResource(R.string.dev_options_log_viewer),
                     onViewClick = onOpenLogViewer,
                     showDivider = false,
