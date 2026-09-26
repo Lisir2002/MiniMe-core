@@ -2337,4 +2337,97 @@
     <string name="tc_add_binding">Add Binding</string>
     <string name="splash_skip">Skip</string>
 
+    <!-- Security Settings Refactor -->
+    <string name="settings_zth_title">Zero Hallucination Tolerance</string>
+    <string name="settings_zth_subtitle">AI behavior confirmation tier</string>
+
+    <string name="security_overview_title">Security Overview</string>
+    <string name="security_overview_score">%d pts</string>
+    <string name="security_overview_risks">Open risks</string>
+    <string name="security_risk_db_not_encrypted">Database not encrypted</string>
+    <string name="security_risk_biometric_off">Biometric not enabled</string>
+    <string name="security_risk_secure_screen_off">Screenshot protection off</string>
+    <string name="security_risk_key_stale">Key not rotated in 90 days</string>
+    <string name="security_risk_emergency_history">Emergency unlock on record</string>
+
+    <string name="security_db_title">Database Encryption</string>
+    <string name="security_db_status_encrypted">Encrypted</string>
+    <string name="security_db_status_plain">Plaintext (unencrypted)</string>
+    <string name="security_db_desc">AES-256 encryption via SQLCipher for the 6 local database files. Even if the device is rooted or backed up, the database content cannot be read directly.</string>
+    <string name="security_db_lib_encrypted">Encrypted</string>
+    <string name="security_db_lib_plain">Plaintext</string>
+    <string name="security_db_lib_migrating">Migrating</string>
+    <string name="security_db_migrating_progress">DB %1$d/%2$d: %3$s (%4$d%%)</string>
+    <string name="security_db_retry">Retry</string>
+    <string name="security_db_turn_on">Enable encryption</string>
+    <string name="security_db_turn_off">Disable encryption</string>
+    <string name="security_db_verify">Verify now</string>
+    <string name="security_db_enable_title">Enable database encryption?</string>
+    <string name="security_db_enable_message">First enablement migrates data per database (table count / row count / sample checksum). The database is read-only during migration. Continue?</string>
+    <string name="security_db_enable_action">Enable</string>
+    <string name="security_db_disable_title">Disable database encryption?</string>
+    <string name="security_db_disable_message">All databases will fall back to plaintext storage and can be read if the device is rooted. Disable anyway?</string>
+    <string name="security_db_disable_action">Disable</string>
+
+    <string name="security_rotate_desc">Generate a new DEK and re-encrypt all credentials. Rotations so far: %d</string>
+    <string name="security_rotate_last_time">Last rotated: %s</string>
+    <string name="security_rotate_stale_warning">Key has not been rotated in over 90 days. Rotate soon.</string>
+    <string name="security_rotate_history_title">Rotation history (last 5)</string>
+    <string name="security_rotate_history_version">v%d</string>
+    <string name="security_rotate_action">Rotate now</string>
+    <string name="security_rotate_confirm_title">Rotate key?</string>
+    <string name="security_rotate_confirm_message">After rotation, all encrypted credentials must be re-entered. Continue?</string>
+    <string name="security_rotate_confirm_action">Rotate</string>
+
+    <string name="security_state_on">On</string>
+    <string name="security_state_off">Off</string>
+
+    <string name="security_biometric_desc">When on, accessing sensitive credentials such as SSH keys/private keys and API keys requires fingerprint or face verification. When off, any app can read credentials directly.</string>
+    <string name="security_biometric_unsupported">Device does not support fingerprint/face</string>
+    <string name="security_biometric_scope_title">Protection scope</string>
+    <string name="security_biometric_scope_ssh">SSH passwords / private keys</string>
+    <string name="security_biometric_scope_api_key">API keys</string>
+    <string name="security_biometric_scope_db_op">Database encryption operations</string>
+    <string name="security_biometric_scope_rotation">Key rotation</string>
+    <string name="security_biometric_timeout_title">Re-auth timeout</string>
+    <string name="security_biometric_timeout_minutes">%d minutes</string>
+    <string name="security_biometric_confirm_title">Enable biometric protection?</string>
+    <string name="security_biometric_confirm_message">When on, accessing sensitive credentials requires fingerprint or face verification. Enable?</string>
+    <string name="security_biometric_confirm_action">Enable</string>
+
+    <string name="security_secure_screen_title">Screenshot / Screen-record Protection</string>
+    <string name="security_secure_screen_desc">When on, protected pages block system screenshots, screen recordings and recents thumbnails, preventing malicious apps from capturing sensitive credentials.</string>
+    <string name="security_secure_screen_scope_title">Protection scope</string>
+    <string name="security_secure_screen_scope_provider">Provider editor only</string>
+    <string name="security_secure_screen_scope_all">All sensitive pages</string>
+    <string name="security_secure_screen_scope_global">Global</string>
+    <string name="security_secure_screen_test">Test protection</string>
+
+    <string name="security_emergency_locked">Too many failures; emergency unlock locked for about %d minutes</string>
+    <string name="security_emergency_open_form">Emergency unlock</string>
+    <string name="security_emergency_submit">Verify</string>
+    <string name="security_emergency_fill_all">Please fill in all fields</string>
+    <string name="security_emergency_bad_port">Invalid port</string>
+    <string name="security_emergency_history_title">Unlock history (last 5)</string>
+    <string name="security_emergency_confirm_title">Confirm emergency unlock?</string>
+    <string name="security_emergency_confirm_message">After unlock, all credentials must be re-entered. This cannot be undone. Continue?</string>
+    <string name="security_emergency_confirm_action">Unlock</string>
+
+    <string name="security_audit_title">Sensitive Operation Audit Log</string>
+    <string name="security_audit_clear">Clear</string>
+    <string name="security_audit_empty">No records</string>
+    <string name="security_audit_result_ok">Success</string>
+    <string name="security_audit_result_fail">Failed</string>
+    <string name="security_audit_action_db">DB encryption</string>
+    <string name="security_audit_action_rotate">Key rotation</string>
+    <string name="security_audit_action_emergency">Emergency unlock</string>
+    <string name="security_audit_action_biometric">Biometric change</string>
+    <string name="security_audit_action_secure">Screenshot protection change</string>
+    <string name="security_audit_clear_title">Clear audit log?</string>
+    <string name="security_audit_clear_message">This cannot be undone. Clear the log?</string>
+    <string name="security_audit_clear_action">Clear</string>
+
+    <string name="security_zth_desc">Stricter tiers prompt more frequent user confirmation; hallucination triggers (ToolOutput/Plan/Skill body) always prompt regardless of tier.</string>
+    <string name="security_zth_swipe_hint">Can be off only for DISABLED / MINIMAL (0/1); forced on at tier >= 2.</string>
+
 </resources>

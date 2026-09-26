@@ -2363,4 +2363,97 @@
     <string name="splash_stage_browser">正在初始化浏览器</string>
     <string name="splash_stage_ui">正在准备界面</string>
 
+    <!-- ── 安全设置重构（Security Settings Refactor）── -->
+    <string name="settings_zth_title">零幻觉容忍</string>
+    <string name="settings_zth_subtitle">AI 行为确认档位</string>
+
+    <string name="security_overview_title">安全概览</string>
+    <string name="security_overview_score">%d 分</string>
+    <string name="security_overview_risks">待处理风险</string>
+    <string name="security_risk_db_not_encrypted">数据库未加密</string>
+    <string name="security_risk_biometric_off">生物识别未开启</string>
+    <string name="security_risk_secure_screen_off">防截图录屏未开启</string>
+    <string name="security_risk_key_stale">密钥超过 90 天未轮换</string>
+    <string name="security_risk_emergency_history">存在紧急解锁记录</string>
+
+    <string name="security_db_title">数据库加密</string>
+    <string name="security_db_status_encrypted">已加密</string>
+    <string name="security_db_status_plain">明文（未加密）</string>
+    <string name="security_db_desc">使用 SQLCipher 对本地 6 个数据库文件进行 AES-256 加密。开启后即使设备被 root 或备份提取，数据库内容也不可直接读取。</string>
+    <string name="security_db_lib_encrypted">已加密</string>
+    <string name="security_db_lib_plain">明文</string>
+    <string name="security_db_lib_migrating">迁移中</string>
+    <string name="security_db_migrating_progress">第 %1$d/%2$d 个库：%3$s（%4$d%%）</string>
+    <string name="security_db_retry">重试</string>
+    <string name="security_db_turn_on">开启加密</string>
+    <string name="security_db_turn_off">关闭加密</string>
+    <string name="security_db_verify">手动校验</string>
+    <string name="security_db_enable_title">开启数据库加密</string>
+    <string name="security_db_enable_message">首次开启需逐库迁移数据（表数/行数/抽样校验），迁移期间数据库只读，耗时取决于数据量。确定继续？</string>
+    <string name="security_db_enable_action">开启</string>
+    <string name="security_db_disable_title">关闭数据库加密</string>
+    <string name="security_db_disable_message">关闭后所有数据库将回退为明文存储，设备被 root 后可直接读取。确定关闭？</string>
+    <string name="security_db_disable_action">关闭</string>
+
+    <string name="security_rotate_desc">生成新的 DEK (Data Encryption Key) 并重新加密所有凭据。当前轮换次数：%d</string>
+    <string name="security_rotate_last_time">上次轮换：%s</string>
+    <string name="security_rotate_stale_warning">密钥已超过 90 天未轮换，建议尽快轮换。</string>
+    <string name="security_rotate_history_title">轮换历史（最近 5 次）</string>
+    <string name="security_rotate_history_version">版本 v%d</string>
+    <string name="security_rotate_action">立即轮换</string>
+    <string name="security_rotate_confirm_title">确认轮换密钥？</string>
+    <string name="security_rotate_confirm_message">轮换后所有已加密凭据需重新录入。确定继续？</string>
+    <string name="security_rotate_confirm_action">轮换</string>
+
+    <string name="security_state_on">已开启</string>
+    <string name="security_state_off">已关闭</string>
+
+    <string name="security_biometric_desc">开启后，访问 SSH 密码/私钥/API Key 等敏感凭据时需验证指纹或面容。关闭后任何应用可直接读取凭据。</string>
+    <string name="security_biometric_unsupported">设备不支持指纹/面容</string>
+    <string name="security_biometric_scope_title">保护范围</string>
+    <string name="security_biometric_scope_ssh">SSH 密码 / 私钥</string>
+    <string name="security_biometric_scope_api_key">API Key</string>
+    <string name="security_biometric_scope_db_op">数据库加密操作</string>
+    <string name="security_biometric_scope_rotation">密钥轮换</string>
+    <string name="security_biometric_timeout_title">重新验证超时</string>
+    <string name="security_biometric_timeout_minutes">%d 分钟</string>
+    <string name="security_biometric_confirm_title">开启生物识别保护？</string>
+    <string name="security_biometric_confirm_message">开启后访问敏感凭据需验证指纹或面容。确定开启？</string>
+    <string name="security_biometric_confirm_action">开启</string>
+
+    <string name="security_secure_screen_title">防截图录屏</string>
+    <string name="security_secure_screen_desc">开启后受保护页面禁止系统截图、录屏和最近任务缩略图，防止敏感凭据被恶意应用截取。</string>
+    <string name="security_secure_screen_scope_title">保护范围</string>
+    <string name="security_secure_screen_scope_provider">仅供应商编辑页</string>
+    <string name="security_secure_screen_scope_all">所有含敏感信息页面</string>
+    <string name="security_secure_screen_scope_global">全局</string>
+    <string name="security_secure_screen_test">测试防截图</string>
+
+    <string name="security_emergency_locked">连续失败过多，紧急解锁已锁定约 %d 分钟</string>
+    <string name="security_emergency_open_form">紧急解锁</string>
+    <string name="security_emergency_submit">提交验证</string>
+    <string name="security_emergency_fill_all">请填写所有字段</string>
+    <string name="security_emergency_bad_port">端口无效</string>
+    <string name="security_emergency_history_title">解锁历史（最近 5 次）</string>
+    <string name="security_emergency_confirm_title">确认紧急解锁？</string>
+    <string name="security_emergency_confirm_message">解锁后所有凭据需重新录入，此操作不可撤销。确定继续？</string>
+    <string name="security_emergency_confirm_action">确认解锁</string>
+
+    <string name="security_audit_title">敏感操作审计日志</string>
+    <string name="security_audit_clear">清空</string>
+    <string name="security_audit_empty">暂无记录</string>
+    <string name="security_audit_result_ok">成功</string>
+    <string name="security_audit_result_fail">失败</string>
+    <string name="security_audit_action_db">数据库加密</string>
+    <string name="security_audit_action_rotate">密钥轮换</string>
+    <string name="security_audit_action_emergency">紧急解锁</string>
+    <string name="security_audit_action_biometric">生物识别变更</string>
+    <string name="security_audit_action_secure">防截图变更</string>
+    <string name="security_audit_clear_title">清空审计日志？</string>
+    <string name="security_audit_clear_message">清空后不可恢复。确定清空？</string>
+    <string name="security_audit_clear_action">清空</string>
+
+    <string name="security_zth_desc">越严格档位越频繁弹卡用户确认；幻觉触发（ToolOutput/Plan/Skill 正文）无论档位，都先弹卡绝不自我麻痹。</string>
+    <string name="security_zth_swipe_hint">关闭仅允许 DISABLED / MINIMAL(0/1)；≥2 强制开。</string>
+
 </resources>

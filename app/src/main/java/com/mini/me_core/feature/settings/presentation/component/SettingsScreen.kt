@@ -89,8 +89,10 @@ import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.presentation.SecuritySettingsViewModel
 import com.mini.me_core.feature.settings.presentation.SettingsViewModel
+import com.mini.me_core.feature.settings.presentation.ZthSettingsViewModel
 import com.mini.me_core.feature.settings.presentation.components.RemoteAuditLogsScreen
 import com.mini.me_core.feature.settings.presentation.components.SecuritySettingsScreen
+import com.mini.me_core.feature.settings.presentation.components.ZthSettingsScreen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
@@ -111,6 +113,7 @@ import androidx.compose.material.icons.rounded.Lan
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Notes
+import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
@@ -131,6 +134,7 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     RemoteServers(R.string.settings_remote_servers),
     Backup(R.string.settings_backup),
     Security(R.string.settings_security),
+    Zth(R.string.settings_zth_title),
     RemoteAuditLogs(R.string.settings_remote_audit_logs),
     About(R.string.settings_about),
     Update(R.string.update_title),
@@ -570,6 +574,11 @@ fun SettingsScreen(
                         androidx.hilt.navigation.compose.hiltViewModel()
                     SecuritySettingsScreen(viewModel = securityViewModel)
                 }
+                SettingsSection.Zth -> {
+                    val zthViewModel: ZthSettingsViewModel =
+                        androidx.hilt.navigation.compose.hiltViewModel()
+                    ZthSettingsScreen(viewModel = zthViewModel)
+                }
                 SettingsSection.RemoteAuditLogs -> {
                     RemoteAuditLogsScreen(auditLogRepo = viewModel.auditLogRepository)
                 }
@@ -877,6 +886,17 @@ internal fun SettingsMenu(
             iconBgDark = Color(0xFFB91C1C),
             keywords = listOf("security", stringResource(R.string.ui____56563edf_2), stringResource(R.string.ui______05ad4f31), stringResource(R.string.ui____5f811dd8), "password", stringResource(R.string.ui____fdbc77bd), "pin"),
             action = { onOpen(SettingsSection.Security) }
+        ),
+        MenuItem(
+            section = SettingsSection.Zth,
+            group = groupData,
+            title = stringResource(R.string.settings_zth_title),
+            subtitle = stringResource(R.string.settings_zth_subtitle),
+            icon = Icons.Rounded.Psychology,
+            iconBgLight = Color(0xFF8B5CF6),
+            iconBgDark = Color(0xFF4C1D95),
+            keywords = listOf("zth", "hallucination", stringResource(R.string.settings_zth_title), "confirm", stringResource(R.string.settings_zth_subtitle)),
+            action = { onOpen(SettingsSection.Zth) }
         ),
         MenuItem(
             section = SettingsSection.RemoteAuditLogs,
