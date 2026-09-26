@@ -1718,7 +1718,9 @@
     <string name="doc_viewer_switch_to_zh">中</string>
 
     <!-- About - QQ feedback group / contact developer -->
-    <string name="about_qq_group_sheet_title">MiniMe-Core Feedback</string>
+    <string name="about_qq_group_sheet_title">QQ Group Feedback</string>
+    <string name="about_qq_group_name_label">Group Name</string>
+    <string name="about_qq_group_name">MiniMe-Core Feedback</string>
     <string name="about_qq_group_number_label">Group No.</string>
     <string name="about_qq_group_number">434751837</string>
     <string name="about_qq_group_copy_number">Copy Group No.</string>
@@ -2793,4 +2795,62 @@
     <string name="download_close">Close</string>
     <string name="download_indeterminate">Downloading, please wait…</string>
     <string name="download_confirm_size_unknown">Unknown size</string>
+
+    <!-- QQ Bot Module -->
+    <string name="qqbot_title">QQ Bot</string>
+    <string name="qqbot_status_stopped">Stopped</string>
+    <string name="qqbot_status_starting">Starting</string>
+    <string name="qqbot_status_running">Running</string>
+    <string name="qqbot_status_error">Error</string>
+    <string name="qqbot_status_stopping">Stopping</string>
+    <string name="qqbot_ws_disconnected">Disconnected</string>
+    <string name="qqbot_ws_connecting">Connecting</string>
+    <string name="qqbot_ws_connected">Connected</string>
+    <string name="qqbot_start">Start</string>
+    <string name="qqbot_stop">Stop</string>
+    <string name="qqbot_restart">Restart</string>
+    <string name="qqbot_login_qr">QR Login</string>
+    <string name="qqbot_logged_in">Logged in</string>
+    <string name="qqbot_not_logged_in">Not logged in</string>
+    <string name="qqbot_bot_qq">Bot QQ</string>
+    <string name="qqbot_ws_port">Reverse WS Port</string>
+    <string name="qqbot_ws_token">Connection Token</string>
+    <string name="qqbot_generate_config">Generate LLBot Config</string>
+    <string name="qqbot_config_generated">Config generated</string>
+    <string name="qqbot_private_trigger">Private Chat Trigger</string>
+    <string name="qqbot_group_at_trigger">Group @ Trigger</string>
+    <string name="qqbot_default_model">Default Model</string>
+    <string name="qqbot_context_length">Context Length</string>
+    <string name="qqbot_logs">Runtime Logs</string>
+    <string name="qqbot_logs_empty">No logs</string>
+    <string name="qqbot_chat_records">Chat Records</string>
+    <string name="qqbot_session_all">All</string>
+    <string name="qqbot_session_group">Groups</string>
+    <string name="qqbot_session_private">Private</string>
+    <string name="qqbot_no_sessions">No sessions</string>
+    <string name="qqbot_no_messages">No messages</string>
+    <string name="qqbot_search">Search</string>
+    <string name="qqbot_search_hint">Search sessions or messages</string>
+    <string name="qqbot_clear_chat">Clear chat records</string>
+    <string name="qqbot_delete_session">Delete session</string>
+    <string name="qqbot_confirm_delete">Delete this session and all messages?</string>
+    <string name="qqbot_confirm_clear">Clear all chat records?</string>
+    <string name="qqbot_notification_running">QBot Running</string>
+    <string name="qqbot_notification_connected">QQ: %1$d · Connected</string>
+    <string name="qqbot_notification_disconnected">QQ disconnected</string>
+    <string name="qqbot_notification_today_messages">Today: %1$d msgs</string>
+    <string name="qqbot_notification_stop">Stop</string>
+    <string name="qqbot_notification_manage">Manage</string>
+    <string name="qqbot_error_port_in_use">Port %1$d is already in use</string>
+    <string name="qqbot_error_start_failed">Start failed: %1$s</string>
+    <string name="qqbot_error_container">Container environment error</string>
+    <string name="qqbot_error_llbot_not_found">LLBot not found</string>
+    <string name="qqbot_llbot_section">LLBot Management</string>
+    <string name="qqbot_connection_section">Connection Config</string>
+    <string name="qqbot_settings_section">Basic Settings</string>
+    <string name="qqbot_message_too_long">Message too long, sent in segments</string>
+    <string name="qqbot_copy_token">Copy Token</string>
+    <string name="qqbot_token_copied">Token copied</string>
+    <string name="qqbot_uptime">Uptime: %1$s</string>
+    <string name="qqbot_today_messages_label">Today Messages</string>
 </resources>

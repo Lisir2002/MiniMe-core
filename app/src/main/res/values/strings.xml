@@ -1788,7 +1788,9 @@
     <string name="doc_viewer_switch_to_zh">中</string>
 
     <!-- About - QQ 反馈群 / 联系开发者 -->
-    <string name="about_qq_group_sheet_title">MiniMe-Core反馈</string>
+    <string name="about_qq_group_sheet_title">QQ群反馈</string>
+    <string name="about_qq_group_name_label">群名</string>
+    <string name="about_qq_group_name">MiniMe-Core反馈</string>
     <string name="about_qq_group_number_label">群号</string>
     <string name="about_qq_group_number">434751837</string>
     <string name="about_qq_group_copy_number">复制群号</string>
@@ -2877,4 +2879,63 @@
     <string name="download_close">关闭</string>
     <string name="download_indeterminate">正在下载，请稍候…</string>
     <string name="download_confirm_size_unknown">未知大小</string>
+
+    <!-- QQ 机器人模块 -->
+    <string name="qqbot_title">QQ 机器人</string>
+    <string name="qqbot_status_stopped">已停止</string>
+    <string name="qqbot_status_starting">启动中</string>
+    <string name="qqbot_status_running">运行中</string>
+    <string name="qqbot_status_error">异常</string>
+    <string name="qqbot_status_stopping">停止中</string>
+    <string name="qqbot_ws_disconnected">未连接</string>
+    <string name="qqbot_ws_connecting">连接中</string>
+    <string name="qqbot_ws_connected">已连接</string>
+    <string name="qqbot_start">启动</string>
+    <string name="qqbot_stop">停止</string>
+    <string name="qqbot_restart">重启</string>
+    <string name="qqbot_login_qr">扫码登录</string>
+    <string name="qqbot_logged_in">已登录</string>
+    <string name="qqbot_not_logged_in">未登录</string>
+    <string name="qqbot_bot_qq">机器人 QQ</string>
+    <string name="qqbot_ws_port">反向 WS 端口</string>
+    <string name="qqbot_ws_token">连接 Token</string>
+    <string name="qqbot_generate_config">生成 LLBot 配置</string>
+    <string name="qqbot_config_generated">配置已生成</string>
+    <string name="qqbot_private_trigger">私聊触发</string>
+    <string name="qqbot_group_at_trigger">群聊 @ 触发</string>
+    <string name="qqbot_default_model">默认模型</string>
+    <string name="qqbot_context_length">上下文长度</string>
+    <string name="qqbot_logs">运行日志</string>
+    <string name="qqbot_logs_empty">暂无日志</string>
+    <string name="qqbot_chat_records">聊天记录</string>
+    <string name="qqbot_session_all">全部</string>
+    <string name="qqbot_session_group">群聊</string>
+    <string name="qqbot_session_private">私聊</string>
+    <string name="qqbot_no_sessions">暂无会话</string>
+    <string name="qqbot_no_messages">暂无消息</string>
+    <string name="qqbot_search">搜索</string>
+    <string name="qqbot_search_hint">搜索会话或消息</string>
+    <string name="qqbot_clear_chat">清空聊天记录</string>
+    <string name="qqbot_delete_session">删除会话</string>
+    <string name="qqbot_confirm_delete">确认删除该会话及所有消息？</string>
+    <string name="qqbot_confirm_clear">确认清空所有聊天记录？</string>
+    <string name="qqbot_notification_running">QBot 运行中</string>
+    <string name="qqbot_notification_connected">QQ: %1$d · 已连接</string>
+    <string name="qqbot_notification_disconnected">QQ 未连接</string>
+    <string name="qqbot_notification_today_messages">今日消息: %1$d</string>
+    <string name="qqbot_notification_stop">停止</string>
+    <string name="qqbot_notification_manage">管理</string>
+    <string name="qqbot_error_port_in_use">端口 %1$d 已被占用</string>
+    <string name="qqbot_error_start_failed">启动失败: %1$s</string>
+    <string name="qqbot_error_container">容器环境异常</string>
+    <string name="qqbot_error_llbot_not_found">未找到 LLBot</string>
+    <string name="qqbot_llbot_section">LLBot 管理</string>
+    <string name="qqbot_connection_section">连接配置</string>
+    <string name="qqbot_settings_section">基础设置</string>
+    <string name="qqbot_message_too_long">消息过长，已分段发送</string>
+    <string name="qqbot_copy_token">复制 Token</string>
+    <string name="qqbot_token_copied">Token 已复制</string>
+    <string name="qqbot_uptime">运行时长: %1$s</string>
+    <string name="qqbot_today_messages_label">今日消息</string>
+    <string name="qqbot_notification_channel_name">QQ 机器人常驻服务</string>
 </resources>
