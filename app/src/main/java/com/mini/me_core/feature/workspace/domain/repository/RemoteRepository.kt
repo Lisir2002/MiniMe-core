@@ -265,6 +265,27 @@ class RemoteRepository @Inject constructor(
         }
     }
 
+    /** 按已保存连接的 id 测试连通性（加载凭据后短连短断）。 */
+    suspend fun testConnectionById(connectionId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val connEntity = getConnectionEntity(connectionId) ?: return@withContext Result.failure(Exception("Connection not found"))
+            val conn = connEntity.toDomainModel()
+
+            val client = when (conn.protocol) {
+                RemoteProtocol.SFTP -> SftpSyncClient(hostKeyManager.createVerifier())
+                RemoteProtocol.FTP -> FtpSyncClient()
+                RemoteProtocol.LOCAL -> LocalSyncClient()
+            }
+            val auth = resolveAuth(connEntity.authType, connEntity.authData, connEntity.passphrase)
+
+            client.connect(conn.host, conn.port, conn.username, auth)
+            client.disconnect()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun listRemoteDirectories(connectionId: String, path: String): Result<List<String>> = withContext(Dispatchers.IO) {
         try {
             val connEntity = getConnectionEntity(connectionId) ?: return@withContext Result.failure(Exception("Connection not found"))

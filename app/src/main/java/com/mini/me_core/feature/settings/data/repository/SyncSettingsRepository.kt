@@ -30,6 +30,24 @@ class SyncSettingsRepository @Inject constructor(
     )
     val maxSyncBatchSize: StateFlow<Int> = _maxSyncBatchSize.asStateFlow()
 
+    /** 全局冲突处理策略：remote_overwrite / local_overwrite / skip / rename。 */
+    private val _conflictStrategy = MutableStateFlow(
+        prefs.getString("conflict_strategy", "remote_overwrite")!!
+    )
+    val conflictStrategy: StateFlow<String> = _conflictStrategy.asStateFlow()
+
+    /** 是否启用自动同步。 */
+    private val _autoSyncEnabled = MutableStateFlow(
+        prefs.getBoolean("auto_sync_enabled", false)
+    )
+    val autoSyncEnabled: StateFlow<Boolean> = _autoSyncEnabled.asStateFlow()
+
+    /** 自动同步间隔（分钟）：5 / 15 / 30 / 60；0 表示仅手动。 */
+    private val _autoSyncIntervalMinutes = MutableStateFlow(
+        prefs.getInt("auto_sync_interval_minutes", 15)
+    )
+    val autoSyncIntervalMinutes: StateFlow<Int> = _autoSyncIntervalMinutes.asStateFlow()
+
     fun setIgnoredPatterns(patterns: String) {
         prefs.edit { putString("ignored_patterns", patterns) }
         _ignoredPatterns.value = patterns
@@ -45,11 +63,28 @@ class SyncSettingsRepository @Inject constructor(
         _maxSyncBatchSize.value = size
     }
 
-    /** 备份快照：同步偏好三键。 */
+    fun setConflictStrategy(strategy: String) {
+        prefs.edit { putString("conflict_strategy", strategy) }
+        _conflictStrategy.value = strategy
+    }
+
+    fun setAutoSync(enabled: Boolean, intervalMinutes: Int) {
+        prefs.edit {
+            putBoolean("auto_sync_enabled", enabled)
+            putInt("auto_sync_interval_minutes", intervalMinutes)
+        }
+        _autoSyncEnabled.value = enabled
+        _autoSyncIntervalMinutes.value = intervalMinutes
+    }
+
+    /** 备份快照：同步偏好全部键。 */
     fun snapshot(): SyncSettingsSnapshot = SyncSettingsSnapshot(
         ignoredPatterns = _ignoredPatterns.value,
         useGitIgnore = _useGitIgnore.value,
-        maxSyncBatchSize = _maxSyncBatchSize.value
+        maxSyncBatchSize = _maxSyncBatchSize.value,
+        conflictStrategy = _conflictStrategy.value,
+        autoSyncEnabled = _autoSyncEnabled.value,
+        autoSyncIntervalMinutes = _autoSyncIntervalMinutes.value,
     )
 
     /** 从备份还原同步偏好。 */
@@ -57,6 +92,8 @@ class SyncSettingsRepository @Inject constructor(
         setIgnoredPatterns(snapshot.ignoredPatterns)
         setUseGitIgnore(snapshot.useGitIgnore)
         setMaxSyncBatchSize(snapshot.maxSyncBatchSize)
+        setConflictStrategy(snapshot.conflictStrategy)
+        setAutoSync(snapshot.autoSyncEnabled, snapshot.autoSyncIntervalMinutes)
     }
 }
 
@@ -65,5 +102,8 @@ class SyncSettingsRepository @Inject constructor(
 data class SyncSettingsSnapshot(
     val ignoredPatterns: String,
     val useGitIgnore: Boolean,
-    val maxSyncBatchSize: Int
+    val maxSyncBatchSize: Int,
+    val conflictStrategy: String = "remote_overwrite",
+    val autoSyncEnabled: Boolean = false,
+    val autoSyncIntervalMinutes: Int = 15,
 )

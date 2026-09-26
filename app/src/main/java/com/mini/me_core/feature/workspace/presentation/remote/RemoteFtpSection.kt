@@ -1,24 +1,35 @@
 package com.mini.me_core.feature.workspace.presentation.remote
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mini.me_core.R
+import com.mini.me_core.core.theme.components.AppButton
+import com.mini.me_core.core.theme.components.AppButtonSize
+import com.mini.me_core.core.theme.components.AppButtonVariant
+import com.mini.me_core.core.theme.components.AppCard
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.ui.res.stringResource
-import com.mini.me_core.R
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 
 @Composable
 fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
@@ -34,59 +45,22 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
     var editPort by remember(port) { mutableStateOf(port.toString()) }
     var editUsername by remember(username) { mutableStateOf(username) }
     var editPassword by remember(password) { mutableStateOf(password) }
+    var editPasswordVisible by remember { mutableStateOf(false) }
     var editAnonymous by remember(isAnonymous) { mutableStateOf(isAnonymous) }
     var editAutoStart by remember(autoStart) { mutableStateOf(autoStart) }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(PrimitiveSpacing.Lg),
+        verticalArrangement = Arrangement.spacedBy(PrimitiveSpacing.Md)
     ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(LocalCornerRadius.current.xl),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
-                verticalAlignment = Alignment.Top
-            ) {
-                Icon(
-                    Icons.Rounded.Info,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp).padding(top = 2.dp)
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(
-                        text = stringResource(R.string.ftp_usage_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.ftp_usage_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(LocalCornerRadius.current.xl),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
-            Column(modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg)) {
+        // ── 状态卡片：开关 + 运行状态 + 服务器地址（可复制） ──
+        AppCard {
+            Column(modifier = Modifier.padding(PrimitiveSpacing.Lg)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -99,7 +73,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                             tint = if (isRunning) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(24.dp)
                         )
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(PrimitiveSpacing.Md))
                         Column {
                             Text(
                                 text = "FTP",
@@ -107,7 +81,8 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (isRunning) stringResource(R.string.ftp_running, serverUrl) else stringResource(R.string.ftp_not_running),
+                                text = if (isRunning) stringResource(R.string.ftp_running, serverUrl)
+                                else stringResource(R.string.ftp_not_running),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (isRunning) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 2.dp)
@@ -120,9 +95,40 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     )
                 }
 
-                if (errorMessage != null) {
-                    val error = errorMessage
-                    Spacer(modifier = Modifier.height(12.dp))
+                if (isRunning) {
+                    Spacer(modifier = Modifier.height(PrimitiveSpacing.Sm))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.remote_ftp_server_url),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = serverUrl,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        IconButton(onClick = {
+                            clipboard.setText(AnnotatedString(serverUrl))
+                            android.widget.Toast.makeText(context, context.getString(R.string.remote_ftp_url_copied), android.widget.Toast.LENGTH_SHORT).show()
+                        }) {
+                            Icon(
+                                Icons.Rounded.ContentCopy,
+                                contentDescription = stringResource(R.string.remote_ftp_copy_url),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                errorMessage?.let { error ->
+                    Spacer(modifier = Modifier.height(PrimitiveSpacing.Sm))
                     Text(
                         text = context.getString(R.string.ftp_error, error),
                         style = MaterialTheme.typography.bodySmall,
@@ -132,15 +138,11 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
             }
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(LocalCornerRadius.current.xl),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
+        // ── 配置卡片 ──
+        AppCard {
             Column(
-                modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.padding(PrimitiveSpacing.Lg),
+                verticalArrangement = Arrangement.spacedBy(PrimitiveSpacing.Md)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -149,7 +151,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(PrimitiveSpacing.Md))
                     Text(
                         text = stringResource(R.string.ftp_config_title),
                         style = MaterialTheme.typography.titleMedium,
@@ -159,7 +161,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
 
                 OutlinedTextField(
                     value = editPort,
-                    onValueChange = { editPort = it.filter { char -> char.isDigit() } },
+                    onValueChange = { editPort = it.filter { ch -> ch.isDigit() } },
                     label = { Text(stringResource(R.string.ftp_listen_port)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
@@ -180,7 +182,14 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     label = { Text(stringResource(R.string.ftp_login_password)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !editAnonymous
+                    enabled = !editAnonymous,
+                    visualTransformation = if (editPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        val image = if (editPasswordVisible) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff
+                        IconButton(onClick = { editPasswordVisible = !editPasswordVisible }) {
+                            Icon(image, contentDescription = stringResource(R.string.remote_toggle_password), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 )
 
                 Row(
@@ -207,15 +216,46 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     Switch(checked = editAutoStart, onCheckedChange = { editAutoStart = it })
                 }
 
-                Button(
+                AppButton(
+                    text = stringResource(R.string.ftp_save_config),
                     onClick = {
                         val p = editPort.toIntOrNull() ?: 2121
                         viewModel.saveFtpServerConfig(p, editUsername, editPassword, editAnonymous, editAutoStart)
                         android.widget.Toast.makeText(context, context.getString(R.string.ftp_config_saved), android.widget.Toast.LENGTH_SHORT).show()
                     },
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text(stringResource(R.string.ftp_save_config))
+                    modifier = Modifier.align(Alignment.End),
+                    size = AppButtonSize.Medium,
+                )
+            }
+        }
+
+        // ── 使用说明卡片 ──
+        AppCard {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(PrimitiveSpacing.Lg),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                    Icons.Rounded.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp).padding(top = 2.dp)
+                )
+                Spacer(modifier = Modifier.width(PrimitiveSpacing.Md))
+                Column {
+                    Text(
+                        text = stringResource(R.string.ftp_usage_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.ftp_usage_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
             }
         }

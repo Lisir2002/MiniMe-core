@@ -16,9 +16,12 @@ import com.mini.me_core.feature.workspace.domain.model.RemoteMount
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.components.AppSegmentedControl
+import com.mini.me_core.core.theme.components.AppTopAppBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,19 +39,22 @@ fun RemoteServerScreen(
     val syncIgnoredPatterns by viewModel.syncIgnoredPatterns.collectAsStateWithLifecycle()
     val syncUseGitIgnore by viewModel.syncUseGitIgnore.collectAsStateWithLifecycle()
     val maxSyncBatchSize by viewModel.maxSyncBatchSize.collectAsStateWithLifecycle()
+    val conflictStrategy by viewModel.conflictStrategy.collectAsStateWithLifecycle()
+    val autoSyncEnabled by viewModel.autoSyncEnabled.collectAsStateWithLifecycle()
+    val autoSyncIntervalMinutes by viewModel.autoSyncIntervalMinutes.collectAsStateWithLifecycle()
+    val testingConnectionIds by viewModel.testingConnectionIds.collectAsStateWithLifecycle()
+    val mountSyncDirections by viewModel.mountSyncDirections.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Column {
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-                    title = { Text(stringResource(R.string.remote_workspace_title)) },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                        }
-                    }
+                AppTopAppBar(
+                    title = stringResource(R.string.remote_workspace_title),
+                    onNavigateBack = onNavigateBack,
+                    navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                    navigationContentDescription = stringResource(R.string.common_back),
                 )
                 AppSegmentedControl(
                     tabs = listOf(
@@ -81,10 +87,11 @@ fun RemoteServerScreen(
         Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
             if (selectedTab == 0) {
                 if (uiState.connections.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.remote_no_connections),
-                        modifier = Modifier.align(Alignment.Center),
-                        style = MaterialTheme.typography.bodyLarge
+                    com.mini.me_core.core.theme.components.AppEmptyState(
+                        title = stringResource(R.string.remote_empty_connections_title),
+                        subtitle = stringResource(R.string.remote_empty_connections_subtitle),
+                        icon = androidx.compose.material.icons.Icons.Rounded.Dns,
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 } else {
                     LazyColumn(
@@ -95,6 +102,12 @@ fun RemoteServerScreen(
                         items(uiState.connections) { conn ->
                             RemoteConnectionCard(
                                 conn = conn,
+                                testing = conn.id in testingConnectionIds,
+                                onTest = { c ->
+                                    viewModel.testConnection(c.id) { success, msg ->
+                                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                                    }
+                                },
                                 onEdit = {
                                     connectionToEdit = it
                                     showAddConnectionDialog = true
@@ -106,10 +119,11 @@ fun RemoteServerScreen(
                 }
             } else if (selectedTab == 1) {
                 if (uiState.mounts.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.remote_no_workspaces),
-                        modifier = Modifier.align(Alignment.Center),
-                        style = MaterialTheme.typography.bodyLarge
+                    com.mini.me_core.core.theme.components.AppEmptyState(
+                        title = stringResource(R.string.remote_empty_mounts_title),
+                        subtitle = stringResource(R.string.remote_empty_mounts_subtitle),
+                        icon = androidx.compose.material.icons.Icons.Rounded.Storage,
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 } else {
                     LazyColumn(
@@ -121,6 +135,8 @@ fun RemoteServerScreen(
                             RemoteMountCard(
                                 mount = mount,
                                 isFailed = mount.id in uiState.failedMountIds,
+                                direction = mountSyncDirections[mount.id] ?: mount.syncDirection,
+                                onDirectionChange = { viewModel.setSyncDirection(mount.id, it) },
                                 onEdit = {
                                     mountToEdit = it
                                     showAddMountDialog = true
@@ -143,9 +159,17 @@ fun RemoteServerScreen(
                     ignoredPatterns = syncIgnoredPatterns,
                     useGitIgnore = syncUseGitIgnore,
                     maxSyncBatchSize = maxSyncBatchSize,
+                    conflictStrategy = conflictStrategy,
+                    autoSyncEnabled = autoSyncEnabled,
+                    autoSyncIntervalMinutes = autoSyncIntervalMinutes,
                     onPatternsChange = { viewModel.setSyncIgnoredPatterns(it) },
                     onUseGitIgnoreChange = { viewModel.setSyncUseGitIgnore(it) },
-                    onMaxSyncBatchSizeChange = { viewModel.setMaxSyncBatchSize(it) }
+                    onMaxSyncBatchSizeChange = { viewModel.setMaxSyncBatchSize(it) },
+                    onDirectionChange = { direction ->
+                        uiState.mounts.forEach { viewModel.setSyncDirection(it.id, direction) }
+                    },
+                    onConflictStrategyChange = { viewModel.setConflictStrategy(it) },
+                    onAutoSyncChange = { enabled, interval -> viewModel.setAutoSync(enabled, interval) }
                 )
             }
 

@@ -23,6 +23,7 @@ import com.mini.me_core.feature.workspace.domain.model.Workspace
 import com.mini.me_core.feature.workspace.data.repository.WorkspaceRepository
 import com.mini.me_core.feature.settings.data.repository.SyncSettingsRepository
 import com.mini.me_core.feature.workspace.domain.remote.ftp.FtpServerManager
+import com.mini.me_core.datalayer.store.KVStore
 
 @HiltViewModel
 class RemoteServerViewModel @Inject constructor(
@@ -30,6 +31,7 @@ class RemoteServerViewModel @Inject constructor(
     private val repository: RemoteRepository,
     private val workspaceRepository: WorkspaceRepository,
     private val syncSettingsRepository: SyncSettingsRepository,
+    private val kv: KVStore,
     val ftpServerManager: FtpServerManager
 ) : ViewModel() {
 
@@ -39,9 +41,28 @@ class RemoteServerViewModel @Inject constructor(
     val syncIgnoredPatterns = syncSettingsRepository.ignoredPatterns
     val syncUseGitIgnore = syncSettingsRepository.useGitIgnore
     val maxSyncBatchSize = syncSettingsRepository.maxSyncBatchSize
+    val conflictStrategy = syncSettingsRepository.conflictStrategy
+    val autoSyncEnabled = syncSettingsRepository.autoSyncEnabled
+    val autoSyncIntervalMinutes = syncSettingsRepository.autoSyncIntervalMinutes
+
+    /** 每个挂载点的同步方向（bidirectional/upload_only/download_only），按 mountId 持久化在 KVStore。 */
+    private val _mountSyncDirections = MutableStateFlow<Map<String, String>>(emptyMap())
+    val mountSyncDirections: StateFlow<Map<String, String>> = _mountSyncDirections.asStateFlow()
+
+    /** 正在测试连通性的连接 id 集合（用于卡片 loading 态）。 */
+    private val _testingConnectionIds = MutableStateFlow<Set<String>>(emptySet())
+    val testingConnectionIds: StateFlow<Set<String>> = _testingConnectionIds.asStateFlow()
 
     init {
         loadData()
+        loadMountSyncDirections()
+    }
+
+    private fun loadMountSyncDirections() {
+        viewModelScope.launch {
+            val entries = kv.getAll(REMOTE_MOUNT_PREFS_NS).associate { it.key to (it.stringVal ?: "bidirectional") }
+            _mountSyncDirections.value = entries
+        }
     }
 
     private fun loadData() {
@@ -267,6 +288,55 @@ class RemoteServerViewModel @Inject constructor(
         }
     }
 
+    /** 测试单个已保存连接的连通性（从卡片触发）。 */
+    fun testConnection(id: String, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            _testingConnectionIds.value = _testingConnectionIds.value + id
+            val result = repository.testConnectionById(id)
+            _testingConnectionIds.value = _testingConnectionIds.value - id
+            if (result.isSuccess) {
+                onResult(true, context.getString(R.string.remote_connect_success))
+            } else {
+                onResult(false, context.getString(R.string.remote_connect_failed, result.exceptionOrNull()?.message))
+            }
+        }
+    }
+
+    /** 批量连接所有未连接的挂载点。 */
+    fun connectAll() {
+        viewModelScope.launch {
+            _uiState.value.mounts.filter { !it.isActive }.forEach { connectMount(it.id) }
+        }
+    }
+
+    /** 批量断开所有已连接的挂载点。 */
+    fun disconnectAll() {
+        viewModelScope.launch {
+            _uiState.value.mounts.filter { it.isActive }.forEach { disconnectMount(it.id) }
+        }
+    }
+
+    /** 设置单个挂载点的同步方向并持久化。 */
+    fun setSyncDirection(mountId: String, direction: String) {
+        viewModelScope.launch {
+            kv.putString(REMOTE_MOUNT_PREFS_NS, "dir_$mountId", direction)
+            _mountSyncDirections.value = _mountSyncDirections.value + (mountId to direction)
+            // TODO: 将 direction 传入 SyncEngine，按方向限制 upload/download/watch 行为
+        }
+    }
+
+    /** 设置全局冲突处理策略并持久化。 */
+    fun setConflictStrategy(strategy: String) {
+        syncSettingsRepository.setConflictStrategy(strategy)
+        // TODO: 将 strategy 传入 SyncEngine，解决冲突时按策略执行
+    }
+
+    /** 设置自动同步开关与间隔（分钟，0 表示仅手动）并持久化。 */
+    fun setAutoSync(enabled: Boolean, intervalMinutes: Int) {
+        syncSettingsRepository.setAutoSync(enabled, intervalMinutes)
+        // TODO: 按 intervalMinutes 启动/取消周期同步协程
+    }
+
     fun setSyncIgnoredPatterns(patterns: String) {
         syncSettingsRepository.setIgnoredPatterns(patterns)
     }
@@ -312,3 +382,6 @@ data class RemoteServerUiState(
     /** 下载完成/失败结果消息（非空时由进度弹窗显示）。 */
     val downloadResult: String? = null,
 )
+
+/** KVStore namespace：按 mountId 保存每挂载点的同步方向等偏好。 */
+private const val REMOTE_MOUNT_PREFS_NS = "remote_mount_prefs"
