@@ -381,6 +381,7 @@
     <string name="common_create">Create</string>
     <string name="common_delete">Delete</string>
     <string name="common_cancel">Cancel</string>
+    <string name="common_confirm">Confirm</string>
     <string name="common_name">Name</string>
     <string name="common_image_preview">Image Preview</string>
     <string name="common_expand">Expand</string>
@@ -1398,6 +1399,46 @@
     <string name="sync_download_all">Download All</string>
     <string name="sync_connect_and_sync">Connect &amp; Sync</string>
 
+    <!-- Remote workspace audit UI -->
+    <string name="remote_empty_connections_title">No remote connections</string>
+    <string name="remote_empty_connections_subtitle">Tap the button below to add a connection</string>
+    <string name="remote_empty_mounts_title">No workspace mounts</string>
+    <string name="remote_empty_mounts_subtitle">Tap the button below to add a workspace mount</string>
+    <string name="remote_action_test">Test connection</string>
+    <string name="remote_testing">Testing…</string>
+    <string name="remote_last_connected">Last connected: %1$s</string>
+    <string name="remote_never_connected">Never connected</string>
+    <string name="remote_time_just_now">Just now</string>
+    <string name="remote_time_minutes_ago">%1$d min ago</string>
+    <string name="remote_time_hours_ago">%1$d h ago</string>
+    <string name="remote_time_days_ago">%1$d d ago</string>
+    <string name="remote_mount_remote_path_label">Remote path</string>
+    <string name="remote_mount_local_path_label">Local path</string>
+    <string name="remote_sync_direction">Sync direction</string>
+    <string name="remote_dir_bidirectional">Bidirectional</string>
+    <string name="remote_dir_upload_only">Upload only</string>
+    <string name="remote_dir_download_only">Download only</string>
+    <string name="remote_conflict_strategy">Conflict resolution</string>
+    <string name="remote_conflict_strategy_desc">What to do when both sides edit the same file</string>
+    <string name="remote_conflict_remote_overwrite">Remote overwrites local</string>
+    <string name="remote_conflict_local_overwrite">Local overwrites remote</string>
+    <string name="remote_conflict_skip">Skip conflicts</string>
+    <string name="remote_conflict_rename">Rename to keep both</string>
+    <string name="remote_auto_sync">Auto sync</string>
+    <string name="remote_auto_sync_desc">Automatically sync connected mounts on an interval</string>
+    <string name="remote_auto_sync_interval">Sync interval</string>
+    <string name="remote_interval_5min">5 minutes</string>
+    <string name="remote_interval_15min">15 minutes</string>
+    <string name="remote_interval_30min">30 minutes</string>
+    <string name="remote_interval_1h">1 hour</string>
+    <string name="remote_interval_manual">Manual only</string>
+    <string name="remote_ignore_templates_title">Common templates</string>
+    <string name="remote_ftp_server_url">Server URL</string>
+    <string name="remote_ftp_copy_url">Copy URL</string>
+    <string name="remote_ftp_url_copied">URL copied to clipboard</string>
+    <string name="remote_batch_connect_all">Connect all</string>
+    <string name="remote_batch_disconnect_all">Disconnect all</string>
+
     <!-- Terminal -->
     <string name="terminal_title">Terminal</string>
     <string name="terminal_reconnect_tab">Reconnect current tab</string>
@@ -1905,6 +1946,60 @@
     <string name="ui_rootfs_602d203f">rootfs is about 150 MB after extraction; 300-500 MB with Bundles installed</string>
     <string name="ui_ssh_1fd07b48">SSH heartbeat interval</string>
     <string name="ui_ssh_ac7515bd">SSH remote terminal</string>
+
+    <!-- Terminal settings semantic names (audit; legacy hash names kept) -->
+    <string name="terminal_appearance">Appearance</string>
+    <string name="terminal_keyboard">Keyboard &amp; Interaction</string>
+    <string name="terminal_behavior">Behavior</string>
+    <string name="terminal_ssh_section">SSH Connection</string>
+    <string name="terminal_font_size">Terminal font size</string>
+    <string name="terminal_font_size_value">%1$d sp</string>
+    <string name="terminal_font_size_hint">Range 10-24 sp</string>
+    <string name="terminal_color_scheme">Color scheme</string>
+    <string name="terminal_color_follow">Follow app</string>
+    <string name="terminal_color_pure_black">Pure black</string>
+    <string name="terminal_color_pure_white">Pure white</string>
+    <string name="terminal_color_amoled">AMOLED black</string>
+    <string name="terminal_cursor_style">Cursor style</string>
+    <string name="terminal_cursor_block">Block</string>
+    <string name="terminal_cursor_underline">Underline</string>
+    <string name="terminal_cursor_bar">Bar</string>
+    <string name="terminal_cursor_blink">Cursor blink</string>
+    <string name="terminal_cursor_blink_sub">Blink the cursor at the input position</string>
+    <string name="terminal_show_tab_bar">Show tab bar</string>
+    <string name="terminal_show_tab_bar_sub">When off, switch tabs via keyboard only</string>
+    <string name="terminal_full_extra_keys">Full function key row</string>
+    <string name="terminal_full_extra_keys_sub">When off, use compact layout (Ctrl/Alt/Fn/arrows)</string>
+    <string name="terminal_scale_persists">Persist font size from pinch zoom</string>
+    <string name="terminal_scale_persists_sub">When off, pinch zoom only temporarily changes display</string>
+    <string name="terminal_auto_pop_ime">Auto-show keyboard on tab switch</string>
+    <string name="terminal_auto_pop_ime_sub">When off, tap the screen to bring up the keyboard after switching</string>
+    <string name="terminal_paste_plain">Paste as plain text</string>
+    <string name="terminal_paste_plain_sub">Strip rich-text formatting on paste</string>
+    <string name="terminal_reset_ctrl_hint">Reset Ctrl usage hints</string>
+    <string name="terminal_reset_ctrl_hint_done">Reset; the Ctrl hint will show again next time</string>
+    <string name="terminal_new_output_indicator">New output indicator</string>
+    <string name="terminal_new_output_indicator_sub">Red dot in the corner when a background tab has new output</string>
+    <string name="terminal_auto_new_tab">Auto-create tab when closing last</string>
+    <string name="terminal_auto_new_tab_sub">Always keep at least one interactive tab</string>
+    <string name="terminal_keep_session">Keep session when leaving</string>
+    <string name="terminal_keep_session_sub">When off, background sessions are destroyed on leave</string>
+    <string name="terminal_scrollback">Scrollback lines</string>
+    <string name="terminal_scrollback_lines">%1$d lines</string>
+    <string name="terminal_scrollback_unlimited">Unlimited</string>
+    <string name="terminal_exit_confirm">Exit confirmation</string>
+    <string name="terminal_exit_confirm_sub">Confirm before exiting the terminal</string>
+    <string name="terminal_ssh_auto_reconnect">Auto-reconnect on disconnect</string>
+    <string name="terminal_ssh_auto_reconnect_sub">Automatically reconnect when the network switches back</string>
+    <string name="terminal_ssh_tcp_keepalive">TCP KeepAlive</string>
+    <string name="terminal_ssh_tcp_keepalive_sub">Periodic keepalive packets to avoid silent carrier drops</string>
+    <string name="terminal_ssh_heartbeat">Heartbeat interval</string>
+    <string name="terminal_ssh_hosts">SSH hosts</string>
+    <string name="terminal_ssh_hosts_sub">Add/edit/delete SSH hosts and keys</string>
+    <string name="terminal_restore_defaults">Restore default settings</string>
+    <string name="terminal_restore_defaults_confirm_title">Restore default settings?</string>
+    <string name="terminal_restore_defaults_confirm_msg">Reset all terminal preferences to defaults? This resets appearance, keyboard, behavior and SSH settings, but keeps containers and saved SSH hosts.</string>
+    <string name="terminal_restore_defaults_done">Terminal settings restored to defaults</string>
     <string name="ui_x86_64_a2f3daf8">x86_64 · QEMU translation · PRoot</string>
 
     <string name="ui___________aac0fde9">Local container not initialized yet</string>
@@ -2663,6 +2758,8 @@
     <string name="viewer_search">Search</string>
     <string name="viewer_outline">Outline</string>
     <string name="viewer_error">Error: %1$s</string>
+    <string name="viewer_error_title">Failed to load code</string>
+    <string name="viewer_error_message">The code viewer failed to load. Please restart the app or update to the latest version.</string>
 
     <!-- Generic download components -->
     <string name="download_confirm_title">Confirm Download</string>

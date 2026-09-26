@@ -10,20 +10,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.List
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -34,56 +25,41 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mini.me_core.R
+import com.mini.me_core.core.theme.components.AppErrorState
 import com.mini.me_core.core.viewer.CodeThemeMapper
 import com.mini.me_core.core.viewer.native.dto.HighlightCategory
 import com.mini.me_core.core.viewer.native.dto.HighlightSpan
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Native 代码查看器内容区（无 Scaffold / 无顶栏）。
+ *
+ * 顶栏（返回 / 文件名 / 搜索 / 大纲）由宿主（关于页）统一提供，遵循 UI 规范「顶栏唯一」。
+ * 详细异常堆栈仅写入 FileLogger，UI 仅展示友好错误提示 + 重试按钮。
+ */
 @Composable
 fun CodeViewerScreen(
     path: String,
-    onBack: () -> Unit,
-    viewModel: CodeViewerViewModel = viewModel(),
+    viewModel: CodeViewerViewModel,
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
-    androidx.compose.runtime.LaunchedEffect(path) { viewModel.open(path) }
+    LaunchedEffect(path) { viewModel.open(path) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(ui.fileName.ifEmpty { stringResource(R.string.viewer_code_title) }, maxLines = 1) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.viewer_back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.onSearchQuery(ui.searchQuery) }) {
-                        Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.viewer_search))
-                    }
-                    IconButton(onClick = { viewModel.toggleOutline() }) {
-                        Icon(Icons.AutoMirrored.Rounded.List, contentDescription = stringResource(R.string.viewer_outline))
-                    }
-                },
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (ui.loading) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+        ui.error?.let {
+            AppErrorState(
+                title = stringResource(R.string.viewer_error_title),
+                message = stringResource(R.string.viewer_error_message),
+                retryText = stringResource(R.string.update_retry),
+                onRetry = { viewModel.open(path) },
+                modifier = Modifier.fillMaxSize(),
             )
+            return@Column
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize(),
-        ) {
-            if (ui.loading) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-            ui.error?.let {
-                Text(stringResource(R.string.viewer_error, it), modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
-                return@Column
-            }
-            CodeLines(ui = ui)
-        }
+        CodeLines(ui = ui)
     }
 }
 

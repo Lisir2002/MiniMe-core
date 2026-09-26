@@ -18,19 +18,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.FolderZip
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -44,17 +37,20 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.mini.me_core.R
 import com.mini.me_core.core.ui.components.FileBrowserItem
 import com.mini.me_core.core.ui.components.fileIconVisual
-import com.mini.me_core.core.viewer.code.CodeViewerScreen
 import com.mini.me_core.feature.about.data.RepoType
 import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * 源码浏览器内容区（无 Scaffold / 无顶栏）。
+ *
+ * 顶栏（返回 / 仓库标题 / 下载）由宿主（关于页）统一提供，遵循 UI 规范「顶栏唯一」。
+ * 打开文件后由宿主切换为 [com.mini.me_core.core.viewer.code.CodeViewerScreen]。
+ */
 @Composable
 fun CodeBrowserScreen(
     owner: String,
     repo: String,
     branch: String,
-    onBack: () -> Unit,
     viewModel: CodeBrowserViewModel = hiltViewModel(),
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
@@ -63,110 +59,73 @@ fun CodeBrowserScreen(
     }
     val context = LocalContext.current
 
-    // 打开文件 -> 进入 Native CodeViewer
-    ui.openingLocalPath?.let { localPath ->
-        CodeViewerScreen(
-            path = localPath,
-            onBack = { viewModel.consumeOpenedFile() },
+    Column(
+        modifier = Modifier
+            .fillMaxSize(),
+    ) {
+        // 面包屑
+        BreadcrumbRow(
+            pathStack = ui.pathStack,
+            rootLabel = stringResource(R.string.code_browser_root),
+            onCrumbClick = { viewModel.breadcrumbClick(it) },
         )
-        return
-    }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(stringResource(R.string.code_browser_title), style = MaterialTheme.typography.titleMedium)
+        when {
+            ui.loading && ui.root == null -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            ui.error != null && ui.root == null -> {
+                Column(
+                    Modifier.fillMaxSize().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.code_browser_error, ui.error ?: ""),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    TextButton(onClick = { viewModel.retry() }) { Text(stringResource(R.string.update_retry)) }
+                }
+            }
+            else -> {
+                val children = viewModel.currentChildren()
+                if (children.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = "$owner/$repo · ${ui.branch}",
-                            style = MaterialTheme.typography.bodySmall,
+                            stringResource(R.string.code_browser_empty),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.requestDownloadZip() }) {
-                        Icon(Icons.Rounded.FolderZip, contentDescription = stringResource(R.string.code_browser_download))
-                    }
-                },
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize(),
-        ) {
-            // 面包屑
-            BreadcrumbRow(
-                pathStack = ui.pathStack,
-                rootLabel = stringResource(R.string.code_browser_root),
-                onCrumbClick = { viewModel.breadcrumbClick(it) },
-            )
-
-            when {
-                ui.loading && ui.root == null -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-                ui.error != null && ui.root == null -> {
-                    Column(
-                        Modifier.fillMaxSize().padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = 8.dp, vertical = 4.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        Text(
-                            text = stringResource(R.string.code_browser_error, ui.error ?: ""),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        TextButton(onClick = { viewModel.retry() }) { Text(stringResource(R.string.update_retry)) }
-                    }
-                }
-                else -> {
-                    val children = viewModel.currentChildren()
-                    if (children.isEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                stringResource(R.string.code_browser_empty),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        items(children, key = { it.path }) { node ->
+                            val visual = fileIconVisual(
+                                name = node.name,
+                                isDir = node.type == RepoType.DIR,
                             )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                horizontal = 8.dp, vertical = 4.dp
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            items(children, key = { it.path }) { node ->
-                                val visual = fileIconVisual(
-                                    name = node.name,
-                                    isDir = node.type == RepoType.DIR,
-                                )
-                                val subtitle = if (node.type == RepoType.DIR) {
-                                    stringResource(R.string.code_browser_items, node.children.size)
-                                } else viewModel.formatSize(node.size)
-                                FileBrowserItem(
-                                    name = node.name,
-                                    subtitle = subtitle,
-                                    icon = visual.icon,
-                                    iconBg = visual.iconBg,
-                                    iconFg = visual.iconFg,
-                                    onClick = {
-                                        if (node.type == RepoType.DIR) viewModel.enterDir(node)
-                                        else viewModel.onFileClick(node)
-                                    },
-                                )
-                            }
+                            val subtitle = if (node.type == RepoType.DIR) {
+                                stringResource(R.string.code_browser_items, node.children.size)
+                            } else viewModel.formatSize(node.size)
+                            FileBrowserItem(
+                                name = node.name,
+                                subtitle = subtitle,
+                                icon = visual.icon,
+                                iconBg = visual.iconBg,
+                                iconFg = visual.iconFg,
+                                onClick = {
+                                    if (node.type == RepoType.DIR) viewModel.enterDir(node)
+                                    else viewModel.onFileClick(node)
+                                },
+                            )
                         }
                     }
                 }

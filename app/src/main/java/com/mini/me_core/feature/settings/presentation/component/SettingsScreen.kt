@@ -326,6 +326,17 @@ fun SettingsScreen(
         }
     }
 
+    // NormFlow 子页面（护栏日志/规则管理/注入诊断/资产查看器）为 Scaffold 前的独立全屏 early return。
+    // 系统返回键应先关闭对应状态变量回到 NormFlow section，而非直接退回设置主页。
+    BackHandler(enabled = showGuardLogs || showRuleManager || showDiagnosis || assetViewerTab != null) {
+        when {
+            showGuardLogs -> showGuardLogs = false
+            showRuleManager -> showRuleManager = false
+            showDiagnosis -> showDiagnosis = false
+            assetViewerTab != null -> assetViewerTab = null
+        }
+    }
+
     // 版本更新页为独立全屏页（自带顶栏：返回/刷新 + 双 Tab）
     if (section == SettingsSection.Update) {
         com.mini.me_core.feature.update.presentation.UpdateScreen(
@@ -362,6 +373,27 @@ fun SettingsScreen(
     if (section == SettingsSection.Logs) {
         LogViewerScreen(
             onNavigateBack = { section = logReturnSection }
+        )
+        return
+    }
+
+    // ── NormFlow 子页面：独立全屏 early return（各自自带顶栏，不嵌套外层 Scaffold，避免双顶栏）──
+    if (showDiagnosis) {
+        NormFlowDiagnosisScreen(onBack = { showDiagnosis = false })
+        return
+    }
+    if (showGuardLogs) {
+        GuardLogsScreen(onBack = { showGuardLogs = false })
+        return
+    }
+    if (showRuleManager) {
+        RuleManagerScreen(projectRoot = "", onBack = { showRuleManager = false })
+        return
+    }
+    if (assetViewerTab != null) {
+        NormFlowAssetViewerScreen(
+            initialTab = assetViewerTab!!,
+            onBack = { assetViewerTab = null }
         )
         return
     }
@@ -403,8 +435,9 @@ fun SettingsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // 模型管理页（Providers section）自带 Scaffold 顶栏，外层不显示顶栏以避免双重顶栏
-            if (section != SettingsSection.Providers) {
+            // 模型管理页（Providers section）自带 Scaffold 顶栏，外层不显示顶栏以避免双重顶栏；
+            // 关于页（About）由 AboutSection 内部根据「关于/浏览源码/查看代码」模式自绘唯一顶栏。
+            if (section != SettingsSection.Providers && section != SettingsSection.About) {
             // 问题6：Menu 主页且搜索模式开启时，顶栏显示搜索输入框；带 Crossfade 平滑切换
             val animScale = com.mini.me_core.core.theme.LocalAnimationScale.current
             val barAnimDuration = (220L * animScale).toInt().coerceAtLeast(0)
@@ -643,16 +676,8 @@ fun SettingsScreen(
                     onDeleteGlobal = { viewModel.deleteGlobalRule(it) }
                 )
                 SettingsSection.NormFlow -> {
-                    when {
-                        showDiagnosis -> NormFlowDiagnosisScreen(onBack = { showDiagnosis = false })
-                        showGuardLogs -> GuardLogsScreen(onBack = { showGuardLogs = false })
-                        showRuleManager -> RuleManagerScreen(projectRoot = "", onBack = { showRuleManager = false })
-                        assetViewerTab != null -> NormFlowAssetViewerScreen(
-                            initialTab = assetViewerTab!!,
-                            onBack = { assetViewerTab = null }
-                        )
-                        else -> NormFlowSection(
-                            normFlowEnabled = normFlowEnabled,
+                    NormFlowSection(
+                        normFlowEnabled = normFlowEnabled,
                             stepInjectEnabled = stepInjectEnabled,
                             toolGuardEnabled = toolGuardEnabled,
                             fileObservationEnabled = fileObservationEnabled,
@@ -708,7 +733,6 @@ fun SettingsScreen(
                             onImportConfig = { showImportDialog = true },
                             onResetStats = { viewModel.resetNormFlowStats() }
                         )
-                    }
                 }
                 SettingsSection.Backup -> {
                     val backupViewModel: com.mini.me_core.feature.backup.presentation.BackupViewModel =
@@ -736,6 +760,7 @@ fun SettingsScreen(
                 SettingsSection.RemoteServers -> {} // 已在上方 early return 处理
                 SettingsSection.Update -> {} // 已在上方 early return 处理
                 SettingsSection.About -> AboutSection(
+                    onNavigateBack = { section = SettingsSection.Menu },
                     onOpenDevOptions = { section = SettingsSection.DevOptions },
                     onOpenUpdate = { section = SettingsSection.Update },
                     onOpenContainerSettings = onNavigateToTerminalSettings,

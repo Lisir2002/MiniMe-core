@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.mini.me_core.core.viewer.FileTypeRegistry
 import com.mini.me_core.core.viewer.native.NativeCodeViewer
 import com.mini.me_core.core.viewer.native.dto.HighlightSpan
+import com.mini.me_core.core.util.FileLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,6 +54,8 @@ class CodeViewerViewModel(app: Application) : AndroidViewModel(app) {
                     loading = false,
                 )
             }.onFailure { e ->
+                // 详细堆栈仅落盘日志，不直接展示给用户（UI 显示友好提示 + 重试）。
+                FileLogger.e("CodeViewer", "open failed: $path", e)
                 _ui.value = _ui.value.copy(loading = false, error = e.message ?: "打开失败")
             }
         }

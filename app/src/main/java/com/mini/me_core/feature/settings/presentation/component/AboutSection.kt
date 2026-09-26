@@ -32,6 +32,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.rounded.Article
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.List
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.CalendarMonth
@@ -44,6 +46,7 @@ import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.MailOutline
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SystemUpdate
@@ -61,6 +64,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -87,6 +91,7 @@ import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.components.AppCard
 import com.mini.me_core.core.theme.components.AppSectionHeader
 import com.mini.me_core.core.theme.components.AppListItem
+import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.feature.about.presentation.CodeBrowserScreen
 import com.mini.me_core.feature.about.presentation.CodeBrowserViewModel
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
@@ -119,6 +124,7 @@ private const val GH_BRANCH = "main"
 
 @Composable
 internal fun AboutSection(
+    onNavigateBack: () -> Unit = {},
     onOpenDevOptions: () -> Unit = {},
     onOpenUpdate: () -> Unit = {},
     onOpenContainerSettings: () -> Unit = {},
@@ -132,6 +138,10 @@ internal fun AboutSection(
     val updateBadgeVM: UpdateBadgeViewModel = hiltViewModel()
     val updateAvailability by updateBadgeVM.availability.collectAsStateWithLifecycle()
     val codeBrowserVM: CodeBrowserViewModel = hiltViewModel()
+    // 代码查看器 VM 提升到此处，顶栏的搜索 / 大纲按钮与内容区共用同一实例。
+    val codeViewerVM: com.mini.me_core.core.viewer.code.CodeViewerViewModel =
+        androidx.lifecycle.viewmodel.compose.viewModel()
+    val browserUi by codeBrowserVM.ui.collectAsStateWithLifecycle()
 
     // F5.6：连续点击版本号 7 次解锁开发者选项，解锁状态持久化
     val prefs = remember { context.getSharedPreferences(PREFS_ABOUT, Context.MODE_PRIVATE) }
@@ -197,20 +207,20 @@ internal fun AboutSection(
         }.getOrNull() ?: "--"
     }
 
-    // 代码浏览器全屏覆盖
-    if (showCodeBrowser) {
-        CodeBrowserScreen(
-            owner = GH_OWNER,
-            repo = GH_REPO,
-            branch = GH_BRANCH,
-            onBack = { showCodeBrowser = false },
-            viewModel = codeBrowserVM,
-        )
-        return
+    // ── 关于页内部导航模式：DOC(法律文档,自带顶栏) > VIEW(查看代码) > BROWSE(浏览源码) > ABOUT ──
+    val viewingPath = browserUi.openingLocalPath
+    val currentDoc = docViewerDoc
+
+    // 系统返回键先收起内部覆盖层（查看代码 -> 浏览源码 -> 法律文档 -> 关于），再交还 SettingsScreen。
+    androidx.activity.compose.BackHandler(enabled = currentDoc != null || showCodeBrowser || viewingPath != null) {
+        when {
+            viewingPath != null -> codeBrowserVM.consumeOpenedFile()
+            currentDoc != null -> docViewerDoc = null
+            showCodeBrowser -> showCodeBrowser = false
+        }
     }
 
-    // 本地法律文档全屏覆盖（用户协议 / 隐私政策 / 开源协议）
-    val currentDoc = docViewerDoc
+    // 法律文档：DocViewerScreen 自带 Scaffold + 顶栏，此处不再叠加顶栏。
     if (currentDoc != null) {
         DocViewerScreen(
             title = stringResource(currentDoc.titleRes),
@@ -219,6 +229,79 @@ internal fun AboutSection(
         )
         return
     }
+
+    // 查看代码：动态顶栏 = 文件名 + 搜索/大纲 actions，返回键回到浏览器目录。
+    if (viewingPath != null) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            AppTopAppBar(
+                title = viewingPath.substringAfterLast('/'),
+                onNavigateBack = { codeBrowserVM.consumeOpenedFile() },
+                navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                navigationContentDescription = stringResource(R.string.viewer_back),
+                actions = {
+                    IconButton(onClick = { codeViewerVM.onSearchQuery(codeViewerVM.ui.value.searchQuery) }) {
+                        Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.viewer_search))
+                    }
+                    IconButton(onClick = { codeViewerVM.toggleOutline() }) {
+                        Icon(Icons.AutoMirrored.Rounded.List, contentDescription = stringResource(R.string.viewer_outline))
+                    }
+                },
+            )
+            Box(modifier = Modifier.weight(1f)) {
+                com.mini.me_core.core.viewer.code.CodeViewerScreen(
+                    path = viewingPath,
+                    viewModel = codeViewerVM,
+                )
+            }
+        }
+        return
+    }
+
+    // 浏览源码：动态顶栏 = 仓库标题(+副标题) + 下载 actions，返回键回到关于页。
+    if (showCodeBrowser) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            AppTopAppBar(
+                title = stringResource(R.string.code_browser_title),
+                onNavigateBack = { showCodeBrowser = false },
+                navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                navigationContentDescription = stringResource(R.string.common_back),
+                titleContent = {
+                    Column {
+                        Text(stringResource(R.string.code_browser_title), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = "${browserUi.owner}/${browserUi.repo} · ${browserUi.branch}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { codeBrowserVM.requestDownloadZip() }) {
+                        Icon(Icons.Rounded.FolderZip, contentDescription = stringResource(R.string.code_browser_download))
+                    }
+                },
+            )
+            Box(modifier = Modifier.weight(1f)) {
+                CodeBrowserScreen(
+                    owner = GH_OWNER,
+                    repo = GH_REPO,
+                    branch = GH_BRANCH,
+                    viewModel = codeBrowserVM,
+                )
+            }
+        }
+        return
+    }
+
+    // 关于页本体：唯一顶栏 = 关于应用，返回键回到设置菜单。
+    Column(modifier = Modifier.fillMaxSize()) {
+        AppTopAppBar(
+            title = stringResource(R.string.settings_about),
+            onNavigateBack = onNavigateBack,
+            navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+            navigationContentDescription = stringResource(R.string.common_back),
+        )
+        Box(modifier = Modifier.weight(1f)) {
 
     Column(
         modifier = Modifier
@@ -307,6 +390,8 @@ internal fun AboutSection(
         )
 
         Spacer(Modifier.height(Spacing.lg))
+        }
+    }
     }
 
     // ── 弹窗 ──────────────────────────────────────────────────────
