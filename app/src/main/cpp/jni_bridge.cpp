@@ -85,13 +85,13 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* /*vm*/, void* /*reserved*/) {
 // ── 通用 ──────────────────────────────────────────────────────────────
 
 JNIEXPORT jstring JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetVersion(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeGetVersion(
         JNIEnv* env, jclass /*clazz*/) {
     return env->NewStringUTF("minimeviewer-native/0.1.0");
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetLastError(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeGetLastError(
         JNIEnv* env, jclass /*clazz*/) {
     return lastErrorToJString(env);
 }
@@ -99,7 +99,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetLastError(
 // 显式释放任意 native 句柄。所有跨 JNI 对象都派生自 NativeRef，虚析构保证正确销毁。
 // 重复 close / 关闭无效句柄安全返回（容错，便于 Kotlin Closeable 幂等 close）。
 JNIEXPORT void JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeClose(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeClose(
         JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     if (handle == 0) {
         return;
@@ -111,7 +111,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeClose(
 // ── 文件加载 ───────────────────────────────────────────────────────────
 
 JNIEXPORT jlong JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeOpenFile(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeOpenFile(
         JNIEnv* env, jclass /*clazz*/, jstring path) {
     MINIME_TRY();
     const char* pathUtf = env->GetStringUTFChars(path, nullptr);
@@ -128,7 +128,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeOpenFile(
 
 // 文件元信息以 JSON 字符串返回（Kotlin 侧用 kotlinx.serialization 解析）。
 JNIEXPORT jstring JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetFileInfo(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeGetFileInfo(
         JNIEnv* env, jclass /*clazz*/, jlong handle) {
     MINIME_TRY();
     minime::FileLoader* loader = asFileLoader(handle);
@@ -148,7 +148,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetFileInfo(
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetLineCount(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeGetLineCount(
         JNIEnv* env, jclass /*clazz*/, jlong handle) {
     MINIME_TRY();
     minime::FileLoader* loader = asFileLoader(handle);
@@ -158,7 +158,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetLineCount(
 }
 
 JNIEXPORT jobjectArray JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeReadLines(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeReadLines(
         JNIEnv* env, jclass /*clazz*/, jlong handle, jlong start, jlong end) {
     MINIME_TRY();
     minime::FileLoader* loader = asFileLoader(handle);
@@ -175,7 +175,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeReadLines(
 }
 
 JNIEXPORT void JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeCloseFile(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeCloseFile(
         JNIEnv* env, jclass /*clazz*/, jlong handle) {
     if (handle == 0) return;
     minime::NativeRef* ref = minime::NativeRef::fromHandle(handle);
@@ -185,7 +185,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeCloseFile(
 // 零拷贝读取：行文本按 [4 字节小端长度][UTF-8 字节] 写入 Kotlin 传入的 DirectByteBuffer。
 // 返回写入行数；Kotlin 从 buffer 起始按长度前缀逐行解析。
 JNIEXPORT jint JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeReadLinesDirect(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeReadLinesDirect(
         JNIEnv* env, jclass /*clazz*/, jlong handle, jlong start, jlong end,
         jobject buffer) {
     MINIME_TRY();
@@ -206,7 +206,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeReadLinesDirec
 
 // 手动切换编码（GBK/UTF-8/UTF-16）重新解码。
 JNIEXPORT jboolean JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeSetEncoding(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeSetEncoding(
         JNIEnv* env, jclass /*clazz*/, jlong handle, jint encoding) {
     MINIME_TRY();
     minime::FileLoader* loader = asFileLoader(handle);
@@ -219,7 +219,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeSetEncoding(
 // ── 代码查看（只读）─────────────────────────────────────────────────────
 // 打开文件 + 选择语法 + 全量解析。languageHint 如 "kotlin"/"python"/"cpp"，空串则按扩展名留空。
 JNIEXPORT jlong JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeOpenCodeViewer(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeOpenCodeViewer(
         JNIEnv* env, jclass /*clazz*/, jstring path, jstring languageHint) {
     MINIME_TRY();
     const char* pathUtf = env->GetStringUTFChars(path, nullptr);
@@ -241,7 +241,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeOpenCodeViewer
 
 // 高亮 spans：扁平数组 [startByte, endByte, category, ...]。
 JNIEXPORT jintArray JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetSpans(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeGetSpans(
         JNIEnv* env, jclass /*clazz*/, jlong handle) {
     MINIME_TRY();
     CodeViewerSession* s = asViewer(handle);
@@ -263,7 +263,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetSpans(
 
 // 折叠区域：扁平数组 [startLine, endLine, kind, ...]。
 JNIEXPORT jintArray JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetFolds(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeGetFolds(
         JNIEnv* env, jclass /*clazz*/, jlong handle) {
     MINIME_TRY();
     CodeViewerSession* s = asViewer(handle);
@@ -283,7 +283,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetFolds(
 
 // 符号大纲：JSON 字符串返回。
 JNIEXPORT jstring JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetOutline(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeGetOutline(
         JNIEnv* env, jclass /*clazz*/, jlong handle) {
     MINIME_TRY();
     CodeViewerSession* s = asViewer(handle);
@@ -303,7 +303,7 @@ Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeGetOutline(
 }
 
 JNIEXPORT void JNICALL
-Java_com_mini_me_core_core_viewer_native_NativeViewerBridge_nativeCloseCodeViewer(
+Java_com_mini_me_1core_core_viewer_native_NativeViewerBridge_nativeCloseCodeViewer(
         JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     if (handle == 0) return;
     delete minime::NativeRef::fromHandle(handle);
