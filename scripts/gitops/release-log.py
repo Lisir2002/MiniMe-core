@@ -301,6 +301,52 @@ def _recent(repo, n):
     return commits
 
 
+def extract_from_changelog(repo: Path, version: str) -> str | None:
+    """从 docs/Version Log/CHANGELOG.md 提取指定版本的正文（不含版本标题行）。
+
+    CHANGELOG 格式：
+        ## [0.0.0.22] - 2026-09-26
+
+        简介...
+
+        ### 新功能
+        ...
+
+        ## [0.0.0.21] - 2026-09-26
+
+    找到对应版本标题后，收集到下一个 ``## [`` 之前的内容并去除首尾空行。
+    找不到返回 None，调用方回退到 commit 草稿生成。
+    """
+    candidates = [
+        repo / "docs" / "Version Log" / "CHANGELOG.md",
+        repo / "CHANGELOG.md",
+    ]
+    path = next((p for p in candidates if p.is_file()), None)
+    if path is None:
+        return None
+
+    header = re.compile(rf"^##\s*\[{re.escape(version)}\]")
+    next_header = re.compile(r"^##\s*\[")
+    lines = path.read_text(encoding="utf-8").splitlines()
+
+    start = None
+    for i, line in enumerate(lines):
+        if header.match(line):
+            start = i + 1
+            break
+    if start is None:
+        return None
+
+    collected: list[str] = []
+    for line in lines[start:]:
+        if next_header.match(line):
+            break
+        collected.append(line)
+
+    text = "\n".join(collected).strip()
+    return text or None
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="MiniMe-core 发版说明生成器（见 AGENTS.md「发版说明格式」）"
@@ -331,6 +377,13 @@ def main():
             version = "Unreleased"
 
     date_str = args.date or date.today().isoformat()
+
+    # 优先从 CHANGELOG.md 提取已人工定稿的版本正文（三处一致的权威来源）；
+    # CHANGELOG 未收录该版本时，才回退到 Conventional Commits 生成草稿。
+    changelog_body = extract_from_changelog(repo, version)
+    if changelog_body is not None:
+        print(changelog_body)
+        return
 
     if prev is None:
         commits = _recent(repo, 30)
