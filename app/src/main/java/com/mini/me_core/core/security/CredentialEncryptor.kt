@@ -270,8 +270,12 @@ class CredentialEncryptor @Inject constructor(
                 cipher.init(Cipher.DECRYPT_MODE, dek, GCMParameterSpec(GCM_TAG_BITS, iv))
                 String(cipher.doFinal(ciphertext), Charsets.UTF_8)
             } catch (e: Exception) {
-                FileLogger.e(TAG, "V2 解密失败", e)
-                throw IllegalStateException("解密凭据失败: ${e.message}", e)
+                // RC71 降级：V2 解密失败（DEK 被重建/密文损坏/GCM tag 校验失败）时
+                // 不再向上抛异常导致上层崩溃，返回空串并记日志。
+                // 上层（API Key / 凭据字段）拿到空串后提示用户重新输入，
+                // 与 ensureInitialized 的「失败回退明文/空串」策略一致。
+                FileLogger.e(TAG, "V2 解密失败，降级返回空串（密文长度=${formatted.length}，DEK可用=${dekCached != null}）", e)
+                ""
             }
         }
 
