@@ -2,6 +2,7 @@ package com.mini.me_core.core.theme.components
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -38,6 +39,7 @@ import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
  * @param navigationIcon 导航图标（默认 ArrowBack）
  * @param navigationContentDescription 导航图标内容描述
  * @param actions 右侧操作区
+ * @param titleContent 可选自定义标题区（如顶栏内联搜索输入框）；非空时替代 [title] 文字
  */
 @Composable
 fun AppTopAppBar(
@@ -45,6 +47,7 @@ fun AppTopAppBar(
     onNavigateBack: (() -> Unit)? = null,
     navigationIcon: ImageVector? = null,
     navigationContentDescription: String? = null,
+    titleContent: @Composable (() -> Unit)? = null,
     actions: @Composable () -> Unit = {},
 ) {
     val colors = LocalAppTheme.current.colors
@@ -76,13 +79,24 @@ fun AppTopAppBar(
             } else {
                 Spacer(Modifier.width(PrimitiveSpacing.Md))
             }
-            Text(
-                text = title,
-                fontWeight = FontWeight.SemiBold,
-                color = colors.textPrimary,
-                maxLines = 1,
-                modifier = Modifier.weight(1f),
-            )
+            if (titleContent != null) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    titleContent()
+                }
+            } else {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textPrimary,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             actions()
             Spacer(Modifier.width(PrimitiveSpacing.Sm))
         }

@@ -65,6 +65,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.getValue
@@ -86,6 +87,7 @@ import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
 import com.mini.me_core.feature.agent.domain.mcp.McpServerStatus
 import com.mini.me_core.feature.backup.presentation.BackupSection
 import com.mini.me_core.feature.settings.data.repository.AppThemeMode
+import com.mini.me_core.feature.settings.data.repository.SecureScreenScope
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.presentation.SecuritySettingsViewModel
@@ -123,6 +125,17 @@ import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Terminal
+import androidx.compose.material.icons.rounded.DeleteForever
+import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
 
 /** 设置页内部二级菜单分区。Menu 为首页菜单，其余为各自的二级页。 */
 enum class SettingsSection(@param:StringRes val titleRes: Int) {
@@ -143,6 +156,17 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Theme(R.string.settings_theme_title),
     DevOptions(R.string.dev_options_title),
 }
+
+/**
+ * settings 路由内含敏感信息的二级 section（ALL_SENSITIVE_PAGES 范围下需要 FLAG_SECURE）。
+ * ProviderEditor（API Key）/ Security（安全设置）/ Backup（备份）/ RemoteServers（SSH 凭据）。
+ */
+private val SENSITIVE_SECURE_SECTIONS = setOf(
+    SettingsSection.ProviderEditor,
+    SettingsSection.Security,
+    SettingsSection.Backup,
+    SettingsSection.RemoteServers,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -229,6 +253,19 @@ fun SettingsScreen(
     // 问题6：搜索模式状态（顶栏按钮触发，替代常驻搜索框）
     var isSearchMode by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    // 操作审计页：顶栏内联搜索 + 溢出菜单状态（UI 规范 v1.0 迁移）。
+    val auditViewModel: com.mini.me_core.feature.settings.presentation.components.AuditLogsViewModel =
+        androidx.hilt.navigation.compose.hiltViewModel()
+    var auditSearchActive by remember { mutableStateOf(false) }
+    var auditSearchQuery by remember { mutableStateOf("") }
+    var auditMenuExpanded by remember { mutableStateOf(false) }
+    var auditClearDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(section) {
+        if (section != SettingsSection.RemoteAuditLogs) {
+            auditSearchActive = false
+            auditSearchQuery = ""
+        }
+    }
     // 搜索历史（KVStore 持久化，由 ViewModel 暴露）
     val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
 
@@ -246,6 +283,29 @@ fun SettingsScreen(
             }
             viewModel.markPendingSectionConsumed(pendingTick)
         }
+    }
+
+    // ── 防截图录屏：settings 路由内按 section 细化窗口级 FLAG_SECURE ──
+    // 与 MainActivity 的路由级逻辑收敛：GLOBAL 全部保护；PROVIDER_EDITOR_ONLY 仅供应商编辑；
+    // ALL_SENSITIVE_PAGES 仅敏感 section（ProviderEditor/Security/Backup/RemoteServers）；关闭开关一律清除。
+    val secureScreenEnabled by viewModel.secureScreenEnabled.collectAsStateWithLifecycle()
+    val secureScreenScope by viewModel.secureScreenScope.collectAsStateWithLifecycle()
+    val secureActivity = LocalContext.current as? android.app.Activity
+    DisposableEffect(secureScreenEnabled, secureScreenScope, section) {
+        val shouldSecure = when {
+            !secureScreenEnabled -> false
+            secureScreenScope == SecureScreenScope.GLOBAL -> true
+            secureScreenScope == SecureScreenScope.PROVIDER_EDITOR_ONLY -> section == SettingsSection.ProviderEditor
+            secureScreenScope == SecureScreenScope.ALL_SENSITIVE_PAGES -> section in SENSITIVE_SECURE_SECTIONS
+            else -> false
+        }
+        if (shouldSecure) {
+            secureActivity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            secureActivity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        }
+        // onDispose 不清理：离开 settings 路由时 MainActivity 会按新路由重新收敛。
+        onDispose { }
     }
 
     // 处于二级页时，系统返回键先回到上一层；首页时交还给上层导航。
@@ -367,19 +427,32 @@ fun SettingsScreen(
                         placeholder = stringResource(R.string.settings_search_hint)
                     )
                 } else {
+                    val auditInSearch = section == SettingsSection.RemoteAuditLogs && auditSearchActive
                     AppTopAppBar(
                         title = stringResource(section.titleRes),
                         onNavigateBack = {
-                            if (section == SettingsSection.Menu) {
-                                onNavigateBack()
-                            } else if (section == SettingsSection.Logs) {
-                                section = logReturnSection
-                            } else {
-                                section = SettingsSection.Menu
+                            when {
+                                auditInSearch -> {
+                                    auditSearchActive = false
+                                    auditSearchQuery = ""
+                                }
+                                section == SettingsSection.Menu -> onNavigateBack()
+                                section == SettingsSection.Logs -> section = logReturnSection
+                                else -> section = SettingsSection.Menu
                             }
                         },
                         navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
-                        navigationContentDescription = stringResource(R.string.common_back)
+                        navigationContentDescription = stringResource(R.string.common_back),
+                        titleContent = if (auditInSearch) {
+                            {
+                                AuditInlineSearchField(
+                                    query = auditSearchQuery,
+                                    onQueryChange = { auditSearchQuery = it },
+                                )
+                            }
+                        } else {
+                            null
+                        }
                     ) {
                         when (section) {
                             // 问题6：Menu 主页顶栏右侧显示搜索按钮
@@ -404,6 +477,60 @@ fun SettingsScreen(
                             SettingsSection.Logs -> {
                                 IconButton(onClick = { viewModel.refreshLogs() }, modifier = Modifier.size(40.dp)) {
                                     Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.settings_refresh_logs), modifier = Modifier.size(20.dp))
+                                }
+                            }
+                            SettingsSection.RemoteAuditLogs -> {
+                                if (auditSearchActive) {
+                                    IconButton(onClick = { auditSearchQuery = "" }, modifier = Modifier.size(40.dp)) {
+                                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.audit_search_cd), modifier = Modifier.size(20.dp))
+                                    }
+                                } else {
+                                    IconButton(onClick = { auditSearchActive = true }, modifier = Modifier.size(40.dp)) {
+                                        Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.audit_search_cd), modifier = Modifier.size(20.dp))
+                                    }
+                                    IconButton(onClick = { auditMenuExpanded = true }, modifier = Modifier.size(40.dp)) {
+                                        Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.audit_more_cd), modifier = Modifier.size(20.dp))
+                                    }
+                                    DropdownMenu(
+                                        expanded = auditMenuExpanded,
+                                        onDismissRequest = { auditMenuExpanded = false },
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.audit_export)) },
+                                            leadingIcon = { Icon(Icons.Rounded.Download, contentDescription = null) },
+                                            onClick = {
+                                                auditMenuExpanded = false
+                                                auditViewModel.exportCsv()
+                                            },
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.ui______9b49362a)) },
+                                            leadingIcon = { Icon(Icons.Rounded.DeleteSweep, contentDescription = null) },
+                                            onClick = {
+                                                auditMenuExpanded = false
+                                                auditViewModel.purgeExpired()
+                                            },
+                                        )
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    stringResource(R.string.audit_clear_all),
+                                                    color = MaterialTheme.colorScheme.error,
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    Icons.Rounded.DeleteForever,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.error,
+                                                )
+                                            },
+                                            onClick = {
+                                                auditMenuExpanded = false
+                                                auditClearDialog = true
+                                            },
+                                        )
+                                    }
                                 }
                             }
                             else -> {}
@@ -599,7 +726,11 @@ fun SettingsScreen(
                     AdvancedSettingsScreen(zthViewModel = zthViewModel)
                 }
                 SettingsSection.RemoteAuditLogs -> {
-                    RemoteAuditLogsScreen()
+                    RemoteAuditLogsScreen(
+                        viewModel = auditViewModel,
+                        searchActive = auditSearchActive,
+                        searchQuery = auditSearchQuery,
+                    )
                 }
                 SettingsSection.ProviderEditor -> {} // 已在上方 early return 处理
                 SettingsSection.RemoteServers -> {} // 已在上方 early return 处理
@@ -662,6 +793,31 @@ fun SettingsScreen(
     }
 
 
+    // 操作审计：清空全部确认弹窗（顶栏溢出菜单触发）
+    if (auditClearDialog) {
+        AlertDialog(
+            onDismissRequest = { auditClearDialog = false },
+            title = { Text(stringResource(R.string.audit_clear_title)) },
+            text = { Text(stringResource(R.string.audit_clear_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    auditClearDialog = false
+                    auditViewModel.clearAll()
+                }) {
+                    Text(
+                        stringResource(R.string.audit_confirm),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { auditClearDialog = false }) {
+                    Text(stringResource(R.string.audit_cancel))
+                }
+            },
+        )
+    }
+
     if (showMcpDialog) {
         McpServerEditDialog(
             initial = editingMcp,
@@ -696,6 +852,40 @@ fun SettingsScreen(
             onDismiss = { showThemeSheet = false }
         )
     }
+}
+
+/** 顶栏内联搜索输入框（操作审计页搜索模式，自动聚焦）。 */
+@Composable
+private fun AuditInlineSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    val colors = MaterialTheme.colorScheme
+    BasicTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
+        cursorBrush = SolidColor(colors.primary),
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester)
+            .padding(end = Spacing.sm),
+        decorationBox = { inner ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (query.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.audit_search_hint),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = colors.onSurfaceVariant,
+                    )
+                }
+                inner()
+            }
+        },
+    )
 }
 
 internal data class MenuItem(

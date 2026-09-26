@@ -40,11 +40,12 @@ class AuditLogsViewModel @Inject constructor(
 
     data class UiState(
         val loading: Boolean = true,
+        val refreshing: Boolean = false,
+        val loadingMore: Boolean = false,
+        val loadMoreError: Boolean = false,
         val error: String? = null,
         val stats: Stats = Stats(),
         val selectedTab: Int = 0,
-        val searchActive: Boolean = false,
-        val searchQuery: String = "",
         val logs: List<RemoteAuditLogEntity> = emptyList(),
         val endReached: Boolean = false,
         val exporting: Boolean = false,
@@ -72,6 +73,17 @@ class AuditLogsViewModel @Inject constructor(
         }
     }
 
+    /** 下拉刷新：保留列表可见，刷新完成后由 [AuditEvent.Refreshed] 提示。 */
+    fun pullRefresh() {
+        viewModelScope.launch {
+            _ui.update { it.copy(refreshing = true, error = null) }
+            runCatching { loadStats(); loadList(reset = true) }
+                .onFailure { e -> _ui.update { it.copy(error = e.message) } }
+            _ui.update { it.copy(refreshing = false, loadingMore = false, loadMoreError = false) }
+            _events.emit(AuditEvent.Refreshed)
+        }
+    }
+
     private suspend fun loadStats() {
         val todayStart = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -90,9 +102,13 @@ class AuditLogsViewModel @Inject constructor(
         }
     }
 
+    /** 顶栏内联搜索状态（由外层 SettingsScreen 顶栏持有，经 applySearch 同步进来）。 */
+    private var searchActive: Boolean = false
+    private var searchQuery: String = ""
+
     fun selectTab(index: Int) {
-        if (index == _ui.value.selectedTab && !_ui.value.searchActive) return
-        _ui.update { it.copy(selectedTab = index, searchActive = false, searchQuery = "") }
+        if (index == _ui.value.selectedTab && !searchActive) return
+        _ui.update { it.copy(selectedTab = index) }
         viewModelScope.launch {
             runCatching {
                 loadList(reset = true)
@@ -101,34 +117,31 @@ class AuditLogsViewModel @Inject constructor(
         }
     }
 
-    fun toggleSearch(active: Boolean) {
-        _ui.update { it.copy(searchActive = active, searchQuery = "") }
-        if (!active) {
-            viewModelScope.launch {
-                runCatching { loadList(reset = true) }
-            }
-        }
-    }
-
-    fun onSearchQueryChange(q: String) {
-        _ui.update { it.copy(searchQuery = q) }
+    /** 顶栏内联搜索驱动：[active] 为 false 时清空关键词并恢复全量列表。 */
+    fun applySearch(active: Boolean, query: String) {
+        searchActive = active
+        searchQuery = if (active) query.trim() else ""
         viewModelScope.launch {
             runCatching { loadList(reset = true) }
         }
     }
 
     fun loadMore() {
-        if (_ui.value.endReached || _ui.value.searchActive || _ui.value.loading) return
+        if (_ui.value.endReached || searchActive || _ui.value.loading || _ui.value.loadingMore) return
         viewModelScope.launch {
+            _ui.update { it.copy(loadingMore = true, loadMoreError = false) }
             runCatching {
                 page += 1
                 val next = repo.pageDescByCategory(tabKeys[_ui.value.selectedTab], page, pageSize)
                 _ui.update {
                     it.copy(
+                        loadingMore = false,
                         logs = it.logs + next,
                         endReached = next.size < pageSize,
                     )
                 }
+            }.onFailure {
+                _ui.update { it.copy(loadingMore = false, loadMoreError = true) }
             }
         }
     }
@@ -136,8 +149,8 @@ class AuditLogsViewModel @Inject constructor(
     private suspend fun loadList(reset: Boolean) {
         if (reset) page = 0
         val state = _ui.value
-        if (state.searchActive && state.searchQuery.isNotBlank()) {
-            val results = searchLogs(state.searchQuery.trim())
+        if (searchActive && searchQuery.isNotBlank()) {
+            val results = searchLogs(searchQuery)
             _ui.update {
                 it.copy(loading = false, error = null, logs = results, endReached = true)
             }
@@ -207,4 +220,5 @@ sealed interface AuditEvent {
     data object ExportDone : AuditEvent
     data object ExportFailed : AuditEvent
     data object Cleared : AuditEvent
+    data object Refreshed : AuditEvent
 }

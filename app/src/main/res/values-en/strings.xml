@@ -152,6 +152,10 @@
     <string name="theme_auto">Auto</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_light">Light</string>
+    <string name="theme_corner_style">Corner Style</string>
+    <string name="theme_corner_rounded">Rounded</string>
+    <string name="theme_corner_sharp">Sharp</string>
+    <string name="theme_corner_pill">Pill</string>
     <string name="settings_keepalive_title">Background Keep-alive</string>
     <string name="settings_keepalive_subtitle">Show a foreground notification to prevent the system from killing the process in background</string>
     <!-- Norm flow (D1-7, aligned with norm-chain-design.md §3.5) -->
@@ -350,6 +354,18 @@
     <string name="audit_more">Load more</string>
     <string name="audit_search_cd">Search</string>
     <string name="audit_more_cd">More actions</string>
+    <string name="audit_stats_retention_label">entries · 90 days</string>
+    <string name="audit_subtitle_count">%1$s · %2$d entries</string>
+    <string name="audit_group_today">Today</string>
+    <string name="audit_group_yesterday">Yesterday</string>
+    <string name="audit_time_today">Today %1$s</string>
+    <string name="audit_time_yesterday">Yesterday %1$s</string>
+    <string name="audit_loading_more">Loading…</string>
+    <string name="audit_no_more">No more entries</string>
+    <string name="audit_load_more_failed">Load failed, tap to retry</string>
+    <string name="audit_refreshed">Refreshed</string>
+    <string name="audit_detail_source_ip">Source IP</string>
+    <string name="audit_detail_connection_id">Connection ID</string>
     <string name="security_http_warning_title">Cleartext HTTP request detected</string>
     <string name="security_http_warning_desc">The app is communicating with %1$s over unencrypted HTTP; data may be intercepted or tampered with. Prefer an HTTPS address, or make sure this service is on a trusted local network.</string>
 
