@@ -50,6 +50,9 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
 
     suspend fun deleteSession(id: String) = withContext(Dispatchers.IO) { q.deleteSession(id) }
 
+    /** 备份「覆盖恢复」专用：清空会话大表（消息/待办需各自调用 deleteAllMessages / deleteAllTodos）。 */
+    suspend fun deleteAllSessions() = withContext(Dispatchers.IO) { q.deleteAllSessions() }
+
     suspend fun getAllSessionsByWorkspaceOnce(workspacePath: String): List<Agent_session> =
         withContext(Dispatchers.IO) { q.selectSessionsByWorkspace(workspacePath).executeAsList() }
 
@@ -296,6 +299,9 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
 
     suspend fun deleteTodosBySession(sessionId: String) =
         withContext(Dispatchers.IO) { q.deleteTodoItemsBySession(sessionId) }
+
+    /** 备份「覆盖恢复」专用：清空待办大表。 */
+    suspend fun deleteAllTodos() = withContext(Dispatchers.IO) { q.deleteAllTodos() }
 
     suspend fun deleteFileEditHunksBySession(sessionId: String) =
         withContext(Dispatchers.IO) { q.deleteFileEditHunksBySession(sessionId) }

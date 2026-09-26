@@ -566,6 +566,73 @@
     <string name="backup_wrong_password">Wrong backup password, or the encrypted backup file is corrupted</string>
     <string name="backup_import_failed">Import failed</string>
 
+    <!-- Backup refactor v0.0.0.21: four sections -->
+    <string name="backup_overview_title">Data Safety Overview</string>
+    <string name="backup_overview_protected">Protected</string>
+    <string name="backup_overview_unprotected">Not protected</string>
+    <string name="backup_overview_last_backup">Last backup: %1$s</string>
+    <string name="backup_overview_never_backup">Never backed up</string>
+    <string name="backup_overview_occupied">Backup size: %1$s</string>
+    <string name="backup_overview_alert_restore">Restore from latest backup</string>
+
+    <string name="backup_auto_config_title">Auto Backup</string>
+    <string name="backup_auto_config_enable">Enable auto backup</string>
+    <string name="backup_auto_config_keep">Keep copies</string>
+    <string name="backup_auto_config_interval">Periodic backup (days)</string>
+    <string name="backup_auto_config_interval_off">Off</string>
+    <string name="backup_auto_config_on_upgrade">Back up before upgrade</string>
+    <string name="backup_auto_local_status">Local: %1$s copies · %2$s</string>
+    <string name="backup_auto_external_status">External secure area: %1$s copies · %2$s</string>
+    <string name="backup_auto_external_unavailable">External secure area unavailable</string>
+    <string name="backup_auto_go_authorize">Authorize</string>
+    <string name="backup_auto_now">Back up now</string>
+
+    <string name="backup_history_title">Backup History</string>
+    <string name="backup_history_empty">No backups yet</string>
+    <string name="backup_history_source_local">Local</string>
+    <string name="backup_history_source_external">External secure area</string>
+    <string name="backup_history_app_version">Version %1$s</string>
+    <string name="backup_history_restore">Restore</string>
+    <string name="backup_history_share">Share</string>
+    <string name="backup_history_delete">Delete</string>
+    <string name="backup_history_verify">Verify recoverability</string>
+    <string name="backup_history_detail">%1$d sessions · %2$d messages · %3$d todos</string>
+    <string name="backup_history_clear_excess">Clean up extra local backups</string>
+
+    <string name="backup_manual_title">Manual Backup &amp; Migrate</string>
+    <string name="backup_manual_export_desc">Pick data scope → set password → export as versioned tar.gz</string>
+    <string name="backup_manual_import_desc">Pick a backup file → preview diff → choose merge or overwrite → restore</string>
+    <string name="backup_security_boundary">Security boundary: local backups are plaintext (readable only by this app); external secure area and exported files are encrypted with the password (AES-GCM).</string>
+
+    <string name="backup_password_strength_weak">Strength: Weak</string>
+    <string name="backup_password_strength_medium">Strength: Medium</string>
+    <string name="backup_password_strength_strong">Strength: Strong</string>
+    <string name="backup_password_strength_hint">Use at least 8 chars mixing letters and digits; leave blank for no encryption</string>
+
+    <string name="backup_preview_title">Restore Preview</string>
+    <string name="backup_preview_backup_contains">Backup contains:</string>
+    <string name="backup_preview_current">Current data:</string>
+    <string name="backup_preview_mode">Restore mode</string>
+    <string name="backup_preview_mode_merge">Merge</string>
+    <string name="backup_preview_mode_merge_desc">Upsert same-ID rows, insert new rows, do not delete existing data</string>
+    <string name="backup_preview_mode_overwrite">Overwrite</string>
+    <string name="backup_preview_mode_overwrite_desc">Clear the domains carried by the backup before writing; other domains are untouched</string>
+    <string name="backup_preview_confirm">Start restore</string>
+
+    <string name="backup_cancel">Cancel</string>
+    <string name="backup_previewing">Analyzing backup…</string>
+    <string name="backup_restoring">Restoring…</string>
+    <string name="backup_undoing">Undoing…</string>
+    <string name="backup_undone">Restore undone</string>
+    <string name="backup_undo_unavailable">No restore point to undo</string>
+    <string name="backup_undo_failed">Undo failed</string>
+    <string name="backup_undo_restore">Undo this restore</string>
+    <string name="backup_cleared_bytes">Freed %1$s</string>
+    <string name="backup_verify_ok">Verified OK: %1$s</string>
+    <string name="backup_verify_bad">Verification failed, backup may be corrupted: %1$s</string>
+    <string name="backup_external_backed_up">Backed up to external secure area</string>
+    <string name="backup_external_unavailable">External secure area is unavailable (storage not authorized or not mounted). Please authorize and retry.</string>
+
     <!-- Chat Drawer -->
     <string name="chat_drawer_tab_chats">Chats</string>
     <string name="chat_drawer_tab_workspace">Workspaces</string>

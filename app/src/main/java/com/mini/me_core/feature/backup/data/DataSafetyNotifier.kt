@@ -91,9 +91,14 @@ class DataSafetyNotifier @Inject constructor(
             FileLogger.w(TAG, "包名变更自动迁移未生效（无可用外部备份或恢复失败），回退告警弹窗")
         }
         if (v == SentinelVerdict.UPGRADED) {
-            runCatching { autoBackupManager.backupAll() }
-                .onFailure { FileLogger.w(TAG, "升级前自动备份失败（不影响启动）", it) }
+            runCatching {
+                val cfg = autoBackupManager.config()
+                if (cfg.backupOnUpgrade) autoBackupManager.backupAll()
+            }.onFailure { FileLogger.w(TAG, "升级前自动备份失败（不影响启动）", it) }
         }
+        // 周期性备份到期检查（独立于升级判定，启动时统一触发一次）。
+        runCatching { autoBackupManager.runPeriodicIfDue() }
+            .onFailure { FileLogger.w(TAG, "周期性备份检查失败（不影响启动）", it) }
         _verdict.value = v
         FileLogger.d(TAG, "启动数据保全完成: $v")
     }

@@ -140,6 +140,10 @@ UPDATE agent_session SET updated_at = ? WHERE id = ?;
 deleteSession:
 DELETE FROM agent_session WHERE id = ?;
 
+-- 备份「覆盖恢复」专用：清空会话大表（消息/待办需各自单独清空，见 deleteAllMessages / deleteAllTodos）。
+deleteAllSessions:
+DELETE FROM agent_session;
+
 updateSessionProviderModel:
 UPDATE agent_session SET provider_id = ?, model = ? WHERE id = ?;
 
@@ -558,6 +562,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 -- P2-3 会话级联删除（对齐 SessionUseCase.deleteSession 的 10 张关联表）。
 deleteTodoItemsBySession:
 DELETE FROM todo_items WHERE session_id = ?;
+
+-- 备份「覆盖恢复」专用：清空待办大表。
+deleteAllTodos:
+DELETE FROM todo_items;
 
 deleteFileEditHunksBySession:
 DELETE FROM file_edit_hunks WHERE session_id = ?;

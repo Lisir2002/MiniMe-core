@@ -29,7 +29,25 @@ interface BackupManager {
      * @param password 备份未加密时传 null 或空；加密文件必须提供正确口令。
      * @return 还原统计（各数据段条目数）；口令错误/格式不符/版本过高时返回失败。
      */
-    suspend fun import(input: InputStream, password: CharArray?): Result<RestoreStats>
+    suspend fun import(input: InputStream, password: CharArray?): Result<RestoreStats> =
+        import(input, password, RestoreMode.MERGE)
+
+    /**
+     * 按指定 [mode] 流式解包并还原（[RestoreMode.OVERWRITE] 先清空对应数据域再插入，仅影响备份携带的域）。
+     */
+    suspend fun import(input: InputStream, password: CharArray?, mode: RestoreMode): Result<RestoreStats>
+
+    /**
+     * 恢复预览：只解析 [input] 统计各域条数并与当前库对比，**不写入任何数据**。
+     * 供 UI 在真正恢复前向用户展示差异/冲突。
+     */
+    suspend fun preview(input: InputStream, password: CharArray?): Result<BackupPreview>
+
+    /**
+     * 备份可恢复性验证：重新打开已写出的 tar.gz，校验 metadata.json 存在、各 jsonl 可逐行解析。
+     * 用于导出后自检（损坏自动重试，不让坏备份进入轮转）与历史列表「验证」入口。
+     */
+    suspend fun verifyBackup(input: InputStream, password: CharArray?): Result<BackupIntegrity>
 }
 
 /** 导出数据范围选项；未勾选的段在快照中保持空值，导入时跳过。 */

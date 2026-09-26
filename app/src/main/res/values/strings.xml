@@ -582,6 +582,73 @@
     <string name="backup_wrong_password">备份口令错误，或加密备份文件已损坏</string>
     <string name="backup_import_failed">导入失败</string>
 
+    <!-- Backup refactor v0.0.0.21: four sections -->
+    <string name="backup_overview_title">数据安全总览</string>
+    <string name="backup_overview_protected">已保护</string>
+    <string name="backup_overview_unprotected">未保护</string>
+    <string name="backup_overview_last_backup">最近备份：%1$s</string>
+    <string name="backup_overview_never_backup">从未备份</string>
+    <string name="backup_overview_occupied">备份占用：%1$s</string>
+    <string name="backup_overview_alert_restore">从最近备份恢复</string>
+
+    <string name="backup_auto_config_title">自动备份</string>
+    <string name="backup_auto_config_enable">启用自动备份</string>
+    <string name="backup_auto_config_keep">保留份数</string>
+    <string name="backup_auto_config_interval">周期备份（天）</string>
+    <string name="backup_auto_config_interval_off">关闭</string>
+    <string name="backup_auto_config_on_upgrade">升级前自动备份</string>
+    <string name="backup_auto_local_status">本机：%1$s 份 · %2$s</string>
+    <string name="backup_auto_external_status">外部安全区：%1$s 份 · %2$s</string>
+    <string name="backup_auto_external_unavailable">外部安全区不可用</string>
+    <string name="backup_auto_go_authorize">去授权</string>
+    <string name="backup_auto_now">立即备份</string>
+
+    <string name="backup_history_title">备份历史</string>
+    <string name="backup_history_empty">暂无备份记录</string>
+    <string name="backup_history_source_local">本机</string>
+    <string name="backup_history_source_external">外部安全区</string>
+    <string name="backup_history_app_version">版本 %1$s</string>
+    <string name="backup_history_restore">恢复</string>
+    <string name="backup_history_share">分享</string>
+    <string name="backup_history_delete">删除</string>
+    <string name="backup_history_verify">验证可恢复</string>
+    <string name="backup_history_detail">%1$d 个会话 · %2$d 条消息 · %3$d 条待办</string>
+    <string name="backup_history_clear_excess">清理多余本机备份</string>
+
+    <string name="backup_manual_title">手动备份与迁移</string>
+    <string name="backup_manual_export_desc">选数据范围 → 设置口令 → 导出为带版本号的 tar.gz</string>
+    <string name="backup_manual_import_desc">选备份文件 → 预览差异 → 选择合并或覆盖 → 恢复</string>
+    <string name="backup_security_boundary">安全边界：本机备份为明文（仅本应用可读）；外部安全区与导出文件按口令/AES-GCM 加密。</string>
+
+    <string name="backup_password_strength_weak">强度：弱</string>
+    <string name="backup_password_strength_medium">强度：中</string>
+    <string name="backup_password_strength_strong">强度：强</string>
+    <string name="backup_password_strength_hint">建议至少 8 位，混合字母与数字；可留空不加密</string>
+
+    <string name="backup_preview_title">恢复预览</string>
+    <string name="backup_preview_backup_contains">备份包含：</string>
+    <string name="backup_preview_current">当前数据：</string>
+    <string name="backup_preview_mode">恢复模式</string>
+    <string name="backup_preview_mode_merge">合并</string>
+    <string name="backup_preview_mode_merge_desc">按主键更新同 ID 记录，新增记录插入，不删除现有数据</string>
+    <string name="backup_preview_mode_overwrite">覆盖</string>
+    <string name="backup_preview_mode_overwrite_desc">先清空备份携带的数据域再整包写入，其他域不受影响</string>
+    <string name="backup_preview_confirm">开始恢复</string>
+
+    <string name="backup_cancel">取消</string>
+    <string name="backup_previewing">正在分析备份…</string>
+    <string name="backup_restoring">正在恢复…</string>
+    <string name="backup_undoing">正在撤销…</string>
+    <string name="backup_undone">已撤销本次恢复</string>
+    <string name="backup_undo_unavailable">无可撤销的恢复点</string>
+    <string name="backup_undo_failed">撤销失败</string>
+    <string name="backup_undo_restore">撤销本次恢复</string>
+    <string name="backup_cleared_bytes">已释放 %1$s</string>
+    <string name="backup_verify_ok">校验通过：%1$s</string>
+    <string name="backup_verify_bad">校验失败，备份可能损坏：%1$s</string>
+    <string name="backup_external_backed_up">已备份到外部安全区</string>
+    <string name="backup_external_unavailable">外部安全区当前不可用（公共存储未授权或未挂载），请授权后重试</string>
+
     <!-- Chat Drawer -->
     <string name="chat_drawer_tab_chats">对话列表</string>
     <string name="chat_drawer_tab_workspace">工作目录</string>

@@ -16,15 +16,18 @@ import com.mini.me_core.feature.agent.domain.permission.PermissionRulesRepositor
 import com.mini.me_core.feature.backup.domain.AgentMessageDto
 import com.mini.me_core.feature.backup.domain.BackupCrypto
 import com.mini.me_core.feature.backup.domain.BackupDecryptionException
+import com.mini.me_core.feature.backup.domain.BackupIntegrity
 import com.mini.me_core.feature.backup.domain.BackupManager
 import com.mini.me_core.feature.backup.domain.BackupMetadata
 import com.mini.me_core.feature.backup.domain.BackupOptions
+import com.mini.me_core.feature.backup.domain.BackupPreview
 import com.mini.me_core.feature.backup.domain.BackupSnapshot
 import com.mini.me_core.feature.backup.domain.ChatSessionDto
 import com.mini.me_core.feature.backup.domain.GitCredentialDto
 import com.mini.me_core.feature.backup.domain.ProviderDto
 import com.mini.me_core.feature.backup.domain.RemoteConnectionDto
 import com.mini.me_core.feature.backup.domain.RemoteMountDto
+import com.mini.me_core.feature.backup.domain.RestoreMode
 import com.mini.me_core.feature.backup.domain.RestoreStats
 import com.mini.me_core.feature.backup.domain.TodoItemDto
 import com.mini.me_core.feature.backup.domain.toMetadata
@@ -191,31 +194,18 @@ class BackupManagerImpl @Inject constructor(
         }
     }
 
-    override suspend fun import(input: InputStream, password: CharArray?): Result<RestoreStats> {
+    override suspend fun import(input: InputStream, password: CharArray?): Result<RestoreStats> =
+        import(input, password, RestoreMode.MERGE)
+
+    override suspend fun import(
+        input: InputStream,
+        password: CharArray?,
+        mode: RestoreMode,
+    ): Result<RestoreStats> {
         val pw = password?.takeIf { it.isNotEmpty() }
         return withContext(Dispatchers.IO) {
             runCatching {
-                if (pw != null) {
-                    val temp = createTempFile()
-                    try {
-                        BufferedInputStream(input).use { src ->
-                            FileOutputStream(temp).use { dst -> BackupCrypto.decryptStream(src, dst, pw) }
-                        }
-                        FileInputStream(temp).use { p ->
-                            GzipCompressorInputStream(p).use { gz ->
-                                TarArchiveInputStream(gz).use { tar -> restoreFromTar(tar) }
-                            }
-                        }
-                    } finally {
-                        temp.delete()
-                    }
-                } else {
-                    BufferedInputStream(input).use { p ->
-                        GzipCompressorInputStream(p).use { gz ->
-                            TarArchiveInputStream(gz).use { tar -> restoreFromTar(tar) }
-                        }
-                    }
-                }
+                openTarStream(input, pw).use { tar -> restoreFromTar(tar, mode, write = true).first }
             }.recoverCatching { e ->
                 when (e) {
                     is BackupDecryptionException -> throw e
@@ -232,6 +222,113 @@ class BackupManagerImpl @Inject constructor(
             }
         }
     }
+
+    override suspend fun preview(input: InputStream, password: CharArray?): Result<BackupPreview> {
+        val pw = password?.takeIf { it.isNotEmpty() }
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val (stats, meta) = openTarStream(input, pw).use { tar -> restoreFromTar(tar, RestoreMode.MERGE, write = false) }
+                BackupPreview(
+                    backup = stats,
+                    current = currentStatsSnapshot(),
+                    appVersion = meta?.appVersion ?: "",
+                    createdAt = meta?.createdAt ?: 0L,
+                    encrypted = pw != null,
+                )
+            }.recoverCatching { e ->
+                when (e) {
+                    is BackupDecryptionException -> throw e
+                    else -> throw IllegalArgumentException(
+                        if (pw != null) "备份文件已损坏，或口令与备份文件不匹配"
+                        else "不是有效的 MiniMe-core 备份文件；如果这是加密备份，请输入导出口令",
+                        e
+                    )
+                }
+            }
+        }
+    }
+
+    override suspend fun verifyBackup(input: InputStream, password: CharArray?): Result<BackupIntegrity> {
+        val pw = password?.takeIf { it.isNotEmpty() }
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                openTarStream(input, pw).use { tar ->
+                    var metadataFound = false
+                    var entryCount = 0
+                    var entry = tar.nextEntry
+                    while (entry != null) {
+                        entryCount++
+                        when (entry.name) {
+                            FILE_METADATA -> {
+                                val plain = tar.readBytes()
+                                json.decodeFromString(BackupMetadata.serializer(), String(plain, Charsets.UTF_8))
+                                metadataFound = true
+                            }
+                            FILE_LEGACY_SNAPSHOT -> {
+                                val plain = tar.readBytes()
+                                json.decodeFromString(BackupSnapshot.serializer(), String(plain, Charsets.UTF_8))
+                                metadataFound = true
+                            }
+                            FILE_SESSIONS, FILE_MESSAGES, FILE_TODOS -> {
+                                // 逐行可解析性校验：读全部字节并按行 decode 一次，损坏行抛异常即失败。
+                                val serializer = when (entry.name) {
+                                    FILE_SESSIONS -> ChatSessionDto.serializer()
+                                    FILE_MESSAGES -> AgentMessageDto.serializer()
+                                    else -> TodoItemDto.serializer()
+                                }
+                                tar.readBytes().toString(Charsets.UTF_8).lineSequence().forEach { line ->
+                                    if (line.isNotBlank()) json.decodeFromString(serializer, line)
+                                }
+                            }
+                            FILE_REGISTRY -> {
+                                // registry.tar 解包成功即视为可解析。
+                                dataRegistry.unpack(tar.readBytes())
+                            }
+                            else -> tar.readBytes()
+                        }
+                        entry = tar.nextEntry
+                    }
+                    if (!metadataFound) error("缺少 metadata.json")
+                    BackupIntegrity(valid = true, entryCount = entryCount)
+                }
+            }.recoverCatching { e ->
+                BackupIntegrity(valid = false, errorReason = e.message ?: "备份校验失败")
+            }
+        }
+    }
+
+    /**
+     * 打开一个 tar 输入流：若 [pw] 非空先流式解密到临时文件再打开 GZIP+TAR；否则直接包装。
+     * 返回的 [TarArchiveInputStream] 由调用方 use() 关闭；内部临时文件在流关闭后清理。
+     */
+    private fun openTarStream(input: InputStream, pw: CharArray?): TarArchiveInputStream {
+        val buffered = BufferedInputStream(input)
+        if (pw == null) {
+            return TarArchiveInputStream(GzipCompressorInputStream(buffered))
+        }
+        val temp = createTempFile()
+        FileOutputStream(temp).use { dst -> BackupCrypto.decryptStream(buffered, dst, pw) }
+        val fis = FileInputStream(temp)
+        // 用一个会同时删除临时文件的包装流：TarArchiveInputStream close 时会关闭底层 gz -> fis。
+        val gz = GzipCompressorInputStream(fis)
+        return object : TarArchiveInputStream(gz) {
+            override fun close() {
+                runCatching { super.close() }
+                temp.delete()
+            }
+        }
+    }
+
+    /** 当前库各数据域条数快照（供恢复预览对比）。 */
+    private suspend fun currentStatsSnapshot(): RestoreStats = RestoreStats(
+        chatSessions = safeDaoSuspend("countSessions", 0) { v2Agent.countSessions() }.toInt(),
+        providers = safeDaoSuspend("countProviders", 0) { settingsRepo.listProviders().size },
+        gitCredentials = safeDaoSuspend("countGitCred", 0) { credentialsRepo.listGitCredentials().size },
+        remoteConnections = safeDaoSuspend("countRemoteConn", 0) { v2WorkspaceRepository.listRemoteConnections().size },
+        remoteMounts = safeDaoSuspend("countRemoteMounts", 0) { v2WorkspaceRepository.listAllRemoteMounts().size },
+        mcpServers = runCatching { mcpConfigRepository.getServers().size }.getOrDefault(0),
+        globalPermissionRules = runCatching { permissionRulesRepository.getGlobalRulesOnce().size }.getOrDefault(0),
+    )
 
     // ── 导出辅助 ──────────────────────────────────────────────
 
@@ -367,7 +464,20 @@ class BackupManagerImpl @Inject constructor(
 
     // ── 导入辅助 ──────────────────────────────────────────────
 
-    private suspend fun restoreFromTar(tar: TarArchiveInputStream): RestoreStats {
+    /**
+     * 解包 tar：根据 [write] 决定是否写库，根据 [mode] 决定是否先清空对应数据域。
+     *
+     * - [write]=false（恢复预览）：只解析 metadata、逐行计数各 jsonl，**不写库**。
+     * - [write]=true 且 [mode]=[RestoreMode.OVERWRITE]：仅对备份实际携带的域先清空再插入，
+     *   绝不触碰备份中不存在的域（数据隔离）。
+     *
+     * @return (统计, 解析到的元数据；legacy 格式也会从 snapshot 还原出元数据)
+     */
+    private suspend fun restoreFromTar(
+        tar: TarArchiveInputStream,
+        mode: RestoreMode,
+        write: Boolean,
+    ): Pair<RestoreStats, BackupMetadata?> {
         var metadata: BackupMetadata? = null
         var stats = RestoreStats()
         var entry = tar.nextEntry
@@ -377,7 +487,17 @@ class BackupManagerImpl @Inject constructor(
                     val plain = tar.readBytes()
                     val snapshot = json.decodeFromString(BackupSnapshot.serializer(), String(plain, Charsets.UTF_8))
                     checkVersion(snapshot.schemaVersion)
-                    return restoreLegacy(snapshot)
+                    if (!write) {
+                        // 预览模式：仅计数，不写库。
+                        stats += RestoreStats(
+                            chatSessions = snapshot.chatSessions.size,
+                            agentMessages = snapshot.agentMessages.size,
+                            todoItems = snapshot.todoItems.size,
+                        )
+                    } else {
+                        stats += restoreLegacy(snapshot, mode)
+                    }
+                    return stats to snapshot.toMetadata()
                 }
                 FILE_METADATA -> {
                     val plain = tar.readBytes()
@@ -388,57 +508,90 @@ class BackupManagerImpl @Inject constructor(
                     val currentWorkspacePath = runCatching { workspaceRepository.currentPath() }
                         .onFailure { FileLogger.w("BackupMgr", "读取当前 workspacePath 失败", it) }
                         .getOrDefault("")
-                    stats += RestoreStats(chatSessions = restoreJsonl(tar, ChatSessionDto.serializer(), "upsertSessions") { dtos ->
-                        safeDaoSuspend("upsertSessions", 0) {
-                            val mapped = dtos.map { it.copy(workspacePath = it.workspacePath.ifBlank { currentWorkspacePath }).toEntity() }
-                            v2Agent.upsertAllSessions(mapped.map { it.toV2() })
-                            dtos.size
-                        }
-                    })
+                    stats += RestoreStats(
+                        chatSessions = restoreJsonl(
+                            tar, ChatSessionDto.serializer(), "sessions", write,
+                            onClear = { if (mode == RestoreMode.OVERWRITE) safeDaoSuspend("clearSessions", Unit) { v2Agent.deleteAllSessions() } },
+                            insert = { dtos ->
+                                safeDaoSuspend("upsertSessions", 0) {
+                                    val mapped = dtos.map { it.copy(workspacePath = it.workspacePath.ifBlank { currentWorkspacePath }).toEntity() }
+                                    v2Agent.upsertAllSessions(mapped.map { it.toV2() })
+                                    dtos.size
+                                }
+                            }
+                        )
+                    )
                 }
                 FILE_MESSAGES -> {
-                    stats += RestoreStats(agentMessages = restoreJsonl(tar, AgentMessageDto.serializer(), "insertMessages") { dtos ->
-                        safeDaoSuspend("insertMessages", 0) {
-                            val mapped = dtos.map { it.toEntity() }
-                            v2Agent.insertAllMessages(mapped.map { it.toV2() })
-                            dtos.size
-                        }
-                    })
+                    stats += RestoreStats(
+                        agentMessages = restoreJsonl(
+                            tar, AgentMessageDto.serializer(), "messages", write,
+                            onClear = { if (mode == RestoreMode.OVERWRITE) safeDaoSuspend("clearMessages", Unit) { v2Agent.deleteAllMessages() } },
+                            insert = { dtos ->
+                                safeDaoSuspend("insertMessages", 0) {
+                                    val mapped = dtos.map { it.toEntity() }
+                                    v2Agent.insertAllMessages(mapped.map { it.toV2() })
+                                    dtos.size
+                                }
+                            }
+                        )
+                    )
                 }
                 FILE_TODOS -> {
-                    stats += RestoreStats(todoItems = restoreJsonl(tar, TodoItemDto.serializer(), "upsertTodos") { dtos ->
-                        safeDaoSuspend("upsertTodos", 0) {
-                            val mapped = dtos.map { it.toEntity() }
-                            v2Agent.upsertAllTodos(mapped.map { it.toV2() })
-                            dtos.size
-                        }
-                    })
+                    stats += RestoreStats(
+                        todoItems = restoreJsonl(
+                            tar, TodoItemDto.serializer(), "todos", write,
+                            onClear = { if (mode == RestoreMode.OVERWRITE) safeDaoSuspend("clearTodos", Unit) { v2Agent.deleteAllTodos() } },
+                            insert = { dtos ->
+                                safeDaoSuspend("upsertTodos", 0) {
+                                    val mapped = dtos.map { it.toEntity() }
+                                    v2Agent.upsertAllTodos(mapped.map { it.toV2() })
+                                    dtos.size
+                                }
+                            }
+                        )
+                    )
                 }
                 FILE_REGISTRY -> {
-                    // 注册表全量段还原：解包后逐域恢复（大表键不在其中，天然跳过；DataStore 目录
-                    // 覆盖后由下方 restoreMeta 的 repository 级恢复再写一遍，保证内存缓存同步刷新）。
+                    // 注册表段：预览模式只解包计数字节，不 restoreAll。
                     val blobs = dataRegistry.unpack(tar.readBytes())
-                    dataRegistry.restoreAll(blobs)
-                    FileLogger.i(TAG, "注册表段还原 ${blobs.size} 个数据域")
+                    if (write) {
+                        dataRegistry.restoreAll(blobs)
+                        FileLogger.i(TAG, "注册表段还原 ${blobs.size} 个数据域")
+                    }
                 }
             }
             entry = tar.nextEntry
         }
         val meta = metadata ?: error("不是有效的 MiniMe-core 备份文件：缺少 metadata.json")
-        return stats + restoreMeta(meta)
+        val metaStats = if (write) restoreMeta(meta, mode) else RestoreStats(
+            providers = meta.providers.size,
+            gitCredentials = meta.gitCredentials.size,
+            remoteConnections = meta.remoteConnections.size,
+            remoteMounts = meta.remoteMounts.size,
+            mcpServers = meta.mcpServers.size,
+            globalPermissionRules = meta.globalPermissionRules.size,
+        )
+        return (stats + metaStats) to meta
     }
 
-    /** 逐行解析 jsonl 条目，每 [PAGE_SIZE] 条回调一次批量插入；返回该文件的总条数。 */
+    /**
+     * 逐行解析 jsonl 条目。[write]=false 时只计数不插入；[onClear] 在 OVERWRITE 模式插入前清空对应域。
+     * 返回该文件解析到的总行数（预览）或实际写入行数（恢复）。
+     */
     private suspend fun <T> restoreJsonl(
         tar: TarArchiveInputStream,
         serializer: KSerializer<T>,
         tag: String,
-        insert: suspend (List<T>) -> Int
+        write: Boolean,
+        onClear: (suspend () -> Unit)? = null,
+        insert: suspend (List<T>) -> Int,
     ): Int {
         val buffer = ByteArray(64 * 1024)
         val line = ByteArrayOutputStream(16 * 1024)
         val batch = ArrayList<T>(PAGE_SIZE)
         var count = 0
+        if (write) onClear?.invoke()
         while (true) {
             val n = tar.read(buffer)
             if (n < 0) break
@@ -453,7 +606,8 @@ class BackupManagerImpl @Inject constructor(
                         if (parsed != null) {
                             batch.add(parsed)
                             if (batch.size >= PAGE_SIZE) {
-                                count += runCatching { insert(batch.toList()) }.getOrDefault(0)
+                                if (write) count += runCatching { insert(batch.toList()) }.getOrDefault(0)
+                                else count += batch.size
                                 batch.clear()
                             }
                         }
@@ -471,7 +625,8 @@ class BackupManagerImpl @Inject constructor(
                 .getOrNull()?.let { batch.add(it) }
         }
         if (batch.isNotEmpty()) {
-            count += runCatching { insert(batch.toList()) }.getOrDefault(0)
+            if (write) count += runCatching { insert(batch.toList()) }.getOrDefault(0)
+            else count += batch.size
         }
         return count
     }
@@ -490,25 +645,28 @@ class BackupManagerImpl @Inject constructor(
         }
     }
 
-    /** 旧格式（单文件 snapshot.json 完整快照）还原。 */
-    private suspend fun restoreLegacy(snapshot: BackupSnapshot): RestoreStats {
-        var stats = restoreMeta(snapshot.toMetadata())
+    /** 旧格式（单文件 snapshot.json 完整快照）还原。OVERWRITE 模式对大表先清空再插入。 */
+    private suspend fun restoreLegacy(snapshot: BackupSnapshot, mode: RestoreMode): RestoreStats {
+        var stats = restoreMeta(snapshot.toMetadata(), mode)
+        val currentWorkspacePath = runCatching { workspaceRepository.currentPath() }
+            .onFailure { FileLogger.w("BackupMgr", "读取 workspacePath 失败(legacy)", it) }
+            .getOrDefault("")
         if (snapshot.chatSessions.isNotEmpty()) {
-            val currentWorkspacePath = runCatching { workspaceRepository.currentPath() }
-                .onFailure { FileLogger.w("BackupMgr", "读取 workspacePath 失败(legacy)", it) }
-                .getOrDefault("")
+            if (mode == RestoreMode.OVERWRITE) safeDaoSuspend("legacyClearSessions", Unit) { v2Agent.deleteAllSessions() }
             safeDaoSuspend("legacyUpsertSessions", Unit) {
                 val mapped = snapshot.chatSessions.map { it.copy(workspacePath = it.workspacePath.ifBlank { currentWorkspacePath }).toEntity() }
                 v2Agent.upsertAllSessions(mapped.map { it.toV2() })
             }
         }
         if (snapshot.agentMessages.isNotEmpty()) {
+            if (mode == RestoreMode.OVERWRITE) safeDaoSuspend("legacyClearMessages", Unit) { v2Agent.deleteAllMessages() }
             safeDaoSuspend("legacyInsertMessages", Unit) {
                 val mapped = snapshot.agentMessages.map { it.toEntity() }
                 v2Agent.insertAllMessages(mapped.map { it.toV2() })
             }
         }
         if (snapshot.todoItems.isNotEmpty()) {
+            if (mode == RestoreMode.OVERWRITE) safeDaoSuspend("legacyClearTodos", Unit) { v2Agent.deleteAllTodos() }
             safeDaoSuspend("legacyUpsertTodos", Unit) {
                 val mapped = snapshot.todoItems.map { it.toEntity() }
                 v2Agent.upsertAllTodos(mapped.map { it.toV2() })
@@ -521,8 +679,8 @@ class BackupManagerImpl @Inject constructor(
         )
     }
 
-    /** 元数据段还原（小表 + 应用设置），新旧格式共用。 */
-    private suspend fun restoreMeta(meta: BackupMetadata): RestoreStats {
+    /** 元数据段还原（小表 + 应用设置），新旧格式共用。OVERWRITE 对小表仍走 upsert（主键替换）。 */
+    private suspend fun restoreMeta(meta: BackupMetadata, mode: RestoreMode = RestoreMode.MERGE): RestoreStats {
         if (meta.providers.isNotEmpty()) {
             safeDaoSuspend("insertProviders", Unit) {
                 meta.providers.forEach { p ->
