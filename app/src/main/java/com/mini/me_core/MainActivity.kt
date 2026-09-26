@@ -29,6 +29,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +58,7 @@ import com.mini.me_core.feature.git.presentation.GitViewModel
 import com.mini.me_core.feature.git.presentation.component.GitScreen
 import com.mini.me_core.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.AppThemeMode
+import com.mini.me_core.feature.settings.data.repository.SecureScreenScope
 import com.mini.me_core.feature.settings.data.repository.ThemeSettingsRepository
 import com.mini.me_core.feature.settings.presentation.SettingsViewModel
 import com.mini.me_core.feature.settings.presentation.component.SettingsScreen
@@ -339,6 +341,23 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
+ * ALL_SENSITIVE_PAGES 范围下需要 FLAG_SECURE 的 NavHost 路由。
+ *
+ * 以 "/" 结尾的项按前缀匹配（带参数路由，如 skill_detail/{skillId}）；
+ * 其余按完整路由名匹配。"settings" 不在此列——其内部 section 级别由 SettingsScreen 细化。
+ */
+private val SENSITIVE_SECURE_ROUTES = setOf(
+    "chat",
+    "capability_center",
+    "proxy_config",
+    "proxy_nodes",
+    "terminal",
+    "terminal_settings",
+    "skill_detail/",
+    "skill_edit/",
+)
+
+/**
  * 根导航容器。
  *
  * [ModalNavigationDrawer] 放在 [NavHost] **外面**，使 Drawer 的生命周期独立于页面切换。
@@ -377,6 +396,34 @@ fun AppNavigation(
     val workspaceViewModel: WorkspaceViewModel = hiltViewModel()
     // 侧边栏「工作目录 → 当前工作台」文件浏览数据源（Activity 级，切换工作区时自动复位到根目录）。
     val workspaceFileViewModel: WorkspaceFileViewModel = hiltViewModel()
+
+    // ── 防截图录屏：根据开关 + 范围 + 当前路由统一管理窗口级 FLAG_SECURE ──
+    // settings 路由不在这里强制设置，由 SettingsScreen 按内部 section 细化（ProviderEditor/Security/Backup/RemoteServers）。
+    val secureScreenEnabled by settingsViewModel.secureScreenEnabled.collectAsStateWithLifecycle()
+    val secureScreenScope by settingsViewModel.secureScreenScope.collectAsStateWithLifecycle()
+    val secureActivity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+    DisposableEffect(secureScreenEnabled, secureScreenScope, currentRoute) {
+        val route = currentRoute
+        val shouldSecure = when {
+            !secureScreenEnabled -> false
+            secureScreenScope == SecureScreenScope.GLOBAL -> true
+            secureScreenScope == SecureScreenScope.PROVIDER_EDITOR_ONLY -> false
+            secureScreenScope == SecureScreenScope.ALL_SENSITIVE_PAGES -> {
+                // settings 路由交给 SettingsScreen 按 section 决定，其余敏感路由在这里统一设置
+                route != "settings" && SENSITIVE_SECURE_ROUTES.any { pattern ->
+                    if (pattern.endsWith("/")) route?.startsWith(pattern) == true else route == pattern
+                }
+            }
+            else -> false
+        }
+        if (shouldSecure) {
+            secureActivity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            secureActivity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        }
+        // onDispose 不清理：路由/范围变化时本 effect 会以新 key 重新计算并收敛到正确状态。
+        onDispose { }
+    }
 
     // 侧边栏打开时，系统返回键先收起侧边栏。
     BackHandler(enabled = drawerState.isOpen) {

@@ -225,24 +225,16 @@ fun ProviderEditorScreen(
     // "2 type arguments expected for fun <T : R, R> Flow<T>.collectAsState(...)"
     }.collectAsState(initial = emptyMap())
 
-    // ── 防截图录屏：读取用户开关，动态控制 FLAG_SECURE ──
-    val secureScreenEnabled by viewModel.secureScreenEnabled.collectAsState()
-
-    DisposableEffect(secureScreenEnabled) {
+    // ── 进入/退出供应商编辑页时重置拉取/测试相关状态 ──
+    // FLAG_SECURE 已上移由 SettingsScreen 按 section 统一管理（本页对应 ProviderEditor section）。
+    DisposableEffect(Unit) {
         viewModel.resetFetchState()
         viewModel.clearTestResults()
         viewModel.resetConnectionTest()
-        val activity = context as? android.app.Activity
-        if (secureScreenEnabled) {
-            activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-        } else {
-            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-        }
         onDispose {
             viewModel.resetFetchState()
             viewModel.clearTestResults()
             viewModel.resetConnectionTest()
-            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
 

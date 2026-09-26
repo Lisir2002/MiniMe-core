@@ -27,6 +27,7 @@ import com.mini.me_core.feature.settings.data.repository.DefaultPolicy
 import com.mini.me_core.feature.settings.data.repository.ViewImageUnknownGuardPolicy
 import com.mini.me_core.feature.settings.data.repository.ContainerSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.SecureScreenRepository
+import com.mini.me_core.feature.settings.data.repository.SecureScreenScope
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
@@ -225,9 +226,13 @@ class SettingsViewModel @Inject constructor(
     // ── 设置页搜索历史（KVStore 持久化，最近 10 条）──
     val searchHistory: StateFlow<List<String>> = searchHistoryManager.history
 
-    // ── 防截图录屏开关（供 ProviderEditorScreen 动态控制 FLAG_SECURE）──
+    // ── 防截图录屏开关（供 MainActivity / SettingsScreen 统一动态控制 FLAG_SECURE）──
     val secureScreenEnabled: StateFlow<Boolean> = secureScreenRepository.enabledFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /** 防截图录屏保护范围（仅供应商编辑页 / 所有敏感页 / 全局）。 */
+    val secureScreenScope: StateFlow<SecureScreenScope> = secureScreenRepository.scopeFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SecureScreenScope.DEFAULT)
 
     // ── F5.5 变更生效即时反馈 ──
     /** 设置变更效果事件：立即生效提示 / 需重启提示。 */
