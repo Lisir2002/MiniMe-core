@@ -2434,4 +2434,9 @@
     <string name="security_zth_desc">Stricter tiers prompt more frequent user confirmation; hallucination triggers (ToolOutput/Plan/Skill body) always prompt regardless of tier.</string>
     <string name="security_zth_swipe_hint">Can be off only for DISABLED / MINIMAL (0/1); forced on at tier >= 2.</string>
 
+    <string name="viewer_code_title">Code Viewer</string>
+    <string name="viewer_back">Back</string>
+    <string name="viewer_search">Search</string>
+    <string name="viewer_outline">Outline</string>
+    <string name="viewer_error">Error: %1$s</string>
 </resources>

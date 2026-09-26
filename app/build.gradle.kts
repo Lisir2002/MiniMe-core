@@ -171,6 +171,26 @@ android {
         // Android 包管理器在安装/运行期按设备 ABI 自动选用 lib/arm64-v8a 或 lib/x86_64 下的 .so
         // （libtermux.so 由 terminal-emulator 模块为全部 ABI 提供），互不干扰、无需用户选择。
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+
+        // ── Native viewer/editor 核心（libminimeviewer）──
+        // c++_shared STL：多个静态库（tree-sitter 核心 + 各 grammar）共享同一份 libc++_shared.so，
+        // 体积更小；AGP 会自动把 libc++_shared.so 打入 APK。符号隐藏在 CMake 侧统一处理。
+        // 不强制 -DCMAKE_BUILD_TYPE=Release：debug 保持 -O0 便于 native 调试，
+        // release 的 -Oz 体积优化在 CMakeLists.txt 内按 Release 构建类型施加。
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DANDROID_STL=c++_shared")
+            }
+        }
+    }
+
+    // Native 构建入口：CMakeLists.txt 位于 app/src/main/cpp/。
+    // version 固定为 SDK 内安装的 cmake 3.22.1（与设计文档一致）。
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     // 双架构通用包：sourceSets.main.assets 挂 _armAssets，其内同时含 container/arm（arm64 容器）与
@@ -217,7 +237,14 @@ android {
             // release 构建的体积/性能深度优化：
             //   debugSymbolLevel=none  —— 不向 APK / AAB 注入 native 调试符号表，省 ~1MB+。
             //   isPseudoLocalesEnabled=false —— 关闭伪本地化资源，省少量体积。
-            ndk { debugSymbolLevel = "none" }
+            //   ndk.abiFilters 仅 arm64-v8a —— release 只打真机主流 ABI，so 体积减半；
+            //     容器功能不受影响（arm64 设备原生执行 aarch64 rootfs，x86_64 容器经 qemu 转译仍可用）；
+            //     x86_64 仅用于模拟器开发调试，debug 变体保留双 ABI。
+            ndk {
+                debugSymbolLevel = "none"
+                abiFilters.clear()
+                abiFilters += listOf("arm64-v8a")
+            }
             isPseudoLocalesEnabled = false
 
             // 利用 R8 / D8 的 advancedMode 与 useLegacyPackaging=false：

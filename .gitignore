@@ -38,3 +38,6 @@ build-dist/
 # Local dev tool config
 mise.toml
 .tool-versions
+
+# Native build intermediates (AGP/CMake)
+app/.cxx/

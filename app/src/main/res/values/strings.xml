@@ -2465,4 +2465,9 @@
     <string name="security_zth_desc">越严格档位越频繁弹卡用户确认；幻觉触发（ToolOutput/Plan/Skill 正文）无论档位，都先弹卡绝不自我麻痹。</string>
     <string name="security_zth_swipe_hint">关闭仅允许 DISABLED / MINIMAL(0/1)；≥2 强制开。</string>
 
+    <string name="viewer_code_title">代码查看</string>
+    <string name="viewer_back">返回</string>
+    <string name="viewer_search">搜索</string>
+    <string name="viewer_outline">大纲</string>
+    <string name="viewer_error">错误: %1$s</string>
 </resources>
