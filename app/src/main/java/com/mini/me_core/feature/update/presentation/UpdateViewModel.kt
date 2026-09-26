@@ -211,6 +211,8 @@ class UpdateViewModel @Inject constructor(
                     )
                 }
             }.onFailure { e ->
+                // 用户主动取消不显示失败弹窗
+                if (e is kotlinx.coroutines.CancellationException) return@onFailure
                 _state.update {
                     it.copy(
                         download = DownloadUiState.Failed(

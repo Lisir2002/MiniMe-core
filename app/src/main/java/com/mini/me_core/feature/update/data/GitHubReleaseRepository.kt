@@ -90,6 +90,10 @@ class GitHubReleaseRepository @Inject constructor(
 
     private val activeCall = AtomicReference<Call?>(null)
 
+    /** 用户主动取消标志：为 true 时下载循环不再切换镜像站重试。 */
+    @Volatile
+    private var downloadCancelled = false
+
     // ── 设置：自动检查开关 ─────────────────────────────────────────────
 
     val autoCheckEnabled: Flow<Boolean> =
@@ -290,6 +294,7 @@ class GitHubReleaseRepository @Inject constructor(
         release: ReleaseInfo,
         onProgress: (DownloadProgress) -> Unit,
     ): String = withContext(Dispatchers.IO) {
+        downloadCancelled = false
         val originalUrl = release.downloadUrl ?: error("no apk asset")
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
             ?: context.filesDir
@@ -360,7 +365,10 @@ class GitHubReleaseRepository @Inject constructor(
                 }
             }.onFailure { e ->
                 lastError = e
-                if (e.message == "download cancelled") throw e
+                // 用户主动取消：不再切换镜像站重试，直接抛出取消异常
+                if (downloadCancelled || e.message == "download cancelled") {
+                    throw kotlinx.coroutines.CancellationException("download cancelled by user", e)
+                }
                 // 删除不完整的下载文件，避免下次恢复时混淆
                 targetFile.delete()
                 if (index == 0) {
@@ -375,6 +383,7 @@ class GitHubReleaseRepository @Inject constructor(
 
     /** 取消当前下载（若无进行中下载则无操作）。 */
     fun cancelDownload() {
+        downloadCancelled = true
         activeCall.getAndSet(null)?.runCatching { cancel() }
     }
 
