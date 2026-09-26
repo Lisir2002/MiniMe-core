@@ -79,7 +79,8 @@
 | 版本日志总目录 | `docs/Version Log/` | 包含 CHANGELOG.md 和按软件分的版本文档 |
 | MiniMe-core 版本日志 | `docs/Version Log/MiniMe-core v-Logs/` | 每个版本一个 md，命名 `MiniMe-core v0.0.0.XX Version Log.md` |
 | MiniMe-Logs 版本日志 | `docs/Version Log/MiniMe-Logs v-Logs/` | 附属应用版本日志 |
-| 路线图 | `docs/roadmap/` | 各版本方向设计文档 |
+
+> **设计文档清理规则**：一次性设计文档（`*-design.md`）在全部落地后必须删除；部分落地的保留并标注进度。规范文档和版本日志永久保留。
 
 ---
 

@@ -2,7 +2,7 @@
 
 > 版本：v1.1
 > 日期：2026-09-27
-> 状态：第一阶段已落地（CMake/JNI/file_loader/tree-sitter/CodeViewer 地基），后续阶段待实施
+> 状态：部分落地（第一阶段已完成：CMake/JNI/file_loader/tree-sitter/CodeViewer 地基）；待落地：第二阶段（代码编辑器）、第三阶段（PDFium）
 > 适用项目：MiniMe-core（applicationId: com.mini.me_core）
 
 ---

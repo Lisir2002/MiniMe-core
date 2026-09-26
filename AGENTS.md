@@ -106,6 +106,7 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 - **UI 变化 → 必须更新对应使用文档**：任何 UI 变化（新增页面、改交互、调布局、改文案）**必须**同步更新 `app/src/main/assets/docs/` 下对应的使用文档，确保用户可见的说明与实际界面一致。AI 应自行在 `docs/` 目录中查找对应的文档；若不存在则新建。
 - **UI 文案 → 必须同步 strings.xml**：任何新增或修改用户可见的中文文案（按钮、标题、提示、Toast 等），**必须**将其提取为 string resource 写入 `app/src/main/res/values/strings.xml`（中文）和 `app/src/main/res/values-en/strings.xml`（英文翻译），并在 `.kt` 代码中用 `stringResource(R.string.xxx)` 或 `context.getString(R.string.xxx)` 引用。**禁止在 .kt 文件中硬编码中文 UI 文案。** 命名规范：语义化英文全小写下划线分隔，通用文案用 `common_` 前缀跨页面复用。
 - **模块文档 / 设计文档（已停用）**：曾经的 `docs/modules/`（模块开发文档）与 `docs/plan-docs/`（设计文档）目录已按维护者决定**整体删除**，对应纪律（模块文档同步、设计文档前置）随之停用，`.githooks/pre-commit` 校验已停用（`spec-check.sh` 已删除）。新增/删除 feature 模块不再要求配套模块文档。
+- **设计文档落地后清理规则（硬性约束）**：`docs/` 下的一次性设计文档（如 `*-design.md`）在设计内容**全部落地完成**后，必须及时删除，不得保留过时设计文档。部分落地的设计文档可保留作为后续开发参考，但需在文档头部标注已落地阶段和待落地阶段。规范类文档（`ui-standards.md`、`ci-release.md`、`AGENTS.md`、`PLAN.md`、`SECURITY.md`）不属于设计文档，必须持续保留并实时更新。版本日志（`docs/Version Log/`）为历史记录，永久保留。
 
 ## Git 提交规范
 
