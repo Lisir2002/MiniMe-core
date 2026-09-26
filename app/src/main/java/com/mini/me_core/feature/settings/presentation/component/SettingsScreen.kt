@@ -65,6 +65,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -247,6 +248,14 @@ fun SettingsScreen(
     }
 
     // 处于二级页时，系统返回键先回到上一层；首页时交还给上层导航。
+
+    // 滚动位置记忆：导航到子页面后 SettingsScreen 离开组合，rememberScrollState 会被销毁。
+    // 将偏移量持久化到 Activity 级 ViewModel，返回时恢复，避免每次回到顶部。
+    val savedScrollOffset by viewModel.settingsScrollOffset.collectAsStateWithLifecycle()
+    val scrollState = rememberScrollState(initial = savedScrollOffset)
+    LaunchedEffect(scrollState) {
+        snapshotFlow { scrollState.value }.collect { viewModel.setSettingsScrollOffset(it) }
+    }
     BackHandler(enabled = section != SettingsSection.Menu) {
         when (section) {
             SettingsSection.ProviderEditor -> section = SettingsSection.Providers
@@ -464,6 +473,7 @@ fun SettingsScreen(
                         isSearchMode = false
                         searchQuery = ""
                     },
+                    scrollState = scrollState,
                 )
                 SettingsSection.Providers -> ModelManagementScreen(
                     viewModel = viewModel,
@@ -732,6 +742,7 @@ internal fun SettingsMenu(
     onClearSearchHistory: () -> Unit = {},
     onRemoveHistoryItem: (String) -> Unit = {},
     onExitSearchMode: () -> Unit = {},
+    scrollState: androidx.compose.foundation.ScrollState,
 ) {
     val themeLabel = stringResource(themeMode.labelRes)
 
@@ -1021,7 +1032,7 @@ internal fun SettingsMenu(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {

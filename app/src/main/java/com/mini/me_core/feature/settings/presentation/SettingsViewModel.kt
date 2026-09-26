@@ -1984,4 +1984,14 @@ class SettingsViewModel @Inject constructor(
             modelMetadataService.clearSamplingConfig(type, modelId)
         }
     }
+
+    // ── 设置页面滚动位置持久化 ─────────────────────────────────────────────
+    // 导航到子页面后 SettingsScreen composable 被移出组合，rememberScrollState() 丢失，
+    // 返回时回到顶部。将偏移量保存在 Activity 级 ViewModel 中，跨导航保持存活。
+    private val _settingsScrollOffset = MutableStateFlow(0)
+    val settingsScrollOffset: StateFlow<Int> = _settingsScrollOffset.asStateFlow()
+
+    fun setSettingsScrollOffset(offset: Int) {
+        if (offset >= 0) _settingsScrollOffset.value = offset
+    }
 }
