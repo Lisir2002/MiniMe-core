@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
+import com.mini.me_core.core.ui.components.fileIconVisual
 import com.mini.me_core.feature.terminal.domain.ContainerFileEntry
 import com.mini.me_core.feature.terminal.domain.ContainerFileType
 
@@ -49,15 +50,20 @@ fun FilePropertiesSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
+            val visual = fileIconVisual(
+                name = entry.name,
+                isDir = entry.isDir,
+                executable = type == ContainerFileType.EXECUTABLE,
+            )
             Box(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(fileTypeBg(type))
+                    .background(visual.iconBg)
                     .align(Alignment.CenterHorizontally),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(fileTypeIcon(type), null, tint = fileTypeFg(type),
+                Icon(visual.icon, null, tint = visual.iconFg,
                     modifier = Modifier.size(30.dp))
             }
             Spacer(Modifier.height(12.dp))

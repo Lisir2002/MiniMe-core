@@ -7,6 +7,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.FolderOpen
@@ -56,6 +58,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
+import com.mini.me_core.core.ui.components.FileBrowserItem
+import com.mini.me_core.core.ui.components.fileIconVisual
 import com.mini.me_core.feature.terminal.domain.ContainerFileAccess
 import com.mini.me_core.feature.terminal.domain.ContainerFileEntry
 import com.mini.me_core.feature.terminal.domain.ContainerFileType
@@ -201,8 +205,24 @@ fun ContainerFileManager(
                     ) {
                         items(entries, key = { it.path }) { entry ->
                             val type = ContainerFileType.classify(entry)
-                            FileRow(
-                                entry = entry, type = type, childCount = childCounts[entry.path],
+                            val visual = fileIconVisual(
+                                name = entry.name,
+                                isDir = entry.isDir,
+                                executable = type == ContainerFileType.EXECUTABLE,
+                            )
+                            val subtitle = when {
+                                entry.isDir -> childCounts[entry.path]?.let {
+                                    "$it ${stringResource(R.string.fm_items_suffix)}"
+                                } ?: "-"
+
+                                else -> "${formatSize(entry.sizeBytes)} · ${formatSmartTime(entry.modifiedAt)}"
+                            }
+                            FileBrowserItem(
+                                name = entry.name,
+                                subtitle = subtitle,
+                                icon = visual.icon,
+                                iconBg = visual.iconBg,
+                                iconFg = visual.iconFg,
                                 selected = entry.path in selected,
                                 onClick = {
                                     if (selected.isNotEmpty()) {
@@ -213,7 +233,18 @@ fun ContainerFileManager(
                                         onOpenEditor(entry)
                                     }
                                 },
-                                onLongClick = { actionTarget = entry }
+                                onLongClick = { actionTarget = entry },
+                                trailing = if (entry.path in selected) {
+                                    {
+                                        Icon(
+                                            Icons.Rounded.Check, null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
                             )
                         }
                     }
@@ -381,21 +412,26 @@ private fun GridFileItem(
     entry: ContainerFileEntry, type: ContainerFileType, selected: Boolean,
     onClick: () -> Unit, onLongClick: () -> Unit,
 ) {
+    val visual = fileIconVisual(
+        name = entry.name,
+        isDir = entry.isDir,
+        executable = type == ContainerFileType.EXECUTABLE,
+    )
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
             .background(if (selected) MaterialTheme.colorScheme.primaryContainer
             else MaterialTheme.colorScheme.surface)
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
-                .background(fileTypeBg(type)),
+            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
+                .background(visual.iconBg),
             contentAlignment = Alignment.Center
         ) {
-            Icon(fileTypeIcon(type), null, tint = fileTypeFg(type), modifier = Modifier.size(28.dp))
+            Icon(visual.icon, null, tint = visual.iconFg, modifier = Modifier.size(22.dp))
         }
         Spacer(Modifier.height(6.dp))
         Text(entry.name, style = MaterialTheme.typography.bodySmall,

@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
+import com.mini.me_core.core.ui.components.fileIconVisual
 import com.mini.me_core.feature.terminal.domain.ContainerFileEntry
 import com.mini.me_core.feature.terminal.domain.ContainerFileType
 
@@ -69,14 +70,19 @@ fun FileActionSheet(
         ) {
             // 头部：图标 + 文件名 + 大小·路径
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val visual = fileIconVisual(
+                    name = entry.name,
+                    isDir = entry.isDir,
+                    executable = type == ContainerFileType.EXECUTABLE,
+                )
                 Box(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(fileTypeBg(type)),
+                        .background(visual.iconBg),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(fileTypeIcon(type), null, tint = fileTypeFg(type),
+                    Icon(visual.icon, null, tint = visual.iconFg,
                         modifier = Modifier.size(24.dp))
                 }
                 Spacer(Modifier.width(12.dp))

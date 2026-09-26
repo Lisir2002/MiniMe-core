@@ -13,29 +13,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Build
-import androidx.compose.material.icons.rounded.Code
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.FolderZip
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.Article
-import androidx.compose.material.icons.rounded.DataObject
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -45,18 +35,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mini.me_core.R
+import com.mini.me_core.core.ui.components.FileBrowserItem
+import com.mini.me_core.core.ui.components.fileIconVisual
 import com.mini.me_core.core.viewer.code.CodeViewerScreen
-import com.mini.me_core.feature.about.data.RepoFileNode
 import com.mini.me_core.feature.about.data.RepoType
 import java.io.File
 
@@ -152,12 +140,27 @@ fun CodeBrowserScreen(
                             )
                         }
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                horizontal = 8.dp, vertical = 4.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
                             items(children, key = { it.path }) { node ->
-                                RepoFileRow(
-                                    node = node,
-                                    sizeText = viewModel.formatSize(node.size),
-                                    childCount = node.children.size,
+                                val visual = fileIconVisual(
+                                    name = node.name,
+                                    isDir = node.type == RepoType.DIR,
+                                )
+                                val subtitle = if (node.type == RepoType.DIR) {
+                                    stringResource(R.string.code_browser_items, node.children.size)
+                                } else viewModel.formatSize(node.size)
+                                FileBrowserItem(
+                                    name = node.name,
+                                    subtitle = subtitle,
+                                    icon = visual.icon,
+                                    iconBg = visual.iconBg,
+                                    iconFg = visual.iconFg,
                                     onClick = {
                                         if (node.type == RepoType.DIR) viewModel.enterDir(node)
                                         else viewModel.onFileClick(node)
@@ -253,76 +256,20 @@ private fun BreadcrumbRow(
             ) {
                 if (index > 0) {
                     Icon(
-                        Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        Icons.Rounded.ChevronRight,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(14.dp),
                     )
                 }
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = if (index == pathStack.lastIndex) FontWeight.Bold else FontWeight.Medium,
+                    style = MaterialTheme.typography.labelLarge,
                     color = if (index == pathStack.lastIndex) MaterialTheme.colorScheme.onSurface
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun RepoFileRow(
-    node: RepoFileNode,
-    sizeText: String,
-    childCount: Int,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(
-            imageVector = fileIconFor(node),
-            contentDescription = null,
-            tint = if (node.type == RepoType.DIR) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = node.name,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-            )
-            val subtitle = if (node.type == RepoType.DIR) {
-                stringResource(R.string.code_browser_items, childCount)
-            } else sizeText
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-private fun fileIconFor(node: RepoFileNode): ImageVector {
-    if (node.type == RepoType.DIR) return Icons.Rounded.Folder
-    val ext = node.name.substringAfterLast('.', "").lowercase()
-    return when (ext) {
-        "kt", "java", "kts" -> Icons.Rounded.Code
-        "md", "markdown" -> Icons.Rounded.Article
-        "json", "yaml", "yml", "toml", "xml" -> Icons.Rounded.DataObject
-        "gradle" -> Icons.Rounded.Build
-        "png", "jpg", "jpeg", "webp", "gif", "svg" -> Icons.Rounded.Image
-        "zip", "gz", "tar" -> Icons.Rounded.FolderZip
-        else -> Icons.Rounded.Description
     }
 }
 
