@@ -66,8 +66,8 @@ class GitHubReleaseRepository @Inject constructor(
         const val KEY_CACHED_LATEST_JSON = "cached_latest_json"
         const val KEY_CACHED_LATEST_TAG = "cached_latest_tag"
 
-        /** 缓存 TTL：4 小时内不重复请求 /releases/latest。 */
-        const val CACHE_TTL_MS = 4L * 60L * 60L * 1000L
+        /** 缓存 TTL：30 分钟内不重复请求 /releases/latest。用户手动进入更新页时强制刷新不受此限制。 */
+        const val CACHE_TTL_MS = 30L * 60L * 1000L
 
         const val API_LATEST =
             "https://api.github.com/repos/Lisir2002/MiniMe-core/releases/latest"

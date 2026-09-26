@@ -134,8 +134,9 @@ fun AppListItem(
         }
     }
 
-    val clickableModifier = if (onClick != null) {
-        Modifier.clickable(onClick = onClick)
+    val effectiveClick = onClick ?: onViewClick
+    val clickableModifier = if (effectiveClick != null) {
+        Modifier.clickable(onClick = effectiveClick)
     } else {
         Modifier
     }

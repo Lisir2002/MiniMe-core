@@ -89,7 +89,7 @@ class UpdateViewModel @Inject constructor(
                 _state.update { it.copy(autoCheck = enabled) }
             }
         }
-        refresh(force = false)
+        refresh(force = true)
     }
 
     /** 手动/自动检查：拉最新版 + 历史列表。 */
