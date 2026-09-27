@@ -42,6 +42,7 @@ dependencyResolutionManagement {
 rootProject.name = "app"
 
 include(":app")
+include(":core")
 include(":terminal-emulator")
 include(":terminal-view")
 include(":logviewer-app")
