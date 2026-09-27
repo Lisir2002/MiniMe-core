@@ -116,6 +116,7 @@ class AIAgentViewModel @Inject constructor(
     private val playbookRegistry: com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookRegistry,
     /** 定时提醒调度循环：会话创建后注册到点投递回调（DSH schedule）。 */
     private val scheduleScheduler: com.mini.me_core.feature.agent.domain.schedule.ScheduleScheduler,
+    private val environmentProbeController: EnvironmentProbeController,
     @param:ApplicationContext private val context: Context
 ) : ViewModel(), SlashCommandContext {
 
@@ -168,13 +169,7 @@ class AIAgentViewModel @Inject constructor(
      * 内存 + SharedPreferences 双写：冷启动/进程被杀后能恢复气泡，避免重新进入 App 后消失。
      * 探测中状态不落盘；仅已完成结果持久化。
      */
-    private val _environmentSnapshots = MutableStateFlow<Map<String, EnvironmentSnapshot>>(emptyMap())
-    val environmentSnapshots: StateFlow<Map<String, EnvironmentSnapshot>> = _environmentSnapshots.asStateFlow()
-
-    private val envSnapshotStore by lazy { EnvironmentSnapshotStore(context) }
-
-    /** 旁路探测节流：记录每个触发消息最近一次探测时间（elapsedRealtime）。 */
-    private val lastProbeAt = mutableMapOf<String, Long>()
+    val environmentSnapshots: StateFlow<Map<String, EnvironmentSnapshot>> = environmentProbeController.environmentSnapshots
 
     private val _agentStates = MutableStateFlow<Map<String, AgentUIState>>(emptyMap())
     val agentStates: StateFlow<Map<String, AgentUIState>> = _agentStates.asStateFlow()
@@ -1281,24 +1276,12 @@ class AIAgentViewModel @Inject constructor(
      */
     fun refreshEnvironment(taskId: String? = null, components: List<String>? = null) {
         val sid = _currentSessionId.value ?: return
-        viewModelScope.launch {
-            if (!containerEngine.isProvisioned()) return@launch
-            val args = if (components.isNullOrEmpty()) emptyMap() else mapOf(
-                "components" to kotlinx.serialization.json.JsonArray(components.map { kotlinx.serialization.json.JsonPrimitive(it) })
-            )
-            val result = runCatching { checkEnvironmentTool.execute(args) }.getOrNull()
-            if (result is ToolResult.Success) {
-                messagePersistenceUseCase.persist(
-                    sid,
-                    MessageRole.TOOL,
-                    result.toTransportString(),
-                    taskId = taskId ?: currentTaskIdBySession[sid] ?: "",
-                    toolName = "check_environment",
-                    toolArgs = null,
-                    isError = false
-                )
-            }
-        }
+        environmentProbeController.refreshEnvironment(
+            sessionId = sid,
+            taskId = taskId,
+            currentTaskId = currentTaskIdBySession[sid],
+            components = components
+        )
     }
 
     /**
@@ -1311,48 +1294,12 @@ class AIAgentViewModel @Inject constructor(
      */
     private fun probeEnvironment(taskId: String, triggerMsgId: String, components: List<String>?) {
         val sid = _currentSessionId.value ?: return
-        // 关键修复：明确传入空集合时不做任何探测，避免空组件集合 → 触发默认全量探测
-        if (components != null && components.isEmpty()) {
-            _environmentSnapshots.value = _environmentSnapshots.value - triggerMsgId
-            return
-        }
-        val now = android.os.SystemClock.elapsedRealtime()
-        val last = lastProbeAt[triggerMsgId] ?: 0L
-        if (now - last < PROBE_THROTTLE_MS) return
-        lastProbeAt[triggerMsgId] = now
-        // 先标记「探测中」，让状态条立即显示转圈
-        _environmentSnapshots.value = _environmentSnapshots.value + (
-            triggerMsgId to EnvironmentSnapshot(key = triggerMsgId, components = emptyList(), probedAt = now, probing = true)
+        environmentProbeController.probeEnvironment(
+            sessionId = sid,
+            taskId = taskId,
+            triggerMsgId = triggerMsgId,
+            components = components
         )
-        viewModelScope.launch {
-            if (!containerEngine.isProvisioned()) {
-                _environmentSnapshots.value = _environmentSnapshots.value - triggerMsgId
-                return@launch
-            }
-            // components==null 走默认组件探测（项目栈启发式）；components 非空且非空列表 → 精准探测指定组件
-            val args = if (components.isNullOrEmpty()) emptyMap() else mapOf(
-                "components" to kotlinx.serialization.json.JsonArray(components.map { kotlinx.serialization.json.JsonPrimitive(it) })
-            )
-            val result = runCatching { checkEnvironmentTool.execute(args) }.getOrNull()
-            val snapshot = if (result is ToolResult.Success) {
-                EnvironmentSnapshot(
-                    key = triggerMsgId,
-                    components = parseEnvironmentComponents(result.toTransportString()),
-                    probedAt = android.os.SystemClock.elapsedRealtime(),
-                    probing = false
-                )
-            } else {
-                // 探测失败：移除占位，避免残留「探测中」状态
-                _environmentSnapshots.value = _environmentSnapshots.value - triggerMsgId
-                return@launch
-            }
-            _environmentSnapshots.value = _environmentSnapshots.value + (triggerMsgId to snapshot)
-            // 探测完成后持久化到磁盘，冷启动可恢复
-            val sid = _currentSessionId.value
-            if (sid != null) {
-                envSnapshotStore.save(sid, _environmentSnapshots.value)
-            }
-        }
     }
 
     /** 从工具参数 JSON 预览中提取 command 字段。 */
@@ -1486,8 +1433,7 @@ class AIAgentViewModel @Inject constructor(
         if (_currentSessionId.value == id) return
         _currentSessionId.value = id
         // 切换会话时从磁盘恢复环境快照（冷启动/进程被杀后重建气泡）
-        _environmentSnapshots.value = envSnapshotStore.load(id)
-        lastProbeAt.clear()
+        environmentProbeController.restoreSnapshots(id)
     }
 
     fun setSessionMode(mode: AgentMode) {
@@ -1788,8 +1734,7 @@ class AIAgentViewModel @Inject constructor(
         if (_currentSessionId.value == id) return
         _currentSessionId.value = id
         // 切换会话时从磁盘恢复环境快照（冷启动/进程被杀后重建气泡）
-        _environmentSnapshots.value = envSnapshotStore.load(id)
-        lastProbeAt.clear()
+        environmentProbeController.restoreSnapshots(id)
     }
 
     /**
@@ -1809,7 +1754,7 @@ class AIAgentViewModel @Inject constructor(
         checkpointManager.clearSessionCheckpoints(id)
         sessionUseCase.deleteSession(id)
         // 删除会话时同步清理环境快照持久化
-        envSnapshotStore.clear(id)
+        environmentProbeController.clearSnapshots(id)
 
         sessionJobs[id]?.cancel()
         sessionJobs.remove(id)
