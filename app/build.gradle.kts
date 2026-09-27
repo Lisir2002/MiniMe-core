@@ -10,6 +10,7 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
     id("app.cash.sqldelight")
+    id("io.gitlab.arturbosch.detekt")
 }
 
 // 品牌 / 产物参数单一事实源（应用名、APK产物前缀、keystore 文件名、图标族名），定义见 branding.gradle.kts。
@@ -527,10 +528,13 @@ sqldelight {
             srcDirs("src/main/sqldelight/infra")
             dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
         }
-        create("QBotDb") {
-            packageName.set("com.mini.mecore.datalayer.sqldelight")
-            srcDirs("src/main/sqldelight/qqbot")
-            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
-        }
     }
+}
+
+detekt {
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+    buildUponDefaultConfig = true
+    allRules = false
+    source.setFrom(files("src/main/java"))
+    parallel = true
 }

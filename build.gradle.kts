@@ -6,4 +6,6 @@ plugins {
     id("com.google.devtools.ksp") version "2.2.21-2.0.5" apply false
     // 新数据层（data-layer-redesign）：SQLDelight 类型安全 SQL 生成
     id("app.cash.sqldelight") version "2.2.1" apply false
+    // detekt 静态代码质量检查
+    id("io.gitlab.arturbosch.detekt") version "1.23.7" apply false
 }
