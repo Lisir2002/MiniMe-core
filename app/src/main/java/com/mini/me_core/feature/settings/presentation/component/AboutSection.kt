@@ -53,7 +53,13 @@ import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Tag
 import androidx.compose.material.icons.rounded.Terminal
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.TextSnippet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material.icons.rounded.Balance
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material3.AlertDialog
@@ -65,6 +71,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,6 +80,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -233,9 +242,12 @@ internal fun AboutSection(
     val viewingPath = browserUi.openingLocalPath
     val currentDoc = docViewerDoc
 
-    // 系统返回键先收起内部覆盖层（查看代码 -> 浏览源码 -> 法律文档 -> 关于），再交还 SettingsScreen。
+    // 系统返回键：优先退出搜索模式 > 关闭大纲 > 收起查看器/浏览器/文档
+    val codeViewerUi by codeViewerVM.ui.collectAsStateWithLifecycle()
     androidx.activity.compose.BackHandler(enabled = currentDoc != null || showCodeBrowser || viewingPath != null) {
         when {
+            codeViewerUi.searchMode -> codeViewerVM.toggleSearchMode()
+            codeViewerUi.showOutline -> codeViewerVM.closeOutline()
             viewingPath != null -> codeBrowserVM.consumeOpenedFile()
             currentDoc != null -> docViewerDoc = null
             showCodeBrowser -> showCodeBrowser = false
@@ -255,23 +267,99 @@ internal fun AboutSection(
         return
     }
 
-    // 查看代码：动态顶栏 = 文件名 + 搜索/大纲 actions，返回键回到浏览器目录。
+    // 查看代码：动态顶栏 = 文件名/搜索框 + 搜索/大纲/编码 actions，返回键回到浏览器目录。
     if (viewingPath != null) {
+        val focusRequester = remember { FocusRequester() }
+        var showEncodingMenu by remember { mutableStateOf(false) }
+        val encLabel = remember(codeViewerUi.currentEncoding) {
+            com.mini.me_core.core.viewer.code.ENCODING_LABELS
+                .firstOrNull { it.first == codeViewerUi.currentEncoding }?.second ?: "UTF-8"
+        }
         Column(modifier = Modifier.fillMaxSize()) {
-            AppTopAppBar(
-                title = viewingPath.substringAfterLast('/'),
-                onNavigateBack = { codeBrowserVM.consumeOpenedFile() },
-                navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
-                navigationContentDescription = stringResource(R.string.viewer_back),
-                actions = {
-                    IconButton(onClick = { codeViewerVM.onSearchQuery(codeViewerVM.ui.value.searchQuery) }) {
-                        Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.viewer_search))
-                    }
-                    IconButton(onClick = { codeViewerVM.toggleOutline() }) {
-                        Icon(Icons.AutoMirrored.Rounded.List, contentDescription = stringResource(R.string.viewer_outline))
-                    }
-                },
-            )
+            if (codeViewerUi.searchMode) {
+                // 搜索模式：顶栏替换为搜索输入框
+                AppTopAppBar(
+                    title = "",
+                    onNavigateBack = { codeViewerVM.toggleSearchMode() },
+                    navigationIcon = Icons.Rounded.Close,
+                    navigationContentDescription = "退出搜索",
+                    titleContent = {
+                        LaunchedEffect(Unit) { focusRequester.requestFocus() }
+                        OutlinedTextField(
+                            value = codeViewerUi.searchQuery,
+                            onValueChange = { codeViewerVM.onSearchQuery(it) },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(end = 8.dp)
+                                .focusRequester(focusRequester),
+                            placeholder = { Text("搜索…", style = MaterialTheme.typography.bodyMedium) },
+                            trailingIcon = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (codeViewerUi.searchResults.isNotEmpty()) {
+                                        Text(
+                                            text = "${codeViewerUi.currentMatchIndex + 1}/${codeViewerUi.searchResults.size}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 4.dp),
+                                        )
+                                    }
+                                    IconButton(onClick = { codeViewerVM.prevMatch() }) {
+                                        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "上一个")
+                                    }
+                                    IconButton(onClick = { codeViewerVM.nextMatch() }) {
+                                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "下一个")
+                                    }
+                                }
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            ),
+                        )
+                    },
+                )
+            } else {
+                // 普通模式：文件名 + 搜索/大纲/编码 actions
+                AppTopAppBar(
+                    title = viewingPath.substringAfterLast('/'),
+                    onNavigateBack = { codeBrowserVM.consumeOpenedFile() },
+                    navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                    navigationContentDescription = "返回",
+                    actions = {
+                        IconButton(onClick = { codeViewerVM.toggleSearchMode() }) {
+                            Icon(Icons.Rounded.Search, contentDescription = "搜索")
+                        }
+                        IconButton(onClick = { codeViewerVM.toggleOutline() }) {
+                            Icon(Icons.AutoMirrored.Rounded.List, contentDescription = "大纲")
+                        }
+                        // 编码切换
+                        Box {
+                            IconButton(onClick = { showEncodingMenu = true }) {
+                                Text(
+                                    text = encLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showEncodingMenu,
+                                onDismissRequest = { showEncodingMenu = false },
+                            ) {
+                                com.mini.me_core.core.viewer.code.ENCODING_LABELS.forEach { (code, name) ->
+                                    DropdownMenuItem(
+                                        text = { Text(name) },
+                                        onClick = {
+                                            codeViewerVM.setEncoding(code)
+                                            showEncodingMenu = false
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    },
+                )
+            }
             Box(modifier = Modifier.weight(1f)) {
                 com.mini.me_core.core.viewer.code.CodeViewerScreen(
                     path = viewingPath,

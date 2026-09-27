@@ -19,15 +19,18 @@ class NativeCodeViewer private constructor(
     val language: String?,
 ) : AutoCloseable {
 
-    val spans: List<HighlightSpan>
-    val folds: List<FoldRegion>
-    val outline: List<SymbolNode>
+    private var _spans: List<HighlightSpan> = emptyList()
+    private var _folds: List<FoldRegion> = emptyList()
+    private var _outline: List<SymbolNode> = emptyList()
+    val spans: List<HighlightSpan> get() = _spans
+    val folds: List<FoldRegion> get() = _folds
+    val outline: List<SymbolNode> get() = _outline
 
     init {
         check(handle != 0L) { "native open failed: " + NativeViewerBridge.nativeGetLastError() }
-        spans = parseSpans(NativeViewerBridge.nativeGetSpans(handle))
-        folds = parseFolds(NativeViewerBridge.nativeGetFolds(handle))
-        outline = parseOutline(NativeViewerBridge.nativeGetOutline(handle))
+        _spans = parseSpans(NativeViewerBridge.nativeGetSpans(handle))
+        _folds = parseFolds(NativeViewerBridge.nativeGetFolds(handle))
+        _outline = parseOutline(NativeViewerBridge.nativeGetOutline(handle))
     }
 
     /** 用 DirectByteBuffer 零拷贝读取 [startLine, endLine) 行文本。 */
@@ -46,6 +49,23 @@ class NativeCodeViewer private constructor(
             out.add(String(bytes, Charsets.UTF_8))
         }
         return out
+    }
+
+    /**
+     * 手动切换编码并重新解码。切换后调用方需重新读取 lines / spans / outline。
+     * encoding: 0=UTF8 1=UTF16LE 2=UTF16BE 3=GB18030 4=LATIN1
+     */
+    fun setEncoding(encoding: Int): Boolean {
+        if (handle == 0L) return false
+        val ok = NativeViewerBridge.nativeSetEncoding(handle, encoding)
+        if (ok) {
+            // 重新解析 spans / folds / outline（解码后字节偏移可能变化）
+            // 注意：这里更新的是只读属性，用 mutable backing
+            _spans = parseSpans(NativeViewerBridge.nativeGetSpans(handle))
+            _folds = parseFolds(NativeViewerBridge.nativeGetFolds(handle))
+            _outline = parseOutline(NativeViewerBridge.nativeGetOutline(handle))
+        }
+        return ok
     }
 
     override fun close() {

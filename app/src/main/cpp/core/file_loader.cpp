@@ -46,7 +46,10 @@ bool isValidUtf8(const char* data, size_t len) {
         else if ((c & 0xF0) == 0xE0) { extra = 2; codepoint = c & 0x0F; }
         else if ((c & 0xF8) == 0xF0) { extra = 3; codepoint = c & 0x07; if (c > 0xF4) return false; }
         else return false;
-        if (i + extra >= len) return false;
+        // Sample boundary: a truncated multibyte sequence at the end of the
+        // 8192-byte sample is NOT an encoding error — we just stopped early.
+        // Treat it as valid so valid UTF-8 files aren't misdetected as GBK/Latin1.
+        if (i + extra >= len) return true;
         for (size_t k = 1; k <= extra; ++k) {
             unsigned char t = static_cast<unsigned char>(data[i + k]);
             if ((t & 0xC0) != 0x80) return false;

@@ -124,7 +124,8 @@ class GitHubCodeRepository @Inject constructor(
                 .build()
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) error("HTTP ${resp.code}")
-                resp.body?.string().orEmpty()
+                // 显式按 UTF-8 解码，避免 Content-Type 缺失时 OkHttp 默认 charset 误判
+                resp.body?.bytes()?.toString(Charsets.UTF_8).orEmpty()
             }
         }
 
