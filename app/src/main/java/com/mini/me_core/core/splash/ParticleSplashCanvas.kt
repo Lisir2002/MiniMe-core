@@ -50,11 +50,11 @@ private fun createGlowSprite(color: Int, sizePx: Int = 128): Bitmap {
         cx, cy, r,
         intArrayOf(
             hotCore,    // 0.00: hot bright core
-            midColor,   // 0.15: mid halo 50%
-            outerColor, // 0.45: outer glow 20%
+            midColor,   // 0.10: mid halo 50%
+            outerColor, // 0.35: outer glow 20%
             0x00000000  // 1.00: transparent edge
         ),
-        floatArrayOf(0f, 0.15f, 0.45f, 1f),
+        floatArrayOf(0f, 0.1f, 0.35f, 1f),
         Shader.TileMode.CLAMP
     )
     val p = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -104,13 +104,13 @@ fun ParticleSplashCanvas(
             native.drawColor(bgArgb)
 
             // ── Background atmosphere: strong radial primary glow at text center ──
-            // Center bright → edge dark, adapts automatically to light/dark via colorScheme.
+            // 优化：中心光晕增强，HOLD时0.3
             val centerGlowAlpha = when (stage) {
-                SplashStage.EXPLODE -> 0.06f + stageProgress * 0.08f
-                SplashStage.CONVERGE -> 0.14f + stageProgress * 0.10f
-                SplashStage.HOLD -> 0.22f
-                SplashStage.SHATTER -> 0.10f * (1f - stageProgress)
-                else -> 0.06f
+                SplashStage.EXPLODE -> 0.08f + stageProgress * 0.1f
+                SplashStage.CONVERGE -> 0.18f + stageProgress * 0.12f
+                SplashStage.HOLD -> 0.3f
+                SplashStage.SHATTER -> 0.15f * (1f - stageProgress)
+                else -> 0.08f
             }
             val gradientRadius = maxOf(w, h) * 0.9f
             val gradient = RadialGradient(
@@ -146,30 +146,40 @@ fun ParticleSplashCanvas(
                 // As mix→1: normal particles fade to onBackground, accents stay primary.
                 val usePrimaryGlow = accent || mix < 0.5f
 
-                // Glow radius: tuned for fine luminous dots.
-                // Subtler when settled (HOLD), puffier during flight.
-                val glowMul = if (stage == SplashStage.HOLD) 4.5f else 7f
+                // 优化：发光半径增强，HOLD时6.5倍，飞行时9倍
+                val glowMul = if (stage == SplashStage.HOLD) 6.5f else 9f
                 val glowRadius = sz * glowMul
                 val glowBmp = if (usePrimaryGlow) primaryGlow else onBgGlow
 
-                // Glow alpha: stronger bloom for luminous dot look.
+                // 优化：发光alpha增强，HOLD时0.45-0.65
                 val glowAlpha = when (stage) {
-                    SplashStage.HOLD -> (0.38f + 0.12f * kotlin.math.sin(elapsedMs * 0.005f)).coerceIn(0.3f, 0.5f)
-                    SplashStage.EXPLODE -> 0.55f
-                    SplashStage.CONVERGE -> 0.55f - 0.15f * mix
-                    else -> 0.4f
+                    SplashStage.HOLD -> (0.45f + 0.2f * kotlin.math.sin(elapsedMs * 0.005f)).coerceIn(0.4f, 0.65f)
+                    SplashStage.EXPLODE -> 0.6f
+                    SplashStage.CONVERGE -> 0.6f - 0.15f * mix
+                    else -> 0.45f
                 }
                 glowPaint.alpha = (glowAlpha * 255).toInt().coerceIn(0, 255)
                 dstRect.set(px - glowRadius, py - glowRadius, px + glowRadius, py + glowRadius)
                 native.drawBitmap(glowBmp, null, dstRect, glowPaint)
 
-                // Core: crisp solid dot using per-particle tinted color.
+                // 优化：核心用径向渐变替代实心圆，中心亮、边缘透明，更柔和
                 val coreColor = if (usePrimaryGlow) particleSystem.primaryTinted[i]
                                 else particleSystem.onBgTinted[i]
-                corePaint.color = coreColor
-                // Core alpha: punchy when formed, slightly transparent during flight.
-                corePaint.alpha = (255 * (0.75f + 0.25f * mix)).toInt().coerceIn(0, 255)
-                native.drawCircle(px, py, sz, corePaint)
+                val coreAlpha = (255 * (0.8f + 0.2f * mix)).toInt().coerceIn(0, 255)
+                val coreRadius = sz * 1.2f
+                val coreGradient = RadialGradient(
+                    px, py, coreRadius,
+                    intArrayOf(
+                        coreColor,
+                        (coreColor and 0x00FFFFFF) or (coreAlpha * 0.6).toInt().shl(24),
+                        0x00000000
+                    ),
+                    floatArrayOf(0f, 0.7f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+                corePaint.shader = coreGradient
+                native.drawCircle(px, py, coreRadius, corePaint)
+                corePaint.shader = null
             }
 
             // ── Aggregation flash pulse at text formation (start of HOLD, 300ms) ──
