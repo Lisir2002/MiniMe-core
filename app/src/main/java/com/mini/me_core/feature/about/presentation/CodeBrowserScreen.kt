@@ -36,8 +36,8 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mini.me_core.R
-import com.mini.me_core.core.ui.components.FileBrowserItem
-import com.mini.me_core.core.ui.components.fileIconVisual
+import com.mini.me_core.core.theme.components.FileBrowserItem
+import com.mini.me_core.core.theme.components.fileIconVisual
 import com.mini.me_core.feature.about.data.RepoType
 import java.io.File
 

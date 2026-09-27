@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.settings.presentation.components
+package com.mini.me_core.feature.settings.presentation.component
 
 import android.content.ContentValues
 import android.content.Context

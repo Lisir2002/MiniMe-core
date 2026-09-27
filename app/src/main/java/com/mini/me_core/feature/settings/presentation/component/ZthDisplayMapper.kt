@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.settings.presentation.components
+package com.mini.me_core.feature.settings.presentation.component
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource

@@ -35,7 +35,7 @@ import com.mini.me_core.R
 import com.mini.me_core.core.theme.components.AppBottomSheet
 import com.mini.me_core.core.theme.components.AppSheetActionItem
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
-import com.mini.me_core.core.ui.components.fileIconVisual
+import com.mini.me_core.core.theme.components.fileIconVisual
 import com.mini.me_core.feature.terminal.domain.ContainerFileEntry
 import com.mini.me_core.feature.terminal.domain.ContainerFileType
 

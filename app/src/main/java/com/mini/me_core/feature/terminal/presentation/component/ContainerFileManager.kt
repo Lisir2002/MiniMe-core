@@ -68,8 +68,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.mini.me_core.R
-import com.mini.me_core.core.ui.components.FileBrowserItem
-import com.mini.me_core.core.ui.components.fileIconVisual
+import com.mini.me_core.core.theme.components.FileBrowserItem
+import com.mini.me_core.core.theme.components.fileIconVisual
 import com.mini.me_core.feature.terminal.domain.ContainerFileAccess
 import com.mini.me_core.feature.terminal.domain.ContainerFileEntry
 import com.mini.me_core.feature.terminal.domain.ContainerFileType

@@ -94,9 +94,9 @@ import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.presentation.SecuritySettingsViewModel
 import com.mini.me_core.feature.settings.presentation.SettingsViewModel
 import com.mini.me_core.feature.settings.presentation.ZthSettingsViewModel
-import com.mini.me_core.feature.settings.presentation.components.RemoteAuditLogsScreen
-import com.mini.me_core.feature.settings.presentation.components.SecuritySettingsScreen
-import com.mini.me_core.feature.settings.presentation.components.AdvancedSettingsScreen
+import com.mini.me_core.feature.settings.presentation.component.RemoteAuditLogsScreen
+import com.mini.me_core.feature.settings.presentation.component.SecuritySettingsScreen
+import com.mini.me_core.feature.settings.presentation.component.AdvancedSettingsScreen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
@@ -256,7 +256,7 @@ fun SettingsScreen(
     var isSearchMode by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     // 操作审计页：顶栏内联搜索 + 溢出菜单状态（UI 规范 v1.0 迁移）。
-    val auditViewModel: com.mini.me_core.feature.settings.presentation.components.AuditLogsViewModel =
+    val auditViewModel: com.mini.me_core.feature.settings.presentation.component.AuditLogsViewModel =
         androidx.hilt.navigation.compose.hiltViewModel()
     var auditSearchActive by remember { mutableStateOf(false) }
     var auditSearchQuery by remember { mutableStateOf("") }

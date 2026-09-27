@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.settings.presentation.components
+package com.mini.me_core.feature.settings.presentation.component
 
 import com.mini.me_core.feature.workspace.domain.RemoteAuditAction
 import com.mini.me_core.feature.workspace.domain.RemoteAuditCategory

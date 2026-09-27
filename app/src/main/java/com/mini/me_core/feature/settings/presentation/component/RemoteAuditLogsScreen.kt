@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.settings.presentation.components
+package com.mini.me_core.feature.settings.presentation.component
 
 import android.widget.Toast
 import androidx.compose.foundation.background

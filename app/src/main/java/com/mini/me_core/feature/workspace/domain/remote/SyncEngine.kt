@@ -174,7 +174,7 @@ class SyncEngine(
                 if (isIgnored(file.absolutePath, file.name)) continue
                 val rPath = "$remoteDir/${file.name}"
                 if (file.isDirectory) {
-                    try { syncClient.createDirectory(rPath) } catch (e: Exception) {}
+                    try { syncClient.createDirectory(rPath) } catch (e: Exception) { FileLogger.w(TAG, "createDirectory failed: $rPath", e) }
                     push(file, rPath)
                 } else {
                     try {
@@ -296,7 +296,9 @@ class SyncEngine(
     private suspend fun forceReconnect() {
         try {
             syncClient.disconnect()
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+            FileLogger.w(TAG, "disconnect failed", e)
+        }
         try {
             syncClient.connect(
                 connection.host,

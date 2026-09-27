@@ -117,10 +117,10 @@ class RcbBridge @Inject constructor(
                 writer.println(processCmd(line))
                 line = reader.readLine()
             }
-        } catch (_: Exception) {
-            // 连接结束 / 单条命令异常不影响下一连接
+        } catch (e: Exception) {
+            FileLogger.w(TAG, "connection read ended", e)
         } finally {
-            try { socket.close() } catch (_: Exception) {}
+            try { socket.close() } catch (e: Exception) { FileLogger.w(TAG, "socket close failed", e) }
         }
     }
 

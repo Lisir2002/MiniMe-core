@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.settings.presentation.components
+package com.mini.me_core.feature.settings.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R

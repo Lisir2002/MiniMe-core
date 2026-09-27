@@ -1,4 +1,4 @@
-package com.mini.me_core.core.ui.components
+package com.mini.me_core.core.theme.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
