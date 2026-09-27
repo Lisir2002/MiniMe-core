@@ -429,6 +429,9 @@ dependencies {
     implementation(project(":terminal-emulator"))
     implementation(project(":terminal-view"))
 
+    // Core 共享模块
+    implementation(project(":core"))
+
     // Material Icons
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)
