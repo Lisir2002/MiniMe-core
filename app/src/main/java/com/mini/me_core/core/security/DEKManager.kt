@@ -83,7 +83,20 @@ class DEKManager private constructor() {
             if (supportsEncryptDecrypt(existingEntry.secretKey)) {
                 return existingEntry.secretKey
             }
-            FileLogger.w(TAG, "已存在 MasterKey 不支持 ENCRYPT/DECRYPT（用途不兼容），删除并重建")
+            // 修复 V2 解密反复失败：supportsEncryptDecrypt 偶发失败可能是 Keystore 未就绪，
+            // 不能仅凭一次失败就删除 MasterKey（会导致旧 DEK 永远无法 unwrap）。
+            // 删除前先做一次真实 wrap+unwrap 往返验证，只有验证也失败才删除重建。
+            FileLogger.w(
+                TAG,
+                "MasterKey supportsEncryptDecrypt 初次校验失败，准备 verifyMasterKey 二次确认 " +
+                    "(alias=$MASTERKEY_ALIAS, purpose=PURPOSE_ENCRYPT|PURPOSE_DECRYPT, " +
+                    "creationMs=${runCatching { keyStore.getCreationDate(MASTERKEY_ALIAS)?.time }.getOrNull()})"
+            )
+            if (verifyMasterKey(existingEntry.secretKey)) {
+                FileLogger.i(TAG, "verifyMasterKey 通过：MasterKey 实际可用，保留不删除（此前 supportsEncryptDecrypt 为偶发失败）")
+                return existingEntry.secretKey
+            }
+            FileLogger.w(TAG, "已存在 MasterKey 不支持 ENCRYPT/DECRYPT 且 verifyMasterKey 也失败，删除并重建")
             keyStore.deleteEntry(MASTERKEY_ALIAS)
             cachedDek = null
         }
@@ -144,13 +157,50 @@ class DEKManager private constructor() {
      * 用 Cipher.ENCRYPT_MODE 初始化，若 KeyGenParameterSpec 未授权 ENCRYPT 用途，
      * Android Keystore 会在 init 时抛 KeyStoreException: Incompatible purpose。
      * 必须 IO 线程。
+     *
+     * 修复：单次 Cipher.init 在 Keystore 未就绪时可能偶发失败（首次解锁后 / 多进程争用），
+     * 误判为「用途不兼容」会删除 MasterKey → 旧 DEK 永远无法 unwrap → 所有 V2 密文失效。
+     * 因此最多重试 3 次，每次间隔 100ms，任意一次成功即视为可用。
      */
     private fun supportsEncryptDecrypt(key: SecretKey): Boolean {
+        repeat(3) { attempt ->
+            val ok = runCatching {
+                val cipher = Cipher.getInstance(TRANSFORMATION)
+                cipher.init(Cipher.ENCRYPT_MODE, key)
+                true
+            }.getOrDefault(false)
+            if (ok) return true
+            if (attempt < 2) {
+                FileLogger.w(TAG, "supportsEncryptDecrypt 第 ${attempt + 1} 次失败，100ms 后重试")
+                try {
+                    Thread.sleep(100)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return false
+                }
+            }
+        }
+        FileLogger.e(TAG, "supportsEncryptDecrypt 连续 3 次均失败，MasterKey 疑似不可用")
+        return false
+    }
+
+    /**
+     * 真实往返验证：用给定 MasterKey 生成一个测试 DEK → wrap → unwrap → 比对字节。
+     * 只有 Cipher.init + doFinal 全链路成功才说明 MasterKey 真正可用。
+     * 用于在删除/重建 MasterKey 前做最终确认，避免因偶发 Keystore 抖动误删密钥。
+     * 必须 IO 线程。
+     */
+    fun verifyMasterKey(masterKey: SecretKey): Boolean {
         return try {
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.ENCRYPT_MODE, key)
-            true
+            val testDek = generateDek()
+            val wrapped = wrapDek(masterKey, testDek)
+            val unwrapped = unwrapDek(masterKey, wrapped)
+            val eq = testDek.encoded.contentEquals(unwrapped.encoded)
+            // unwrapDek 会把测试 DEK 写入缓存，这里清掉避免污染正式 DEK 缓存
+            cachedDek = null
+            eq
         } catch (e: Exception) {
+            FileLogger.w(TAG, "verifyMasterKey 往返测试失败: ${e.message}", e)
             false
         }
     }

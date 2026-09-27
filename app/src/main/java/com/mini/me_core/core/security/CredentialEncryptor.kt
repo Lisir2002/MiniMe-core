@@ -9,10 +9,15 @@ import com.mini.me_core.feature.workspace.domain.RemoteAuditCategory
 import com.mini.me_core.feature.workspace.domain.repository.RemoteAuditLogRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.Base64
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
@@ -85,6 +90,24 @@ class CredentialEncryptor @Inject constructor(
     /** ensureInitialized 是否已成功执行过一次（volatile 双检速通路径）。 */
     @Volatile
     private var initialized: Boolean = false
+
+    // ============== 稳定性与故障统计（修复 V2 解密反复失败） ==============
+
+    /** 连续 unwrapDek 失败次数。达到阈值才重建 DEK，避免单次 Keystore 抖动误删旧密文。 */
+    private val consecutiveUnwrapFailures = AtomicInteger(0)
+
+    /** 连续失败多少次后才允许重建 DEK。 */
+    private val unwrapFailureThreshold = 3
+
+    /** DEK 重建事件，UI 层可收集以提示用户凭据已失效需重新输入。 */
+    private val _dekRotatedEvent = MutableStateFlow<Long>(0L)
+    val dekRotatedEvent: StateFlow<Long> = _dekRotatedEvent
+
+    /** 字段级解密失败计数：fieldName -> 连续失败次数。 */
+    private val decryptFailures = ConcurrentHashMap<String, AtomicInteger>()
+
+    /** 已标记为损坏的字段集合（连续失败 >= 3 次后加入，后续直接返回空串不再尝试）。 */
+    private val corruptedFields = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
 
     // ============== 初始化 ==============
 
@@ -166,11 +189,28 @@ class CredentialEncryptor @Inject constructor(
                 if (dekCached == null) {
                     try {
                         dekCached = dekManager.unwrapDek(masterKey, existing.dekCiphertext)
+                        // unwrap 成功：重置连续失败计数
+                        consecutiveUnwrapFailures.set(0)
                     } catch (e: Exception) {
+                        // 修复：单次 unwrap 失败不立即重建 DEK（可能是 Keystore 临时抖动）。
+                        // 连续失败达到阈值才重建，避免一次性毁掉所有旧 V2 密文。
+                        val failCount = consecutiveUnwrapFailures.incrementAndGet()
                         FileLogger.e(
                             TAG,
-                            "DEK unwrap 失败（MasterKey 被重置/重装），重建 DEK；旧 V2 密文将无法解开",
+                            "DEK unwrap 失败（连续第 $failCount/$unwrapFailureThreshold 次），" +
+                                "本次不重建 DEK，等待下次重试。lastErr=${e.message}",
                             e
+                        )
+                        if (failCount < unwrapFailureThreshold) {
+                            // 未达阈值：置空 DEK 让本次降级，下次 ensureInitialized 再试
+                            dekCached = null
+                            throw e
+                        }
+                        // 达到阈值：备份旧 dekCiphertext 到日志后重建 DEK
+                        FileLogger.w(
+                            TAG,
+                            "DEK重建前备份旧dekCiphertext(Base64): " +
+                                Base64.getEncoder().encodeToString(existing.dekCiphertext.toByteArray())
                         )
                         val newDek = dekManager.generateDek()
                         val newCiphertext = dekManager.wrapDek(masterKey, newDek)
@@ -182,12 +222,14 @@ class CredentialEncryptor @Inject constructor(
                             )
                         )
                         dekCached = newDek
+                        consecutiveUnwrapFailures.set(0)
+                        _dekRotatedEvent.value = System.currentTimeMillis()
                         runCatching {
                             auditLogRepo.append(
                                 category = RemoteAuditCategory.CREDENTIAL,
                                 action = RemoteAuditAction.CRED_ROTATE_DEK,
                                 success = false,
-                                message = "DEK unwrap 失败，已重建 DEK（旧密文不可恢复）: ${e.message}"
+                                message = "DEK unwrap 连续 $failCount 次失败，已重建 DEK（旧密文不可恢复）: ${e.message}"
                             )
                         }
                     }
@@ -255,9 +297,14 @@ class CredentialEncryptor @Inject constructor(
      *  - 无前缀 → 尝试 V1 单密钥 decrypt；失败回退明文直接返回。
      *
      * RC61a 修正：强制 IO 线程，避免 Flow 收集线程（mapLatest 内调用时）阻塞首帧。
+     *
+     * @param fieldName 字段名（如 provider_api_key_xxx / proxy_password），用于故障统计与日志排查。
+     *        默认 "unknown" 保持向后兼容，调用方应逐步传入具体字段名。
      */
-    suspend fun decrypt(formatted: String): String = withContext(Dispatchers.IO) {
+    suspend fun decrypt(formatted: String, fieldName: String = "unknown"): String = withContext(Dispatchers.IO) {
         if (formatted.isEmpty()) return@withContext ""
+        // 已标记为损坏的字段：直接返回空串，不再尝试解密（减少日志刷屏和 CPU 浪费）
+        if (corruptedFields.contains(fieldName)) return@withContext ""
         if (formatted.startsWith(SCHEME_V2)) {
             ensureInitialized()
             val dek = requireDek()
@@ -268,19 +315,48 @@ class CredentialEncryptor @Inject constructor(
                 val ciphertext = combined.copyOfRange(IV_LEN, combined.size)
                 val cipher = Cipher.getInstance(TRANSFORMATION)
                 cipher.init(Cipher.DECRYPT_MODE, dek, GCMParameterSpec(GCM_TAG_BITS, iv))
-                String(cipher.doFinal(ciphertext), Charsets.UTF_8)
+                val plain = String(cipher.doFinal(ciphertext), Charsets.UTF_8)
+                // 解密成功：重置该字段的失败计数
+                decryptFailures[fieldName]?.set(0)
+                plain
             } catch (e: Exception) {
-                // RC71 降级：V2 解密失败（DEK 被重建/密文损坏/GCM tag 校验失败）时
-                // 不再向上抛异常导致上层崩溃，返回空串并记日志。
-                // 上层（API Key / 凭据字段）拿到空串后提示用户重新输入，
-                // 与 ensureInitialized 的「失败回退明文/空串」策略一致。
-                FileLogger.e(TAG, "V2 解密失败，降级返回空串（密文长度=${formatted.length}，DEK可用=${dekCached != null}）", e)
+                // 字段级失败计数：连续 3 次失败标记为损坏
+                val count = decryptFailures.getOrPut(fieldName) { AtomicInteger(0) }.incrementAndGet()
+                if (count >= 3) {
+                    corruptedFields.add(fieldName)
+                    FileLogger.e(TAG, "字段[$fieldName] 连续 $count 次解密失败，标记为已损坏，后续直接返回空串")
+                }
+                val ciphertextPreview = try {
+                    val raw = Base64.getDecoder().decode(formatted.removePrefix(SCHEME_V2))
+                    if (raw.size >= 16) Base64.getEncoder().encodeToString(raw.copyOfRange(0, 16)) else "N/A"
+                } catch (_: Exception) {
+                    "PARSE_FAIL"
+                }
+                FileLogger.e(
+                    TAG,
+                    "V2解密失败 field=$fieldName len=${formatted.length} DEK=${dekCached != null} " +
+                        "failCount=$count preview=$ciphertextPreview",
+                    e
+                )
                 ""
             }
         }
 
         // 无前缀：尝试 V1 单密钥解密，失败回退明文（V1 legacy 也跑 IO，因为要 Keystore）
         decryptV1Legacy(formatted)
+    }
+
+    /** 返回当前已标记为损坏的字段集合（线程安全只读快照）。 */
+    fun getCorruptedFields(): Set<String> = corruptedFields.toSet()
+
+    /**
+     * 重置某字段的失败计数与损坏标记。用户重新输入该字段后调用，
+     * 让后续解密恢复正常尝试（而非永远短路返回空串）。
+     */
+    fun resetFieldFailure(fieldName: String) {
+        decryptFailures.remove(fieldName)?.set(0)
+        corruptedFields.remove(fieldName)
+        FileLogger.i(TAG, "已重置字段[$fieldName]的解密失败计数与损坏标记")
     }
 
     // ============== 密钥轮换 ==============
@@ -499,6 +575,57 @@ class CredentialEncryptor @Inject constructor(
         }
     }
 
+    // ============== 健康检查（防止未来复发） ==============
+
+    /**
+     * 凭据加密体系健康检查。建议在 Application.onCreate / MainActivity.onCreate 的 IO 线程调用。
+     * 检查项：
+     *  1. MasterKey 是否存在且可用（getOrCreateMasterKey 不抛异常）；
+     *  2. DEK 能否正常 unwrap（ensureInitialized 成功且 dekCached 非空）；
+     *  3. 一次 encrypt→decrypt 往返测试。
+     * 任一失败都记录详细日志并返回问题描述。
+     */
+    suspend fun performHealthCheck(): HealthCheckResult = withContext(Dispatchers.IO) {
+        val problems = mutableListOf<String>()
+
+        // 1. MasterKey 存在性
+        if (!dekManager.isMasterKeyAvailable()) {
+            problems.add("MasterKey 不存在于 Android Keystore")
+        }
+
+        // 2. ensureInitialized + DEK unwrap
+        try {
+            ensureInitialized()
+            if (dekCached == null) {
+                problems.add("ensureInitialized 后 DEK 仍为 null（连续 unwrap 失败中，计数=${consecutiveUnwrapFailures.get()}）")
+            }
+        } catch (e: Exception) {
+            problems.add("ensureInitialized 抛异常: ${e.message}")
+        }
+
+        // 3. encrypt→decrypt 往返
+        try {
+            if (dekCached != null) {
+                val probe = "healthcheck_probe_${System.currentTimeMillis()}"
+                val enc = encrypt(probe)
+                val dec = decrypt(enc, fieldName = "__healthcheck__")
+                if (dec != probe) {
+                    problems.add("encrypt/decrypt 往返不一致: enc=${enc.take(20)}... dec=$dec")
+                }
+            }
+        } catch (e: Exception) {
+            problems.add("encrypt/decrypt 往返测试异常: ${e.message}")
+        }
+
+        if (problems.isEmpty()) {
+            FileLogger.i(TAG, "performHealthCheck 通过：MasterKey/DEK/往返测试均正常")
+            HealthCheckResult(healthy = true, problems = emptyList())
+        } else {
+            FileLogger.e(TAG, "performHealthCheck 发现 ${problems.size} 个问题: $problems")
+            HealthCheckResult(healthy = false, problems = problems)
+        }
+    }
+
     // ── V2 映射 ──────────────────────────────────────────────────────
 
     private fun com.mini.mecore.datalayer.sqldelight.workspace.Credential_encryption_state.toEntity() = CredentialEncryptionStateEntity(
@@ -527,6 +654,12 @@ class CredentialEncryptor @Inject constructor(
         val newMasterKeyCreatedAtMs: Long,
         val fieldsResetToEmpty: Int,
         val fieldsSuccessfullyMigrated: Int
+    )
+
+    /** 加密体系健康检查结果。 */
+    data class HealthCheckResult(
+        val healthy: Boolean,
+        val problems: List<String>
     )
 }
 
