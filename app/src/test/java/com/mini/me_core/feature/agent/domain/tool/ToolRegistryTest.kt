@@ -1,6 +1,6 @@
-package com.mini.me_core.feature.agent.domain.tool
+package com.mini.me_core.feature.agent.domain.execution.tool
 
-import com.mini.me_core.feature.agent.domain.model.AgentMode
+import com.mini.me_core.feature.agent.domain.core.model.AgentMode
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals

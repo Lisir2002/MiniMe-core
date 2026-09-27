@@ -10,9 +10,9 @@ import com.mini.mecore.datalayer.sqldelight.agent.Todo_items as V2TodoItem
 import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
 import com.mini.me_core.feature.agent.data.local.entity.ChatSessionEntity
 import com.mini.me_core.feature.agent.data.local.entity.TodoItemEntity
-import com.mini.me_core.feature.agent.domain.mcp.McpConfigRepository
-import com.mini.me_core.feature.agent.domain.mcp.McpManager
-import com.mini.me_core.feature.agent.domain.permission.PermissionRulesRepository
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpConfigRepository
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpManager
+import com.mini.me_core.feature.agent.domain.execution.permission.PermissionRulesRepository
 import com.mini.me_core.feature.backup.domain.AgentMessageDto
 import com.mini.me_core.feature.backup.domain.BackupCrypto
 import com.mini.me_core.feature.backup.domain.BackupDecryptionException

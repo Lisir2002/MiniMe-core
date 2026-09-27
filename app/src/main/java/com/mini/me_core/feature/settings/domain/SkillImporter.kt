@@ -3,13 +3,13 @@ package com.mini.me_core.feature.settings.domain
 import android.content.Context
 import android.net.Uri
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.skill.LocalDirectorySkillSource
-import com.mini.me_core.feature.agent.domain.skill.Skill
-import com.mini.me_core.feature.agent.domain.skill.SkillParser
-import com.mini.me_core.feature.agent.domain.skill.SkillScope
-import com.mini.me_core.feature.agent.domain.skill.SkillSourceType
-import com.mini.me_core.feature.agent.domain.skill.SkillStateRepository
-import com.mini.me_core.feature.agent.domain.skill.SkillType
+import com.mini.me_core.feature.agent.domain.knowledge.skill.LocalDirectorySkillSource
+import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillParser
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillScope
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillSourceType
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillStateRepository
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.zip.ZipEntry
@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit
  * 归一化为临时技能目录，经「预校验 → 冲突检测 → 安装」三步落盘。
  *
  * 安全模型（§4.3.6）：导入仅做文件落盘，App 不执行任何导入内容中的脚本；
- * SCRIPT 技能仍需模型发起调用且经 [com.mini.me_core.feature.agent.domain.skill.SkillExecutor] 强制审批后才执行。
+ * SCRIPT 技能仍需模型发起调用且经 [com.mini.me_core.feature.agent.domain.knowledge.skill.SkillExecutor] 强制审批后才执行。
  *
  * 使用流程：
  * 1. [prepareFromZip] / [prepareFromMarkdown] / [prepareFromUrl] 产出 [SkillPrepareResult]（含解析预览与临时目录）。

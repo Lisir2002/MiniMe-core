@@ -1,7 +1,7 @@
-package com.mini.me_core.feature.agent.domain.input
+package com.mini.me_core.feature.agent.domain.execution.input
 
-import com.mini.me_core.feature.agent.domain.input.UserInputParser.IntentLabel
-import com.mini.me_core.feature.agent.domain.input.UserInputParser.Marker
+import com.mini.me_core.feature.agent.domain.execution.input.UserInputParser.IntentLabel
+import com.mini.me_core.feature.agent.domain.execution.input.UserInputParser.Marker
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

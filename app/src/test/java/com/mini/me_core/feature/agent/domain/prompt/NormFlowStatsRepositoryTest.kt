@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.prompt
+package com.mini.me_core.feature.agent.domain.core.prompt
 
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking

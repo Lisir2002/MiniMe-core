@@ -37,8 +37,8 @@ import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.components.AppBottomSheet
 import com.mini.me_core.core.theme.components.AppSheetHeader
-import com.mini.me_core.feature.agent.domain.skill.Skill
-import com.mini.me_core.feature.agent.domain.skill.SkillScope
+import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillScope
 import com.mini.me_core.feature.agent.presentation.ConversationSkillsViewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add

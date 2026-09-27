@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.workflow
+package com.mini.me_core.feature.agent.domain.execution.workflow
 
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals

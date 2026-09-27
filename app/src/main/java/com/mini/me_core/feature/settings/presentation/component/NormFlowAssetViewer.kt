@@ -37,8 +37,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.core.theme.components.AppTopAppBar
-import com.mini.me_core.feature.agent.domain.prompt.AgentAsset
-import com.mini.me_core.feature.agent.domain.sop.SopAsset
+import com.mini.me_core.feature.agent.domain.core.prompt.AgentAsset
+import com.mini.me_core.feature.agent.domain.knowledge.sop.SopAsset
 import com.mini.me_core.core.theme.Spacing
 
 /** P1：规范查看器（只读）：静态规则 / SOP 两个 Tab，点击项查看全文。 */

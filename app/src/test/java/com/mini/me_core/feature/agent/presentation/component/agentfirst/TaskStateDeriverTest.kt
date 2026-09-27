@@ -1,6 +1,6 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst.derivers
 
-import com.mini.me_core.feature.agent.domain.tool.PendingToolPermission
+import com.mini.me_core.feature.agent.domain.execution.tool.PendingToolPermission
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.MessageRole

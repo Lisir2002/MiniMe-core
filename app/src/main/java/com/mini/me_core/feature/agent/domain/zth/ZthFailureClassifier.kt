@@ -1,8 +1,8 @@
 package com.mini.me_core.feature.agent.domain.zth
 
-import com.mini.me_core.feature.agent.domain.permission.FailureClass
-import com.mini.me_core.feature.agent.domain.permission.FailureClassification
-import com.mini.me_core.feature.agent.domain.permission.FailureSubClass
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureClass
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureClassification
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureSubClass
 import java.io.IOException
 import java.net.SocketException
 import java.net.SocketTimeoutException

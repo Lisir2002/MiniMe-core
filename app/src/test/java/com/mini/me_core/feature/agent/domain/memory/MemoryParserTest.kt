@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.memory
+package com.mini.me_core.feature.agent.domain.session.memory
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

@@ -1,8 +1,8 @@
 package com.mini.me_core.feature.agent.data.local.entity
 
 import com.mini.me_core.core.util.EnumSafe
-import com.mini.me_core.feature.agent.domain.model.TodoItem
-import com.mini.me_core.feature.agent.domain.model.TodoStatus
+import com.mini.me_core.feature.agent.domain.core.model.TodoItem
+import com.mini.me_core.feature.agent.domain.core.model.TodoStatus
 
 data class TodoItemEntity(
      val id: String,

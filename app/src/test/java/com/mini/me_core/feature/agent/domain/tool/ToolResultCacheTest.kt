@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.tool
+package com.mini.me_core.feature.agent.domain.execution.tool
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive

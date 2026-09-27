@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.guard
+package com.mini.me_core.feature.agent.domain.core.guard
 
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking

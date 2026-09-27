@@ -47,10 +47,10 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.core.theme.Elevation
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.tool.question.PendingUserQuestion
-import com.mini.me_core.feature.agent.domain.tool.question.QuestionItem
-import com.mini.me_core.feature.agent.domain.tool.question.SingleAnswer
-import com.mini.me_core.feature.agent.domain.tool.question.UserQuestionAnswer
+import com.mini.me_core.feature.agent.domain.execution.tool.question.PendingUserQuestion
+import com.mini.me_core.feature.agent.domain.execution.tool.question.QuestionItem
+import com.mini.me_core.feature.agent.domain.execution.tool.question.SingleAnswer
+import com.mini.me_core.feature.agent.domain.execution.tool.question.UserQuestionAnswer
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 

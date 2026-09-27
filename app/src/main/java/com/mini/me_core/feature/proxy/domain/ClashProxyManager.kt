@@ -90,7 +90,7 @@ data class ProxyTraffic(
 )
 
 /**
- * 容器内 mihomo 代理引擎管理器（生命周期仿 [com.mini.me_core.feature.agent.domain.bridge.RcbBridge]）。
+ * 容器内 mihomo 代理引擎管理器（生命周期仿 [com.mini.me_core.feature.agent.domain.container.bridge.RcbBridge]）。
  *
  * 职责分层（《网络代理设计 v1.0》§2.3 / §5）：
  *  - **配置合成**：订阅/手动 YAML → `synthesizeConfig()` 叠加**固定覆盖块**（mixed-port 7890、

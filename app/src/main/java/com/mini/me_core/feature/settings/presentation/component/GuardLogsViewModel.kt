@@ -1,8 +1,8 @@
 package com.mini.me_core.feature.settings.presentation.component
 
 import androidx.lifecycle.ViewModel
-import com.mini.me_core.feature.agent.domain.guard.GuardLogEntry
-import com.mini.me_core.feature.agent.domain.guard.GuardLogRepository
+import com.mini.me_core.feature.agent.domain.core.guard.GuardLogEntry
+import com.mini.me_core.feature.agent.domain.core.guard.GuardLogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject

@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.permission
+package com.mini.me_core.feature.agent.domain.execution.permission
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

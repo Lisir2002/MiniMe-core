@@ -1,7 +1,7 @@
 package com.mini.me_core.di
 
 import com.mini.me_core.feature.agent.data.CodeChangeTracker
-import com.mini.me_core.feature.agent.domain.tool.todo.TodoTool
+import com.mini.me_core.feature.agent.domain.execution.tool.todo.TodoTool
 import com.mini.me_core.feature.settings.domain.repository.AIProviderRepository
 import com.mini.me_core.feature.agent.data.remote.anthropic.AnthropicApi
 import com.mini.me_core.feature.agent.data.remote.gemini.GeminiApi
@@ -13,29 +13,29 @@ import com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
 import com.mini.me_core.feature.agent.domain.container.RemoteSshEngine
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
-import com.mini.me_core.feature.agent.domain.tool.file.ReadFileTool
-import com.mini.me_core.feature.agent.domain.tool.file.SendFileTool
-import com.mini.me_core.feature.agent.domain.tool.file.ViewImageTool
-import com.mini.me_core.feature.agent.domain.tool.file.WriteFileTool
-import com.mini.me_core.feature.agent.domain.tool.editor.EditFileTool
-import com.mini.me_core.feature.agent.domain.tool.container.ExecuteCommandTool
-import com.mini.me_core.feature.agent.domain.tool.container.CheckEnvironmentTool
-import com.mini.me_core.feature.agent.domain.tool.container.EnsureAndroidEnvTool
-import com.mini.me_core.feature.agent.domain.tool.container.SwitchContainerArchTool
-import com.mini.me_core.feature.agent.domain.tool.container.TerminalSessionTool
-import com.mini.me_core.feature.agent.domain.tool.explorer.ListFilesTool
-import com.mini.me_core.feature.agent.domain.tool.explorer.SearchCodeTool
-import com.mini.me_core.feature.agent.domain.tool.skill.LoadSkillTool
-import com.mini.me_core.feature.agent.domain.tool.question.AskUserQuestionTool
-import com.mini.me_core.feature.agent.domain.tool.browser.BrowserAgentTool
-import com.mini.me_core.feature.agent.domain.prompt.SystemPromptProvider
-import com.mini.me_core.feature.agent.domain.workflow.AgentWorkflow
-import com.mini.me_core.feature.agent.domain.tool.ToolPermissionManager
-import com.mini.me_core.feature.agent.domain.permission.ToolPermissionPolicyEngine
-import com.mini.me_core.feature.agent.domain.tool.AgentTool
-import com.mini.me_core.feature.agent.domain.tool.ToolRegistry
-import com.mini.me_core.feature.agent.domain.tool.intent.IntentAnalyzeTool
-import com.mini.me_core.feature.agent.domain.tool.ToolOutputStore
+import com.mini.me_core.feature.agent.domain.execution.tool.file.ReadFileTool
+import com.mini.me_core.feature.agent.domain.execution.tool.file.SendFileTool
+import com.mini.me_core.feature.agent.domain.execution.tool.file.ViewImageTool
+import com.mini.me_core.feature.agent.domain.execution.tool.file.WriteFileTool
+import com.mini.me_core.feature.agent.domain.execution.tool.editor.EditFileTool
+import com.mini.me_core.feature.agent.domain.execution.tool.container.ExecuteCommandTool
+import com.mini.me_core.feature.agent.domain.execution.tool.container.CheckEnvironmentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.container.EnsureAndroidEnvTool
+import com.mini.me_core.feature.agent.domain.execution.tool.container.SwitchContainerArchTool
+import com.mini.me_core.feature.agent.domain.execution.tool.container.TerminalSessionTool
+import com.mini.me_core.feature.agent.domain.execution.tool.explorer.ListFilesTool
+import com.mini.me_core.feature.agent.domain.execution.tool.explorer.SearchCodeTool
+import com.mini.me_core.feature.agent.domain.execution.tool.skill.LoadSkillTool
+import com.mini.me_core.feature.agent.domain.execution.tool.question.AskUserQuestionTool
+import com.mini.me_core.feature.agent.domain.execution.tool.browser.BrowserAgentTool
+import com.mini.me_core.feature.agent.domain.core.prompt.SystemPromptProvider
+import com.mini.me_core.feature.agent.domain.execution.workflow.AgentWorkflow
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionManager
+import com.mini.me_core.feature.agent.domain.execution.permission.ToolPermissionPolicyEngine
+import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolRegistry
+import com.mini.me_core.feature.agent.domain.execution.tool.intent.IntentAnalyzeTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolOutputStore
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -200,8 +200,8 @@ object AgentModule {
 
     @Provides
     @Singleton
-    fun provideToolResultTypeRegistry(): com.mini.me_core.feature.agent.domain.tool.ToolResultTypeRegistry {
-        return com.mini.me_core.feature.agent.domain.tool.ToolResultTypeRegistry()
+    fun provideToolResultTypeRegistry(): com.mini.me_core.feature.agent.domain.execution.tool.ToolResultTypeRegistry {
+        return com.mini.me_core.feature.agent.domain.execution.tool.ToolResultTypeRegistry()
     }
 
     @Provides
@@ -213,7 +213,7 @@ object AgentModule {
         writeFileTool: WriteFileTool,
         editFileTool: EditFileTool,
         executeCommandTool: ExecuteCommandTool,
-        runCodeTool: com.mini.me_core.feature.agent.domain.tool.container.RunCodeTool,
+        runCodeTool: com.mini.me_core.feature.agent.domain.execution.tool.container.RunCodeTool,
         checkEnvironmentTool: CheckEnvironmentTool,
         ensureAndroidEnvTool: EnsureAndroidEnvTool,
         switchContainerArchTool: SwitchContainerArchTool,
@@ -221,34 +221,34 @@ object AgentModule {
         listFilesTool: ListFilesTool,
         searchCodeTool: SearchCodeTool,
         loadSkillTool: LoadSkillTool,
-        runSkillScriptTool: com.mini.me_core.feature.agent.domain.tool.skill.RunSkillScriptTool,
-        loadRuleTool: com.mini.me_core.feature.agent.domain.tool.rule.LoadRuleTool,
-        loadSopTool: com.mini.me_core.feature.agent.domain.tool.sop.LoadSopTool,
+        runSkillScriptTool: com.mini.me_core.feature.agent.domain.execution.tool.skill.RunSkillScriptTool,
+        loadRuleTool: com.mini.me_core.feature.agent.domain.execution.tool.rule.LoadRuleTool,
+        loadSopTool: com.mini.me_core.feature.agent.domain.execution.tool.sop.LoadSopTool,
         askUserQuestionTool: AskUserQuestionTool,
-        manageMcpTool: com.mini.me_core.feature.agent.domain.tool.mcp.ManageMcpTool,
-        webSearchTool: com.mini.me_core.feature.agent.domain.tool.search.WebSearchTool,
-        webFetchTool: com.mini.me_core.feature.agent.domain.tool.search.WebFetchTool,
-        switchModeTool: com.mini.me_core.feature.agent.domain.tool.mode.SwitchModeTool,
+        manageMcpTool: com.mini.me_core.feature.agent.domain.execution.tool.mcp.ManageMcpTool,
+        webSearchTool: com.mini.me_core.feature.agent.domain.execution.tool.search.WebSearchTool,
+        webFetchTool: com.mini.me_core.feature.agent.domain.execution.tool.search.WebFetchTool,
+        switchModeTool: com.mini.me_core.feature.agent.domain.execution.tool.mode.SwitchModeTool,
         todoTool: TodoTool,
-        memoryTool: com.mini.me_core.feature.agent.domain.tool.memory.MemoryTool,
-        generateImageTool: com.mini.me_core.feature.agent.domain.tool.image.GenerateImageTool,
+        memoryTool: com.mini.me_core.feature.agent.domain.execution.tool.memory.MemoryTool,
+        generateImageTool: com.mini.me_core.feature.agent.domain.execution.tool.image.GenerateImageTool,
         browserTool: BrowserAgentTool,
-        storageTool: com.mini.me_core.feature.agent.domain.tool.storage.StorageTool,
-        networkProxyTool: com.mini.me_core.feature.agent.domain.tool.proxy.NetworkProxyTool,
-        goalTool: com.mini.me_core.feature.agent.domain.tool.goal.GoalTool,
-        jobStartTool: com.mini.me_core.feature.agent.domain.tool.job.JobStartTool,
-        jobStatusTool: com.mini.me_core.feature.agent.domain.tool.job.JobStatusTool,
-        jobKillTool: com.mini.me_core.feature.agent.domain.tool.job.JobKillTool,
-        jobLogTool: com.mini.me_core.feature.agent.domain.tool.job.JobLogTool,
-        scheduleTool: com.mini.me_core.feature.agent.domain.tool.schedule.ScheduleTool,
-        planTool: com.mini.me_core.feature.agent.domain.tool.plan.PlanTool,
+        storageTool: com.mini.me_core.feature.agent.domain.execution.tool.storage.StorageTool,
+        networkProxyTool: com.mini.me_core.feature.agent.domain.execution.tool.proxy.NetworkProxyTool,
+        goalTool: com.mini.me_core.feature.agent.domain.execution.tool.goal.GoalTool,
+        jobStartTool: com.mini.me_core.feature.agent.domain.execution.tool.job.JobStartTool,
+        jobStatusTool: com.mini.me_core.feature.agent.domain.execution.tool.job.JobStatusTool,
+        jobKillTool: com.mini.me_core.feature.agent.domain.execution.tool.job.JobKillTool,
+        jobLogTool: com.mini.me_core.feature.agent.domain.execution.tool.job.JobLogTool,
+        scheduleTool: com.mini.me_core.feature.agent.domain.execution.tool.schedule.ScheduleTool,
+        planTool: com.mini.me_core.feature.agent.domain.execution.tool.plan.PlanTool,
         intentAnalyzeTool: IntentAnalyzeTool,
-        playbookStartTool: com.mini.me_core.feature.agent.domain.tool.playbook.PlaybookStartTool,
-        playbookAdvanceTool: com.mini.me_core.feature.agent.domain.tool.playbook.PlaybookAdvanceTool,
-        playbookStatusTool: com.mini.me_core.feature.agent.domain.tool.playbook.PlaybookStatusTool,
-        playbookAbortTool: com.mini.me_core.feature.agent.domain.tool.playbook.PlaybookAbortTool,
-        gitOpsTool: com.mini.me_core.feature.agent.domain.tool.git.GitOpsTool,
-        resultTypeRegistry: com.mini.me_core.feature.agent.domain.tool.ToolResultTypeRegistry
+        playbookStartTool: com.mini.me_core.feature.agent.domain.execution.tool.playbook.PlaybookStartTool,
+        playbookAdvanceTool: com.mini.me_core.feature.agent.domain.execution.tool.playbook.PlaybookAdvanceTool,
+        playbookStatusTool: com.mini.me_core.feature.agent.domain.execution.tool.playbook.PlaybookStatusTool,
+        playbookAbortTool: com.mini.me_core.feature.agent.domain.execution.tool.playbook.PlaybookAbortTool,
+        gitOpsTool: com.mini.me_core.feature.agent.domain.execution.tool.git.GitOpsTool,
+        resultTypeRegistry: com.mini.me_core.feature.agent.domain.execution.tool.ToolResultTypeRegistry
     ): ToolRegistry {
         return ToolRegistry().apply {
             // L3 联动注册：工具注册到 ToolRegistry 时，同步把 provides 类型登记到中央注册表，
@@ -258,7 +258,7 @@ object AgentModule {
                 tool.provides.forEach { type ->
                     resultTypeRegistry.register(
                         type = type,
-                        schema = com.mini.me_core.feature.agent.domain.tool.TypeSchema(
+                        schema = com.mini.me_core.feature.agent.domain.execution.tool.TypeSchema(
                             type = type,
                             capability = tool.capabilities.firstOrNull()
                         ),
@@ -375,26 +375,26 @@ object AgentModule {
 
     @Provides
     @Singleton
-    fun provideToolDependencyScheduler(): com.mini.me_core.feature.agent.domain.tool.ToolDependencyScheduler {
-        return com.mini.me_core.feature.agent.domain.tool.ToolDependencyScheduler()
+    fun provideToolDependencyScheduler(): com.mini.me_core.feature.agent.domain.execution.tool.ToolDependencyScheduler {
+        return com.mini.me_core.feature.agent.domain.execution.tool.ToolDependencyScheduler()
     }
 
     @Provides
     @Singleton
-    fun provideToolResultCache(): com.mini.me_core.feature.agent.domain.tool.ToolResultCache {
-        return com.mini.me_core.feature.agent.domain.tool.ToolResultCache()
+    fun provideToolResultCache(): com.mini.me_core.feature.agent.domain.execution.tool.ToolResultCache {
+        return com.mini.me_core.feature.agent.domain.execution.tool.ToolResultCache()
     }
 
     @Provides
     @Singleton
-    fun provideToolEventBus(): com.mini.me_core.feature.agent.domain.tool.ToolEventBus {
-        return com.mini.me_core.feature.agent.domain.tool.ToolEventBus()
+    fun provideToolEventBus(): com.mini.me_core.feature.agent.domain.execution.tool.ToolEventBus {
+        return com.mini.me_core.feature.agent.domain.execution.tool.ToolEventBus()
     }
 
     @Provides
     @Singleton
-    fun provideIncrementalIndexStore(): com.mini.me_core.feature.agent.domain.tool.IncrementalIndexStore {
-        return com.mini.me_core.feature.agent.domain.tool.IncrementalIndexStore()
+    fun provideIncrementalIndexStore(): com.mini.me_core.feature.agent.domain.execution.tool.IncrementalIndexStore {
+        return com.mini.me_core.feature.agent.domain.execution.tool.IncrementalIndexStore()
     }
 
     @Provides
@@ -409,8 +409,8 @@ object AgentModule {
         promptProvider: SystemPromptProvider,
         permissionManager: ToolPermissionManager,
         policyEngine: ToolPermissionPolicyEngine,
-        contextCompactor: com.mini.me_core.feature.agent.domain.workflow.ContextCompactor,
-        planApprovalManager: com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalManager,
+        contextCompactor: com.mini.me_core.feature.agent.domain.execution.workflow.ContextCompactor,
+        planApprovalManager: com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalManager,
         toolOutputStore: ToolOutputStore,
         modelMetadataService: ModelMetadataService,
         visionModelSettingsRepository: com.mini.me_core.feature.settings.data.repository.VisionModelSettingsRepository,
@@ -418,26 +418,26 @@ object AgentModule {
         compatibilityPolicyRepository: com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepository,
         sessionUseCase: com.mini.me_core.feature.agent.domain.session.SessionUseCase,
         messagePersistenceUseCase: com.mini.me_core.feature.agent.domain.session.MessagePersistenceUseCase,
-        checkpointManager: com.mini.me_core.feature.agent.domain.checkpoint.CheckpointManager,
-        dependencyScheduler: com.mini.me_core.feature.agent.domain.tool.ToolDependencyScheduler,
-        toolResultCache: com.mini.me_core.feature.agent.domain.tool.ToolResultCache,
-        toolEventBus: com.mini.me_core.feature.agent.domain.tool.ToolEventBus,
-        incrementalIndexStore: com.mini.me_core.feature.agent.domain.tool.IncrementalIndexStore,
-        skillStateRepository: com.mini.me_core.feature.agent.domain.skill.SkillStateRepository,
-        skillExecutor: com.mini.me_core.feature.agent.domain.skill.SkillExecutor,
-        skillRuntimeProbe: com.mini.me_core.feature.agent.domain.skill.SkillRuntimeProbe,
-        hookDispatcher: com.mini.me_core.feature.agent.domain.hook.HookDispatcher,
-        wakeQueueManager: com.mini.me_core.feature.agent.domain.wake.WakeQueueManager,
-        goalService: com.mini.me_core.feature.agent.domain.goal.GoalService,
-        planService: com.mini.me_core.feature.agent.domain.plan.PlanService,
-        toolGuards: Set<@JvmSuppressWildcards com.mini.me_core.feature.agent.domain.guard.ToolGuard>,
-        fileObservationGuard: com.mini.me_core.feature.agent.domain.guard.FileObservationGuard,
+        checkpointManager: com.mini.me_core.feature.agent.domain.session.checkpoint.CheckpointManager,
+        dependencyScheduler: com.mini.me_core.feature.agent.domain.execution.tool.ToolDependencyScheduler,
+        toolResultCache: com.mini.me_core.feature.agent.domain.execution.tool.ToolResultCache,
+        toolEventBus: com.mini.me_core.feature.agent.domain.execution.tool.ToolEventBus,
+        incrementalIndexStore: com.mini.me_core.feature.agent.domain.execution.tool.IncrementalIndexStore,
+        skillStateRepository: com.mini.me_core.feature.agent.domain.knowledge.skill.SkillStateRepository,
+        skillExecutor: com.mini.me_core.feature.agent.domain.knowledge.skill.SkillExecutor,
+        skillRuntimeProbe: com.mini.me_core.feature.agent.domain.knowledge.skill.SkillRuntimeProbe,
+        hookDispatcher: com.mini.me_core.feature.agent.domain.core.hook.HookDispatcher,
+        wakeQueueManager: com.mini.me_core.feature.agent.domain.schedule.wake.WakeQueueManager,
+        goalService: com.mini.me_core.feature.agent.domain.session.goal.GoalService,
+        planService: com.mini.me_core.feature.agent.domain.session.plan.PlanService,
+        toolGuards: Set<@JvmSuppressWildcards com.mini.me_core.feature.agent.domain.core.guard.ToolGuard>,
+        fileObservationGuard: com.mini.me_core.feature.agent.domain.core.guard.FileObservationGuard,
         normFlowSettingsRepository: com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository,
-        guardLogRepository: com.mini.me_core.feature.agent.domain.guard.GuardLogRepository,
-        trajectoryService: com.mini.me_core.feature.agent.domain.trajectory.TrajectoryService,
-        playbookExecutor: com.mini.me_core.feature.agent.domain.playbook.PlaybookExecutor
+        guardLogRepository: com.mini.me_core.feature.agent.domain.core.guard.GuardLogRepository,
+        trajectoryService: com.mini.me_core.feature.agent.domain.session.trajectory.TrajectoryService,
+        playbookExecutor: com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookExecutor
     ): AgentWorkflow {
-        return com.mini.me_core.feature.agent.domain.workflow.StatefulAgentWorkflow(
+        return com.mini.me_core.feature.agent.domain.execution.workflow.StatefulAgentWorkflow(
             toolRegistry,
             aiProviderRepository,
             openAIApi,

@@ -31,8 +31,8 @@ data class CommandResult(val output: String, val exitCode: Int?, val timedOut: B
  * - [LinuxContainerEngine]：本地 PRoot 容器，原有逻辑零变化；
  * - `RemoteSshEngine`：远程 SSH 服务器，用 sshj exec channel 执行。
  *
- * 工具层（[com.mini.me_core.feature.agent.domain.tool.container.ExecuteCommandTool]、
- * [com.mini.me_core.feature.agent.domain.tool.explorer.SearchCodeTool]、
+ * 工具层（[com.mini.me_core.feature.agent.domain.execution.tool.container.ExecuteCommandTool]、
+ * [com.mini.me_core.feature.agent.domain.execution.tool.explorer.SearchCodeTool]、
  * [com.mini.me_core.feature.git.domain.GitRepository]）依赖本接口而非具体实现，
  * 由 DI 按当前执行模式注入对应实例。
  *

@@ -1,9 +1,9 @@
 package com.mini.me_core.feature.agent.data
 
-import com.mini.me_core.feature.agent.domain.model.ChangeType
-import com.mini.me_core.feature.agent.domain.model.CodeChange
-import com.mini.me_core.feature.agent.domain.tool.ToolCall
-import com.mini.me_core.feature.agent.domain.tool.ToolResult
+import com.mini.me_core.feature.agent.domain.core.model.ChangeType
+import com.mini.me_core.feature.agent.domain.core.model.CodeChange
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

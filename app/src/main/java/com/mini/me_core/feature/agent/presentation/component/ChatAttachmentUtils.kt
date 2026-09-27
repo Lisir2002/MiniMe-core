@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.mini.me_core.R
-import com.mini.me_core.feature.agent.domain.model.AgentImage
+import com.mini.me_core.feature.agent.domain.core.model.AgentImage
 import com.mini.me_core.feature.agent.presentation.AgentAttachment
 import java.io.File
 import java.util.Base64

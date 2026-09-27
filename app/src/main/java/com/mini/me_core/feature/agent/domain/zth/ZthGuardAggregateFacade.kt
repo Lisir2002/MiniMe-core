@@ -4,11 +4,11 @@ import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.data.repository.ZthCapabilityAuditRepository
 import com.mini.me_core.feature.agent.data.repository.ZthCheckpointRepository
 import com.mini.me_core.feature.agent.data.repository.ZthTelemetryRepository
-import com.mini.me_core.feature.agent.domain.model.AgentMode
-import com.mini.me_core.feature.agent.domain.permission.FailureClass
-import com.mini.me_core.feature.agent.domain.permission.FailureClassification
-import com.mini.me_core.feature.agent.domain.permission.FailureSubClass
-import com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalChoice
+import com.mini.me_core.feature.agent.domain.core.model.AgentMode
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureClass
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureClassification
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureSubClass
+import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalChoice
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.ZthTierRepository
 import java.util.UUID

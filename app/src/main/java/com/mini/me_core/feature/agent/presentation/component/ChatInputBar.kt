@@ -32,9 +32,9 @@ import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.ui.rememberImeBottomInset
-import com.mini.me_core.feature.agent.domain.command.SlashCommandHandler
-import com.mini.me_core.feature.agent.domain.model.AgentMode
-import com.mini.me_core.feature.agent.domain.model.ReasoningEffort
+import com.mini.me_core.feature.agent.domain.execution.command.SlashCommandHandler
+import com.mini.me_core.feature.agent.domain.core.model.AgentMode
+import com.mini.me_core.feature.agent.domain.core.model.ReasoningEffort
 import com.mini.me_core.feature.agent.presentation.QueuedRequest
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 

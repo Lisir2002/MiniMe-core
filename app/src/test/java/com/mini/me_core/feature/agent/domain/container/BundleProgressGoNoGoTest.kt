@@ -1,6 +1,6 @@
-package com.mini.me_core.feature.agent.domain.container.progress
+package com.mini.me_core.feature.agent.domain.container.container.progress
 
-import com.mini.me_core.feature.agent.domain.container.GlobalInstallArchiveStore
+import com.mini.me_core.feature.agent.domain.container.container.GlobalInstallArchiveStore
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId
 import kotlin.math.roundToInt
 import org.junit.After

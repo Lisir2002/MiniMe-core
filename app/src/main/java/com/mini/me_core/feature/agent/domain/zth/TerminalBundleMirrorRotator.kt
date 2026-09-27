@@ -1,6 +1,6 @@
 package com.mini.me_core.feature.agent.domain.zth
 
-import com.mini.me_core.feature.agent.domain.permission.FailureSubClass
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureSubClass
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton

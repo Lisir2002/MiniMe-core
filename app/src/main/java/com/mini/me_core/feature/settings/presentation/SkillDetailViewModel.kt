@@ -5,9 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.R
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.skill.Skill
-import com.mini.me_core.feature.agent.domain.skill.SkillSourceType
-import com.mini.me_core.feature.agent.domain.skill.SkillStateRepository
+import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillSourceType
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillStateRepository
 import com.mini.me_core.feature.settings.domain.SkillExporter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext

@@ -100,7 +100,7 @@ class ContainerInstaller @Inject constructor(
          * 从 assets 提取内置提示词到 ~/.minime/prompts/，每次启动全量覆盖，使 App 升级后提示词随之更新。
          *
          * 用户自定义覆盖放在 ~/.minime/prompts.custom/（同名即覆盖），本方法不触碰该目录，
-         * 故用户重写的片段不会被升级覆盖。参见 [com.mini.me_core.feature.agent.domain.prompt.SystemPromptProvider]。
+         * 故用户重写的片段不会被升级覆盖。参见 [com.mini.me_core.feature.agent.domain.core.prompt.SystemPromptProvider]。
          */
         fun extractPrompts(context: Context) {
             val destDir = File(File(context.filesDir, "minime"), "prompts")

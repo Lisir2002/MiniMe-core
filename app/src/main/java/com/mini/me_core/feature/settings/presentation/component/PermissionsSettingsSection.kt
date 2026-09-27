@@ -34,8 +34,8 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
-import com.mini.me_core.feature.agent.domain.permission.PermissionDecision
-import com.mini.me_core.feature.agent.domain.permission.PermissionRule
+import com.mini.me_core.feature.agent.domain.execution.permission.PermissionDecision
+import com.mini.me_core.feature.agent.domain.execution.permission.PermissionRule
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 

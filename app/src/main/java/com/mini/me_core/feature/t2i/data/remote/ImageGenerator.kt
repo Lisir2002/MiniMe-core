@@ -2,7 +2,7 @@ package com.mini.me_core.feature.t2i.data.remote
 
 import android.content.Context
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.provider.joinUrl
+import com.mini.me_core.feature.agent.domain.core.provider.joinUrl
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,7 +18,7 @@ import javax.inject.Singleton
 
 /**
  * T2I 文生图 Provider 抽象接口（对齐
- * [com.mini.me_core.feature.agent.domain.provider.AIProvider] 的思路：统一一个 generate 方法，
+ * [com.mini.me_core.feature.agent.domain.core.provider.AIProvider] 的思路：统一一个 generate 方法，
  * 各具体 Adapter 按契约实现；但与 LLM AIProvider 接口契约完全独立，不共享任何 request/response shape）。
  *
  * ### endpointMode 语义

@@ -4,9 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.data.local.entity.SkillConversationStateEntity
-import com.mini.me_core.feature.agent.domain.skill.Skill
-import com.mini.me_core.feature.agent.domain.skill.SkillScope
-import com.mini.me_core.feature.agent.domain.skill.SkillStateRepository
+import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillScope
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillStateRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow

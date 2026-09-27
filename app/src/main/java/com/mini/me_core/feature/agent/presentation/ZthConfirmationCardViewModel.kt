@@ -3,7 +3,7 @@ package com.mini.me_core.feature.agent.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.permission.FailureSubClass
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureSubClass
 import com.mini.me_core.feature.agent.domain.zth.ZthConfirmationCardStateMachine
 import com.mini.me_core.feature.agent.domain.zth.ZthConfirmationCardStateMachine.CardAction
 import com.mini.me_core.feature.agent.domain.zth.ZthConfirmationCardStateMachine.CardEvent

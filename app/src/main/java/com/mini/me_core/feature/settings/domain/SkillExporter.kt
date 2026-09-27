@@ -5,7 +5,7 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import com.mini.me_core.BuildConfig
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.skill.Skill
+import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.BufferedOutputStream
 import java.io.File

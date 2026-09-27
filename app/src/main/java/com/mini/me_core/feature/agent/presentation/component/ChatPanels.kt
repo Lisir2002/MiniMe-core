@@ -48,11 +48,11 @@ import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.Elevation
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.model.ChangeType
-import com.mini.me_core.feature.agent.domain.model.CodeChange
-import com.mini.me_core.feature.agent.domain.permission.PermissionChoice
-import com.mini.me_core.feature.agent.domain.tool.PendingToolPermission
-import com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalRequest
+import com.mini.me_core.feature.agent.domain.core.model.ChangeType
+import com.mini.me_core.feature.agent.domain.core.model.CodeChange
+import com.mini.me_core.feature.agent.domain.execution.permission.PermissionChoice
+import com.mini.me_core.feature.agent.domain.execution.tool.PendingToolPermission
+import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalRequest
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check

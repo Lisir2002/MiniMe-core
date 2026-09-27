@@ -1,6 +1,6 @@
-package com.mini.me_core.feature.agent.domain.input
+package com.mini.me_core.feature.agent.domain.execution.input
 
-import com.mini.me_core.feature.agent.domain.model.AgentContext
+import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

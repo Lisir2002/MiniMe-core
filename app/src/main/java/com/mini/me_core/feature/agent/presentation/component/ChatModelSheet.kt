@@ -42,7 +42,7 @@ import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.components.AppBottomSheet
 import com.mini.me_core.core.theme.resolve
-import com.mini.me_core.feature.agent.domain.model.ReasoningEffort
+import com.mini.me_core.feature.agent.domain.core.model.ReasoningEffort
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.presentation.component.ModelLogoIcon
 import com.mini.me_core.feature.settings.presentation.component.ProviderLogoIcon

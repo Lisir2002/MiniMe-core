@@ -1,9 +1,9 @@
-package com.mini.me_core.feature.agent.domain.input
+package com.mini.me_core.feature.agent.domain.execution.input
 
-import com.mini.me_core.feature.agent.domain.model.AgentContext
-import com.mini.me_core.feature.agent.domain.model.AgentMessage
-import com.mini.me_core.feature.agent.domain.tool.ToolResult
-import com.mini.me_core.feature.agent.domain.tool.intent.IntentAnalyzeTool
+import com.mini.me_core.feature.agent.domain.core.model.AgentContext
+import com.mini.me_core.feature.agent.domain.core.model.AgentMessage
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
+import com.mini.me_core.feature.agent.domain.execution.tool.intent.IntentAnalyzeTool
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject

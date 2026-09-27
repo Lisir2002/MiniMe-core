@@ -46,9 +46,9 @@ import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.core.theme.components.AppSegmentedControl
-import com.mini.me_core.feature.agent.domain.model.AgentMode
-import com.mini.me_core.feature.agent.domain.tool.ToolCapability
-import com.mini.me_core.feature.agent.domain.tool.ToolPermissionPolicy
+import com.mini.me_core.feature.agent.domain.core.model.AgentMode
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionPolicy
 import com.mini.me_core.feature.capability.presentation.AgentInfoUi
 import com.mini.me_core.feature.capability.presentation.CapabilityCenterViewModel
 import com.mini.me_core.feature.capability.presentation.ParameterUiModel

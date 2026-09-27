@@ -2,9 +2,9 @@ package com.mini.me_core.feature.workspace.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mini.me_core.feature.agent.domain.tool.ToolEvent
-import com.mini.me_core.feature.agent.domain.tool.ToolEventBus
-import com.mini.me_core.feature.agent.domain.tool.ToolEventListener
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolEvent
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolEventBus
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolEventListener
 import com.mini.me_core.feature.workspace.data.repository.WorkspaceRepository
 import com.mini.me_core.feature.workspace.domain.DelegatingFileAccess
 import com.mini.me_core.feature.workspace.domain.FileEntry

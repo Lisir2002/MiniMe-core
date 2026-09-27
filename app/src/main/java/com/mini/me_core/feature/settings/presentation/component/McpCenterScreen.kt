@@ -38,8 +38,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
-import com.mini.me_core.feature.agent.domain.mcp.McpServerStatus
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerConfig
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerStatus
 
 /**
  * MCP 中心页面：顶部 Segmented Control 切换「外部工具」与「开放服务」，

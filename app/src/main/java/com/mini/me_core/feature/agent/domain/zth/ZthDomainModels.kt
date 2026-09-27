@@ -1,13 +1,13 @@
 package com.mini.me_core.feature.agent.domain.zth
 
-import com.mini.me_core.feature.agent.domain.model.AgentMode
-import com.mini.me_core.feature.agent.domain.tool.AgentTool
-import com.mini.me_core.feature.agent.domain.tool.ToolCapability
-import com.mini.me_core.feature.agent.domain.tool.ToolResult
-import com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalChoice
-import com.mini.me_core.feature.agent.domain.permission.FailureClass
-import com.mini.me_core.feature.agent.domain.permission.FailureClassification
-import com.mini.me_core.feature.agent.domain.permission.FailureSubClass
+import com.mini.me_core.feature.agent.domain.core.model.AgentMode
+import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
+import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalChoice
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureClass
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureClassification
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureSubClass
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 
 /**

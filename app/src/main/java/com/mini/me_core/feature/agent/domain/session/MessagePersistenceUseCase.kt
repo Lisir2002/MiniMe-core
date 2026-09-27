@@ -3,10 +3,10 @@ package com.mini.me_core.feature.agent.domain.session
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_message as V2AgentMessage
 import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
-import com.mini.me_core.feature.agent.domain.model.AgentMessage
-import com.mini.me_core.feature.agent.domain.model.CONTEXT_COMPACTION_MARKER
-import com.mini.me_core.feature.agent.domain.model.CONTEXT_SUMMARY_LEGACY_PREFIX
-import com.mini.me_core.feature.agent.domain.tool.ToolCall
+import com.mini.me_core.feature.agent.domain.core.model.AgentMessage
+import com.mini.me_core.feature.agent.domain.core.model.CONTEXT_COMPACTION_MARKER
+import com.mini.me_core.feature.agent.domain.core.model.CONTEXT_SUMMARY_LEGACY_PREFIX
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
 import com.mini.me_core.feature.agent.presentation.AgentAttachment
 import com.mini.me_core.feature.agent.presentation.MessageRole
 import kotlinx.coroutines.Dispatchers
@@ -368,14 +368,14 @@ class MessagePersistenceUseCase @Inject constructor(
         return result
     }
 
-    private fun AgentAttachment.toAgentImage(): com.mini.me_core.feature.agent.domain.model.AgentImage? {
+    private fun AgentAttachment.toAgentImage(): com.mini.me_core.feature.agent.domain.core.model.AgentImage? {
         if (!isImage || localPath.isBlank()) return null
         val file = java.io.File(localPath)
         if (!file.exists() || !file.isFile || file.length() <= 0) return null
         return try {
             val bytes = file.readBytes()
             val base64 = java.util.Base64.getEncoder().encodeToString(bytes)
-            com.mini.me_core.feature.agent.domain.model.AgentImage(
+            com.mini.me_core.feature.agent.domain.core.model.AgentImage(
                 mimeType = mimeType.ifBlank { "image/jpeg" },
                 base64Data = base64,
                 path = containerPath

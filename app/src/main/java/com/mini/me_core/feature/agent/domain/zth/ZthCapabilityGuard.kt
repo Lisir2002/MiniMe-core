@@ -1,7 +1,7 @@
 package com.mini.me_core.feature.agent.domain.zth
 
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.tool.ToolCapability
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton

@@ -93,7 +93,7 @@ class LinuxContainerEngine @Inject constructor(
     /** Level 2+3 融合：5 路真实信号聚合器；按 bundleId/custom(null) 各自独立，公开 StateFlow 给 UI。 */
     val progressAggregator: RealProgressAggregator,
     private val concurrencyPolicy: PrefetchConcurrencyPolicy,
-    private val rcbBridge: com.mini.me_core.feature.agent.domain.bridge.RcbBridge,
+    private val rcbBridge: com.mini.me_core.feature.agent.domain.container.bridge.RcbBridge,
     private val proxyManager: com.mini.me_core.feature.proxy.domain.ClashProxyManager,
 ) : CommandEngine {
     /** 容器初始化的实时进度，供所有入口（终端页/AI/后台终端/MCP）共享同一份状态。 */

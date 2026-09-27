@@ -2,13 +2,13 @@ package com.mini.me_core.feature.capability.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mini.me_core.feature.agent.domain.permission.PermissionRulesRepository
-import com.mini.me_core.feature.agent.domain.skill.Skill
-import com.mini.me_core.feature.agent.domain.skill.SkillStateRepository
-import com.mini.me_core.feature.agent.domain.tool.AgentTool
-import com.mini.me_core.feature.agent.domain.tool.ToolCapability
-import com.mini.me_core.feature.agent.domain.tool.ToolPermissionPolicy
-import com.mini.me_core.feature.agent.domain.tool.ToolRegistry
+import com.mini.me_core.feature.agent.domain.execution.permission.PermissionRulesRepository
+import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillStateRepository
+import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionPolicy
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolRegistry
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
 import com.mini.me_core.feature.settings.domain.repository.AIProviderRepository

@@ -54,8 +54,8 @@ import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.model.CodeChange
-import com.mini.me_core.feature.agent.domain.tool.PendingToolPermission
+import com.mini.me_core.feature.agent.domain.core.model.CodeChange
+import com.mini.me_core.feature.agent.domain.execution.tool.PendingToolPermission
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.EnvironmentSnapshot

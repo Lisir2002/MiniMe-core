@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.container
+package com.mini.me_core.feature.agent.domain.container.container
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

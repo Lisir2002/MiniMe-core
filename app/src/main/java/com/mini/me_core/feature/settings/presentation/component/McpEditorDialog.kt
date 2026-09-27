@@ -61,8 +61,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mini.me_core.core.theme.Radius
-import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
-import com.mini.me_core.feature.agent.domain.mcp.McpToolDescriptor
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerConfig
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpToolDescriptor
 import kotlinx.serialization.json.JsonObject
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R

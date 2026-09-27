@@ -1,10 +1,10 @@
-package com.mini.me_core.feature.agent.domain.mcp.server
+package com.mini.me_core.feature.agent.domain.execution.mcp.server
 
-import com.mini.me_core.feature.agent.domain.tool.AgentTool
-import com.mini.me_core.feature.agent.domain.tool.ToolParameter
-import com.mini.me_core.feature.agent.domain.tool.ToolPermissionManager
-import com.mini.me_core.feature.agent.domain.tool.ToolRegistry
-import com.mini.me_core.feature.agent.domain.tool.ToolResult
+import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolParameter
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionManager
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolRegistry
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement

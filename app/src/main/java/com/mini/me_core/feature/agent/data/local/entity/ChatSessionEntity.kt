@@ -1,9 +1,9 @@
 package com.mini.me_core.feature.agent.data.local.entity
 
 import com.mini.me_core.core.util.EnumSafe
-import com.mini.me_core.feature.agent.domain.model.AgentMode
-import com.mini.me_core.feature.agent.domain.model.ChatSession
-import com.mini.me_core.feature.agent.domain.model.ReasoningEffort
+import com.mini.me_core.feature.agent.domain.core.model.AgentMode
+import com.mini.me_core.feature.agent.domain.core.model.ChatSession
+import com.mini.me_core.feature.agent.domain.core.model.ReasoningEffort
 
 data class ChatSessionEntity(
      val id: String,

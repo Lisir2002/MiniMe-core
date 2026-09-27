@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.prompt
+package com.mini.me_core.feature.agent.domain.core.prompt
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

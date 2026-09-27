@@ -1,7 +1,7 @@
 package com.mini.me_core.feature.backup.domain
 
-import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
-import com.mini.me_core.feature.agent.domain.permission.PermissionRule
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerConfig
+import com.mini.me_core.feature.agent.domain.execution.permission.PermissionRule
 import com.mini.me_core.feature.settings.data.repository.SyncSettingsSnapshot
 import kotlinx.serialization.Serializable
 

@@ -3,7 +3,7 @@ package com.mini.me_core.feature.agent.data.repository
 
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.me_core.feature.agent.data.local.entity.HallucinationFuseEntity
-import com.mini.me_core.feature.agent.domain.permission.FuseState
+import com.mini.me_core.feature.agent.domain.execution.permission.FuseState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject

@@ -9,7 +9,7 @@ import javax.inject.Singleton
 
 /**
  * T2I 文生图权限策略组合引擎 P1~P6（优先级严格从高到低；任一阶段命中 DENY / ASK 即短路返回，
- * 不再继续评估后续阶段）。与 [com.mini.me_core.feature.agent.domain.permission.ToolPermissionPolicyEngine]
+ * 不再继续评估后续阶段）。与 [com.mini.me_core.feature.agent.domain.execution.permission.ToolPermissionPolicyEngine]
  * 概念对齐，但策略维度换成 T2I 专用的「额度 + 强制确认」，而非 shell 命令段解析。
  *
  * ### 评估顺序（数字越小优先级越高，命中短路）

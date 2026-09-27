@@ -1,8 +1,8 @@
 package com.mini.me_core.feature.agent.presentation
 
 import androidx.compose.runtime.Immutable
-import com.mini.me_core.feature.agent.domain.model.AgentImage
-import com.mini.me_core.feature.agent.domain.model.WorkflowStatus
+import com.mini.me_core.feature.agent.domain.core.model.AgentImage
+import com.mini.me_core.feature.agent.domain.core.model.WorkflowStatus
 import com.mini.me_core.feature.agent.presentation.component.EnvironmentComponentState
 import kotlinx.serialization.Serializable
 

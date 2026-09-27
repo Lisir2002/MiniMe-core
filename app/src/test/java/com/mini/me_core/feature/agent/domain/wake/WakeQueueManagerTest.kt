@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.wake
+package com.mini.me_core.feature.agent.domain.schedule.wake
 
 import com.mini.me_core.datalayer.repository.WakeQueueStore
 import com.mini.mecore.datalayer.sqldelight.agent.Wake_queue as V2WakeItem

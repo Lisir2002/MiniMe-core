@@ -62,7 +62,7 @@ import com.mini.me_core.feature.agent.presentation.TaskSubGroup
 import com.mini.me_core.feature.agent.presentation.TaskSubGroupType
 import com.mini.me_core.feature.agent.domain.container.progress.InstallProgress
 import com.mini.me_core.feature.agent.domain.container.progress.InstallProgressParsers
-import com.mini.me_core.feature.agent.domain.permission.ShellCommandParser
+import com.mini.me_core.feature.agent.domain.execution.permission.ShellCommandParser
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.ChatBubble

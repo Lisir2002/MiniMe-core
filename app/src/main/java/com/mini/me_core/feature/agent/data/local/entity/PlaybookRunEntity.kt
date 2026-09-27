@@ -65,7 +65,7 @@ enum class PlaybookStageStatus {
 /**
  * 单个阶段的持久化状态（D5-3，序列化进 [PlaybookRunEntity.stageStatuses] 的 JSON 数组元素）。
  *
- * - [name]：阶段名（与 [com.mini.me_core.feature.agent.domain.playbook.PlaybookStage.name] 对齐）。
+ * - [name]：阶段名（与 [com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookStage.name] 对齐）。
  * - [status]：[PlaybookStageStatus] 名称。
  * - [artifacts]：阶段**产物清单**（D5-8，阶段 DONE 时记录本阶段已完成/产出的文件路径清单，
  *   `playbook_resume`/`playbook_retry` 时注入给模型对照跳过已完成操作；文件写按内容写入天然幂等）。

@@ -1,8 +1,8 @@
 package com.mini.me_core.feature.agent.domain.zth
 
-import com.mini.me_core.feature.agent.domain.model.AgentMode
-import com.mini.me_core.feature.agent.domain.tool.ToolCall
-import com.mini.me_core.feature.agent.domain.tool.ToolCapability
+import com.mini.me_core.feature.agent.domain.core.model.AgentMode
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
@@ -50,7 +50,7 @@ class ZthWorkflowHooks @Inject constructor(
         mode: AgentMode = AgentMode.PLAN,
         executionMode: ExecutionMode = ExecutionMode.LOCAL_PROOT,
         onlineValidated: Boolean = true
-    ): Pair<com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalChoice, StructuredPlanBundle> {
+    ): Pair<com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalChoice, StructuredPlanBundle> {
         val structured = facade.structuredPlan(
             sessionId = sessionId ?: "global", planText = planText,
             affectedFiles = affectedFiles, estimatedToolCalls = estimatedToolCalls

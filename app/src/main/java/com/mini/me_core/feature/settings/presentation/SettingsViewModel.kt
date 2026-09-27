@@ -10,14 +10,14 @@ import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
 import com.mini.me_core.feature.agent.domain.container.ContainerProfile
 import com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
 import com.mini.me_core.feature.agent.domain.container.RootfsSource
-import com.mini.me_core.feature.agent.domain.mcp.McpConfigRepository
-import com.mini.me_core.feature.agent.domain.mcp.McpManager
-import com.mini.me_core.feature.agent.domain.mcp.server.McpServerManager
-import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
-import com.mini.me_core.feature.agent.domain.mcp.McpServerStatus
-import com.mini.me_core.feature.agent.domain.mcp.McpToolDescriptor
-import com.mini.me_core.feature.agent.domain.permission.PermissionRule
-import com.mini.me_core.feature.agent.domain.permission.PermissionRulesRepository
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpConfigRepository
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpManager
+import com.mini.me_core.feature.agent.domain.execution.mcp.server.McpServerManager
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerConfig
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerStatus
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpToolDescriptor
+import com.mini.me_core.feature.agent.domain.execution.permission.PermissionRule
+import com.mini.me_core.feature.agent.domain.execution.permission.PermissionRulesRepository
 import com.mini.me_core.feature.settings.data.remote.ModelApiService
 import com.mini.me_core.feature.settings.data.remote.ModelMetadataService
 import com.mini.me_core.feature.settings.data.remote.ModelTestResult
@@ -34,9 +34,9 @@ import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeRepository
 import com.mini.me_core.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository
-import com.mini.me_core.feature.agent.domain.guard.GuardLogRepository
-import com.mini.me_core.feature.agent.domain.playbook.PlaybookExecutor
-import com.mini.me_core.feature.agent.domain.prompt.NormFlowStatsRepository
+import com.mini.me_core.feature.agent.domain.core.guard.GuardLogRepository
+import com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookExecutor
+import com.mini.me_core.feature.agent.domain.core.prompt.NormFlowStatsRepository
 
 import com.mini.me_core.core.util.LogLineParser
 import com.mini.me_core.feature.settings.data.repository.LogFilterSettingsRepository

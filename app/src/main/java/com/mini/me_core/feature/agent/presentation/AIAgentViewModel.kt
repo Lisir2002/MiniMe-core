@@ -10,7 +10,7 @@ import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepositor
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_message as V2AgentMessage
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
 import com.mini.mecore.datalayer.sqldelight.agent.SelectAllSessionsWithCount as V2SessionWithCount
-import com.mini.me_core.feature.agent.domain.checkpoint.CheckpointManager
+import com.mini.me_core.feature.agent.domain.session.checkpoint.CheckpointManager
 import com.mini.me_core.feature.agent.data.local.dao.ChatSessionWithCount
 import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
 import com.mini.me_core.feature.agent.data.local.entity.ChatSessionEntity
@@ -19,42 +19,42 @@ import com.mini.me_core.feature.agent.domain.container.ContainerInitState
 import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
 import com.mini.me_core.feature.settings.domain.repository.AIProviderRepository
 import com.mini.me_core.feature.settings.data.repository.DefaultModelSettingsRepository
-import com.mini.me_core.feature.agent.domain.model.AgentContext
-import com.mini.me_core.feature.agent.domain.model.AgentImage
-import com.mini.me_core.feature.agent.domain.model.AgentMessage
-import com.mini.me_core.feature.agent.domain.model.AgentMode
-import com.mini.me_core.feature.agent.domain.model.ChangeType
-import com.mini.me_core.feature.agent.domain.model.ChatSession
-import com.mini.me_core.feature.agent.domain.model.CodeChange
-import com.mini.me_core.feature.agent.domain.model.ReasoningEffort
-import com.mini.me_core.feature.agent.domain.model.WorkflowStatus
-import com.mini.me_core.feature.agent.domain.permission.PermissionChoice
-import com.mini.me_core.feature.agent.domain.permission.BuildCommandClassifier
-import com.mini.me_core.feature.agent.domain.workflow.AgentWorkflow
+import com.mini.me_core.feature.agent.domain.core.model.AgentContext
+import com.mini.me_core.feature.agent.domain.core.model.AgentImage
+import com.mini.me_core.feature.agent.domain.core.model.AgentMessage
+import com.mini.me_core.feature.agent.domain.core.model.AgentMode
+import com.mini.me_core.feature.agent.domain.core.model.ChangeType
+import com.mini.me_core.feature.agent.domain.core.model.ChatSession
+import com.mini.me_core.feature.agent.domain.core.model.CodeChange
+import com.mini.me_core.feature.agent.domain.core.model.ReasoningEffort
+import com.mini.me_core.feature.agent.domain.core.model.WorkflowStatus
+import com.mini.me_core.feature.agent.domain.execution.permission.PermissionChoice
+import com.mini.me_core.feature.agent.domain.execution.permission.BuildCommandClassifier
+import com.mini.me_core.feature.agent.domain.execution.workflow.AgentWorkflow
 import com.mini.me_core.feature.terminal.domain.TabFinishedEvent
 import com.mini.me_core.feature.terminal.domain.TAIL_LINES
 import com.mini.me_core.feature.terminal.domain.TerminalSessionManager
 import com.mini.me_core.feature.terminal.domain.takeTailLines
-import com.mini.me_core.feature.agent.domain.workflow.AgentEvent
-import com.mini.me_core.feature.agent.domain.tool.ToolPermissionManager
-import com.mini.me_core.feature.agent.domain.tool.ToolRegistry
-import com.mini.me_core.feature.agent.domain.tool.ToolResult
-import com.mini.me_core.feature.agent.domain.tool.container.CheckEnvironmentTool
-import com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalChoice
-import com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalManager
-import com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalRequest
-import com.mini.me_core.feature.agent.domain.tool.question.AskUserQuestionManager
-import com.mini.me_core.feature.agent.domain.tool.question.UserQuestionAnswer
-import com.mini.me_core.feature.agent.domain.tool.toTransportString
+import com.mini.me_core.feature.agent.domain.execution.workflow.AgentEvent
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionManager
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolRegistry
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
+import com.mini.me_core.feature.agent.domain.execution.tool.container.CheckEnvironmentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalChoice
+import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalManager
+import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalRequest
+import com.mini.me_core.feature.agent.domain.execution.tool.question.AskUserQuestionManager
+import com.mini.me_core.feature.agent.domain.execution.tool.question.UserQuestionAnswer
+import com.mini.me_core.feature.agent.domain.execution.tool.toTransportString
 import com.mini.me_core.feature.agent.domain.session.SessionUseCase
 import com.mini.me_core.feature.agent.domain.session.MessagePersistenceUseCase
 import com.mini.me_core.feature.backup.domain.BackupManager
-import com.mini.me_core.feature.agent.domain.command.SlashCommandContext
-import com.mini.me_core.feature.agent.domain.command.SlashCommandRegistry
-import com.mini.me_core.feature.agent.domain.command.SlashCommandHandler
-import com.mini.me_core.feature.agent.domain.input.BehaviorModeManager
-import com.mini.me_core.feature.agent.domain.prompt.AgentAssetRegistry
-import com.mini.me_core.feature.agent.domain.rule.RuleRegistry
+import com.mini.me_core.feature.agent.domain.execution.command.SlashCommandContext
+import com.mini.me_core.feature.agent.domain.execution.command.SlashCommandRegistry
+import com.mini.me_core.feature.agent.domain.execution.command.SlashCommandHandler
+import com.mini.me_core.feature.agent.domain.execution.input.BehaviorModeManager
+import com.mini.me_core.feature.agent.domain.core.prompt.AgentAssetRegistry
+import com.mini.me_core.feature.agent.domain.core.rule.RuleRegistry
 import com.mini.me_core.feature.agent.presentation.AgentAttachment
 import com.mini.me_core.feature.agent.presentation.component.formatTokenCount
 import com.mini.me_core.feature.agent.presentation.component.parseEnvironmentComponents
@@ -111,9 +111,9 @@ class AIAgentViewModel @Inject constructor(
     /** 分层规则注册表（D3-1）：/rules 命令列出/加载四级规则资产。 */
     private val ruleRegistry: RuleRegistry,
     /** Playbook 剧本执行器（D5-3）：/playbook 命令驱动多阶段剧本编排。 */
-    private val playbookExecutor: com.mini.me_core.feature.agent.domain.playbook.PlaybookExecutor,
+    private val playbookExecutor: com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookExecutor,
     /** Playbook 剧本注册表（D5-1）：/playbook 无参列出可用剧本资产清单。 */
-    private val playbookRegistry: com.mini.me_core.feature.agent.domain.playbook.PlaybookRegistry,
+    private val playbookRegistry: com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookRegistry,
     /** 定时提醒调度循环：会话创建后注册到点投递回调（DSH schedule）。 */
     private val scheduleScheduler: com.mini.me_core.feature.agent.domain.schedule.ScheduleScheduler,
     @param:ApplicationContext private val context: Context
@@ -1755,7 +1755,7 @@ class AIAgentViewModel @Inject constructor(
                     val result = playbookExecutor.start(arg, sid)
                     // 启动成功：把首阶段目标交回 Agent 继续执行（对齐 §3.3.7 双入口；命令文本已落库，
                     // sendAgentRequest 展开为 USER 消息驱动 workflow，skipCommandDispatch 防递归）。
-                    if (result is com.mini.me_core.feature.agent.domain.playbook.PlaybookOpResult.Stage) {
+                    if (result is com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookOpResult.Stage) {
                         sendAgentRequest(result.message)
                     } else {
                         messagePersistenceUseCase.persist(sid, MessageRole.ASSISTANT, result.message, isCompacted = true)

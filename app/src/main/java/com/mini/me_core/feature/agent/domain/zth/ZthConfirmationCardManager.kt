@@ -3,10 +3,10 @@ package com.mini.me_core.feature.agent.domain.zth
 import com.mini.me_core.core.security.ZthSensitiveColumnCrypto
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.AgentRepository
-import com.mini.me_core.feature.agent.domain.permission.FailureSubClass
-import com.mini.me_core.feature.agent.domain.permission.FuseState
-import com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalChoice
-import com.mini.me_core.feature.agent.domain.tool.mode.PlanApprovalManager
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureSubClass
+import com.mini.me_core.feature.agent.domain.execution.permission.FuseState
+import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalChoice
+import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalManager
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers

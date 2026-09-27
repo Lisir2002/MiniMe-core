@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.tool.git
+package com.mini.me_core.feature.agent.domain.execution.tool.git
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

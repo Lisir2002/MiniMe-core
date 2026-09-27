@@ -63,7 +63,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.tool.question.UserQuestionAnswer
+import com.mini.me_core.feature.agent.domain.execution.tool.question.UserQuestionAnswer
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AIAgentViewModel

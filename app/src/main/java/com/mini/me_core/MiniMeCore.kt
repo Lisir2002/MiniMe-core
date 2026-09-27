@@ -15,7 +15,7 @@ import com.mini.me_core.core.util.FileLogger
 import net.schmizz.sshj.common.SecurityUtils
 import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
 import com.mini.me_core.feature.credentials.data.GitCredentialsFileSync
-import com.mini.me_core.feature.agent.domain.mcp.McpManager
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpManager
 import com.mini.me_core.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.LogSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.resolveSshConfigOrNull
@@ -93,7 +93,7 @@ class MiniMeCore : Application() {
 
     /** 内置 MCP 服务器管理：注入即触发构造（init 读 DataStore + 按 autoStart 自动拉起监听）。 */
     @Inject
-    lateinit var mcpServerManager: com.mini.me_core.feature.agent.domain.mcp.server.McpServerManager
+    lateinit var mcpServerManager: com.mini.me_core.feature.agent.domain.execution.mcp.server.McpServerManager
 
     /** git 凭据/署名落盘同步器：启动即把 Room 凭据 + DataStore 署名写到容器持久挂载目录，
      *  供终端/AI/UI 三端 git 经 credential.helper=store 共用，兜底 rootfs 升级或文件被删。 */

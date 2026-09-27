@@ -84,8 +84,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.R
-import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
-import com.mini.me_core.feature.agent.domain.mcp.McpServerStatus
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerConfig
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerStatus
 import com.mini.me_core.feature.backup.presentation.BackupSection
 import com.mini.me_core.feature.settings.data.repository.AppThemeMode
 import com.mini.me_core.feature.settings.data.repository.SecureScreenScope

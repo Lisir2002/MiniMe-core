@@ -3,8 +3,8 @@ package com.mini.me_core.feature.agent.domain.zth
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.me_core.feature.agent.data.local.entity.HallucinationFuseEntity
-import com.mini.me_core.feature.agent.domain.permission.FailureClassification
-import com.mini.me_core.feature.agent.domain.permission.FuseState
+import com.mini.me_core.feature.agent.domain.execution.permission.FailureClassification
+import com.mini.me_core.feature.agent.domain.execution.permission.FuseState
 import javax.inject.Inject
 import javax.inject.Singleton
 

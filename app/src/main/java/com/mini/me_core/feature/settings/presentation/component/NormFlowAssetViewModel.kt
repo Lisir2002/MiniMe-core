@@ -1,10 +1,10 @@
 package com.mini.me_core.feature.settings.presentation.component
 
 import androidx.lifecycle.ViewModel
-import com.mini.me_core.feature.agent.domain.prompt.AgentAsset
-import com.mini.me_core.feature.agent.domain.prompt.AgentAssetRegistry
-import com.mini.me_core.feature.agent.domain.sop.SopAsset
-import com.mini.me_core.feature.agent.domain.sop.SopRegistry
+import com.mini.me_core.feature.agent.domain.core.prompt.AgentAsset
+import com.mini.me_core.feature.agent.domain.core.prompt.AgentAssetRegistry
+import com.mini.me_core.feature.agent.domain.knowledge.sop.SopAsset
+import com.mini.me_core.feature.agent.domain.knowledge.sop.SopRegistry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.session
+package com.mini.me_core.feature.agent.domain.session.session
 
 import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
 import org.junit.Assert.assertEquals

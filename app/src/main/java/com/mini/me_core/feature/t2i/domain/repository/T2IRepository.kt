@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 /**
  * T2I 域门面（v2-full-takeover P2-2）。
  *
- * 目的：把 [com.mini.me_core.feature.agent.domain.tool.image.GenerateImageTool] 与
+ * 目的：把 [com.mini.me_core.feature.agent.domain.execution.tool.image.GenerateImageTool] 与
  * [com.mini.me_core.feature.t2i.domain.permission.T2IPermissionPolicyEngine] 从 Room DAO
  * 解耦，使业务读源可按 [com.mini.me_core.datalayer.DataReadMode] 在 Room / V2 间切换。
  *

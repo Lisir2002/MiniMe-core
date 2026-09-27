@@ -71,8 +71,8 @@ import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
-import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
-import com.mini.me_core.feature.agent.domain.mcp.McpServerStatus
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerConfig
+import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerStatus
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource

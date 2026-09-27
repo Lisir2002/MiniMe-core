@@ -60,10 +60,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.skill.Skill
-import com.mini.me_core.feature.agent.domain.skill.SkillScope
-import com.mini.me_core.feature.agent.domain.skill.SkillSourceType
-import com.mini.me_core.feature.agent.domain.skill.SkillType
+import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillScope
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillSourceType
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillType
 import com.mini.me_core.feature.settings.presentation.SkillsViewModel
 
 /**

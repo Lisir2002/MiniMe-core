@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.sop
+package com.mini.me_core.feature.agent.domain.knowledge.sop
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

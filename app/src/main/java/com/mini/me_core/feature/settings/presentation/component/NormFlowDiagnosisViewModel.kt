@@ -1,7 +1,7 @@
 package com.mini.me_core.feature.settings.presentation.component
 
 import androidx.lifecycle.ViewModel
-import com.mini.me_core.feature.agent.domain.prompt.SystemPromptProvider
+import com.mini.me_core.feature.agent.domain.core.prompt.SystemPromptProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -57,8 +57,8 @@ import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.resolve
 import com.mini.me_core.core.theme.resolveOn
-import com.mini.me_core.feature.agent.domain.model.AgentMode
-import com.mini.me_core.feature.agent.domain.model.ReasoningEffort
+import com.mini.me_core.feature.agent.domain.core.model.AgentMode
+import com.mini.me_core.feature.agent.domain.core.model.ReasoningEffort
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 
 /**

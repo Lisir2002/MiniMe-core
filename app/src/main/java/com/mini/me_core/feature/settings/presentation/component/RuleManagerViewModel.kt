@@ -1,8 +1,8 @@
 package com.mini.me_core.feature.settings.presentation.component
 
 import androidx.lifecycle.ViewModel
-import com.mini.me_core.feature.agent.domain.rule.RuleAsset
-import com.mini.me_core.feature.agent.domain.rule.RuleRegistry
+import com.mini.me_core.feature.agent.domain.core.rule.RuleAsset
+import com.mini.me_core.feature.agent.domain.core.rule.RuleRegistry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
