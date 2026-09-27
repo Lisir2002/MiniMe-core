@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="workspace_select">选择工作区</string>
+    <string name="workspace_switch">切换工作区</string>
+    <string name="workspace_switch_confirm">切换工作区会停止当前工作区所有正在运行的 AI 会话并关闭终端标签。确定要切换吗？</string>
+    <string name="workspace_confirm">确定</string>
+    <string name="workspace_open">打开工作区</string>
+    <string name="workspace_new">新建</string>
+    <string name="workspace_empty_hint">暂无工作区，点击「新建」创建一个</string>
+    <string name="workspace_delete">删除工作区</string>
+    <string name="workspace_delete_confirm">确定删除「%1$s」？该目录下的所有文件都将被删除，且无法恢复。</string>
+    <string name="workspace_delete_confirm_with_sessions">确定删除「%1$s」？将同时删除 %2$d 个对话及全部消息，目录下的所有文件也将被删除，且无法恢复。</string>
+    <string name="workspace_new_workspace">新建工作区</string>
+    <string name="workspace_name_hint">例如 my-project</string>
+    <string name="workspace_name_exists">已存在同名工作区</string>
+    <string name="workspace_rename">重命名工作区</string>
+    <string name="workspace_rename_hint">请输入新的工作区名称</string>
+    <string name="workspace_view_bindings">查看对话绑定</string>
+    <string name="workspace_no_bound_sessions">该工作区暂无绑定的对话</string>
+    <string name="workspace_switch_to">切换到该工作区</string>
+    <string name="workspace_current">当前</string>
+    <string name="workspace_menu">工作区操作</string>
+    <string name="workspace_bind_section_title">工作台绑定</string>
+    <string name="workspace_bind_desc">会话与工作台绑定后，AI 的工作目录固定为该工作台，绑定后不可中途切换。新会话在发送第一条消息时自动绑定当前工作台，也可在此手动绑定。</string>
+    <string name="workspace_bind_bound">已绑定：%1$s</string>
+    <string name="workspace_bind_bound_hint">绑定已确定，如需更换请新建会话</string>
+    <string name="workspace_bind_unbound_hint">当前会话尚未绑定，选择要绑定的工作台：</string>
+    <string name="workspace_bind_no_session">尚未选择会话</string>
+    <string name="workspace_bind_empty">暂无可用工作台</string>
+    <string name="workspace_bind_action">绑定到该工作台</string>
+    <string name="workspace_tab_current">当前工作台</string>
+    <string name="workspace_tab_all">所有工作台</string>
+    <string name="workspace_file_root">工作区根目录</string>
+    <string name="workspace_file_empty">当前目录为空</string>
+    <string name="workspace_file_up">返回上一级</string>
+</resources>

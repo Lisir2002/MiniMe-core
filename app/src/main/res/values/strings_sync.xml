@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sync_unknown_connection">未知连接</string>
+    <string name="sync_ignore_list">目录/文件忽略列表</string>
+    <string name="sync_ignore_desc">多个规则请用英文逗号分隔。这些名称的目录及文件将不会被同步到远程服务器（如 node_modules）。</string>
+    <string name="sync_ignore_rules">忽略规则</string>
+    <string name="sync_ignore_saved">忽略规则已保存</string>
+    <string name="sync_save_rules">保存规则</string>
+    <string name="sync_follow_gitignore">遵循 .gitignore 规则</string>
+    <string name="sync_gitignore_desc">如果项目根目录存在 .gitignore，也会自动读取并忽略其中的文件与目录。</string>
+    <string name="sync_gitignore_enabled">已开启 .gitignore 过滤</string>
+    <string name="sync_gitignore_disabled">已关闭 .gitignore 过滤</string>
+    <string name="sync_max_batch_size">单次最大同步队列数量</string>
+    <string name="sync_batch_size_desc">防止突发性大量文件修改同时请求服务端导致断开连接。超过此数量的操作将排队按批次执行（批次间稍作停顿）。</string>
+    <string name="sync_max_batch_count">最大数量</string>
+    <string name="sync_batch_size_saved">最大队列数量已保存</string>
+    <string name="sync_save_batch_size">保存数量</string>
+    <string name="sync_via_connection">通过: %1$s</string>
+    <string name="sync_auto_connect">自动连接</string>
+    <string name="sync_mount_subdir">镜像子目录: %1$s</string>
+    <string name="sync_remote_path">远程路径: %1$s</string>
+    <string name="sync_local_path">本地路径: %1$s</string>
+    <string name="sync_disconnect">断开连接</string>
+    <string name="sync_all">同步全部</string>
+    <string name="sync_upload_all">上传全部</string>
+    <string name="sync_download_all">下载全部</string>
+    <string name="sync_connect_and_sync">连接并同步</string>
+</resources>

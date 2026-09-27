@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="template_open">模板</string>
+    <string name="template_search_hint">搜索模板…</string>
+    <string name="template_new">+ 新建模板</string>
+    <string name="template_cat_programming">编程</string>
+    <string name="template_cat_writing">写作</string>
+    <string name="template_cat_analysis">分析</string>
+    <string name="template_cat_creative">创意</string>
+    <string name="template_cat_custom">我的模板</string>
+    <string name="template_edit">编辑</string>
+    <string name="template_delete">删除</string>
+    <string name="template_use">使用</string>
+    <string name="template_name_hint">模板名称</string>
+    <string name="template_content_hint">提示词内容</string>
+    <string name="template_save">保存</string>
+</resources>

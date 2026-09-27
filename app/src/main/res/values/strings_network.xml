@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="net_stats">请求 %1$d · 成功率 %2$d%% · 平均 %3$d ms</string>
+    <string name="net_item">%1$s %2$s · %3$d · %4$d ms</string>
+    <string name="net_slowest">最慢请求</string>
+    <string name="net_clear">清空网络记录</string>
+    <string name="net_detail">请求详情</string>
+    <string name="net_req_headers">请求头</string>
+    <string name="net_resp_headers">响应头</string>
+    <string name="net_req_body">请求体</string>
+    <string name="net_resp_body">响应体</string>
+    <string name="net_total_requests">总请求</string>
+    <string name="net_success_rate">成功率</string>
+    <string name="net_avg_duration">平均耗时</string>
+    <string name="net_slowest_req">最慢</string>
+    <string name="net_refresh">刷新</string>
+    <string name="net_export">导出</string>
+    <string name="net_export_success">已导出到下载目录</string>
+    <string name="net_clear_confirm_title">清空网络记录</string>
+    <string name="net_clear_confirm_message">确定要清空所有网络请求记录吗？此操作不可撤销。</string>
+    <string name="proxy_ai_hosts_direct">模型接口直连（跳过代理）</string>
+    <string name="proxy_ai_hosts_direct_desc">开启后 OpenAI / Anthropic / Gemini 官方接口直连，省去代理一跳延迟；若直连不通（依赖代理才能访问），请关闭以回退代理。</string>
+</resources>

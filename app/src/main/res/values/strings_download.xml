@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="download_confirm_title">确认下载</string>
+    <string name="download_confirm_message">文件：%1$s\n大小：%2$s\n来源：%3$s</string>
+    <string name="download_confirm_button">确认下载</string>
+    <string name="download_progress_title">正在下载</string>
+    <string name="download_progress_speed">%1$s/s</string>
+    <string name="download_progress_remaining">剩余约 %1$s</string>
+    <string name="download_progress_cancel">取消下载</string>
+    <string name="download_pause">暂停</string>
+    <string name="download_resume">继续</string>
+    <string name="download_paused_title">已暂停</string>
+    <string name="download_completed_title">下载完成</string>
+    <string name="download_completed_open">打开文件</string>
+    <string name="download_failed_title">下载失败</string>
+    <string name="download_failed_retry">重试</string>
+    <string name="download_size_unknown">未知</string>
+    <string name="download_close">关闭</string>
+    <string name="download_indeterminate">正在下载，请稍候…</string>
+    <string name="download_confirm_size_unknown">未知大小</string>
+</resources>

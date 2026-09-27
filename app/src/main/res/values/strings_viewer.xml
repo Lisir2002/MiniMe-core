@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="md_code_expand">展开全部代码</string>
+    <string name="md_code_collapse">收起代码</string>
+    <string name="md_code_lines">共 %1$d 行</string>
+    <string name="md_image_failed">图片加载失败</string>
+    <string name="doc_viewer_error">文档加载失败，请稍后重试</string>
+    <string name="doc_viewer_switch_to_en">EN</string>
+    <string name="doc_viewer_switch_to_zh">中</string>
+    <string name="code_browser_title">浏览源码</string>
+    <string name="code_browser_download">下载源码</string>
+    <string name="code_browser_downloading">正在下载源码… %1$d%%</string>
+    <string name="code_browser_download_done">源码下载完成</string>
+    <string name="code_browser_open">打开</string>
+    <string name="code_browser_share">分享</string>
+    <string name="code_browser_error">加载失败：%1$s</string>
+    <string name="code_browser_loading">加载中…</string>
+    <string name="code_browser_empty">空目录</string>
+    <string name="code_browser_items">%1$d 项</string>
+    <string name="code_browser_root">根目录</string>
+    <string name="code_browser_repo_label">仓库</string>
+    <string name="code_browser_bytes">%1$s</string>
+    <string name="code_browser_branch_main">main</string>
+    <string name="viewer_code_title">代码查看</string>
+    <string name="viewer_back">返回</string>
+    <string name="viewer_search">搜索</string>
+    <string name="viewer_outline">大纲</string>
+    <string name="viewer_error">错误: %1$s</string>
+    <string name="viewer_error_title">代码查看加载失败</string>
+    <string name="viewer_error_message">代码查看器加载失败，请重启应用或更新到最新版本。</string>
+    <string name="viewer_loading">正在加载文件…</string>
+    <string name="viewer_empty">文件内容为空</string>
+</resources>

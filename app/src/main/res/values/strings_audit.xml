@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="audit_stats_total">总事件</string>
+    <string name="audit_stats_failed">失败事件</string>
+    <string name="audit_stats_today">今日事件</string>
+    <string name="audit_retention_hint">保留 10000 条 / 90 天</string>
+    <string name="audit_tab_all">全部</string>
+    <string name="audit_tab_connect">连接</string>
+    <string name="audit_tab_credential">凭据</string>
+    <string name="audit_tab_backup">备份</string>
+    <string name="audit_tab_security">安全</string>
+    <string name="audit_tab_skill">技能</string>
+    <string name="audit_search_hint">搜索动作 / 连接名 / 主机</string>
+    <string name="audit_export">导出日志</string>
+    <string name="audit_clear_all">清空全部</string>
+    <string name="audit_clear_title">清空审计日志？</string>
+    <string name="audit_clear_message">将删除所有审计日志，不可恢复</string>
+    <string name="audit_confirm">确认</string>
+    <string name="audit_cancel">取消</string>
+    <string name="audit_empty_title">暂无审计记录</string>
+    <string name="audit_empty_subtitle">操作记录将自动显示在这里</string>
+    <string name="audit_load_error">加载失败</string>
+    <string name="audit_retry">重试</string>
+    <string name="audit_export_done">已导出到下载目录</string>
+    <string name="audit_export_failed">导出失败</string>
+    <string name="audit_more">加载更多</string>
+    <string name="audit_search_cd">搜索</string>
+    <string name="audit_more_cd">更多操作</string>
+    <string name="audit_stats_retention_label">条上限 / 90 天</string>
+    <string name="audit_subtitle_count">%1$s · 共 %2$d 条</string>
+    <string name="audit_group_today">今天</string>
+    <string name="audit_group_yesterday">昨天</string>
+    <string name="audit_time_today">今天 %1$s</string>
+    <string name="audit_time_yesterday">昨天 %1$s</string>
+    <string name="audit_loading_more">加载中…</string>
+    <string name="audit_no_more">没有更多了</string>
+    <string name="audit_load_more_failed">加载失败，点击重试</string>
+    <string name="audit_refreshed">已刷新</string>
+    <string name="audit_detail_source_ip">来源 IP</string>
+    <string name="audit_detail_connection_id">连接 ID</string>
+</resources>

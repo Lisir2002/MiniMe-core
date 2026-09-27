@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="crash_dialog_title">上次异常退出</string>
+    <string name="crash_dialog_message">检测到上次运行发生崩溃，是否查看崩溃报告？</string>
+    <string name="crash_view">查看报告</string>
+    <string name="crash_dismiss">关闭</string>
+    <string name="crash_history">崩溃历史</string>
+    <string name="crash_empty">暂无崩溃记录（仅本地保存）</string>
+    <string name="crash_copied">崩溃详情已复制到剪贴板</string>
+    <string name="crash_clear">清空崩溃记录</string>
+    <string name="crash_detail">崩溃详情</string>
+    <string name="crash_item_time">崩溃时间 %1$s</string>
+    <string name="crash_exception_type">异常类型</string>
+    <string name="crash_copy">复制</string>
+    <string name="crash_export">导出</string>
+    <string name="crash_clear_confirm_title">清空崩溃记录</string>
+    <string name="crash_clear_confirm_message">确定要清空所有崩溃报告吗？此操作不可撤销。</string>
+</resources>

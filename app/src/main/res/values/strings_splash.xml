@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="splash_skip">跳过</string>
+    <string name="splash_style_particle">粒子聚合</string>
+    <string name="splash_style_minimal">简约渐变</string>
+    <string name="splash_style_classic">经典Logo</string>
+    <string name="splash_style_off">关闭</string>
+    <string name="splash_stage_data">正在加载本地数据</string>
+    <string name="splash_stage_ai">正在初始化AI服务</string>
+    <string name="splash_stage_terminal">正在准备终端环境</string>
+    <string name="splash_stage_browser">正在初始化浏览器</string>
+    <string name="splash_stage_ui">正在准备界面</string>
+</resources>
