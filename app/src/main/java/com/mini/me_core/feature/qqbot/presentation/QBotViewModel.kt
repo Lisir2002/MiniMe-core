@@ -2,17 +2,27 @@ package com.mini.me_core.feature.qqbot.presentation
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.feature.qqbot.data.QBotRepository
 import com.mini.me_core.feature.qqbot.domain.LLBotProcessManager
+import com.mini.me_core.feature.qqbot.domain.MessageProcessor
 import com.mini.me_core.feature.qqbot.domain.OneBot11Server
+import com.mini.me_core.feature.qqbot.domain.OneBotApiClient
 import com.mini.me_core.feature.qqbot.domain.QBotConfig
+import com.mini.me_core.feature.qqbot.domain.QBotConstants
+import com.mini.me_core.feature.qqbot.domain.QBotLoginState
 import com.mini.me_core.feature.qqbot.domain.QBotMessage
+import com.mini.me_core.feature.qqbot.domain.QBotModelOption
 import com.mini.me_core.feature.qqbot.domain.QBotService
 import com.mini.me_core.feature.qqbot.domain.QBotSession
 import com.mini.me_core.feature.qqbot.domain.QBotState
 import com.mini.me_core.feature.qqbot.domain.QBotWsState
+import com.mini.me_core.feature.qqbot.domain.QrCodeManager
+import com.mini.me_core.feature.settings.data.remote.ModelMetadataService
+import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
+import com.mini.me_core.feature.settings.domain.repository.AIProviderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
@@ -21,9 +31,14 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -44,6 +59,11 @@ class QBotViewModel @Inject constructor(
     private val repository: QBotRepository,
     private val processManager: LLBotProcessManager,
     private val oneBotServer: OneBot11Server,
+    private val oneBotApiClient: OneBotApiClient,
+    private val qrCodeManager: QrCodeManager,
+    private val messageProcessor: MessageProcessor,
+    private val providerRepository: AIProviderRepository,
+    private val modelMetadataService: ModelMetadataService,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -57,6 +77,43 @@ class QBotViewModel @Inject constructor(
 
     /** 反向 WS 连接状态（LLBot 是否已连上来）。 */
     val wsState: StateFlow<QBotWsState> = oneBotServer.wsState
+
+    // ── 登录状态 ────────────────────────────────────────────────────────
+
+    /** 登录二维码 PNG 字节；null 表示当前不展示二维码。 */
+    val qrCodeData: StateFlow<ByteArray?> = qrCodeManager.qrCodeData
+
+    /** 登录状态机。 */
+    val loginState: StateFlow<QBotLoginState> = qrCodeManager.loginState
+
+    /** 登录成功后的机器人 QQ 号。 */
+    val loggedBotQq: StateFlow<Long> = qrCodeManager.botQq
+
+    /** 登录成功后的机器人昵称。 */
+    val loggedBotNickname: StateFlow<String> = qrCodeManager.botNickname
+
+    /** 登录失败的错误信息。 */
+    val loginErrorMessage: StateFlow<String> = qrCodeManager.loginErrorMessage
+
+    /** 当前选中模型的上下文窗口（token），未知为 0。 */
+    private val _selectedModelContextTokens = MutableStateFlow(0)
+    val selectedModelContextTokens: StateFlow<Int> = _selectedModelContextTokens.asStateFlow()
+
+    // ── 可选模型列表 ────────────────────────────────────────────────────
+
+    /**
+     * 全部可用模型（来自已启用供应商的 models 列表），供设置页下拉选择。
+     * 不复写模型管理逻辑，直接复用 [AIProviderRepository.getAllProviders]。
+     */
+    val modelOptions: StateFlow<List<QBotModelOption>> = providerRepository.getAllProviders()
+        .map { providers ->
+            providers.filter { it.isEnabled }.flatMap { p ->
+                p.models.map { m ->
+                    QBotModelOption(modelId = m, providerId = p.id, providerName = p.name)
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** 进入 RUNNING 的时刻，用于推算在线时长；非运行态为 0。 */
     private val runningSince = MutableStateFlow(0L)
@@ -72,6 +129,26 @@ class QBotViewModel @Inject constructor(
                 }
                 wasRunning = state == QBotState.RUNNING
             }
+        }
+        // WS 连接建立后查询机器人登录信息，回填 QQ 号 / 昵称。
+        viewModelScope.launch {
+            wsState.collect { state ->
+                if (state == QBotWsState.CONNECTED) {
+                    refreshLoginInfo()
+                }
+            }
+        }
+    }
+
+    /** 调用 OneBot `get_login_info`，回填机器人 QQ / 昵称并同步到消息处理链。 */
+    private fun refreshLoginInfo() {
+        viewModelScope.launch {
+            runCatching { oneBotApiClient.getLoginInfo() }
+                .getOrNull()
+                ?.let { (qq, nickname) ->
+                    messageProcessor.botQq = qq
+                    qrCodeManager.onLoggedIn(qq, nickname)
+                }
         }
     }
 
@@ -125,10 +202,76 @@ class QBotViewModel @Inject constructor(
     }
 
     /** 启动前台服务（内部会拉起 LLBot 进程与 WS 服务端）。 */
-    fun startBot() = QBotService.start(context)
+    fun startBot() {
+        // 启动前把最新配置（含 botQq / 登录方式 / 密码）注入进程管理器。
+        processManager.configure(_config.value)
+        QBotService.start(context)
+    }
 
     /** 停止前台服务（内部会停止 LLBot 进程与 WS 服务端）。 */
     fun stopBot() = QBotService.stop(context)
+
+    /** 清除登录状态并重启 LLBot，重新获取二维码。 */
+    fun relogin() {
+        viewModelScope.launch {
+            qrCodeManager.resetForRelogin()
+            QBotService.stop(context)
+            delay(600L) // 等待服务停止、进程退出
+            processManager.configure(_config.value)
+            QBotService.start(context)
+        }
+    }
+
+    /** 手动隐藏当前二维码（例如用户已扫码后刷新页面）。 */
+    fun clearQrCode() = qrCodeManager.clearQrCode()
+
+    /** 重试登录（登录失败 / 掉线后）。 */
+    fun retryLogin() = relogin()
+
+    /**
+     * 从可选模型中选择默认模型；自动读取该模型的上下文窗口并回填上下文长度，
+     * 上下文长度不再允许自由编辑。
+     */
+    fun selectModel(option: QBotModelOption) {
+        updateConfig { it.copy(defaultModel = option.modelId) }
+        viewModelScope.launch {
+            runCatching {
+                val providers = providerRepository.getAllProviders().first()
+                val provider = providers.firstOrNull { it.id == option.providerId }
+                val meta = provider?.let {
+                    modelMetadataService.resolve(it.type, option.modelId)
+                }
+                val ctxTokens = meta?.let { it.inputTokens ?: it.contextTokens } ?: 0
+                _selectedModelContextTokens.value = ctxTokens
+                // 由模型上下文窗口推导一个合理的消息条数（约每 1K token 一条消息），
+                //  clamped 到常用区间；模型无元数据时保留默认 20。
+                val derived = if (ctxTokens > 0) (ctxTokens / 1000).coerceIn(8, 200)
+                else QBotConstants.DEFAULT_CONTEXT_LENGTH
+                updateConfig { it.copy(contextLength = derived) }
+            }
+        }
+    }
+
+    /** 设置登录方式（qrcode / password）。 */
+    fun setLoginType(type: String) {
+        updateConfig { it.copy(loginType = type) }
+    }
+
+    /** 设置密码（轻量 Base64 编码后持久化）。 */
+    fun setPassword(plain: String) {
+        val encoded = if (plain.isBlank()) ""
+        else Base64.encodeToString(plain.toByteArray(), Base64.NO_WRAP)
+        updateConfig { it.copy(passwordEncrypted = encoded) }
+    }
+
+    /** 读取已保存密码的明文（仅用于回填输入框）。 */
+    fun savedPasswordPlain(): String {
+        val enc = _config.value.passwordEncrypted
+        if (enc.isBlank()) return ""
+        return runCatching {
+            String(Base64.decode(enc, Base64.NO_WRAP), Charsets.UTF_8)
+        }.getOrDefault("")
+    }
 
     /** 更新配置并立即写盘。 */
     fun updateConfig(updater: (QBotConfig) -> QBotConfig) {
@@ -170,6 +313,8 @@ class QBotViewModel @Inject constructor(
         wsPort = prefs.getInt(KEY_WS_PORT, DEFAULT_WS_PORT),
         wsToken = prefs.getString(KEY_WS_TOKEN, "") ?: "",
         botQq = prefs.getLong(KEY_BOT_QQ, 0L),
+        loginType = prefs.getString(KEY_LOGIN_TYPE, "qrcode") ?: "qrcode",
+        passwordEncrypted = prefs.getString(KEY_PASSWORD_ENC, "") ?: "",
         privateTriggerEnabled = prefs.getBoolean(KEY_PRIVATE_TRIGGER, true),
         groupAtTriggerEnabled = prefs.getBoolean(KEY_GROUP_AT_TRIGGER, true),
         defaultModel = prefs.getString(KEY_DEFAULT_MODEL, "") ?: "",
@@ -183,6 +328,8 @@ class QBotViewModel @Inject constructor(
             .putInt(KEY_WS_PORT, config.wsPort)
             .putString(KEY_WS_TOKEN, config.wsToken)
             .putLong(KEY_BOT_QQ, config.botQq)
+            .putString(KEY_LOGIN_TYPE, config.loginType)
+            .putString(KEY_PASSWORD_ENC, config.passwordEncrypted)
             .putBoolean(KEY_PRIVATE_TRIGGER, config.privateTriggerEnabled)
             .putBoolean(KEY_GROUP_AT_TRIGGER, config.groupAtTriggerEnabled)
             .putString(KEY_DEFAULT_MODEL, config.defaultModel)
@@ -197,6 +344,8 @@ class QBotViewModel @Inject constructor(
         private const val KEY_WS_PORT = "ws_port"
         private const val KEY_WS_TOKEN = "ws_token"
         private const val KEY_BOT_QQ = "bot_qq"
+        private const val KEY_LOGIN_TYPE = "login_type"
+        private const val KEY_PASSWORD_ENC = "password_enc"
         private const val KEY_PRIVATE_TRIGGER = "private_trigger"
         private const val KEY_GROUP_AT_TRIGGER = "group_at_trigger"
         private const val KEY_DEFAULT_MODEL = "default_model"

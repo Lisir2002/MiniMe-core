@@ -4,6 +4,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.add
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -65,6 +68,19 @@ class OneBotApiClient @Inject constructor(
             }
             server.sendApiRequest("send_group_msg", params)
         }
+    }
+
+    /**
+     * 查询机器人自身登录信息（OneBot 11 `get_login_info`）。
+     *
+     * @return (QQ号, 昵称)；未连接 / 超时 / 失败时返回 null。
+     */
+    suspend fun getLoginInfo(): Pair<Long, String>? {
+        val resp = server.sendApiRequest("get_login_info", buildJsonObject {})
+        val data = resp?.data ?: return null
+        val userId = data["user_id"]?.jsonPrimitive?.longOrNull ?: return null
+        val nickname = data["nickname"]?.jsonPrimitive?.contentOrNull ?: ""
+        return userId to nickname
     }
 
     /**

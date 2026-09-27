@@ -18,6 +18,32 @@ enum class QBotState {
 }
 
 /**
+ * QQ 登录状态（与 [QBotState] 进程生命周期正交，单独描述账号登录进展）。
+ */
+enum class QBotLoginState {
+    /** 未登录 / 尚未尝试登录。 */
+    LOGGED_OUT,
+
+    /** 二维码已生成并展示，等待用户用 QQ 扫码。 */
+    QR_SHOWN,
+
+    /** 已扫码，等待用户在手机 QQ 上确认。 */
+    SCANNING,
+
+    /** 正在登录（提交票据 / 鉴权中）。 */
+    LOGGING_IN,
+
+    /** 已登录成功，持有 QQ 号与昵称。 */
+    LOGGED_IN,
+
+    /** 登录失败（密码错误 / 风控 / 二维码过期等）。 */
+    LOGIN_FAILED,
+
+    /** 运行中掉线（被挤下线 / 网络断开导致会话失效）。 */
+    OFFLINE;
+}
+
+/**
  * 会话类型
  */
 enum class QBotSessionType {
@@ -79,12 +105,34 @@ data class QBotConfig(
     val wsPort: Int = 3001,
     val wsToken: String = "",
     val botQq: Long = 0,
+    /** 登录方式：qrcode（扫码）/ password（密码）。 */
+    val loginType: String = "qrcode",
+    /** 轻量编码（Base64）存储的密码，第一阶段可选；不做强加密。 */
+    val passwordEncrypted: String = "",
     val privateTriggerEnabled: Boolean = true,
     val groupAtTriggerEnabled: Boolean = true,
     val defaultModel: String = "",
     val contextLength: Int = 20,
     val llBotPath: String = ""
 )
+
+/**
+ * 一个可选模型条目（聚合模型 id、所属供应商与上下文长度），供设置页下拉选择。
+ */
+data class QBotModelOption(
+    /** 模型 id，如 "gpt-4o-mini"。 */
+    val modelId: String,
+    /** 供应商 id。 */
+    val providerId: String,
+    /** 供应商显示名。 */
+    val providerName: String,
+    /** 模型上下文窗口（token），未知为 0。 */
+    val contextTokens: Int = 0,
+) {
+    /** 列表展示用标签：模型名（供应商名）。 */
+    val displayLabel: String
+        get() = if (providerName.isBlank()) modelId else "$modelId（$providerName）"
+}
 
 /**
  * QQ 机器人运行时状态
@@ -94,6 +142,8 @@ data class QBotStatus(
     val wsState: QBotWsState = QBotWsState.DISCONNECTED,
     val botQq: Long = 0,
     val botNickname: String = "",
+    val loginState: QBotLoginState = QBotLoginState.LOGGED_OUT,
+    val loginErrorMessage: String = "",
     val llBotPid: Int = -1,
     val uptimeMs: Long = 0,
     val todayMessageCount: Int = 0,

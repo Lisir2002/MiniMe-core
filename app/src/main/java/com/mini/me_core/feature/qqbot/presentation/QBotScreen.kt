@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.qqbot.presentation
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,7 +34,11 @@ import androidx.compose.material.icons.rounded.Power
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.*
+import com.mini.me_core.core.theme.components.AppTextField
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,12 +62,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.graphics.BitmapFactory
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
@@ -76,7 +84,9 @@ import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 import com.mini.me_core.feature.qqbot.domain.QBotConfig
+import com.mini.me_core.feature.qqbot.domain.QBotLoginState
 import com.mini.me_core.feature.qqbot.domain.QBotMessage
+import com.mini.me_core.feature.qqbot.domain.QBotModelOption
 import com.mini.me_core.feature.qqbot.domain.QBotSession
 import com.mini.me_core.feature.qqbot.domain.QBotSessionType
 import com.mini.me_core.feature.qqbot.domain.QBotState
@@ -103,6 +113,13 @@ fun QBotScreen(
     val selectedSessionId by viewModel.selectedSessionId.collectAsStateWithLifecycle()
     val currentSession by viewModel.currentSession.collectAsStateWithLifecycle()
     val messages by viewModel.currentMessages.collectAsStateWithLifecycle()
+    val qrCodeData by viewModel.qrCodeData.collectAsStateWithLifecycle()
+    val loginState by viewModel.loginState.collectAsStateWithLifecycle()
+    val loggedBotQq by viewModel.loggedBotQq.collectAsStateWithLifecycle()
+    val loggedBotNickname by viewModel.loggedBotNickname.collectAsStateWithLifecycle()
+    val loginErrorMessage by viewModel.loginErrorMessage.collectAsStateWithLifecycle()
+    val modelOptions by viewModel.modelOptions.collectAsStateWithLifecycle()
+    val selectedModelCtx by viewModel.selectedModelContextTokens.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableIntStateOf(0) }
 
@@ -130,8 +147,16 @@ fun QBotScreen(
                 wsState = wsState,
                 uptimeMs = uptimeMs,
                 config = config,
+                loginState = loginState,
+                qrCodeData = qrCodeData,
+                loggedBotQq = loggedBotQq,
+                loggedBotNickname = loggedBotNickname,
+                loginErrorMessage = loginErrorMessage,
                 onStart = viewModel::startBot,
                 onStop = viewModel::stopBot,
+                onRelogin = viewModel::relogin,
+                onRetry = viewModel::retryLogin,
+                onClearQr = viewModel::clearQrCode,
             )
 
             val tabTitles = listOf(
@@ -170,8 +195,16 @@ fun QBotScreen(
                 )
                 else -> SettingsPanel(
                     config = config,
+                    modelOptions = modelOptions,
+                    selectedModelContextTokens = selectedModelCtx,
+                    loginState = loginState,
                     onUpdate = { newConfig -> viewModel.updateConfig { newConfig } },
                     onGenerateToken = viewModel::generateToken,
+                    onSelectModel = viewModel::selectModel,
+                    onSetLoginType = viewModel::setLoginType,
+                    onSetPassword = viewModel::setPassword,
+                    savedPassword = viewModel.savedPasswordPlain(),
+                    onRelogin = viewModel::relogin,
                 )
             }
         }
@@ -208,8 +241,16 @@ private fun QBotStatusCard(
     wsState: QBotWsState,
     uptimeMs: Long,
     config: QBotConfig,
+    loginState: QBotLoginState,
+    qrCodeData: ByteArray?,
+    loggedBotQq: Long,
+    loggedBotNickname: String,
+    loginErrorMessage: String,
     onStart: () -> Unit,
     onStop: () -> Unit,
+    onRelogin: () -> Unit,
+    onRetry: () -> Unit,
+    onClearQr: () -> Unit,
 ) {
     val colors = LocalAppTheme.current.colors
     val isActive = botState == QBotState.RUNNING || botState == QBotState.STARTING
@@ -220,11 +261,57 @@ private fun QBotStatusCard(
         Column(modifier = Modifier.padding(PrimitiveSpacing.Lg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StatusBadge(botState = botState)
+                Spacer(Modifier.width(PrimitiveSpacing.Sm))
+                LoginBadge(loginState = loginState)
                 Spacer(Modifier.weight(1f))
                 ConnectionBadge(wsState = wsState)
             }
 
             Spacer(Modifier.height(PrimitiveSpacing.Md))
+
+            // 登录二维码区块：仅在等待扫码时展示。
+            if (loginState == QBotLoginState.QR_SHOWN ||
+                (loginState == QBotLoginState.SCANNING && qrCodeData != null)
+            ) {
+                QrCodeDisplay(
+                    qrCodeData = qrCodeData,
+                    onRefresh = onClearQr,
+                )
+                Spacer(Modifier.height(PrimitiveSpacing.Md))
+            }
+
+            // 登录成功：显示 QQ 号 + 昵称。
+            if (loginState == QBotLoginState.LOGGED_IN) {
+                val qq = loggedBotQq.takeIf { it != 0L } ?: config.botQq
+                InfoRow(
+                    label = stringResource(R.string.qqbot_login_state),
+                    value = stringResource(
+                        R.string.qqbot_logged_in_as,
+                        loggedBotNickname.ifBlank { "-" },
+                        qq,
+                    ),
+                )
+            }
+
+            // 登录失败 / 掉线：显示错误与操作按钮。
+            if (loginState == QBotLoginState.LOGIN_FAILED) {
+                Text(
+                    text = stringResource(R.string.qqbot_login_failed) +
+                        (loginErrorMessage.ifBlank { "" }.let { if (it.isBlank()) "" else ": $it" }),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.error,
+                )
+                Spacer(Modifier.height(PrimitiveSpacing.Sm))
+                OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.qqbot_login_retry))
+                }
+            }
+            if (loginState == QBotLoginState.OFFLINE) {
+                Spacer(Modifier.height(PrimitiveSpacing.Sm))
+                OutlinedButton(onClick = onRelogin, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.qqbot_relogin))
+                }
+            }
 
             InfoRow(
                 label = stringResource(R.string.qqbot_bot_qq),
@@ -257,6 +344,91 @@ private fun QBotStatusCard(
                 icon = if (isActive) Icons.Rounded.Power else Icons.Rounded.SmartToy,
             )
         }
+    }
+}
+
+/** 登录状态徽章，与进程运行徽章并排。 */
+@Composable
+private fun LoginBadge(loginState: QBotLoginState) {
+    val colors = LocalAppTheme.current.colors
+    val (bg, fg, textRes) = when (loginState) {
+        QBotLoginState.LOGGED_IN -> Triple(
+            colors.successContainer, colors.onSuccessContainer, R.string.qqbot_login_logged_in,
+        )
+        QBotLoginState.QR_SHOWN, QBotLoginState.SCANNING, QBotLoginState.LOGGING_IN -> Triple(
+            colors.warningContainer, colors.onWarningContainer, R.string.qqbot_login_qr_shown,
+        )
+        QBotLoginState.LOGIN_FAILED -> Triple(
+            colors.errorContainer, colors.onErrorContainer, R.string.qqbot_login_failed,
+        )
+        QBotLoginState.OFFLINE -> Triple(
+            colors.errorContainer, colors.onErrorContainer, R.string.qqbot_login_offline,
+        )
+        QBotLoginState.LOGGED_OUT -> Triple(
+            colors.surfaceSunken, colors.textSecondary, R.string.qqbot_login_logged_out,
+        )
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(bg)
+            .padding(horizontal = PrimitiveSpacing.Md, vertical = 4.dp),
+    ) {
+        Text(
+            text = stringResource(textRes),
+            color = fg,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+/** 登录二维码展示：把 PNG 字节解码为 Bitmap 居中显示，下方提示扫码。 */
+@Composable
+private fun QrCodeDisplay(
+    qrCodeData: ByteArray?,
+    onRefresh: () -> Unit,
+) {
+    val colors = LocalAppTheme.current.colors
+    val bitmap = remember(qrCodeData) {
+        qrCodeData?.let { bytes ->
+            runCatching {
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(200.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White)
+                .padding(8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = stringResource(R.string.qqbot_login_qr),
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Text(
+                    text = stringResource(R.string.qqbot_login_qr_shown),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textTertiary,
+                )
+            }
+        }
+        Spacer(Modifier.height(PrimitiveSpacing.Sm))
+        Text(
+            text = stringResource(R.string.qqbot_qr_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary,
+        )
     }
 }
 
@@ -609,11 +781,20 @@ private fun BubbleSurface(text: String, bg: Color, fg: Color) {
 // 设置面板
 // ─────────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsPanel(
     config: QBotConfig,
+    modelOptions: List<QBotModelOption>,
+    selectedModelContextTokens: Int,
+    loginState: QBotLoginState,
     onUpdate: (QBotConfig) -> Unit,
     onGenerateToken: () -> Unit,
+    onSelectModel: (QBotModelOption) -> Unit,
+    onSetLoginType: (String) -> Unit,
+    onSetPassword: (String) -> Unit,
+    savedPassword: String,
+    onRelogin: () -> Unit,
 ) {
     val colors = LocalAppTheme.current.colors
 
@@ -622,8 +803,7 @@ private fun SettingsPanel(
     }
     var portText by remember(config.wsPort) { mutableStateOf(config.wsPort.toString()) }
     var tokenText by remember(config.wsToken) { mutableStateOf(config.wsToken) }
-    var modelText by remember(config.defaultModel) { mutableStateOf(config.defaultModel) }
-    var ctxText by remember(config.contextLength) { mutableStateOf(config.contextLength.toString()) }
+    var passwordText by remember(savedPassword) { mutableStateOf(savedPassword) }
 
     Column(
         modifier = Modifier
@@ -632,6 +812,53 @@ private fun SettingsPanel(
             .padding(PrimitiveSpacing.Lg),
         verticalArrangement = Arrangement.spacedBy(PrimitiveSpacing.Md),
     ) {
+        // ── 账号登录区 ──────────────────────────────────────────────
+        SectionHeader(text = stringResource(R.string.qqbot_login_section))
+
+        Text(
+            text = stringResource(R.string.qqbot_login_type),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.textSecondary,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(PrimitiveSpacing.Sm)) {
+            FilterChip(
+                selected = config.loginType == "qrcode",
+                onClick = { onSetLoginType("qrcode") },
+                label = { Text(stringResource(R.string.qqbot_login_type_qrcode)) },
+            )
+            FilterChip(
+                selected = config.loginType == "password",
+                onClick = { onSetLoginType("password") },
+                label = { Text(stringResource(R.string.qqbot_login_type_password)) },
+            )
+        }
+
+        if (config.loginType == "password") {
+            OutlinedTextField(
+                value = passwordText,
+                onValueChange = {
+                    passwordText = it
+                    onSetPassword(it)
+                },
+                label = { Text(stringResource(R.string.qqbot_login_password)) },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        OutlinedButton(
+            onClick = onRelogin,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(PrimitiveSpacing.Sm))
+            Text(stringResource(R.string.qqbot_relogin))
+        }
+
+        HorizontalDivider(color = colors.borderMuted)
+
+        // ── 连接配置区 ──────────────────────────────────────────────
         OutlinedTextField(
             value = qqText,
             onValueChange = {
@@ -673,6 +900,26 @@ private fun SettingsPanel(
             }
         }
 
+        // ── 模型选择（下拉）─────────────────────────────────────────
+        ModelDropdown(
+            selectedModelId = config.defaultModel,
+            options = modelOptions,
+            onSelect = onSelectModel,
+        )
+
+        // 上下文长度：只读显示，沿用模型设置。
+        InfoRow(
+            label = stringResource(R.string.qqbot_context_length_readonly),
+            value = if (selectedModelContextTokens > 0) {
+                stringResource(
+                    R.string.qqbot_model_context_follow,
+                    formatTokens(selectedModelContextTokens),
+                )
+            } else {
+                config.contextLength.toString()
+            },
+        )
+
         AppListItem(
             icon = Icons.Rounded.Power,
             title = stringResource(R.string.qqbot_auto_start),
@@ -692,31 +939,79 @@ private fun SettingsPanel(
             onCheckedChange = { onUpdate(config.copy(groupAtTriggerEnabled = it)) },
         )
 
-        OutlinedTextField(
-            value = modelText,
-            onValueChange = {
-                modelText = it
-                onUpdate(config.copy(defaultModel = it))
-            },
-            label = { Text(stringResource(R.string.qqbot_default_model)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        OutlinedTextField(
-            value = ctxText,
-            onValueChange = {
-                ctxText = it
-                onUpdate(config.copy(contextLength = it.trim().toIntOrNull() ?: 20))
-            },
-            label = { Text(stringResource(R.string.qqbot_context_length)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
-        )
-
         Spacer(Modifier.height(PrimitiveSpacing.Lg))
     }
+}
+
+@Composable
+private fun SectionHeader(text: String) {
+    val colors = LocalAppTheme.current.colors
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = colors.brandPrimary,
+    )
+}
+
+/** 模型下拉选择器：从已有供应商模型列表中选择，不允许自由输入。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModelDropdown(
+    selectedModelId: String,
+    options: List<QBotModelOption>,
+    onSelect: (QBotModelOption) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selected = options.firstOrNull { it.modelId == selectedModelId }
+    val displayText = selected?.displayLabel
+        ?: selectedModelId.takeIf { it.isNotBlank() }
+        ?: stringResource(R.string.qqbot_model_picker_hint)
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+    ) {
+        AppTextField(
+            value = displayText,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(R.string.qqbot_default_model)) },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            if (options.isEmpty()) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.qqbot_no_models_available)) },
+                    onClick = { expanded = false },
+                )
+            } else {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option.displayLabel) },
+                        onClick = {
+                            onSelect(option)
+                            expanded = false
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun formatTokens(tokens: Int): String = when {
+    tokens >= 1_000_000 -> "${tokens / 1_000_000}M"
+    tokens >= 1_000 -> "${tokens / 1_000}K"
+    else -> tokens.toString()
 }
 
 // ─────────────────────────────────────────────────────────────────────
