@@ -74,6 +74,11 @@ class ThemeSettingsViewModel @Inject constructor(
         viewModelScope.launch { themeManager.setCornerStyle(style) }
     }
 
+    /** 设置圆角基准半径（dp，0-24）。 */
+    fun setCornerRadius(radius: Float) {
+        viewModelScope.launch { themeManager.setCornerRadius(radius) }
+    }
+
     /** 设置字体大小缩放（0.8-1.4）。 */
     fun setFontScale(scale: Float) {
         viewModelScope.launch { themeManager.setFontScale(scale) }

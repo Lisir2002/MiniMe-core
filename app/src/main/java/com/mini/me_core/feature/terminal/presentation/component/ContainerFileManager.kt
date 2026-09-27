@@ -1,6 +1,11 @@
 package com.mini.me_core.feature.terminal.presentation.component
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -31,8 +36,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -53,17 +60,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import com.mini.me_core.R
 import com.mini.me_core.core.ui.components.FileBrowserItem
 import com.mini.me_core.core.ui.components.fileIconVisual
 import com.mini.me_core.feature.terminal.domain.ContainerFileAccess
 import com.mini.me_core.feature.terminal.domain.ContainerFileEntry
 import com.mini.me_core.feature.terminal.domain.ContainerFileType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * 容器内文件管理器主组件（P0/P1 重构后）：
@@ -96,9 +109,23 @@ fun ContainerFileManager(
     var showNewDialog by remember { mutableStateOf(false) }
     var pendingRename by remember { mutableStateOf<ContainerFileEntry?>(null) }
     var pendingDelete by remember { mutableStateOf<List<ContainerFileEntry>>(emptyList()) }
+    var searchQuery by remember { mutableStateOf("") }
+    var showSearch by remember { mutableStateOf(false) }
+    val searchFocusRequester = remember { FocusRequester() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    LaunchedEffect(showSearch) {
+        if (showSearch) searchFocusRequester.requestFocus()
+    }
+
+    // 搜索过滤结果（同时影响列表与网格视图）
+    val searching = showSearch && searchQuery.isNotBlank()
+    val displayEntries = remember(entries, searchQuery, showSearch) {
+        if (!showSearch || searchQuery.isBlank()) entries
+        else entries.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    }
 
     LaunchedEffect(Unit) {
         val home = runCatching { access.homeDir() }.getOrNull()
@@ -137,8 +164,87 @@ fun ContainerFileManager(
         selected = emptySet()
     }
 
-    BackHandler(enabled = !isRoot || selected.isNotEmpty()) {
+    BackHandler(enabled = showSearch) {
+        showSearch = false
+        searchQuery = ""
+    }
+    BackHandler(enabled = !showSearch && (!isRoot || selected.isNotEmpty())) {
         if (selected.isNotEmpty()) selected = emptySet() else goUp()
+    }
+
+    // 文件选择器：导入一个或多个文件到当前目录
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        scope.launch {
+            snackbar.showSnackbar(context.getString(R.string.fm_importing, uris.size))
+            var success = 0
+            var lastError: String? = null
+            withContext(Dispatchers.IO) {
+                for (uri in uris) {
+                    try {
+                        val fileName = queryDisplayName(context, uri)
+                            ?: uri.lastPathSegment?.substringAfterLast('/')
+                            ?: "imported_${System.currentTimeMillis()}"
+                        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            ?: throw IllegalStateException("无法打开 $uri")
+                        val target = if (currentPath.endsWith("/")) currentPath + fileName else "$currentPath/$fileName"
+                        access.writeFileBytes(target, bytes)
+                            .onSuccess { success++ }
+                            .onFailure { lastError = it.message ?: it.toString() }
+                    } catch (t: Throwable) {
+                        lastError = t.message ?: t.toString()
+                    }
+                }
+            }
+            reload()
+            if (success > 0) {
+                snackbar.showSnackbar(context.getString(R.string.fm_import_success, success))
+            } else {
+                snackbar.showSnackbar(context.getString(R.string.fm_import_failed, lastError ?: "unknown"))
+            }
+        }
+    }
+
+    fun startImport() {
+        runCatching {
+            importLauncher.launch(arrayOf("*/*"))
+        }.onFailure {
+            scope.launch {
+                snackbar.showSnackbar(context.getString(R.string.fm_import_failed, it.message ?: it.toString()))
+            }
+        }
+    }
+
+    fun shareEntry(entry: ContainerFileEntry) {
+        if (entry.isDir) {
+            scope.launch { snackbar.showSnackbar(context.getString(R.string.fm_share_dir_not_supported)) }
+            return
+        }
+        scope.launch {
+            try {
+                val bytes = withContext(Dispatchers.IO) {
+                    access.readFileBytes(entry.path).getOrThrow()
+                }
+                val cacheFile = withContext(Dispatchers.IO) {
+                    File(context.cacheDir, entry.name).apply { writeBytes(bytes) }
+                }
+                val uri = FileProvider.getUriForFile(
+                    context, "${context.packageName}.fileprovider", cacheFile
+                )
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = guessMimeByName(entry.name)
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(
+                    Intent.createChooser(intent, context.getString(R.string.fm_share_title))
+                )
+            } catch (t: Throwable) {
+                snackbar.showSnackbar(context.getString(R.string.fm_share_failed, t.message ?: t.toString()))
+            }
+        }
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -159,7 +265,39 @@ fun ContainerFileManager(
             BreadcrumbRow(path = currentPath, onNavigate = { currentPath = it },
                 modifier = Modifier.weight(1f))
         }
-        if (loading) {
+        if (showSearch) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .focusRequester(searchFocusRequester),
+                singleLine = true,
+                leadingIcon = {
+                    Icon(Icons.Rounded.Search, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Rounded.Close, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                },
+                placeholder = { Text(stringResource(R.string.fm_search_hint)) }
+            )
+        }
+        if (searching) {
+            Text(
+                text = stringResource(R.string.fm_search_result_count, displayEntries.size),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+            )
+        }
+        if (loading && !searching) {
             Box(modifier = Modifier.fillMaxWidth().padding(16.dp),
                 contentAlignment = Alignment.Center) { CircularProgressIndicator(modifier = Modifier.size(24.dp)) }
         }
@@ -172,7 +310,15 @@ fun ContainerFileManager(
                 },
                 label = "fileNav"
             ) { path ->
-                if (entries.isEmpty() && !loading) {
+                if (searching && displayEntries.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            stringResource(R.string.fm_search_no_result),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else if (entries.isEmpty() && !loading) {
                     EmptyState(onNew = { showNewDialog = true })
                 } else if (gridView) {
                     LazyVerticalGrid(
@@ -181,7 +327,7 @@ fun ContainerFileManager(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(entries, key = { it.path }) { entry ->
+                        items(displayEntries, key = { it.path }) { entry ->
                             val type = ContainerFileType.classify(entry)
                             GridFileItem(
                                 entry = entry, type = type, selected = entry.path in selected,
@@ -203,7 +349,7 @@ fun ContainerFileManager(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        items(entries, key = { it.path }) { entry ->
+                        items(displayEntries, key = { it.path }) { entry ->
                             val type = ContainerFileType.classify(entry)
                             val visual = fileIconVisual(
                                 name = entry.name,
@@ -256,11 +402,14 @@ fun ContainerFileManager(
             multiSelect = selected.isNotEmpty(),
             selectedCount = selected.size,
             clipboardCount = clipboardPaths.size,
-            onSearch = { },
+            onSearch = {
+                showSearch = !showSearch
+                if (!showSearch) searchQuery = ""
+            },
             onOpenSortMenu = { showSortMenu = true },
             onToggleView = { gridView = !gridView },
             onNew = { showNewDialog = true },
-            onImport = { scope.launch { snackbar.showSnackbar("导入待接入系统选择器") } },
+            onImport = { startImport() },
             onPaste = {
                 if (clipboardPaths.isEmpty()) return@FileBrowserToolbar
                 scope.launch {
@@ -284,7 +433,7 @@ fun ContainerFileManager(
             onDismiss = { actionTarget = null },
             onOpen = { if (entry.isDir) currentPath = entry.path else onOpenEditor(entry) },
             onEdit = { onOpenEditor(entry) },
-            onShare = { scope.launch { snackbar.showSnackbar("分享待接入") } },
+            onShare = { actionTarget = null; shareEntry(entry) },
             onCopy = { onClipboard(listOf(entry.path), false) },
             onCut = { onClipboard(listOf(entry.path), true) },
             onRename = { pendingRename = entry },
@@ -464,5 +613,40 @@ private fun BreadcrumbRow(path: String, onNavigate: (String) -> Unit, modifier: 
                     tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
             }
         }
+    }
+}
+
+/** 从 ContentResolver 查询 URI 对应的显示文件名。 */
+private fun queryDisplayName(context: android.content.Context, uri: Uri): String? {
+    return runCatching {
+        context.contentResolver.query(
+            uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+        )?.use { c ->
+            val idx = c.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME)
+            if (c.moveToFirst()) c.getString(idx) else null
+        }
+    }.getOrNull()
+}
+
+/** 根据文件名扩展名猜测 MIME 类型，用于分享 Intent。 */
+private fun guessMimeByName(name: String): String {
+    val ext = name.substringAfterLast('.', "").lowercase()
+    return when (ext) {
+        "txt", "md", "log", "sh", "conf", "ini", "properties", "yaml", "yml" -> "text/plain"
+        "jpg", "jpeg" -> "image/jpeg"
+        "png" -> "image/png"
+        "gif" -> "image/gif"
+        "webp" -> "image/webp"
+        "bmp" -> "image/bmp"
+        "pdf" -> "application/pdf"
+        "json" -> "application/json"
+        "xml" -> "application/xml"
+        "zip" -> "application/zip"
+        "gz", "tgz" -> "application/gzip"
+        "mp3" -> "audio/mpeg"
+        "wav" -> "audio/wav"
+        "mp4" -> "video/mp4"
+        "webm" -> "video/webm"
+        else -> "application/octet-stream"
     }
 }

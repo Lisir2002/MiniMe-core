@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -78,6 +79,7 @@ fun ContainerStatusCard(
         is ContainerInitState.Failed -> stringResource(R.string.tc_status_error) to MaterialTheme.colorScheme.error
         is ContainerInitState.ExtractingRootfs,
         ContainerInitState.DeployingProot -> stringResource(R.string.tc_status_initializing) to MaterialTheme.colorScheme.secondary
+        ContainerInitState.Restarting -> stringResource(R.string.tc_status_restarting) to MaterialTheme.colorScheme.secondary
         is ContainerInitState.Ready,
         is ContainerInitState.BundleInstalling,
         is ContainerInitState.BundleUninstalling -> stringResource(R.string.tc_status_running) to SemanticColors.Success
@@ -197,6 +199,7 @@ fun ContainerStatusCard(
                         label = stringResource(R.string.tc_restart_container),
                         onClick = onRestart,
                         enabled = containerInstalled,
+                        loading = initProgress is ContainerInitState.Restarting,
                         modifier = Modifier.weight(1f)
                     )
                     GridActionButton(
@@ -238,14 +241,23 @@ private fun GridActionButton(
     label: String,
     onClick: () -> Unit,
     enabled: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    loading: Boolean = false,
 ) {
     OutlinedButton(
         onClick = onClick,
-        enabled = enabled,
+        enabled = enabled && !loading,
         modifier = modifier.height(36.dp)
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+        }
         Spacer(modifier = Modifier.width(4.dp))
         Text(label, fontSize = 12.sp)
     }

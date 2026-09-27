@@ -2566,7 +2566,9 @@
     <string name="tc_status_initializing">初始化中</string>
     <string name="tc_status_running">运行中</string>
     <string name="tc_status_error">异常</string>
+    <string name="tc_status_restarting">重启中</string>
     <string name="tc_restart_container">重启容器</string>
+    <string name="tc_restart_success">容器已重启</string>
     <string name="tc_switch_image">切换镜像</string>
     <string name="tc_mirror_source">镜像源</string>
     <string name="tc_init_container">初始化容器</string>
@@ -2661,6 +2663,15 @@
     <string name="fm_skip">跳过</string>
     <string name="fm_line_numbers">行号</string>
     <string name="fm_word_wrap">自动换行</string>
+    <string name="fm_search_hint">输入文件名搜索...</string>
+    <string name="fm_search_result_count">搜索结果：%1$d 项</string>
+    <string name="fm_search_no_result">未找到匹配的文件</string>
+    <string name="fm_importing">正在导入 %1$d 个文件...</string>
+    <string name="fm_import_success">已导入 %1$d 个文件</string>
+    <string name="fm_import_failed">导入失败：%1$s</string>
+    <string name="fm_share_dir_not_supported">请选择文件而非目录</string>
+    <string name="fm_share_failed">分享失败：%1$s</string>
+    <string name="fm_share_title">分享文件</string>
     <string name="tc_mirror_aliyun">阿里云镜像（默认）</string>
     <string name="tc_mirror_tuna">清华 TUNA</string>
     <string name="tc_mirror_ustc">中科大 USTC</string>

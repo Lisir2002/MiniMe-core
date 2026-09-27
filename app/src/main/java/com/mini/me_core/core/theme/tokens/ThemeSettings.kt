@@ -28,18 +28,23 @@ enum class ThemeMode {
 /**
  * 圆角风格枚举（Phase 5 显示偏好）。
  *
- * ROUNDED = 圆角（默认，12dp 圆角）
+ * ROUNDED = 圆角（默认，配合 [ThemeSettings.cornerRadius] 自定义半径）
  * Sharp = 直角（0dp）
- * Pill = 胶囊（999dp，全圆角）
+ *
+ * 历史版本曾有 Pill（胶囊）预设，已移除；旧持久化值 "Pill" 在
+ * [fromPersisted] 中自动迁移为 [ROUNDED]，半径改由 [ThemeSettings.cornerRadius]
+ * 接管。
  */
 enum class CornerStyle {
     ROUNDED,
-    Sharp,
-    Pill;
+    Sharp;
 
     companion object {
-        fun fromPersisted(value: String?): CornerStyle =
-            entries.firstOrNull { it.name == value } ?: ROUNDED
+        fun fromPersisted(value: String?): CornerStyle = when (value) {
+            // 向后兼容：旧版 Pill 胶囊预设迁移为圆角（半径走 cornerRadius 默认值）
+            "Pill" -> ROUNDED
+            else -> entries.firstOrNull { it.name == value } ?: ROUNDED
+        }
     }
 }
 
@@ -91,6 +96,8 @@ data class ThemePreset(
  * @property backgroundMask 背景图遮罩浓度（0.0-1.0，默认 0.5）
  * @property cardOpacity 卡片透明度（0.0-1.0，默认 1.0）
  * @property cornerStyle 圆角风格（默认 ROUNDED）
+ * @property cornerRadius 圆角基准半径（单位 dp，范围 0-24，默认 12）；
+ *           仅在 [cornerStyle] 为 ROUNDED 时生效，Sharp 模式强制 0dp
  * @property fontScale 字体大小缩放（0.8-1.4，默认 1.0）
  * @property animationScale 动效强度（0.0-1.0，默认 1.0，0.0=关闭动效）
  */
@@ -103,6 +110,7 @@ data class ThemeSettings(
     val backgroundMask: Float = 0.5f,
     val cardOpacity: Float = 1.0f,
     val cornerStyle: String = "ROUNDED",
+    val cornerRadius: Float = 12f,
     val fontScale: Float = 1.0f,
     val animationScale: Float = 1.0f,
     /** Component Tokens：字体粗细缩放（0.8-1.2，默认 1.0） */

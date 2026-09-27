@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.mini.me_core.R
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.domain.container.ContainerArch
 import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
@@ -99,6 +100,13 @@ class TerminalSettingsViewModel @Inject constructor(
     fun consumeErrorToast() { _errorToast.value = null }
     private fun postError(msg: String) { _errorToast.value = msg }
 
+    // ── 成功 toast（与 errorToast 同语义，UI 承接 Snackbar） ─────
+    private val _successToast = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    val successToast: StateFlow<String?> = _successToast
+
+    fun consumeSuccessToast() { _successToast.value = null }
+    private fun postSuccess(msg: String) { _successToast.value = msg }
+
     // ── G1 外观 ───────────────────────────────────────────────────
     val fontSizeSp: StateFlow<Int> = settingsRepo.fontSizeFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, 12)
@@ -177,6 +185,7 @@ class TerminalSettingsViewModel @Inject constructor(
                 is com.mini.me_core.feature.agent.domain.container.ContainerInitState.Ready -> true
                 is com.mini.me_core.feature.agent.domain.container.ContainerInitState.BundleInstalling,
                 is com.mini.me_core.feature.agent.domain.container.ContainerInitState.BundleUninstalling -> true
+                com.mini.me_core.feature.agent.domain.container.ContainerInitState.Restarting -> true
                 is com.mini.me_core.feature.agent.domain.container.ContainerInitState.ExtractingRootfs,
                 com.mini.me_core.feature.agent.domain.container.ContainerInitState.DeployingProot,
                 com.mini.me_core.feature.agent.domain.container.ContainerInitState.Idle,
@@ -478,6 +487,7 @@ class TerminalSettingsViewModel @Inject constructor(
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             runCatching { containerEngine.restartContainerKeepData() }
                 .onFailure { postError(it.message ?: "重启容器失败") }
+                .onSuccess { postSuccess(appContext.getString(R.string.tc_restart_success)) }
             refreshStorageUsed()
         }
     }

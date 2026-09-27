@@ -964,6 +964,8 @@ class LinuxContainerEngine @Inject constructor(
      * 进程启动，挂载的 rootfs 与用户安装的包全部保留。
      */
     suspend fun restartContainerKeepData() = withContext(Dispatchers.IO) {
+        // 0) 立即切到 Restarting 状态，让 UI 按钮 loading 禁用、徽章显示"重启中"。
+        _initProgress.value = ContainerInitState.Restarting
         // 1) 杀掉本 app 进程树下的 proot / qemu 子进程。
         //    宿主 shell 下用 pkill 按可执行文件名匹配；proot 跑在本 app UID 下，权限足够。
         //    忽略一切失败（无权限 / 无匹配进程都是正常情况）。

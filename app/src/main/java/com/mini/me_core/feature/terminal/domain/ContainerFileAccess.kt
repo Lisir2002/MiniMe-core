@@ -120,6 +120,12 @@ class ContainerFileAccess @Inject constructor(
         return runOp("echo '$b64' | base64 -d > ${shellQuote(path)}", FILE_READ_TIMEOUT)
     }
 
+    /** 写入文件字节（用于从主机侧导入文件到容器）。 */
+    suspend fun writeFileBytes(path: String, bytes: ByteArray): Result<Unit> {
+        val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+        return runOp("echo '$b64' | base64 -d > ${shellQuote(path)}", FILE_READ_TIMEOUT)
+    }
+
     /** 读取文件字节（用于图片预览/导出），base64 解码。 */
     suspend fun readFileBytes(path: String): Result<ByteArray> {
         val out = run("base64 ${shellQuote(path)} 2>/dev/null | tr -d '\\n'", FILE_READ_TIMEOUT)

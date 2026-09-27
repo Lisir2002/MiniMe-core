@@ -44,13 +44,26 @@ class ComponentTokensTest {
     }
 
     @Test
-    fun `CornerStyle Pill 映射到全 999dp 档位`() {
-        val scale = CornerScale.from(CornerStyle.Pill)
-        assertEquals(999.dp, scale.xs)
-        assertEquals(999.dp, scale.sm)
-        assertEquals(999.dp, scale.md)
-        assertEquals(999.dp, scale.lg)
-        assertEquals(999.dp, scale.xl)
+    fun `CornerStyle ROUNDED 自定义半径按比例生成档位`() {
+        val scale = CornerScale.from(CornerStyle.ROUNDED, 18f)
+        assertEquals(18.dp * 0.33f, scale.xs)
+        assertEquals(18.dp * 0.5f, scale.sm)
+        assertEquals(18.dp * 0.67f, scale.md)
+        assertEquals(18.dp * 0.83f, scale.lg)
+        assertEquals(18.dp, scale.xl)
+        assertEquals(18.dp * 1.33f, scale.xxl)
+        assertEquals(999.dp, scale.pill)
+    }
+
+    @Test
+    fun `CornerStyle Sharp 自定义半径仍全 0`() {
+        val scale = CornerScale.from(CornerStyle.Sharp, 18f)
+        assertEquals(0.dp, scale.xs)
+        assertEquals(0.dp, scale.sm)
+        assertEquals(0.dp, scale.md)
+        assertEquals(0.dp, scale.lg)
+        assertEquals(0.dp, scale.xl)
+        // pill 不随风格变
         assertEquals(999.dp, scale.pill)
     }
 
@@ -148,12 +161,12 @@ class ComponentTokensTest {
     }
 
     @Test
-    fun `withCornerScale Pill 使所有圆角变胶囊`() {
+    fun `withCornerScale 自定义半径使卡片圆角跟随 xl`() {
         val base = ComponentTokens.Light
-        val pill = base.withCornerScale(CornerScale.Pill)
-        assertEquals(999.dp, pill.card.cornerRadius)
-        assertEquals(999.dp, pill.button.cornerRadius)
-        assertEquals(999.dp, pill.toolCard.cornerRadius)
+        val custom = base.withCornerScale(CornerScale.custom(18.dp))
+        assertEquals(18.dp, custom.card.cornerRadius)
+        assertEquals(18.dp, custom.button.cornerRadius)
+        assertEquals(18.dp * 0.83f, custom.toolCard.cornerRadius)
     }
 
     @Test
@@ -178,13 +191,14 @@ class ComponentTokensTest {
     }
 
     @Test
-    fun `用户气泡非对称圆角 - Pill 全 999`() {
+    fun `用户气泡非对称圆角 - 自定义半径跟随 xxl`() {
         val base = ComponentTokens.Light
-        val pill = base.withCornerScale(CornerScale.Pill)
-        assertEquals(999.dp, pill.bubble.userBubbleCornerTopStart)
-        assertEquals(999.dp, pill.bubble.userBubbleCornerTopEnd)
-        assertEquals(999.dp, pill.bubble.userBubbleCornerBottomEnd)
-        assertEquals(999.dp, pill.bubble.userBubbleCornerBottomStart)
+        val custom = base.withCornerScale(CornerScale.custom(18.dp))
+        // 自定义半径档位（非默认 Rounded）：四个角都跟随 xxl = radius * 1.33
+        assertEquals(18.dp * 1.33f, custom.bubble.userBubbleCornerTopStart)
+        assertEquals(18.dp * 1.33f, custom.bubble.userBubbleCornerTopEnd)
+        assertEquals(18.dp * 1.33f, custom.bubble.userBubbleCornerBottomEnd)
+        assertEquals(18.dp * 1.33f, custom.bubble.userBubbleCornerBottomStart)
     }
 
     // ── 6. pill 字段始终 999dp ──
@@ -193,7 +207,7 @@ class ComponentTokensTest {
     fun `CornerScale pill 字段始终 999dp`() {
         assertEquals(999.dp, CornerScale.Rounded.pill)
         assertEquals(999.dp, CornerScale.Sharp.pill)
-        assertEquals(999.dp, CornerScale.Pill.pill)
+        assertEquals(999.dp, CornerScale.custom(18.dp).pill)
     }
 
     // ── 7. map() 非标圆角跟随风格切换 ──
@@ -209,13 +223,12 @@ class ComponentTokensTest {
     }
 
     @Test
-    fun `map Pill 模式下非标值变胶囊`() {
-        assertEquals(999.dp, CornerScale.Pill.map(18.dp))
-        assertEquals(999.dp, CornerScale.Pill.map(24.dp))
-        assertEquals(999.dp, CornerScale.Pill.map(28.dp))
-        assertEquals(999.dp, CornerScale.Pill.map(3.dp))
-        assertEquals(999.dp, CornerScale.Pill.map(2.dp))
-        assertEquals(999.dp, CornerScale.Pill.map(20.dp))
+    fun `map 自定义半径模式下非标值按比例缩放`() {
+        // 基准 12dp，自定义 24dp → 比例 2x
+        val custom = CornerScale.custom(24.dp)
+        assertEquals(36.dp, custom.map(18.dp))
+        assertEquals(48.dp, custom.map(24.dp))
+        assertEquals(56.dp, custom.map(28.dp))
     }
 
     @Test

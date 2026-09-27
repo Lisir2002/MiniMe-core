@@ -206,6 +206,7 @@ class MainActivity : ComponentActivity() {
             val cardAlpha = themeSettingsState.cardOpacity
             // 问题3：提取显示偏好（圆角/字体/动效）传给 MiniMeTheme
             val cornerStyle = themeSettingsState.cornerStyleEnum()
+            val cornerRadius = themeSettingsState.cornerRadius
             val fontScale = themeSettingsState.fontScale
             val animationScale = themeSettingsState.animationScale
             // Component Tokens：字体粗细缩放
@@ -218,6 +219,7 @@ class MainActivity : ComponentActivity() {
                 backgroundScrim = bgScrim,
                 cardAlpha = cardAlpha,
                 cornerStyle = cornerStyle,
+                cornerRadius = cornerRadius,
                 fontScale = fontScale,
                 animationScale = animationScale,
                 fontWeightScale = fontWeightScale,

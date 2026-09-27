@@ -281,6 +281,8 @@ fun MiniMeTheme(
     cardAlpha: Float = 1.0f,
     // 问题3：显示偏好——圆角风格
     cornerStyle: com.mini.me_core.core.theme.tokens.CornerStyle = com.mini.me_core.core.theme.tokens.CornerStyle.ROUNDED,
+    // 问题3：显示偏好——自定义圆角基准半径（dp，0-24，默认 12）
+    cornerRadius: Float = 12f,
     // 问题3：显示偏好——字体缩放（1.0=标准）
     fontScale: Float = 1.0f,
     // 问题3：显示偏好——动效缩放（1.0=正常，0.0=关闭）
@@ -302,9 +304,9 @@ fun MiniMeTheme(
         AppTypography.scaleFontSize(fontScale)
     }
 
-    // Component Tokens：根据 cornerStyle + fontScale + fontWeightScale 动态构建
-    val cornerScale = com.mini.me_core.core.theme.tokens.CornerScale.from(cornerStyle)
-    val componentTokens = remember(darkTheme, cornerStyle, fontScale, fontWeightScale, customColors) {
+    // Component Tokens：根据 cornerStyle + cornerRadius + fontScale + fontWeightScale 动态构建
+    val cornerScale = com.mini.me_core.core.theme.tokens.CornerScale.from(cornerStyle, cornerRadius)
+    val componentTokens = remember(darkTheme, cornerStyle, cornerRadius, fontScale, fontWeightScale, customColors) {
         val base = if (darkTheme) {
             com.mini.me_core.core.theme.tokens.ComponentTokens.Dark
         } else {

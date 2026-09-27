@@ -62,7 +62,7 @@ data class ComponentTokens(
         bubble = bubble.copy(
             userBubbleCornerTopStart = scale.xxl,
             userBubbleCornerTopEnd = scale.xxl,
-            // 用户气泡右下小圆角：Rounded 模式 4dp，Sharp/Pill 跟随整体
+            // 用户气泡右下小圆角：默认 Rounded 模式 4dp，Sharp/自定义半径跟随整体 xxl
             userBubbleCornerBottomEnd = if (scale == CornerScale.Rounded) PrimitiveRadius.Xs else scale.xxl,
             userBubbleCornerBottomStart = scale.xxl,
         ),

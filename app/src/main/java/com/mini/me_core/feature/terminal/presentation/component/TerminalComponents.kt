@@ -1198,6 +1198,8 @@ fun containerInitMessage(context: Context, state: ContainerInitState): String = 
         "正在卸载包…"
     is ContainerInitState.Failed ->
         context.getString(R.string.terminal_preparing_env_failed, state.reason)
+    ContainerInitState.Restarting ->
+        context.getString(R.string.tc_status_restarting)
     ContainerInitState.Idle, is ContainerInitState.Ready ->
         context.getString(R.string.terminal_preparing_env_first_run)
     else ->

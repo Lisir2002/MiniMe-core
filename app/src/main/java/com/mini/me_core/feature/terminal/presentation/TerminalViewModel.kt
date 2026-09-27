@@ -99,7 +99,8 @@ class TerminalViewModel @Inject constructor(
             when (state) {
                 is ContainerInitState.Ready,
                 is ContainerInitState.BundleInstalling,
-                is ContainerInitState.BundleUninstalling -> true
+                is ContainerInitState.BundleUninstalling,
+                ContainerInitState.Restarting -> true
                 else -> false
             }
         }

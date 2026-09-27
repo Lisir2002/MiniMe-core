@@ -170,6 +170,7 @@ internal fun SharedContainerEnvCard(
         is ContainerInitState.Idle -> stringResource(R.string.ui______aeade8e9)
         is ContainerInitState.ExtractingRootfs -> stringResource(R.string.ui______c95456ed)
         ContainerInitState.DeployingProot -> stringResource(R.string.ui______c5778ca3)
+        ContainerInitState.Restarting -> stringResource(R.string.tc_status_restarting)
         is ContainerInitState.Ready -> processingTextWhenReady ?: stringResource(R.string.ui_____c30ecc7a)
         is ContainerInitState.BundleInstalling ->
             "已就绪（正在安装${initProgress.bundleId?.stableKey ?: "功能包"}…）"

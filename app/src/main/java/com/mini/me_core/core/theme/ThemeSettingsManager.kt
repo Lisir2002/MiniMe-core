@@ -166,6 +166,15 @@ class ThemeSettingsManager @Inject constructor(
     }
 
     /**
+     * 设置圆角基准半径（单位 dp，clamp 到 0..24，默认 12）。
+     * 仅在 ROUNDED 风格下生效；随 [ThemeSettings] JSON 自动持久化。
+     */
+    suspend fun setCornerRadius(radius: Float) {
+        val clamped = radius.coerceIn(0f, 24f)
+        persist(_settings.value.copy(cornerRadius = clamped))
+    }
+
+    /**
      * 设置字体大小缩放（0.8-1.4）。
      */
     suspend fun setFontScale(scale: Float) {

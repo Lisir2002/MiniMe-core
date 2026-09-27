@@ -47,6 +47,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -163,9 +165,11 @@ fun ThemeSettingsScreen(
             AppSectionHeader(title = "显示偏好", subtitle = "圆角、字体大小和动效")
             DisplayPreferencesSection(
                 cornerStyle = settings.cornerStyleEnum(),
+                cornerRadius = settings.cornerRadius,
                 fontScale = settings.fontScale,
                 animationScale = settings.animationScale,
                 onCornerStyleChange = { viewModel.setCornerStyle(it) },
+                onCornerRadiusChange = { viewModel.setCornerRadius(it) },
                 onFontScaleChange = { viewModel.setFontScale(it) },
                 onAnimationScaleChange = { viewModel.setAnimationScale(it) },
                 modifier = Modifier.padding(horizontal = 16.dp),
@@ -620,12 +624,16 @@ private fun ColorRow(
             }
         }
 
-        // 对比度警告（WCAG AA: 4.5:1）
+        // 对比度警告（WCAG AA: 4.5:1）：浅 warning 背景圆角容器包裹，保证 warning 文字在卡片上对比度
         if (lowContrast) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(start = 38.dp, top = 2.dp),
+                modifier = Modifier
+                    .padding(start = 38.dp, top = 2.dp)
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
+                    .background(colors.warning.copy(alpha = 0.1f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 Box(
                     modifier = Modifier
@@ -745,26 +753,29 @@ private fun Color.toHexShort(): String =
 // ──────────────────────────────────────────────
 
 /**
- * 显示偏好区域：圆角风格选择 + 字体大小滑块 + 动效强度滑块。
+ * 显示偏好区域：圆角风格选择（圆角/直角）+ 自定义圆角半径滑块 + 字体大小滑块 + 动效强度滑块。
  */
 @Composable
 private fun DisplayPreferencesSection(
     cornerStyle: CornerStyle,
+    cornerRadius: Float,
     fontScale: Float,
     animationScale: Float,
     onCornerStyleChange: (CornerStyle) -> Unit,
+    onCornerRadiusChange: (Float) -> Unit,
     onFontScaleChange: (Float) -> Unit,
     onAnimationScaleChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalAppTheme.current.colors
+    val isRounded = cornerStyle == CornerStyle.ROUNDED
 
     AppCard(modifier = modifier) {
         Column(
             modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // 圆角风格三选一（预览用固定中性色，不受主题影响，确保客观对比）
+            // 圆角风格二选一（预览形状跟随实际 cornerRadius，选中态走品牌主色）
             Text(
                 text = stringResource(R.string.theme_corner_style),
                 fontSize = LocalComponentTokens.current.text.titleSmallFontSize,
@@ -775,27 +786,24 @@ private fun DisplayPreferencesSection(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                val previewShapeColor = Color(0xFF616161)
-                val selectedBorderColor = Color(0xFF2196F3)
-                val unselectedBorderColor = Color(0xFFE0E0E0)
-                val selectedTextColor = Color(0xFF2196F3)
-                val unselectedTextColor = Color(0xFF424242)
+                // 圆角预览使用当前实际半径；直角预览 0dp
+                val roundedShape: androidx.compose.ui.graphics.Shape =
+                    RoundedCornerShape(cornerRadius.dp)
+                val sharpShape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(0.dp)
                 val styles = listOf(
-                    Triple(CornerStyle.ROUNDED, stringResource(R.string.theme_corner_rounded), RoundedCornerShape(LocalCornerRadius.current.xl)),
-                    Triple(CornerStyle.Sharp, stringResource(R.string.theme_corner_sharp), RoundedCornerShape(0.dp)),
-                    Triple(CornerStyle.Pill, stringResource(R.string.theme_corner_pill), RoundedCornerShape(50)),
+                    Triple(CornerStyle.ROUNDED, stringResource(R.string.theme_corner_rounded), roundedShape),
+                    Triple(CornerStyle.Sharp, stringResource(R.string.theme_corner_sharp), sharpShape),
                 )
                 styles.forEach { (style, label, shape) ->
                     val isSelected = style == cornerStyle
-                    val isPill = style == CornerStyle.Pill
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
-                            .background(Color.White)
+                            .background(colors.surfaceSunken)
                             .border(
                                 width = if (isSelected) 2.dp else 1.dp,
-                                color = if (isSelected) selectedBorderColor else unselectedBorderColor,
+                                color = if (isSelected) colors.brandPrimary else colors.borderDefault,
                                 shape = RoundedCornerShape(LocalCornerRadius.current.lg),
                             )
                             .clickable { onCornerStyleChange(style) }
@@ -803,27 +811,42 @@ private fun DisplayPreferencesSection(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        // 预览形状（固定深灰色填充，胶囊更宽体现长条形）
+                        // 预览形状（跟随实际圆角半径）
                         Box(
                             modifier = Modifier
-                                .size(
-                                    width = if (isPill) 64.dp else 56.dp,
-                                    height = 28.dp,
-                                )
+                                .size(width = 56.dp, height = 28.dp)
                                 .clip(shape)
-                                .background(previewShapeColor),
+                                .background(colors.textSecondary),
                         )
                         Text(
                             text = label,
                             fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) selectedTextColor else unselectedTextColor,
+                            color = if (isSelected) colors.brandPrimary else colors.textSecondary,
                         )
+                        // 圆角模式下显示当前半径数值
+                        if (style == CornerStyle.ROUNDED) {
+                            Text(
+                                text = "%.0fdp".format(cornerRadius),
+                                fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
+                                color = colors.textTertiary,
+                            )
+                        }
                     }
                 }
             }
 
             Spacer(Modifier.height(4.dp))
+
+            // 圆角半径滑块（仅圆角模式可用，直角模式禁用置灰）
+            SliderRow(
+                label = "圆角半径",
+                value = cornerRadius,
+                valueRange = 0f..24f,
+                onValueChange = onCornerRadiusChange,
+                valueLabel = "%.0fdp".format(cornerRadius),
+                enabled = isRounded,
+            )
 
             // 字体大小滑块
             SliderRow(
@@ -854,7 +877,8 @@ private fun DisplayPreferencesSection(
 // ──────────────────────────────────────────────
 
 /**
- * 动效强度预览：点击后播放一段横向滑动+渐隐动画，动画时长跟随 LocalAnimationScale。
+ * 动效强度预览：点击后播放一次"圆点左→右移动 + 缩放(1.0→1.5→1.0) + 透明度变化"动画，
+ * 播完自动回到初始位置（不 toggle）。动画时长跟随 LocalAnimationScale。
  * 0% 时直接跳变（无动画），100% 时最慢最丝滑。
  */
 @Composable
@@ -862,19 +886,27 @@ private fun AnimationPreviewBox() {
     val colors = LocalAppTheme.current.colors
     val animScale = com.mini.me_core.core.theme.LocalAnimationScale.current
 
-    var playTrigger by remember { mutableStateOf(false) }
-    val animDuration = (600L * animScale).toInt().coerceAtLeast(0)
+    var playCount by remember { mutableStateOf(0) }
+    val progress = remember { androidx.compose.animation.core.Animatable(0f) }
+    val animDuration = (900L * animScale).toInt().coerceAtLeast(0)
 
-    val offsetX by animateFloatAsState(
-        targetValue = if (playTrigger) 180f else 0f,
-        animationSpec = tween(durationMillis = animDuration),
-        label = "previewOffset",
-    )
-    val alpha by animateFloatAsState(
-        targetValue = if (playTrigger) 0.3f else 1f,
-        animationSpec = tween(durationMillis = animDuration),
-        label = "previewAlpha",
-    )
+    LaunchedEffect(playCount) {
+        if (playCount == 0) return@LaunchedEffect
+        progress.snapTo(0f)
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = animDuration, easing = androidx.compose.animation.core.LinearEasing),
+        )
+        progress.snapTo(0f)
+    }
+
+    val p = progress.value
+    // 横向位移：从左侧 8dp 出发，向右移动 200dp
+    val offsetX = 8f + p * 200f
+    // 缩放 1.0 -> 1.5 -> 1.0（中点峰值），透明度同步起伏
+    val wave = kotlin.math.sin((p * Math.PI).toDouble()).toFloat()
+    val dotScale = 1f + 0.5f * wave
+    val dotAlpha = 1f - 0.4f * wave
 
     Column(
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -882,24 +914,25 @@ private fun AnimationPreviewBox() {
         Text(
             text = "点击预览动效",
             fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
-            color = colors.textTertiary,
+            color = colors.textSecondary,
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(36.dp)
+                .height(48.dp)
                 .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
                 .background(colors.surfaceSunken)
                 .border(1.dp, colors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.sm))
-                .clickable { playTrigger = !playTrigger },
+                .clickable { playCount++ },
             contentAlignment = Alignment.CenterStart,
         ) {
             Box(
                 modifier = Modifier
-                    .padding(start = 8.dp + offsetX.dp)
+                    .padding(start = offsetX.dp)
+                    .scale(dotScale)
                     .size(20.dp)
                     .clip(CircleShape)
-                    .background(colors.brandPrimary.copy(alpha = alpha)),
+                    .background(colors.brandPrimary.copy(alpha = dotAlpha)),
             )
         }
     }
@@ -910,7 +943,7 @@ private fun AnimationPreviewBox() {
 // ──────────────────────────────────────────────
 
 /**
- * 页面底部红色"恢复出厂主题"按钮。
+ * 页面底部"恢复出厂主题"按钮：描边样式（透明底 + 1dp error 描边 + error 文字）。
  */
 @Composable
 private fun FactoryResetButton(
@@ -919,14 +952,15 @@ private fun FactoryResetButton(
 ) {
     val colors = LocalAppTheme.current.colors
 
-    Button(
+    androidx.compose.material3.OutlinedButton(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = colors.error.copy(alpha = 0.1f),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = Color.Transparent,
             contentColor = colors.error,
         ),
         shape = RoundedCornerShape(LocalCornerRadius.current.lg),
+        border = androidx.compose.foundation.BorderStroke(1.dp, colors.error),
     ) {
         Text(
             text = "恢复出厂主题",
@@ -950,6 +984,7 @@ private fun SliderRow(
     valueRange: ClosedFloatingPointRange<Float>,
     onValueChange: (Float) -> Unit,
     valueLabel: String,
+    enabled: Boolean = true,
 ) {
     val colors = LocalAppTheme.current.colors
 
@@ -958,16 +993,29 @@ private fun SliderRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(text = label, fontSize = LocalComponentTokens.current.text.bodyMediumFontSize, color = colors.textPrimary)
-            Text(text = valueLabel, fontSize = LocalComponentTokens.current.text.bodySmallFontSize, color = colors.textSecondary)
+            Text(
+                text = label,
+                fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
+                color = if (enabled) colors.textPrimary else colors.textDisabled,
+            )
+            Text(
+                text = valueLabel,
+                fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
+                color = if (enabled) colors.textSecondary else colors.textDisabled,
+            )
         }
         Slider(
             value = value,
             onValueChange = onValueChange,
             valueRange = valueRange,
+            enabled = enabled,
             colors = SliderDefaults.colors(
                 thumbColor = colors.brandPrimary,
                 activeTrackColor = colors.brandPrimary,
+                inactiveTrackColor = colors.borderDefault.copy(alpha = 0.3f),
+                disabledThumbColor = colors.textDisabled,
+                disabledActiveTrackColor = colors.textDisabled.copy(alpha = 0.4f),
+                disabledInactiveTrackColor = colors.borderDefault.copy(alpha = 0.15f),
             ),
         )
     }

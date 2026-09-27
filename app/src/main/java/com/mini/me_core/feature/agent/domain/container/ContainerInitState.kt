@@ -55,4 +55,10 @@ sealed interface ContainerInitState {
 
     /** 初始化失败，[reason] 为原因。 */
     data class Failed(val reason: String) : ContainerInitState
+
+    /**
+     * 正在重启容器（保留数据）：杀掉旧 proot 进程并重新就绪 rootfs/proot。
+     * 与 [Ready] 区分：此时按钮应 loading 禁用，徽章显示"重启中"。
+     */
+    data object Restarting : ContainerInitState
 }

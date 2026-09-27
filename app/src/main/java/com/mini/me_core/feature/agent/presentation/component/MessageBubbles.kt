@@ -171,18 +171,15 @@ internal fun AgentMessageItem(
                         Surface(
                             shape = when {
                                 // 混合模式：用户气泡圆角 16/16/4/16（右下小圆角指向用户）
-                                // 问题3：根据 cornerStyle 动态调整——Sharp 全直角，Pill 全胶囊
+                                // 问题3：根据 cornerStyle 动态调整——Sharp 全直角，ROUNDED 保持默认非对称圆角
                                 isUser -> when (cornerStyle) {
                                     com.mini.me_core.core.theme.tokens.CornerStyle.Sharp ->
                                         RoundedCornerShape(0.dp, 0.dp, 0.dp, 0.dp)
-                                    com.mini.me_core.core.theme.tokens.CornerStyle.Pill ->
-                                        RoundedCornerShape(999.dp, 999.dp, 999.dp, 999.dp)
                                     else -> RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
                                 }
                                 // 混合模式：工具块圆角 10dp（问题3：根据 cornerStyle 调整）
                                 message.role == MessageRole.TOOL -> when (cornerStyle) {
                                     com.mini.me_core.core.theme.tokens.CornerStyle.Sharp -> RoundedCornerShape(0.dp)
-                                    com.mini.me_core.core.theme.tokens.CornerStyle.Pill -> RoundedCornerShape(999.dp)
                                     else -> RoundedCornerShape(LocalCornerRadius.current.lg)
                                 }
                                 else -> {

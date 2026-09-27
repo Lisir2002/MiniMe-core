@@ -160,6 +160,7 @@ fun TerminalContainerScreen(
     val sshKeepalive by viewModel.sshKeepalive.collectAsStateWithLifecycle()
 
     val errorToast by viewModel.errorToast.collectAsStateWithLifecycle()
+    val successToast by viewModel.successToast.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -167,6 +168,13 @@ fun TerminalContainerScreen(
         errorToast?.let {
             scope.launch { snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long) }
             viewModel.consumeErrorToast()
+        }
+    }
+
+    LaunchedEffect(successToast) {
+        successToast?.let {
+            scope.launch { snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short) }
+            viewModel.consumeSuccessToast()
         }
     }
 
