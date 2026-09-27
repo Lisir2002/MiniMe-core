@@ -103,10 +103,10 @@ class ParticleSystem(
             shatterVx[i] = cos(shatterAngle) * shatterSpeedPx
             shatterVy[i] = sin(shatterAngle) * shatterSpeedPx + 600f * density
 
-            // All particles are dots — no shards.
-            // Size: 0.5-1.2dp radius (1-2.4dp diameter), fine and luminous
-            // for crisp text detail without coarse mosaic look.
-            size[i] = (0.5f + Random.nextFloat() * 0.7f) * density
+            // 优化：粒子大小统一化，0.65-0.9dp（差异38%），避免粗糙感
+            // 边缘粒子稍小，中心粒子稍大，增加层次感
+            val edgeFactor = if (i % 3 == 0) 0.85f else 1f
+            size[i] = (0.65f + Random.nextFloat() * 0.25f) * density * edgeFactor
 
             // 30% accent particles (primary color), 70% onBackground
             isAccent[i] = Random.nextFloat() < 0.3f
@@ -196,8 +196,8 @@ class ParticleSystem(
         paint.color = android.graphics.Color.WHITE
         canvas.drawText(text, bitmapW / 2f, bitmapH / 2f - (paint.descent() + paint.ascent()) / 2f, paint)
 
-        // Fine sampling step: 1.1dp — very dense for crisp letter outlines
-        val stepPx = (1.1f * density).toInt().coerceAtLeast(2)
+        // 优化：采样步长0.75dp（更密集），alpha阈值60（保留边缘半透明像素）
+        val stepPx = (0.75f * density).toInt().coerceAtLeast(1)
         val points = mutableListOf<Float>()
         val centerOffsetY = centerY - bitmapH / 2f
 
@@ -205,9 +205,18 @@ class ParticleSystem(
             for (px in 0 until bitmapW step stepPx) {
                 val pixel = bitmap.getPixel(px, py)
                 val alpha = android.graphics.Color.alpha(pixel)
-                if (alpha > 100) {
-                    points.add(px.toFloat())
-                    points.add(py.toFloat() + centerOffsetY)
+                if (alpha > 60) {
+                    // 边缘检测：alpha在60-150之间的是边缘粒子，增加权重
+                    val isEdge = alpha < 150
+                    val jitterX = (Random.nextFloat() - 0.5f) * 0.6f * density
+                    val jitterY = (Random.nextFloat() - 0.5f) * 0.6f * density
+                    points.add(px.toFloat() + jitterX)
+                    points.add(py.toFloat() + centerOffsetY + jitterY)
+                    // 边缘粒子增加权重（重复添加，让边缘更清晰）
+                    if (isEdge && Random.nextFloat() < 0.3f) {
+                        points.add(px.toFloat() + jitterX)
+                        points.add(py.toFloat() + centerOffsetY + jitterY)
+                    }
                 }
             }
         }
