@@ -370,123 +370,101 @@ val ALLOWED_APPLICATION_IDS = setOf("com.mini.me_core", "com.mini.me_core.debug"
 
 dependencies {
     // Compose BOM
-    val composeBom = platform("androidx.compose:compose-bom:2025.12.01")
-    implementation(composeBom)
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    debugImplementation("androidx.compose.ui:ui-tooling")
-    implementation("androidx.compose.animation:animation")
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    implementation(libs.androidx.compose.animation)
 
     // Lifecycle + ViewModel
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
-    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.activity.compose)
 
     // Navigation
-    implementation("androidx.navigation:navigation-compose:2.9.0")
+    implementation(libs.androidx.navigation.compose)
 
     // Hilt 依赖注入
-    implementation("com.google.dagger:hilt-android:2.56.1")
-    ksp("com.google.dagger:hilt-compiler:2.56.1")
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.compose)
 
-
-    
     // 网络请求
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging.interceptor)
 
     // HTML 解析与清洗 (用于 WebFetchTool)
-    implementation("org.jsoup:jsoup:1.18.1")
+    implementation(libs.jsoup)
 
     // 协程
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.core)
 
     // Kotlin 序列化
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+    implementation(libs.kotlinx.serialization.json)
 
     // 内置 MCP 服务器（Streamable HTTP）：Ktor CIO 起 HTTP 监听 + SSE，供外部 MCP 客户端连入。
-    // 与项目协程/序列化栈同源。
-    implementation("io.ktor:ktor-server-core:2.3.13")
-    implementation("io.ktor:ktor-server-cio:2.3.13")
-    implementation("io.ktor:ktor-server-websockets:2.3.13")
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.server.websockets)
 
     // YAML 解析 (用于 Skill Frontmatter)
-    implementation("org.yaml:snakeyaml:2.2")
+    implementation(libs.snakeyaml)
 
     // 远程同步 (SFTP/FTP) 与内置 FTP 服务端
-    implementation("com.hierynomus:sshj:0.38.0")
-    // BouncyCastle：sshj 0.38.0 用 X25519 密钥交换，Android 自带裁剪版 BC 不含该算法，
-    // 需显式引入完整版并注册替换（见 MiniMeCore.registerBouncyCastle）。版本与 sshj 传递依赖一致。
-    implementation("org.bouncycastle:bcprov-jdk18on:1.75")
-    implementation("commons-net:commons-net:3.10.0")
-    implementation("org.apache.ftpserver:ftpserver-core:1.2.0")
-    implementation("org.slf4j:slf4j-simple:2.0.9")
+    implementation(libs.sshj)
+    implementation(libs.bouncycastle)
+    implementation(libs.commons.net)
+    implementation(libs.ftpserver.core)
+    implementation(libs.slf4j.simple)
 
-    // 容器：解压 Alpine rootfs tar.gz（正确处理 symlink/hardlink/权限位）
-    implementation("org.apache.commons:commons-compress:1.26.2")
-    // xz 解压支持：commons-compress 的 XZCompressorInputStream 依赖此库（解压用户导入的 .tar.xz 镜像）
-    implementation("org.tukaani:xz:1.10")
+    // 容器：解压 Alpine rootfs tar.gz
+    implementation(libs.commons.compress)
+    implementation(libs.xz)
 
-    // Termux 开源终端组件：terminal-emulator 负责 VT100/ANSI 解析与 PTY（自带 native .so），
-    // terminal-view 是渲染用的 Android View。经 JitPack 分发（com.github.<user>.<repo> 坐标形式），
-    // 避免自行实现终端模拟器。
+    // Termux 开源终端组件
     implementation(project(":terminal-emulator"))
     implementation(project(":terminal-view"))
 
     // Material Icons
-    implementation("androidx.compose.material:material-icons-core")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.androidx.compose.material.icons.core)
+    implementation(libs.androidx.compose.material.icons.extended)
 
     // Markdown Renderer
-    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.41.0")
-    // Markdown Renderer — Code Syntax Highlighting
-    implementation("com.mikepenz:multiplatform-markdown-renderer-code:0.41.0")
-    // 语法高亮引擎（markdown-renderer-code 传递引入，显式声明以供 diff 视图直接使用）
-    implementation("dev.snipme:highlights-jvm:1.1.0")
+    implementation(libs.multiplatform.markdown.renderer.m3)
+    implementation(libs.multiplatform.markdown.renderer.code)
+    implementation(libs.highlights.jvm)
 
     // Core Android
-    implementation("androidx.core:core:1.16.0")
-    // 启动画面（Splash Screen）：AndroidX 官方库，兼容 API 26+
-    implementation("androidx.core:core-splashscreen:1.0.1")
-    // WebView 文档起始注入（addDocumentStartJavaScript，用于内置浏览器动态数据捕获的 fetch/XHR/WS/SSE 插桩）
-    implementation("androidx.webkit:webkit:1.13.0")
+    implementation(libs.androidx.core)
+    implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.webkit)
+
     // Testing
     testImplementation("junit:junit:4.13.2")
-    // Robolectric（数据库加密模块单元测试：模拟 Android Keystore / SharedPreferences / Context）
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("androidx.test:core:1.6.1")
-    // JSON（SqlDelightDataProvider 通用表转储 Provider 使用；main sourceSet 需要）
-    implementation("org.json:json:20240303")
+    implementation(libs.json)
 
-    // ── 新数据层（data-layer-redesign）─ SQLDelight（设计文档 §2/§12）──
-    // Android 驱动（AndroidSqliteDriver，L0 引擎，可插拔加密 factory 的明文实现）
-    implementation("app.cash.sqldelight:android-driver:2.2.1")
-    // 响应式查询（KVStore.observe 等 asFlow 扩展）
-    implementation("app.cash.sqldelight:coroutines-extensions:2.2.1")
-    // JVM 驱动（迁移黄金测试 / 数据保护测试用 NativeSqliteDriver，设计 §5.5）
+    // SQLDelight
+    implementation(libs.sqldelight.android.driver)
+    implementation(libs.sqldelight.coroutines.extensions)
     testImplementation("app.cash.sqldelight:sqlite-driver:2.2.1")
-    // androidx-sqlite 桥接（PlainDriverFactory 的 FrameworkSQLiteOpenHelperFactory）
-    implementation("androidx.sqlite:sqlite-framework:2.4.0")
-    // ── 数据库加密（P1：基础设施 + 可选加密，设计文档 db-encryption-migration-design.md §5.3）──
-    // SQLCipher for Android：基于 SQLite 3.41.2 + OpenSSL，提供全库透明加密（AES-256-CBC + HMAC-SHA512）。
-    // CipherDriverFactory 使用其 SupportFactory(passphrase) 构造 AndroidSqliteDriver。
-    // P1 阶段默认仍为明文（DI 绑定 RoutingDriverFactory，未开启加密时走 PlainDriverFactory），
-    // 用户在设置页手动开启加密后，经 DbEncryptionMigrationEngine 迁移到加密库。
-    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
+    implementation(libs.androidx.sqlite.framework)
+
+    // 数据库加密
+    implementation(libs.sqlcipher)
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
-    androidTestImplementation(composeBom)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    // F6.2 内存泄漏检测：仅 debug 构建包含，release 零影响。
-    // LeakCanary 自动在 Activity/Fragment 销毁后检测泄漏并在通知栏给出引用链。
-    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
+    // 内存泄漏检测
+    debugImplementation(libs.leakcanary.android)
 }
 
 // ── 新数据层（data-layer-redesign）─ SQLDelight 6 库拓扑（设计文档 §4 / §12）──
