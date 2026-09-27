@@ -2883,6 +2883,9 @@
     <string name="download_progress_speed">%1$s/s</string>
     <string name="download_progress_remaining">剩余约 %1$s</string>
     <string name="download_progress_cancel">取消下载</string>
+    <string name="download_pause">暂停</string>
+    <string name="download_resume">继续</string>
+    <string name="download_paused_title">已暂停</string>
     <string name="download_completed_title">下载完成</string>
     <string name="download_completed_open">打开文件</string>
     <string name="download_failed_title">下载失败</string>
@@ -2960,6 +2963,31 @@
     <string name="qqbot_connection_status">连接状态</string>
     <string name="qqbot_clear_messages">清空消息</string>
     <string name="qqbot_uptime_label">在线时长</string>
+    <!-- 登录流程 -->
+    <string name="qqbot_login_state">登录状态</string>
+    <string name="qqbot_login_logged_out">未登录</string>
+    <string name="qqbot_login_qr_shown">等待扫码</string>
+    <string name="qqbot_login_scanning">已扫码，待确认</string>
+    <string name="qqbot_login_logging_in">登录中</string>
+    <string name="qqbot_login_logged_in">已登录</string>
+    <string name="qqbot_login_failed">登录失败</string>
+    <string name="qqbot_login_offline">已掉线</string>
+    <string name="qqbot_qr_hint">请使用手机 QQ 扫描二维码登录</string>
+    <string name="qqbot_qr_refresh">刷新二维码</string>
+    <string name="qqbot_logged_in_as">已登录：%1$s（%2$d）</string>
+    <string name="qqbot_login_retry">重试</string>
+    <string name="qqbot_relogin">重新登录</string>
+    <string name="qqbot_relogin_hint">清除登录态并重新获取二维码</string>
+    <string name="qqbot_login_type">登录方式</string>
+    <string name="qqbot_login_type_qrcode">扫码登录</string>
+    <string name="qqbot_login_type_password">密码登录</string>
+    <string name="qqbot_login_password">QQ 密码</string>
+    <string name="qqbot_login_password_hint">输入 QQ 密码（可选，第一阶段默认扫码）</string>
+    <string name="qqbot_model_picker_hint">请选择默认模型</string>
+    <string name="qqbot_model_context_follow">上下文窗口：%1$s（自动沿用模型设置）</string>
+    <string name="qqbot_context_length_readonly">上下文条数（沿用模型）</string>
+    <string name="qqbot_no_models_available">暂无可用模型，请先在服务商中添加</string>
+    <string name="qqbot_login_section">账号登录</string>
 
     <!-- Theme settings -->
     <string name="theme_section_preview">实时预览</string>

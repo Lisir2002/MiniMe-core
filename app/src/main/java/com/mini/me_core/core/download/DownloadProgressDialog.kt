@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -37,10 +38,12 @@ import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
  * 样式跟随 AppDialog / AppButton，使用 Semantic Token 颜色，无硬编码颜色，无 emoji。
  *
  * @param task 当前下载任务
- * @param onCancel 取消下载回调（仅下载中显示）
+ * @param onCancel 取消下载回调（仅下载中/暂停时显示）
  * @param onRetry 重试回调（仅失败时显示；null 表示不显示）
  * @param onOpen 打开已下载文件回调（仅完成时显示；null 表示不显示）
  * @param onDismiss 关闭弹窗回调（完成/失败时关闭弹窗本身）
+ * @param onPause 暂停回调（仅下载中且非 null 时显示「暂停」按钮）
+ * @param onResume 继续回调（仅暂停中且非 null 时显示「继续」按钮）
  */
 @Composable
 fun DownloadProgressDialog(
@@ -49,9 +52,11 @@ fun DownloadProgressDialog(
     onRetry: (() -> Unit)? = null,
     onOpen: (() -> Unit)? = null,
     onDismiss: () -> Unit,
+    onPause: (() -> Unit)? = null,
+    onResume: (() -> Unit)? = null,
 ) {
     val colors = LocalAppTheme.current.colors
-    val indeterminate = task.status == DownloadStatus.DOWNLOADING && task.totalBytes <= 0
+    val indeterminate = task.status == DownloadStatus.DOWNLOADING && task.totalBytes <= 0L
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -59,6 +64,7 @@ fun DownloadProgressDialog(
             val titleText = when (task.status) {
                 DownloadStatus.COMPLETED -> stringResource(R.string.download_completed_title)
                 DownloadStatus.FAILED -> stringResource(R.string.download_failed_title)
+                DownloadStatus.PAUSED -> stringResource(R.string.download_paused_title)
                 else -> stringResource(R.string.download_progress_title)
             }
             Text(
@@ -76,7 +82,7 @@ fun DownloadProgressDialog(
             }
         },
         confirmButton = {
-            Row(horizontalArrangement = Arrangement.End) {
+            Row(horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                 when (task.status) {
                     DownloadStatus.COMPLETED -> {
                         TextButton(onClick = onDismiss) {
@@ -115,7 +121,28 @@ fun DownloadProgressDialog(
                         }
                     }
                     else -> {
-                        // 下载中：取消按钮
+                        // 暂停中：显示「继续」
+                        if (task.status == DownloadStatus.PAUSED && onResume != null) {
+                            TextButton(onClick = onResume) {
+                                Text(
+                                    text = stringResource(R.string.download_resume),
+                                    color = colors.brandPrimary,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                            Spacer(Modifier.width(PrimitiveSpacing.Sm))
+                        }
+                        // 下载中：显示「暂停」
+                        if (task.status == DownloadStatus.DOWNLOADING && onPause != null) {
+                            TextButton(onClick = onPause) {
+                                Text(
+                                    text = stringResource(R.string.download_pause),
+                                    color = colors.brandPrimary,
+                                )
+                            }
+                            Spacer(Modifier.width(PrimitiveSpacing.Sm))
+                        }
+                        // 取消按钮
                         TextButton(onClick = onCancel) {
                             Text(
                                 text = stringResource(R.string.download_progress_cancel),

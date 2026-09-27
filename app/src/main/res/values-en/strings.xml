@@ -2788,6 +2788,9 @@
     <string name="download_progress_speed">%1$s/s</string>
     <string name="download_progress_remaining">About %1$s left</string>
     <string name="download_progress_cancel">Cancel Download</string>
+    <string name="download_pause">Pause</string>
+    <string name="download_resume">Resume</string>
+    <string name="download_paused_title">Paused</string>
     <string name="download_completed_title">Download Complete</string>
     <string name="download_completed_open">Open File</string>
     <string name="download_failed_title">Download Failed</string>

@@ -17,7 +17,7 @@ data class DownloadTask(
     val localPath: String? = null,
 )
 
-enum class DownloadStatus { PENDING, CONFIRMING, DOWNLOADING, COMPLETED, FAILED, CANCELLED }
+enum class DownloadStatus { PENDING, CONFIRMING, DOWNLOADING, PAUSED, COMPLETED, FAILED, CANCELLED }
 
 /**
  * 字节大小格式化工具（无硬编码颜色/文案，纯数值→字符串）。

@@ -8,7 +8,9 @@ import com.mini.me_core.feature.update.domain.UpdateAvailability
 import com.mini.me_core.feature.update.domain.VersionComparator
 import com.mini.me_core.core.util.FileLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,12 +24,20 @@ import okhttp3.Request
 import okio.buffer
 import okio.sink
 import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * 用户主动暂停下载时抛出的异常（普通 Exception，非 CancellationException）。
+ * 用于与真实网络失败区分：暂停时保留已下载分片，由 ViewModel 转为 PAUSED 状态。
+ */
+class DownloadPausedException(cause: Throwable? = null) : Exception("download paused by user", cause)
 
 /**
  * 下载进度回调模型。
@@ -88,11 +98,18 @@ class GitHubReleaseRepository @Inject constructor(
     private val _availability = MutableStateFlow<UpdateAvailability>(UpdateAvailability.Idle)
     val availability: StateFlow<UpdateAvailability> = _availability.asStateFlow()
 
+    /** 当前在途的网络请求（最后一个 call）。取消/暂停时立即 cancel()。 */
     private val activeCall = AtomicReference<Call?>(null)
 
-    /** 用户主动取消标志：为 true 时下载循环不再切换镜像站重试。 */
+    /** 用户主动取消标志：为 true 时下载循环不再切换镜像站重试，并删除已下载文件。 */
+    private val downloadCancelled = AtomicBoolean(false)
+
+    /** 用户主动暂停标志：为 true 时停止读取，保留已下载文件以便 Range 续传。 */
+    private val downloadPaused = AtomicBoolean(false)
+
+    /** 当前下载目标文件（暂停/恢复时用于查询已下载字节数）。 */
     @Volatile
-    private var downloadCancelled = false
+    private var currentTargetFile: File? = null
 
     // ── 设置：自动检查开关 ─────────────────────────────────────────────
 
@@ -287,20 +304,30 @@ class GitHubReleaseRepository @Inject constructor(
 
     /**
      * 下载 APK 到私有下载目录。回调在 IO 线程。
+     *
+     * @param resumeFrom 从指定字节数续传（携带 `Range: bytes=<n>-`）。
+     *   - 服务器返回 206：追加写入；
+     *   - 服务器返回 200（不支持 Range）：删除旧文件从头下载。
      * @return 下载完成的文件绝对路径。
-     * @throws java.io.IOException 下载失败（含主动取消）。
+     * @throws CancellationException 用户主动取消。
+     * @throws DownloadPausedException 用户主动暂停（文件已保留）。
      */
     suspend fun downloadApk(
         release: ReleaseInfo,
         onProgress: (DownloadProgress) -> Unit,
+        resumeFrom: Long = 0L,
     ): String = withContext(Dispatchers.IO) {
-        downloadCancelled = false
+        // 新一轮下载（含恢复）都先复位取消/暂停标志。
+        downloadCancelled.set(false)
+        downloadPaused.set(false)
+
         val originalUrl = release.downloadUrl ?: error("no apk asset")
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
             ?: context.filesDir
         val fileName = "MiniMe-core-${release.versionName}.apk"
         val targetFile = File(dir, fileName)
         val filePath = targetFile.absolutePath
+        currentTargetFile = targetFile
 
         // 构建下载 URL 列表：直连 + 镜像站备用线路
         val downloadUrls = buildList {
@@ -308,83 +335,175 @@ class GitHubReleaseRepository @Inject constructor(
             addAll(MIRROR_PREFIXES.map { prefix -> prefix + originalUrl })
         }
 
+        // 协程被取消（如 ViewModel 清除）时，同步取消在途网络请求。
+        val job = coroutineContext[Job]
+        val cancelHandle = job?.invokeOnCompletion {
+            activeCall.getAndSet(null)?.runCatching { cancel() }
+        }
+
         var lastError: Throwable? = null
-        downloadUrls.forEachIndexed { index, url ->
-            val label = if (index == 0) "直连" else "镜像${MIRROR_PREFIXES[index - 1]}"
-            runCatching {
-                val req = Request.Builder().url(url).build()
-                val call = client.newCall(req)
+        try {
+            // 用普通 for 循环替代 forEachIndexed：取消/暂停时直接抛出，
+            // 不允许 runCatching 吞掉异常后继续尝试下一个镜像。
+            for ((index, url) in downloadUrls.withIndex()) {
+                // 每次进入镜像前检查：取消/暂停立即终止整个循环
+                if (downloadCancelled.get()) {
+                    targetFile.delete()
+                    throw CancellationException("download cancelled by user")
+                }
+                if (downloadPaused.get()) {
+                    throw DownloadPausedException()
+                }
+
+                val reqBuilder = Request.Builder().url(url)
+                if (resumeFrom > 0L) {
+                    reqBuilder.header("Range", "bytes=$resumeFrom-")
+                }
+                val call = client.newCall(reqBuilder.build())
                 activeCall.set(call)
+
                 try {
                     call.execute().use { resp ->
-                        if (!resp.isSuccessful) error("HTTP ${resp.code}")
+                        val supportsRange = resp.code == 206
+                        // 服务器不支持 Range（返回 200）：从头下载，删除旧分片
+                        val effectiveResumeFrom =
+                            if (resumeFrom > 0L && supportsRange) resumeFrom else 0L
+                        if (resumeFrom > 0L && !supportsRange && targetFile.exists()) {
+                            targetFile.delete()
+                        }
+                        if (!resp.isSuccessful && !supportsRange) error("HTTP ${resp.code}")
                         val body = resp.body ?: error("empty body")
-                        val contentLength = body.contentLength()
+                        val partialLength = body.contentLength()
+                        val contentLength = if (effectiveResumeFrom > 0L && partialLength > 0L)
+                            effectiveResumeFrom + partialLength else partialLength
+
                         val source = body.source()
-                        val sink = targetFile.sink().buffer()
-                        var totalRead = 0L
+                        val sink = if (effectiveResumeFrom > 0L)
+                            FileOutputStream(targetFile, true).sink().buffer()
+                        else
+                            targetFile.sink().buffer()
+
+                        var totalRead = effectiveResumeFrom
                         val buffer = okio.Buffer()
                         var lastPct = -1
                         var lastTickMs = System.currentTimeMillis()
-                        var lastTickBytes = 0L
+                        var lastTickBytes = effectiveResumeFrom
                         var currentSpeed = 0L
 
-                        while (true) {
-                            if (call.isCanceled()) error("download cancelled")
-                            val read = source.read(buffer, 8192L)
-                            if (read == -1L) break
-                            sink.write(buffer, read)
-                            totalRead += read
-                            val pct = if (contentLength > 0) {
-                                ((totalRead * 100) / contentLength).toInt()
-                            } else 0
+                        try {
+                            while (true) {
+                                // 每个 buffer 读取后都检查取消/暂停
+                                if (downloadCancelled.get()) {
+                                    runCatching { sink.close() }
+                                    runCatching { source.close() }
+                                    call.cancel()
+                                    targetFile.delete()
+                                    throw CancellationException("download cancelled by user")
+                                }
+                                if (downloadPaused.get()) {
+                                    runCatching { sink.close() }
+                                    runCatching { source.close() }
+                                    call.cancel()
+                                    // 暂停：保留已下载文件，不删除
+                                    throw DownloadPausedException()
+                                }
+                                val read = source.read(buffer, 8192L)
+                                if (read == -1L) break
+                                sink.write(buffer, read)
+                                totalRead += read
 
-                            val now = System.currentTimeMillis()
-                            val elapsed = now - lastTickMs
-                            if (elapsed >= 200L) {
-                                val delta = totalRead - lastTickBytes
-                                currentSpeed = if (elapsed > 0) (delta * 1000L) / elapsed else 0L
-                                lastTickMs = now
-                                lastTickBytes = totalRead
-                            }
+                                val pct = if (contentLength > 0L)
+                                    ((totalRead * 100L) / contentLength).toInt() else 0
 
-                            if (pct != lastPct) {
-                                lastPct = pct
-                                onProgress(DownloadProgress(pct, totalRead, contentLength, currentSpeed, filePath))
+                                val now = System.currentTimeMillis()
+                                val elapsed = now - lastTickMs
+                                if (elapsed >= 200L) {
+                                    val delta = totalRead - lastTickBytes
+                                    currentSpeed =
+                                        if (elapsed > 0L) (delta * 1000L) / elapsed else 0L
+                                    lastTickMs = now
+                                    lastTickBytes = totalRead
+                                }
+
+                                if (pct != lastPct) {
+                                    lastPct = pct
+                                    onProgress(
+                                        DownloadProgress(
+                                            pct, totalRead, contentLength, currentSpeed, filePath,
+                                        ),
+                                    )
+                                }
                             }
+                            sink.close()
+                            source.close()
+                        } catch (e: CancellationException) {
+                            runCatching { sink.close() }
+                            runCatching { source.close() }
+                            throw e
+                        } catch (e: DownloadPausedException) {
+                            runCatching { sink.close() }
+                            runCatching { source.close() }
+                            throw e
                         }
-                        sink.close()
-                        source.close()
-                        if (contentLength > 0) {
+
+                        if (contentLength > 0L) {
                             onProgress(DownloadProgress(100, contentLength, contentLength, 0L, filePath))
                         }
                         return@withContext filePath
                     }
-                } finally {
+                } catch (e: CancellationException) {
                     activeCall.compareAndSet(call, null)
-                }
-            }.onFailure { e ->
-                lastError = e
-                // 用户主动取消：不再切换镜像站重试，直接抛出取消异常
-                if (downloadCancelled || e.message == "download cancelled") {
-                    throw kotlinx.coroutines.CancellationException("download cancelled by user", e)
-                }
-                // 删除不完整的下载文件，避免下次恢复时混淆
-                targetFile.delete()
-                if (index == 0) {
-                    FileLogger.i(TAG, "下载直连失败，切换镜像: ${e.message}")
-                } else if (index < downloadUrls.size - 1) {
+                    throw e
+                } catch (e: DownloadPausedException) {
+                    activeCall.compareAndSet(call, null)
+                    throw e
+                } catch (e: Throwable) {
+                    activeCall.compareAndSet(call, null)
+                    // call.cancel() 后阻塞 read 会抛 IOException，此时按取消/暂停处理
+                    if (downloadCancelled.get()) {
+                        targetFile.delete()
+                        throw CancellationException("download cancelled by user", e)
+                    }
+                    if (downloadPaused.get()) {
+                        // 暂停触发的流中断：保留文件
+                        throw DownloadPausedException(e)
+                    }
+                    // 普通失败：删除不完整文件，继续尝试下一个镜像
+                    targetFile.delete()
+                    lastError = e
+                    val label = if (index == 0) "直连" else "镜像${MIRROR_PREFIXES[index - 1]}"
                     FileLogger.i(TAG, "下载$label 失败，切换下一个镜像: ${e.message}")
                 }
             }
+            throw lastError ?: IllegalStateException("所有下载线路均失败")
+        } finally {
+            cancelHandle?.dispose()
+            activeCall.getAndSet(null)?.runCatching { cancel() }
         }
-        throw lastError ?: IllegalStateException("所有下载线路均失败")
     }
 
-    /** 取消当前下载（若无进行中下载则无操作）。 */
-    fun cancelDownload() {
-        downloadCancelled = true
+    /** 当前已落盘的字节数（暂停后恢复续传用）。 */
+    fun currentDownloadedBytes(): Long =
+        currentTargetFile?.takeIf { it.exists() }?.length() ?: 0L
+
+    /** 暂停当前下载：设置暂停标志并取消在途 call，保留已下载文件。 */
+    fun pauseDownload() {
+        downloadPaused.set(true)
         activeCall.getAndSet(null)?.runCatching { cancel() }
+    }
+
+    /** 恢复下载前复位暂停标志（实际续传由调用方重新调用 downloadApk(resumeFrom=...)）。 */
+    fun resumeDownload() {
+        downloadPaused.set(false)
+        downloadCancelled.set(false)
+    }
+
+    /** 取消当前下载：设置取消标志、取消在途 call、删除已下载临时文件。 */
+    fun cancelDownload() {
+        downloadCancelled.set(true)
+        downloadPaused.set(false)
+        activeCall.getAndSet(null)?.runCatching { cancel() }
+        currentTargetFile?.takeIf { it.exists() }?.delete()
     }
 
     /** 格式化字节大小为可读字符串（供 UI 复用）。 */

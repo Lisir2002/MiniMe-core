@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.R
 import com.mini.me_core.feature.update.data.ApkInstaller
+import com.mini.me_core.feature.update.data.DownloadPausedException
 import com.mini.me_core.feature.update.data.DownloadProgress
 import com.mini.me_core.feature.update.data.GitHubReleaseRepository
 import com.mini.me_core.feature.update.domain.ReleaseInfo
@@ -28,6 +29,7 @@ import javax.inject.Inject
 sealed interface DownloadUiState {
     data object Idle : DownloadUiState
     data class Downloading(val progress: DownloadProgress) : DownloadUiState
+    data class Paused(val progress: DownloadProgress) : DownloadUiState
     data class Done(val filePath: String, val fileSize: Long) : DownloadUiState
     data class Failed(val message: String) : DownloadUiState
 }
@@ -75,6 +77,12 @@ class UpdateViewModel @Inject constructor(
     val snackbar: SharedFlow<String> = _snackbar.asSharedFlow()
 
     private var downloadJob: kotlinx.coroutines.Job? = null
+
+    /** 当前正在/最近下载的 Release（暂停后恢复续传用）。 */
+    private var activeRelease: ReleaseInfo? = null
+
+    /** 最近一次下载进度（暂停时保留用于渲染 PAUSED 弹窗）。 */
+    private var lastProgress: DownloadProgress? = null
 
     init {
         val current = runCatching {
@@ -181,7 +189,7 @@ class UpdateViewModel @Inject constructor(
     fun confirmDownload() {
         val release = _state.value.pendingConfirmRelease ?: return
         _state.update { it.copy(pendingConfirmRelease = null) }
-        startDownload(release)
+        startDownload(release, resumeFrom = 0L)
     }
 
     /** 取消确认弹窗。 */
@@ -194,14 +202,16 @@ class UpdateViewModel @Inject constructor(
         _state.update { it.copy(download = DownloadUiState.Idle) }
     }
 
-    private fun startDownload(release: ReleaseInfo) {
+    private fun startDownload(release: ReleaseInfo, resumeFrom: Long) {
         downloadJob?.cancel()
+        activeRelease = release
         downloadJob = viewModelScope.launch {
             _state.update { it.copy(download = DownloadUiState.Idle) }
             runCatching {
-                repository.downloadApk(release) { progress ->
+                repository.downloadApk(release, onProgress = { progress ->
+                    lastProgress = progress
                     _state.update { it.copy(download = DownloadUiState.Downloading(progress)) }
-                }
+                }, resumeFrom = resumeFrom)
             }.onSuccess { path ->
                 val size = runCatching { java.io.File(path).length() }.getOrDefault(0L)
                 _state.update {
@@ -211,22 +221,60 @@ class UpdateViewModel @Inject constructor(
                     )
                 }
             }.onFailure { e ->
-                // 用户主动取消不显示失败弹窗
-                if (e is kotlinx.coroutines.CancellationException) return@onFailure
-                _state.update {
-                    it.copy(
-                        download = DownloadUiState.Failed(
-                            e.message ?: app.getString(R.string.update_download_failed)
-                        )
-                    )
+                when {
+                    // 用户主动暂停：保留文件，切换到 PAUSED 状态（不视为失败）
+                    e is DownloadPausedException -> {
+                        val paused = lastProgress
+                        val bytes = repository.currentDownloadedBytes()
+                        _state.update {
+                            it.copy(
+                                download = DownloadUiState.Paused(
+                                    DownloadProgress(
+                                        percent = paused?.percent ?: 0,
+                                        downloadedBytes = bytes,
+                                        totalBytes = paused?.totalBytes ?: 0L,
+                                        speedBytesPerSec = 0L,
+                                        filePath = paused?.filePath ?: "",
+                                    ),
+                                ),
+                            )
+                        }
+                    }
+                    // 用户主动取消：不显示失败弹窗
+                    e is kotlinx.coroutines.CancellationException -> return@onFailure
+                    else -> {
+                        _state.update {
+                            it.copy(
+                                download = DownloadUiState.Failed(
+                                    e.message ?: app.getString(R.string.update_download_failed)
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 
+    /** 暂停下载：通知仓库取消在途 call 并保留分片；协程内会抛 DownloadPausedException。 */
+    fun pauseDownload() {
+        if (_state.value.download !is DownloadUiState.Downloading) return
+        repository.pauseDownload()
+    }
+
+    /** 继续下载：从已落盘字节数发起 Range 续传。 */
+    fun resumeDownload() {
+        val release = activeRelease ?: return
+        if (_state.value.download !is DownloadUiState.Paused) return
+        repository.resumeDownload()
+        val resumeFrom = repository.currentDownloadedBytes()
+        startDownload(release, resumeFrom = resumeFrom)
+    }
+
     fun cancelDownload() {
         repository.cancelDownload()
         downloadJob?.cancel()
+        lastProgress = null
         _state.update { it.copy(download = DownloadUiState.Idle) }
     }
 

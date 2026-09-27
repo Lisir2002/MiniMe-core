@@ -202,6 +202,25 @@ fun UpdateScreen(
                 ),
                 onCancel = { viewModel.cancelDownload() },
                 onDismiss = { viewModel.cancelDownload() },
+                onPause = { viewModel.pauseDownload() },
+            )
+        }
+        is DownloadUiState.Paused -> {
+            val p = dl.progress
+            com.mini.me_core.core.download.DownloadProgressDialog(
+                task = com.mini.me_core.core.download.DownloadTask(
+                    id = "apk",
+                    title = p.filePath.substringAfterLast('/'),
+                    url = "",
+                    totalBytes = p.totalBytes,
+                    downloadedBytes = p.downloadedBytes,
+                    speedBytesPerSec = 0L,
+                    status = com.mini.me_core.core.download.DownloadStatus.PAUSED,
+                    localPath = p.filePath,
+                ),
+                onCancel = { viewModel.cancelDownload() },
+                onDismiss = { viewModel.cancelDownload() },
+                onResume = { viewModel.resumeDownload() },
             )
         }
         is DownloadUiState.Done -> {
