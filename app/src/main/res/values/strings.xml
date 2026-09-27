@@ -2950,6 +2950,16 @@
     <string name="qqbot_uptime">运行时长: %1$s</string>
     <string name="qqbot_today_messages_label">今日消息</string>
     <string name="qqbot_notification_channel_name">QQ 机器人常驻服务</string>
+    <string name="qqbot_tab_sessions">会话</string>
+    <string name="qqbot_tab_chat">聊天</string>
+    <string name="qqbot_tab_settings">设置</string>
+    <string name="qqbot_no_session_selected">请先选择一个会话</string>
+    <string name="qqbot_generate_token">生成</string>
+    <string name="qqbot_auto_start">自动启动</string>
+    <string name="qqbot_not_configured">未配置</string>
+    <string name="qqbot_connection_status">连接状态</string>
+    <string name="qqbot_clear_messages">清空消息</string>
+    <string name="qqbot_uptime_label">在线时长</string>
 
     <!-- Theme settings -->
     <string name="theme_section_preview">实时预览</string>

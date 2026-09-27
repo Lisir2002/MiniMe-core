@@ -600,7 +600,8 @@ fun AppNavigation(
                     onStopAllAndCloseTerminal = { agentViewModel.stopAllAndCloseTerminal() },
                     onNavigateToNetProxy = { navController.navigate("proxy_config") },
                     // 能力中心入口（自侧边栏移入设置）：设置页点击直接跳转能力中心。
-                    onNavigateToCapabilityCenter = { navController.navigate("capability_center") }
+                    onNavigateToCapabilityCenter = { navController.navigate("capability_center") },
+                    onNavigateToQBot = { navController.navigate("qqbot") }
                 )
             }
             composable("capability_center") {
@@ -710,6 +711,14 @@ fun AppNavigation(
                     loginPromptManager = browserLoginPromptManager,
                     takeoverManager = browserTakeoverManager,
                     credentialStore = browserCredentialStore,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            // QQ 机器人第一阶段管理页：会话列表 / 聊天记录 / 基础设置。
+            composable("qqbot") {
+                val qBotViewModel: com.mini.me_core.feature.qqbot.presentation.QBotViewModel = hiltViewModel()
+                com.mini.me_core.feature.qqbot.presentation.QBotScreen(
+                    viewModel = qBotViewModel,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
