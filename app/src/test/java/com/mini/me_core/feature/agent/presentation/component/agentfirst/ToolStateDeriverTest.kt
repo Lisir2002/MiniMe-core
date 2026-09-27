@@ -1,6 +1,6 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst.derivers
 
-import com.mini.me_core.feature.agent.domain.session.session.SessionUseCase
+import com.mini.me_core.feature.agent.domain.session.SessionUseCase
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.MessageRole
