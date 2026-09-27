@@ -36,7 +36,6 @@ enum class LibName(val fileName: String) {
     WORKSPACE("minime_workspace_v2.db"),
     T2I("minime_t2i_v2.db"),
     INFRA("minime_infra_v2.db"),
-    QQBOT("minime_qqbot_v1.db"),
 }
 
 interface DatabasePathProvider {

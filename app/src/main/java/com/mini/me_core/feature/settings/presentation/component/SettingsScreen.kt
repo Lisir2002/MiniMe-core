@@ -179,8 +179,7 @@ fun SettingsScreen(
     onNavigateToSshHosts: () -> Unit = {},
     onStopAllAndCloseTerminal: () -> Unit = {},
     onNavigateToNetProxy: () -> Unit = {},
-    onNavigateToCapabilityCenter: () -> Unit = {},
-    onNavigateToQBot: () -> Unit = {}
+    onNavigateToCapabilityCenter: () -> Unit = {}
 ) {
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val activeProvider by viewModel.activeProvider.collectAsStateWithLifecycle()
@@ -618,7 +617,6 @@ fun SettingsScreen(
                     onNavigateToTerminalSettings = onNavigateToTerminalSettings,
                     onNavigateToNetProxy = onNavigateToNetProxy,
                     onNavigateToCapabilityCenter = onNavigateToCapabilityCenter,
-                    onNavigateToQBot = onNavigateToQBot,
                     // 问题6：传入搜索状态（由顶栏搜索框驱动）
                     searchQuery = searchQuery,
                     isSearchMode = isSearchMode,
@@ -949,7 +947,6 @@ internal fun SettingsMenu(
     onNavigateToTerminalSettings: () -> Unit = {},
     onNavigateToNetProxy: () -> Unit = {},
     onNavigateToCapabilityCenter: () -> Unit = {},
-    onNavigateToQBot: () -> Unit = {},
     // 问题6：搜索词由顶栏搜索框提供，不再内部管理
     searchQuery: String = "",
     isSearchMode: Boolean = false,
@@ -1079,18 +1076,6 @@ internal fun SettingsMenu(
             iconBgDark = Color(0xFF14693A),
             keywords = listOf("terminal", stringResource(R.string.ui____4722bc0c), "ssh", "shell", "bash", stringResource(R.string.ui____ddf7d2a5), "container", stringResource(R.string.ui____34772285), stringResource(R.string.ui____22c79904), "docker", "alpine", "proot"),
             action = onNavigateToTerminalSettings
-        ),
-        // QQ 机器人管理页：独立路由（会话列表 / 聊天记录 / 启停与基础设置）。
-        MenuItem(
-            section = null,
-            group = groupEnv,
-            title = stringResource(R.string.qqbot_title),
-            subtitle = stringResource(R.string.qqbot_chat_records),
-            icon = Icons.Rounded.SmartToy,
-            iconBgLight = Color(0xFF12B7F5),
-            iconBgDark = Color(0xFF0B5E85),
-            keywords = listOf("qq", "qqbot", "bot", stringResource(R.string.qqbot_title), "onebot", "websocket", stringResource(R.string.qqbot_chat_records)),
-            action = onNavigateToQBot
         ),
         MenuItem(
             section = null,
