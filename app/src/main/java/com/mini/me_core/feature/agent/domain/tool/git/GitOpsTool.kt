@@ -574,16 +574,16 @@ class GitOpsTool @Inject constructor(
                 .trim()
             val entry = "- `${firstLine}`"
             when (type) {
-                "feat" -> sections["Added（新增）"]!!.add(entry)
-                "perf" -> sections["Improved（改进）"]!!.add(entry)
-                "fix" -> sections["Fixed（修复）"]!!.add(entry)
-                "refactor" -> sections["Changed（变更）"]!!.add(entry)
-                "docs" -> sections["Adjusted（调整）"]!!.add(entry)
-                "style" -> sections["Adjusted（调整）"]!!.add(entry)
-                "chore" -> sections["Adjusted（调整）"]!!.add(entry)
-                "ci" -> sections["Adjusted（调整）"]!!.add(entry)
-                "build" -> sections["Adjusted（调整）"]!!.add(entry)
-                "test" -> sections["Adjusted（调整）"]!!.add(entry)
+                "feat" -> sections.getValue("Added（新增）").add(entry)
+                "perf" -> sections.getValue("Improved（改进）").add(entry)
+                "fix" -> sections.getValue("Fixed（修复）").add(entry)
+                "refactor" -> sections.getValue("Changed（变更）").add(entry)
+                "docs" -> sections.getValue("Adjusted（调整）").add(entry)
+                "style" -> sections.getValue("Adjusted（调整）").add(entry)
+                "chore" -> sections.getValue("Adjusted（调整）").add(entry)
+                "ci" -> sections.getValue("Adjusted（调整）").add(entry)
+                "build" -> sections.getValue("Adjusted（调整）").add(entry)
+                "test" -> sections.getValue("Adjusted（调整）").add(entry)
                 else -> unclassified.add(entry)
             }
         }

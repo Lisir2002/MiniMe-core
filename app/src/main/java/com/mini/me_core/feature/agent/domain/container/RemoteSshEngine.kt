@@ -87,7 +87,7 @@ class RemoteSshEngine @Inject constructor(
         try {
             var line: String?
             while (reader.readLine().also { line = it } != null) {
-                emit(CommandEvent.Line(line!!))
+                emit(CommandEvent.Line(line ?: continue))
             }
             val exitCode = session.exitStatus
             watchdog.cancel()
@@ -179,7 +179,7 @@ class RemoteSshEngine @Inject constructor(
                 try {
                     var line: String?
                     while (reader.readLine().also { line = it } != null) {
-                        output.append(line!!)
+                        output.append(line ?: continue)
                         output.append("\n")
                     }
                     exitCode = session.exitStatus

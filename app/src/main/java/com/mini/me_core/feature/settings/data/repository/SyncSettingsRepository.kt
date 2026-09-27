@@ -16,7 +16,8 @@ class SyncSettingsRepository @Inject constructor(
     private val prefs = context.getSharedPreferences("sync_settings", Context.MODE_PRIVATE)
 
     private val _ignoredPatterns = MutableStateFlow(
-        prefs.getString("ignored_patterns", ".git,node_modules,build,dist,.gradle,.idea,.cxx,.vscode,tmp")!!
+        prefs.getString("ignored_patterns", ".git,node_modules,build,dist,.gradle,.idea,.cxx,.vscode,tmp")
+            ?: ".git,node_modules,build,dist,.gradle,.idea,.cxx,.vscode,tmp"
     )
     val ignoredPatterns: StateFlow<String> = _ignoredPatterns.asStateFlow()
 
@@ -32,7 +33,7 @@ class SyncSettingsRepository @Inject constructor(
 
     /** 全局冲突处理策略：remote_overwrite / local_overwrite / skip / rename。 */
     private val _conflictStrategy = MutableStateFlow(
-        prefs.getString("conflict_strategy", "remote_overwrite")!!
+        prefs.getString("conflict_strategy", "remote_overwrite") ?: "remote_overwrite"
     )
     val conflictStrategy: StateFlow<String> = _conflictStrategy.asStateFlow()
 

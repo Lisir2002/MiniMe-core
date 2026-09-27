@@ -262,11 +262,11 @@ object InlineMdTokenizer {
 
     private fun token(v: String): MdInline = when {
         v.startsWith("![") -> {
-            val m = Regex("!\\[([^\\]]*)]\\(([^)\\s]+)\\)").find(v)!!
+            val m = Regex("!\\[([^\\]]*)]\\(([^)\\s]+)\\)").find(v) ?: return MdInline.Text(v)
             MdInline.Img(m.groupValues[1], m.groupValues[2])
         }
         v.startsWith("[") -> {
-            val m = Regex("\\[([^\\]]+)]\\(([^)\\s]+)\\)").find(v)!!
+            val m = Regex("\\[([^\\]]+)]\\(([^)\\s]+)\\)").find(v) ?: return MdInline.Text(v)
             MdInline.Link(m.groupValues[2], m.groupValues[1])
         }
         v.startsWith("`") && v.endsWith("`") -> MdInline.Code(v.substring(1, v.length - 1))

@@ -45,7 +45,7 @@ suspend fun launchFirstByteWatchdog(
     close: () -> Unit,
     timeoutMs: Long = FIRST_BYTE_TIMEOUT_MS,
     isFirstByteReceived: () -> Boolean
-): Job = CoroutineScope(coroutineContext[Job]!!).launch {
+): Job = CoroutineScope(coroutineContext[Job] ?: error("No Job in coroutineContext")).launch {
     delay(timeoutMs)
     if (!isFirstByteReceived()) {
         runCatching { close() }

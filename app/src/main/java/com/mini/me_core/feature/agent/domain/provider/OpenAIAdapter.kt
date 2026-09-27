@@ -572,7 +572,8 @@ class OpenAIAdapter @Inject constructor(
             if (consumed[i]) continue
             val msg = raw[i]
             if (msg.role == "assistant" && msg.tool_calls?.isNotEmpty() == true) {
-                val remaining = msg.tool_calls!!.map { it.id }.toMutableSet()
+                val calls = msg.tool_calls ?: continue
+                val remaining = calls.map { it.id }.toMutableSet()
                 val matchedTools = mutableListOf<OpenAIChatMessage>()
                 for (j in i + 1 until raw.size) {
                     if (consumed[j]) continue
@@ -584,8 +585,8 @@ class OpenAIAdapter @Inject constructor(
                         if (remaining.isEmpty()) break
                     }
                 }
-                val keptCalls = if (remaining.isEmpty()) msg.tool_calls
-                else msg.tool_calls!!.filter { it.id !in remaining }
+                val keptCalls = if (remaining.isEmpty()) calls
+                else calls.filter { it.id !in remaining }
                 cleaned.add(if (keptCalls === msg.tool_calls) msg else msg.copy(tool_calls = keptCalls.ifEmpty { null }))
                 cleaned.addAll(matchedTools)
             } else if (msg.role == "tool") {

@@ -386,18 +386,20 @@ object FileLogger : Logger {
         runCatching {
             val today = fileNameFormat.format(Instant.now())
             // 目录切换 / 跨天 / writer 缺失 → 重开文件。
-            if (currentWriter == null || currentFile == null ||
-                currentFile!!.parentFile != dir ||
-                currentFile!!.name != "log-$today.txt"
+            val file = currentFile
+            if (currentWriter == null || file == null ||
+                file.parentFile != dir ||
+                file.name != "log-$today.txt"
             ) {
                 closeWriter()
                 openLogFile(dir, today)
             }
             // 写这批会让文件超限 → 先滚动再写。
-            if (currentFile!!.length() + sb.length > LogConfig.maxFileBytes) {
+            val current = currentFile ?: return@runCatching
+            if (current.length() + sb.length > LogConfig.maxFileBytes) {
                 rotateAndReopen(dir, today)
             }
-            currentWriter!!.write(sb.toString())
+            currentWriter?.write(sb.toString())
             bufferedBytes += sb.length
             if (bufferedBytes >= LogConfig.bufferSizeBytes) {
                 flushWriter()

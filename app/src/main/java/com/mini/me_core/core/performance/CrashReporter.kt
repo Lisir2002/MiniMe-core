@@ -89,8 +89,9 @@ object CrashReporter {
      */
     fun consumePendingCrash(): String? {
         val latest = listReports().firstOrNull() ?: return null
+        val ctx = appContext ?: return null
         // 用一个标记文件记录「本次启动是否已提示过最近崩溃」。
-        val marker = File(appContext!!.filesDir, "crash_reports/.consumed")
+        val marker = File(ctx.filesDir, "crash_reports/.consumed")
         val lastConsumed = marker.takeIf { it.exists() }?.readText()?.trim().orEmpty()
         if (lastConsumed == latest.name) return null
         marker.writeText(latest.name)

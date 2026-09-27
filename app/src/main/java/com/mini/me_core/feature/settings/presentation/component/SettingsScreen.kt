@@ -388,8 +388,9 @@ fun SettingsScreen(
         return
     }
     if (assetViewerTab != null) {
+        val tab = assetViewerTab ?: return
         NormFlowAssetViewerScreen(
-            initialTab = assetViewerTab!!,
+            initialTab = tab,
             onBack = { assetViewerTab = null }
         )
         return

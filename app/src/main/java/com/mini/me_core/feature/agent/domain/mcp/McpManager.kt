@@ -176,7 +176,7 @@ class McpManager @Inject constructor(
             StdioTransport(
                 serverName = cfg.name,
                 engine = containerEngine,
-                program = cfg.command!!,
+                program = cfg.command ?: error("stdio MCP server requires command: ${cfg.name}"),
                 programArgs = cfg.args,
                 projectPath = workspaceRepository.currentPath(),
                 extraEnv = cfg.env

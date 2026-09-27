@@ -222,12 +222,13 @@ fun PasswordListScreen(
     }
 
     if (deleteHost != null) {
+        val host = deleteHost ?: return
         AlertDialog(
             onDismissRequest = { deleteHost = null },
             title = { Text(stringResource(R.string.browser_pwm_delete)) },
-            text = { Text(stringResource(R.string.browser_pwm_delete_confirm, deleteHost!!)) },
+            text = { Text(stringResource(R.string.browser_pwm_delete_confirm, host)) },
             confirmButton = {
-                TextButton(onClick = { onDelete(deleteHost!!); deleteHost = null }) {
+                TextButton(onClick = { onDelete(host); deleteHost = null }) {
                     Text(stringResource(R.string.workspace_confirm))
                 }
             },

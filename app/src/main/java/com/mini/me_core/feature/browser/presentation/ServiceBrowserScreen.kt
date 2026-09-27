@@ -2043,13 +2043,14 @@ private fun BookmarksBottomSheet(
     }
 
     if (removeTarget != null) {
+        val target = removeTarget ?: return
         AlertDialog(
             onDismissRequest = { removeTarget = null },
             title = { Text(stringResource(R.string.browser_remove_bookmark)) },
-            text = { Text(removeTarget!!) },
+            text = { Text(target) },
             confirmButton = {
                 TextButton(onClick = {
-                    onRemove(removeTarget!!)
+                    onRemove(target)
                     removeTarget = null
                 }) {
                     Text(stringResource(R.string.workspace_confirm))
@@ -2642,13 +2643,14 @@ private fun CredentialsDialog(
     )
 
     if (deleteHost != null) {
+        val host = deleteHost ?: return
         AlertDialog(
             onDismissRequest = { deleteHost = null },
             title = { Text(stringResource(R.string.browser_credentials_delete)) },
-            text = { Text(stringResource(R.string.browser_credentials_delete_confirm, deleteHost!!)) },
+            text = { Text(stringResource(R.string.browser_credentials_delete_confirm, host)) },
             confirmButton = {
                 TextButton(onClick = {
-                    credentialStore.delete(deleteHost!!)
+                    credentialStore.delete(host)
                     deleteHost = null
                 }) {
                     Text(stringResource(R.string.workspace_confirm))

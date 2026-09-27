@@ -115,9 +115,10 @@ class ZthConfirmationCardViewModel @Inject constructor(
         val payload = _uiState.value.pendingCard
         applyUiStateFromTransition(r, payload)
         if (r.newState == ZthConfirmationCardStateMachine.CardState.CONFIRMING_TX && r.action == CardAction.START_LINK_TX_4_WRITE) {
+            val card = payload ?: return
             doCommit(
-                choice = if (payload?.modifiedPlanPlaintext.isNullOrBlank()) UserCardChoice.CONFIRM else UserCardChoice.MODIFY_AND_CONFIRM,
-                payload = payload!!
+                choice = if (card.modifiedPlanPlaintext.isNullOrBlank()) UserCardChoice.CONFIRM else UserCardChoice.MODIFY_AND_CONFIRM,
+                payload = card
             )
         }
     }
@@ -145,7 +146,8 @@ class ZthConfirmationCardViewModel @Inject constructor(
         val r = sm.onEvent(CardEvent.USER_CLICK_REJECT)
         applyUiStateFromTransition(r, payload)
         if (r.newState == ZthConfirmationCardStateMachine.CardState.REJECTING_AUDIT && r.action == CardAction.START_REJECT_AUDIT_WRITE) {
-            doCommit(UserCardChoice.REJECT, payload!!)
+            val card = payload ?: return
+            doCommit(UserCardChoice.REJECT, card)
         }
     }
 
@@ -156,7 +158,8 @@ class ZthConfirmationCardViewModel @Inject constructor(
         applyUiStateFromTransition(r, payload)
         // tier≥2 的 cancel 仍然会让状态机走 REJECTING_AUDIT → 实际上 REFINE；tier 1 按 refine
         if (r.action == CardAction.WAKE_WORKFLOW_WITH_REFINE) {
-            doCommit(UserCardChoice.CANCEL_TIER1_OR_LOWER, payload!!)
+            val card = payload ?: return
+            doCommit(UserCardChoice.CANCEL_TIER1_OR_LOWER, card)
         }
     }
 

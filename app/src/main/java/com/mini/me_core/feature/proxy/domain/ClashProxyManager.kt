@@ -324,7 +324,7 @@ class ClashProxyManager @Inject constructor(
                 .get().build()
             okHttp.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful || resp.body == null) return@use null
-                resp.body!!.string()
+                resp.body?.string()
             }
         }.getOrNull()
     }
@@ -554,7 +554,7 @@ class ClashProxyManager @Inject constructor(
                     throw IOException("HTTP ${resp.code}")
                 }
                 val md = MessageDigest.getInstance("SHA-256")
-                resp.body!!.byteStream().use { input ->
+                resp.body?.byteStream()?.use { input ->
                     gz.outputStream().buffered().use { out ->
                         val buf = ByteArray(64 * 1024)
                         while (true) {
@@ -727,8 +727,9 @@ class ClashProxyManager @Inject constructor(
         val source = when {
             inlineYaml != null -> inlineYaml
             else -> {
-                val revealed = repository.revealSecret(profileId!!)
-                    ?: return "未找到已播种 profile：$profileId"
+                val id = profileId ?: return "需要 profile_id 或 inline yaml"
+                val revealed = repository.revealSecret(id)
+                    ?: return "未找到已播种 profile：$id"
                 // 订阅型 profile 存的是订阅 URL：需先拉取远端 YAML；手动型存的就是 YAML 原文。
                 val trimmed = revealed.trim()
                 if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {

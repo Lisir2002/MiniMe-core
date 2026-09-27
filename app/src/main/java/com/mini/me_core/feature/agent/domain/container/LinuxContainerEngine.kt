@@ -286,7 +286,7 @@ class LinuxContainerEngine @Inject constructor(
         try {
             var line: String?
             while (reader.readLine().also { line = it } != null) {
-                emit(CommandEvent.Line(line!!))
+                emit(CommandEvent.Line(line ?: continue))
             }
             val exitCode = process.waitFor()
             watchdog.cancel()
@@ -416,7 +416,7 @@ class LinuxContainerEngine @Inject constructor(
                     try {
                         var line: String?
                         while (reader.readLine().also { line = it } != null) {
-                            output.append(line!!)
+                            output.append(line ?: continue)
                             output.append("\n")
                         }
                         exitCode = process.waitFor()
@@ -1183,7 +1183,7 @@ class LinuxContainerEngine @Inject constructor(
             if (existing == null || !existing.isActive) {
                 initJob = initScope.launch { doInit(profile) }
             }
-            initJob!!
+            checkNotNull(initJob)
         }
         // 等待完成；若调用方（终端页）被取消，join 抛 CancellationException，但后台 job 继续执行。
         job.join()
@@ -1230,7 +1230,7 @@ class LinuxContainerEngine @Inject constructor(
             if (existing == null || !existing.isActive) {
                 initJob = initScope.launch { doInit(target) }
             }
-            initJob!!
+            checkNotNull(initJob)
         }
         job.join()
         refreshContainerHome()

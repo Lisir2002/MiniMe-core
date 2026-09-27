@@ -131,7 +131,7 @@ class ZthFailureClassifier @Inject constructor() {
         }
 
         // (d) Throwable 按类型细分
-        val t = throwable!!
+        val t = throwable ?: return FailureSubClass.OUTPUT_HALLUCINATION_HIGH_CONF
         val msg = (t.message ?: "").lowercase()
         return when (t) {
             // 超时类

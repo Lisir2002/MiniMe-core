@@ -118,7 +118,7 @@ fun applyCollapse(items: List<LogListItem>, collapsedLevels: Set<LogLevel>): Lis
     while (i < items.size) {
         val item = items[i]
         if (item is LogListItem.Entry && item.parsed.level in collapsedLevels) {
-            val level = item.parsed.level!!
+            val level = item.parsed.level ?: continue
             var count = 0
             // 跳过该等级的连续 Entry（及其后的 Loose 堆栈行）
             while (i < items.size) {
