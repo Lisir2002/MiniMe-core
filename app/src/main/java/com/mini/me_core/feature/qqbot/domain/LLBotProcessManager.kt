@@ -246,6 +246,8 @@ class LLBotProcessManager @Inject constructor(
     private suspend fun awaitPortReady(port: Int, timeoutMs: Long): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
+            // 启动等待期间也实时解析日志，及时提取二维码与登录状态。
+            drainLogFile()
             if (containerBridge.checkPort(port)) return true
             delay(PORT_POLL_INTERVAL_MS)
         }
@@ -286,7 +288,7 @@ class LLBotProcessManager @Inject constructor(
         if (size < logOffset) logOffset = 0L // file rotated/truncated
         if (size == logOffset) return
         val readResult = containerBridge.executeCommand(
-            "tail -c ${logOffset + 1} $LOG_PATH 2>/dev/null",
+            "dd if=$LOG_PATH bs=1 skip=$logOffset 2>/dev/null",
             timeoutMs = 3_000L
         )
         readResult.output.lineSequence()

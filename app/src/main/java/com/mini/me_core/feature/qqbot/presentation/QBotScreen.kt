@@ -118,6 +118,7 @@ fun QBotScreen(
     val loggedBotQq by viewModel.loggedBotQq.collectAsStateWithLifecycle()
     val loggedBotNickname by viewModel.loggedBotNickname.collectAsStateWithLifecycle()
     val loginErrorMessage by viewModel.loginErrorMessage.collectAsStateWithLifecycle()
+    val smsCodePhone by viewModel.smsCodePhone.collectAsStateWithLifecycle()
     val modelOptions by viewModel.modelOptions.collectAsStateWithLifecycle()
     val selectedModelCtx by viewModel.selectedModelContextTokens.collectAsStateWithLifecycle()
 
@@ -198,6 +199,8 @@ fun QBotScreen(
                     modelOptions = modelOptions,
                     selectedModelContextTokens = selectedModelCtx,
                     loginState = loginState,
+                    qrCodeData = qrCodeData,
+                    smsCodePhone = smsCodePhone,
                     onUpdate = { newConfig -> viewModel.updateConfig { newConfig } },
                     onGenerateToken = viewModel::generateToken,
                     onSelectModel = viewModel::selectModel,
@@ -205,6 +208,8 @@ fun QBotScreen(
                     onSetPassword = viewModel::setPassword,
                     savedPassword = viewModel.savedPasswordPlain(),
                     onRelogin = viewModel::relogin,
+                    onClearQr = viewModel::clearQrCode,
+                    onSubmitSmsCode = viewModel::submitSmsCode,
                 )
             }
         }
@@ -358,6 +363,9 @@ private fun LoginBadge(loginState: QBotLoginState) {
         QBotLoginState.QR_SHOWN, QBotLoginState.SCANNING, QBotLoginState.LOGGING_IN -> Triple(
             colors.warningContainer, colors.onWarningContainer, R.string.qqbot_login_qr_shown,
         )
+        QBotLoginState.SMS_CODE_REQUIRED -> Triple(
+            colors.warningContainer, colors.onWarningContainer, R.string.qqbot_sms_code_required,
+        )
         QBotLoginState.LOGIN_FAILED -> Triple(
             colors.errorContainer, colors.onErrorContainer, R.string.qqbot_login_failed,
         )
@@ -429,6 +437,100 @@ private fun QrCodeDisplay(
             style = MaterialTheme.typography.bodySmall,
             color = colors.textSecondary,
         )
+    }
+}
+
+/** 设置页内嵌二维码显示：带加载状态、扫码状态、刷新按钮。 */
+@Composable
+private fun QrCodeInlineDisplay(
+    qrCodeData: ByteArray?,
+    loginState: QBotLoginState,
+    onRefresh: () -> Unit,
+    onRelogin: () -> Unit,
+) {
+    val colors = LocalAppTheme.current.colors
+    val bitmap = remember(qrCodeData) {
+        qrCodeData?.let { bytes ->
+            runCatching {
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(PrimitiveSpacing.Md),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            when {
+                loginState == QBotLoginState.LOGGED_IN -> {
+                    Icon(
+                        Icons.Rounded.Power,
+                        contentDescription = null,
+                        tint = colors.success,
+                        modifier = Modifier.size(32.dp),
+                    )
+                    Spacer(Modifier.height(PrimitiveSpacing.Sm))
+                    Text(
+                        text = stringResource(R.string.qqbot_logged_in),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary,
+                    )
+                }
+                bitmap != null -> {
+                    Box(
+                        modifier = Modifier
+                            .size(180.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White)
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Image(
+                            bitmap = bitmap,
+                            contentDescription = stringResource(R.string.qqbot_login_qr),
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    Spacer(Modifier.height(PrimitiveSpacing.Sm))
+                    val statusText = when (loginState) {
+                        QBotLoginState.SCANNING -> stringResource(R.string.qqbot_qr_scanned_wait_confirm)
+                        QBotLoginState.LOGGING_IN -> stringResource(R.string.qqbot_logging_in)
+                        else -> stringResource(R.string.qqbot_qr_hint)
+                    }
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary,
+                    )
+                    Spacer(Modifier.height(PrimitiveSpacing.Sm))
+                    Row(horizontalArrangement = Arrangement.spacedBy(PrimitiveSpacing.Sm)) {
+                        OutlinedButton(onClick = onRefresh) {
+                            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(stringResource(R.string.qqbot_qr_refresh))
+                        }
+                    }
+                }
+                else -> {
+                    CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.height(PrimitiveSpacing.Sm))
+                    Text(
+                        text = stringResource(R.string.qqbot_qr_loading),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary,
+                    )
+                    Spacer(Modifier.height(PrimitiveSpacing.Sm))
+                    OutlinedButton(onClick = onRelogin) {
+                        Text(stringResource(R.string.qqbot_relogin))
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -788,6 +890,8 @@ private fun SettingsPanel(
     modelOptions: List<QBotModelOption>,
     selectedModelContextTokens: Int,
     loginState: QBotLoginState,
+    qrCodeData: ByteArray?,
+    smsCodePhone: String,
     onUpdate: (QBotConfig) -> Unit,
     onGenerateToken: () -> Unit,
     onSelectModel: (QBotModelOption) -> Unit,
@@ -795,6 +899,8 @@ private fun SettingsPanel(
     onSetPassword: (String) -> Unit,
     savedPassword: String,
     onRelogin: () -> Unit,
+    onClearQr: () -> Unit,
+    onSubmitSmsCode: (String) -> Unit,
 ) {
     val colors = LocalAppTheme.current.colors
 
@@ -804,6 +910,7 @@ private fun SettingsPanel(
     var portText by remember(config.wsPort) { mutableStateOf(config.wsPort.toString()) }
     var tokenText by remember(config.wsToken) { mutableStateOf(config.wsToken) }
     var passwordText by remember(savedPassword) { mutableStateOf(savedPassword) }
+    var smsCodeText by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -823,13 +930,28 @@ private fun SettingsPanel(
         Row(horizontalArrangement = Arrangement.spacedBy(PrimitiveSpacing.Sm)) {
             FilterChip(
                 selected = config.loginType == "qrcode",
-                onClick = { onSetLoginType("qrcode") },
+                onClick = {
+                    onSetLoginType("qrcode")
+                    // 切换到扫码登录后自动重启LLBot获取新二维码
+                    onRelogin()
+                },
                 label = { Text(stringResource(R.string.qqbot_login_type_qrcode)) },
             )
             FilterChip(
                 selected = config.loginType == "password",
                 onClick = { onSetLoginType("password") },
                 label = { Text(stringResource(R.string.qqbot_login_type_password)) },
+            )
+        }
+
+        // 扫码登录：内嵌二维码显示区域
+        if (config.loginType == "qrcode") {
+            Spacer(Modifier.height(PrimitiveSpacing.Sm))
+            QrCodeInlineDisplay(
+                qrCodeData = qrCodeData,
+                loginState = loginState,
+                onRefresh = onClearQr,
+                onRelogin = onRelogin,
             )
         }
 
@@ -845,6 +967,49 @@ private fun SettingsPanel(
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // 设备锁短信验证码：仅在需要时显示
+            if (loginState == QBotLoginState.SMS_CODE_REQUIRED) {
+                Spacer(Modifier.height(PrimitiveSpacing.Sm))
+                AppCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(PrimitiveSpacing.Md),
+                        verticalArrangement = Arrangement.spacedBy(PrimitiveSpacing.Sm),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.qqbot_sms_code_required),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.warning,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        if (smsCodePhone.isNotBlank()) {
+                            Text(
+                                text = stringResource(R.string.qqbot_sms_code_sent_to, smsCodePhone),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary,
+                            )
+                        }
+                        OutlinedTextField(
+                            value = smsCodeText,
+                            onValueChange = { smsCodeText = it },
+                            label = { Text(stringResource(R.string.qqbot_sms_code_input)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Button(
+                            onClick = {
+                                onSubmitSmsCode(smsCodeText)
+                                smsCodeText = ""
+                            },
+                            enabled = smsCodeText.length >= 4,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.qqbot_sms_code_submit))
+                        }
+                    }
+                }
+            }
         }
 
         OutlinedButton(

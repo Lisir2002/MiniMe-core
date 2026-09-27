@@ -58,6 +58,13 @@ class QrCodeManager @Inject constructor() {
             "登录失败", "Login failed", "login error",
             "二维码已过期", "QR expired", "timeout"
         )
+
+        // 需要设备锁短信验证码
+        private val SMS_CODE_KEYWORDS = listOf(
+            "设备锁", "验证码", "短信验证", "手机验证",
+            "sms code", "verification code", "device lock",
+            "请输入验证码", "验证码已发送"
+        )
     }
 
     // ============== 可观察状态 ==============
@@ -76,6 +83,9 @@ class QrCodeManager @Inject constructor() {
 
     private val _loginErrorMessage = MutableStateFlow("")
     val loginErrorMessage: StateFlow<String> = _loginErrorMessage.asStateFlow()
+
+    private val _smsCodePhone = MutableStateFlow("")
+    val smsCodePhone: StateFlow<String> = _smsCodePhone.asStateFlow()
 
     // ============== 公开方法 ==============
 
@@ -146,7 +156,20 @@ class QrCodeManager @Inject constructor() {
             return
         }
 
-        // 5. 登录失败
+        // 5. 需要设备锁短信验证码
+        if (SMS_CODE_KEYWORDS.any { line.contains(it, ignoreCase = true) }) {
+            if (_loginState.value != QBotLoginState.SMS_CODE_REQUIRED) {
+                _loginState.value = QBotLoginState.SMS_CODE_REQUIRED
+                _qrCodeData.value = null
+                // 尝试从日志中提取手机号（尾号4位）
+                val phoneMatch = Regex("""1[3-9]\d{9}|尾号\s*(\d{4})""").find(line)
+                _smsCodePhone.value = phoneMatch?.value ?: ""
+                FileLogger.i(TAG, "需要设备锁短信验证码: $line")
+            }
+            return
+        }
+
+        // 6. 登录失败
         if (LOGIN_FAILED_KEYWORDS.any { line.contains(it, ignoreCase = true) }) {
             _loginState.value = QBotLoginState.LOGIN_FAILED
             _loginErrorMessage.value = line.trim().take(200)
@@ -196,5 +219,17 @@ class QrCodeManager @Inject constructor() {
         if (state == QBotLoginState.LOGGED_OUT || state == QBotLoginState.LOGIN_FAILED) {
             _qrCodeData.value = null
         }
+    }
+
+    /**
+     * 提交设备锁短信验证码。
+     * 提交后状态转为登录中，实际验证码传递由 LLBotProcessManager 通过容器通道处理。
+     */
+    fun submitSmsCode(code: String) {
+        if (_loginState.value != QBotLoginState.SMS_CODE_REQUIRED) return
+        if (code.isBlank()) return
+        _loginState.value = QBotLoginState.LOGGING_IN
+        _loginErrorMessage.value = ""
+        FileLogger.i(TAG, "已提交短信验证码，等待登录结果")
     }
 }

@@ -95,6 +95,14 @@ class QBotViewModel @Inject constructor(
     /** 登录失败的错误信息。 */
     val loginErrorMessage: StateFlow<String> = qrCodeManager.loginErrorMessage
 
+    /** 设备锁验证码发送的手机号（尾号）。 */
+    val smsCodePhone: StateFlow<String> = qrCodeManager.smsCodePhone
+
+    /** 提交设备锁短信验证码。 */
+    fun submitSmsCode(code: String) {
+        qrCodeManager.submitSmsCode(code)
+    }
+
     /** 当前选中模型的上下文窗口（token），未知为 0。 */
     private val _selectedModelContextTokens = MutableStateFlow(0)
     val selectedModelContextTokens: StateFlow<Int> = _selectedModelContextTokens.asStateFlow()

@@ -33,6 +33,9 @@ enum class QBotLoginState {
     /** 正在登录（提交票据 / 鉴权中）。 */
     LOGGING_IN,
 
+    /** 需要设备锁短信验证码。 */
+    SMS_CODE_REQUIRED,
+
     /** 已登录成功，持有 QQ 号与昵称。 */
     LOGGED_IN,
 
