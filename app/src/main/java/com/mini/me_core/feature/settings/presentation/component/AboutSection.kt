@@ -86,6 +86,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.mini.me_core.BuildConfig
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentScrollState
 import com.mini.me_core.core.theme.components.AppBottomSheet
 import com.mini.me_core.core.theme.components.AppButton
 import com.mini.me_core.core.theme.components.AppButtonVariant
@@ -327,10 +328,11 @@ internal fun AboutSection(
         )
         Box(modifier = Modifier.weight(1f)) {
 
+    val aboutScrollState = rememberPersistentScrollState("settings_about")
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(aboutScrollState)
             .padding(vertical = Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {

@@ -66,6 +66,7 @@ import com.mini.me_core.core.theme.components.AppSectionHeader
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.feature.agent.domain.container.ContainerInitState
 import com.mini.me_core.feature.agent.domain.container.GlobalInstallArchiveStore
@@ -144,7 +145,9 @@ fun TerminalBundleManagerScreen(
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
+        val listState = rememberPersistentLazyListState("terminal_bundle_manager")
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),

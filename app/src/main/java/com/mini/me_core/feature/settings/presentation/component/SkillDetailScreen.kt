@@ -69,6 +69,7 @@ import com.mini.me_core.core.theme.components.AppLoadingState
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentScrollState
 import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.feature.agent.domain.skill.Skill
 import com.mini.me_core.feature.agent.domain.skill.SkillScope
@@ -291,10 +292,11 @@ private fun FilesTab(
 /** 详情 Tab：技能元信息详情（可滚动）。 */
 @Composable
 private fun DetailTab(skill: Skill?) {
+    val scrollState = rememberPersistentScrollState("skill_detail")
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(Spacing.md)
     ) {
         if (skill == null) {

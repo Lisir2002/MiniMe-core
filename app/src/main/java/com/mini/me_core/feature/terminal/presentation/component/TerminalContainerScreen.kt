@@ -98,6 +98,7 @@ import com.mini.me_core.core.theme.components.AppSectionHeader
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
+import com.mini.me_core.core.ui.rememberPersistentScrollState
 import com.mini.me_core.feature.agent.domain.container.ContainerArch
 import com.mini.me_core.feature.agent.domain.container.ContainerProfile
 import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
@@ -198,9 +199,9 @@ fun TerminalContainerScreen(
     // 容器文件预览
     var previewFile by remember { mutableStateOf<ContainerFileEntry?>(null) }
 
-    // 每个 Tab 独立的滚动状态
-    val containerScrollState = rememberScrollState()
-    val terminalScrollState = rememberScrollState()
+    // 每个 Tab 独立的滚动状态（持久化，返回时恢复位置）
+    val containerScrollState = rememberPersistentScrollState("terminal_container")
+    val terminalScrollState = rememberPersistentScrollState("terminal_terminal_tab")
     // F3.1：容器 Tab 内子切换（0=状态/镜像 1=文件管理器）
     var containerSubTab by remember { mutableIntStateOf(0) }
 

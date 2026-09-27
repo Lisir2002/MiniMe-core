@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentScrollState
 import com.mini.me_core.feature.backup.data.guard.SentinelVerdict
 import com.mini.me_core.feature.backup.domain.AutoBackupConfig
 import com.mini.me_core.feature.backup.domain.BackupHistoryItem
@@ -143,10 +144,12 @@ internal fun BackupSection(viewModel: BackupViewModel) {
         }
     }
 
+    val backupScrollState = rememberPersistentScrollState("settings_backup")
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(backupScrollState)
             .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {

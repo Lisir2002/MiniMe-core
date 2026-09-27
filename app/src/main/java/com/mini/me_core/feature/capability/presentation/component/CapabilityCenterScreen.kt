@@ -44,6 +44,7 @@ import com.mini.me_core.core.theme.components.AppEmptyState
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.feature.agent.domain.model.AgentMode
 import com.mini.me_core.feature.agent.domain.tool.ToolCapability
@@ -142,7 +143,9 @@ private fun ToolsTab(tools: List<ToolUiModel>) {
         )
         return
     }
+    val listState = rememberPersistentLazyListState("capability_tools")
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
@@ -329,7 +332,9 @@ private fun AgentTab(
     agentInfo: AgentInfoUi,
     currentSessionMode: AgentMode
 ) {
+    val listState = rememberPersistentLazyListState("capability_agent")
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)

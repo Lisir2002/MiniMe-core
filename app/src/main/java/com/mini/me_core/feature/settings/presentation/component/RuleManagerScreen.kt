@@ -29,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.core.theme.components.AppTopAppBar
 
 /** P3：分层规则管理页（只读列表 + 启用/禁用内存覆盖）。 */
@@ -66,7 +67,9 @@ fun RuleManagerScreen(
                 )
             }
         } else {
+            val listState = rememberPersistentLazyListState("settings_rule_manager")
             LazyColumn(
+                state = listState,
                 modifier = Modifier.padding(padding).fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = Spacing.sm)
             ) {

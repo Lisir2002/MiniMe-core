@@ -145,6 +145,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.browser.domain.AgentActionRecord
 import com.mini.me_core.feature.browser.domain.BrowserBookmark
 import com.mini.me_core.feature.browser.domain.BrowserController
@@ -1590,7 +1591,9 @@ private fun BrowserHomePage(
     recentVisits: List<BrowserHistoryEntry>,
     onOpen: (String) -> Unit
 ) {
+    val listState = rememberPersistentLazyListState("browser_screen")
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)

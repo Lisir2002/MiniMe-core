@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentScrollState
 import com.mini.me_core.core.theme.components.AppButton
 import com.mini.me_core.core.theme.components.AppButtonColor
 import com.mini.me_core.core.theme.components.AppButtonSize
@@ -87,7 +88,9 @@ fun SecuritySettingsScreen(
         }
     }
 
-    androidx.compose.material3.Scaffold(
+    val securityScrollState = rememberPersistentScrollState("settings_security")
+
+        androidx.compose.material3.Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
@@ -95,7 +98,7 @@ fun SecuritySettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(securityScrollState)
                 .padding(Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {

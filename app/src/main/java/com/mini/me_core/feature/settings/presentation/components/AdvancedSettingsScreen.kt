@@ -31,6 +31,7 @@ import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.components.AppCard
 import com.mini.me_core.core.theme.components.AppSectionHeader
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.settings.presentation.ZthSettingsViewModel
 
 /**
@@ -47,12 +48,14 @@ fun AdvancedSettingsScreen(
     zthViewModel: ZthSettingsViewModel,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val listState = rememberPersistentLazyListState("settings_advanced")
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),

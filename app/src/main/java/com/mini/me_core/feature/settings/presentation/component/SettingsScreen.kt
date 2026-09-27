@@ -2,6 +2,7 @@ package com.mini.me_core.feature.settings.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
+import com.mini.me_core.core.ui.rememberPersistentScrollState
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
@@ -310,13 +311,8 @@ fun SettingsScreen(
 
     // 处于二级页时，系统返回键先回到上一层；首页时交还给上层导航。
 
-    // 滚动位置记忆：导航到子页面后 SettingsScreen 离开组合，rememberScrollState 会被销毁。
-    // 将偏移量持久化到 Activity 级 ViewModel，返回时恢复，避免每次回到顶部。
-    val savedScrollOffset by viewModel.settingsScrollOffset.collectAsStateWithLifecycle()
-    val scrollState = rememberScrollState(initial = savedScrollOffset)
-    LaunchedEffect(scrollState) {
-        snapshotFlow { scrollState.value }.collect { viewModel.setSettingsScrollOffset(it) }
-    }
+    // 滚动位置持久化：返回设置首页时停留在进入子页面前的位置
+    val scrollState = rememberPersistentScrollState("settings_menu")
     BackHandler(enabled = section != SettingsSection.Menu) {
         when (section) {
             SettingsSection.ProviderEditor -> section = SettingsSection.Providers

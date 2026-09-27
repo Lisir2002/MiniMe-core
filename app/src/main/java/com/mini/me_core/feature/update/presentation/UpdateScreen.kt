@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentScrollState
 import com.mini.me_core.core.theme.components.AppButton
 import com.mini.me_core.core.theme.components.AppButtonColor
 import com.mini.me_core.core.theme.components.AppButtonVariant
@@ -247,10 +248,11 @@ private fun LatestTab(
     viewModel: UpdateViewModel,
     onOpenLink: (String) -> Unit,
 ) {
+    val updateScrollState = rememberPersistentScrollState("settings_update")
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(updateScrollState)
             .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {

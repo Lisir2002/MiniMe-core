@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.core.theme.components.AppTopAppBar
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,7 +95,9 @@ fun RemoteServerScreen(
                         modifier = Modifier.align(Alignment.Center)
                     )
                 } else {
+                    val connectionsListState = rememberPersistentLazyListState("settings_remote_connections")
                     LazyColumn(
+                        state = connectionsListState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -126,7 +129,9 @@ fun RemoteServerScreen(
                         modifier = Modifier.align(Alignment.Center)
                     )
                 } else {
+                    val mountsListState = rememberPersistentLazyListState("settings_remote_mounts")
                     LazyColumn(
+                        state = mountsListState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)

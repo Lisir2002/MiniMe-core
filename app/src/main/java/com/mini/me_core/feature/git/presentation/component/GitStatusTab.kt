@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.git.domain.model.GitFileChange
 import com.mini.me_core.feature.git.domain.model.GitStatus
 import androidx.compose.material.icons.Icons
@@ -85,7 +86,9 @@ internal fun StatusTab(
             EmptyState(stringResource(R.string.git_clean_with_changes))
         } else {
             val ss = s ?: return
+            val listState = rememberPersistentLazyListState("git_status")
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = Spacing.xl)
             ) {

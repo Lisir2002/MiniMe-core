@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.git.domain.model.GitBranch
 import com.mini.me_core.feature.git.domain.model.GitTag
 import androidx.compose.material.icons.Icons
@@ -361,7 +362,9 @@ internal fun BranchesTab(
     val localTree = remember(localBranches) { buildBranchTree(localBranches) }
     val remoteTree = remember(remoteBranches) { buildBranchTree(remoteBranches) }
 
+    val listState = rememberPersistentLazyListState("git_branches")
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = Spacing.xl)
     ) {

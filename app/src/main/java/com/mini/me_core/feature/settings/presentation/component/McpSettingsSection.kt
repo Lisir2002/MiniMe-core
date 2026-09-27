@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.sp
 import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.agent.domain.mcp.McpServerConfig
 import com.mini.me_core.feature.agent.domain.mcp.McpServerStatus
 import kotlin.math.roundToInt
@@ -92,7 +93,9 @@ internal fun McpSection(
     modifier: Modifier = Modifier,
     onAddServer: (() -> Unit)? = null
 ) {
+    val listState = rememberPersistentLazyListState("settings_mcp_external")
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)

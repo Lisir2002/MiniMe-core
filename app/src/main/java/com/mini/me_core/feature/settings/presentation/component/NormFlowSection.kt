@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.agent.presentation.component.formatTokenCountShort
 
 /**
@@ -146,7 +147,9 @@ internal fun NormFlowSection(
     var guardExpanded by remember { mutableStateOf(false) }
     var runtimeExpanded by remember { mutableStateOf(false) }
 
+    val listState = rememberPersistentLazyListState("settings_normflow")
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),

@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
@@ -72,7 +72,7 @@ fun LogViewerScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var showFilterSheet by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
+    val listState = rememberPersistentLazyListState("settings_logs")
 
     val isExpanded = LocalConfiguration.current.screenWidthDp >= 600
     val entries = remember(state.content, state.collapsedLevels) {

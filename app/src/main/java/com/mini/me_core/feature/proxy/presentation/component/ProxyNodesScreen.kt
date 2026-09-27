@@ -59,6 +59,7 @@ import com.mini.me_core.core.theme.components.AppLoadingState
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.proxy.domain.ProxyGroupInfo
 import com.mini.me_core.feature.proxy.domain.ProxyNodeInfo
 import com.mini.me_core.feature.proxy.domain.ProxyTraffic
@@ -549,6 +550,7 @@ private fun GroupsTab(
         groups.firstOrNull()?.name?.let { setOf(it) } ?: emptySet()
     }
 
+    val listState = rememberPersistentLazyListState("proxy_nodes")
     when {
         groupsView?.loading == true -> AppLoadingState(stringResource(R.string.ui_______5f2b08e6))
         !enabled || !(groupsView?.running == true) -> Column(
@@ -579,6 +581,7 @@ private fun GroupsTab(
             modifier = Modifier.padding(Spacing.md)
         )
         else -> LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)

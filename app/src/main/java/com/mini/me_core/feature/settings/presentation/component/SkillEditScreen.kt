@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentScrollState
 import com.mini.me_core.feature.agent.domain.skill.SkillScope
 import com.mini.me_core.feature.agent.domain.skill.SkillType
 import com.mini.me_core.feature.settings.presentation.SkillEditViewModel
@@ -163,10 +164,11 @@ fun SkillEditScreen(
         }
 
         // ── 编辑区 ──
+        val editScrollState = rememberPersistentScrollState("skill_edit")
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(editScrollState)
                 .padding(horizontal = Spacing.md)
         ) {
             if (currentFile == "SKILL.md" || currentFile == "CLAUDE.md") {

@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.settings.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -72,7 +73,9 @@ internal fun ProvidersSection(
         EmptyHint(stringResource(R.string.providers_empty))
         return
     }
+    val listState = rememberPersistentLazyListState("settings_providers")
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)

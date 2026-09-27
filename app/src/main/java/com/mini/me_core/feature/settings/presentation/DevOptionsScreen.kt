@@ -62,6 +62,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.core.theme.components.AppCard
 import com.mini.me_core.core.theme.components.AppCardVariant
 import com.mini.me_core.core.theme.components.AppConfirmDialog
@@ -423,7 +424,9 @@ private fun PerformanceTab(
         else -> colors.success
     }
 
+    val listState = rememberPersistentLazyListState("settings_dev_perf")
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -619,7 +622,9 @@ private fun DebugTab(
     onSetWebViewDebug: (Boolean) -> Unit,
     onOpenLogViewer: () -> Unit,
 ) {
+    val listState = rememberPersistentLazyListState("settings_dev_debug")
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -722,7 +727,9 @@ private fun MonitorTab(
     onClearAnr: () -> Unit,
 ) {
     val colors = LocalAppTheme.current.colors
+    val listState = rememberPersistentLazyListState("settings_dev_monitor")
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),

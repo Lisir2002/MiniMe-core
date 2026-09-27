@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.components.AppTopAppBar
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -63,7 +64,9 @@ fun GuardLogsScreen(
                 )
             }
         } else {
+            val listState = rememberPersistentLazyListState("settings_guard_logs")
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()

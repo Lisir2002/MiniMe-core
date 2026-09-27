@@ -57,6 +57,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.proxy.domain.ProxyGroupInfo
 import com.mini.me_core.feature.proxy.domain.ProxyNodeInfo
 import com.mini.me_core.feature.proxy.domain.ProxySubscription
@@ -129,7 +130,9 @@ fun ProxyConfigScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            val listState = rememberPersistentLazyListState("proxy_config")
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(Spacing.md),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm)

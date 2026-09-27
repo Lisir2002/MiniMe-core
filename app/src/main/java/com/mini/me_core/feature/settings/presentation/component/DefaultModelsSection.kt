@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 
@@ -111,7 +112,9 @@ internal fun DefaultModelsSection(
     }
     val compactionMetadata = if (compactionProviderId.isBlank() || compactionModel.isBlank()) null else modelMetadata[compactionModel]
 
+    val listState = rememberPersistentLazyListState("settings_default_models")
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)

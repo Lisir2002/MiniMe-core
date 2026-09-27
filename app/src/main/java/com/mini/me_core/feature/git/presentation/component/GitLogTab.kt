@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.git.domain.model.GitCommit
 import com.mini.me_core.feature.git.domain.model.GitFileChange
 import com.mini.me_core.feature.git.domain.model.GitGraph
@@ -89,7 +90,7 @@ internal fun LogTab(
     val canvasWidth = laneWidth * (graph.maxLane + 1) + Spacing.sm * 2
     // 每行高度，用于计算连线纵向跨度（节点居中）。
     val rowHeight = 72.dp
-    val listState = rememberLazyListState()
+    val listState = rememberPersistentLazyListState("git_log")
     // 滚到底且还有更多、且不在加载中时触发加载下一页。用 derivedStateOf 避免每帧回调。
     val reachedBottom by remember {
         derivedStateOf {

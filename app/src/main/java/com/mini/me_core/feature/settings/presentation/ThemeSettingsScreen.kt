@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.settings.presentation
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.ui.rememberPersistentScrollState
 
 import androidx.compose.foundation.background
 import androidx.compose.animation.core.animateFloatAsState
@@ -109,12 +110,13 @@ fun ThemeSettingsScreen(
     // 恢复出厂确认 Dialog 状态
     var showResetConfirm by remember { mutableStateOf(false) }
 
+    val themeScrollState = rememberPersistentScrollState("settings_theme")
     // 问题4修复：去掉自带 Scaffold + AppTopAppBar，复用外层 SettingsScreen 的顶栏
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.surfacePage)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(themeScrollState),
     ) {
         Spacer(Modifier.height(16.dp))
 

@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Code
@@ -97,7 +97,7 @@ fun RemoteAuditLogsScreen(
     val scope = rememberCoroutineScope()
     val snackbarHost = remember { SnackbarHostState() }
     val english = LocalConfiguration.current.locales[0]?.language == "en"
-    val listState = rememberLazyListState()
+    val listState = rememberPersistentLazyListState("settings_remote_audit")
 
     // 顶栏内联搜索状态由外层 SettingsScreen 持有，这里同步进 ViewModel（跳过首次初始化，避免与 init refresh 重复）。
     var searchSynced by remember { mutableStateOf(false) }

@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 
 /**
  * 内置 MCP 服务器（服务端）二级页：把本机编码后端开放给外部 MCP 客户端。
@@ -99,7 +100,9 @@ internal fun McpServerSection(
         onSaveConfig(newPort, requireApproval, autoStart)
     }
 
+    val listState = rememberPersistentLazyListState("settings_mcp_server")
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)

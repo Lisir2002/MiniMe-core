@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.agent.domain.permission.PermissionDecision
 import com.mini.me_core.feature.agent.domain.permission.PermissionRule
 import androidx.compose.ui.res.stringResource
@@ -50,7 +51,9 @@ internal fun PermissionsSection(
     onPromote: (PermissionRule) -> Unit,
     onDeleteGlobal: (PermissionRule) -> Unit
 ) {
+    val listState = rememberPersistentLazyListState("settings_permissions")
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)

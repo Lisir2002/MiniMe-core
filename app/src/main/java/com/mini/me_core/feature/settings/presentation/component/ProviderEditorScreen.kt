@@ -106,6 +106,7 @@ import androidx.compose.ui.unit.sp
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.ui.rememberPersistentScrollState
 import com.mini.me_core.feature.agent.data.local.entity.ModelCapabilityOverrideEntity
 import com.mini.me_core.feature.settings.data.remote.ModelTestResult
 import com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepository
@@ -149,6 +150,7 @@ fun ProviderEditorScreen(
     var showFetchDialog by remember { mutableStateOf(false) }
     var fetchDialogKey by remember { mutableIntStateOf(0) }
     var selectedTab by remember { mutableIntStateOf(0) }
+    val editorScrollState = rememberPersistentScrollState("settings_provider_editor")
     // RC63 ④：当前「能力覆盖」面板正在编辑哪一个模型；null=关闭。
     var capabilityOverrideModel by remember { mutableStateOf<String?>(null) }
 
@@ -359,7 +361,7 @@ fun ProviderEditorScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(editorScrollState)
                         .padding(Spacing.lg),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
