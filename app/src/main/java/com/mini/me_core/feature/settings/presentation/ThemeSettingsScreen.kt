@@ -119,7 +119,7 @@ fun ThemeSettingsScreen(
         Spacer(Modifier.height(16.dp))
 
             // ── Section 1: 实时预览 ──
-            AppSectionHeader(title = "实时预览")
+            AppSectionHeader(title = stringResource(R.string.theme_section_preview))
             ThemePreviewCard(
                 preset = currentPreset,
                 isDark = isDark,
@@ -129,7 +129,7 @@ fun ThemeSettingsScreen(
             Spacer(Modifier.height(24.dp))
 
             // ── Section 2: 外观模式 ──
-            AppSectionHeader(title = "外观模式")
+            AppSectionHeader(title = stringResource(R.string.theme_section_appearance))
             AppearanceModeSelector(
                 selectedMode = ThemeMode.fromPersisted(settings.mode),
                 onModeSelected = { viewModel.setMode(it) },
@@ -139,7 +139,10 @@ fun ThemeSettingsScreen(
             Spacer(Modifier.height(24.dp))
 
             // ── Section 3: 主题预设 ──
-            AppSectionHeader(title = "主题预设", subtitle = "选择喜欢的配色方案")
+            AppSectionHeader(
+                title = stringResource(R.string.theme_section_presets),
+                subtitle = stringResource(R.string.theme_section_presets_sub),
+            )
             PresetCarousel(
                 presets = ThemePresets.All,
                 selectedPresetId = settings.presetId,
@@ -149,7 +152,10 @@ fun ThemeSettingsScreen(
             Spacer(Modifier.height(24.dp))
 
             // ── Section 4: 颜色自定义（Phase 5）──
-            AppSectionHeader(title = "颜色自定义", subtitle = "覆盖预设颜色，点击圆点选择")
+            AppSectionHeader(
+                title = stringResource(R.string.theme_section_custom_colors),
+                subtitle = stringResource(R.string.theme_section_custom_colors_sub),
+            )
             ColorCustomizationSection(
                 settings = settings,
                 currentColors = colors,
@@ -162,7 +168,10 @@ fun ThemeSettingsScreen(
             Spacer(Modifier.height(24.dp))
 
             // ── Section 5: 显示偏好（Phase 5）──
-            AppSectionHeader(title = "显示偏好", subtitle = "圆角、字体大小和动效")
+            AppSectionHeader(
+                title = stringResource(R.string.theme_section_display),
+                subtitle = stringResource(R.string.theme_section_display_sub),
+            )
             DisplayPreferencesSection(
                 cornerStyle = settings.cornerStyleEnum(),
                 cornerRadius = settings.cornerRadius,
@@ -189,10 +198,10 @@ fun ThemeSettingsScreen(
     // 恢复出厂确认 Dialog
     if (showResetConfirm) {
         AppDialog(
-            title = "恢复出厂主题？",
-            message = "将清除所有自定义颜色和显示偏好，恢复到默认预设和外观模式。",
+            title = stringResource(R.string.theme_reset_confirm_title),
+            message = stringResource(R.string.theme_reset_confirm_msg),
             type = AppDialogType.Destructive,
-            confirmText = "确认恢复",
+            confirmText = stringResource(R.string.theme_reset_confirm_button),
             onDismiss = { showResetConfirm = false },
             onConfirm = { viewModel.resetToDefaults() },
         )
@@ -257,7 +266,7 @@ private fun ThemePreviewCard(
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        text = "帮我分析一下这个项目",
+                        text = stringResource(R.string.theme_preview_msg_user),
                         fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                         color = previewColors.onBrandPrimary,
                     )
@@ -273,7 +282,7 @@ private fun ThemePreviewCard(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = "好的，我来分析项目结构。",
+                    text = stringResource(R.string.theme_preview_msg_assistant),
                     fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                     color = previewColors.textPrimary,
                 )
@@ -288,7 +297,7 @@ private fun ThemePreviewCard(
                             .background(previewColors.success),
                     )
                     Text(
-                        text = "读取文件列表",
+                        text = stringResource(R.string.theme_preview_tool_call),
                         fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                         color = previewColors.textSecondary,
                     )
@@ -324,7 +333,7 @@ private fun ThemePreviewCard(
                 }
                 // 占位文字
                 Text(
-                    text = "输入消息...",
+                    text = stringResource(R.string.theme_preview_input_hint),
                     fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                     color = previewColors.textTertiary,
                     modifier = Modifier.weight(1f),
@@ -361,9 +370,9 @@ private fun AppearanceModeSelector(
 ) {
     val colors = LocalAppTheme.current.colors
     val modes = listOf(
-        Triple(ThemeMode.AUTO, "跟随系统", Icons.Rounded.BrightnessAuto),
-        Triple(ThemeMode.LIGHT, "浅色", Icons.Rounded.LightMode),
-        Triple(ThemeMode.DARK, "深色", Icons.Rounded.DarkMode),
+        Triple(ThemeMode.AUTO, stringResource(R.string.theme_mode_auto), Icons.Rounded.BrightnessAuto),
+        Triple(ThemeMode.LIGHT, stringResource(R.string.theme_mode_light), Icons.Rounded.LightMode),
+        Triple(ThemeMode.DARK, stringResource(R.string.theme_mode_dark), Icons.Rounded.DarkMode),
     )
 
     AppCard(modifier = modifier) {
@@ -499,7 +508,7 @@ private fun PresetCarousel(
                             .padding(horizontal = 8.dp, vertical = 2.dp),
                     ) {
                         Text(
-                            text = "使用中",
+                            text = stringResource(R.string.theme_preset_in_use),
                             fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                             fontWeight = FontWeight.Bold,
                             color = colors.onBrandPrimary,
@@ -618,7 +627,7 @@ private fun ColorRow(
                 )
                 if (isCustom) {
                     TextButton(onClick = onReset) {
-                        Text("恢复", fontSize = LocalComponentTokens.current.text.labelSmallFontSize, color = colors.textSecondary)
+                        Text(stringResource(R.string.theme_color_reset), fontSize = LocalComponentTokens.current.text.labelSmallFontSize, color = colors.textSecondary)
                     }
                 }
             }
@@ -642,7 +651,7 @@ private fun ColorRow(
                         .background(colors.warning),
                 )
                 Text(
-                    text = "对比度不足（%.1f:1），可能影响可读性".format(contrastRatio),
+                    text = stringResource(R.string.theme_color_low_contrast, contrastRatio),
                     fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
                     color = colors.warning,
                 )
@@ -688,7 +697,7 @@ private fun ColorPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("选择$title") },
+        title = { Text(stringResource(R.string.theme_color_picker_title, title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // 当前选中色预览
@@ -729,12 +738,12 @@ private fun ColorPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(selectedColor) }) {
-                Text("确定", color = colors.brandPrimary)
+                Text(stringResource(R.string.common_confirm), color = colors.brandPrimary)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.common_cancel))
             }
         },
     )
@@ -840,7 +849,7 @@ private fun DisplayPreferencesSection(
 
             // 圆角半径滑块（仅圆角模式可用，直角模式禁用置灰）
             SliderRow(
-                label = "圆角半径",
+                label = stringResource(R.string.theme_corner_radius),
                 value = cornerRadius,
                 valueRange = 0f..24f,
                 onValueChange = onCornerRadiusChange,
@@ -850,7 +859,7 @@ private fun DisplayPreferencesSection(
 
             // 字体大小滑块
             SliderRow(
-                label = "字体大小",
+                label = stringResource(R.string.theme_font_size),
                 value = fontScale,
                 valueRange = 0.8f..1.4f,
                 onValueChange = onFontScaleChange,
@@ -859,11 +868,11 @@ private fun DisplayPreferencesSection(
 
             // 动效强度滑块
             SliderRow(
-                label = "动效强度",
+                label = stringResource(R.string.theme_animation_scale),
                 value = animationScale,
                 valueRange = 0f..1f,
                 onValueChange = onAnimationScaleChange,
-                valueLabel = if (animationScale == 0f) "关闭" else "%.0f%%".format(animationScale * 100),
+                valueLabel = if (animationScale == 0f) stringResource(R.string.common_close) else "%.0f%%".format(animationScale * 100),
             )
 
             // 动效预览：点击播放动画，时长跟随 animationScale
@@ -912,7 +921,7 @@ private fun AnimationPreviewBox() {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
-            text = "点击预览动效",
+            text = stringResource(R.string.theme_animation_preview_hint),
             fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
             color = colors.textSecondary,
         )
@@ -963,7 +972,7 @@ private fun FactoryResetButton(
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.error),
     ) {
         Text(
-            text = "恢复出厂主题",
+            text = stringResource(R.string.theme_factory_reset),
             fontWeight = FontWeight.Medium,
             fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
         )

@@ -91,7 +91,7 @@ data class ThemePreset(
  * @property mode 外观模式
  * @property presetId 当前应用的预设 ID
  * @property customOverrides 自定义颜色覆盖 Map（key=友好色名字, value=ARGB hex 字符串）。
- *           Phase 5 复用此字段存储 9 项可自定义颜色，与 Phase 4 设计一致。
+ *           Phase 5 复用此字段存储 10 项可自定义颜色，与 Phase 4 设计一致。
  * @property backgroundImage 背景图 URI（null=无背景图）
  * @property backgroundMask 背景图遮罩浓度（0.0-1.0，默认 0.5）
  * @property cardOpacity 卡片透明度（0.0-1.0，默认 1.0）
@@ -138,7 +138,7 @@ data class ThemeSettings(
 }
 
 /**
- * 9 项可自定义颜色的友好名称到 SemanticColors 字段的映射（Phase 5）。
+ * 10 项可自定义颜色的友好名称到 SemanticColors 字段的映射（Phase 5）。
  *
  * key = 用户在 UI 上看到的友好名称，value = SemanticColors 对应字段的取值函数。
  * 自定义颜色覆盖时，先从预设获取基础色，再用 customOverrides Map 覆盖指定字段。
@@ -172,11 +172,14 @@ object CustomColorFields {
     /** 成功色 → [SemanticColors.success] */
     const val SUCCESS = "success"
 
-    /** 全部 9 项可自定义颜色 key 列表 */
+    /** 警告色 → [SemanticColors.warning] */
+    const val WARNING = "warning"
+
+    /** 全部可自定义颜色 key 列表 */
     val ALL_KEYS = listOf(
         PRIMARY, BACKGROUND, SURFACE, SURFACE_VARIANT,
         TEXT_PRIMARY, TEXT_SECONDARY, BORDER_DEFAULT,
-        ERROR, SUCCESS,
+        ERROR, SUCCESS, WARNING,
     )
 
     /** 友好名称到中文显示名的映射 */
@@ -190,6 +193,7 @@ object CustomColorFields {
         BORDER_DEFAULT to "默认边框",
         ERROR to "错误色",
         SUCCESS to "成功色",
+        WARNING to "警告色",
     )
 
     /**
@@ -211,6 +215,7 @@ object CustomColorFields {
             borderDefault = overrides[BORDER_DEFAULT].toColor() ?: base.borderDefault,
             error = overrides[ERROR].toColor() ?: base.error,
             success = overrides[SUCCESS].toColor() ?: base.success,
+            warning = overrides[WARNING].toColor() ?: base.warning,
         )
     }
 
@@ -227,6 +232,7 @@ object CustomColorFields {
         BORDER_DEFAULT -> colors.borderDefault
         ERROR -> colors.error
         SUCCESS -> colors.success
+        WARNING -> colors.warning
         else -> colors.brandPrimary
     }
 
@@ -237,7 +243,7 @@ object CustomColorFields {
     fun getContrastBackground(field: String, colors: SemanticColors): Color = when (field) {
         TEXT_PRIMARY, TEXT_SECONDARY -> colors.surfacePage
         PRIMARY, SURFACE, SURFACE_VARIANT, BORDER_DEFAULT -> colors.surfacePage
-        ERROR, SUCCESS -> colors.surfaceCard
+        ERROR, SUCCESS, WARNING -> colors.surfaceCard
         BACKGROUND -> colors.textPrimary
         else -> colors.surfacePage
     }
