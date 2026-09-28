@@ -290,7 +290,7 @@ class SecuritySettingsViewModel @Inject constructor(
                 val states = LibName.entries.map { lib ->
                     val size = runCatching { pathProvider.mainDb(lib).length() }.getOrDefault(0L)
                     LibEncryptionState(
-                        libName = lib.name.lowercase(),
+                        libName = lib.dbId,
                         fileSizeBytes = size,
                     )
                 }

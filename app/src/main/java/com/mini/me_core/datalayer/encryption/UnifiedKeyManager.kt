@@ -28,10 +28,28 @@ interface UnifiedKeyManager {
     /** 获取或创建指定用途的DEK（32字节AES-256） */
     suspend fun getOrCreateDek(purpose: String): ByteArray
 
-    /** 获取已存在的DEK，不存在返回null */
+    /**
+     * 获取已存在的DEK，不存在返回null。
+     *
+     * ⚠️ 与「读取失败」严格区分：DEK 存在但解不开（Keystore 故障 / 密文损坏）时**抛异常**，
+     *    绝不返回 null —— null 会被误读为「还没有 DEK」进而生成新 DEK 覆盖，
+     *    一旦覆盖，用旧 DEK 加密的数据将**永久不可解**。
+     */
     suspend fun getDek(purpose: String): ByteArray?
 
-    /** 轮换指定用途的DEK（生成新DEK，旧DEK不再保留用于加密新数据） */
+    /**
+     * 轮换指定用途的DEK。
+     *
+     * 语义随 purpose 而异（这是设计 §4.2 决策 3 的落地，但按用途分类）：
+     *  - **数据库密钥**（[CipherPassphrase.DB_PREFIX] 开头）：**直接拒绝**。库文件是整体加密的，
+     *    换 DEK 而不重加密文件 = 该库立即不可读；必须走
+     *    [com.mini.me_core.datalayer.encryption.KeyRotationMigrator]（旧/新口令 provider）
+     *    做 `sqlcipher_export` 整体重加密。
+     *  - **其它用途**（如字段加密）：旧 DEK 保留为 `dek_<purpose>_prev`，用于解密轮换前产生的历史密文；
+     *    [decrypt] 在当前 DEK 校验失败时自动回退到 prev。
+     *
+     * @throws IllegalArgumentException 对数据库密钥调用（应改用 KeyRotationMigrator）
+     */
     suspend fun rotateDek(purpose: String): ByteArray
 
     /** 检查DEK是否已初始化 */
@@ -94,6 +112,12 @@ class AndroidUnifiedKeyManager(
         // ── 旧版兼容：旧数据库密钥存储 ──
         private const val LEGACY_DB_PREFS = "minime_db_keys"
         private const val LEGACY_DB_MASTER_ALIAS = "minime_db_master"
+
+        /** DEK 在 EncryptedSharedPreferences 中的键前缀（值 = Base64(DEK)）。 */
+        private const val DEK_KEY_PREFIX = "dek_"
+
+        /** 轮换后旧 DEK 的保存后缀（仅非数据库用途；供历史密文解密）。 */
+        private const val DEK_PREV_SUFFIX = "_prev"
 
         /**
          * 旧版 LibName.name → 新版 purpose 映射。
@@ -166,9 +190,19 @@ class AndroidUnifiedKeyManager(
     }
 
     override suspend fun getOrCreateDek(purpose: String): ByteArray = withContext(Dispatchers.IO) {
-        // 先尝试新体系
-        val existing = readDek(purpose)
-        if (existing != null) return@withContext existing
+        when (val read = readDekResult(purpose)) {
+            is DekRead.Present -> return@withContext read.dek
+            is DekRead.Broken -> {
+                // ⚠️ fail-close：DEK 存在但解不开时**绝不**生成新 DEK 覆盖。
+                //    覆盖 = 用旧 DEK 加密的数据永久不可解（6 个库全部报废）。
+                throw DatabaseEncryptionException(
+                    "DEK 已存在但无法解密，拒绝重建以免永久丢失数据: purpose=$purpose, " +
+                        "cause=${read.cause.javaClass.simpleName}",
+                    read.cause,
+                )
+            }
+            DekRead.Absent -> Unit
+        }
 
         // 新体系没有，尝试旧版导入
         val imported = tryImportLegacyDek(purpose)
@@ -185,15 +219,43 @@ class AndroidUnifiedKeyManager(
     }
 
     override suspend fun getDek(purpose: String): ByteArray? = withContext(Dispatchers.IO) {
-        readDek(purpose)
+        when (val read = readDekResult(purpose)) {
+            is DekRead.Present -> read.dek
+            // 存在但解不开 ≠ 不存在。抛异常而非返回 null，避免调用方误判为「未初始化」。
+            is DekRead.Broken -> throw DatabaseEncryptionException(
+                "DEK 存在但无法解密: purpose=$purpose, cause=${read.cause.javaClass.simpleName}",
+                read.cause,
+            )
+            DekRead.Absent -> null
+        }
     }
 
     override suspend fun rotateDek(purpose: String): ByteArray = withContext(Dispatchers.IO) {
-        // 清除旧DEK，生成新DEK
-        encryptedPrefs.edit().remove(dekPrefKey(purpose)).apply()
+        if (CipherPassphrase.isDbPurpose(purpose)) {
+            // 库文件是**整体加密**的：换 DEK 而不重加密文件 = 该库立刻不可读，且无旧 DEK 可救。
+            // 正确做法是 KeyRotationMigrator（旧口令/新口令 provider）跑 sqlcipher_export。
+            throw IllegalArgumentException(
+                "数据库密钥不允许直接轮换：换 DEK 而库文件未重加密会使该库立即不可读。" +
+                    "请改用 KeyRotationMigrator(sqlcipher_export 整体重加密): purpose=$purpose",
+            )
+        }
+
+        val current = when (val read = readDekResult(purpose)) {
+            is DekRead.Present -> read.dek
+            is DekRead.Broken -> throw DatabaseEncryptionException(
+                "当前 DEK 无法解密，拒绝轮换: purpose=$purpose",
+                read.cause,
+            )
+            DekRead.Absent -> null
+        }
+        // 旧 DEK 先转存为 prev（保历史数据优先于保新密钥）
+        if (current != null) {
+            storePrevDek(purpose, current)
+            current.fill(0)
+        }
         val newDek = generateRandomDek()
         storeDek(purpose, newDek)
-        FileLogger.i(TAG, "DEK已轮换: purpose=$purpose")
+        FileLogger.i(TAG, "DEK已轮换: purpose=$purpose（旧DEK保留为 prev，仍可解密历史数据）")
         newDek
     }
 
@@ -219,27 +281,50 @@ class AndroidUnifiedKeyManager(
     }
 
     override suspend fun decrypt(purpose: String, ciphertextB64: String): ByteArray = withContext(Dispatchers.IO) {
-        val dek = getDek(purpose)
-            ?: throw DatabaseEncryptionException("DEK未初始化，无法解密: purpose=$purpose")
-        try {
-            val combined = Base64.decode(ciphertextB64, Base64.NO_WRAP)
-            if (combined.size < GCM_IV_LEN + 1) {
-                throw DatabaseEncryptionException("密文格式错误：长度不足")
-            }
-            val iv = combined.copyOfRange(0, GCM_IV_LEN)
-            val ciphertext = combined.copyOfRange(GCM_IV_LEN, combined.size)
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(dek, "AES"), GCMParameterSpec(GCM_TAG_BITS, iv))
-            cipher.doFinal(ciphertext)
-        } finally {
-            dek.fill(0)
+        // 候选 DEK：当前 → 上一代（轮换前的历史密文用旧 DEK 才能解开）
+        val candidates = dekCandidates(purpose)
+        if (candidates.isEmpty()) {
+            throw DatabaseEncryptionException("DEK未初始化，无法解密: purpose=$purpose")
         }
+        var lastError: Exception? = null
+        for (dek in candidates) {
+            try {
+                return@withContext decryptWith(dek, ciphertextB64)
+            } catch (e: Exception) {
+                lastError = e
+            } finally {
+                dek.fill(0)
+            }
+        }
+        throw DatabaseEncryptionException(
+            "解密失败（已尝试 ${candidates.size} 个候选DEK，含轮换前的旧DEK）: purpose=$purpose",
+            lastError,
+        )
     }
 
+    /**
+     * 紧急重置：清除**字段及其它非数据库用途**的 DEK。
+     *
+     * ⚠️ 绝不清除 `db_*`（数据库 DEK）：那会让 6 个库全部不可读，下次启动走
+     *    「不可读 → 隔离 → 以全新库重建」，等于清空用户全部数据。本操作的语义是
+     *    「重置凭据主密钥、凭据需重新录入」，不应波及数据库。
+     */
     override suspend fun emergencyReset() = withContext(Dispatchers.IO) {
         try {
-            encryptedPrefs.edit().clear().commit()
-            FileLogger.w(TAG, "紧急重置：所有DEK已清除，加密数据将不可读")
+            val editor = encryptedPrefs.edit()
+            var removed = 0
+            for (key in encryptedPrefs.all.keys) {
+                // 只处理 DEK 键；同 prefs 里的其它业务键不属本操作职责范围
+                if (!key.startsWith(DEK_KEY_PREFIX)) continue
+                val purpose = key.removePrefix(DEK_KEY_PREFIX)
+                if (!CipherPassphrase.isDbPurpose(purpose)) {
+                    editor.remove(key)
+                    removed++
+                }
+            }
+            val committed = editor.commit()
+            if (!committed) throw DatabaseEncryptionException("紧急重置失败（commit 返回 false）")
+            FileLogger.w(TAG, "紧急重置：已清除 $removed 个非数据库DEK；数据库DEK(db_*)保留，避免全库不可读")
         } catch (e: Exception) {
             throw DatabaseEncryptionException("紧急重置失败: cause=${e.javaClass.simpleName}", e)
         }
@@ -247,18 +332,75 @@ class AndroidUnifiedKeyManager(
 
     // ============== 内部方法 ==============
 
-    private fun dekPrefKey(purpose: String): String = "dek_$purpose"
+    /**
+     * DEK 读取结果。**区分「不存在」与「存在但解不开」是本类的关键不变量**：
+     * 把后者当前者处理会导致生成新 DEK 覆盖旧 DEK，数据永久不可解（设计 §2.1.5 / §7.3）。
+     */
+    private sealed interface DekRead {
+        data class Present(val dek: ByteArray) : DekRead
+        data object Absent : DekRead
+        data class Broken(val cause: Exception) : DekRead
+    }
 
-    /** 从EncryptedSharedPreferences读取DEK（解密后返回明文字节） */
-    private fun readDek(purpose: String): ByteArray? {
-        return try {
-            val wrapped = encryptedPrefs.getString(dekPrefKey(purpose), null) ?: return null
-            // EncryptedSharedPreferences 已用MasterKey自动解密，这里存储的就是Base64编码的DEK
-            Base64.decode(wrapped, Base64.NO_WRAP)
+    private fun dekPrefKey(purpose: String): String = "$DEK_KEY_PREFIX$purpose"
+
+    private fun prevDekPrefKey(purpose: String): String = "$DEK_KEY_PREFIX$purpose$DEK_PREV_SUFFIX"
+
+    /** 读取 DEK：不存在 → [DekRead.Absent]；存在但读取/解码失败 → [DekRead.Broken]。 */
+    private fun readDekResult(purpose: String): DekRead {
+        val wrapped = try {
+            encryptedPrefs.getString(dekPrefKey(purpose), null)
         } catch (e: Exception) {
-            FileLogger.e(TAG, "读取DEK失败: purpose=$purpose, cause=${e.javaClass.simpleName}", e)
-            null
+            // 连 prefs 都读不了（Keystore 故障 / 存储损坏）：无法判定为「不存在」，按损坏处理
+            FileLogger.e(TAG, "读取DEK失败(存储层): purpose=$purpose, cause=${e.javaClass.simpleName}", e)
+            return DekRead.Broken(e)
+        } ?: return DekRead.Absent
+        return try {
+            // EncryptedSharedPreferences 已用MasterKey自动解密，这里存储的就是Base64编码的DEK
+            val dek = Base64.decode(wrapped, Base64.NO_WRAP)
+            if (dek.isEmpty()) {
+                DekRead.Broken(IllegalStateException("DEK 解码结果为空"))
+            } else {
+                DekRead.Present(dek)
+            }
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "读取DEK失败(解码): purpose=$purpose, cause=${e.javaClass.simpleName}", e)
+            DekRead.Broken(e)
         }
+    }
+
+    /** 解密候选：当前 DEK（必须存在）+ 上一代 DEK（存在时）。 */
+    private fun dekCandidates(purpose: String): List<ByteArray> {
+        val result = ArrayList<ByteArray>(2)
+        when (val read = readDekResult(purpose)) {
+            is DekRead.Present -> result += read.dek
+            is DekRead.Broken -> throw DatabaseEncryptionException(
+                "DEK 存在但无法解密: purpose=$purpose, cause=${read.cause.javaClass.simpleName}",
+                read.cause,
+            )
+            DekRead.Absent -> Unit
+        }
+        runCatching { encryptedPrefs.getString(prevDekPrefKey(purpose), null) }
+            .getOrNull()
+            ?.let { wrapped ->
+                runCatching { Base64.decode(wrapped, Base64.NO_WRAP) }
+                    .getOrNull()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { result += it }
+            }
+        return result
+    }
+
+    private fun decryptWith(dek: ByteArray, ciphertextB64: String): ByteArray {
+        val combined = Base64.decode(ciphertextB64, Base64.NO_WRAP)
+        if (combined.size < GCM_IV_LEN + 1) {
+            throw DatabaseEncryptionException("密文格式错误：长度不足")
+        }
+        val iv = combined.copyOfRange(0, GCM_IV_LEN)
+        val ciphertext = combined.copyOfRange(GCM_IV_LEN, combined.size)
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(dek, "AES"), GCMParameterSpec(GCM_TAG_BITS, iv))
+        return cipher.doFinal(ciphertext)
     }
 
     /** 将DEK存入EncryptedSharedPreferences（自动用MasterKey加密） */
@@ -268,6 +410,16 @@ class AndroidUnifiedKeyManager(
         if (!committed) {
             dek.fill(0)
             throw DatabaseEncryptionException("DEK持久化失败（EncryptedSharedPreferences commit返回false）: purpose=$purpose")
+        }
+    }
+
+    /** 把上一代 DEK 另存为 `dek_<purpose>_prev`，供 [decrypt] 解密轮换前的历史密文。 */
+    private fun storePrevDek(purpose: String, oldDek: ByteArray) {
+        runCatching {
+            val encoded = Base64.encodeToString(oldDek, Base64.NO_WRAP)
+            encryptedPrefs.edit().putString(prevDekPrefKey(purpose), encoded).commit()
+        }.onFailure { e ->
+            FileLogger.w(TAG, "保存上一代DEK失败（历史密文将无法解密）: purpose=$purpose, ${e.message}")
         }
     }
 

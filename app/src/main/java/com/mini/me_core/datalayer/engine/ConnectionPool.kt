@@ -35,7 +35,8 @@ class ConnectionPool(
         // 迁移前探测 + 快照：必须在 driver 创建之前
         onPreOpen?.invoke(lib)
         // 通过加密数据库管理器创建驱动（内部处理明文→加密升级迁移）
-        val open: () -> SqlDriver = { encryptedManager.getDriverBlocking(lib.name.lowercase()) }
+        // dbId（而非 name.lowercase()）：与 DatabaseDefinition.id 同一真源，且与设备区域无关
+        val open: () -> SqlDriver = { encryptedManager.getDriverBlocking(lib.dbId) }
         val created = openGuard?.invoke(lib, open) ?: open()
         drivers[lib] = created
         // 立即对齐 schema + 自愈，再让任何业务代码访问。

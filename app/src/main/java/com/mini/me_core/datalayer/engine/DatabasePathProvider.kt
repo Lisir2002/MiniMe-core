@@ -29,13 +29,28 @@ import java.io.File
  *     且必须在 changelog 显式记录「为何弃旧库」并保留旧文件可人工恢复；
  *  3. 任何 `fileName` 变更都是破坏性数据事件，需经评审，不在修复提交里顺手改。
  */
-enum class LibName(val fileName: String) {
-    AGENT("minime_agent_v3.db"),
-    CREDENTIALS("minime_credentials_v2.db"),
-    SETTINGS("minime_settings_v2.db"),
-    WORKSPACE("minime_workspace_v2.db"),
-    T2I("minime_t2i_v2.db"),
-    INFRA("minime_infra_v2.db"),
+/**
+ * @param fileName 物理文件名（数据契约）。
+ * @param dbId **密钥与注册表侧的唯一标识**：必须与 [com.mini.me_core.datalayer.encryption.DatabaseDefinition.id]
+ *   逐字相等（见 `BuiltinDatabases`）。
+ *
+ * ⚠️ 为什么不从 `name` 推导（如 `name.lowercase()`）：
+ *  1. 该 API 语义上是 **locale-sensitive**（等价 `lowercase(Locale.getDefault())`）。
+ *     实测（Kotlin 2.1 / JVM）：纯 ASCII 走快路径，土耳其语下 `"T2I".lowercase()` 仍得 `t2i`；
+ *     但同一区域的 `java.lang.String.toLowerCase(Locale)` 得到的是 `t2ı`、`I` → `ı`。
+ *     把标识正确性押在「当前版本恰好有 ASCII 快路径」上，是不可接受的地基——
+ *     一旦库标识含非 ASCII 或实现变化，`db_t2ı` 与 `db_t2i` 错配 → 加密库被判损坏 →
+ *     隔离重建 → 历史数据清空。
+ *  2. 更本质地：枚举名与 `DatabaseDefinition.id` 本就是两个命名空间，靠字符串变换维系
+ *     一致性属于隐式契约。显式写死常量，两路共用同一字面量，与区域和实现彻底解耦。
+ */
+enum class LibName(val fileName: String, val dbId: String) {
+    AGENT("minime_agent_v3.db", "agent"),
+    CREDENTIALS("minime_credentials_v2.db", "credentials"),
+    SETTINGS("minime_settings_v2.db", "settings"),
+    WORKSPACE("minime_workspace_v2.db", "workspace"),
+    T2I("minime_t2i_v2.db", "t2i"),
+    INFRA("minime_infra_v2.db", "infra"),
 }
 
 interface DatabasePathProvider {

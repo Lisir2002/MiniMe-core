@@ -1,8 +1,11 @@
 # MiniMe-core 数据库加密全新架构设计
 
-> 版本：v1.0
-> 日期：2026-09-28
-> 状态：设计评审中
+> 版本：v1.1
+> 日期：2026-09-28（v1.0）；2026-09-29（v1.1 按实现修订）
+> 状态：**已实现**（随 v0.0.0.37 全部落地；有 2 处主动偏离，见 §12 对照）
+>
+> v1.1 修订说明：原设计里「迁移改用逐表事务拷贝」「数据库新增零修改核心代码」两条
+> 与最终实现不同，已在 §4.4 / §6.1 / §8 / §12 标注实际做法与理由。**以代码为准。**
 
 ## 1. 问题诊断
 
@@ -35,8 +38,8 @@ SQLite error 100 (SQLITE_ROW) 表示执行语句后有结果行未消费。SQLCi
 
 1. **一次性加密，永久加密**：新安装直接创建加密数据库，消除明文→加密迁移需求
 2. **统一密钥管理**：单一MasterKey，统一管理所有DEK，消除重复逻辑
-3. **插件化注册**：数据库通过注册表注册，新增数据库零修改核心代码
-4. **简化升级**：旧版升级使用更可靠的逐表事务拷贝，避免ATTACH/sqlcipher_export
+3. **插件化注册**：数据库通过注册表注册（实现为**半插件化**，见 §6.1）
+4. **简化升级**：旧版升级用 `sqlcipher_export` 整体搬运，所有返回结果行的语句走 `rawExecSQL`
 5. **自愈优先**：密钥损坏时有恢复机制，不轻易丢失数据
 6. **开放扩展**：预留新增数据库、新增加密算法、新增密钥存储的出入口
 
@@ -341,61 +344,51 @@ class EncryptedDatabaseManager(
 > 现行实现见 `datalayer/encryption/KeyRotationMigrator.kt`：以 `sqlcipher_export` 为主体，
 > 形态差异收敛为「旧口令 provider / 新口令 provider」两个入参（明文→加密即 `PLAIN` → `dekProvider`）。
 
+> ⚠️ **本节已按实现修订（原设计写的是「逐表事务拷贝」）**。实际采用
+> `ATTACH + sqlcipher_export`，语句一律用 `rawExecSQL` 执行。理由见下方「为什么最终选
+> `sqlcipher_export`」。这是本文档唯一一处**实现主动偏离设计、且经评审认为代码更优**的地方。
+
 #### 设计思路
 
-这是本次重构的核心改进。放弃使用 `ATTACH + sqlcipher_export` 的复杂方案，改用更简单可靠的：
-
-1. 打开明文数据库（系统SQLite，非SQLCipher）
-2. 创建新的加密数据库（SQLCipher）
-3. 在一个事务中，逐表拷贝schema和数据
-4. 校验数据一致性
-5. 原子替换文件
-6. 失败时保留明文库，可回滚
-
-**为什么不用ATTACH+sqlcipher_export？**
-- ATTACH在SQLCipher中行为复杂，容易出现"another row available"
-- sqlcipher_export是表值函数，返回结果行必须消费
-- PRAGMA带schema前缀也会返回结果行
-- 逐表拷贝虽然代码多一点，但逻辑简单，边界情况少，可靠性高
-
-#### 迁移流程
+形态差异被收敛成两个入参 —— `PassphraseProvider from`（旧形态）/ `to`（新形态）：
+明文→加密即 `PLAIN`（空口令）→ `dekProvider`；未来 DEK 轮换只是换一对 provider，**迁移主体不动**。
 
 ```
-1. 检查明文库是否存在
-   ├─ 不存在 → 跳过（新安装或已升级）
-   └─ 存在 → 继续
-
-2. 创建加密临时库（.enc.tmp）
-   └─ 用SQLCipher创建空库，执行schema.create
-
-3. 开启事务，逐表拷贝
-   ├─ 获取所有用户表名（排除sqlite_系统表）
-   ├─ 对每个表：
-   │   ├─ 从明文库读取所有行
-   │   └─ 批量插入加密库（INSERT OR REPLACE）
-   └─ 提交事务
-
-4. 数据校验
-   ├─ 行数比对
-   └─ 抽样数据比对
-
-5. 原子替换
-   ├─ 删除明文库sidecar（-wal/-shm）
-   ├─ renameTo加密临时库 → 主库名
-   └─ 删除明文库备份
-
-6. 标记升级完成
-   └─ 写入SharedPreferences: migration_<dbId>_completed = true
+1. 用 from 口令打开源库（打不开 = 它不处于源形态 → 放弃迁移，不当损坏库重建）
+   └─ 抓源库逐表行数快照（比对基准）
+2. ATTACH 临时库（.enc.tmp）并附 to 口令
+3. SELECT sqlcipher_export('encrypted')   ← 必须 rawExecSQL
+4. DETACH
+5. 关闭源库
+6. 校验目标库：表数 > 0 **且逐表行数与源库快照完全一致**
+7. 备份源形态库为 <name>.pre_enc.bak（永久保留，可人工恢复）
+8. renameTo 临时库 → 主库名（原子替换）
+9. 写入 migration_<dbId>_completed = true
 ```
+
+**为什么最终选 `sqlcipher_export`（而不是原设计的逐表事务拷贝）**
+- 原设计的归因不准确：error 100 "another row available" 的根因是**用 `execSQL` 执行返回结果行的语句**，
+  不是 ATTACH/sqlcipher_export 本身。`rawExecSQL` 不消费结果行，天然规避。
+- `sqlcipher_export` 由 Zetetic 官方实现，自动搬运 schema / 触发器 / 虚拟表 / 索引 / BLOB，
+  边界情况远少于手写逐表拷贝（后者要自己处理 FTS5 虚拟表、外键顺序、ROWID 冲突、类型亲和性差异）。
+- 代价是「校验」变得更重要，故第 6 步强制逐表 `COUNT(*)` 比对（见下）。
+
+**第 6 步：数据校验（不可省略）**
+- 只判「表数 > 0」挡不住「表在、数据没了」这种静默丢数据；
+- 做法是 export 前抓源库 `表名 → COUNT(*)` 快照，export 后对目标库再抓一次逐表比对；
+- 任一表缺失或行数不符 → 抛异常中止迁移，**源库原样保留**、临时文件删除、不标记完成；
+- 少数虚拟表（contentless FTS5 等）拒绝 `COUNT(*)`，记 `n/a` 跳过，不判失败。
 
 #### 关键安全保证
 
-- **主库全程只读**：迁移过程中明文库只读取，不修改
-- **事务原子性**：数据拷贝在一个事务中，失败回滚不影响临时库
-- **原子替换**：renameTo在同一文件系统是原子操作
-- **可回滚**：替换前保留明文库备份，替换失败可恢复
+- **源形态不可识别即放弃**：源库用 from 口令打不开时不迁移、不标记完成，交给上层 UNREADABLE 分支处置
+  （绝不把它当损坏库重建 —— 那会静默清空数据）
+- **校验不过即中止**：行数比对不一致时保留源库与现场，可人工恢复
+- **原子替换**：renameTo 在同一文件系统是原子操作
+- **可回滚**：替换前备份源形态库为 `.pre_enc.bak`
 - **幂等性**：升级完成后标记，重复调用直接跳过
-- **失败不丢数据**：任何步骤失败，明文库仍在，下次启动可重试
+- **失败不丢数据**：任何步骤失败源库仍在，下次启动可重试
+- **失败可降级**：不抛异常不崩溃，记录失败原因，应用继续启动（源库保持原形态可用）
 
 ### 4.5 EncryptedDriverFactory（加密驱动工厂）
 
@@ -455,13 +448,21 @@ class EncryptedDriverFactory(
 ### 5.3 回滚方案
 
 如果升级后出现严重问题：
-- 明文库备份保留7天（可配置）
-- 提供开发者选项：回滚到明文模式（仅调试用）
-- 回滚时将加密库数据导回明文库
+- 源形态库备份为 `<name>.pre_enc.bak`，**永久保留**（设计原定保留 7 天后清理，
+  实现未做清理：多占一点空间换取「任何时候都能人工恢复」，比定时删除更安全；
+  后续若确认需要清理，应改为「迁移成功 N 天后再删」而非无条件删）
+- 回滚时人工用备份覆盖主库即可
+- ⚠️ 没有「回滚到明文模式」的开关：新架构全库默认加密，不提供明文降级路径
 
 ## 6. 扩展性设计
 
 ### 6.1 新增数据库
+
+> ⚠️ **本节已按实现修订**：「零修改核心代码」**未达成**（半插件化）。
+> 新增一个库仍需改 3 处：`LibName`（含 `dbId`）、`BuiltinDatabases`、`DataLayerModule.SCHEMA_MAP`；
+> `DatabasePathProvider` 自动跟随。标识唯一真源已统一为 `LibName.dbId`（与 `DatabaseDefinition.id` 相等，
+> 有单测守门：`KeyIdentityConsistencyTest`）。彻底插件化留待后续把 `ConnectionPool` 改为按
+> `DatabaseDefinition` 工作、把 `LibName` 降级为兼容别名。
 
 新增数据库只需3步：
 1. 实现 `DatabaseDefinition` 接口
@@ -523,8 +524,11 @@ interface EncryptionProvider {
 ### 7.3 故障安全
 
 - fail-close：加密驱动创建失败抛异常，绝不回退明文
-- 迁移失败保留明文库，可重试或回滚
-- 密钥损坏时有明确错误提示，不静默降级返回空数据
+- **DEK 存在但解不开 ≠ 不存在**：一律抛异常，绝不生成新 DEK 覆盖（覆盖 = 旧数据永久不可解）
+- **数据库密钥禁止直接 `rotateDek`**：换 DEK 而库文件未重加密会让该库立即不可读，
+  必须走 `KeyRotationMigrator`（`sqlcipher_export` 整体重加密）
+- **`emergencyReset` 只清非 `db_*` 的 DEK**：清数据库 DEK = 6 个库全部不可读，语义上不应波及
+- 迁移失败保留源形态库，可重试或回滚；迁移成功前必须过「逐表行数比对」
 - 迁移状态持久化，崩溃后可恢复
 
 ## 8. 与现有代码对比
@@ -533,48 +537,48 @@ interface EncryptionProvider {
 |------|----------|--------|
 | MasterKey数量 | 2个（db + credential） | 1个（统一） |
 | DEK管理 | 2套独立逻辑 | 1套统一管理 |
-| 数据库注册 | 硬编码枚举 | 接口化注册表 |
-| 新增数据库 | 修改5+处核心代码 | 实现接口+注册 |
-| 迁移方式 | ATTACH+sqlcipher_export（复杂易错） | 逐表事务拷贝（简单可靠） |
+| 数据库注册 | 硬编码枚举 | 接口化注册表（`LibName.dbId` 为标识唯一真源） |
+| 新增数据库 | 修改5+处核心代码 | 改 `LibName`+`BuiltinDatabases`+`SCHEMA_MAP`（半插件化，见 §6.1） |
+| 迁移方式 | 明文/加密双轨 + 反复重试失败 | `sqlcipher_export` + `rawExecSQL` + 逐表行数校验 |
 | 明文/加密 | 双轨制，动态路由 | 全加密，无明文模式 |
-| 密钥损坏处理 | 降级返回空串（丢数据） | 抛异常+恢复机制 |
+| 密钥损坏处理 | 生成新DEK覆盖（旧数据永久不可解） | fail-close 抛异常，绝不覆盖 |
 | 迁移失败 | 重试3次永久失败 | 可无限重试，保留明文库 |
 | 代码量 | ~1500行（6个文件） | ~800行（5个文件） |
 
 ## 9. 实施计划
 
-### 阶段一：基础框架（1-2天）
+### 阶段一：基础框架（1-2天） ✅ 已完成
 
 1. 创建 `DatabaseDefinition` 接口和 `DatabaseRegistry`
 2. 创建 `UnifiedKeyManager` 接口和Android实现
 3. 创建 `EncryptedDriverFactory`
 4. 单元测试：密钥管理、数据库注册
 
-### 阶段二：迁移引擎（2-3天）
+### 阶段二：迁移引擎（2-3天） ✅ 已完成
 
-1. 实现 `LegacyMigrationEngine`（逐表事务拷贝）
+1. 实现 `KeyRotationMigrator`（由 `LegacyMigrationEngine` 泛化：`sqlcipher_export` + provider 入参）
 2. 实现升级检测和状态追踪
 3. 集成测试：明文→加密迁移、数据一致性校验
 4. 边界测试：大库迁移、中断恢复、回滚
 
-### 阶段三：集成替换（1-2天）
+### 阶段三：集成替换（1-2天） ✅ 已完成
 
 1. 将现有6个数据库改为注册式定义
 2. 替换DataLayerModule中的依赖注入
 3. 移除旧的DEKManager、AndroidDatabaseKeyProvider、CipherDriverFactory、RoutingDriverFactory、DbEncryptionMigrationEngine
 4. 全量编译验证
 
-### 阶段四：密钥迁移与兼容（1天）
+### 阶段四：密钥迁移与兼容（1天） ✅ 已完成
 
 1. 实现旧版DEK导入逻辑
 2. 实现旧版MasterKey兼容解密
 3. 升级测试：从旧版本升级数据完整性
 
-### 阶段五：验证与发版（1天）
+### 阶段五：验证与发版（1天） ✅ 已完成
 
 1. 全量测试：单元测试+集成测试+UI测试
 2. 真机测试：升级迁移、密钥轮换、崩溃恢复
-3. 发版（v0.0.0.31）
+3. 发版（v0.0.0.36 正式版 / v0.0.0.37 补齐剩余设计项）
 
 ## 10. 风险与缓解
 
@@ -590,7 +594,8 @@ interface EncryptionProvider {
 
 新架构的核心改进：
 
-1. **消除"another row available"根因**：放弃ATTACH+sqlcipher_export，改用逐表事务拷贝，从根本上避免SQLCipher结果行未消费问题。
+1. **消除"another row available"根因**：保留 `ATTACH + sqlcipher_export`，但所有返回结果行的语句一律用
+   `rawExecSQL` 执行（根因是 `execSQL` 消费结果行的方式，不是这两条语句本身）。
 
 2. **统一密钥管理**：合并两套密钥体系，减少重复代码，降低维护成本。
 
@@ -601,3 +606,17 @@ interface EncryptionProvider {
 5. **自愈与恢复**：迁移失败可重试可回滚，密钥损坏有明确处理，不静默丢数据。
 
 6. **开放扩展**：预留加密算法、密钥存储、插件数据库的扩展口。
+
+---
+
+## 12. 设计与实现对照（v1.1 补充）
+
+| 设计条目 | 实现状态 | 说明 |
+|---|---|---|
+| DEK 损坏 fail-close（§2.1.5 自愈优先） | ✅ 已实现 | `UnifiedKeyManager` 用 `DekRead.Present/Absent/Broken` 区分「不存在」与「解不开」，后者一律抛异常 |
+| 密钥轮换保留旧 DEK（§4.2 决策 3） | ✅ 已实现（按用途分类） | `db_*` 直接拒绝轮换（须走 `KeyRotationMigrator`）；其余用途保留 `dek_<purpose>_prev`，`decrypt` 自动回退 |
+| 迁移后数据校验（§4.4 第 4 步） | ✅ 已实现 | 逐表 `COUNT(*)` 前后比对（抽样比对未做：行数一致 + `sqlcipher_export` 官方实现已足够，性价比低） |
+| 明文库备份保留 7 天（§5.3） | ❌ 未实现（有意保留现状） | `.pre_enc.bak` 永久保留，比定时删除更安全；如需清理应改为「成功 N 天后删」 |
+| `EncryptionProvider` / `KeyStoreProvider`（§6.2/§6.3） | ❌ 未实现 | 纯预留扩展口，当前只支持 SQLCipher + Android Keystore |
+| 迁移用逐表事务拷贝（§4.4 原设计） | ⚠️ **偏离**：改用 `sqlcipher_export` | 经评审认为代码更优，理由见 §4.4 |
+| 新增数据库零修改核心代码（§6.1） | ⚠️ **偏离**：半插件化 | 标识已统一为 `LibName.dbId`，但仍需改 3 处，理由见 §6.1 |

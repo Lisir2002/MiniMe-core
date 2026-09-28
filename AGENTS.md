@@ -391,7 +391,7 @@ Hilt 被广泛使用。各 Feature 模块定义自己的 DI 模块（如 `AgentM
 
 | # | 不变量 | 值 / 单点 | 落地位置 |
 |---|--------|-----------|----------|
-| 1 | DEK purpose 命名 | `db_<库标识>`（如 `db_agent`、`db_infra`；`LibName.name.lowercase()` 或 `DatabaseDefinition.id`） | `CipherPassphrase.purpose()` |
+| 1 | DEK purpose 命名 | `db_<库标识>`（如 `db_agent`、`db_infra`）；库标识**唯一真源 = `LibName.dbId`**，与 `DatabaseDefinition.id` 逐字相等，**禁止**用 `name.lowercase()` 推导（该 API locale-sensitive） | `CipherPassphrase.purpose()` |
 | 2 | SQLCipher passphrase | `Base64(DEK)`（NO_WRAP）的 UTF-8 字节；**不得**再用原始 DEK 字节、hex、或二次派生 | `CipherPassphrase.encode()` |
 | 3 | Keystore MasterKey alias | `minime_master_key`（AES-256-GCM，硬件 backing，密钥不出 Keystore） | `AndroidUnifiedKeyManager` |
 | 4 | DEK 存储位置 | EncryptedSharedPreferences 文件 `minime_unified_keys`，键名 `dek_<purpose>` | `AndroidUnifiedKeyManager` |
@@ -402,6 +402,8 @@ Hilt 被广泛使用。各 Feature 模块定义自己的 DI 模块（如 `AgentM
 2. 新增任何「打开数据库」的代码路径（driver、版本探测、健康扫描、备份导出、迁移器）都必须与 driver 用**同一套** purpose + passphrase，否则该文件在别人眼里就是损坏文件。
 3. **改密钥 = 改 provider，不改迁移代码**：密钥形态演进（明文→加密、轮换 DEK、换 KDF）统一走 `KeyRotationMigrator`，入参替换为「旧口令 provider / 新口令 provider」即可，迁移主体（`sqlcipher_export` 9 步）不重写。
 4. 诊断不可读库时，日志必须带 `size=` 与 `head=`（前 8 字节 hex）：`head` 非 SQLite 魔数 `53 51 4c 69` 即可判定为加密库或真损坏，是区分「密钥不匹配」与「文件损坏」的第一手证据。
+5. **DEK「存在但解不开」≠「不存在」**：一律 fail-close 抛异常，**绝不**生成新 DEK 覆盖——覆盖后旧密文永久不可解（6 库报废）。见 `UnifiedKeyManager.DekRead`。
+6. **禁止对 `db_*` 直接 `rotateDek`**：库文件是整体加密的，换 DEK 而不重加密文件 = 该库立即不可读；必须走 `KeyRotationMigrator`。`emergencyReset` 同理只清非 `db_*` 的 DEK。
 
 **数据访问**：业务读写全部经 `datalayer/repository` 门面；`data/local/entity/*.kt` 为纯 Kotlin data class（已剥离 Room 注解），仅当 DTO 被领域/UI/Firebase 层复用（如 `V2Xxx.toEntity()`、Backup 的 `toDto/toEntity`）。
 
