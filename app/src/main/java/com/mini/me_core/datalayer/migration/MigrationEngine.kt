@@ -71,6 +71,7 @@ class MigrationEngine(
                 // 之后 driver 才能以全新库重建，且原始文件仍在，可人工恢复。
                 FileLogger.e(TAG, "  $lib 库文件存在但无法打开（损坏/密钥不匹配）：先快照保命，再隔离原文件")
                 snapshot(lib, heavy)
+                preservePlaintextBackup(lib)
                 quarantine(lib)
             }
         }
@@ -146,6 +147,29 @@ class MigrationEngine(
         // 主库已被快照内容替换，原 -wal 属于旧内容，必须清掉避免与新主库不一致
         main.resolveSibling("${main.name}-wal").takeIf { it.exists() && !bak.resolveSibling("${bak.name}-wal").exists() }?.delete()
         return true
+    }
+
+    /**
+     * 抢救「明文→加密」迁移留下的明文备份 `<name>.pre_enc.bak`（LegacyMigrationEngine Step6 产物）。
+     *
+     * 该文件是加密迁移**之前**的明文库，若完整则是损坏现场唯一可直接读取的原始数据。
+     * 复制到 backup 目录统一保管：既不覆盖任何现有文件，又让它与快照并列、便于导出恢复。
+     *
+     * @return 是否发现并保存了明文备份。
+     */
+    private fun preservePlaintextBackup(lib: LibName): Boolean {
+        val main = pathProvider.mainDb(lib)
+        val legacy = main.resolveSibling("${main.name}.pre_enc.bak")
+        if (!legacy.exists() || legacy.length() == 0L) return false
+        val dest = pathProvider.backupDir().resolve("${lib.fileName}.pre_enc.bak")
+        return runCatching {
+            legacy.copyTo(dest, overwrite = true)
+            FileLogger.i(TAG, "发现迁移前明文备份，已另存可人工恢复：${dest.absolutePath}（${legacy.length()} 字节）")
+            true
+        }.getOrElse {
+            FileLogger.w(TAG, "明文备份另存失败：${legacy.absolutePath}（原文件未改动）")
+            false
+        }
     }
 
     /**

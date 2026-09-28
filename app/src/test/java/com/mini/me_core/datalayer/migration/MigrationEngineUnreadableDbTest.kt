@@ -77,6 +77,22 @@ class MigrationEngineUnreadableDbTest {
     }
 
     @Test
+    fun `preOpen 抢救迁移留下的明文备份 pre_enc bak`() {
+        val p = FolderPathProvider(tmp.newFolder())
+        val main = p.mainDb(LibName.AGENT)
+        main.writeText("CORRUPT")
+        // 模拟「明文→加密」迁移 Step6 留下的明文备份（损坏现场唯一可直接读取的原始数据）
+        main.resolveSibling("${main.name}.pre_enc.bak").writeText("PLAINTEXT-ORIGINAL")
+
+        val engine = MigrationEngine(p, FakeProbe(version = VERSION_UNREADABLE))
+        engine.preOpen(LibName.AGENT, fakeSchema(3))
+
+        val saved = p.backupDir().resolve("${LibName.AGENT.fileName}.pre_enc.bak")
+        assertTrue("明文备份必须被另存，否则人工恢复无从谈起", saved.exists())
+        assertEquals("明文备份内容必须原样保留", "PLAINTEXT-ORIGINAL", saved.readText())
+    }
+
+    @Test
     fun `preOpen 对不可读但文件缺失的库不产生快照`() {
         val p = FolderPathProvider(tmp.newFolder())
         val engine = MigrationEngine(p, FakeProbe(version = VERSION_UNREADABLE))
