@@ -21,10 +21,19 @@ class Queue(private val db: InfraDb) {
 
     private val q get() = db.queueQueries
 
+    /**
+     * 入队。
+     * P1 修复：原 INSERT + SELECT last_insert_rowid() 分两步无事务包裹，
+     * 并发场景下两条 INSERT 之间可能插入其他记录导致返回错误的 rowid。
+     * 改为单事务保证原子性。
+     */
     fun enqueue(topic: String, payload: String, nextRun: Long = System.currentTimeMillis()): Long {
-        q.insertQueueItem(topic, payload, "pending", 0, nextRun, null, System.currentTimeMillis())
-        // selectLastInsertId 生成形态为 ExecutableQuery<Long>（单列函数查询直接返回标量）
-        return q.selectLastInsertId().executeAsOne()
+        var id = 0L
+        db.transaction {
+            q.insertQueueItem(topic, payload, "pending", 0, nextRun, null, System.currentTimeMillis())
+            id = q.selectLastInsertId().executeAsOne()
+        }
+        return id
     }
 
     fun pending(topic: String, now: Long = System.currentTimeMillis()): List<QueueItem> =

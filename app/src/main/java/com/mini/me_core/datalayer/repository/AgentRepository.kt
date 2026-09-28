@@ -77,9 +77,16 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
     suspend fun getSessionPageAfter(lastUpdatedAtMs: Long, lastId: String, limit: Long): List<Agent_session> =
         withContext(Dispatchers.IO) { q.selectSessionPageAfter(lastUpdatedAtMs, lastUpdatedAtMs, lastId, limit).executeAsList() }
 
+    /**
+     * 批量 upsert 会话（备份恢复用）。
+     * P1 修复：原实现 forEach 逐条 upsert 无事务包裹，每条 INSERT 都是独立 autocommit，
+     * 大数据量下产生大量 fsync 导致极慢。改为单事务包裹，要么全部成功要么全部回滚。
+     */
     suspend fun upsertAllSessions(sessions: List<Agent_session>) = withContext(Dispatchers.IO) {
-        sessions.forEach { s ->
-            q.upsertSession(s.id, s.title, s.mode, s.model, s.status, s.created_at, s.updated_at, s.workspace_path, s.reasoning_effort, s.provider_id, s.total_input_tokens, s.total_output_tokens, s.last_input_tokens)
+        db.transaction {
+            sessions.forEach { s ->
+                q.upsertSession(s.id, s.title, s.mode, s.model, s.status, s.created_at, s.updated_at, s.workspace_path, s.reasoning_effort, s.provider_id, s.total_input_tokens, s.total_output_tokens, s.last_input_tokens)
+            }
         }
     }
 
@@ -116,8 +123,17 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
         q.insertMessage(e.id, e.session_id, e.role, e.seq, e.created_at, e.task_id, e.content, e.tool_calls_json, e.tool_call_id, e.tool_name, e.tool_args, e.is_error, e.reasoning, e.signature, e.attachments_json, e.is_compacted, e.is_context_summary, e.is_compaction_marker, e.input_tokens, e.output_tokens, e.chunk_group_id, e.chunk_index)
     }
 
+    /**
+     * 批量插入消息。
+     * P1 修复：原实现 forEach 调用 suspend insertMessage，每条消息都 withContext 跳线程，
+     * 既慢又无法保证原子性。改为单事务内直接调用 queries.insertMessage，同线程顺序执行。
+     */
     suspend fun insertAllMessages(messages: List<Agent_message>) = withContext(Dispatchers.IO) {
-        messages.forEach { insertMessage(it) }
+        db.transaction {
+            messages.forEach { e ->
+                q.insertMessage(e.id, e.session_id, e.role, e.seq, e.created_at, e.task_id, e.content, e.tool_calls_json, e.tool_call_id, e.tool_name, e.tool_args, e.is_error, e.reasoning, e.signature, e.attachments_json, e.is_compacted, e.is_context_summary, e.is_compaction_marker, e.input_tokens, e.output_tokens, e.chunk_group_id, e.chunk_index)
+            }
+        }
     }
 
     fun observeMessagesBySession(sessionId: String): Flow<List<Agent_message>> =
@@ -289,9 +305,15 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
     suspend fun getTodoPageBySessionAfter(sessionId: String, lastCreatedAtMs: Long, lastId: String, limit: Long): List<com.mini.mecore.datalayer.sqldelight.agent.Todo_items> =
         withContext(Dispatchers.IO) { q.selectTodoPageBySessionAfter(sessionId, lastCreatedAtMs, lastId, limit).executeAsList() }
 
+    /**
+     * 批量 upsert 待办（备份恢复用）。
+     * P1 修复：原 forEach 逐条 upsert 无事务包裹，改为单事务保证原子性和性能。
+     */
     suspend fun upsertAllTodos(todos: List<com.mini.mecore.datalayer.sqldelight.agent.Todo_items>) = withContext(Dispatchers.IO) {
-        todos.forEach { t ->
-            q.upsertTodoItem(t.id, t.session_id, t.subject, t.description, t.status, t.priority, t.sort_order, t.created_at_ms, t.updated_at_ms)
+        db.transaction {
+            todos.forEach { t ->
+                q.upsertTodoItem(t.id, t.session_id, t.subject, t.description, t.status, t.priority, t.sort_order, t.created_at_ms, t.updated_at_ms)
+            }
         }
     }
 

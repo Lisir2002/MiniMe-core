@@ -460,6 +460,8 @@ dependencies {
 
     // 数据库加密
     implementation(libs.sqlcipher)
+    // Jetpack Security：EncryptedSharedPreferences（统一密钥管理存储DEK）
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform(libs.androidx.compose.bom))

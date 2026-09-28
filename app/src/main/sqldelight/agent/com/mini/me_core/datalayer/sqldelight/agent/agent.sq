@@ -220,8 +220,10 @@ DELETE FROM agent_message WHERE session_id = ? AND seq > ?;
 markPendingToolsInterrupted:
 UPDATE agent_message SET content = ?, is_error = 1 WHERE role = ? AND content LIKE ?;
 
+-- P1 修复：原全局 LIKE 搜索无 LIMIT，大库下返回海量行导致 OOM。
+-- 加 LIMIT 500 防止内存溢出；全局搜索场景下 500 条足够展示。
 searchMessages:
-SELECT * FROM agent_message WHERE content LIKE '%' || ? || '%' ORDER BY seq ASC;
+SELECT * FROM agent_message WHERE content LIKE '%' || ? || '%' ORDER BY seq ASC LIMIT 500;
 
 selectAllMessages:
 SELECT * FROM agent_message ORDER BY seq ASC;
@@ -528,6 +530,22 @@ CREATE TABLE zth_telemetry_events (
   metric_b             INTEGER,
   created_at_ms        INTEGER NOT NULL
 );
+
+-- P1 审计补全索引：高频按 session_id 查询/删除的表补索引，避免全表扫描。
+-- 全新安装在此建索引；老库由 6.sqm 迁移补齐（CREATE INDEX IF NOT EXISTS 幂等）。
+CREATE INDEX idx_todo_items_session ON todo_items (session_id);
+CREATE INDEX idx_wake_queue_session_status ON wake_queue (session_id, status);
+CREATE INDEX idx_agent_goals_session ON agent_goals (session_id);
+CREATE INDEX idx_agent_plans_session ON agent_plans (session_id);
+CREATE INDEX idx_agent_jobs_session ON agent_jobs (session_id);
+CREATE INDEX idx_agent_schedules_session ON agent_schedules (session_id);
+CREATE INDEX idx_agent_trajectories_session ON agent_trajectories (session_id);
+CREATE INDEX idx_agent_playbook_runs_session ON agent_playbook_runs (session_id);
+CREATE INDEX idx_zth_sentinels_session ON zth_user_confirmed_sentinels (session_id);
+CREATE INDEX idx_file_edit_hunks_session ON file_edit_hunks (session_id);
+CREATE INDEX idx_mode_switch_history_session ON mode_switch_history (session_id);
+CREATE INDEX idx_session_checkpoints_session ON session_checkpoints (session_id);
+CREATE INDEX idx_checkpoint_file_snapshots_checkpoint ON checkpoint_file_snapshots (checkpoint_id);
 
 -- ── queries（补表）──
 insertTodoItem:

@@ -69,13 +69,18 @@ class DocumentStore(private val db: InfraDb, private val driver: SqlDriver) {
     fun delete(collection: String, key: String) =
         queries.tombstoneDoc(System.currentTimeMillis(), collection, key)
 
-    /** FTS5 全文检索：跨 collection 匹配标题/正文（collection/key 作为 title）。 */
+    /**
+     * FTS5 全文检索：跨 collection 匹配标题/正文（collection/key 作为 title）。
+     * P1 修复：原查询无 LIMIT，FTS 匹配大量文档时一次性加载全部到内存导致 OOM。
+     * 加 LIMIT 100 限制单次返回条数。
+     */
     fun search(match: String): List<DocEntry> {
         val sql = """
             SELECT d.id, d.collection, d.key, d.doc_json, d.version, d.updated_at
             FROM doc_store d JOIN doc_fts f ON d.id = f.rowid
             WHERE doc_fts MATCH ? AND d.deleted = 0
             ORDER BY rank
+            LIMIT 100
         """.trimIndent()
         return driver.executeQuery(null, sql, { cursor ->
             val out = mutableListOf<DocEntry>()

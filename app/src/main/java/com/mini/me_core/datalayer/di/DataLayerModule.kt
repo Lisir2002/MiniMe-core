@@ -2,22 +2,24 @@ package com.mini.me_core.datalayer.di
 
 import android.content.Context
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.datalayer.engine.AndroidDatabaseKeyProvider
+import com.mini.me_core.datalayer.backup.DatabaseBackupManager
+import com.mini.me_core.datalayer.cleanup.DatabaseCleanupManager
+import com.mini.me_core.datalayer.encryption.AndroidUnifiedKeyManager
+import com.mini.me_core.datalayer.encryption.DatabaseRegistry
+import com.mini.me_core.datalayer.encryption.EncryptedDatabaseManager
+import com.mini.me_core.datalayer.encryption.EncryptedDriverFactory
+import com.mini.me_core.datalayer.encryption.LegacyMigrationEngine
+import com.mini.me_core.datalayer.encryption.UnifiedKeyManager
+import com.mini.me_core.datalayer.encryption.registerBuiltinDatabases
 import com.mini.me_core.datalayer.engine.AndroidDatabasePathProvider
 import com.mini.me_core.datalayer.engine.AndroidVersionProbe
 import com.mini.me_core.datalayer.engine.ConnectionPool
-import com.mini.me_core.datalayer.engine.CrashRecovery
-import com.mini.me_core.datalayer.engine.DatabaseDriverFactory
-import com.mini.me_core.datalayer.engine.DatabaseKeyProvider
 import com.mini.me_core.datalayer.engine.DatabasePathProvider
-import com.mini.me_core.datalayer.engine.DbEncryptionMigrationEngine
-import com.mini.me_core.datalayer.engine.EncryptionStatus
 import com.mini.me_core.datalayer.engine.LibName
-import com.mini.me_core.datalayer.engine.MigrationStateStore
-import com.mini.me_core.datalayer.engine.RoutingDriverFactory
-import com.mini.me_core.datalayer.engine.SharedPreferencesMigrationStateStore
+import com.mini.me_core.datalayer.health.DatabaseHealthChecker
 import com.mini.me_core.datalayer.migration.MigrationEngine
 import com.mini.me_core.datalayer.migration.SchemaSelfHealer
+import com.mini.me_core.datalayer.monitor.QueryPerformanceMonitor
 import com.mini.me_core.datalayer.repository.AgentRepository
 import com.mini.me_core.datalayer.repository.CredentialsRepository
 import com.mini.me_core.datalayer.repository.SettingsRepository
@@ -42,22 +44,18 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * 新数据层（data-layer-redesign）DI 模块（设计 §12：L0 引擎）。
+ * 数据层 DI 模块（db-encryption-redesign 新架构）。
  *
- * 拓扑：6 个物理库（5 核心域 + 1 infra），每库独立 Database 类与版本链；
- * 每库打开时经 [MigrationEngine.ensureSchema] 完成「全新建库 / 版本迁移 + 快照安全网」。
+ * 拓扑：6 个物理库，全部默认SQLCipher加密。
+ * - DatabaseRegistry：注册表，启动时注册6个内置库定义
+ * - UnifiedKeyManager：统一密钥管理（单一MasterKey + EncryptedSharedPreferences）
+ * - EncryptedDriverFactory：SQLCipher加密驱动创建
+ * - LegacyMigrationEngine：旧版明文库→加密库逐表事务拷贝迁移
+ * - EncryptedDatabaseManager：统一管理驱动获取和升级触发
+ * - ConnectionPool：每库单连接holder，保留ensureSchema + SchemaSelfHealer钩子
  *
- * v2-full-takeover P3-紧急加固：ConnectionPool 在首次创建 driver 后、返回给任何调用者之前，
- * 立刻触发 onOpened 回调，对该库跑 ensureSchema + 必要时 SchemaSelfHealer 自愈。
- * 这解决了「DataRegistryModule.provideDataProviders 先于 provideAgentDb 拿到 driver
- * → ensureSchema + 自愈未执行 → 业务查询遇到缺列的旧表 → 启动即崩」的竞态窗口。
- *
- * 加密插拔（设计 §8 / §12.2）：P1 阶段绑定 [RoutingDriverFactory]，
- * 根据每库 [EncryptionStatus] 动态选择明文/加密驱动。默认所有库为 PLAIN，
- * 行为与 [com.mini.me_core.datalayer.engine.PlainDriverFactory] 完全一致。
- * 用户在设置页开启加密后，[DbEncryptionMigrationEngine] 执行迁移并更新状态，
- * RoutingDriverFactory 自动切换到 [com.mini.me_core.datalayer.engine.CipherDriverFactory]。
- * 启动时 [CrashRecovery] 检测并回滚迁移中的崩溃状态。
+ * 保留：MigrationEngine（schema版本迁移）、DatabasePathProvider（快照/回滚）。
+ * 移除：旧版双轨明文/加密路由、CrashRecovery、分散的密钥管理。
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -65,7 +63,7 @@ object DataLayerModule {
 
     private const val TAG = "DatalayerBootstrap"
 
-    // ── L0 引擎 ──────────────────────────────────────────────────────────
+    // ── 路径与Schema迁移（保留）──────────────────────────────────────────
 
     @Provides
     @Singleton
@@ -74,45 +72,50 @@ object DataLayerModule {
 
     @Provides
     @Singleton
-    fun provideDatabaseKeyProvider(@ApplicationContext context: Context): DatabaseKeyProvider =
-        AndroidDatabaseKeyProvider(context)
+    fun provideMigrationEngine(pathProvider: DatabasePathProvider): MigrationEngine =
+        MigrationEngine(pathProvider, AndroidVersionProbe(pathProvider))
+
+    // ── 新加密架构 ──────────────────────────────────────────────────────
 
     @Provides
     @Singleton
-    fun provideMigrationStateStore(@ApplicationContext context: Context): MigrationStateStore =
-        SharedPreferencesMigrationStateStore(context)
+    fun provideDatabaseRegistry(): DatabaseRegistry =
+        DatabaseRegistry().also { registerBuiltinDatabases(it) }
 
     @Provides
     @Singleton
-    fun provideDbEncryptionMigrationEngine(
+    fun provideUnifiedKeyManager(@ApplicationContext context: Context): UnifiedKeyManager =
+        AndroidUnifiedKeyManager(context)
+
+    @Provides
+    @Singleton
+    fun provideEncryptedDriverFactory(
         @ApplicationContext context: Context,
-        pathProvider: DatabasePathProvider,
-        keyProvider: DatabaseKeyProvider,
-        stateStore: MigrationStateStore,
-    ): DbEncryptionMigrationEngine =
-        DbEncryptionMigrationEngine(context, pathProvider, keyProvider, stateStore)
+        keyManager: UnifiedKeyManager,
+    ): EncryptedDriverFactory = EncryptedDriverFactory(context, keyManager)
 
     @Provides
     @Singleton
-    fun provideCrashRecovery(
-        pathProvider: DatabasePathProvider,
-        stateStore: MigrationStateStore,
-    ): CrashRecovery = CrashRecovery(pathProvider, stateStore)
-
-    @Provides
-    @Singleton
-    fun provideDriverFactory(
+    fun provideLegacyMigrationEngine(
         @ApplicationContext context: Context,
-        pathProvider: DatabasePathProvider,
-        keyProvider: DatabaseKeyProvider,
-        stateStore: MigrationStateStore,
-    ): DatabaseDriverFactory = RoutingDriverFactory(context, pathProvider, keyProvider, stateStore)
+        keyManager: UnifiedKeyManager,
+    ): LegacyMigrationEngine = LegacyMigrationEngine(context, keyManager)
+
+    @Provides
+    @Singleton
+    fun provideEncryptedDatabaseManager(
+        @ApplicationContext context: Context,
+        registry: DatabaseRegistry,
+        driverFactory: EncryptedDriverFactory,
+        migrationEngine: LegacyMigrationEngine,
+    ): EncryptedDatabaseManager =
+        EncryptedDatabaseManager(context, registry, driverFactory, migrationEngine)
+
+    // ── ConnectionPool（改为使用EncryptedDatabaseManager）──────────────
 
     /**
      * Schema 映射表：6 个库 → 各自的 SQLDelight Schema。
-     * 供 ConnectionPool.onOpened 回调在 driver 创建时立即 ensureSchema 使用——
-     * 不依赖具体库的 DI（比如 AgentDb），避免 provideAgentDb 的 provideDataProviders
-     * 之间出现注入顺序竞态。
+     * 供 ConnectionPool.onPreOpen/onOpened 回调在 driver 创建前后跑 ensureSchema 使用。
      */
     private val SCHEMA_MAP = mapOf(
         LibName.AGENT to AgentDb.Schema,
@@ -126,22 +129,11 @@ object DataLayerModule {
     @Provides
     @Singleton
     fun provideConnectionPool(
-        factory: DatabaseDriverFactory,
+        encryptedManager: EncryptedDatabaseManager,
         engine: MigrationEngine,
-        stateStore: MigrationStateStore,
     ): ConnectionPool {
-        // 迁移前钩子：在 factory.create（AndroidSqliteDriver 构造，会立即打开并迁移）之前，
-        // 用原生只读连接探测真实 user_version，对旧版本库先快照保命。
-        // 若漏调，driver 打开后 ensureSchema 仍有 codeMigrations 兜底，但快照安全网会失效——故必须此处先跑。
+        // 迁移前钩子：在 driver 创建之前，用原生只读连接探测真实 user_version，对旧版本库先快照保命。
         val preOpenHook: (LibName) -> Unit = preOpenHook@{ lib ->
-            // 迁移状态检测：如果库处于迁移中状态，说明 CrashRecovery 未完全回滚
-            // （理论上 Application.onCreate 中已调用 CrashRecovery.recoverAll()）。
-            // P1 阶段记录警告，不阻断启动（RoutingDriverFactory 会回退到明文驱动）。
-            val migrationStatus = stateStore.getState(lib).encryptionStatus
-            if (migrationStatus != EncryptionStatus.PLAIN && migrationStatus != EncryptionStatus.ENCRYPTED) {
-                FileLogger.w(TAG, "preOpen($lib) 库处于迁移中状态 $migrationStatus，CrashRecovery 应已回滚")
-            }
-
             val schema = SCHEMA_MAP[lib]
             if (schema == null) {
                 FileLogger.w(TAG, "未知 LibName=$lib，跳过 preOpen")
@@ -152,7 +144,6 @@ object DataLayerModule {
                 engine.preOpen(lib, schema)
                 FileLogger.v(TAG, "preOpen($lib) 完成")
             }.onFailure {
-                // preOpen 失败（如只读探测异常）：不阻断启动，driver 仍会打开并由 ensureSchema 兜底。
                 FileLogger.e(TAG, "preOpen($lib) 失败（忽略，driver 打开后由 ensureSchema 兜底）", it)
             }
         }
@@ -171,45 +162,30 @@ object DataLayerModule {
                 FileLogger.e(TAG, "ensureSchema($lib) 失败（忽略，下次打开重试）", it)
             }
 
-            // 对 AGENT 库额外跑 SchemaSelfHealer 自愈 + 保证性复核：
-            // 历史设备可能因 MigrationEngine.ensureSchema 的「版本相等 no-op」分支
-            // 遇到 user_version 已对齐但 agent_message/agent_session 表缺关键列的旧表。
-            // 自愈幂等（结构完好则跳过），只在首次打开时跑一次。
+            // 对 AGENT 库额外跑 SchemaSelfHealer 自愈
             if (lib == LibName.AGENT) {
-                FileLogger.d(TAG, "开始 AGENT 库结构自愈（agent_session + agent_message）")
+                FileLogger.d(TAG, "开始 AGENT 库结构自愈")
                 runCatching {
                     SchemaSelfHealer.healAgentSession(driver)
                     SchemaSelfHealer.healAgentMessage(driver)
                     SchemaSelfHealer.ensureAgentMessageUsable(driver)
                     SchemaSelfHealer.ensureAgentSessionUsable(driver)
-                    FileLogger.d(TAG, "AGENT 库结构自愈完成，agent_message.id 列已确认存在")
+                    FileLogger.d(TAG, "AGENT 库结构自愈完成")
                 }.onFailure {
-                    // 自愈失败是 FATAL：AGENT 库若 agent_message 缺 id，任何消息查询都会崩。
-                    // 让异常向上冒泡，进程以明确的错误崩溃（不再落回 confusing 的 no such column）。
-                    FileLogger.e(TAG, "AGENT 库结构自愈失败（FATAL，进程将崩溃）", it)
+                    FileLogger.e(TAG, "AGENT 库结构自愈失败（FATAL）", it)
                     throw it
                 }
             }
         }
-        return ConnectionPool(factory, preOpenHook, hook)
+        return ConnectionPool(encryptedManager, preOpenHook, hook)
     }
 
-    @Provides
-    @Singleton
-    fun provideMigrationEngine(pathProvider: DatabasePathProvider): MigrationEngine =
-        MigrationEngine(pathProvider, AndroidVersionProbe(pathProvider))
-
-    // ── 6 个 Database：ConnectionPool.onOpened 已确保 ensureSchema + 自愈先跑，
-    //   这里再调一遍是幂等安全网（provideAgentDb 里的自愈会在 ConnectionPool 之后再跑一次，
-    //   但对已修好的表只会做一次「结构完好，跳过」的幂等检查）───────────────────────
+    // ── 6 个 Database：从 ConnectionPool 获取加密驱动 ──────────────────
 
     @Provides
     @Singleton
     fun provideAgentDb(pool: ConnectionPool, engine: MigrationEngine): AgentDb {
         val driver = pool.driver(LibName.AGENT)
-        // ConnectionPool.onOpened 已跑过 ensureSchema + 自愈，这里再补一遍幂等复核，
-        // 且无论 onOpened 是否执行（理论上 AGENT 一定执行过），都保证 provideAgentDb 返回的
-        // AgentDb 所操作的库一定是结构完整的。
         engine.ensureSchema(LibName.AGENT, driver, AgentDb.Schema)
         SchemaSelfHealer.healAgentSession(driver)
         SchemaSelfHealer.healAgentMessage(driver)
@@ -258,7 +234,7 @@ object DataLayerModule {
         return InfraDb(driver)
     }
 
-    // ── 5 个一等 Store（设计 §6）─────────────────────────────────────────
+    // ── 5 个一等 Store ──────────────────────────────────────────────────
 
     @Provides
     @Singleton
@@ -281,7 +257,7 @@ object DataLayerModule {
     @Singleton
     fun provideTimeSeries(db: InfraDb): TimeSeries = TimeSeries(db)
 
-    // ── 5 个域 Repository（设计 §11 / L2 门面）────────────────────────────
+    // ── 5 个域 Repository ───────────────────────────────────────────────
 
     @Provides
     @Singleton
@@ -306,4 +282,36 @@ object DataLayerModule {
     @Provides
     @Singleton
     fun provideT2iRepository(db: T2iDb): T2iRepository = T2iRepository(db)
+
+    // ── P2 扩展：健康检查 / 备份恢复 / 清理 / 性能监控 ───────────────────
+
+    @Provides
+    @Singleton
+    fun provideDatabaseHealthChecker(
+        @ApplicationContext context: Context,
+        registry: DatabaseRegistry,
+        pool: ConnectionPool,
+    ): DatabaseHealthChecker = DatabaseHealthChecker(context, registry, pool)
+
+    @Provides
+    @Singleton
+    fun provideDatabaseBackupManager(
+        @ApplicationContext context: Context,
+        registry: DatabaseRegistry,
+        pool: ConnectionPool,
+    ): DatabaseBackupManager = DatabaseBackupManager(context, registry, pool)
+
+    @Provides
+    @Singleton
+    fun provideDatabaseCleanupManager(
+        pool: ConnectionPool,
+    ): DatabaseCleanupManager = DatabaseCleanupManager(pool)
+
+    /**
+     * 性能监控器是单例 object，这里提供一个 @Provides 方法便于 Hilt 注入。
+     * release 构建可在调用方设置 QueryPerformanceMonitor.enabled = false 禁用。
+     */
+    @Provides
+    @Singleton
+    fun provideQueryPerformanceMonitor(): QueryPerformanceMonitor = QueryPerformanceMonitor
 }

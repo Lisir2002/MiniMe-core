@@ -46,7 +46,6 @@ import com.mini.me_core.core.theme.components.AppButtonVariant
 import com.mini.me_core.core.theme.components.AppCard
 import com.mini.me_core.core.theme.components.AppDialog
 import com.mini.me_core.core.theme.components.AppDialogType
-import com.mini.me_core.datalayer.engine.EncryptionStatus
 import com.mini.me_core.feature.settings.data.repository.BiometricScope
 import com.mini.me_core.feature.settings.data.repository.BiometricTimeoutMinutes
 import com.mini.me_core.feature.settings.data.repository.SecureScreenScope
@@ -71,8 +70,6 @@ fun SecuritySettingsScreen(
     // 确认弹窗状态
     var showBiometricConfirm by remember { mutableStateOf(false) }
     var pendingBiometricValue by remember { mutableStateOf(false) }
-    var showDbEnableConfirm by remember { mutableStateOf(false) }
-    var showDbDisableConfirm by remember { mutableStateOf(false) }
     var showRotateConfirm by remember { mutableStateOf(false) }
     var showClearAuditConfirm by remember { mutableStateOf(false) }
 
@@ -108,17 +105,7 @@ fun SecuritySettingsScreen(
             )
 
             DatabaseEncryptionCard(
-                enabled = uiState.dbEncryptionEnabled,
-                migrating = uiState.dbEncryptionMigrating,
-                progress = uiState.dbEncryptionProgress,
-                currentLib = uiState.dbEncryptionCurrentLib,
-                error = uiState.dbEncryptionError,
                 libStates = uiState.libStates,
-                verificationResult = uiState.dbVerificationResult,
-                onRetry = { viewModel.retryMigration() },
-                onVerify = { viewModel.verifyDbEncryption() },
-                onRequestEnable = { showDbEnableConfirm = true },
-                onRequestDisable = { showDbDisableConfirm = true },
             )
 
             RotationCard(
@@ -177,32 +164,6 @@ fun SecuritySettingsScreen(
             type = AppDialogType.Default,
             onDismiss = { showBiometricConfirm = false },
             onConfirm = { viewModel.toggleBiometric(pendingBiometricValue) },
-        )
-    }
-    if (showDbEnableConfirm) {
-        AppDialog(
-            title = stringResource(R.string.security_db_enable_title),
-            message = stringResource(R.string.security_db_enable_message),
-            confirmText = stringResource(R.string.security_db_enable_action),
-            type = AppDialogType.Default,
-            onDismiss = { showDbEnableConfirm = false },
-            onConfirm = {
-                showDbEnableConfirm = false
-                viewModel.enableDbEncryption()
-            },
-        )
-    }
-    if (showDbDisableConfirm) {
-        AppDialog(
-            title = stringResource(R.string.security_db_disable_title),
-            message = stringResource(R.string.security_db_disable_message),
-            confirmText = stringResource(R.string.security_db_disable_action),
-            type = AppDialogType.Destructive,
-            onDismiss = { showDbDisableConfirm = false },
-            onConfirm = {
-                showDbDisableConfirm = false
-                viewModel.disableDbEncryption()
-            },
         )
     }
     if (showRotateConfirm) {
@@ -316,17 +277,7 @@ private fun riskLabel(target: SecurityScoreCalculator.RiskTarget): String = when
 
 @Composable
 private fun DatabaseEncryptionCard(
-    enabled: Boolean,
-    migrating: Boolean,
-    progress: Int,
-    currentLib: String?,
-    error: String?,
     libStates: List<LibEncryptionState>,
-    verificationResult: String?,
-    onRetry: () -> Unit,
-    onVerify: () -> Unit,
-    onRequestEnable: () -> Unit,
-    onRequestDisable: () -> Unit,
 ) {
     AppCard {
         Column(modifier = Modifier.padding(Spacing.md)) {
@@ -336,13 +287,18 @@ private fun DatabaseEncryptionCard(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(Modifier.weight(1f))
+                Icon(
+                    Icons.Rounded.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.width(20.dp).height(20.dp),
+                )
+                Spacer(Modifier.width(Spacing.xs))
                 Text(
-                    text = if (enabled) stringResource(R.string.security_db_status_encrypted)
-                    else stringResource(R.string.security_db_status_plain),
+                    text = stringResource(R.string.security_db_status_encrypted),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
-                    color = if (enabled) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.error,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
             Spacer(Modifier.height(Spacing.xs))
@@ -352,18 +308,10 @@ private fun DatabaseEncryptionCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            // 逐库状态
+            // 逐库状态（新架构全部加密，仅展示文件大小）
             if (libStates.isNotEmpty()) {
                 Spacer(Modifier.height(Spacing.sm))
                 libStates.forEach { lib ->
-                    val (label, color) = when (lib.display) {
-                        LibEncryptionState.Display.ENCRYPTED ->
-                            stringResource(R.string.security_db_lib_encrypted) to MaterialTheme.colorScheme.primary
-                        LibEncryptionState.Display.PLAIN ->
-                            stringResource(R.string.security_db_lib_plain) to MaterialTheme.colorScheme.onSurfaceVariant
-                        LibEncryptionState.Display.MIGRATING ->
-                            stringResource(R.string.security_db_lib_migrating) to MaterialTheme.colorScheme.tertiary
-                    }
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -374,9 +322,9 @@ private fun DatabaseEncryptionCard(
                             modifier = Modifier.width(110.dp),
                         )
                         Text(
-                            text = label,
+                            text = stringResource(R.string.security_db_lib_encrypted),
                             style = MaterialTheme.typography.bodySmall,
-                            color = color,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                         Spacer(Modifier.weight(1f))
                         Text(
@@ -386,74 +334,6 @@ private fun DatabaseEncryptionCard(
                         )
                     }
                 }
-            }
-
-            // 迁移进度
-            if (migrating) {
-                Spacer(Modifier.height(Spacing.sm))
-                val currentIndex = libStates.indexOfFirst { it.libName == currentLib } + 1
-                Text(
-                    text = stringResource(R.string.security_db_migrating_progress, currentIndex, libStates.size, currentLib ?: "", progress),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(Spacing.xs))
-                LinearProgressIndicator(
-                    progress = { progress / 100f },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            error?.let {
-                Spacer(Modifier.height(Spacing.sm))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Rounded.ErrorOutline,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.width(16.dp).height(16.dp),
-                    )
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    Spacer(Modifier.weight(1f))
-                    AppButton(
-                        text = stringResource(R.string.security_db_retry),
-                        onClick = onRetry,
-                        variant = AppButtonVariant.Outlined,
-                        buttonColor = AppButtonColor.Error,
-                        size = AppButtonSize.Small,
-                    )
-                }
-            }
-
-            verificationResult?.let {
-                Spacer(Modifier.height(Spacing.sm))
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Spacer(Modifier.height(Spacing.sm))
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                AppButton(
-                    text = if (enabled) stringResource(R.string.security_db_turn_off)
-                    else stringResource(R.string.security_db_turn_on),
-                    onClick = { if (enabled) onRequestDisable() else onRequestEnable() },
-                    buttonColor = if (enabled) AppButtonColor.Error else AppButtonColor.Primary,
-                    enabled = !migrating,
-                )
-                AppButton(
-                    text = stringResource(R.string.security_db_verify),
-                    onClick = onVerify,
-                    variant = AppButtonVariant.Tonal,
-                    size = AppButtonSize.Medium,
-                )
             }
         }
     }

@@ -163,12 +163,6 @@ class MiniMeCore : Application() {
     @Inject
     lateinit var connectionPool: ConnectionPool
 
-    /** 数据库加密迁移崩溃恢复：启动时扫描 6 库状态，回滚迁移中的崩溃现场。
-     *  必须在任何数据库访问之前调用（见 [onCreate]），操作仅限文件系统 + SharedPreferences，
-     *  不打开数据库，主线程 < 100ms（设计文档 §7）。 */
-    @Inject
-    lateinit var crashRecovery: com.mini.me_core.datalayer.engine.CrashRecovery
-
     /** GitHub Releases 仓库：启动时后台静默检查新版本（结果用于关于页红点，不弹窗）。 */
     @Inject
     lateinit var updateRepository: com.mini.me_core.feature.update.data.GitHubReleaseRepository
@@ -210,11 +204,6 @@ class MiniMeCore : Application() {
         // 通用启动期迁移框架：按序执行所有一次性数据迁移任务。
         // 必须在任何 DB 访问之前（任务会重命名数据库文件）。已完成任务命中标记，零开销跳过。
         MigrationRunner.runAll(this, emptyList())
-
-        // 数据库加密迁移崩溃恢复：扫描 6 库迁移状态，回滚非稳定状态。
-        // 正常情况下为幂等空操作，仅清理可能残留的临时文件。
-        crashRecovery.recoverAll()
-        FileLogger.d(TAG, "数据层：崩溃恢复检查完成")
 
         registerBouncyCastle()
         createNotificationChannels()

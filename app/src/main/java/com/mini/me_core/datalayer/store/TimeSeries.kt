@@ -18,10 +18,17 @@ class TimeSeries(private val db: InfraDb) {
 
     private val q get() = db.tsQueries
 
+    /**
+     * 记录一条时序数据。
+     * P1 修复：原 INSERT + SELECT last_insert_rowid() 无事务包裹，并发下可能返回错误 id。
+     */
     fun record(ts: Long, type: String, payloadJson: String, meta: String? = null): Long {
-        q.insertTs(ts, type, payloadJson, meta)
-        // selectLastInsertId 生成形态为 ExecutableQuery<Long>（单列函数查询直接返回标量）
-        return q.selectLastInsertId().executeAsOne()
+        var id = 0L
+        db.transaction {
+            q.insertTs(ts, type, payloadJson, meta)
+            id = q.selectLastInsertId().executeAsOne()
+        }
+        return id
     }
 
     fun byType(type: String): List<TsEntry> =

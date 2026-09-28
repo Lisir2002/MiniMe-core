@@ -1,0 +1,44 @@
+-- v6 → v7 迁移（P1 数据层审计：补全缺失索引）
+--
+-- 审计发现多张高频按 session_id 查询/删除的表缺少索引，导致每次查询全表扫描。
+-- 以下索引全部使用 CREATE INDEX IF NOT EXISTS，对已迁移库幂等，不修改任何数据。
+-- 索引覆盖：会话级联删除路径（deleteSession）和按会话列表查询路径。
+
+-- todo_items：selectTodoItemsBySession / deleteTodoItemsBySession / 分页查询
+CREATE INDEX IF NOT EXISTS idx_todo_items_session ON todo_items (session_id);
+
+-- wake_queue：selectWakeBySessionAndStatus（按 session + status 查）
+CREATE INDEX IF NOT EXISTS idx_wake_queue_session_status ON wake_queue (session_id, status);
+
+-- agent_goals：selectGoalsBySession / deleteGoalsBySession
+CREATE INDEX IF NOT EXISTS idx_agent_goals_session ON agent_goals (session_id);
+
+-- agent_plans：selectPlansBySession / deletePlansBySession
+CREATE INDEX IF NOT EXISTS idx_agent_plans_session ON agent_plans (session_id);
+
+-- agent_jobs：selectJobsBySession / deleteJobsBySession
+CREATE INDEX IF NOT EXISTS idx_agent_jobs_session ON agent_jobs (session_id);
+
+-- agent_schedules：selectSchedulesBySession / deleteSchedulesBySession
+CREATE INDEX IF NOT EXISTS idx_agent_schedules_session ON agent_schedules (session_id);
+
+-- agent_trajectories：selectTrajectoriesBySession / deleteTrajectoriesBySession
+CREATE INDEX IF NOT EXISTS idx_agent_trajectories_session ON agent_trajectories (session_id);
+
+-- agent_playbook_runs：selectPlaybookRunsBySession / deletePlaybookRunsBySession
+CREATE INDEX IF NOT EXISTS idx_agent_playbook_runs_session ON agent_playbook_runs (session_id);
+
+-- zth_user_confirmed_sentinels：selectSentinelsBySession
+CREATE INDEX IF NOT EXISTS idx_zth_sentinels_session ON zth_user_confirmed_sentinels (session_id);
+
+-- file_edit_hunks：selectFileEditHunksBySession / deleteFileEditHunksBySession
+CREATE INDEX IF NOT EXISTS idx_file_edit_hunks_session ON file_edit_hunks (session_id);
+
+-- mode_switch_history：selectModeSwitchesBySession / deleteModeSwitchesBySession
+CREATE INDEX IF NOT EXISTS idx_mode_switch_history_session ON mode_switch_history (session_id);
+
+-- session_checkpoints：selectSessionCheckpoints / deleteCheckpointsBySession
+CREATE INDEX IF NOT EXISTS idx_session_checkpoints_session ON session_checkpoints (session_id);
+
+-- checkpoint_file_snapshots：selectCheckpointFileSnapshots（FK 不自动建索引）
+CREATE INDEX IF NOT EXISTS idx_checkpoint_file_snapshots_checkpoint ON checkpoint_file_snapshots (checkpoint_id);

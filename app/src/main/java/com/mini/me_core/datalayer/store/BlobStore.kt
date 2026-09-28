@@ -12,10 +12,24 @@ class BlobStore(private val db: InfraDb) {
 
     private val q get() = db.blobQueries
 
+    /** P1 修复：BLOB 写入大小护栏，防止超大字节数组导致 OOM。10MB 上限。 */
+    private val maxBlobSize = 10L * 1024 * 1024
+
+    /**
+     * 存储大二进制。
+     * P1 修复：原 INSERT + SELECT last_insert_rowid() 无事务包裹，并发下可能返回错误 id。
+     * 同时增加大小护栏，超过 10MB 抛异常拒绝写入，避免 OOM。
+     */
     fun put(data: ByteArray, mime: String? = null): Long {
-        q.insertBlob(mime, data.size.toLong(), data, System.currentTimeMillis())
-        // selectLastInsertId 生成形态为 ExecutableQuery<Long>（单列函数查询直接返回标量）
-        return q.selectLastInsertId().executeAsOne()
+        if (data.size > maxBlobSize) {
+            throw IllegalArgumentException("Blob 大小 ${data.size} 超过上限 $maxBlobSize 字节")
+        }
+        var id = 0L
+        db.transaction {
+            q.insertBlob(mime, data.size.toLong(), data, System.currentTimeMillis())
+            id = q.selectLastInsertId().executeAsOne()
+        }
+        return id
     }
 
     fun get(id: Long): ByteArray? = q.selectBlob(id).executeAsOneOrNull()?.data_

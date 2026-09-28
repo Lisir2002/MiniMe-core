@@ -6,11 +6,7 @@ import com.mini.me_core.core.security.CredentialEncryptor
 import com.mini.me_core.core.security.OperationResult
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.engine.DatabasePathProvider
-import com.mini.me_core.datalayer.engine.DbEncryptionMigrationEngine
-import com.mini.me_core.datalayer.engine.EncryptionStatus
 import com.mini.me_core.datalayer.engine.LibName
-import com.mini.me_core.datalayer.engine.MigrationResult
-import com.mini.me_core.datalayer.engine.MigrationStateStore
 import com.mini.me_core.feature.settings.data.repository.BiometricConfigRepository
 import com.mini.me_core.feature.settings.data.repository.BiometricScope
 import com.mini.me_core.feature.settings.data.repository.BiometricTimeoutMinutes
@@ -33,22 +29,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** 单个库的加密状态（用于数据库加密卡片逐库展示）。 */
+/** 单个库的加密状态（新架构全部默认加密，仅展示文件信息）。 */
 data class LibEncryptionState(
     val libName: String,
-    val status: EncryptionStatus,
     val fileSizeBytes: Long = 0L,
-) {
-    /** UI 分类：已加密 / 明文 / 迁移中。 */
-    val display: Display
-        get() = when (status) {
-            EncryptionStatus.ENCRYPTED -> Display.ENCRYPTED
-            EncryptionStatus.PLAIN -> Display.PLAIN
-            else -> Display.MIGRATING
-        }
-
-    enum class Display { ENCRYPTED, PLAIN, MIGRATING }
-}
+)
 
 /** 密钥轮换历史条目。 */
 data class RotationHistoryEntry(
@@ -66,14 +51,8 @@ data class SecurityUiState(
     val resetting: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null,
-    // 数据库加密：SQLCipher 加密状态与迁移进度
-    val dbEncryptionEnabled: Boolean = false,
-    val dbEncryptionMigrating: Boolean = false,
-    val dbEncryptionProgress: Int = 0,
-    val dbEncryptionCurrentLib: String? = null,
-    val dbEncryptionError: String? = null,
+    // 数据库加密：新架构全部默认加密，仅展示状态
     val libStates: List<LibEncryptionState> = emptyList(),
-    val dbVerificationResult: String? = null,
     // 防截图录屏
     val secureScreenEnabled: Boolean = true,
     val secureScreenScope: SecureScreenScope = SecureScreenScope.DEFAULT,
@@ -93,6 +72,9 @@ data class SecurityUiState(
     // 审计日志
     val auditEntries: List<SecurityAuditEntry> = emptyList(),
 ) {
+    /** 新架构：所有数据库默认加密。 */
+    val dbEncryptionEnabled: Boolean get() = true
+
     /** 是否处于紧急解锁锁定中。 */
     fun isEmergencyLocked(nowMs: Long = System.currentTimeMillis()): Boolean =
         emergencyLockoutUntil > nowMs
@@ -102,8 +84,6 @@ data class SecurityUiState(
 class SecuritySettingsViewModel @Inject constructor(
     private val encryptor: CredentialEncryptor,
     private val auditLogRepo: RemoteAuditLogRepository,
-    private val dbMigrationEngine: DbEncryptionMigrationEngine,
-    private val dbMigrationStateStore: MigrationStateStore,
     private val secureScreenRepository: SecureScreenRepository,
     private val pathProvider: DatabasePathProvider,
     private val biometricConfigRepository: BiometricConfigRepository,
@@ -113,7 +93,6 @@ class SecuritySettingsViewModel @Inject constructor(
     private val _baseState = MutableStateFlow(SecurityUiState())
     val baseState: StateFlow<SecurityUiState> = _baseState.asStateFlow()
 
-    /** 外部配置流（防截图 + 生物识别配置），与 baseState 解耦后再合并。 */
     private data class ExternalConfig(
         val secureEnabled: Boolean,
         val secureScope: SecureScreenScope,
@@ -188,15 +167,14 @@ class SecuritySettingsViewModel @Inject constructor(
     fun refreshSecurityScore() {
         viewModelScope.launch {
             try {
-                val base = _baseState.value
                 val now = System.currentTimeMillis()
                 val audit = securityAuditLogRepository.list()
                 val hasEmergencyHistory = audit.any { it.action == SecurityAuditEntry.ACTION_EMERGENCY_UNLOCK }
                 val inputs = SecurityScoreCalculator.Inputs(
-                    dbEncrypted = base.dbEncryptionEnabled,
-                    biometricEnabled = base.biometricRequired,
+                    dbEncrypted = true, // 新架构全部默认加密
+                    biometricEnabled = _baseState.value.biometricRequired,
                     secureScreenEnabled = runCatching { secureScreenRepository.enabledFlow.first() }.getOrDefault(true),
-                    keyRotatedWithin90Days = SecurityScoreCalculator.Inputs.isKeyFresh(base.lastRotatedAt, now),
+                    keyRotatedWithin90Days = SecurityScoreCalculator.Inputs.isKeyFresh(_baseState.value.lastRotatedAt, now),
                     noEmergencyUnlockHistory = !hasEmergencyHistory,
                 )
                 val result = SecurityScoreCalculator.calculate(inputs)
@@ -237,16 +215,10 @@ class SecuritySettingsViewModel @Inject constructor(
                             loading = false,
                             error = "切换失败: ${result.error.message}"
                         )
-                        securityAuditLogRepository.append(
-                            action = SecurityAuditEntry.ACTION_BIOMETRIC,
-                            success = false,
-                            detail = "切换失败: ${result.error.message}",
-                        )
                     }
                 }
             } catch (e: Exception) {
                 _baseState.value = _baseState.value.copy(loading = false, error = "切换失败: ${e.message}")
-                FileLogger.w("SecurityVM", "切换生物识别失败", e)
             }
         }
     }
@@ -298,213 +270,36 @@ class SecuritySettingsViewModel @Inject constructor(
                             rotating = false,
                             error = "轮换失败: ${result.error.message}"
                         )
-                        securityAuditLogRepository.append(
-                            action = SecurityAuditEntry.ACTION_KEY_ROTATE,
-                            success = false,
-                            detail = "轮换失败: ${result.error.message}",
-                        )
                     }
                 }
             } catch (e: Exception) {
-                // 修复：encryptor 抛异常时 rotating 永远卡 true —— 这里兜底复位。
                 _baseState.value = _baseState.value.copy(
                     rotating = false,
                     error = "轮换失败: ${e.message}"
                 )
                 FileLogger.e("SecurityVM", "rotateDek 异常", e)
-                securityAuditLogRepository.append(
-                    action = SecurityAuditEntry.ACTION_KEY_ROTATE,
-                    success = false,
-                    detail = "轮换异常: ${e.message}",
-                )
             }
         }
     }
 
-    // ── 数据库加密（SQLCipher）───────────────────────────────────────
+    // ── 数据库加密状态展示（新架构：全部默认加密）──────────────────────
 
     fun refreshDbEncryptionStatus() {
         viewModelScope.launch {
             try {
                 val states = LibName.entries.map { lib ->
-                    val st = dbMigrationStateStore.getState(lib)
                     val size = runCatching { pathProvider.mainDb(lib).length() }.getOrDefault(0L)
                     LibEncryptionState(
-                        libName = lib.name,
-                        status = st.encryptionStatus,
+                        libName = lib.name.lowercase(),
                         fileSizeBytes = size,
                     )
                 }
-                val allEncrypted = states.all { it.status == EncryptionStatus.ENCRYPTED }
-                _baseState.value = _baseState.value.copy(
-                    dbEncryptionEnabled = allEncrypted,
-                    libStates = states,
-                )
+                _baseState.value = _baseState.value.copy(libStates = states)
                 refreshSecurityScore()
             } catch (e: Exception) {
                 FileLogger.w("SecurityVM", "刷新数据库加密状态失败", e)
             }
         }
-    }
-
-    fun enableDbEncryption() {
-        viewModelScope.launch {
-            _baseState.value = _baseState.value.copy(
-                dbEncryptionMigrating = true,
-                dbEncryptionProgress = 0,
-                dbEncryptionError = null,
-                dbEncryptionCurrentLib = null,
-            )
-
-            var completed = 0
-            var hasError = false
-            val total = LibName.entries.size
-            for (lib in LibName.entries) {
-                _baseState.value = _baseState.value.copy(dbEncryptionCurrentLib = lib.name)
-                try {
-                    val result = dbMigrationEngine.migrateToEncrypted(lib)
-                    when (result) {
-                        MigrationResult.SUCCESS, MigrationResult.ALREADY_ENCRYPTED -> {
-                            completed++
-                            _baseState.value = _baseState.value.copy(
-                                dbEncryptionProgress = (completed.toDouble() / total * 100).toInt(),
-                            )
-                        }
-                        MigrationResult.FAILED_RETRYABLE -> {
-                            hasError = true
-                            _baseState.value = _baseState.value.copy(
-                                dbEncryptionError = "库 ${lib.name} 迁移失败（可重试）",
-                            )
-                            break
-                        }
-                        MigrationResult.ALREADY_PLAIN -> Unit
-                    }
-                } catch (e: Exception) {
-                    hasError = true
-                    _baseState.value = _baseState.value.copy(
-                        dbEncryptionError = "库 ${lib.name} 迁移异常: ${e.message}",
-                    )
-                    FileLogger.e("SecurityVM", "数据库加密迁移失败: ${lib.name}", e)
-                    break
-                }
-            }
-
-            _baseState.value = _baseState.value.copy(
-                dbEncryptionMigrating = false,
-                dbEncryptionCurrentLib = null,
-                dbEncryptionEnabled = !hasError && completed == total,
-                successMessage = if (!hasError) "数据库加密已开启（$total 个库）" else null,
-            )
-            securityAuditLogRepository.append(
-                action = SecurityAuditEntry.ACTION_DB_ENCRYPTION,
-                success = !hasError,
-                detail = if (!hasError) "开启数据库加密（$total 个库）" else "开启数据库加密失败",
-            )
-            refreshDbEncryptionStatus()
-        }
-    }
-
-    fun disableDbEncryption() {
-        viewModelScope.launch {
-            _baseState.value = _baseState.value.copy(
-                dbEncryptionMigrating = true,
-                dbEncryptionProgress = 0,
-                dbEncryptionError = null,
-                dbEncryptionCurrentLib = null,
-            )
-
-            var completed = 0
-            var hasError = false
-            val total = LibName.entries.size
-            for (lib in LibName.entries) {
-                _baseState.value = _baseState.value.copy(dbEncryptionCurrentLib = lib.name)
-                try {
-                    val result = dbMigrationEngine.migrateToPlain(lib)
-                    when (result) {
-                        MigrationResult.SUCCESS, MigrationResult.ALREADY_PLAIN -> {
-                            completed++
-                            _baseState.value = _baseState.value.copy(
-                                dbEncryptionProgress = (completed.toDouble() / total * 100).toInt(),
-                            )
-                        }
-                        MigrationResult.FAILED_RETRYABLE -> {
-                            hasError = true
-                            _baseState.value = _baseState.value.copy(
-                                dbEncryptionError = "库 ${lib.name} 反向迁移失败（可重试）",
-                            )
-                            break
-                        }
-                        MigrationResult.ALREADY_ENCRYPTED -> Unit
-                    }
-                } catch (e: Exception) {
-                    hasError = true
-                    _baseState.value = _baseState.value.copy(
-                        dbEncryptionError = "库 ${lib.name} 反向迁移异常: ${e.message}",
-                    )
-                    FileLogger.e("SecurityVM", "数据库解密迁移失败: ${lib.name}", e)
-                    break
-                }
-            }
-
-            _baseState.value = _baseState.value.copy(
-                dbEncryptionMigrating = false,
-                dbEncryptionCurrentLib = null,
-                dbEncryptionEnabled = hasError,
-                successMessage = if (!hasError) "数据库加密已关闭（所有库已回退到明文）" else null,
-            )
-            securityAuditLogRepository.append(
-                action = SecurityAuditEntry.ACTION_DB_ENCRYPTION,
-                success = !hasError,
-                detail = if (!hasError) "关闭数据库加密" else "关闭数据库加密失败",
-            )
-            refreshDbEncryptionStatus()
-        }
-    }
-
-    /** 迁移失败后重试：复用当前开关方向。 */
-    fun retryMigration() {
-        viewModelScope.launch {
-            val currentlyEnabled = _baseState.value.dbEncryptionEnabled
-            if (currentlyEnabled) disableDbEncryption() else enableDbEncryption()
-        }
-    }
-
-    /** 手动校验：逐库重读状态 + 文件存在性/大小，输出结果摘要。 */
-    fun verifyDbEncryption() {
-        viewModelScope.launch {
-            try {
-                val sb = StringBuilder()
-                var ok = 0
-                LibName.entries.forEach { lib ->
-                    val st = dbMigrationStateStore.getState(lib)
-                    val file = runCatching { pathProvider.mainDb(lib) }.getOrNull()
-                    val exists = file?.exists() == true
-                    val size = file?.length() ?: 0L
-                    val statusLabel = when (st.encryptionStatus) {
-                        EncryptionStatus.ENCRYPTED -> "已加密"
-                        EncryptionStatus.PLAIN -> "明文"
-                        else -> "迁移中"
-                    }
-                    val fileLabel = when {
-                        !exists -> "文件缺失"
-                        size <= 0L -> "空文件"
-                        else -> "%.1f KB".format(size / 1024.0)
-                    }
-                    sb.appendLine("${lib.name}: $statusLabel · $fileLabel")
-                    if (st.encryptionStatus == EncryptionStatus.ENCRYPTED && exists && size > 0L) ok++
-                }
-                _baseState.value = _baseState.value.copy(
-                    dbVerificationResult = "校验完成：$ok/${LibName.entries.size} 个库状态正常\n$sb",
-                )
-            } catch (e: Exception) {
-                _baseState.value = _baseState.value.copy(dbVerificationResult = "校验失败: ${e.message}")
-                FileLogger.w("SecurityVM", "手动校验数据库失败", e)
-            }
-        }
-    }
-
-    fun toggleDbEncryption(enabled: Boolean) {
-        if (enabled) enableDbEncryption() else disableDbEncryption()
     }
 
     // ── 防截图录屏 ─────────────────────────────────────────────────────
@@ -515,11 +310,6 @@ class SecuritySettingsViewModel @Inject constructor(
                 secureScreenRepository.setEnabled(enabled)
                 _baseState.value = _baseState.value.copy(
                     successMessage = "防截图录屏已${if (enabled) "开启" else "关闭"}"
-                )
-                securityAuditLogRepository.append(
-                    action = SecurityAuditEntry.ACTION_SECURE_SCREEN,
-                    success = true,
-                    detail = "防截图录屏已${if (enabled) "开启" else "关闭"}",
                 )
                 refreshSecurityScore()
             } catch (e: Exception) {
@@ -553,7 +343,6 @@ class SecuritySettingsViewModel @Inject constructor(
             _baseState.value = _baseState.value.copy(resetting = true, error = null, successMessage = null)
             try {
                 encryptor.emergencyResetMasterKey()
-                FileLogger.i("SecurityVM", "紧急重置完成")
                 auditLogRepo.append(
                     category = RemoteAuditCategory.SECURITY,
                     action = RemoteAuditAction.EMERGENCY_RESET_MASTERKEY,
@@ -575,7 +364,6 @@ class SecuritySettingsViewModel @Inject constructor(
                 loadState()
                 refreshSecurityScore()
             } catch (e: Exception) {
-                // 验证失败计数：连续 5 次失败锁定 5 分钟。
                 val failed = _baseState.value.emergencyFailedAttempts + 1
                 val lockoutUntil = if (failed >= 5) now + 5 * 60 * 1000L else 0L
                 _baseState.value = _baseState.value.copy(
@@ -583,11 +371,6 @@ class SecuritySettingsViewModel @Inject constructor(
                     emergencyFailedAttempts = failed,
                     emergencyLockoutUntil = lockoutUntil,
                     error = "重置失败: ${e.message}",
-                )
-                securityAuditLogRepository.append(
-                    action = SecurityAuditEntry.ACTION_EMERGENCY_UNLOCK,
-                    success = false,
-                    detail = "失败（$host:$port）: ${e.message}",
                 )
             }
         }
