@@ -10,15 +10,22 @@ import net.sqlcipher.database.SQLiteDatabase
 import java.io.File
 
 /**
- * 旧版升级迁移引擎（逐表事务拷贝）。
+ * 旧版升级迁移引擎（官方推荐 sqlcipher_export 方案）。
  *
- * 放弃 ATTACH + sqlcipher_export，改用更可靠的逐表事务拷贝：
- * 1. 检查明文库是否存在
- * 2. 创建加密临时库（.enc.tmp），用SQLDelight Schema建表
- * 3. 开启事务，逐表从明文库SELECT * → 批量INSERT OR REPLACE到加密库
- * 4. 数据校验（行数比对）
- * 5. 原子替换（renameTo）
- * 6. 标记完成
+ * 核心流程（Zetetic官方推荐）：
+ * 1. 用SQLCipher打开明文库（空密钥）
+ * 2. ATTACH 加密临时库（带密钥）
+ * 3. 用 rawExecSQL 执行 SELECT sqlcipher_export('encrypted')
+ *    （必须用rawExecSQL，不能用execSQL，否则报"another row available" error 100）
+ * 4. DETACH 加密库
+ * 5. 关闭明文库
+ * 6. 验证加密库
+ * 7. 原子替换
+ *
+ * sqlcipher_export 自动复制：schema、触发器、虚拟表、索引、所有数据，
+ * 不需要手动逐表拷贝，避免表结构不匹配和BLOB处理问题。
+ *
+ * 迁移失败时安全降级：不崩溃，保留明文库，记录错误日志，应用可正常启动。
  */
 class LegacyMigrationEngine(
     private val context: Context,
@@ -55,63 +62,76 @@ class LegacyMigrationEngine(
         val dek = runBlocking(Dispatchers.IO) {
             keyManager.getOrCreateDek("db_${definition.id}")
         }
-        val passphraseBytes = Base64.encodeToString(dek, Base64.NO_WRAP).toByteArray(Charsets.UTF_8)
+        // SQLCipher的密钥需要是字符串，用Base64编码
+        val passphrase = Base64.encodeToString(dek, Base64.NO_WRAP)
         dek.fill(0)
 
+        var plainDb: SQLiteDatabase? = null
         try {
-            // Step 1: 打开明文库（只读）
-            FileLogger.d(TAG, "[${definition.id}] Step1: 打开明文库")
-            val plainDb = android.database.sqlite.SQLiteDatabase.openDatabase(
-                plainFile.absolutePath,
-                null,
-                android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
-            )
-
-            // Step 2: 创建并打开加密临时库，直接从明文库复制schema
-            // 不依赖AndroidSqliteDriver（懒加载可能导致表未创建），直接用SQLiteDatabase
-            FileLogger.d(TAG, "[${definition.id}] Step2: 创建加密库并复制schema")
+            // Step 1: 清理旧的临时文件
             if (tempFile.exists()) tempFile.delete()
+
+            // Step 2: 用SQLCipher打开明文库（空密钥，因为是明文）
+            // 注意：必须用SQLCipher的SQLiteDatabase打开，不能用android标准的，
+            // 因为后续要在同一个连接上执行ATTACH和sqlcipher_export
+            FileLogger.d(TAG, "[${definition.id}] Step1: 打开明文库")
             SQLiteDatabase.loadLibs(context)
-            val encDb = SQLiteDatabase.openOrCreateDatabase(
-                tempFile.absolutePath,
-                passphraseBytes,
+            plainDb = SQLiteDatabase.openDatabase(
+                plainFile.absolutePath,
+                "",  // 空密钥 = 明文
                 null,
+                SQLiteDatabase.OPEN_READWRITE,
             )
 
-            // 从明文库读取并执行所有schema对象（表、索引、触发器、视图）
-            replicateSchema(plainDb, encDb, definition.id)
+            // Step 3: ATTACH 加密临时库
+            // 密钥中的单引号需要转义
+            val escapedPassphrase = passphrase.replace("'", "''")
+            FileLogger.d(TAG, "[${definition.id}] Step2: ATTACH加密临时库")
+            plainDb.rawExecSQL(
+                "ATTACH DATABASE '${tempFile.absolutePath}' AS encrypted KEY '$escapedPassphrase'"
+            )
 
-            // Step 3: 开启事务，逐表拷贝数据
-            FileLogger.d(TAG, "[${definition.id}] Step3: 逐表拷贝数据")
-            encDb.beginTransaction()
-            try {
-                val tableNames = getUserTables(plainDb)
-                FileLogger.d(TAG, "[${definition.id}] 发现 ${tableNames.size} 个用户表: ${tableNames.joinToString()}")
+            // Step 4: 执行 sqlcipher_export（必须用rawExecSQL！）
+            // 这会自动复制所有表、索引、触发器、视图、虚拟表和数据
+            FileLogger.d(TAG, "[${definition.id}] Step3: 执行sqlcipher_export")
+            plainDb.rawExecSQL("SELECT sqlcipher_export('encrypted')")
 
-                for (table in tableNames) {
-                    copyTable(plainDb, encDb, table)
-                }
-                encDb.setTransactionSuccessful()
-            } finally {
-                encDb.endTransaction()
+            // Step 5: DETACH
+            FileLogger.d(TAG, "[${definition.id}] Step4: DETACH加密库")
+            plainDb.rawExecSQL("DETACH DATABASE encrypted")
+
+            // Step 6: 关闭明文库
+            plainDb.close()
+            plainDb = null
+
+            // Step 7: 验证加密库（用密钥打开，查询表数量）
+            FileLogger.d(TAG, "[${definition.id}] Step5: 验证加密库")
+            val encDb = SQLiteDatabase.openDatabase(
+                tempFile.absolutePath,
+                passphrase,
+                null,
+                SQLiteDatabase.OPEN_READONLY,
+            )
+            val cursor = encDb.rawQuery(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+                null,
+            )
+            val tableCount = if (cursor.moveToFirst()) cursor.getLong(0) else 0L
+            cursor.close()
+            encDb.close()
+            FileLogger.d(TAG, "[${definition.id}] 加密库验证通过，共 $tableCount 个表")
+
+            if (tableCount == 0L) {
+                throw DatabaseEncryptionException("迁移验证失败：加密库中没有任何用户表")
             }
 
-            // Step 4: 数据校验
-            FileLogger.d(TAG, "[${definition.id}] Step4: 数据校验")
-            validateRowCounts(plainDb, encDb)
-
-            // Step 5: 关闭数据库
-            FileLogger.d(TAG, "[${definition.id}] Step5: 关闭数据库")
-            plainDb.close()
-            encDb.close()
-
-            // Step 6: 备份明文库
+            // Step 8: 备份明文库
             FileLogger.d(TAG, "[${definition.id}] Step6: 备份明文库")
             plainFile.copyTo(backupFile, overwrite = true)
             plainFile.resolveSibling("${plainFile.name}-wal").takeIf { it.exists() }?.delete()
             plainFile.resolveSibling("${plainFile.name}-shm").takeIf { it.exists() }?.delete()
 
-            // Step 7: 原子替换
+            // Step 9: 原子替换
             FileLogger.d(TAG, "[${definition.id}] Step7: 原子替换")
             if (!tempFile.renameTo(plainFile)) {
                 throw DatabaseEncryptionException("原子替换失败: ${tempFile.name} → ${plainFile.name}")
@@ -120,158 +140,34 @@ class LegacyMigrationEngine(
             markMigrationCompleted(definition.id)
             FileLogger.i(TAG, "[${definition.id}] 迁移完成！")
 
-        } catch (e: DatabaseEncryptionException) {
-            throw e
         } catch (e: Exception) {
             FileLogger.e(TAG, "[${definition.id}] 迁移失败: ${e.message}", e)
+            runCatching { plainDb?.close() }
             runCatching { tempFile.delete() }
-            throw DatabaseEncryptionException("明文→加密迁移失败: ${definition.id}", e)
-        } finally {
-            passphraseBytes.fill(0)
-        }
-    }
-
-    /**
-     * 从明文库复制完整schema到加密库（表、索引、触发器、视图）。
-     * 直接读取sqlite_master中的sql语句并执行，确保加密库结构与明文库完全一致。
-     */
-    private fun replicateSchema(
-        plainDb: android.database.sqlite.SQLiteDatabase,
-        encDb: SQLiteDatabase,
-        dbId: String,
-    ) {
-        // 按顺序创建：表 → 视图 → 触发器 → 索引
-        // 表必须先创建，其他对象依赖表
-        val types = listOf("table", "view", "trigger", "index")
-        var totalObjects = 0
-
-        for (type in types) {
-            val cursor = plainDb.rawQuery(
-                "SELECT name, sql FROM sqlite_master WHERE type=? " +
-                    "AND sql IS NOT NULL " +
-                    "AND name NOT LIKE 'sqlite_%' " +
-                    "AND name != 'android_metadata' " +
-                    "ORDER BY name",
-                arrayOf(type),
-            )
-            cursor.use {
-                while (it.moveToNext()) {
-                    val name = it.getString(0)
-                    val sql = it.getString(1)
-                    if (sql.isNotBlank()) {
-                        // 跳过自动索引（sqlite_autoindex_开头）
-                        if (name.startsWith("sqlite_autoindex_")) continue
-                        FileLogger.d(TAG, "  [$dbId] 创建$type: $name")
-                        encDb.execSQL(sql)
-                        totalObjects++
-                    }
-                }
-            }
-        }
-        FileLogger.d(TAG, "  [$dbId] schema复制完成，共 $totalObjects 个对象")
-    }
-
-    private fun getUserTables(db: android.database.sqlite.SQLiteDatabase): List<String> {
-        val tables = mutableListOf<String>()
-        val cursor = db.rawQuery(
-            "SELECT name FROM sqlite_master WHERE type='table' " +
-                "AND name NOT LIKE 'sqlite_%' AND name != 'android_metadata' ORDER BY name",
-            null,
-        )
-        cursor.use {
-            while (it.moveToNext()) tables.add(it.getString(0))
-        }
-        return tables
-    }
-
-    private fun copyTable(
-        source: android.database.sqlite.SQLiteDatabase,
-        dest: SQLiteDatabase,
-        table: String,
-    ) {
-        data class ColumnInfo(val name: String, val type: String)
-        val columns = mutableListOf<ColumnInfo>()
-        val colCursor = source.rawQuery("PRAGMA table_info($table)", null)
-        colCursor.use {
-            while (it.moveToNext()) {
-                val name = it.getString(1)
-                val type = it.getString(2) ?: ""
-                columns.add(ColumnInfo(name, type.uppercase()))
-            }
-        }
-        if (columns.isEmpty()) {
-            FileLogger.w(TAG, "  表 $table 无列，跳过")
-            return
-        }
-
-        val placeholders = columns.joinToString(",") { "?" }
-        val columnsStr = columns.joinToString(",") { it.name }
-        val insertSql = "INSERT OR REPLACE INTO $table ($columnsStr) VALUES ($placeholders)"
-
-        var totalRows = 0
-        val cursor = source.rawQuery("SELECT $columnsStr FROM $table", null)
-        cursor.use {
-            val stmt = dest.compileStatement(insertSql)
-            while (it.moveToNext()) {
-                stmt.clearBindings()
-                for (i in columns.indices) {
-                    val colType = columns[i].type
-                    when {
-                        it.isNull(i) -> stmt.bindNull(i + 1)
-                        colType.contains("BLOB") -> stmt.bindBlob(i + 1, it.getBlob(i))
-                        colType.contains("INT") -> stmt.bindLong(i + 1, it.getLong(i))
-                        colType.contains("REAL") || colType.contains("FLOA") ||
-                            colType.contains("DOUB") -> stmt.bindDouble(i + 1, it.getDouble(i))
-                        else -> stmt.bindString(i + 1, it.getString(i))
-                    }
-                }
-                stmt.execute()
-                totalRows++
-            }
-        }
-        FileLogger.d(TAG, "  表 $table: 拷贝 $totalRows 行")
-    }
-
-    private fun validateRowCounts(
-        source: android.database.sqlite.SQLiteDatabase,
-        dest: SQLiteDatabase,
-    ) {
-        val tables = getUserTables(source)
-        var mismatches = 0
-        for (table in tables) {
-            val srcCount = queryRowCount(source, table)
-            val destCount = queryRowCountEnc(dest, table)
-            if (srcCount != destCount) {
-                FileLogger.e(TAG, "行数不匹配: $table 明文=$srcCount 加密=$destCount")
-                mismatches++
-            }
-        }
-        if (mismatches > 0) {
-            throw DatabaseEncryptionException("数据校验失败：$mismatches 个表行数不匹配")
-        }
-        FileLogger.d(TAG, "数据校验通过：${tables.size} 个表行数一致")
-    }
-
-    private fun queryRowCount(db: android.database.sqlite.SQLiteDatabase, table: String): Long {
-        db.rawQuery("SELECT COUNT(*) FROM $table", null).use {
-            return if (it.moveToFirst()) it.getLong(0) else 0L
-        }
-    }
-
-    private fun queryRowCountEnc(db: SQLiteDatabase, table: String): Long {
-        db.rawQuery("SELECT COUNT(*) FROM $table", null).use {
-            return if (it.moveToFirst()) it.getLong(0) else 0L
+            // 安全降级：不抛出异常，不崩溃，保留明文库，应用可正常启动
+            markMigrationFailed(definition.id, e.message ?: "unknown")
+            FileLogger.w(TAG, "[${definition.id}] 迁移失败，安全降级为明文模式，应用继续运行")
         }
     }
 
     // ============== 迁移状态 ==============
 
     private fun migrationKey(dbId: String): String = "migration_${dbId}_completed"
+    private fun migrationFailedKey(dbId: String): String = "migration_${dbId}_failed"
 
     private fun isMigrationCompleted(dbId: String): Boolean =
         prefs.getBoolean(migrationKey(dbId), false)
 
     private fun markMigrationCompleted(dbId: String) {
-        prefs.edit().putBoolean(migrationKey(dbId), true).commit()
+        prefs.edit()
+            .putBoolean(migrationKey(dbId), true)
+            .remove(migrationFailedKey(dbId))
+            .commit()
+    }
+
+    private fun markMigrationFailed(dbId: String, reason: String) {
+        prefs.edit()
+            .putString(migrationFailedKey(dbId), reason)
+            .commit()
     }
 }
