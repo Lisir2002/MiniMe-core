@@ -45,7 +45,7 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 | 构建 | Android Gradle Plugin 8.9.3 + KSP |
 | UI | Jetpack Compose（BOM 2025.12.01）+ Material 3 |
 | 依赖注入 | Hilt 2.56.1 (Dagger) |
-| 数据库 | SQLDelight 2.2.1（6 库拓扑，`datalayer/`；支持可选 SQLCipher AES-256 加密，默认明文，设置页可开启）；旧 Room 数据层已完全移除 |
+| 数据库 | SQLDelight 2.2.1（6 库拓扑，`datalayer/`；**全部默认 SQLCipher AES-256 加密**，无明文/加密开关）；旧 Room 数据层已完全移除 |
 | 网络 | Retrofit 2.11.0 + OkHttp 4.12.0 + Gson |
 | 终端 | Termux terminal-emulator + terminal-view（JNI libtermux.so） |
 | 容器 | PRoot + Alpine Linux 3.21 rootfs（arm64-v8a / x86_64 双架构，运行时按宿主选择） |
@@ -379,11 +379,29 @@ Hilt 被广泛使用。各 Feature 模块定义自己的 DI 模块（如 `AgentM
 数据层为 **SQLDelight V2 六库拓扑**（`datalayer/`），旧 Room 数据层（世代0 巨型单库 `LegacyAgentDatabase`、世代1 按域拆 5 库、全部 DAO/`@Entity` 注解/迁移基建/Room gradle 依赖）已从程序**完全剔除**。
 
 **V2 分层**：
-- L0 引擎 `datalayer/engine`：ConnectionPool + RoutingDriverFactory（根据每库加密状态动态选择 Plain/CipherDriverFactory）+ DbEncryptionMigrationEngine（7 步明文↔加密迁移）+ CrashRecovery（启动时崩溃回滚）+ DatabaseKeyProvider（Android Keystore MasterKey → per-DB DEK）。Cipher 即 SQLCipher AES-256 加密，默认明文，可在设置页开启。
+- L0 引擎 `datalayer/engine`：ConnectionPool + `datalayer/encryption` 加密栈（`UnifiedKeyManager` → `EncryptedDriverFactory` → `EncryptedDatabaseManager`）+ `MigrationEngine`（schema 版本迁移 + 迁移前快照/回滚）。**6 库全部默认加密**，已移除旧的双轨明文/加密路由（`RoutingDriverFactory` / `DbEncryptionMigrationEngine` / `CrashRecovery` / 分散密钥管理）。
 - L1 迁移 `datalayer/migration`：MigrationEngine / HeavyMigration / CodeMigration（必须保留）。
 - L2 门面 `datalayer/repository/*`：`AgentRepository`（业务聚合）+ 泛型 KV / Document / Queue / Blob / TimeSeries store。
 - DI：`datalayer/di/DataLayerModule.kt` 独立提供全部 V2 driver / 6 库 / 仓储（不依赖任何旧数据层）。
 - SQL 定义：`app/src/main/sqldelight/<域>/`，查询类/数据类落在 `com.mini.me_core.datalayer.sqldelight.*`。
+
+### 密钥体系四条不变量（不可漂移）
+
+6 库全部 SQLCipher 加密，**以下四条是跨模块的数据契约**：任何一侧（driver / probe / 迁移器 / 备份）擅自改动其一，都会出现「driver 能开、probe 打不开」的**假损坏**——日志报 `SQLiteException: file is not a database (SQLITE_NOTADB)` 而数据其实完好，进而触发隔离重建、历史数据被清空。
+
+| # | 不变量 | 值 / 单点 | 落地位置 |
+|---|--------|-----------|----------|
+| 1 | DEK purpose 命名 | `db_<库标识>`（如 `db_agent`、`db_infra`；`LibName.name.lowercase()` 或 `DatabaseDefinition.id`） | `CipherPassphrase.purpose()` |
+| 2 | SQLCipher passphrase | `Base64(DEK)`（NO_WRAP）的 UTF-8 字节；**不得**再用原始 DEK 字节、hex、或二次派生 | `CipherPassphrase.encode()` |
+| 3 | Keystore MasterKey alias | `minime_master_key`（AES-256-GCM，硬件 backing，密钥不出 Keystore） | `AndroidUnifiedKeyManager` |
+| 4 | DEK 存储位置 | EncryptedSharedPreferences 文件 `minime_unified_keys`，键名 `dek_<purpose>` | `AndroidUnifiedKeyManager` |
+
+强制纪律：
+
+1. **purpose / passphrase 只允许经 `CipherPassphrase` 构造**，禁止在其它文件里手写 `"db_$id"` 或 `Base64.encodeToString(dek, ...)`。历史教训：`EncryptedDriverFactory` 与 `AndroidVersionProbe` 各自拼串发生过漂移。
+2. 新增任何「打开数据库」的代码路径（driver、版本探测、健康扫描、备份导出、迁移器）都必须与 driver 用**同一套** purpose + passphrase，否则该文件在别人眼里就是损坏文件。
+3. **改密钥 = 改 provider，不改迁移代码**：密钥形态演进（明文→加密、轮换 DEK、换 KDF）统一走 `KeyRotationMigrator`，入参替换为「旧口令 provider / 新口令 provider」即可，迁移主体（`sqlcipher_export` 9 步）不重写。
+4. 诊断不可读库时，日志必须带 `size=` 与 `head=`（前 8 字节 hex）：`head` 非 SQLite 魔数 `53 51 4c 69` 即可判定为加密库或真损坏，是区分「密钥不匹配」与「文件损坏」的第一手证据。
 
 **数据访问**：业务读写全部经 `datalayer/repository` 门面；`data/local/entity/*.kt` 为纯 Kotlin data class（已剥离 Room 注解），仅当 DTO 被领域/UI/Firebase 层复用（如 `V2Xxx.toEntity()`、Backup 的 `toDto/toEntity`）。
 

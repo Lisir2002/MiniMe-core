@@ -32,8 +32,20 @@ class MigrationEngine(
     },
 ) {
 
-    private companion object {
+    companion object {
         const val TAG = "MigrationEngine"
+
+        /**
+         * 快照保留份数（含「最近一次」的 `<name>.bak`）。
+         *
+         * 为什么不再只留一份：单份快照是**覆盖式**的——若应用在「迁移中途失败」后再次启动，
+         * 新一轮 preOpen 会立刻用（已被写坏的）主库覆盖掉唯一快照，安全网在真正需要它的那一刻
+         * 恰好失效。轮转后至少保住迁移前的若干代现场，可人工挑一份完整恢复。
+         */
+        const val MAX_SNAPSHOTS = 3
+
+        /** 快照后缀：`<name>.bak` = 最近一次；`<name>.<时间戳>.bak` = 轮转历史。 */
+        const val SNAPSHOT_SUFFIX = ".bak"
     }
 
     /**
@@ -122,16 +134,105 @@ class MigrationEngine(
         }, 0, null).value
     }
 
-    /** 迁移前文件级快照（§5.3）：cp 主库 + -wal + -shm 到 backup/<name>.bak（零逻辑、保真）。 */
+    /**
+     * 迁移前文件级快照（§5.3）：cp 主库 + -wal + -shm 到 backup/<name>.bak（零逻辑、保真）。
+     *
+     * 轮转语义：写入新快照**前**，先把上一份 `<name>.bak` 另存为 `<name>.<时间戳>.bak`，
+     * 再按 [MAX_SNAPSHOTS] 淘汰最旧的历史快照。
+     * `<name>.bak` 始终是「最近一次」，[restoreSnapshot] 的回滚目标不变。
+     */
     fun snapshot(lib: LibName, heavy: Boolean) {
         val main = pathProvider.mainDb(lib)
         if (!main.exists()) return
         val bak = pathProvider.snapshotFile(lib)
+        rotateCurrentSnapshot(bak)
         main.copyTo(bak, overwrite = true)
         copySidecar(main, bak, "wal")
         copySidecar(main, bak, "shm")
+        pruneSnapshots(lib)
         if (heavy) {
             // 重版本/危险迁移：此处叠加逻辑备份（SQL dump / 表级导出），当前留扩展位。
+        }
+    }
+
+    /**
+     * 把「最近一次」快照 `<name>.bak` 另存为历史快照 `<name>.<时间戳>.bak`（-wal / -shm 跟随）。
+     *
+     * 失败（renameTo 返回 false）时不阻断：宁可覆盖旧快照，也不能让快照流程抛异常拖垮启动。
+     */
+    private fun rotateCurrentSnapshot(bak: File) {
+        if (!bak.exists()) return
+        val base = bak.nameWithoutExtension
+        var rotated = bak.resolveSibling("$base.${System.currentTimeMillis()}$SNAPSHOT_SUFFIX")
+        var seq = 0
+        while (rotated.exists() && seq < 100) {
+            seq++
+            rotated = bak.resolveSibling("$base.${System.currentTimeMillis()}-$seq$SNAPSHOT_SUFFIX")
+        }
+        if (!bak.renameTo(rotated)) {
+            FileLogger.w(TAG, "快照轮转失败（renameTo 返回 false）：${bak.name}，本次将覆盖旧快照")
+            return
+        }
+        FileLogger.d(TAG, "快照轮转：${bak.name} → ${rotated.name}")
+        listOf("wal", "shm").forEach { ext ->
+            val src = bak.resolveSibling("${bak.name}-$ext")
+            if (src.exists() && !src.renameTo(rotated.resolveSibling("${rotated.name}-$ext"))) {
+                FileLogger.w(TAG, "快照轮转 $ext 附属文件失败：${src.name}")
+            }
+        }
+    }
+
+    /**
+     * 历史快照（**不含**「最近一次」的 `<name>.bak`），按修改时间**降序**（最新在前）。
+     *
+     * 只认 `<name>.<数字时间戳>.bak` 形态，避免把 `.pre_enc.bak` 等其它产物误当快照淘汰。
+     */
+    fun listSnapshots(lib: LibName): List<File> {
+        val dir = pathProvider.backupDir()
+        if (!dir.isDirectory) return emptyList()
+        // fileName 含 `.`（minime_agent_v3.db），需转义后再拼正则
+        val pattern = Regex("^${Regex.escape(lib.fileName)}\\.\\d+(?:-\\d+)?\\.bak$")
+        return (dir.listFiles() ?: emptyArray())
+            .filter { it.isFile && pattern.matches(it.name) }
+            .sortedByDescending { it.lastModified() }
+    }
+
+    /** 淘汰超出 [MAX_SNAPSHOTS] 的历史快照（最旧的先删，含其 -wal / -shm）。 */
+    private fun pruneSnapshots(lib: LibName) {
+        // `.bak`（最近一次）独立占 1 份，历史最多保留 MAX_SNAPSHOTS - 1 份
+        val keep = MAX_SNAPSHOTS - 1
+        val history = listSnapshots(lib)
+        if (history.size <= keep) return
+        history.drop(keep).forEach { stale ->
+            listOf("", "-wal", "-shm").forEach { suffix ->
+                val f = if (suffix.isEmpty()) stale else stale.resolveSibling("${stale.name}$suffix")
+                if (f.exists() && !f.delete()) {
+                    FileLogger.w(TAG, "淘汰过期快照失败：${f.name}")
+                }
+            }
+            FileLogger.d(TAG, "淘汰过期快照：${stale.name}")
+        }
+    }
+
+    /**
+     * 在快照保护下执行 [block]（典型场景：driver 创建 / schema 迁移 / 加密形态迁移）。
+     *
+     * 语义：先 [snapshot] → 执行 → 一旦抛异常立刻 [restoreSnapshot] 回滚，再重抛原异常
+     * （不吞异常，上层仍可按既有降级策略处理）。
+     *
+     * ⚠️ 只适用于 **driver 打开之前**：driver 打开后持有文件句柄，此时替换文件会让
+     * 已打开的连接指向被换掉的内容。
+     *
+     * @return [block] 的返回值。
+     */
+    fun <T> withSnapshotGuard(lib: LibName, heavy: Boolean = false, block: () -> T): T {
+        snapshot(lib, heavy)
+        return try {
+            block()
+        } catch (t: Throwable) {
+            val restored = restoreSnapshot(lib)
+            FileLogger.e(TAG, "$lib 迁移失败，已自动回滚到快照：restored=$restored", t)
+            throw t
         }
     }
 
@@ -150,7 +251,7 @@ class MigrationEngine(
     }
 
     /**
-     * 抢救「明文→加密」迁移留下的明文备份 `<name>.pre_enc.bak`（LegacyMigrationEngine Step6 产物）。
+     * 抢救密钥形态迁移留下的源形态备份 `<name>.pre_enc.bak`（KeyRotationMigrator Step8 产物）。
      *
      * 该文件是加密迁移**之前**的明文库，若完整则是损坏现场唯一可直接读取的原始数据。
      * 复制到 backup 目录统一保管：既不覆盖任何现有文件，又让它与快照并列、便于导出恢复。

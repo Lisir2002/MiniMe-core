@@ -1,6 +1,5 @@
 package com.mini.me_core.datalayer.encryption
 
-import android.content.Context
 import app.cash.sqldelight.db.SqlDriver
 import com.mini.me_core.core.util.FileLogger
 import kotlinx.coroutines.Dispatchers
@@ -11,16 +10,19 @@ import kotlinx.coroutines.runBlocking
  *
  * 统一管理所有数据库的生命周期：
  * - 首次创建：直接创建加密数据库
- * - 升级检测：检测旧版文明文数据库，触发LegacyMigration
+ * - 形态迁移：检测到仍处于源形态（旧版明文库）的库，触发 [KeyRotationMigrator]
  * - 驱动创建：统一使用SQLCipher加密驱动
  *
  * 所有数据库默认加密，不再有明文/加密路由选择。
+ *
+ * 迁移的**形态**由注入的 provider 决定（[KeyRotationMigrator.PassphraseProvider]），
+ * 本类不感知密钥细节：将来换密钥体系只需在 DI 处换 provider，不改这里。
  */
 class EncryptedDatabaseManager(
-    private val context: Context,
     private val registry: DatabaseRegistry,
     private val driverFactory: EncryptedDriverFactory,
-    private val migrationEngine: LegacyMigrationEngine,
+    private val migrator: KeyRotationMigrator,
+    private val targetPassphrase: KeyRotationMigrator.PassphraseProvider,
 ) {
 
     private companion object {
@@ -29,16 +31,16 @@ class EncryptedDatabaseManager(
 
     /**
      * 获取指定数据库的SqlDriver（suspend版本）。
-     * 如检测到旧版文明文数据库，先执行升级加密。
+     * 如检测到仍为源形态（旧版明文库），先执行升级加密。
      */
     suspend fun getDriver(dbId: String): SqlDriver {
         val definition = registry.get(dbId)
             ?: throw IllegalArgumentException("数据库未注册: $dbId")
 
-        // 检测并执行旧版升级（懒加载，数据库被访问时才触发）
-        if (migrationEngine.needsMigration(definition)) {
-            FileLogger.i(TAG, "检测到旧版明文库，开始升级加密: $dbId")
-            migrationEngine.migrateToEncrypted(definition)
+        // 检测并执行形态迁移（懒加载，数据库被访问时才触发）
+        if (migrator.needsMigration(definition)) {
+            FileLogger.i(TAG, "检测到源形态库，开始明文→加密迁移: $dbId")
+            migrator.migrate(definition, KeyRotationMigrator.PLAIN, targetPassphrase)
         }
 
         return driverFactory.createBlocking(definition)
@@ -59,6 +61,6 @@ class EncryptedDatabaseManager(
      */
     fun isEncrypted(dbId: String): Boolean {
         val definition = registry.get(dbId) ?: return false
-        return !migrationEngine.needsMigration(definition)
+        return !migrator.needsMigration(definition)
     }
 }

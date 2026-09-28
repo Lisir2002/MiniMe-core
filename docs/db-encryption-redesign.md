@@ -96,7 +96,7 @@ SQLite error 100 (SQLITE_ROW) 表示执行语句后有结果行未消费。SQLCi
 | DatabaseRegistry | 数据库定义注册，运行时查询，支持插件扩展 |
 | UnifiedKeyManager | 统一密钥管理，MasterKey + 所有DEK，支持轮换/备份/恢复 |
 | EncryptedDatabaseManager | 数据库生命周期管理，驱动创建，升级触发 |
-| LegacyMigrationEngine | 旧版明文数据库升级加密（仅升级时使用一次） |
+| KeyRotationMigrator | 密钥形态迁移（明文→加密；入参为旧/新口令 provider，轮换只换 provider） |
 | EncryptedDriverFactory | SQLCipher加密驱动创建，统一passphrase编码 |
 
 ## 4. 核心模块详细设计
@@ -336,7 +336,10 @@ class EncryptedDatabaseManager(
 }
 ```
 
-### 4.4 LegacyMigrationEngine（旧版升级迁移引擎）
+### 4.4 KeyRotationMigrator（密钥形态迁移引擎，原 LegacyMigrationEngine）
+
+> 现行实现见 `datalayer/encryption/KeyRotationMigrator.kt`：以 `sqlcipher_export` 为主体，
+> 形态差异收敛为「旧口令 provider / 新口令 provider」两个入参（明文→加密即 `PLAIN` → `dekProvider`）。
 
 #### 设计思路
 

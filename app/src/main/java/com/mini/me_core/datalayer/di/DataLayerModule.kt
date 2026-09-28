@@ -8,7 +8,7 @@ import com.mini.me_core.datalayer.encryption.AndroidUnifiedKeyManager
 import com.mini.me_core.datalayer.encryption.DatabaseRegistry
 import com.mini.me_core.datalayer.encryption.EncryptedDatabaseManager
 import com.mini.me_core.datalayer.encryption.EncryptedDriverFactory
-import com.mini.me_core.datalayer.encryption.LegacyMigrationEngine
+import com.mini.me_core.datalayer.encryption.KeyRotationMigrator
 import com.mini.me_core.datalayer.encryption.UnifiedKeyManager
 import com.mini.me_core.datalayer.encryption.registerBuiltinDatabases
 import com.mini.me_core.datalayer.engine.AndroidDatabasePathProvider
@@ -50,7 +50,7 @@ import javax.inject.Singleton
  * - DatabaseRegistry：注册表，启动时注册6个内置库定义
  * - UnifiedKeyManager：统一密钥管理（单一MasterKey + EncryptedSharedPreferences）
  * - EncryptedDriverFactory：SQLCipher加密驱动创建
- * - LegacyMigrationEngine：旧版明文库→加密库逐表事务拷贝迁移
+ * - KeyRotationMigrator：密钥形态迁移（明文→加密；未来 DEK 轮换只需换 provider）
  * - EncryptedDatabaseManager：统一管理驱动获取和升级触发
  * - ConnectionPool：每库单连接holder，保留ensureSchema + SchemaSelfHealer钩子
  *
@@ -102,20 +102,19 @@ object DataLayerModule {
 
     @Provides
     @Singleton
-    fun provideLegacyMigrationEngine(
-        @ApplicationContext context: Context,
-        keyManager: UnifiedKeyManager,
-    ): LegacyMigrationEngine = LegacyMigrationEngine(context, keyManager)
+    fun provideKeyRotationMigrator(@ApplicationContext context: Context): KeyRotationMigrator =
+        KeyRotationMigrator(context)
 
     @Provides
     @Singleton
     fun provideEncryptedDatabaseManager(
-        @ApplicationContext context: Context,
         registry: DatabaseRegistry,
         driverFactory: EncryptedDriverFactory,
-        migrationEngine: LegacyMigrationEngine,
+        migrator: KeyRotationMigrator,
+        keyManager: UnifiedKeyManager,
     ): EncryptedDatabaseManager =
-        EncryptedDatabaseManager(context, registry, driverFactory, migrationEngine)
+        // 迁移形态由 provider 决定：换密钥体系只需换这里的 provider，迁移主体不动。
+        EncryptedDatabaseManager(registry, driverFactory, migrator, KeyRotationMigrator.dekProvider(keyManager))
 
     // ── ConnectionPool（改为使用EncryptedDatabaseManager）──────────────
 
@@ -183,7 +182,17 @@ object DataLayerModule {
                 }
             }
         }
-        return ConnectionPool(encryptedManager, preOpenHook, hook)
+        // 打开守卫：driver 创建（含加密形态迁移、schema 迁移）失败时自动回滚到迁移前快照，
+        // 避免主库停在「迁移半成品」状态——那正是过去读到 file is not a database 的来源之一。
+        val openGuard: (LibName, () -> app.cash.sqldelight.db.SqlDriver) -> app.cash.sqldelight.db.SqlDriver =
+            { lib, open -> engine.withSnapshotGuard(lib) { open() } }
+
+        return ConnectionPool(
+            encryptedManager = encryptedManager,
+            onPreOpen = preOpenHook,
+            onOpened = hook,
+            openGuard = openGuard,
+        )
     }
 
     // ── 6 个 Database：从 ConnectionPool 获取加密驱动 ──────────────────
