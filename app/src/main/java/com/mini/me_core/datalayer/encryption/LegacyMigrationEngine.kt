@@ -3,12 +3,10 @@ package com.mini.me_core.datalayer.encryption
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
-import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.mini.me_core.core.util.FileLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import net.sqlcipher.database.SQLiteDatabase
-import net.sqlcipher.database.SupportFactory
 import java.io.File
 
 /**
@@ -61,28 +59,18 @@ class LegacyMigrationEngine(
         dek.fill(0)
 
         try {
-            // Step 1: 创建加密临时库（用SQLDelight建表）
-            // 注意：AndroidSqliteDriver构造函数不会立即打开数据库，必须执行一次查询
-            // 触发SQLiteOpenHelper.onCreate()执行schema.create()，否则表不会被创建。
-            FileLogger.d(TAG, "[${definition.id}] Step1: 创建加密临时库")
-            if (tempFile.exists()) tempFile.delete()
-            val initDriver = AndroidSqliteDriver(
-                schema = definition.schema,
-                context = context,
-                name = tempFile.name,
-                factory = SupportFactory(passphraseBytes),
-            )
-            // 触发数据库创建和表创建（SQLiteOpenHelper懒加载，必须执行一次查询）
-            initDriver.execute(null, "SELECT 1", 0)
-            initDriver.close()
-
-            // Step 2: 打开明文库（只读）和加密临时库（读写）
-            FileLogger.d(TAG, "[${definition.id}] Step2: 打开数据库")
+            // Step 1: 打开明文库（只读）
+            FileLogger.d(TAG, "[${definition.id}] Step1: 打开明文库")
             val plainDb = android.database.sqlite.SQLiteDatabase.openDatabase(
                 plainFile.absolutePath,
                 null,
                 android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
             )
+
+            // Step 2: 创建并打开加密临时库，直接从明文库复制schema
+            // 不依赖AndroidSqliteDriver（懒加载可能导致表未创建），直接用SQLiteDatabase
+            FileLogger.d(TAG, "[${definition.id}] Step2: 创建加密库并复制schema")
+            if (tempFile.exists()) tempFile.delete()
             SQLiteDatabase.loadLibs(context)
             val encDb = SQLiteDatabase.openOrCreateDatabase(
                 tempFile.absolutePath,
@@ -90,7 +78,10 @@ class LegacyMigrationEngine(
                 null,
             )
 
-            // Step 3: 开启事务，逐表拷贝
+            // 从明文库读取并执行所有schema对象（表、索引、触发器、视图）
+            replicateSchema(plainDb, encDb, definition.id)
+
+            // Step 3: 开启事务，逐表拷贝数据
             FileLogger.d(TAG, "[${definition.id}] Step3: 逐表拷贝数据")
             encDb.beginTransaction()
             try {
@@ -140,6 +131,46 @@ class LegacyMigrationEngine(
         }
     }
 
+    /**
+     * 从明文库复制完整schema到加密库（表、索引、触发器、视图）。
+     * 直接读取sqlite_master中的sql语句并执行，确保加密库结构与明文库完全一致。
+     */
+    private fun replicateSchema(
+        plainDb: android.database.sqlite.SQLiteDatabase,
+        encDb: SQLiteDatabase,
+        dbId: String,
+    ) {
+        // 按顺序创建：表 → 视图 → 触发器 → 索引
+        // 表必须先创建，其他对象依赖表
+        val types = listOf("table", "view", "trigger", "index")
+        var totalObjects = 0
+
+        for (type in types) {
+            val cursor = plainDb.rawQuery(
+                "SELECT name, sql FROM sqlite_master WHERE type=? " +
+                    "AND sql IS NOT NULL " +
+                    "AND name NOT LIKE 'sqlite_%' " +
+                    "AND name != 'android_metadata' " +
+                    "ORDER BY name",
+                arrayOf(type),
+            )
+            cursor.use {
+                while (it.moveToNext()) {
+                    val name = it.getString(0)
+                    val sql = it.getString(1)
+                    if (sql.isNotBlank()) {
+                        // 跳过自动索引（sqlite_autoindex_开头）
+                        if (name.startsWith("sqlite_autoindex_")) continue
+                        FileLogger.d(TAG, "  [$dbId] 创建$type: $name")
+                        encDb.execSQL(sql)
+                        totalObjects++
+                    }
+                }
+            }
+        }
+        FileLogger.d(TAG, "  [$dbId] schema复制完成，共 $totalObjects 个对象")
+    }
+
     private fun getUserTables(db: android.database.sqlite.SQLiteDatabase): List<String> {
         val tables = mutableListOf<String>()
         val cursor = db.rawQuery(
@@ -158,18 +189,23 @@ class LegacyMigrationEngine(
         dest: SQLiteDatabase,
         table: String,
     ) {
-        val columnNames = mutableListOf<String>()
+        data class ColumnInfo(val name: String, val type: String)
+        val columns = mutableListOf<ColumnInfo>()
         val colCursor = source.rawQuery("PRAGMA table_info($table)", null)
         colCursor.use {
-            while (it.moveToNext()) columnNames.add(it.getString(1))
+            while (it.moveToNext()) {
+                val name = it.getString(1)
+                val type = it.getString(2) ?: ""
+                columns.add(ColumnInfo(name, type.uppercase()))
+            }
         }
-        if (columnNames.isEmpty()) {
+        if (columns.isEmpty()) {
             FileLogger.w(TAG, "  表 $table 无列，跳过")
             return
         }
 
-        val placeholders = columnNames.joinToString(",") { "?" }
-        val columnsStr = columnNames.joinToString(",")
+        val placeholders = columns.joinToString(",") { "?" }
+        val columnsStr = columns.joinToString(",") { it.name }
         val insertSql = "INSERT OR REPLACE INTO $table ($columnsStr) VALUES ($placeholders)"
 
         var totalRows = 0
@@ -178,10 +214,15 @@ class LegacyMigrationEngine(
             val stmt = dest.compileStatement(insertSql)
             while (it.moveToNext()) {
                 stmt.clearBindings()
-                for (i in columnNames.indices) {
-                    when (val value = it.getString(i)) {
-                        null -> stmt.bindNull(i + 1)
-                        else -> stmt.bindString(i + 1, value)
+                for (i in columns.indices) {
+                    val colType = columns[i].type
+                    when {
+                        it.isNull(i) -> stmt.bindNull(i + 1)
+                        colType.contains("BLOB") -> stmt.bindBlob(i + 1, it.getBlob(i))
+                        colType.contains("INT") -> stmt.bindLong(i + 1, it.getLong(i))
+                        colType.contains("REAL") || colType.contains("FLOA") ||
+                            colType.contains("DOUB") -> stmt.bindDouble(i + 1, it.getDouble(i))
+                        else -> stmt.bindString(i + 1, it.getString(i))
                     }
                 }
                 stmt.execute()
