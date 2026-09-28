@@ -72,8 +72,14 @@ object DataLayerModule {
 
     @Provides
     @Singleton
-    fun provideMigrationEngine(pathProvider: DatabasePathProvider): MigrationEngine =
-        MigrationEngine(pathProvider, AndroidVersionProbe(pathProvider))
+    fun provideMigrationEngine(
+        @ApplicationContext context: Context,
+        pathProvider: DatabasePathProvider,
+        keyManager: UnifiedKeyManager,
+    ): MigrationEngine =
+        // 6 库默认 SQLCipher 加密：探测必须加密感知（明文探测加密库会误报 SQLITE_NOTADB，
+        // 并使 preOpen 恒判 FRESH、迁移前快照失效）。注入 UnifiedKeyManager 让探测能解密读版本。
+        MigrationEngine(pathProvider, AndroidVersionProbe(context, pathProvider, keyManager))
 
     // ── 新加密架构 ──────────────────────────────────────────────────────
 
