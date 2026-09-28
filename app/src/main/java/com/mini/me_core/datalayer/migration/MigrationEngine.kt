@@ -65,6 +65,14 @@ class MigrationEngine(
                 // 提前到打开前拒绝，避免用低版本 schema 打开高版本数据造成损坏。
                 error("[$lib] 检测到版本回退：$current > $target，拒绝打开以防数据损坏")
             }
+            PreOpenAction.UNREADABLE -> {
+                // 文件存在但打不开（损坏 / 密钥不匹配 / 迁移半成品）。
+                // 顺序不可颠倒：先快照（复制到 backup/ 保命）→ 再隔离（重命名主库），
+                // 之后 driver 才能以全新库重建，且原始文件仍在，可人工恢复。
+                FileLogger.e(TAG, "  $lib 库文件存在但无法打开（损坏/密钥不匹配）：先快照保命，再隔离原文件")
+                snapshot(lib, heavy)
+                quarantine(lib)
+            }
         }
         return action
     }
@@ -138,6 +146,29 @@ class MigrationEngine(
         // 主库已被快照内容替换，原 -wal 属于旧内容，必须清掉避免与新主库不一致
         main.resolveSibling("${main.name}-wal").takeIf { it.exists() && !bak.resolveSibling("${bak.name}-wal").exists() }?.delete()
         return true
+    }
+
+    /**
+     * 隔离不可读的主库：重命名为 `<name>.broken-<时间戳>`（-wal / -shm 一并跟随）。
+     *
+     * 与删除的区别：保留现场，用户可事后用备份/专业工具抢救；也让 driver 能以全新库正常建表启动，
+     * 不至于卡在启动崩溃。调用方须**先**调用 [snapshot]——隔离后原路径即为空。
+     */
+    private fun quarantine(lib: LibName) {
+        val main = pathProvider.mainDb(lib)
+        if (!main.exists()) return
+        val broken = main.resolveSibling("${main.name}.broken-${System.currentTimeMillis()}")
+        if (!main.renameTo(broken)) {
+            FileLogger.e(TAG, "隔离不可读库失败（renameTo 返回 false）：${main.absolutePath}")
+            return
+        }
+        FileLogger.i(TAG, "已隔离不可读库：${broken.name}（原文件保留，可人工恢复）")
+        listOf("wal", "shm").forEach { ext ->
+            val src = main.resolveSibling("${main.name}-$ext")
+            if (src.exists() && !src.renameTo(broken.resolveSibling("${broken.name}-$ext"))) {
+                FileLogger.w(TAG, "隔离 $ext 附属文件失败：${src.name}")
+            }
+        }
     }
 
     private fun copySidecar(main: File, bak: File, ext: String) {

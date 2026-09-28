@@ -39,11 +39,11 @@ class EncryptedDriverFactory(
      */
     fun createBlocking(definition: DatabaseDefinition): SqlDriver {
         val dek = runBlocking(Dispatchers.IO) {
-            keyManager.getOrCreateDek("db_${definition.id}")
+            keyManager.getOrCreateDek(CipherPassphrase.purpose(definition.id))
         }
         // DEK编码为Base64字符串，再转UTF-8字节作为SQLCipher passphrase
-        val passphraseBytes = Base64.encodeToString(dek, Base64.NO_WRAP)
-            .toByteArray(Charsets.UTF_8)
+        // ⚠️ 必须与 AndroidVersionProbe 的探测打开方式完全一致，否则出现「driver 能开、probe 打不开」的假损坏
+        val passphraseBytes = CipherPassphrase.encode(dek).toByteArray(Charsets.UTF_8)
         dek.fill(0)
         try {
             val cipherFactory = SupportFactory(passphraseBytes)

@@ -1,9 +1,10 @@
 package com.mini.me_core.datalayer.engine
 
 import android.content.Context
-import android.util.Base64
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.datalayer.encryption.CipherPassphrase
 import com.mini.me_core.datalayer.encryption.UnifiedKeyManager
+import com.mini.me_core.datalayer.migration.VERSION_UNREADABLE
 import com.mini.me_core.datalayer.migration.VersionProbe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -26,7 +27,9 @@ import net.sqlcipher.database.SQLiteDatabase as CipherSQLiteDatabase
  *  1. 文件不存在 / 空文件 → 0（全新库）；
  *  2. 前 16 字节 == `SQLite format 3\u0000` → 明文库 → 明文只读打开读 `PRAGMA user_version`；
  *  3. 否则视为 SQLCipher 加密库 → 用 [UnifiedKeyManager] 取 DEK，以 SQLCipher 只读打开读取；
- *  4. 有密钥仍打不开 → 真·损坏 / 密钥不匹配 → 记日志返回 0，交由上层兜底。
+ *  4. 有密钥仍打不开 → 真·损坏 / 密钥不匹配 → 记日志返回 [VERSION_UNREADABLE]（-1），
+ *     上层 [com.mini.me_core.datalayer.migration.PreOpenAction.UNREADABLE] 先快照再隔离，
+ *     **不**按全新库处理（返回 0 会导致历史数据被静默清空）。
  *
  * 只读打开不会触发 SQLDelight 的 `onCreate` / `onUpgrade`，故读到的是库当前真实版本，
  * 而非迁移后的目标版本。见 [VersionProbe] 文档说明。
@@ -74,9 +77,15 @@ class AndroidVersionProbe(
             }
         }
     } catch (e: Exception) {
-        // 明文库仍打不开：真·损坏 / 不可读。按 0（全新库）处理，交由 ensureSchema + SchemaSelfHealer 兜底。
-        FileLogger.e(TAG, "readVersion($lib) 明文库只读打开失败（可能损坏），按 0 处理交由自愈兜底", e)
-        0
+        // 明文库仍打不开：真·损坏 / 不可读。
+        // ⚠️ 返回 UNREADABLE 而非 0：文件已有数据，绝不可被当作「全新库」静默重建。
+        FileLogger.e(
+            TAG,
+            "readVersion($lib) 明文库只读打开失败（真·损坏）：size=${file.length()} head=${headHex(file)}，" +
+                "返回 UNREADABLE 交由上层先快照再隔离",
+            e,
+        )
+        VERSION_UNREADABLE
     }
 
     private fun readVersionEncrypted(file: File, lib: LibName): Int {
@@ -88,9 +97,10 @@ class AndroidVersionProbe(
         }
         var cipherDb: CipherSQLiteDatabase? = null
         return try {
-            // DEK purpose 与 EncryptedDriverFactory/LegacyMigrationEngine 保持一致：db_<id>
-            val dek = runBlocking(Dispatchers.IO) { km.getOrCreateDek("db_${lib.name.lowercase()}") }
-            val passphrase = Base64.encodeToString(dek, Base64.NO_WRAP)
+            // purpose 与 passphrase 必须与 EncryptedDriverFactory 完全一致（共用 CipherPassphrase），
+            // 否则会出现「driver 能开、probe 打不开」的假损坏。
+            val dek = runBlocking(Dispatchers.IO) { km.getOrCreateDek(CipherPassphrase.purpose(lib)) }
+            val passphrase = CipherPassphrase.encode(dek)
             dek.fill(0)
             CipherSQLiteDatabase.loadLibs(context)
             val opened = CipherSQLiteDatabase.openDatabase(
@@ -107,12 +117,29 @@ class AndroidVersionProbe(
                 cursor.close()
             }
         } catch (e: Exception) {
-            // 有密钥仍打不开：真·损坏或密钥不匹配。按 0（全新库）处理，交由自愈/重建兜底。
-            FileLogger.e(TAG, "readVersion($lib) 加密库只读打开失败（可能损坏/密钥不匹配），按 0 处理交由自愈兜底", e)
-            0
+            // 有密钥仍打不开：真·损坏 / 密钥不匹配 / 迁移中断的半成品。
+            // ⚠️ 返回 UNREADABLE 而非 0：0 会被判为「全新库」，跳过快照并可能被自愈清空。
+            FileLogger.e(
+                TAG,
+                "readVersion($lib) 加密库只读打开失败（损坏/密钥不匹配）：size=${file.length()} head=${headHex(file)}，" +
+                    "返回 UNREADABLE 交由上层先快照再隔离",
+                e,
+            )
+            VERSION_UNREADABLE
         } finally {
             runCatching { cipherDb?.close() }
         }
+    }
+
+    /** 取文件头前 8 字节的十六进制，用于区分「文件损坏」与「密钥不匹配」的现场取证。 */
+    private fun headHex(file: File): String = try {
+        FileInputStream(file).use { input ->
+            val head = ByteArray(8)
+            val n = input.read(head)
+            if (n <= 0) "<empty>" else head.copyOf(n).joinToString("") { "%02x".format(it) }
+        }
+    } catch (e: Exception) {
+        "<unreadable:${e.javaClass.simpleName}>"
     }
 
     companion object {

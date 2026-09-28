@@ -3,6 +3,16 @@ package com.mini.me_core.datalayer.migration
 import com.mini.me_core.datalayer.engine.LibName
 
 /**
+ * [VersionProbe.readVersion] 的「不可读」返回值：库文件存在且非空，但用当前密钥/打开方式打不开
+ * （真·损坏、密钥不匹配、或迁移中断留下的半成品）。
+ *
+ * ⚠️ 与 `0`（文件不存在 / 空文件 = 全新库）**必须区分**：旧实现把「打不开」也返回 0，
+ * 使 [MigrationEngine.preOpen] 恒判 [PreOpenAction.FRESH] ——既跳过迁移前快照安全网，
+ * 又让上层把「有数据的坏库」当成「全新库」处理，一旦自愈重建就是静默清空历史数据。
+ */
+const val VERSION_UNREADABLE = -1
+
+/**
  * 在 SQLDelight driver「构造 / 打开 / 迁移」之前，读取库的物理 `user_version`。
  *
  * ## 为什么必须绕开 SQLDelight driver 探测
@@ -24,7 +34,11 @@ import com.mini.me_core.datalayer.engine.LibName
  * JVM 单测用一个不依赖 framework 的等价实现注入，使 preOpen 决策可被纯 JVM 覆盖。
  */
 interface VersionProbe {
-    /** 库文件不存在 → 0（全新库）；只读打开失败（可能损坏）→ 记日志后返回 0，交由自愈/重建兜底。 */
+    /**
+     * @return 库文件不存在 / 空文件 → `0`（全新库）；
+     *         文件存在但只读打开失败 → [VERSION_UNREADABLE]（不可与 `0` 混为一谈）。
+     *         实现内部须记日志；调用方按 [PreOpenAction.UNREADABLE] 走「先快照再隔离」。
+     */
     fun readVersion(lib: LibName): Int
 }
 
@@ -47,11 +61,21 @@ enum class PreOpenAction {
 
     /** current > target：版本回退，拒绝打开以防数据损坏。 */
     DOWNGRADE,
+
+    /**
+     * current == [VERSION_UNREADABLE]：文件存在但打不开（损坏 / 密钥不匹配 / 迁移半成品）。
+     *
+     * 处置顺序不可颠倒：**先快照**（原文件复制到 backup/ 保命）→ **再隔离**
+     * （主库重命名为 `.broken-<时间戳>`）→ 才允许 driver 以全新库重建。
+     * 绝不可按 FRESH 处理——那等于不留证据地清空用户数据。
+     */
+    UNREADABLE,
 }
 
 fun decidePreOpen(current: Int, target: Long): PreOpenAction {
     val t = current.toLong()
     return when {
+        current < 0 -> PreOpenAction.UNREADABLE
         current == 0 -> PreOpenAction.FRESH
         t < target -> PreOpenAction.UPGRADE_SNAPSHOT
         t == target -> PreOpenAction.ALIGNED_NOOP
