@@ -62,6 +62,8 @@ class LegacyMigrationEngine(
 
         try {
             // Step 1: 创建加密临时库（用SQLDelight建表）
+            // 注意：AndroidSqliteDriver构造函数不会立即打开数据库，必须执行一次查询
+            // 触发SQLiteOpenHelper.onCreate()执行schema.create()，否则表不会被创建。
             FileLogger.d(TAG, "[${definition.id}] Step1: 创建加密临时库")
             if (tempFile.exists()) tempFile.delete()
             val initDriver = AndroidSqliteDriver(
@@ -70,6 +72,8 @@ class LegacyMigrationEngine(
                 name = tempFile.name,
                 factory = SupportFactory(passphraseBytes),
             )
+            // 触发数据库创建和表创建（SQLiteOpenHelper懒加载，必须执行一次查询）
+            initDriver.execute(null, "SELECT 1", 0)
             initDriver.close()
 
             // Step 2: 打开明文库（只读）和加密临时库（读写）
