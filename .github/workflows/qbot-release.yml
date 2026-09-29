@@ -96,6 +96,23 @@ jobs:
           fi
           echo "✓ versionCode 单调递增: $prev_vc -> $cur_vc"
 
+      # 绑定发版门禁（强制）：MiniMe-QBot 与「MiniMe-QBot 环境注入器」共享同一套运行环境资产，
+      # 不可单独升级，必须同批一起发布。故要求同一提交上同时存在 qbot-injector-v* Tag；
+      # 缺失即失败（见 AGENTS.md「发版规范 §1 · 绑定发版」与 docs/Version Log/README.md）。
+      # 仅打 qbot-v* tag 触发时校验；workflow_dispatch（手动，无 tag）跳过。
+      - name: Verify paired injector tag
+        if: startsWith(github.ref, 'refs/tags/qbot-v')
+        run: |
+          set -e
+          git fetch --tags --force >/dev/null 2>&1 || true
+          paired=$(git tag --points-at HEAD | grep '^qbot-injector-v[0-9]' || true)
+          if [[ -n "$paired" ]]; then
+            echo "✓ 已找到配对注入器 Tag: $(echo "$paired" | tr '\n' ' ')"
+          else
+            echo "::error::绑定发版门禁未通过：提交 $(git rev-parse --short HEAD) 上缺少 qbot-injector-v* Tag。MiniMe-QBot 与「MiniMe-QBot 环境注入器」为绑定应用，必须同批一起发布（两枚 Tag 打在同一提交上）。"
+            exit 1
+          fi
+
       - name: Build QBot Release APK
         run: ./gradlew :qbot-app:assembleRelease --stacktrace
 
