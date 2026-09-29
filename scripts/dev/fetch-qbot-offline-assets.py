@@ -34,6 +34,7 @@ rootfs / napcat / qq 仅需网络与 curl。
 """
 
 import argparse
+import gzip
 import os
 import re
 import shutil
@@ -355,9 +356,23 @@ def _apt_download_and_pack(mirror: str, dest: str, status_src: str) -> int:
 
         tmp_tar = dest + ".part"
         # 与解压侧约定一致：条目为 `./xxx.deb`，QBotRuntimeInstaller 直接平铺释放到 offline/apt。
-        with tarfile.open(tmp_tar, "w:gz") as tar:
-            for deb in debs:
-                tar.add(deb, arcname="./" + os.path.basename(deb))
+        #
+        # **必须打成可复现包**：tar 条目元数据与 gzip 头全部归一化（mtime=0、uid/gid=0、清空
+        # uname/gname），否则每次构建的字节都不同。而 manifest 的 packVersion 由资产 sha256
+        # 派生（见 gen-qbot-pack-manifest.py）——若 pool.bin 不可复现，**每次发版都会换一个
+        # packVersion**，用户已注入的环境永远对不上新包，被迫每次重下 300MB+ 注入器重注入，
+        # 「环境只下载一次」的设计目标被抵消。
+        with open(tmp_tar, "wb") as raw:
+            with gzip.GzipFile(filename="", mode="wb", compresslevel=9, fileobj=raw, mtime=0) as gz:
+                with tarfile.open(fileobj=gz, mode="w", format=tarfile.GNU_FORMAT) as tar:
+                    for deb in debs:
+                        info = tar.gettarinfo(deb, arcname="./" + os.path.basename(deb))
+                        info.mtime = 0
+                        info.uid = info.gid = 0
+                        info.uname = info.gname = ""
+                        info.mode = 0o644
+                        with open(deb, "rb") as fh:
+                            tar.addfile(info, fh)
         os.replace(tmp_tar, dest)
         _best_effort_rmtree(tmp)
         return len(debs)
