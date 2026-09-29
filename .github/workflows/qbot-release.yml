@@ -41,7 +41,11 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: '14742923'
-          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+          # 必须显式安装 NDK：Gradle 会配置 :qbot-app 依赖的兄弟模块 :app（含 externalNativeBuild），
+          # 配置期即解析 NDK，缺失时由 AGP 隐式下载；该隐式下载一旦网络抖动损坏 zip，会以
+          # 「Failed to install the following SDK components」这种难以定位的报错中断发版。
+          # 在此显式安装，使工具链依赖可见、失败点前移。
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.0.12077973'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
