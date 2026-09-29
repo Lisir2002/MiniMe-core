@@ -48,7 +48,7 @@ object QueryPerformanceMonitor {
      * 杜绝「记录用 100、查询传 50 却拿不到 50–100ms 记录」的自相矛盾（审计 L5）。
      * 调用方若需更细粒度，须同时把相同阈值传给 [recordQuery] 与 [getSlowQueries]。
      */
-    const val SLOW_QUERY_THRESHOLD_MS = 100
+    const val SLOW_QUERY_THRESHOLD_MS = 100L
 
     // 慢查询环形缓冲区
     private val slowQueries = ArrayDeque<SlowQueryEntry>()

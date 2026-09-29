@@ -54,7 +54,7 @@ class BlobStore(private val db: InfraDb, private val blobDir: File) {
                 id = q.selectLastInsertId().executeAsOne()
                 val rel = "$REL_DIR/$id.bin"
                 File(blobDir, rel).writeBytes(data)
-                q.updateBlobPath(id, rel)
+                q.updateBlobPath(rel, id)
             }
             if (id == 0L) id = q.selectLastInsertId().executeAsOne()
         }

@@ -23,6 +23,12 @@ class GoalService @Inject constructor(
     private val v2Agent: V2AgentRepository,
 ) {
 
+    private companion object {
+        const val TAG = "GoalService"
+        /** 激活冲突重试上限：首试 + 至多 1 次重试（CAS 并发改了 revision 才重试）。 */
+        const val MAX_ACTIVATE_ATTEMPTS = 2
+    }
+
     /** 读取会话当前 ACTIVE 目标；无则返回 null。 */
     suspend fun getActive(sessionId: String): GoalEntity? =
         v2Agent.getActiveGoalBySession(sessionId)?.toEntity()
