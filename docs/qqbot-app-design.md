@@ -529,7 +529,7 @@ UI 纪律（沿用主应用规范）：
 
 | 包 | 文件 | 职责 |
 |----|------|------|
-| `runtime/` | `QBotRuntimePaths` / `QBotRuntimeState` / `QBotRuntimeInstaller` / `QBotContainerExecutor` | 资产安装（PRoot + Alpine rootfs）、容器内命令执行；协议端数据目录持久映射为容器内 `/root/qbot`，rootfs 重装不丢登录态 |
+| `runtime/` | `QBotRuntimePaths` / `QBotRuntimeState` / `QBotRuntimeInstaller` / `QBotContainerExecutor` | 资产安装（PRoot + Ubuntu glibc rootfs）、容器内命令执行；协议端数据目录持久映射为容器内 `/root/qbot`，rootfs 重装不丢登录态 |
 | `protocol/` | `QBotProtocolConfig` / `QBotProtocolProcessManager` / `OneBotClient` / `QBotQrCodeSource` | 协议端配置（端口 / token，端口冲突自动后探）、NapCat 幂等供给与进程守护（退避重启上限 5 次）、OneBot 11 接口调用、二维码获取（原生接口优先、日志解析兜底） |
 | `login/` | `QBotLoginState` / `QBotLoginRepository` / `QBotLoginCoordinator` | 登录状态机、登录态加密持久化、登录链路编排（免扫码恢复、掉线监控与恢复） |
 | `log/` | `QBotLogBus` | 运行日志总线（内存环形缓冲 + token/base64 脱敏），汇聚运行时/协议端/登录各层可观测信息，供登录页实时订阅；写入同时经主应用日志层落盘 |

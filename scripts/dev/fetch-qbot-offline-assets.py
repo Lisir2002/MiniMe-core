@@ -2,7 +2,7 @@
 """抓取 MiniMe-QBot 首次启动所需的离线资产（glibc 运行时底座 + 协议端本体）。
 
 产出（默认写入 qbot-app/src/_qbotAssets/，与 app/src/_armAssets 同为「入库二进制资产」）：
-  rootfs/ubuntu-22.04-arm64-rootfs.tar.gz   glibc 容器底座（Ubuntu base，官方 arm64 rootfs）
+  rootfs/ubuntu-22.04-arm64-rootfs.bin      glibc 容器底座（Ubuntu base，官方 arm64 rootfs，gzip 内容）
   napcat/NapCat.Shell.zip                    协议端本体（GitHub Releases latest）
 
 为什么是 glibc 底座：NapCat 官方仅支持 Ubuntu/Debian/CentOS（glibc），官方 QQ Linux 客户端
@@ -36,7 +36,10 @@ USER_AGENT = "Mozilla/5.0 (compatible; MiniMeQBotAssetFetch/1.0)"
 # 容器底座：Ubuntu base 官方 arm64 rootfs（glibc）。`22.04/release/` 为最新点版本的稳定符号链接。
 # 与 QBotRuntimeInstaller 的 ROOTFS 资产路径 / INSTALL_VERSION 联动，改动需同步。
 ROOTFS_URL = "https://cdimage.ubuntu.com/ubuntu-base/releases/22.04/release/ubuntu-base-22.04-base-arm64.tar.gz"
-ROOTFS_NAME = "ubuntu-22.04-arm64-rootfs.tar.gz"
+# 注意：文件名**不得以 `.gz` 结尾**。打包工具会把 `.gz` 资产自动解压并去掉后缀，
+# 导致 APK 内资产名与 QBotRuntimeInstaller 预期的路径不符、运行环境安装失败；
+# 故用 `.bin` 后缀（内容仍是 gzip，运行期按魔数嗅探）。
+ROOTFS_NAME = "ubuntu-22.04-arm64-rootfs.bin"
 
 # 协议端本体：GitHub Releases latest（与上游 napcat-linux-installer 一致）。
 NAPCAT_URL = "https://github.com/NapNeko/NapCatQQ/releases/latest/download/NapCat.Shell.zip"
