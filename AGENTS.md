@@ -193,7 +193,7 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 | MiniMe-QBot（QQ 机器人） | `MiniMe-QBot` | `qbot-v` | `MiniMe-QBot-v{版本}-{变体}.apk` | `docs/Version Log/CHANGELOG-qbot.md` |
 | MiniMe-QBot 环境注入器 | `MiniMe-QBot Injector` | `qbot-injector-v` | `MiniMe-QBot-Injector-v{版本}-{变体}.apk` | `docs/Version Log/CHANGELOG-qbot-injector.md` |
 
-> **绑定发版（强制）**：`MiniMe-QBot`（`qbot-v*`）与 `MiniMe-QBot 环境注入器`（`qbot-injector-v*`）为**绑定应用**——二者共享同一套运行环境资产，不可单独升级。**每次发版必须同批一起发布两款最新版**（即使其中一方当次无改动，也要一并重新打 Tag 发布），两份版本日志须同批一并更新。CI 已加**双向配对门禁**：推 `qbot-v*` Tag 时若同一提交上缺少 `qbot-injector-v*` Tag（或反之）即构建失败。
+> **绑定发版（强制）**：`MiniMe-QBot`（`qbot-v*`）与 `MiniMe-QBot 环境注入器`（`qbot-injector-v*`）为**绑定应用**——二者共享同一套运行环境资产，不可单独升级。**每次发版必须同批一起发布两款最新版**（即使其中一方当次无改动，也要一并重新打 Tag 发布），两份版本日志须同批一并更新。CI 由**同一个工作流**（`.github/workflows/qbot-release.yml`）一次性抓取资产、生成清单并同批构建两款 APK 后各自发布 Release，保证两侧包版本必然一致；推 `qbot-v*` Tag 触发，要求同一提交上同时存在 `qbot-injector-v*` Tag，缺失即配对门禁失败。
 
 #### 2. 发版页面标题格式
 

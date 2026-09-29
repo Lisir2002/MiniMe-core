@@ -55,7 +55,7 @@ Version Log/
 
 - **每次发版必须同批一起发布两款最新版**，即使其中一方当次无改动，也要一并重新打 Tag 发布。
 - 两份版本日志（`CHANGELOG-qbot.md` 与 `CHANGELOG-qbot-injector.md`）须同批一并更新，并在各自头部互相交叉引用。
-- 两枚 Tag 必须打在**同一个提交**上；CI 已加双向配对门禁，缺少配对 Tag 时构建失败。
+- 两枚 Tag 必须打在**同一个提交**上，一次 push 一并推送；CI 由**同一个工作流**（`.github/workflows/qbot-release.yml`）一次抓取资产、生成清单并同批构建两款 APK，推 `qbot-v*` 触发，缺少配对的 `qbot-injector-v*` Tag 时配对门禁失败。
 
 ## 发版流程
 
