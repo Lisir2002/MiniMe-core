@@ -34,11 +34,13 @@ class MigrationEngine(
 ) {
 
     /**
-     * 本进程内已拍过快照的库（M2）。
+     * 本进程内 [preOpen] 已为某库拍过迁移前快照的集合（M2）。
      *
-     * 一次冷启动里 [preOpen] 与 [withSnapshotGuard] 会各请求一次快照，而两者抓的都是
-     * 「迁移前」的同一现场；重复快照不仅多花一倍 IO，还会让轮转多淘汰一代，
-     * 真正的迁移前现场反而更快消失。去重后 `<name>.bak` 保住的是更早、更干净的那份。
+     * 一次冷启动里 [preOpen] 与 [withSnapshotGuard] 都会请求迁移前快照，两者抓的是
+     * 「迁移前」同一现场。[preOpen] 拍完后把库记入本集合；[withSnapshotGuard] 见库已在集合内
+     * 即复用、不再重复拍——既省一倍 IO，又避免轮转多淘汰一代、让真正的迁移前现场更快消失。
+     * 注意：[snapshot] 自身仍**始终轮转**（重复调用保留多代现场，恢复安全网与测试契约都依赖此），
+     * 本集合只用来防止「preOpen + guard」这一对真实双调用重复拍。
      */
     private val snapshottedThisProcess = Collections.synchronizedSet(mutableSetOf<LibName>())
 
@@ -170,16 +172,12 @@ class MigrationEngine(
      * 再按 [MAX_SNAPSHOTS] 淘汰最旧的历史快照。
      * `<name>.bak` 始终是「最近一次」，[restoreSnapshot] 的回滚目标不变。
      *
-     * ⚠️ **每进程每库只快照一次**（M2）：一次冷启动里 `preOpen` 会快照一次、
-     * [withSnapshotGuard] 又快照一次，两次都是「迁移前」的同一现场，却吃掉两代轮转，
-     * 让真正的迁移前现场更快被淘汰，还多花一倍 IO。故用 [snapshottedThisProcess] 去重，
-     * 需要强制再拍一份（运维/导出场景）时显式传 `force = true`。
+     * ⚠️ 本方法**始终轮转**，不在内部做「本进程去重」——重复调用即保留多代现场
+     * （恢复安全网与测试契约都依赖此行为）。「preOpen 与 withSnapshotGuard 的真实启动双调用
+     * 只拍一份」的去重放在 [withSnapshotGuard]：它依据 [snapshottedThisProcess]（由 [preOpen]
+     * 的快照写入）判断是否复用 preOpen 的快照，而非拦掉所有重复调用。
      */
-    fun snapshot(lib: LibName, heavy: Boolean, force: Boolean = false) {
-        if (!force && lib in snapshottedThisProcess) {
-            FileLogger.d(TAG, "  $lib 本进程已快照过，跳过重复快照（M2）")
-            return
-        }
+    fun snapshot(lib: LibName, heavy: Boolean) {
         val main = pathProvider.mainDb(lib)
         if (!main.exists()) return
         val bak = pathProvider.snapshotFile(lib)
@@ -265,7 +263,9 @@ class MigrationEngine(
      * @return [block] 的返回值。
      */
     fun <T> withSnapshotGuard(lib: LibName, heavy: Boolean = false, block: () -> T): T {
-        snapshot(lib, heavy)
+        // M2：preOpen 已在本进程为同库拍过迁移前快照（写入 [snapshottedThisProcess]）时复用，
+        // 避免「preOpen + guard」双调用吃掉两代轮转、让真正的迁移前现场更快被淘汰。
+        if (lib !in snapshottedThisProcess) snapshot(lib, heavy)
         return try {
             block()
         } catch (t: Throwable) {

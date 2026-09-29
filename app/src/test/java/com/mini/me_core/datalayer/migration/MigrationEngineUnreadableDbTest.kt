@@ -67,9 +67,16 @@ class MigrationEngineUnreadableDbTest {
 
         assertEquals(PreOpenAction.UNREADABLE, action)
 
-        val bak = p.snapshotFile(LibName.AGENT)
-        assertTrue("不可读库必须先快照保命", bak.exists())
-        assertEquals("快照必须保住原始字节，否则人工恢复无从谈起", "CORRUPT-BUT-PRECIOUS", bak.readText())
+        // M1：坏库不占 .bak 回滚位，改落 backup/<name>.broken-<ts>.bak（可人工恢复、不参与轮转淘汰）
+        val broken = p.backupDir().listFiles { f ->
+            f.name.startsWith("${LibName.AGENT.fileName}.broken-") && f.name.endsWith(".bak")
+        }
+        assertTrue("不可读库必须先另存现场保命（broken-<ts>.bak）", broken != null && broken.isNotEmpty())
+        assertEquals(
+            "坏库现场副本必须保住原始字节，否则人工恢复无从谈起",
+            "CORRUPT-BUT-PRECIOUS",
+            broken!!.first().readText(),
+        )
 
         assertFalse("隔离后主库路径须空出，供 driver 以全新库重建", main.exists())
         val isolated = main.parentFile!!.listFiles { f -> f.name.startsWith("${main.name}.broken-") }
