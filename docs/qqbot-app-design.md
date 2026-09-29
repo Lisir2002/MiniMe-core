@@ -162,19 +162,20 @@ arrayOf("git", "describe", "--tags", "--always", "--dirty")
 
 > 该修复同时消除主应用现有的潜在版本劫持风险，属"顺手关门"，建议独立提交。
 
-#### 2.6.2 CI 侧配套改造（进度：多应用基建已完成，模块侧待建）
+#### 2.6.2 CI 侧配套改造（进度：全部完成）
 
 | 脚本 / 流程 | 改造内容 | 状态 |
 |-------------|----------|------|
 | `app/build.gradle.kts` | 主应用版本推导加 `--match "v[0-9]*"`，隔离其它应用 tag | ✅ 已完成（§2.6.1 前置缺陷已修） |
 | `scripts/gitops/check-release-format.py` | 增加 `qbot → "MiniMe-QBot"`、`APP_TAG_PREFIXES` 映射表、`--app qbot`；并把标题正则改为兼容**三段版本号**（顺带修掉 MiniMe Logs 三段版本号此前必然校验失败的问题） | ✅ 已完成 |
 | `scripts/gitops/release-log.py` | 增加 `--app`（决定 tag 前缀与版本日志路径）与 `--path`（按目录隔离提交范围，避免把主应用提交混入附属应用日志）；默认 prev 按本应用 tag 前缀过滤 | ✅ 已完成 |
-| `.github/workflows/qbot-release.yml` | 新建 QBot 构建/发布 workflow（tag `qbot-v*`，产物 `MiniMe-QBot-v{版本}-{变体}.apk`）；已含 `fetch-depth: 0` | ✅ 已创建（`:qbot-app` 已落地，可随首个 `qbot-v*` tag 启用；发版前须先建 `CHANGELOG-qbot.md`） |
-| `docs/Version Log/CHANGELOG-qbot.md` | QBot 独立版本日志（`release-log.py --app qbot` 的权威来源） | ⬜ 待建（首个版本发版前创建） |
+| `.github/workflows/qbot-release.yml` | 新建 QBot 构建/发布 workflow（tag `qbot-v*`，产物 `MiniMe-QBot-v{版本}-{变体}.apk`）；已含 `fetch-depth: 0`、签名校验、硬校验门禁 | ✅ 已创建（`:qbot-app` 与 `CHANGELOG-qbot.md` 均已就绪，可随首个 `qbot-v*` tag 启用） |
+| `docs/Version Log/CHANGELOG-qbot.md` | QBot 独立版本日志（`release-log.py --app qbot` 的权威来源） | ✅ 已完成（已建骨架，含 `## [Unreleased]`；首个版本发版时录入条目） |
 | `qbot-app/build.gradle.kts` | 版本推导为 `git describe --match "qbot-v[0-9]*"`，versionCode 用**独立的 `0.0.1` 递增公式**（不与主应用 `0.0.0.x` 号段混算） | ✅ 已完成（最小骨架落地，见 §2.6.3） |
-| release workflow | versionCode 单调校验需**按 app 隔离** | ⬜ 待建 |
+| release workflow | versionCode 单调校验需**按 app 隔离** | ✅ 已完成（主应用 workflow 的 prev tag 限定为 `^v[0-9]`；QBot workflow 新增按 `qbot-v` 隔离的三段式 versionCode 单调校验） |
 
-> 上述模块侧项目（版本推导 / 签名 / 日志层）已随最小骨架落地；`CHANGELOG-qbot.md` 与 workflow 的按 app 隔离校验仍待完成，在此之前 QBot 无法合规发版。
+> §2.6 全部改造项已完成（多应用基建 + 模块骨架 + 版本日志 + workflow 按 app 隔离）。
+> QBot 现可合规发版：录入 `CHANGELOG-qbot.md` 本版条目后，打 `qbot-v0.0.1` tag 即触发 CI。
 > 完整发版规则见 AGENTS「发版流程」与 [docs/ci-release.md](file:///workspace/docs/ci-release.md)。
 
 #### 2.6.3 最小骨架落地内容（已完成）

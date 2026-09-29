@@ -6,7 +6,8 @@
 
 ```
 Version Log/
-├── CHANGELOG.md                    # 总版本日志（所有版本汇总，倒序排列）
+├── CHANGELOG.md                    # 主应用（MiniMe-core）版本日志（所有版本汇总，倒序排列）
+├── CHANGELOG-qbot.md               # 附属应用（QQ 机器人）版本日志
 ├── MiniMe-core v-Logs/             # 主应用各版本独立日志
 │   ├── MiniMe-core 0.0.0.01 Version Log.md
 │   ├── MiniMe-core 0.0.0.02 Version Log.md
@@ -33,7 +34,7 @@ Version Log/
 - 文档内容中的版本号、Tag、APK 命名均使用原格式，不补零
 - 主应用：`0.0.0.1`、`0.0.0.17`
 - 附属应用：`0.0.1`、`0.0.7`
-- Tag 命名：主应用 `v{版本号}`（如 `v0.0.0.17`），附属应用 `logviewer-v{版本号}`（如 `logviewer-v0.0.7`）
+- Tag 命名：主应用 `v{版本号}`（如 `v0.0.0.17`）；附属应用 MiniMe Logs 用 `logviewer-v{版本号}`（如 `logviewer-v0.0.7`），MiniMe-QBot 用 `qbot-v{版本号}`（如 `qbot-v0.0.1`）
 
 ## 格式规范
 
