@@ -1,24 +1,28 @@
-name: QBot Release
+name: QBot Injector Release
 
-# 打 qbot-v* tag 时触发：构建 :qbot-app:assembleRelease 并上传 APK 到 Release。
-# 与主应用 android-release.yml、MiniMe Logs 的 logviewer-release.yml 并行，互不影响。
-#   tag 例：qbot-v0.0.1 / qbot-v0.0.1-rc1
-#   产物：MiniMe-QBot-v0.0.1-release.apk（命名遵循 AGENTS.md「发版规范」§1：
+# 打 qbot-injector-v* tag 时触发：构建 :injector-app:assembleRelease 并上传 APK 到 Release。
+# 与主应用 android-release.yml、MiniMe Logs 的 logviewer-release.yml、QBot 的 qbot-release.yml 并行，互不影响。
+#   tag 例：qbot-injector-v0.0.1 / qbot-injector-v0.0.1-rc1
+#   产物：MiniMe-QBot-Injector-v0.0.1-release.apk（命名遵循 AGENTS.md「发版规范」§1：
 #         {软件名}-{版本号}-{变体}.apk，变体为 release / rcN）
 #
-# 前置条件（均已满足；发版前仅需先录入 CHANGELOG-qbot.md 本版条目）：
-#   1. :qbot-app 模块已存在并配置 release 签名（复用主应用唯一官方密钥）；
-#   2. 版本推导已按 `git describe --match "qbot-v[0-9]*"` 实现，版本号独立为 0.0.1 递增；
-#   3. 独立版本日志 docs/Version Log/CHANGELOG-qbot.md 已创建（release-log.py --app qbot 的权威来源）。
+# 「MiniMe-QBot 环境注入器」是体积型运行资产（glibc rootfs / NapCat / apt 依赖池 / QQ 客户端）
+# 的唯一承载者：一次性写入公共目录 /sdcard/MiniMeQBot/，供 :qbot-app 只读消费。
+# 主应用因此得以瘦身到仅 PRoot 组件 + 代码（见 docs/qbot-injector-design.md）。
+#
+# 前置条件（均已满足；发版前仅需先录入 CHANGELOG-qbot-injector.md 本版条目）：
+#   1. :injector-app 模块已存在并配置 release 签名（复用主应用唯一官方密钥）；
+#   2. 版本推导已按 `git describe --match "qbot-injector-v[0-9]*"` 实现，版本号独立为 0.0.1 递增；
+#   3. 独立版本日志 docs/Version Log/CHANGELOG-qbot-injector.md 已创建（release-log.py --app injector 的权威来源）。
 on:
   push:
     tags:
-      - 'qbot-v*'
+      - 'qbot-injector-v*'
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build & Release QBot APK
+    name: Build & Release QBot Injector APK
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -41,38 +45,37 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: '14742923'
-          # 必须显式安装 NDK：Gradle 会配置 :qbot-app 依赖的兄弟模块 :app（含 externalNativeBuild），
-          # 配置期即解析 NDK，缺失时由 AGP 隐式下载；该隐式下载一旦网络抖动损坏 zip，会以
-          # 「Failed to install the following SDK components」这种难以定位的报错中断发版。
-          # 在此显式安装，使工具链依赖可见、失败点前移。
+          # 必须显式安装 NDK：Gradle 配置期会解析兄弟模块 :app（含 externalNativeBuild）的 NDK，
+          # 缺失时由 AGP 隐式下载；该隐式下载一旦网络抖动损坏 zip，会以难以定位的报错中断发版。
+          # 在此显式安装，使工具链依赖可见、失败点前移（与 qbot-release.yml 一致）。
           packages: 'platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.0.12077973'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # 补齐注入资产：QBot 自身已不再打包体积型资产（改由「MiniMe-QBot 环境注入器」注入公共目录，
-      # 见 docs/qbot-injector-design.md），此处抓取是为了**生成随包期望清单** pack-manifest.json。
-      #   容器底座 + 协议端本体 + 协议端启动器已入库，脚本自动跳过（幂等）；
-      #   apt 依赖闭包（~80MB）与官方 QQ 客户端 deb（~200MB）体积超 GitHub 单文件 100MB 上限，无法入库。
+      # 补齐注入资产：apt 依赖闭包（~80MB）与官方 QQ 客户端 deb（~200MB）体积超 GitHub
+      # 单文件 100MB 上限无法入库，由脚本在构建机侧抓取；容器底座 / 协议端本体 / 启动器已入库，
+      # 脚本自动跳过（幂等）。
       - name: Fetch QBot offline assets
         run: python3 scripts/dev/fetch-qbot-offline-assets.py
 
-      # 生成 QBot 随包期望清单 assets/qbot/pack-manifest.json（与注入器同批、同 packVersion）：
-      #   运行时据此校验用户是否已运行注入器、且注入包版本与本应用匹配（见 QBotInjectedPack）。
+      # 生成注入包清单 manifest.json（注入器随包资产的唯一事实源）：
+      #   packVersion 由资产内容 sha256 派生，与 :qbot-app 的期望清单 pack-manifest.json 同批写出，
+      #   保证「注入器产出的包」与「QBot 期望的包」版本必然一致（见 gen-qbot-pack-manifest.py）。
       - name: Generate pack manifest
         run: python3 scripts/dev/gen-qbot-pack-manifest.py
 
-      # 校验 versionCode 单调递增：QBot 的 versionCode = 三段版本号映射
-      #   A*1000000 + B*1000 + C（与 qbot-app/build.gradle.kts qbotGitVersionCode() 一致）。
-      # prev tag 必须按本应用前缀 qbot-v 过滤，避免被主应用 / Logviewer 的 tag 干扰。
+      # 校验 versionCode 单调递增：注入器的 versionCode = 三段版本号映射
+      #   A*1000000 + B*1000 + C（与 injector-app/build.gradle.kts injectorGitVersionCode() 一致）。
+      # prev tag 必须按本应用前缀 qbot-injector-v 过滤，避免被主应用 / QBot / Logviewer 的 tag 干扰。
       # 允许相等：rc 转正式版时常在同一提交上打 tag，versionCode 相等是正常的。
-      # 仅打 qbot-v* tag 触发时校验；workflow_dispatch（手动，无 tag）跳过。
+      # 仅打 qbot-injector-v* tag 触发时校验；workflow_dispatch（手动，无 tag）跳过。
       - name: Verify versionCode monotonic
-        if: startsWith(github.ref, 'refs/tags/qbot-v')
+        if: startsWith(github.ref, 'refs/tags/qbot-injector-v')
         run: |
           set -e
           vc_of_tag() {
-            local ver="${1#qbot-v}"
+            local ver="${1#qbot-injector-v}"
             if [[ "$ver" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-rc[0-9]+)?$ ]]; then
               echo $(( ${BASH_REMATCH[1]} * 1000000 + ${BASH_REMATCH[2]} * 1000 + ${BASH_REMATCH[3]} ))
             else
@@ -80,9 +83,9 @@ jobs:
             fi
           }
           cur_tag="${GITHUB_REF_NAME}"
-          prev_tag=$(git tag --sort=-creatordate | grep '^qbot-v' | grep -v "^${cur_tag}$" | head -1 || true)
+          prev_tag=$(git tag --sort=-creatordate | grep '^qbot-injector-v' | grep -v "^${cur_tag}$" | head -1 || true)
           if [[ -z "$prev_tag" ]]; then
-            echo "无历史 QBot tag，跳过 versionCode 单调校验（首次发版）"
+            echo "无历史 QBot Injector tag，跳过 versionCode 单调校验（首次发版）"
             echo "当前 tag 映射 versionCode = $(vc_of_tag "$cur_tag")"
             exit 0
           fi
@@ -96,16 +99,16 @@ jobs:
           fi
           echo "✓ versionCode 单调递增: $prev_vc -> $cur_vc"
 
-      - name: Build QBot Release APK
-        run: ./gradlew :qbot-app:assembleRelease --stacktrace
+      - name: Build Injector Release APK
+        run: ./gradlew :injector-app:assembleRelease --stacktrace
 
       - name: Rename APK
         id: rename
         run: |
           set -e
           # 形如 0.0.1 / 0.0.1-rc1 → 提取基础版本号与变体
-          tag="${GITHUB_REF_NAME}"          # qbot-v0.0.1 / qbot-v0.0.1-rc1
-          ver="${tag#qbot-v}"               # 0.0.1 / 0.0.1-rc1
+          tag="${GITHUB_REF_NAME}"          # qbot-injector-v0.0.1 / qbot-injector-v0.0.1-rc1
+          ver="${tag#qbot-injector-v}"      # 0.0.1 / 0.0.1-rc1
           if [[ "$ver" =~ ^([0-9.]+)-(rc[0-9]+)$ ]]; then
             base_ver="${BASH_REMATCH[1]}"
             variant="${BASH_REMATCH[2]}"
@@ -113,12 +116,12 @@ jobs:
             base_ver="$ver"
             variant="release"
           fi
-          src="qbot-app/build/outputs/apk/release/qbot-app-release.apk"
-          out="dist/MiniMe-QBot-v${base_ver}-${variant}.apk"
+          src="injector-app/build/outputs/apk/release/injector-app-release.apk"
+          out="dist/MiniMe-QBot-Injector-v${base_ver}-${variant}.apk"
           mkdir -p dist
           cp "$src" "$out"
           echo "apk=$out" >> "$GITHUB_OUTPUT"
-          echo "QBOT_VER=$ver" >> "$GITHUB_ENV"
+          echo "INJECTOR_VER=$ver" >> "$GITHUB_ENV"
           echo "packaged $out"
           ls -lh "$out"
 
@@ -132,18 +135,18 @@ jobs:
           ls -lh "$APK"
 
       # 生成附属应用发版说明草稿：
-      #   --app qbot  → 用 qbot 的 tag 前缀与独立版本日志（docs/Version Log/CHANGELOG-qbot.md）
-      #   --path qbot-app → 仅统计 qbot-app 目录下的提交，隔离主应用提交
+      #   --app injector  → 用注入器的 tag 前缀与独立版本日志（docs/Version Log/CHANGELOG-qbot-injector.md）
+      #   --path injector-app → 仅统计 injector-app 目录下的提交，隔离其它应用提交
       - name: Generate release notes
         id: changelog
         run: |
           set -e
           cur_tag="${GITHUB_REF_NAME}"
-          prev_tag=$(git tag --sort=-creatordate | grep '^qbot-v' | grep -v "^${cur_tag}$" | head -1 || true)
-          version="${cur_tag#qbot-v}"
+          prev_tag=$(git tag --sort=-creatordate | grep '^qbot-injector-v' | grep -v "^${cur_tag}$" | head -1 || true)
+          version="${cur_tag#qbot-injector-v}"
 
           # 用数组拼参数，避免在 ${var:+...} 里嵌套引号造成的词法歧义
-          notes_args=(--app qbot --path qbot-app --cur "$cur_tag" --version "$version" --date "$(date +%Y-%m-%d)")
+          notes_args=(--app injector --path injector-app --cur "$cur_tag" --version "$version" --date "$(date +%Y-%m-%d)")
           if [ -n "$prev_tag" ]; then
             notes_args+=(--prev "$prev_tag")
           fi
@@ -156,7 +159,7 @@ jobs:
             echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
 
-      # 保留已更新的 Release 内容（与主应用/Logviewer 逻辑一致）
+      # 保留已更新的 Release 内容（与主应用 / QBot / Logviewer 逻辑一致）
       - name: Preserve existing release content
         id: preserve
         env:
@@ -170,7 +173,7 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/${cur_tag}" || echo "")
 
           final_body="${{ steps.changelog.outputs.body }}"
-          final_name="MiniMe-QBot v${QBOT_VER}"
+          final_name="MiniMe-QBot Injector v${INJECTOR_VER}"
 
           if echo "$existing" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('id') else 1)" 2>/dev/null; then
             existing_body=$(echo "$existing" | python3 -c "import json,sys; print(json.load(sys.stdin).get('body',''))")
@@ -193,7 +196,7 @@ jobs:
             echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
 
-      # 发版格式硬校验门禁（与主应用/Logviewer 一致）
+      # 发版格式硬校验门禁（与主应用 / QBot / Logviewer 一致）
       - name: Validate release notes (hard checks)
         run: |
           set -e
@@ -210,7 +213,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          # 标题基础格式「MiniMe-QBot v{版本号}」，发版后必须手动补充「— 更新内容概括」（≤20字，用户语言）
+          # 标题基础格式「MiniMe-QBot Injector v{版本号}」，发版后必须手动补充「— 更新内容概括」（≤20字，用户语言）
           name: ${{ steps.preserve.outputs.name }}
           body: ${{ steps.preserve.outputs.body }}
           files: |

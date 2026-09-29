@@ -46,9 +46,12 @@ __pycache__/
 # Native build intermediates (AGP/CMake)
 app/.cxx/
 
-# QBot 随包离线资产：apt 依赖闭包 / 官方 QQ 客户端 deb 体积大（合计约 280MB）且后者超
+# QBot 注入资产：apt 依赖闭包 / 官方 QQ 客户端 deb 体积大（合计约 280MB）且后者超
 # GitHub 单文件 100MB 上限，不入库；构建期由 scripts/dev/fetch-qbot-offline-assets.py 抓取
-# （CI 在打包前执行，:qbot-app 的 verifyQbotOfflineAssets 会硬校验其齐备）。
+# （CI 在打包前执行，:injector-app 的 verifyInjectorAssets 会硬校验其齐备）。
+# manifest.json 由 scripts/dev/gen-qbot-pack-manifest.py 依据资产内容 sha256 派生生成，
+# 内容随资产变动，故同为构建产物、不入库（:injector-app 打包前重新生成）。
 # 容器底座、协议端本体与预编译启动器体积小且版本固定，仍然入库。
 qbot-app/src/_qbotAssets/apt/
 qbot-app/src/_qbotAssets/qq/
+qbot-app/src/_qbotAssets/manifest.json

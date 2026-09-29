@@ -161,7 +161,7 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 3. **真机装 rc 包**，至少跑通 AI 对话 + 终端 + 容器启动三条主线。
 4. 有问题 -> 从该 RC Tag 拉 `hotfix/xxx` 分支修复（**勿从最新 `main` 拉**，否则会把已合入的未发版功能带进修复包）-> 升 rc 序号打 Tag（`v1.7.0-rc2`）推送重发 -> 将修复合回 `main` 并推送 -> 删除 hotfix 分支；无问题 -> 直接打正式 Tag（`v1.7.0`）推远端转正。
 5. **Release 正文人工更新（强制）**：CI 自动创建的 Release 标题已包含自动生成的更新内容概括（由 `release-log.py --title-summary` 生成，格式「{软件名} v{版本号} — {概括}」），正文为带占位符的草稿。**必须在发版后手动完成以下项**：
-   - **标题**：概括由 CI 自动生成，如不合适可手动修改（≤20字，用户语言，禁止内部术语），最终格式为 `{软件名} v{版本号} — {更新内容概括}`。主应用软件名为 `MiniMe-core`，附属应用为 `MiniMe Logs`。
+   - **标题**：概括由 CI 自动生成，如不合适可手动修改（≤20字，用户语言，禁止内部术语），最终格式为 `{软件名} v{版本号} — {更新内容概括}`。主应用软件名为 `MiniMe-core`，各附属应用软件名见「发版规范 §1 附属应用一览」。
    - **正文**：更新为完整格式，内容必须与 `docs/Version Log/` 下对应版本文档完全一致。
    - 未更新正文的 Release 视为发版未完成。
 6. **打 Tag 前脚本同步检查（强制）**：打 Tag 前必须确认 `scripts/gitops/release-log.py`、`AGENTS.md` 等发版相关脚本和规范的最新改动已提交到 `main`。CI 使用 Tag 指向 commit 中的脚本，若脚本更新在 Tag 之后的 commit 中，CI 仍会使用旧脚本生成旧格式草稿。
@@ -183,6 +183,15 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 - 正式版示例：`MiniMe-v0.0.0.15-release.apk`
 - 预览版示例：`MiniMe-v0.0.0.16-rc1.apk`
 - CI 中由 `Rename APK` 步骤自动根据 tag 是否含 `-rc` 后缀判定变体。
+
+**附属应用一览**（软件名 / tag 前缀 / Release 命名 / 独立版本日志，新增应用须在此登记）：
+
+| 应用 | 软件名（标题） | Tag 前缀 | Release 命名 | 独立版本日志 |
+|---|---|---|---|---|
+| MiniMe-core（主应用） | `MiniMe-core` | `v` | `MiniMe-v{版本}-{变体}.apk` | `docs/Version Log/CHANGELOG.md` |
+| MiniMe Logs（日志查看器） | `MiniMe Logs` | `logviewer-v` | `minime-logs-v{版本}.apk` | `docs/Version Log/CHANGELOG-logviewer.md` |
+| MiniMe-QBot（QQ 机器人） | `MiniMe-QBot` | `qbot-v` | `MiniMe-QBot-v{版本}-{变体}.apk` | `docs/Version Log/CHANGELOG-qbot.md` |
+| MiniMe-QBot 环境注入器 | `MiniMe-QBot Injector` | `qbot-injector-v` | `MiniMe-QBot-Injector-v{版本}-{变体}.apk` | `docs/Version Log/CHANGELOG-qbot-injector.md` |
 
 #### 2. 发版页面标题格式
 
@@ -309,7 +318,7 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 - [ ] CI 构建成功，APK 已上传到 Release Assets
 - [ ] APK 签名校验通过（非 debug 包，签名正确）
 - [ ] APK 大小在合理范围（约 80-90MB）
-- [ ] **Release 标题**符合格式：`{软件名} v{版本} — {更新概括}`（主应用 MiniMe-core，附属应用 MiniMe Logs，概括≤20字）
+- [ ] **Release 标题**符合格式：`{软件名} v{版本} — {更新概括}`（主应用 MiniMe-core，附属应用软件名见「发版规范 §1 附属应用一览」，概括≤20字）
 - [ ] **Release 正文**已从草稿更新为完整格式，无占位符残留
 - [ ] 正文条目格式合规：每条为 `**4-9字小标题**：20-40字说明`
 - [ ] 正文无 emoji

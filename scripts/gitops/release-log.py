@@ -74,6 +74,10 @@ APP_CONFIG = {
         "tag_prefix": "qbot-v",
         "changelog_paths": ["docs/Version Log/CHANGELOG-qbot.md"],
     },
+    "injector": {
+        "tag_prefix": "qbot-injector-v",
+        "changelog_paths": ["docs/Version Log/CHANGELOG-qbot-injector.md"],
+    },
 }
 
 # 内部术语 -> 用户语言 映射（自动过滤技术细节）
