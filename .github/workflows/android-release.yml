@@ -136,7 +136,10 @@ jobs:
             fi
           }
           cur_tag="${GITHUB_REF_NAME}"
-          prev_tag=$(git tag --sort=-creatordate | grep -vE "^${cur_tag}$" | head -1)
+          # 取「本应用（主应用）」的上一个 tag：必须用 ^v[0-9] 过滤，
+          # 否则会取到其它应用（logviewer-v* / qbot-v*）的 tag，导致 versionCode 校验与
+          # applicationId 对比失去意义、Release 提交范围错乱。
+          prev_tag=$(git tag --sort=-creatordate | grep -E '^v[0-9]' | grep -vE "^${cur_tag}$" | head -1)
           if [[ -z "$prev_tag" ]]; then
             echo "无历史 tag，跳过 versionCode 单调校验（首次发版）"
             echo "当前 tag 映射 versionCode = $(vc_of_tag "$cur_tag")"
@@ -161,7 +164,10 @@ jobs:
         run: |
           set -e
           cur_tag="${GITHUB_REF_NAME}"
-          prev_tag=$(git tag --sort=-creatordate | grep -vE "^${cur_tag}$" | head -1)
+          # 取「本应用（主应用）」的上一个 tag：必须用 ^v[0-9] 过滤，
+          # 否则会取到其它应用（logviewer-v* / qbot-v*）的 tag，导致 versionCode 校验与
+          # applicationId 对比失去意义、Release 提交范围错乱。
+          prev_tag=$(git tag --sort=-creatordate | grep -E '^v[0-9]' | grep -vE "^${cur_tag}$" | head -1)
           if [[ -z "$prev_tag" ]]; then
             echo "无历史 tag，跳过 applicationId 一致性校验（首次发版）"
             exit 0
@@ -286,7 +292,10 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           cur_tag="${GITHUB_REF_NAME}"
-          prev_tag=$(git tag --sort=-creatordate | grep -vE "^${cur_tag}$" | head -1)
+          # 取「本应用（主应用）」的上一个 tag：必须用 ^v[0-9] 过滤，
+          # 否则会取到其它应用（logviewer-v* / qbot-v*）的 tag，导致 versionCode 校验与
+          # applicationId 对比失去意义、Release 提交范围错乱。
+          prev_tag=$(git tag --sort=-creatordate | grep -E '^v[0-9]' | grep -vE "^${cur_tag}$" | head -1)
           version="${cur_tag#v}"
           # 多行输出用 EOF 分隔符；release-log.py 直接产出 Release 正文草稿
           delimiter="EOF_$(date +%s)"

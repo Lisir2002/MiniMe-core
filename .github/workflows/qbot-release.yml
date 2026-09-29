@@ -6,10 +6,10 @@ name: QBot Release
 #   产物：MiniMe-QBot-v0.0.1-release.apk（命名遵循 AGENTS.md「发版规范」§1：
 #         {软件名}-{版本号}-{变体}.apk，变体为 release / rcN）
 #
-# 前置条件（未满足时本 workflow 不可用，但保持休眠、不影响其它应用）：
-#   1. 仓库内已存在 :qbot-app 模块（settings.gradle.kts 已 include），且已配置 release 签名；
-#   2. qbot-app/build.gradle.kts 的版本推导已按 `git describe --match "qbot-v[0-9]*"` 实现，
-#      版本号独立为 0.0.1 递增（详见 docs/qqbot-app-design.md §2.6）。
+# 前置条件（均已满足；发版前仅需先录入 CHANGELOG-qbot.md 本版条目）：
+#   1. :qbot-app 模块已存在并配置 release 签名（复用主应用唯一官方密钥）；
+#   2. 版本推导已按 `git describe --match "qbot-v[0-9]*"` 实现，版本号独立为 0.0.1 递增；
+#   3. 独立版本日志 docs/Version Log/CHANGELOG-qbot.md 已创建（release-log.py --app qbot 的权威来源）。
 on:
   push:
     tags:
@@ -45,6 +45,40 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      # 校验 versionCode 单调递增：QBot 的 versionCode = 三段版本号映射
+      #   A*1000000 + B*1000 + C（与 qbot-app/build.gradle.kts qbotGitVersionCode() 一致）。
+      # prev tag 必须按本应用前缀 qbot-v 过滤，避免被主应用 / Logviewer 的 tag 干扰。
+      # 允许相等：rc 转正式版时常在同一提交上打 tag，versionCode 相等是正常的。
+      # 仅打 qbot-v* tag 触发时校验；workflow_dispatch（手动，无 tag）跳过。
+      - name: Verify versionCode monotonic
+        if: startsWith(github.ref, 'refs/tags/qbot-v')
+        run: |
+          set -e
+          vc_of_tag() {
+            local ver="${1#qbot-v}"
+            if [[ "$ver" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-rc[0-9]+)?$ ]]; then
+              echo $(( ${BASH_REMATCH[1]} * 1000000 + ${BASH_REMATCH[2]} * 1000 + ${BASH_REMATCH[3]} ))
+            else
+              echo 0
+            fi
+          }
+          cur_tag="${GITHUB_REF_NAME}"
+          prev_tag=$(git tag --sort=-creatordate | grep '^qbot-v' | grep -v "^${cur_tag}$" | head -1 || true)
+          if [[ -z "$prev_tag" ]]; then
+            echo "无历史 QBot tag，跳过 versionCode 单调校验（首次发版）"
+            echo "当前 tag 映射 versionCode = $(vc_of_tag "$cur_tag")"
+            exit 0
+          fi
+          cur_vc=$(vc_of_tag "$cur_tag")
+          prev_vc=$(vc_of_tag "$prev_tag")
+          echo "上个 Release($prev_tag) versionCode = $prev_vc"
+          echo "当前(${cur_tag}) versionCode     = $cur_vc"
+          if [[ "$cur_vc" -lt "$prev_vc" ]]; then
+            echo "::error::versionCode 回退: 当前 $cur_vc < 上个 Release($prev_tag) $prev_vc。请确保新 tag 版本号（三段式 x.x.x）在上个 Release 之上按语义推进。"
+            exit 1
+          fi
+          echo "✓ versionCode 单调递增: $prev_vc -> $cur_vc"
 
       - name: Build QBot Release APK
         run: ./gradlew :qbot-app:assembleRelease --stacktrace
