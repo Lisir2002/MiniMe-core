@@ -211,7 +211,7 @@ jobs:
             echo "已生成发版说明草稿：$out"
           }
           emit qbot qbot-app "qbot-v" "$QBOT_TAG" "$QBOT_VER" dist/notes-qbot.md
-          emit inj injector-app "qbot-injector-v" "$INJ_TAG" "$INJ_VER" dist/notes-injector.md
+          emit injector injector-app "qbot-injector-v" "$INJ_TAG" "$INJ_VER" dist/notes-injector.md
 
       # 保留已更新的 Release 内容（与主应用 / Logviewer 逻辑一致）：正文若已被人工补齐则不覆盖，
       # 标题若已含「—」概括则保留。
