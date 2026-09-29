@@ -69,8 +69,8 @@ INTERNAL_TERM_REGEX = re.compile(
     r"|\.gradle\b|\.yml\b|\.yaml\b"  # 配置文件后缀
 )
 
-# 标题格式正则（版本号兼容三段 0.0.1 与四段 0.0.0.19）
-TITLE_REGEX = re.compile(r"^(.+?) v(\d+\.\d+\.\d+(?:\.\d+)?) — (.+)$")
+# 标题格式正则（版本号兼容三段 0.0.1 与四段 0.0.0.19，并允许预览版 -rcN 后缀）
+TITLE_REGEX = re.compile(r"^(.+?) v(\d+\.\d+\.\d+(?:\.\d+)?(?:-rc\d+)?) — (.+)$")
 
 
 def run_git(args, repo):
