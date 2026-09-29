@@ -1,6 +1,6 @@
 # MiniMe-QBot 附属应用设计文档（第一阶段：登录）
 
-> 文档版本：v1.1
+> 文档版本：v1.2
 > 状态：设计阶段（第一阶段未落地）
 > 最后更新：2026-09-29
 > 替代关系：本文档**全面替代**已废弃的 `qq-bot-integration-design.md`（旧方案为 LLBot + OneBot 11 反向 WS 嵌入主应用容器，整体舍弃）
@@ -79,18 +79,22 @@
 
 > 注：OneBot 11 标准未定义"扫码登录"接口，扫码能力属**协议端私有扩展**（见 §4.3）。因此登录能力需通过 `ProtocolEndpoint` 抽象层隔离，标准接口走 OneBot 11，私有接口按协议端适配。
 
-### 2.2 协议端选型：可插拔，默认 LLBot 无头模式（Rust / arm64）
+### 2.2 协议端选型：可插拔，默认 **NapCat**（Linux arm64）
 
-| 协议端 | 实现语言 | 需 QQ 客户端 | arm64 Linux | 状态 | 结论 |
-|--------|---------|-------------|-------------|------|------|
-| **LLBot 无头模式** | Rust / Node | 否（纯协议） | Rust 版有 arm64 二进制 | 维护中 | **默认选型** |
-| NapCat | Node/TS | 需官方 QQ Linux 客户端（x86_64 为主） | 受限 | 维护中 | 备选（架构适配后） |
-| Lagrange.Core | C# (.NET) | 否（NTQQ 协议） | .NET 可跑 | 维护中 | 备选 |
+> **本节已按调研证据修订**（v1.2）：原默认选型 LLBot 在 arm64 上无法证实，改为 NapCat。
+
+| 协议端 | 实现语言 | 需 QQ 客户端 | **arm64 Linux** | 状态 | 结论 |
+|--------|---------|-------------|-----------------|------|------|
+| **NapCat** | Node/TS | 需官方 QQ Linux 客户端 | ✅ **明确支持**（官方支持矩阵含 Linux Arm64；官方 QQ 提供 arm64 Linux 安装包；已有 aarch64 Debian 设备实跑并扫码登录的案例） | 维护中 | **默认选型** |
+| LLBot（LuckyLilliaBot） | Rust / Node | 否（纯协议） | ⚠️ **未证实**（官方定位为 Windows / Docker，Docker 镜像为 `linux/amd64`） | 维护中 | 备选（Windows/Docker 场景） |
+| Lagrange.Core | C# (.NET) | 否（NTQQ 协议） | ⚠️ 未证实（需自验证 .NET arm64 部署） | 维护中 | 备选 |
 | OpenShamrock | Kotlin/Java (Xposed) | 需官方手机 QQ + Root | 原生 Android | **原仓库已归档**（2024-08），仅社区 fork | 不在第一方案内（见 §2.3 R3） |
 
-**决策**：第一阶段以 **LLBot 无头模式（Rust / arm64）** 为默认协议端，但代码只依赖 OneBot 11 + `ProtocolEndpoint` 抽象，协议端切换为配置项。
+**决策**：第一阶段以 **NapCat（Linux arm64）** 为默认协议端，代码只依赖 OneBot 11 + `ProtocolEndpoint` 抽象，协议端切换为配置项。
 
-**待验证项**：LLBot 无头 Rust 版是否提供可直接运行的静态 arm64 Linux 二进制（决定 §2.3 走 R1 还是 R2）。
+**关键推论（影响 §2.3）**：NapCat 是 Node 应用且**依赖官方 QQ Linux 客户端**，二者都无法收敛为"单文件静态二进制"，因此 **R2（静态二进制直挂）不成立**，运行时**定案走 R1（内嵌 Linux 运行时）**。
+
+**待验证项（唯一剩余）**：在 Android 的 PRoot 环境下承载 NapCat + 官方 QQ Linux arm64 客户端能否成功登录。验证方式：见 §11「待验证清单」V1。
 
 ### 2.3 运行时选型：内嵌 Linux 运行时承载协议端
 
@@ -98,17 +102,17 @@
 
 | 方案 | 说明 | 体积/冷启动 | 可行性 | 结论 |
 |------|------|-------------|--------|------|
-| **R1 内嵌 Linux 运行时**（PRoot + Alpine rootfs） | 完整用户空间，可运行非静态二进制、可装 Node 等 | 重 | 高（主应用已验证该链路） | **基线方案** |
-| **R2 静态二进制直挂执行** | 协议端以静态 musl 二进制随 APK 分发，直接 exec | 最轻 | 依赖上游是否提供静态二进制 | 优先优化项（待验证） |
+| **R1 内嵌 Linux 运行时**（PRoot + Alpine rootfs） | 完整用户空间，可运行 Node、可注入官方 QQ Linux arm64 客户端 | 重 | 高（主应用已验证该链路；ARM 设备已有 NapCat 实跑案例） | **定案方案** |
+| **R2 静态二进制直挂执行** | 协议端以静态 musl 二进制随 APK 分发，直接 exec | 最轻 | **不成立** | **已否决**（默认协议端 NapCat 需 Node + 官方 QQ 客户端，无法静态化，见 §2.2） |
 | **R3 Root + Shamrock** | 复用官方手机 QQ 登录，行为最接近真人 | 最轻 | 需 Root + LSPosed + 特定 QQ 版本；上游已归档 | 可选高级路径（非默认） |
 | **R4 外部协议端** | 协议端跑在 PC/服务器 | 无 | 高 | 与"附属应用独立可用"目标冲突，排除 |
 
-**决策**：
-- **基线走 R1**（与主应用已有的容器链路一致，兼容性最广、不要求 Root）；
-- 若 R2 的静态二进制可行，则 R2 作为**首选轻量化路径**，R1 降级为 R2 不可用时的兜底；
+**决策（已按证据收敛）**：
+- **定案走 R1**：R2 因默认协议端无法静态化而不成立，R1 成为唯一基线（与主应用已有的容器链路一致，不要求 Root）。
+- R1 需在运行时内解决：Node 环境 + 官方 QQ Linux arm64 客户端注入（这是 §11 的 V1 验证内容）。
 - R3 作为面向 Root 用户的**可选增强**，独立成阶段，不进第一方案。
 
-**约束提醒**：主应用为支持运行 Linux 二进制而将 `targetSdk` 锁定在 28（绕过 Android 10+ W^X 限制）。附属应用若走 R1/R2，**同样需要锁定 `targetSdk = 28`**，这是必须接受的既定约束。
+**约束提醒**：主应用为支持运行 Linux 二进制而将 `targetSdk` 锁定在 28（绕过 Android 10+ W^X 限制）。附属应用走 R1，**同样需要锁定 `targetSdk = 28`**，这是必须接受的既定约束。
 
 ### 2.4 登录方式：扫码登录为主
 
@@ -135,6 +139,39 @@
 | versionCode | 由该前缀对应的**独立公式**生成，保证在本应用内单调递增 |
 | 发版校验 | CI 走 `check-release-format.py --app qbot` 分支 |
 
+#### 2.6.1 ⚠️ 必须先修的前置缺陷：`git describe` 未做前缀过滤（主应用已受此害）
+
+现有 `app/build.gradle.kts` 的版本推导用的是裸 `git describe --tags --always --dirty`：
+
+```
+arrayOf("git", "describe", "--tags", "--always", "--dirty")
+```
+
+`git describe` 默认**不区分 tag 来源**，会选取**最近的任意 tag**。这意味着：
+
+- 今天：`logviewer-v0.0.8` 这类 tag 若成为最近 tag，主应用的正则 `^(\d+)\.(\d+)\.(\d+)\.(\d+)` **匹配失败** → 版本号静默回退到 `0.0.1-dev.N`（开发态），`versionCode` 也从 tag 公式退化为 `BASE + 提交数`。
+- 明天：`qbot-v0.0.1` 会制造同样的干扰，而且 **QBot 越频繁发版，主应用越容易被"劫持"**。这正是 AGENTS 反复警告的"versionCode 回退 → 升级判定失效"的温床。
+
+**必须在 QBot 打第一个 tag 之前修复**：
+
+| 应用 | 应改为 |
+|------|--------|
+| 主应用 | `git describe --tags --always --dirty --match "v[0-9]*"` |
+| MiniMe Logs | `... --match "logviewer-v[0-9]*"`（并同时去掉硬编码版本） |
+| MiniMe-QBot | `... --match "qbot-v[0-9]*"` |
+
+> 该修复同时消除主应用现有的潜在版本劫持风险，属"顺手关门"，建议独立提交。
+
+#### 2.6.2 CI 侧配套改造（发版前必须完成）
+
+| 脚本 / 流程 | 现状 | 需改造 |
+|-------------|------|--------|
+| `scripts/gitops/check-release-format.py` | `APP_NAMES` 仅 `main` / `logviewer`；prefix 是二元三元表达式 | 增加 `qbot → "MiniMe-QBot"`，prefix 改为映射表，`--app` choices 增加 `qbot` |
+| `scripts/gitops/release-log.py` | **无 app 概念**（仅服务主应用） | 需引入 app 维度（tag 前缀识别 → 软件名/版本号/产物名） |
+| `.github/workflows/android-release.yml` | 仅主应用构建与发布 | 增加 QBot 构建/发布分支，产物命名 `MiniMe-QBot-v{版本}-{变体}.apk`，versionCode 单调校验按 app 隔离 |
+
+> 这三项是**打 Tag 发版的必要前置**，不完成则 QBot 无法合规发版（详见 AGENTS 发版流程与 [docs/ci-release.md](file:///workspace/docs/ci-release.md)）。
+
 > 注意：MiniMe Logs 目前采用**硬编码** `versionCode/versionName`（`8` / `"0.0.8"`），本案**不沿用**该做法——AGENTS 要求版本以 Git Tag 为唯一事实源，硬编码易忘记递增。
 
 ### 2.7 日志层复用：沿用主应用日志层（源码复制）
@@ -143,7 +180,8 @@
 
 - 参照实现：[`logviewer-app/build.gradle.kts`](file:///workspace/logviewer-app/build.gradle.kts) 的 `stageReferencedSources` 任务。
 - 复用范围：日志核心（`FileLogger` / `AILogger` / `LogLineParser` / `LogLevel` / `LogConfig` / `LogSanitizer` / `LogStats` / `Logger`）及日志基础设施（`LogFiles` / `LogLevelController` / `DiagnosticCleanup`）。
-- **已知代价**：复制方案下，主应用日志文件若改名/移位，本模块会在编译期报 unresolved（可见但定位成本高）。此代价已知并接受；若后续复制项膨胀或频繁踩坑，再评估抽公共库模块。
+- **风险与缓解（已闭环）**：复制方案下，主应用日志文件若改名/移位，会产生编译期 unresolved。为把"定位成本高"降为"失败即报"，`Copy` 任务后追加**清单校验任务**：将待复制文件路径登记为显式清单，复制完成后逐个断言目标文件存在（缺失即 `throw GradleException` 并列出缺失项），使构建在最早的同步阶段失败并指明文件，而非拖到 Kotlin 编译期。
+- **升级预案**：若复制项持续膨胀或频繁踩坑，改为抽取公共库模块（如 `:minime-log`），届时主应用与 MiniMe Logs 一并迁移，一次清掉历史债。
 
 ### 2.8 数据归属与访问：主应用持有，QBot 经 IPC 访问
 
@@ -163,7 +201,20 @@
 | 公共存储目录共享加密库 | Android 10+ 分区存储隔离，且属安全降级 |
 | QBot 直接打开主应用的加密数据库 | 密钥不可得，必然"假损坏" |
 
-**访问方式**：QBot 需要主应用数据时，经 **IPC 访问层**（AIDL bound service / ContentProvider / 本地回环 HTTP，三选一在实施时定），主应用作为**唯一数据提供方与写入方**。
+**访问方式（已定案，非"实施时再定"）**：采用 **AIDL 绑定服务（业务级接口）+ 签名级自定义权限**。
+
+| 项 | 定案 |
+|----|------|
+| 传输机制 | 主应用导出一个 **AIDL bound service**，暴露**业务级**方法（不暴露裸 cursor / SQL） |
+| 调用方鉴权 | 自定义权限 `com.mini.me_core.permission.ACCESS_QBOT_DATA`，`protectionLevel="signature"` |
+| 写权限 | 独立权限 `...WRITE_QBOT_DATA`（同样 signature 级），且**默认不授予**，需用户在主应用显式开启 |
+| 读写策略 | 默认**只读**；写入必须走显式授权开关 + 用户确认 |
+| 调用方限制 | 依赖**同签名**天然限定：只有与主应用同签名的应用才能持有 signature 级权限 |
+| 生命周期 | QBot 通过 `bindService` 按需绑定，主应用服务不可用时快速失败并降级提示 |
+
+**由此产生的签名要求**：MiniMe-QBot 必须与主应用**共用签名**（与 MiniMe Logs 现状一致）。注意：签名 secrets 必须走独立配置且**不入库**（`:logviewer-app` 目前的明文密码写法不得沿用）。
+
+**为何不用 ContentProvider**：主应用的数据访问是仓储（Repository）级业务逻辑，而非裸表游标；用 AIDL 暴露业务方法可避免把数据模型与 SQL 细节泄漏到进程边界之外。
 
 **QBot 本地数据**：仅保留登录态等**极少量自身数据**（见 §五），使用 QBot 自己的 Keystore 密钥体系加密，与主应用数据完全分离。
 
@@ -203,8 +254,8 @@
 │  └─────────────────────────────────────────────────────────┘  │
 │                                                               │
 │  ┌─────────────────────────────────────────────────────────┐  │
-│  │  Linux 运行时（PRoot + rootfs，或静态二进制直挂）         │  │
-│  │  └── 协议端进程（LLBot 无头）→ 本地回环 OneBot 11         │  │
+│  │  Linux 运行时（PRoot + rootfs）                          │  │
+│  │  └── 协议端进程（NapCat）→ 本地回环 OneBot 11           │  │
 │  └─────────────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────────────┘
 ```
@@ -428,30 +479,53 @@ UI 纪律（沿用主应用规范）：
 
 ---
 
-## 十、风险与对策
+## 十、风险闭环表
 
-| 风险 | 严重度 | 对策 |
-|------|--------|------|
-| 协议端停更/失效（生态动荡） | 高 | 契约锁定 OneBot 11 + `ProtocolEndpoint` 抽象，协议端可插拔替换 |
-| 静态二进制不可用（R2 不成立） | 中 | 回落 R1 内嵌运行时（已验证链路） |
-| Android 后台杀进程 | 高 | 前台服务 + 守护 + WakeLock；引导关电池优化 |
-| 运行时体积大 / 冷启动慢 | 中 | 首次初始化提示；R2 轻量化；启动状态可见不阻塞 UI |
-| `targetSdk = 28` 约束 | 中 | 作为既定约束接受，与主应用保持一致 |
-| 无法直接共享主应用数据与密钥 | 高 | **设计上即不允许**；数据归主应用，QBot 经 IPC 访问（§2.8），第一阶段无此需求 |
-| IPC 边界被越权调用 | 中 | 限定调用方（签名校验 / 权限声明）+ 默认只读 + 写操作显式授权（§5.3） |
-| 日志层源码复制脆弱（主应用改名/移位） | 中 | 已知并接受；复制项失控或频繁踩坑时改抽公共库模块（§2.7） |
-| 版本命名空间与主应用冲突 | 中 | 独立 Tag 前缀 `qbot-v*` + 独立 versionCode 公式（§2.6） |
-| 扫码能力无标准接口 | 中 | `QrCodeSource` 抽象 + 按协议端适配，原生接口优先 |
-| 个人号登录封号 | 高 | 风控专题处理（延后）；第一阶段明确提示用户风险 |
+> 状态口径：**已闭环** = 已有确定结论或缓解措施，无需再决策；**待实测** = 只能由实验/实机验证关闭，已验证方案已在 §11 列明；**已接受** = 主动接受，不再处理。
+
+| # | 风险 | 严重度 | 状态 | 结论 / 缓解措施 |
+|---|------|--------|------|------------------|
+| R1 | 协议端 arm64 可用性（原"待验证项"） | 高 | **已闭环** | 调研确认 **NapCat 支持 Linux arm64**，官方 QQ 亦有 arm64 Linux 包；默认协议端由 LLBot 改为 NapCat（§2.2） |
+| R2 | 静态二进制不可用（R2 方案不成立） | 中 | **已闭环** | NapCat 需 Node + 官方 QQ 客户端，无法静态化 → R2 否决，运行时**定案 R1**（§2.2/§2.3） |
+| R3 | 协议端停更/失效（生态动荡） | 高 | **已闭环** | 契约锁定 OneBot 11 + `ProtocolEndpoint` 抽象；已选定"默认 NapCat + 备选 LLBot/Lagrange"的多后端策略（§2.2） |
+| R4 | 版本命名空间与其它应用冲突 | 高 | **已闭环（含前置缺陷修复）** | 独立前缀 `qbot-v*`；并发现主应用 `git describe` **未做前缀过滤**的既存缺陷，修复方案已定（§2.6.1） |
+| R5 | CI 无法为多应用发版 | 中 | **已闭环（方案已定）** | 明确列出 3 处改造：`check-release-format.py` / `release-log.py` / release workflow（§2.6.2） |
+| R6 | 日志层源码复制脆弱 | 中 | **已闭环** | 增加**清单校验任务**（缺失即 GradleException），把风险从"编译期难定位"降为"同步期即报"；并留抽公共库的升级预案（§2.7） |
+| R7 | IPC 边界被越权调用 | 中 | **已闭环** | 定案 AIDL 业务级服务 + `signature` 级自定义权限 + 默认只读 + 写权限显式授予（§2.8） |
+| R8 | 无法直接共享主应用数据与密钥 | 高 | **已闭环** | 设计上即禁止；数据归主应用、QBot 经 IPC 访问；第一阶段无此需求（§2.8/§5.0） |
+| R9 | 扫码能力无标准接口 | 中 | **已闭环** | `QrCodeSource` 抽象，协议端原生接口优先、日志解析兜底（§4.3） |
+| R10 | `targetSdk = 28` 约束 | 中 | **已接受** | 既定约束，与主应用保持一致（§2.3） |
+| R11 | 运行时体积大 / 冷启动慢 | 中 | **已接受（第一阶段）** | R1 体积无法回避；以首次初始化进度、启动状态可见来缓解；R2 已否决，故无轻量化捷径 |
+| R12 | Android 后台杀进程 | 高 | **待实测** | 保活组合已定（前台服务 + 守护 + WakeLock）；实际存活率需在国产 ROM 实机验证（§7.1、§11 V2） |
+| R13 | PRoot 内承载 NapCat + 官方 QQ 客户端能否登录 | 高 | **待实测** | 全案唯一未消除的技术不确定性 → §11 V1（必须先验证，不通过则方案需重估） |
+| R14 | 个人号登录封号 | 高 | **已接受（延后）** | 按决策延后为风控专题；第一阶段 UI 需明确提示风险 |
+
+**闭环结论**：14 项风险中，**9 项已在设计层闭环、2 项主动接受、2 项待实测（V1/V2）、1 项延后**。唯一可能推翻方案的是 **R13**，因此它被列为实施前的第一道门（§11 V1）。
+
+---
+
+## 十一、待验证清单（实施前）
+
+| 编号 | 验证项 | 为什么必须先做 | 通过标准 | 失败后果 |
+|------|--------|----------------|----------|----------|
+| **V1** | 在 Android（arm64）的 PRoot 运行时内，能否拉起 NapCat + 官方 QQ Linux arm64 客户端并完成扫码登录 | 全案最底层假设；不成立则 R1 + NapCat 组合不可用 | OneBot 11 `get_login_info` 返回正确 QQ 号 | 需重估方案：改协议端（Lagrange/LLBot 另验）或改运行时 |
+| **V2** | 后台保活实际存活率（主流国产 ROM 各测至少一款） | 决定"免扫码恢复"是否真能成立 | 静置 12h 后进程存活、登录态有效 | 需强化保活或改交互预期（提示用户手动保活） |
+| **V3** | 首次初始化耗时与运行时体积 | 决定首次启动 UX 与分发体积 | 给出可接受的耗时/体积基线 | 需优化 rootfs 裁剪或改分发策略 |
+
+> V1 建议作为**第一阶段开工的第一个任务**，以最小验证脚本形态先跑通，再进入 UI 与状态机开发。
 
 ---
 
 ## 附录：参考资源
 
 - OneBot 11 标准：https://11.onebot.dev/
-- LLBot 文档：https://github.com/LLOneBot/LuckyLilliaDoc
-- NapCat 文档：https://napneko.github.io/
-- Lagrange.Core：https://github.com/LagrangeDev/Lagrange.Core
+- **NapCat 文档（默认协议端）**：https://napneko.github.io/
+- NapCat 平台/架构支持矩阵：https://napneko.github.io/config/advanced
+- NapCat 部署方式（含 Linux arm64）：https://doc.napneko.icu/guide/boot/Shell
+- NapCat 在 ARM 开发板实跑案例：https://cloud.tencent.cn/developer/article/2742154
+- 官方 QQ Linux 下载（含 arm64 包）：https://im.qq.com/rainbow/linuxQQDownload
+- LLBot（备选）文档：https://github.com/LLOneBot/LuckyLilliaDoc
+- Lagrange.Core（备选）：https://github.com/LagrangeDev/Lagrange.Core
 - OpenShamrock（已归档，仅供背景了解）：https://github.com/whitechi73/OpenShamrock
 - 主应用容器链路：`app/src/main/java/com/mini/me_core/feature/agent/domain/container/`
 - 主应用 MCP 服务端（第三阶段接入候选）：`app/src/main/java/com/mini/me_core/feature/agent/domain/execution/mcp/server/`
