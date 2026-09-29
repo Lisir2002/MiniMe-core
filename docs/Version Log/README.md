@@ -49,6 +49,14 @@ Version Log/
 
 本目录下所有文档（CHANGELOG.md、各独立版本文档）以及 GitHub Release 正文必须严格遵循 AGENTS.md 中的格式规范，保持三处一致。
 
+## 绑定发版（强制）
+
+**MiniMe-QBot（`qbot-v*`）与 MiniMe-QBot 环境注入器（`qbot-injector-v*`）为绑定应用**：二者共享同一套运行环境资产，不可单独升级。
+
+- **每次发版必须同批一起发布两款最新版**，即使其中一方当次无改动，也要一并重新打 Tag 发布。
+- 两份版本日志（`CHANGELOG-qbot.md` 与 `CHANGELOG-qbot-injector.md`）须同批一并更新，并在各自头部互相交叉引用。
+- 两枚 Tag 必须打在**同一个提交**上；CI 已加双向配对门禁，缺少配对 Tag 时构建失败。
+
 ## 发版流程
 
 1. 代码变更完成并通过编译验证
