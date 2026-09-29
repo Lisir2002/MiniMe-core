@@ -23,6 +23,7 @@ GitHub Release 正文草稿。
 用法（仓库根执行）：
   python3 scripts/gitops/release-log.py --prev v0.0.0.14 --cur v0.0.0.15
   python3 scripts/gitops/release-log.py --version 0.0.0.15 --date 2026-09-25
+  python3 scripts/gitops/release-log.py --prev qbot-v0.0.1 --cur qbot-v0.0.2 --app qbot --path qbot-app
 
 设计约束：
   - 仅为正文草稿，永不替代人工复核：简介价值化润色、条目小标题提炼仍需人工完成。
@@ -57,6 +58,23 @@ USER_CATEGORY_MAP = {
 
 # 用户层排除：纯 CI/测试/格式/文档/构建/依赖噪音，不进用户可见日志
 USER_EXCLUDE = {"ci", "test", "style", "docs", "chore", "build", "deps"}
+
+# 多应用维度：tag 前缀（与各自 build.gradle.kts 的 `git describe --match` 保持一致）
+# 与各自的版本日志路径。main 走原有双路径回退，附属应用走独立版本日志文件。
+APP_CONFIG = {
+    "main": {
+        "tag_prefix": "v",
+        "changelog_paths": ["docs/Version Log/CHANGELOG.md", "CHANGELOG.md"],
+    },
+    "logviewer": {
+        "tag_prefix": "logviewer-v",
+        "changelog_paths": ["docs/Version Log/CHANGELOG-logviewer.md"],
+    },
+    "qbot": {
+        "tag_prefix": "qbot-v",
+        "changelog_paths": ["docs/Version Log/CHANGELOG-qbot.md"],
+    },
+}
 
 # 内部术语 -> 用户语言 映射（自动过滤技术细节）
 INTERNAL_TERM_MAP = {
@@ -137,12 +155,16 @@ def run(cmd, repo):
     ).stdout.strip()
 
 
-def get_commits(repo, prev, cur):
-    """取 <prev>..<cur> 之间的提交，解析为结构体列表。"""
+def get_commits(repo, prev, cur, path=None):
+    """取 <prev>..<cur> 之间的提交，解析为结构体列表。
+
+    path 非空时仅统计该路径下的提交（多应用仓库中用于隔离本应用的提交范围）。
+    """
     rng = f"{prev}..{cur}"
-    raw = run(
-        ["git", "log", rng, "--pretty=format:%H%x1f%s%x1f%b%x1e"], repo
-    )
+    cmd = ["git", "log", rng, "--pretty=format:%H%x1f%s%x1f%b%x1e"]
+    if path:
+        cmd += ["--", path]
+    raw = run(cmd, repo)
     commits = []
     if not raw:
         return commits
@@ -277,9 +299,12 @@ def _compare_url(repo, prev, cur):
     return f"https://github.com/{github.group(1)}/compare/{prev}...{cur}"
 
 
-def _recent(repo, n):
-    """无历史 tag 时取最近 n 条提交。"""
-    raw = run(["git", "log", f"-{n}", "--pretty=format:%H%x1f%s%x1f%b%x1e"], repo)
+def _recent(repo, n, path=None):
+    """无历史 tag 时取最近 n 条提交（path 非空时仅统计该路径）。"""
+    cmd = ["git", "log", f"-{n}", "--pretty=format:%H%x1f%s%x1f%b%x1e"]
+    if path:
+        cmd += ["--", path]
+    raw = run(cmd, repo)
     commits = []
     for entry in raw.split("\x1e"):
         entry = entry.strip()
@@ -301,8 +326,12 @@ def _recent(repo, n):
     return commits
 
 
-def extract_from_changelog(repo: Path, version: str) -> str | None:
-    """从 docs/Version Log/CHANGELOG.md 提取指定版本的正文（不含版本标题行）。
+def extract_from_changelog(repo: Path, version: str,
+                           changelog_paths: list[str] | None = None) -> str | None:
+    """从版本日志中提取指定版本的正文（不含版本标题行）。
+
+    changelog_paths 为候选相对路径列表（按顺序取第一个存在的文件）；
+    缺省回退到主应用的双路径（docs/Version Log/CHANGELOG.md → CHANGELOG.md）。
 
     CHANGELOG 格式：
         ## [0.0.0.22] - 2026-09-26
@@ -317,10 +346,8 @@ def extract_from_changelog(repo: Path, version: str) -> str | None:
     找到对应版本标题后，收集到下一个 ``## [`` 之前的内容并去除首尾空行。
     找不到返回 None，调用方回退到 commit 草稿生成。
     """
-    candidates = [
-        repo / "docs" / "Version Log" / "CHANGELOG.md",
-        repo / "CHANGELOG.md",
-    ]
+    paths = changelog_paths or APP_CONFIG["main"]["changelog_paths"]
+    candidates = [repo / p for p in paths]
     path = next((p for p in candidates if p.is_file()), None)
     if path is None:
         return None
@@ -347,7 +374,8 @@ def extract_from_changelog(repo: Path, version: str) -> str | None:
     return text or None
 
 
-def generate_title_summary(repo: Path, version: str, commits: list[dict]) -> str:
+def generate_title_summary(repo: Path, version: str, commits: list[dict],
+                           changelog_paths: list[str] | None = None) -> str:
     """从 CHANGELOG 或 commit 内容生成 10-20 字的标题更新概括。
 
     逻辑：
@@ -357,7 +385,7 @@ def generate_title_summary(repo: Path, version: str, commits: list[dict]) -> str
     4. 兜底："应用体验优化与问题修复"
     """
     # 优先从 CHANGELOG 提取
-    changelog_body = extract_from_changelog(repo, version)
+    changelog_body = extract_from_changelog(repo, version, changelog_paths)
     if changelog_body:
         keywords = []
         for line in changelog_body.splitlines():
@@ -407,6 +435,10 @@ def main():
     parser.add_argument("--date", default=None, help="发布日期 YYYY-MM-DD（默认今天）")
     parser.add_argument("--version", default=None, help="版本号（默认 cur tag 去 v 前缀）")
     parser.add_argument("--repo", default=None, help="仓库根（默认 git 自动探测）")
+    parser.add_argument("--app", choices=sorted(APP_CONFIG.keys()), default="main",
+                        help="应用类型（决定默认 tag 前缀与版本日志路径）")
+    parser.add_argument("--path", default=None,
+                        help="仅统计该路径下的提交（如 qbot-app），隔离多应用仓库的提交范围")
     parser.add_argument("--title-summary", action="store_true",
                         help="仅输出标题更新概括（10-20字），不输出完整正文")
     args = parser.parse_args()
@@ -414,11 +446,13 @@ def main():
     repo = Path(args.repo) if args.repo else \
         Path(run(["git", "rev-parse", "--show-toplevel"], Path.cwd()))
 
-    # 解析 prev=最近 tag（若未给）
+    # 解析 prev=最近 tag（若未给）：必须按本应用的 tag 前缀过滤，否则会取到
+    # 其它应用（logviewer-v* / qbot-v*）的 tag，生成错乱的提交范围。
     prev = args.prev
     if not prev:
+        tag_prefix = APP_CONFIG[args.app]["tag_prefix"]
         tags = run(["git", "tag", "--sort=-creatordate"], repo).splitlines()
-        tags = [t for t in tags if t != args.cur]
+        tags = [t for t in tags if t.startswith(tag_prefix) and t != args.cur]
         prev = tags[0] if tags else None
 
     # 解析版本号
@@ -433,24 +467,26 @@ def main():
 
     # 优先从 CHANGELOG.md 提取已人工定稿的版本正文（三处一致的权威来源）；
     # CHANGELOG 未收录该版本时，才回退到 Conventional Commits 生成草稿。
-    changelog_body = extract_from_changelog(repo, version)
+    changelog_body = extract_from_changelog(repo, version, APP_CONFIG[args.app]["changelog_paths"])
     if changelog_body is not None:
         if args.title_summary:
             # 从 CHANGELOG 正文提取概括
-            summary = generate_title_summary(repo, version, [])
+            summary = generate_title_summary(repo, version, [],
+                                             APP_CONFIG[args.app]["changelog_paths"])
             print(summary)
             return
         print(changelog_body)
         return
 
     if prev is None:
-        commits = _recent(repo, 30)
+        commits = _recent(repo, 30, args.path)
     else:
-        commits = get_commits(repo, prev, args.cur)
+        commits = get_commits(repo, prev, args.cur, args.path)
 
     # --title-summary：仅输出标题概括，不输出完整正文
     if args.title_summary:
-        summary = generate_title_summary(repo, version, commits)
+        summary = generate_title_summary(repo, version, commits,
+                                         APP_CONFIG[args.app]["changelog_paths"])
         print(summary)
         return
 

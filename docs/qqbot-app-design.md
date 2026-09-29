@@ -162,15 +162,20 @@ arrayOf("git", "describe", "--tags", "--always", "--dirty")
 
 > 该修复同时消除主应用现有的潜在版本劫持风险，属"顺手关门"，建议独立提交。
 
-#### 2.6.2 CI 侧配套改造（发版前必须完成）
+#### 2.6.2 CI 侧配套改造（进度：多应用基建已完成，模块侧待建）
 
-| 脚本 / 流程 | 现状 | 需改造 |
-|-------------|------|--------|
-| `scripts/gitops/check-release-format.py` | `APP_NAMES` 仅 `main` / `logviewer`；prefix 是二元三元表达式 | 增加 `qbot → "MiniMe-QBot"`，prefix 改为映射表，`--app` choices 增加 `qbot` |
-| `scripts/gitops/release-log.py` | **无 app 概念**（仅服务主应用） | 需引入 app 维度（tag 前缀识别 → 软件名/版本号/产物名） |
-| `.github/workflows/android-release.yml` | 仅主应用构建与发布 | 增加 QBot 构建/发布分支，产物命名 `MiniMe-QBot-v{版本}-{变体}.apk`，versionCode 单调校验按 app 隔离 |
+| 脚本 / 流程 | 改造内容 | 状态 |
+|-------------|----------|------|
+| `app/build.gradle.kts` | 主应用版本推导加 `--match "v[0-9]*"`，隔离其它应用 tag | ✅ 已完成（§2.6.1 前置缺陷已修） |
+| `scripts/gitops/check-release-format.py` | 增加 `qbot → "MiniMe-QBot"`、`APP_TAG_PREFIXES` 映射表、`--app qbot`；并把标题正则改为兼容**三段版本号**（顺带修掉 MiniMe Logs 三段版本号此前必然校验失败的问题） | ✅ 已完成 |
+| `scripts/gitops/release-log.py` | 增加 `--app`（决定 tag 前缀与版本日志路径）与 `--path`（按目录隔离提交范围，避免把主应用提交混入附属应用日志）；默认 prev 按本应用 tag 前缀过滤 | ✅ 已完成 |
+| `.github/workflows/qbot-release.yml` | 新建 QBot 构建/发布 workflow（tag `qbot-v*`，产物 `MiniMe-QBot-v{版本}-{变体}.apk`）；已含 `fetch-depth: 0` | ✅ 已创建（**休眠**：待 `:qbot-app` 存在后才可用） |
+| `docs/Version Log/CHANGELOG-qbot.md` | QBot 独立版本日志（`release-log.py --app qbot` 的权威来源） | ⬜ 待建（首个版本发版前创建） |
+| `qbot-app/build.gradle.kts` | 版本推导须为 `git describe --match "qbot-v[0-9]*"`，versionCode 用**独立的 `0.0.1` 递增公式**（不与主应用 `0.0.0.x` 号段混算） | ⬜ 待建（随模块一起落地） |
+| release workflow | versionCode 单调校验需**按 app 隔离** | ⬜ 待建 |
 
-> 这三项是**打 Tag 发版的必要前置**，不完成则 QBot 无法合规发版（详见 AGENTS 发版流程与 [docs/ci-release.md](file:///workspace/docs/ci-release.md)）。
+> 上述"待建"项均随 `:qbot-app` 模块落地一并完成；在此之前 QBot 无法合规发版。
+> 完整发版规则见 AGENTS「发版流程」与 [docs/ci-release.md](file:///workspace/docs/ci-release.md)。
 
 > 注意：MiniMe Logs 目前采用**硬编码** `versionCode/versionName`（`8` / `"0.0.8"`），本案**不沿用**该做法——AGENTS 要求版本以 Git Tag 为唯一事实源，硬编码易忘记递增。
 

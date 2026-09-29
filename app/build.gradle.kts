@@ -39,9 +39,13 @@ val BASE_VERSION = "0.0.1"
 //   匹配四段 tag：正式 "0.0.0.1"、"0.0.0.1-rcN"；以及 tag 后的日常提交
 //   "0.0.0.1-rcN-<n>-g<hash>[dirty]" → "0.0.0.1-rcN-dev.<n>+<hash>[dirty]"。
 //   其余（旧三段 tag 如 1.x / 0.6.0-rc 等、无 v 前缀、无 git）一律 fallback，防版本号回跳。
+//   【必须 --match "v[0-9]*"】git describe 默认不区分 tag 来源、只取「最近任意 tag」，
+//   仓库内其它应用（logviewer-v* / qbot-v*）的 tag 一旦成为最近 tag，本函数正则即失配、
+//   版本号被静默降级为 dev 值（versionCode 同时从 tag 公式退化为提交数公式，破坏单调性）。
+//   加 --match 把候选限定为主应用自己的 v<数字>* tag，隔离其它应用的 tag 命名空间。
 fun gitVersionName(): String = try {
     val process = Runtime.getRuntime().exec(
-        arrayOf("git", "describe", "--tags", "--always", "--dirty"),
+        arrayOf("git", "describe", "--tags", "--always", "--dirty", "--match", "v[0-9]*"),
         null,
         rootProject.projectDir
     )
@@ -74,10 +78,11 @@ fun gitVersionName(): String = try {
 // 提交数回退会导致新版本 versionCode < 旧版、Android 升级判定失效。现改为 tag 驱动，与提交历史
 // 解耦——历史可随时压缩/重写，versionCode 依然单调。
 // 无 tag（dev 构建 / 旧三段 tag / 无 git 环境）时回退 BASE + 提交数（dev 包不发布，仅保证可覆盖安装）。
+// 与 gitVersionName 同样必须 --match "v[0-9]*"（原因见上），否则其它应用的 tag 会劫持这里的解析。
 // CI 额外校验 versionCode 单调（见 .github/workflows/android-release.yml），映射规则与本函数一致。
 fun gitVersionCode(): Int = try {
     val describeProcess = Runtime.getRuntime().exec(
-        arrayOf("git", "describe", "--tags", "--always", "--dirty"),
+        arrayOf("git", "describe", "--tags", "--always", "--dirty", "--match", "v[0-9]*"),
         null,
         rootProject.projectDir
     )
