@@ -546,6 +546,7 @@ UI 纪律（沿用主应用规范）：
 - **运行位置**：PRoot 容器内，伪 root（`proot -0`）执行，工作目录即协议端数据目录。
 - **硬链接仿真（必须）**：PRoot 调用固定带 `--link2symlink`。Android 上客户机内的 `link()` 会失败（EACCES），而 dpkg 安装 `.deb` 时必须为「被替换的旧文件」和 dpkg status 创建**备份硬链接**，缺失该扩展会在解包阶段中断（`unable to make backup link ... Permission denied`）。启用后 proot 把客户机硬链接仿真为符号链接（proot-distro 在 Android 上安装 Debian/Ubuntu 包的默认做法）。见 `QBotContainerExecutor.buildBaseArgv`。
 - **dpkg 中断自愈**：供给脚本在安装依赖前先执行 `dpkg --configure -a`（忽略退出码），修复上一次供给失败可能留下的半解包「已中断」状态，避免后续 `apt-get install` 被直接拒绝。
+- **刻意排除 `ca-certificates`（及其唯一依赖 `openssl`）**：该包 postinst 会在 PRoot 伪 root 客户机内重建 `/etc/ssl/certs` 信任库而失败，使**整批** `apt-get install` 返回非零、首次供给中断。已用 `dpkg-deb -f Depends` 核对：离线闭包内无任何包依赖它。容器内 TLS 由协议端（Node 内置根证书）与 QQ（Chromium 内置根证书）各自满足；回退路径的 `curl` 亦固定带 `-k`，不依赖系统 CA。
 - **契约**（环境变量，由 `QBotProtocolProcessManager` 注入，勿随意更改）：`QBOT_DATA_DIR` / `QBOT_ONEBOT_PORT` / `QBOT_ONEBOT_TOKEN` / `QBOT_WEBUI_PORT` / `QBOT_WEBUI_TOKEN` / `QBOT_APT_MIRROR`。
 - **进度契约**：脚本每阶段开始时输出 `[qbot-step] i/n 说明`，`QBotProtocolProcessManager` 解析为 `QBotProvisionProgress` 驱动登录页确定进度条；`QBotContainerExecutor.exec` 的 `onLine` 回调使脚本输出**逐行实时**进入日志总线。调整阶段须同步维护 `n` 并保持格式一致。
 - **幂等**：成功完成后写出 `$QBOT_DATA_DIR/.provisioned`（内容为 `PROVISION_VERSION`），该版本号须与 `QBotProtocolProcessManager.PROVISION_VERSION` **严格一致**；调用方据此跳过重复供给。

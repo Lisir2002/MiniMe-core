@@ -62,10 +62,15 @@ NAPCAT_URL = "https://github.com/NapNeko/NapCatQQ/releases/latest/download/NapCa
 # 目标包集合：与 provision-protocol.sh 的「联网回退」分支一致，但**不含 g++ / libc6-dev**——
 # 协议端启动器改为随包预编译 .so（见 launcher 一节），容器内不再需要编译器与头文件。
 #   xvfb/xauth/xdg-utils：无显示环境启动 QQ（Electron）
-#   curl/ca-certificates/zip/unzip/xz-utils/jq/procps：解压与进程管理
+#   curl/zip/unzip/xz-utils/jq/procps：解压与进程管理
 #   其余图形/音频库：QQ（Electron）运行所需
+#
+# **刻意不含 ca-certificates（及其唯一依赖 openssl）**：该包的 postinst 会在 PRoot 伪 root
+# 客户机内失败（生成/重建 /etc/ssl/certs 信任库那一步），使整批 apt install 返回非零，
+# 首次供给因此中断。已用 `dpkg-deb -f Depends` 逐个核对：池中**没有任何包依赖它**，故整体移除；
+# 容器内 TLS 由协议端（Node 内置根证书）与 QQ（Chromium 内置根证书）各自满足，不受影响。
 APT_TARGETS = [
-    "curl", "ca-certificates", "zip", "unzip", "jq", "xz-utils", "procps",
+    "curl", "zip", "unzip", "jq", "xz-utils", "procps",
     "xvfb", "xauth", "xdg-utils",
     "libgtk-3-0", "libnotify4", "libnss3", "libxss1", "libxtst6",
     "libatspi2.0-0", "libuuid1", "libsecret-1-0", "libappindicator3-1",
