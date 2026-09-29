@@ -1,9 +1,17 @@
 # MiniMe-QBot 附属应用设计文档（第一阶段：登录）
 
-> 文档版本：v1.3
-> 状态：设计阶段（第一阶段进行中：`:qbot-app` 最小骨架已落地，登录链路未实现）
+> 文档版本：v1.4
+> 状态：**部分落地**（第一阶段登录链路代码已落地，真机 V1/V2/V3 待实测）
 > 最后更新：2026-09-29
 > 替代关系：本文档**全面替代**已废弃的 `qq-bot-integration-design.md`（旧方案为 LLBot + OneBot 11 反向 WS 嵌入主应用容器，整体舍弃）
+
+**落地进度**
+
+| 阶段 | 状态 | 说明 |
+|------|------|------|
+| 第一阶段：登录 | **代码已落地** | 运行环境安装、NapCat 供给与进程管理、OneBot 11 客户端、二维码获取、登录状态机、登录态加密持久化、前台服务保活、单页登录屏 UI 均已完成；`./gradlew :qbot-app:assembleDebug` 通过 |
+| 第一阶段待闭环 | 待实测 | §十一 V1（PRoot 内 NapCat + 官方 QQ 客户端可登录）、V2（国产 ROM 后台存活率）、V3（首次初始化耗时/体积）只能由真机验证关闭 |
+| 第二～五阶段 | 未开始 | 见 §九 |
 
 **应用标识**
 
@@ -190,7 +198,7 @@ arrayOf("git", "describe", "--tags", "--always", "--dirty")
 | 日志层 | 构建期 Copy 主应用日志层 11 个文件到 generated sourceSet（主应用只读、零改动）；Copy 任务后追加清单校验，缺失即 `GradleException` 并列出缺失项 |
 | 应用骨架 | `QBotApplication`（Hilt 入口）+ `MainActivity`（`@AndroidEntryPoint`）+ `LoginScreen` 占位页；文案走 `strings.xml` 中英双份 |
 
-> 尚未实现（第一阶段后续）：运行时（PRoot + rootfs）、协议端（NapCat）、登录状态机、二维码、前台服务与保活。
+> 上述骨架之上的第一阶段登录链路**已全部落地**（运行时 / 协议端 / 登录状态机 / 二维码 / 前台服务与保活），实际文件清单与供给脚本说明见 §八。
 
 > 注意：MiniMe Logs 目前采用**硬编码** `versionCode/versionName`（`8` / `"0.0.8"`），本案**不沿用**该做法——AGENTS 要求版本以 Git Tag 为唯一事实源，硬编码易忘记递增。
 
@@ -479,6 +487,30 @@ UI 纪律（沿用主应用规范）：
 已在 `settings.gradle.kts` 的 `include(...)` 中登记 `:qbot-app`（与 `:logviewer-app` 同级，见 [settings.gradle.kts](file:///workspace/settings.gradle.kts#L44-L49)）。
 
 命名纪律：统一 MiniMecore 命名体系；release 签名 secrets 不入库（吸取 `:logviewer-app` 明文密码的教训）。
+
+### 8.1 第一阶段登录落地结构（已完成）
+
+实际落地文件与职责（`qbot-app/src/main/java/com/mini/qbot/`）：
+
+| 包 | 文件 | 职责 |
+|----|------|------|
+| `runtime/` | `QBotRuntimePaths` / `QBotRuntimeState` / `QBotRuntimeInstaller` / `QBotContainerExecutor` | 资产安装（PRoot + Alpine rootfs）、容器内命令执行；协议端数据目录持久映射为容器内 `/root/qbot`，rootfs 重装不丢登录态 |
+| `protocol/` | `QBotProtocolConfig` / `QBotProtocolProcessManager` / `OneBotClient` / `QBotQrCodeSource` | 协议端配置（端口 / token，端口冲突自动后探）、NapCat 幂等供给与进程守护（退避重启上限 5 次）、OneBot 11 接口调用、二维码获取（原生接口优先、日志解析兜底） |
+| `login/` | `QBotLoginState` / `QBotLoginRepository` / `QBotLoginCoordinator` | 登录状态机、登录态加密持久化、登录链路编排（免扫码恢复、掉线监控与恢复） |
+| `security/` | `QBotSecretStore` | 自建 Keystore 字段级加密（alias `minime_qbot_master_key`，与主应用密钥严格隔离） |
+| `service/` | `QBotLoginService` | 前台服务保活（常驻通知 + WakeLock + `START_STICKY`），驱动登录协调器 |
+| `ui/` | `QBotLoginViewModel` / `LoginScreen` | 单页登录屏（顶部状态条 + 随状态切换的主区 + 可折叠日志区），文案走 `strings.xml` 中英双份 |
+
+> 启动时机：登录宿主前台服务仅由用户动作触发（「初始化运行环境 / 启动登录 / 重试」按钮经 `MainActivity` 拉起），不在应用打开时自动下载运行时。
+
+### 8.2 协议端供给脚本（新增资产）
+
+- **位置**：`qbot-app/src/main/assets/qbot/provision-protocol.sh`；运行时由 `QBotRuntimeInstaller` 提取到协议端数据目录，经 `proot -b` 映射为容器内可见。
+- **运行位置**：PRoot 容器内，伪 root（`proot -0`）执行，工作目录即协议端数据目录。
+- **契约**（环境变量，由 `QBotProtocolProcessManager` 注入，勿随意更改）：`QBOT_DATA_DIR` / `QBOT_ONEBOT_PORT` / `QBOT_ONEBOT_TOKEN` / `QBOT_WEBUI_PORT` / `QBOT_WEBUI_TOKEN` / `QBOT_ALPINE_MIRROR`。
+- **幂等**：成功完成后写出 `$QBOT_DATA_DIR/.provisioned`（内容为 `PROVISION_VERSION`），该版本号须与 `QBotProtocolProcessManager.PROVISION_VERSION` **严格一致**；调用方据此跳过重复供给。
+- **目录约定**（登录链路依赖，勿改）：`napcat/`（NapCat 工作目录）、`napcat/cache/qrcode.png`（扫码二维码落盘位置）、`napcat/config/onebot11.json`（OneBot 配置）。
+- **不确定性**：脚本依赖 NapCat 与官方 QQ Linux arm64 客户端（§11 V1）。若真机验证发现安装 / 启动方式变化，只需修订本脚本，代码侧契约不变。
 
 ---
 
