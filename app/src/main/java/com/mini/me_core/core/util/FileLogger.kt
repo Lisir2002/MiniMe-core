@@ -1,15 +1,12 @@
 package com.mini.me_core.core.util
 
-import android.Manifest
 import android.content.ContentValues
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
-import androidx.core.content.ContextCompat
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileInputStream
@@ -68,7 +65,25 @@ object FileLogger : Logger {
     }
 
     // ── 写入管线状态（仅在 ioExecutor 线程内读写；currentWriter/currentFile 用 @Volatile 供 flush() 读） ──
+
+    /**
+     * 待落盘行队列。⚠️ **有界**（审计 G2）：无界队列在 IO 阻塞 / 日志洪水时会无限增长直至 OOM。
+     * 超过 [MAX_PENDING_LINES] 时新行被丢弃并累加 [droppedLines]，进程恢复后由 ioExecutor 补一条汇总提示。
+     * 取舍：宁可丢日志也不崩应用。
+     */
     private val pending = java.util.concurrent.ConcurrentLinkedQueue<String>()
+
+    private const val MAX_PENDING_LINES = 8192
+
+    /** 因队列满被丢弃的行数（供诊断）。 */
+    private val droppedLines = java.util.concurrent.atomic.AtomicLong(0)
+
+    /**
+     * 单飞行标志（审计 G1）：每写一行都 `ioExecutor.execute { processQueue() }` 会向线程池灌入
+     * 大量空转 Runnable（首个 drain 后其余基本只 poll 到 null）。改为「只在 false→true 时提交一次」，
+     * drain 结束再复位，同一时刻至多一个 drain 任务在跑。
+     */
+    private val drainScheduled = java.util.concurrent.atomic.AtomicBoolean(false)
 
     @Volatile
     private var logDir: File? = null
@@ -127,23 +142,9 @@ object FileLogger : Logger {
     /**
      * 解析日志目录：优先公共外部存储 `Documents/MiniMe-core/logs`（卸载后保留，需 WRITE_EXTERNAL_STORAGE
      * 权限，targetSdk=28 下可写）；权限未授予时回退外部私有目录，再回退内部存储。
+     * 规则收敛在 [LogDirResolver]（审计 M），与 [AILogger] 共用同一实现。
      */
-    @Suppress("DEPRECATION") // targetSdk=28 下 getExternalStoragePublicDirectory 仍可用且不受分区存储限制
-    private fun resolveLogDir(context: Context): File {
-        if (hasExternalStorageWrite(context)) {
-            val base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val dir = File(File(base, LogConfig.publicRootDir), LogConfig.logSubdir)
-            if (dir.exists() || dir.mkdirs()) return dir
-        }
-        // 回退：外部私有目录（卸载时清除，但无需权限）；再回退内部存储。
-        val base = context.getExternalFilesDir(null) ?: context.filesDir
-        return File(base, LogConfig.logSubdir).apply { mkdirs() }
-    }
-
-    private fun hasExternalStorageWrite(context: Context): Boolean =
-        Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
-            PackageManager.PERMISSION_GRANTED
+    private fun resolveLogDir(context: Context): File = LogDirResolver.resolve(context, LogConfig.logSubdir)
 
     // ── Logger 接口实现 ──
 
@@ -192,7 +193,11 @@ object FileLogger : Logger {
         i(tag, "$label 耗时 ${durationMs}ms")
     }
 
-    /** 主动把内存缓冲落到磁盘（异步执行并最多等待 2 秒）。退出/导出前调用以保证一致。 */
+    /** 主动把内存缓冲落到磁盘（异步执行并最多等待 2 秒）。退出/导出前调用以保证一致。
+     *
+     * ⚠️ 审计 A2：这是「写 → 读」一致性契约的入口——任何要读取 log 文件内容的动作
+     * （导出、查看、退出）都应先调用它，否则缓冲区中最近若干行不在磁盘文件里。
+     */
     fun flush() {
         val latch = CountDownLatch(1)
         ioExecutor.execute {
@@ -207,6 +212,9 @@ object FileLogger : Logger {
 
     /** 暴露日志统计（按等级 / 按 Tag）。 */
     fun getStats(): LogStats = LogStats
+
+    /** 因队列溢出被丢弃的行数（诊断用，见 G2）。 */
+    fun getDroppedLineCount(): Long = droppedLines.get()
 
     /**
      * 构建设备信息摘要字符串，供崩溃处理器在崩溃快照中附加。
@@ -233,14 +241,22 @@ object FileLogger : Logger {
      *   - API 29+：MediaStore.Downloads 集合（免权限，文件管理器可见）；
      *   - API <29：legacy 公共 Download 目录（需 WRITE_EXTERNAL_STORAGE）。
      * [extraFile] 可附带一个额外文件（如崩溃快照 summary），名称形如 `crash-xxx.log`。
+     * ⚠️ 附带内容**强制过 [LogSanitizer]**（审计 D1）：该产物会写入**公共** Downloads 目录，
+     *    而崩溃快照里含完整堆栈 + 设备信息，是最敏感的产物；过去这条支线绕过了脱敏，
+     *    与"落盘必脱敏"策略矛盾，这里补齐。
      * 返回导出成功的文件名列表；无日志且无额外文件时返回空列表。调用方负责捕获异常。
      *
      * 日志文件采用 **8KB 流式复制**，不再 readText 全量读入内存，避免低端设备 OOM。
+     *
+     * ⚠️ 导出前先 [flush]（审计 A2）：导出复制的是**磁盘文件**，缓冲区中未落盘的
+     *    「最近若干行」不会出现在导出结果里；崩溃前最后几行恰恰最要紧。故先 flush 再读。
      */
     fun exportLogsToDownloads(
         context: Context,
         extraFile: Pair<String, String>? = null
     ): List<String> {
+        // 一致性契约：任何"读走 log 文件内容"的动作前先 flush（见 flush() 注释）。
+        flush()
         val exported = mutableListOf<String>()
         for (file in listLogFiles()) {
             val ok = publishToPublic(context, file.name) { out ->
@@ -249,8 +265,9 @@ object FileLogger : Logger {
             if (ok) exported.add(file.name)
         }
         if (extraFile != null) {
+            val safeBody = sanitizeText(extraFile.second)
             val ok = publishToPublic(context, extraFile.first) { out ->
-                out.write(extraFile.second.toByteArray(Charsets.UTF_8))
+                out.write(safeBody.toByteArray(Charsets.UTF_8))
             }
             if (ok) exported.add(extraFile.first)
         }
@@ -295,7 +312,7 @@ object FileLogger : Logger {
 
     @Suppress("DEPRECATION") // targetSdk=28 下 getExternalStoragePublicDirectory 仍可用
     private fun publishViaLegacyFile(context: Context, name: String, block: (OutputStream) -> Unit) {
-        if (!hasExternalStorageWrite(context)) throw IllegalStateException("未授予存储权限")
+        if (!LogDirResolver.hasExternalStorageWritePermission(context)) throw IllegalStateException("未授予存储权限")
         val base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         val dir = File(File(base, LogConfig.publicRootDir), LogConfig.logSubdir)
         if (!dir.exists() && !dir.mkdirs()) throw IllegalStateException("无法创建导出目录")
@@ -310,9 +327,16 @@ object FileLogger : Logger {
      * 会因进程被杀而全部丢失（这正是用户说「闪退拿不到日志」的根因），因此 CrashHandler
      * 必须绕过异步，保证 CRASH 记录在 return 前已经 fsync-ish 落盘。
      * 写入前同样经过脱敏；文件不存在 / 为空时先写格式头。
+     *
+     * ⚠️ **单写者（审计 E2）**：`flushSync` 与常驻 [currentWriter] 会写同一文件。
+     * 若各自持流，两个文件位置会互相覆盖 / 留空洞（进程在"已停止运行"弹窗期间并不立即死，
+     * 足够让后续 flush 把紧急那行冲掉）。故这里**先关闭常驻 writer**（同步 flush + close，
+     * 让本次独占该文件），写完再用一个 append 流补齐，最后置空 writer 交由下次 enqueue 重建。
      */
     fun flushSync(level: String, tag: String, message: String, throwable: Throwable?) {
         val dir = logDir ?: return
+        // 1) 先接管：同步关掉常驻 writer，避免与下面的写入并发同一个文件（单写者）。
+        closeWriterSync()
         val now = Instant.now()
         val today = fileNameFormat.format(now)
         val threadName = Thread.currentThread().name
@@ -328,9 +352,12 @@ object FileLogger : Logger {
         runCatching { LogLevel.valueOf(level) }.getOrNull()?.let { LogStats.increment(it, tag) }
         runCatching {
             val file = File(dir, "log-$today.txt")
+            // E3：exists() 必须在开流之前判断——FileOutputStream(append=true) 会先创建文件，
+            //     开流后再 exists() 恒为真，格式头逻辑形同虚设。
+            val needHeader = !file.exists() || file.length() == 0L
             FileOutputStream(file, true).use { fos ->
                 OutputStreamWriter(fos, Charsets.UTF_8).use { writer ->
-                    if (!file.exists() || file.length() == 0L) {
+                    if (needHeader) {
                         writer.write(headerText())
                     }
                     writer.write(line)
@@ -345,42 +372,98 @@ object FileLogger : Logger {
         }
     }
 
-    /** 返回当前所有日志文件（含滚动 .1/.2），按文件名（即日期）排序，供"查看日志"等界面使用。 */
+    /** 同步关闭常驻 writer（供 [flushSync] 在接管写权前调用）。 */
+    private fun closeWriterSync() {
+        val w = currentWriter
+        currentWriter = null
+        currentFile = null
+        bufferedBytes = 0L
+        runCatching { w?.flush(); w?.close() }
+    }
+
+    /**
+     * 返回当前所有日志文件（含滚动 .1/.2），按 `(日期, 滚动序号)` 排序（审计 L4），
+     * 供"查看日志"等界面使用。
+     *
+     * ⚠️ 读前先 [flush]（审计 A2）：否则刚刚产生、仍在缓冲区里的行不在文件中，查看时会"看不到最新日志"。
+     */
     fun listLogFiles(): List<File> {
+        flush()
         val dir = logDir ?: return emptyList()
-        return dir.listFiles { f -> f.isFile && f.name.startsWith("log-") && f.name.endsWith(".txt") }
-            ?.sortedBy { it.name }
-            ?: emptyList()
+        val files = dir.listFiles { f -> f.isFile && f.name.startsWith(APP_LOG_PREFIX) && f.name.endsWith(".txt") }
+            ?.toList()
+            ?: return emptyList()
+        return LogFiles.sortAppLogFiles(files)
     }
 
     // ── 内存缓冲 + 批量写入（仅 ioExecutor 线程内执行） ──
 
-    /** 调用线程侧：构建一行（含线程名 + 脱敏 + 堆栈），投递到队列并触发一次消费。 */
+    /**
+     * 调用线程侧：只做**廉价**的等级判定 + 入队原始数据；字符串拼接与脱敏
+     * （6 个正则，见 [LogSanitizer]）全部下沉到 ioExecutor（审计 G3），避免主线程 /
+     * OkHttp 线程承担逐行正则扫描。throwable 立即拍快照（`stackTraceToString`），
+     * 避免延迟到 IO 线程时其内部状态已变化。
+     */
     private fun enqueue(levelEnum: LogLevel, level: String, tag: String, message: String, throwable: Throwable?) {
         if (logDir == null) return // 未初始化则只走 logcat，不落盘
-        val now = Instant.now()
-        val threadName = Thread.currentThread().name
-        val safeMessage = sanitizeText(message)
-        val safeStack = throwable?.let { sanitizeText(stackTraceToString(it)) }
-        val line = buildString {
-            append(timestampFormat.format(now)).append(' ').append(level)
-            append(" [").append(tag).append("]")
-            append(" [thread:").append(threadName).append("] ").append(safeMessage)
-            if (safeStack != null) append('\n').append(safeStack)
-            append('\n')
+        if (pending.size >= MAX_PENDING_LINES) {
+            // 背压：队列满则丢弃并计数，绝不无限增长（G2）。
+            droppedLines.incrementAndGet()
+            return
         }
+        val snapshot = throwable?.let { stackTraceToString(it) }
         LogStats.increment(levelEnum, tag)
-        pending.offer(line)
-        ioExecutor.execute { processQueue() }
+        pending.offer(QueuedLine(level, tag, message, snapshot))
+        scheduleDrain()
     }
 
-    /** ioExecutor 侧：把队列里累积的行一次性写进常驻 BufferedWriter，按需滚动/定时 flush。 */
+    /** 入队一行（供 ioExecutor 侧组装为最终文本）。 */
+    private class QueuedLine(
+        val level: String,
+        val tag: String,
+        val message: String,
+        val stack: String?,
+    )
+
+    /** 单飞行提交 drain（G1）：仅 false→true 时提交一次。 */
+    private fun scheduleDrain() {
+        if (drainScheduled.compareAndSet(false, true)) {
+            ioExecutor.execute {
+                try {
+                    processQueue()
+                } finally {
+                    drainScheduled.set(false)
+                    // 提交与复位之间可能有新行入队而错过了提交，这里补一次。
+                    if (!pending.isEmpty() && drainScheduled.compareAndSet(false, true)) {
+                        ioExecutor.execute { try { processQueue() } finally { drainScheduled.set(false) } }
+                    }
+                }
+            }
+        }
+    }
+
+    /** ioExecutor 侧：把队列里累积的行组装 + 脱敏后一次性写进常驻 BufferedWriter。 */
     private fun processQueue() {
         val dir = logDir ?: return
         val sb = StringBuilder()
         while (true) {
-            val line = pending.poll() ?: break
-            sb.append(line)
+            val q = pending.poll() ?: break
+            // G3：字符串拼接 + 脱敏在 IO 线程执行（已不阻塞调用线程）。
+            val now = Instant.now()
+            val threadName = Thread.currentThread().name
+            val safeMessage = sanitizeText(q.message)
+            val safeStack = q.stack?.let { sanitizeText(it) }
+            sb.append(timestampFormat.format(now)).append(' ').append(q.level)
+            sb.append(" [").append(q.tag).append("]")
+            sb.append(" [thread:").append(threadName).append("] ").append(safeMessage)
+            if (safeStack != null) sb.append('\n').append(safeStack)
+            sb.append('\n')
+        }
+        // 补一条丢弃汇总（G2），让"丢日志"可见而非静默。
+        val dropped = droppedLines.getAndSet(0)
+        if (dropped > 0) {
+            sb.append(timestampFormat.format(Instant.now()))
+                .append(" WARN [FileLogger] [thread:file-logger] 日志队列溢出，已丢弃 ").append(dropped).append(" 行\n")
         }
         if (sb.isEmpty()) return
         runCatching {
@@ -395,8 +478,10 @@ object FileLogger : Logger {
                 openLogFile(dir, today)
             }
             // 写这批会让文件超限 → 先滚动再写。
+            // G4：计入 bufferedBytes——磁盘 length 不含 BufferedWriter 中未 flush 的部分，
+            //     只比 length 会让实际文件比阈值大出一个缓冲区字节数。
             val current = currentFile ?: return@runCatching
-            if (current.length() + sb.length > LogConfig.maxFileBytes) {
+            if (current.length() + bufferedBytes + sb.length > LogConfig.maxFileBytes) {
                 rotateAndReopen(dir, today)
             }
             currentWriter?.write(sb.toString())
@@ -412,6 +497,7 @@ object FileLogger : Logger {
     /** 打开（或追加）当天日志文件；文件不存在 / 为空时先写格式头。仅 ioExecutor 线程调用。 */
     private fun openLogFile(dir: File, today: String) {
         val file = File(dir, "log-$today.txt")
+        // E3：exists()/length() 必须在开流之前判断（开流后文件已被创建，exists() 恒真）。
         val needHeader = !file.exists() || file.length() == 0L
         val writer = BufferedWriter(
             OutputStreamWriter(FileOutputStream(file, true), Charsets.UTF_8),
@@ -474,13 +560,6 @@ object FileLogger : Logger {
         return sw.toString().trimEnd()
     }
 
-    /** 删除超过 [LogConfig.maxAgeDays] 天的日志文件（含滚动文件）。 */
-    private fun cleanupOldLogs(dir: File) {
-        val cutoff = System.currentTimeMillis() - LogConfig.maxAgeDays * 24L * 60 * 60 * 1000
-        dir.listFiles { f -> f.isFile && f.name.startsWith("log-") && f.name.endsWith(".txt") }?.forEach { file ->
-            if (file.lastModified() < cutoff) {
-                runCatching { file.delete() }
-            }
-        }
-    }
+    /** 删除超过 [LogConfig.maxAgeDays] 天的日志文件（含滚动文件）。规则收敛于 [DiagnosticCleanup]。 */
+    private fun cleanupOldLogs(dir: File) = DiagnosticCleanup.cleanupAppLogs(dir)
 }

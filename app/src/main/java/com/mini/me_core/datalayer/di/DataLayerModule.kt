@@ -200,11 +200,25 @@ object DataLayerModule {
         val openGuard: (LibName, () -> app.cash.sqldelight.db.SqlDriver) -> app.cash.sqldelight.db.SqlDriver =
             { lib, open -> engine.withSnapshotGuard(lib) { open() } }
 
+        // A1：慢查询监控接线。过去 MonitoringDriverWrapper 全仓无注入点 → 采集链路整体悬空。
+        // 这里在自愈完成后（onOpened 之后、写缓存之前）按需包装 driver，把每次 execute/executeQuery 的
+        // 耗时上报 QueryPerformanceMonitor。开关与 QueryPerformanceMonitor.enabled 一致，
+        // release 下可由上层置 false 关闭（零开销）。
+        val wrapDriver: (LibName, app.cash.sqldelight.db.SqlDriver) -> app.cash.sqldelight.db.SqlDriver =
+            { lib, driver ->
+                if (QueryPerformanceMonitor.enabled) {
+                    com.mini.me_core.datalayer.monitor.MonitoringDriverWrapper(driver, lib.dbId)
+                } else {
+                    driver
+                }
+            }
+
         return ConnectionPool(
             encryptedManager = encryptedManager,
             onPreOpen = preOpenHook,
             onOpened = hook,
             openGuard = openGuard,
+            wrapDriver = wrapDriver,
         )
     }
 

@@ -51,6 +51,14 @@ class MiniMeCore : Application() {
         /** 上次运行触发内存临界（RUNNING_CRITICAL/lowMemory）的时间戳，供下次启动诊断「无日志闪退」。 */
         const val KEY_LAST_TRIM_CRITICAL = "last_trim_critical_ms"
 
+        /** 启动自动导出日志到公共目录的节流窗口（审计 F1）：12h 内最多导出一次。 */
+        const val KEY_LAST_LOG_EXPORT = "last_log_export_ms"
+        const val LOG_EXPORT_THROTTLE_MS = 12L * 60 * 60 * 1000
+
+        /** 崩溃遗留的待导出标记（审计 E1）：崩溃时轻量落盘，下次启动补导出。 */
+        const val KEY_PENDING_CRASH_EXPORT_STAMP = "pending_crash_export_stamp"
+        const val KEY_PENDING_CRASH_EXPORT_BODY = "pending_crash_export_body"
+
         /**
          * 启动预热 AGENT 库是否已成功完成（崩溃快照指纹）。崩溃快照首行输出该标记：
          *  - `true` = 本进程已执行过 AGENT 库结构自愈/对齐，若此刻仍出现 `no such column`，
@@ -241,9 +249,11 @@ class MiniMeCore : Application() {
             }.onFailure { FileLogger.w(TAG, "内置文档/提示词提取失败", it) }
             FileLogger.v(TAG, "异步预热：文档/提示词提取完成")
         }
-        // 上一轮日志导出到公共目录（解决"闪退时来不及导出"的盲区）
+        // 上一轮日志导出到公共目录（审计 F1）：**不再每次冷启动无条件全量导出**——
+        // 那会让每次启动都重复搬运数十 MB 日志到 MediaStore，且同名 insert 会无限堆副本。
+        // 改为节流：距上次成功导出 > EXPORT_THROTTLE_MS 才导一次；崩溃与手动导出仍按需立即执行。
         appScope.launch {
-            runCatching { FileLogger.exportLogsToDownloads(this@MiniMeCore) }
+            runCatching { maybeExportLogsThrottled() }
                 .onFailure { FileLogger.w(TAG, "启动时自动导出日志到公共目录失败（忽略，私有日志仍在）", it) }
             FileLogger.v(TAG, "异步预热：上一轮日志导出完成")
         }
@@ -288,9 +298,10 @@ class MiniMeCore : Application() {
                 .onFailure { FileLogger.w(TAG, "上次退出诊断异常（忽略，不影响启动）", it) }
             FileLogger.v(TAG, "异步预热：上次退出诊断完成")
         }
-        // 日志等级持久化同步（唯一同步点）
+        // 日志等级持久化同步（唯一同步点）：同时下发到 FileLogger 与 AILogger（审计 H1），
+        // 保证「用户调级」对体量最大的 AI 会话日志同样生效，口径一致。
         appScope.launch {
-            logSettings.levelFlow.collectLatest { FileLogger.setMinLevel(it) }
+            logSettings.levelFlow.collectLatest { com.mini.me_core.core.util.LogLevelController.apply(it) }
         }
         // ============== RC61b 修正：首帧优先，延后重活 + 严格异常/超时隔离 ==============
         // 冷启动时把「加载执行模式 → 建立 SSH 连接」延后 500ms，
@@ -465,10 +476,11 @@ class MiniMeCore : Application() {
             }.onFailure {
                 android.util.Log.e("CRASH", "崩溃报告写入失败（忽略）", it)
             }
-            // Step 2.5: 崩溃日志同步导出到公共外部存储 Download/MiniMe-core/logs/。
-            //   私有目录（Android/data/...）在 Android 11+ 文件管理器不可见，用户拿不到日志；
-            //   这里把全部日志 + 一份带时间戳的崩溃快照写进公共 Downloads（API 29+ MediaStore 免权限），
-            //   保证闪退后用户/开发者能在文件管理器直接定位崩溃栈。
+            // Step 2.5（审计 E1）：崩溃处理器**不做重 IO**。
+            //   过去在此同步把全部日志 + 崩溃快照写进 MediaStore（可能数十 MB），把最贵的事压在
+            //   系统杀进程前的时间窗里，轻则卡死数秒、重则触发 watchdog。现在只落一个**轻量标记**
+            //   （快照文本本身很小，仍随标记一并落盘），真正的公共目录导出推迟到**下次启动**在后台补做。
+            //   证据不丢：CRASH 行已由 Step 2 的 flushSync 同步保底，崩溃报告已由 CrashReporter 落盘。
             runCatching {
                 val stamp = java.time.Instant.now().toString().replace(":", "-")
                 val snapshot = buildString {
@@ -484,9 +496,9 @@ class MiniMeCore : Application() {
                     append("=".repeat(60)).append('\n')
                     append("日志已同步落盘到私有目录，本快照用于快速定位。完整日志见同目录 log-*.txt。\n")
                 }
-                FileLogger.exportLogsToDownloads(this@MiniMeCore, "crash-$stamp.log" to snapshot)
+                markPendingExport(stamp, snapshot)
             }.onFailure {
-                android.util.Log.e("CRASH", "⚠️ 崩溃日志导出到公共目录失败，仍保留私有日志", it)
+                android.util.Log.e("CRASH", "⚠️ 崩溃待导出标记写入失败，仍保留私有日志", it)
             }
             // Step 3: 交给系统原处理器（弹出"应用已停止运行"弹窗 + 收集 dropbox，最终杀进程）
             runCatching {
@@ -582,11 +594,57 @@ class MiniMeCore : Application() {
                     TAG,
                     "预防闸门：上次运行 ${agoMin} 分钟前曾触发内存临界（RUNNING_CRITICAL/lowMemory），" +
                         "进程可能已被系统静默回收（LMKD 杀无 Java 日志）；" +
-                        "排查见 Download/MiniMe-core/logs/（本次启动已自动导出）"
+                        "排查见 Download/MiniMe-core/logs/ 或应用内日志查看页"
                 )
             }
         }
         diagPrefs().edit().remove(KEY_LAST_TRIM_CRITICAL).apply()
+    }
+
+    /**
+     * 节流导出日志到公共目录（审计 F1）。
+     *
+     * 过去每次冷启动都会无条件全量导出所有日志到 MediaStore——日志达数十 MB 时每次启动白跑一遍重 IO，
+     * 且同名 insert 会被系统重命名堆出无限副本。这里改为：距上次成功导出 > [LOG_EXPORT_THROTTLE_MS]
+     * 才导一次；崩溃导出（[installCrashHandler]）与手动导出（日志查看页）仍按需立即执行。
+     * 另：若上次崩溃留下了待导出标记（[markPendingExport]），这里**优先立即**补导出（跳过节流）。
+     */
+    private fun maybeExportLogsThrottled() {
+        val prefs = diagPrefs()
+        // 崩溃遗留的待导出：不节流，立即补（这就是 E1 推迟到启动期的那件重活）。
+        val pendingStamp = prefs.getString(KEY_PENDING_CRASH_EXPORT_STAMP, null)
+        if (pendingStamp != null) {
+            val body = prefs.getString(KEY_PENDING_CRASH_EXPORT_BODY, "") ?: ""
+            runCatching {
+                FileLogger.exportLogsToDownloads(this, "crash-$pendingStamp.log" to body)
+            }.onSuccess {
+                prefs.edit().remove(KEY_PENDING_CRASH_EXPORT_STAMP).remove(KEY_PENDING_CRASH_EXPORT_BODY).apply()
+                FileLogger.i(TAG, "上次崩溃的日志已补导出到公共目录（stamp=$pendingStamp）")
+            }.onFailure {
+                FileLogger.w(TAG, "上次崩溃日志补导出失败，保留标记下次再试", it)
+            }
+        }
+        val last = prefs.getLong(KEY_LAST_LOG_EXPORT, 0L)
+        val now = System.currentTimeMillis()
+        if (last > 0L && now - last < LOG_EXPORT_THROTTLE_MS) {
+            FileLogger.v(TAG, "跳过启动日志导出（距上次 ${(now - last) / 60_000} 分钟，未超节流窗口）")
+            return
+        }
+        val exported = FileLogger.exportLogsToDownloads(this)
+        if (exported.isNotEmpty()) {
+            prefs.edit().putLong(KEY_LAST_LOG_EXPORT, now).apply()
+        }
+    }
+
+    /**
+     * 崩溃处理器专用：把「待导出」标记与崩溃快照文本落进 SharedPreferences（极轻量，无 MediaStore IO）。
+     * 下次启动由 [maybeExportLogsThrottled] 优先补导出（审计 E1）。
+     */
+    private fun markPendingExport(stamp: String, snapshot: String) {
+        diagPrefs().edit()
+            .putString(KEY_PENDING_CRASH_EXPORT_STAMP, stamp)
+            .putString(KEY_PENDING_CRASH_EXPORT_BODY, snapshot)
+            .apply()
     }
 
     private fun diagPrefs(): SharedPreferences = getSharedPreferences(DIAG_PREFS, MODE_PRIVATE)

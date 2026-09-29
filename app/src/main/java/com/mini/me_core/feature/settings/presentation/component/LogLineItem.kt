@@ -66,44 +66,18 @@ sealed interface LogListItem {
 /**
  * 把扁平的日志行列表聚合成「行头 + 堆栈附属行」分组。
  *
- * 能被 [LogLineParser] 解析的行作为新 Entry 的行头；紧随其后无法解析的行归入该 Entry 的堆栈。
- * 在任何行头之前出现的孤立行作为 [LogListItem.Loose] 保留。
+ * L2：聚合规则收敛到 [com.mini.me_core.core.util.LogEntryClassifier]（与 logviewer-app 共用同一真源），
+ * 这里只把共享模型映射为 Compose 侧渲染类型 [LogListItem]。
  */
-fun buildLogEntries(lines: List<String>): List<LogListItem> {
-    val items = mutableListOf<LogListItem>()
-    var currentHeader: String? = null
-    var currentParsed: ParsedLogLine? = null
-    var stack = mutableListOf<String>()
-
-    fun flush() {
-        val h = currentHeader
-        val p = currentParsed
-        if (h != null && p != null) {
-            items.add(LogListItem.Entry(h, p, stack.toList()))
+fun buildLogEntries(lines: List<String>): List<LogListItem> =
+    com.mini.me_core.core.util.LogEntryClassifier.classify(lines).map { item ->
+        when (item) {
+            is com.mini.me_core.core.util.LogEntryClassifier.Item.Head ->
+                LogListItem.Entry(item.entry.headerRaw, item.entry.parsed, item.entry.stack)
+            is com.mini.me_core.core.util.LogEntryClassifier.Item.Stray ->
+                LogListItem.Loose(item.loose.line)
         }
     }
-
-    for (line in lines) {
-        // 跳过日志文件格式头块（`# MiniMe Log Format vN` / `# app-version:` / `# pid:`）
-        if (line.isBlank()) continue
-        if (line.trimStart().startsWith("#")) continue
-        val parsed = LogLineParser.parse(line)
-        if (parsed != null) {
-            flush()
-            currentHeader = line
-            currentParsed = parsed
-            stack = mutableListOf()
-        } else {
-            if (currentHeader == null) {
-                items.add(LogListItem.Loose(line))
-            } else {
-                stack.add(line)
-            }
-        }
-    }
-    flush()
-    return items
-}
 
 /**
  * 按折叠等级把连续同等级 Entry 折叠成汇总行。

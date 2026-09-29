@@ -24,6 +24,17 @@ object LogConfig {
     /** 日志保留天数：早于该天数的文件在 init / 权限切换时删除（默认 7 天）。 */
     var maxAgeDays: Int = DEFAULT_MAX_AGE_DAYS
 
+    /**
+     * 崩溃报告保留条数（审计 F2：把原先硬编码在 CrashReporter 的常量收敛到集中配置）。
+     */
+    var maxCrashReports: Int = DEFAULT_MAX_CRASH_REPORTS
+
+    /**
+     * AILogger 常驻 writer 的空闲超时（毫秒）。超过该时长未写入的会话 writer 会被自动
+     * flush + 关闭，避免 fd / 内存随会话数单调增长（审计 H2）。
+     */
+    var aiWriterIdleTimeoutMs: Long = DEFAULT_AI_WRITER_IDLE_TIMEOUT_MS
+
     // ── 内存缓冲 / 批量 flush ──
     /** 内存缓冲累积到该字节数时触发一次批量落盘（默认 64KB）。 */
     var bufferSizeBytes: Int = DEFAULT_BUFFER_SIZE_BYTES
@@ -53,6 +64,8 @@ object LogConfig {
     const val DEFAULT_MAX_FILE_BYTES: Long = 5L * 1024 * 1024          // 5MB
     const val DEFAULT_MAX_AI_FILE_BYTES: Long = 20L * 1024 * 1024      // 20MB
     const val DEFAULT_MAX_AGE_DAYS: Int = 7
+    const val DEFAULT_MAX_CRASH_REPORTS: Int = 10
+    const val DEFAULT_AI_WRITER_IDLE_TIMEOUT_MS: Long = 5L * 60 * 1000
     const val DEFAULT_BUFFER_SIZE_BYTES: Int = 64 * 1024               // 64KB
     const val DEFAULT_FLUSH_INTERVAL_MS: Long = 500L
     const val DEFAULT_PUBLIC_ROOT_DIR: String = "MiniMe-core"
@@ -65,6 +78,8 @@ object LogConfig {
         maxFileBytes = DEFAULT_MAX_FILE_BYTES
         maxAiFileBytes = DEFAULT_MAX_AI_FILE_BYTES
         maxAgeDays = DEFAULT_MAX_AGE_DAYS
+        maxCrashReports = DEFAULT_MAX_CRASH_REPORTS
+        aiWriterIdleTimeoutMs = DEFAULT_AI_WRITER_IDLE_TIMEOUT_MS
         bufferSizeBytes = DEFAULT_BUFFER_SIZE_BYTES
         flushIntervalMs = DEFAULT_FLUSH_INTERVAL_MS
         publicRootDir = DEFAULT_PUBLIC_ROOT_DIR

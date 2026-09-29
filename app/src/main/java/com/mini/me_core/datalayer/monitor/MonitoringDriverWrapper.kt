@@ -89,8 +89,14 @@ class MonitoringDriverWrapper(
 
     /** 提取 SQL 摘要作为查询名（前 60 字符，去掉空白）。 */
     private fun summarizeSql(sql: String): String {
-        val compact = sql.replace(Regex("\\s+"), " ").trim()
+        // G3b：正则提为常量——过去每次查询都 `Regex("\\s+")`（构造即 Pattern.compile），
+        //      在 SQL 热路径上逐次编译。提到 companion 复用。
+        val compact = WHITESPACE_REGEX.replace(sql, " ").trim()
         return if (compact.length <= 60) compact else compact.substring(0, 60) + "..."
+    }
+
+    private companion object {
+        val WHITESPACE_REGEX = Regex("\\s+")
     }
 
     /** 代理 Cursor，统计 next() 调用次数。 */

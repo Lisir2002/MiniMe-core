@@ -1,5 +1,7 @@
 package com.mini.me_core.datalayer.monitor
 
+import com.mini.me_core.core.util.FileLogger
+
 /** 慢查询记录。 */
 data class SlowQueryEntry(
     val dbId: String,
@@ -37,6 +39,8 @@ data class DatabasePerformance(
  * - release 构建可通过 enabled=false 全局禁用，零开销
  */
 object QueryPerformanceMonitor {
+
+    private const val TAG = "QueryPerf"
 
     @Volatile
     var enabled: Boolean = true
@@ -99,6 +103,12 @@ object QueryPerformanceMonitor {
                     slowQueries.removeFirst()
                 }
             }
+            // 审计 K：慢查询不能只闷在内存环形缓冲里——进程一死证据全失。落一条结构化 WARN 日志，
+            // 进入可导出的日志链路，让"卡顿/慢"在日志文件里可查（tab 前缀便于过滤：grep [DIAG-SQL]）。
+            FileLogger.w(
+                TAG,
+                "[DIAG-SQL] 慢查询 ${durationMs}ms rows=$rowCount db=$dbId sql=${queryName.take(120)}",
+            )
         }
     }
 

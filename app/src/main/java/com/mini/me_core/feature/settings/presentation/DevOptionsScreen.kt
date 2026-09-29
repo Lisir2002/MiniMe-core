@@ -1006,6 +1006,12 @@ private fun DataTab(
         }
     }
 
+    // 慢查询快照（审计 A1/K）：接线后 QueryPerformanceMonitor 才真正有数据，这里给出消费出口。
+    val slowQueries = remember {
+        runCatching { com.mini.me_core.datalayer.monitor.QueryPerformanceMonitor.getSlowQueries() }
+            .getOrDefault(emptyList())
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.lg),
@@ -1052,6 +1058,39 @@ private fun DataTab(
                         style = MaterialTheme.typography.labelSmall,
                         color = colors.textTertiary,
                     )
+                }
+            }
+        }
+
+        // 慢查询（from QueryPerformanceMonitor，审计 A1）
+        item {
+            AppSectionHeader(
+                title = "慢查询（>100ms，最近 ${slowQueries.size} 条）",
+                icon = Icons.Rounded.Storage,
+            )
+            AppCard {
+                Column(modifier = Modifier.padding(Spacing.md)) {
+                    if (slowQueries.isEmpty()) {
+                        Text(
+                            text = "暂无慢查询记录（监控已启用）",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.textSecondary,
+                        )
+                    } else {
+                        slowQueries.take(20).forEach { q ->
+                            Text(
+                                text = "${q.durationMs}ms · rows=${q.rowCount} · ${q.dbId}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textPrimary,
+                            )
+                            Text(
+                                text = q.queryName,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.textSecondary,
+                            )
+                            Spacer(Modifier.height(Spacing.xs))
+                        }
+                    }
                 }
             }
         }

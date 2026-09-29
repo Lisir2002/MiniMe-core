@@ -1,11 +1,7 @@
 package com.mini.me_core.core.util
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Environment
 import android.util.Log
-import androidx.core.content.ContextCompat
 import com.google.gson.GsonBuilder
 import java.io.BufferedWriter
 import java.io.File
@@ -51,11 +47,60 @@ object AILogger {
     @Volatile
     private var logDir: File? = null
 
+    /**
+     * 最小记录等级（审计 H1）：与 [FileLogger] 共用同一上限——[LogLevelController] 在等级变更时
+     * 会同时下发到两处。级别高于静默阈值的 AI 日志不再写入，避免"用户调到 ERROR 后体量最大的
+     * AI 会话日志仍全量落盘"的口径不一致。
+     */
+    @Volatile
+    private var minLevel: LogLevel = LogLevel.VERBOSE
+
+    /** 由 [LogLevelController] 调用，与 FileLogger.setMinLevel 保持同一等级。 */
+    fun setMinLevel(level: LogLevel) {
+        minLevel = level
+    }
+
+    /** 当前是否应记录：AI 日志按 INFO 级别计（其内容价值等同信息级）。 */
+    private fun shouldLog(): Boolean = LogLevel.INFO.ordinal >= minLevel.ordinal
+
     /** 每会话的调用计数：用于把同一次交互的 REQUEST / RESPONSE 配上同一序号。 */
     private val counters = ConcurrentHashMap<String, AtomicInteger>()
 
-    /** 每会话常驻的 BufferedWriter（避免每次 open/close；活动会话数通常很少）。 */
-    private val sessionWriters = ConcurrentHashMap<String, BufferedWriter>()
+    /**
+     * 每会话常驻的 BufferedWriter（避免每次 open/close）。
+     *
+     * ⚠️ 审计 H2：entry 记录最后写入时间，空闲超过 [LogConfig.aiWriterIdleTimeoutMs] 的 writer
+     * 由 [scheduleIdleSweep] 自动 flush + 关闭并移除，避免 fd / 内存随会话数单调增长
+     * （Android 单进程 fd 上限通常 ~1024）。
+     */
+    private class SessionWriter(val writer: BufferedWriter) {
+        @Volatile var lastWriteMs: Long = System.currentTimeMillis()
+    }
+
+    private val sessionWriters = ConcurrentHashMap<String, SessionWriter>()
+
+    init {
+        // 周期性回收空闲 writer（H2）。
+        val sweep = Executors.newSingleThreadScheduledExecutor { r ->
+            Thread(r, "ai-logger-sweep").apply { isDaemon = true }
+        }
+        sweep.scheduleWithFixedDelay({
+            ioExecutor.execute { sweepIdleWriters() }
+        }, LogConfig.aiWriterIdleTimeoutMs, LogConfig.aiWriterIdleTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+    }
+
+    private fun sweepIdleWriters() {
+        val cutoff = System.currentTimeMillis() - LogConfig.aiWriterIdleTimeoutMs
+        val it = sessionWriters.entries.iterator()
+        while (it.hasNext()) {
+            val (id, sw) = it.next()
+            if (sw.lastWriteMs < cutoff) {
+                runCatching { sw.writer.flush(); sw.writer.close() }
+                it.remove()
+                counters.remove(id)
+            }
+        }
+    }
 
     /** 初始化日志目录。重复调用安全。 */
     fun init(context: Context) {
@@ -86,23 +131,9 @@ object AILogger {
     /**
      * 解析日志目录：优先公共外部存储 `Documents/MiniMe-core/ai-logs`（卸载后保留，需 WRITE_EXTERNAL_STORAGE
      * 权限，targetSdk=28 下可写）；权限未授予时回退外部私有目录，再回退内部存储。
+     * 规则收敛在 [LogDirResolver]（审计 M），与 [FileLogger] 共用同一实现。
      */
-    @Suppress("DEPRECATION") // targetSdk=28 下 getExternalStoragePublicDirectory 仍可用且不受分区存储限制
-    private fun resolveLogDir(context: Context): File {
-        if (hasExternalStorageWrite(context)) {
-            val base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val dir = File(File(base, LogConfig.publicRootDir), LogConfig.aiLogSubdir)
-            if (dir.exists() || dir.mkdirs()) return dir
-        }
-        // 回退：外部私有目录（卸载时清除，但无需权限）；再回退内部存储。
-        val base = context.getExternalFilesDir(null) ?: context.filesDir
-        return File(base, LogConfig.aiLogSubdir).apply { mkdirs() }
-    }
-
-    private fun hasExternalStorageWrite(context: Context): Boolean =
-        Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
-            PackageManager.PERMISSION_GRANTED
+    private fun resolveLogDir(context: Context): File = LogDirResolver.resolve(context, LogConfig.aiLogSubdir)
 
     /**
      * 记录一次请求的 URL 与请求体，并把本会话计数 +1（作为本次交互的序号）。
@@ -169,27 +200,31 @@ object AILogger {
         if (LogConfig.enableSanitizer) LogSanitizer.sanitize(text) else text
 
     private fun write(sessionId: String?, text: String) {
+        // H1：与 FileLogger 同口径的等级门——级别静默时不写（含体积最大的会话日志）。
+        if (!shouldLog()) return
         val dir = logDir ?: return // 未初始化则直接丢弃，避免在无目录时报错刷屏
         val safeId = (sessionId ?: "unknown").replace(Regex("[^A-Za-z0-9_-]"), "_")
-        val safeText = sanitize(text)
+        // G3：脱敏（6 个正则）下沉到 ioExecutor，避免在调用线程（OkHttp 回调）处理几十 KB 文本。
         ioExecutor.execute {
             runCatching {
+                val safeText = sanitize(text)
                 val file = File(dir, "session-$safeId.log")
                 // 即将超限 → 非破坏性滚动（关闭旧 writer，rename .1/.2...）。
                 if (file.exists() && file.length() + safeText.length > LogConfig.maxAiFileBytes) {
-                    sessionWriters.remove(safeId)?.let { runCatching { it.flush(); it.close() } }
+                    sessionWriters.remove(safeId)?.let { runCatching { it.writer.flush(); it.writer.close() } }
                     rotateSessionFile(dir, safeId)
                 }
-                val writer = sessionWriters.getOrPut(safeId) {
-                    BufferedWriter(
+                val sw = sessionWriters.getOrPut(safeId) {
+                    val w = BufferedWriter(
                         OutputStreamWriter(FileOutputStream(file, true), Charsets.UTF_8),
                         8192
-                    ).also { w ->
-                        if (!file.exists() || file.length() == 0L) w.write(aiHeaderText())
-                    }
+                    )
+                    if (!file.exists() || file.length() == 0L) w.write(aiHeaderText())
+                    SessionWriter(w)
                 }
-                writer.write(safeText)
-                writer.flush() // AI 日志块较大且重要，逐块 flush 避免大块滞留内存。
+                sw.writer.write(safeText)
+                sw.writer.flush() // AI 日志块较大且重要，逐块 flush 避免大块滞留内存。
+                sw.lastWriteMs = System.currentTimeMillis()
             }.onFailure { Log.e(TAG, "写入 AI 会话日志失败", it) }
         }
     }
@@ -210,15 +245,11 @@ object AILogger {
         "# MiniMe AI Log Format v${LogConfig.formatVersion}\n"
 
     private fun closeAllWriters() {
-        sessionWriters.values.forEach { runCatching { it.flush(); it.close() } }
+        sessionWriters.values.forEach { runCatching { it.writer.flush(); it.writer.close() } }
         sessionWriters.clear()
+        counters.clear()
     }
 
-    /** 删除超过 [LogConfig.maxAgeDays] 天未更新的会话日志文件（含滚动文件）。 */
-    private fun cleanupOldLogs(dir: File) {
-        val cutoff = System.currentTimeMillis() - LogConfig.maxAgeDays * 24L * 60 * 60 * 1000
-        dir.listFiles { f -> f.isFile && f.name.startsWith("session-") && f.name.endsWith(".log") }?.forEach { file ->
-            if (file.lastModified() < cutoff) runCatching { file.delete() }
-        }
-    }
+    /** 删除超过 [LogConfig.maxAgeDays] 天未更新的会话日志文件（含滚动文件）。规则收敛于 [DiagnosticCleanup]。 */
+    private fun cleanupOldLogs(dir: File) = DiagnosticCleanup.cleanupAiLogs(dir)
 }

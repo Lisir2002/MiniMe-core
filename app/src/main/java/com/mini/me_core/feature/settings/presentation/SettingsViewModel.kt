@@ -874,7 +874,9 @@ class SettingsViewModel @Inject constructor(
 
     /** 选择单个日志文件：作用域收窄到该文件对应的日期。 */
     fun selectSingleFile(fileName: String) {
-        val fileDate = fileName.removePrefix("log-").removeSuffix(".txt")
+        // L1：用统一解析器取逻辑日期，兼容滚动件（log-<date>.N.txt 也解析为 <date>）。
+        val fileDate = com.mini.me_core.core.util.LogFiles.parseAppLogDate(fileName)
+            ?: fileName.removePrefix("log-").removeSuffix(".txt")
         _logViewerState.update {
             it.copy(
                 dateRangeMode = DateRangeMode.SINGLE_FILE,
@@ -984,7 +986,9 @@ class SettingsViewModel @Inject constructor(
             DateRangeMode.LAST_7_DAYS -> Triple(emptySet(), fmt.format(today.minusDays(6)), fmt.format(today))
             DateRangeMode.ALL -> Triple(emptySet(), null, null)
             DateRangeMode.SINGLE_FILE -> {
-                val date = singleFileName?.removePrefix("log-")?.removeSuffix(".txt")
+                // L1：统一解析器，兼容滚动件。
+                val date = singleFileName?.let { com.mini.me_core.core.util.LogFiles.parseAppLogDate(it) }
+                    ?: singleFileName?.removePrefix("log-")?.removeSuffix(".txt")
                 Triple(date?.let { setOf(it) } ?: emptySet(), null, null)
             }
             DateRangeMode.CUSTOM -> Triple(emptySet(), null, null) // 起止由调用方写入 state
@@ -1250,8 +1254,24 @@ class SettingsViewModel @Inject constructor(
                 raf.close()
             }
         } catch (e: Exception) {
-            // 降级：使用 readLines
-            file.readLines(Charsets.UTF_8).takeLast(n)
+            // 降级（L3）：用流式环形缓冲尾读，避免 readLines 把整个文件读进内存。
+            readFileTailStreaming(file, n)
+        }
+    }
+
+    /** 流式尾读：环形缓冲只保留最后 n 行，内存占用与文件大小无关。 */
+    private fun readFileTailStreaming(file: java.io.File, n: Int): List<String> {
+        val ring = ArrayDeque<String>(n)
+        return try {
+            file.bufferedReader(Charsets.UTF_8).useLines { seq ->
+                seq.forEach { line ->
+                    if (ring.size == n) ring.removeFirst()
+                    ring.addLast(line.trimEnd('\r'))
+                }
+            }
+            ring.toList()
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 
@@ -1262,10 +1282,10 @@ class SettingsViewModel @Inject constructor(
     ): List<java.io.File> {
         val dates = snapshot.selectedDates
         if (dates.isNotEmpty()) {
-            // 列表模式：按选中日期精确匹配
+            // 列表模式：按选中日期精确匹配（L1：统一解析器，滚动件也归入其逻辑日期）
             return allFiles.filter { f ->
-                val fileDate = f.name.removePrefix("log-").removeSuffix(".txt")
-                fileDate in dates
+                val fileDate = com.mini.me_core.core.util.LogFiles.parseAppLogDate(f.name)
+                fileDate != null && fileDate in dates
             }
         }
         val rangeStart = snapshot.customDateStart
@@ -1273,7 +1293,7 @@ class SettingsViewModel @Inject constructor(
         if (rangeStart != null || rangeEnd != null) {
             // 范围模式：按日期范围筛选
             return allFiles.filter { f ->
-                val fileDate = f.name.removePrefix("log-").removeSuffix(".txt")
+                val fileDate = com.mini.me_core.core.util.LogFiles.parseAppLogDate(f.name) ?: return@filter false
                 val inRange = (rangeStart == null || fileDate >= rangeStart) &&
                     (rangeEnd == null || fileDate <= rangeEnd)
                 inRange
@@ -1284,6 +1304,14 @@ class SettingsViewModel @Inject constructor(
     }
 
     /** 统计日志行中各等级的行数（附属行/堆栈不计入）。供显示筛选栏的数量徽章使用。 */
+    /**
+     * 统计**当前已展示行**中各等级的条数（供筛选栏数量徽章）。
+     *
+     * 与 `FileLogger.getStats()` / [com.mini.me_core.core.util.LogStats] 的分工（审计 A3）：
+     *  - 这里统计的是「读进来、且已过筛选」的行 → 反映 UI 当前所见，必须逐行算，不能复用累计统计；
+     *  - `LogStats` 是**写入侧**的进程级累计（按等级/Tag），供诊断与慢查询汇入使用，不随筛选变化。
+     * 两者口径不同、不可互相替代，故不再视为"重复实现"。
+     */
     private fun countLevels(lines: List<String>): Map<LogLevel, Int> {
         val counts = HashMap<LogLevel, Int>()
         for (line in lines) {

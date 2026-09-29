@@ -3,6 +3,7 @@ package com.mini.me_core.core.performance
 import android.content.Context
 import android.os.Build
 import com.mini.me_core.BuildConfig
+import com.mini.me_core.core.util.LogSanitizer
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -15,11 +16,25 @@ import java.util.Locale
  * - 崩溃时由 MiniMeCore.installCrashHandler 调用 [record]，把设备信息 + 版本 + 堆栈写入
  *   app 私有目录 filesDir/crash_reports/，最多保留 [MAX_REPORTS] 条，超出删除最旧。
  * - [consumePendingCrash] 供下次启动 MainActivity 检测「上次异常退出」并弹窗查看。
+ *
+ * ⚠️ 安全（审计 D1）：崩溃报告是**最敏感的**诊断产物（含完整堆栈 + 设备 + 全部线程），
+ * 而它会被同步导出到**公共** Downloads 目录，故落盘前统一过 [LogSanitizer] 脱敏，
+ * 与 FileLogger「落盘必脱敏」策略保持同一口径。
  */
 object CrashReporter {
 
     private const val DIR_NAME = "crash_reports"
-    private const val MAX_REPORTS = 10
+
+    /**
+     * 崩溃报告保留条数（审计 F2：纳入集中配置，不再散落硬编码）。
+     */
+    val MAX_REPORTS: Int get() = com.mini.me_core.core.util.LogConfig.maxCrashReports
+
+    /**
+     * 采集堆栈时最多列出的线程数（审计 E1）：崩溃处理必须在毫秒级完成，
+     * `Thread.getAllStackTraces()` 会 STW 地枚举全部线程，重场景下拖慢杀进程前窗口。
+     */
+    private const val MAX_THREADS_IN_REPORT = 24
 
     @Volatile
     private var appContext: Context? = null
@@ -53,12 +68,21 @@ object CrashReporter {
             throwable.printStackTrace(java.io.PrintWriter(sw))
             sb.append(sw.toString())
             sb.appendLine("-".repeat(60))
-            sb.appendLine("All threads:")
-            for ((name, stack) in Thread.getAllStackTraces()) {
+            sb.appendLine("All threads (最多 $MAX_THREADS_IN_REPORT 条):")
+            // E1：限制线程数，避免在最需要快速退出的崩溃路径上做全量 STW 遍历。
+            val stacks = Thread.getAllStackTraces()
+            var printed = 0
+            for ((name, stack) in stacks) {
+                if (printed >= MAX_THREADS_IN_REPORT) {
+                    sb.appendLine("  … 其余 ${stacks.size - printed} 个线程已省略")
+                    break
+                }
+                printed++
                 sb.appendLine("  Thread: $name")
                 for (e in stack.take(8)) sb.appendLine("    at $e")
             }
-            file.writeText(sb.toString())
+            // D1：统一脱敏后再落盘（会被导出到公共目录）。
+            file.writeText(LogSanitizer.sanitize(sb.toString()))
             trimOld()
             file
         }.getOrNull()
@@ -77,10 +101,8 @@ object CrashReporter {
     }
 
     private fun trimOld() {
-        val reports = listReports()
-        if (reports.size > MAX_REPORTS) {
-            reports.drop(MAX_REPORTS).forEach { runCatching { it.delete() } }
-        }
+        // 规则收敛于 DiagnosticCleanup（审计 F2），保留条数来自 LogConfig.maxCrashReports。
+        com.mini.me_core.core.util.DiagnosticCleanup.trimCrashReports(dir())
     }
 
     /**

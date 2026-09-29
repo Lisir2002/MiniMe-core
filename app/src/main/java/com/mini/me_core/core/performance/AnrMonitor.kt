@@ -91,6 +91,11 @@ object AnrMonitor {
     private fun addRecord(record: AnrRecord) {
         records.add(0, record)
         while (records.size > MAX_RECORDS) records.removeAt(records.size - 1)
+        // 审计 K：ANR 不能只留内存——进程被杀即永久丢失。落一条结构化日志进入可导出链路。
+        com.mini.me_core.core.util.FileLogger.w(
+            "DIAG-ANR",
+            "[DIAG-ANR] 主线程阻塞 ${record.blockDurationMs}ms @ ${record.formattedTime()}\n${record.mainThreadStack}",
+        )
     }
 
     fun snapshot(): List<AnrRecord> = records.toList()

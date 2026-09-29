@@ -40,7 +40,19 @@ object NetworkMonitor {
             // 保留前 MAX_RECORDS（最新的）。
             while (records.size > MAX_RECORDS) records.removeAt(records.size - 1)
         }
+        // 审计 K：慢/失败请求落一条结构化日志（进程被杀后仍可追溯）。
+        // 只记异常与慢请求，避免正常流量淹没日志。
+        if (record.error != null || record.durationMs >= SLOW_NET_MS || record.statusCode >= 400) {
+            com.mini.me_core.core.util.FileLogger.w(
+                "DIAG-NET",
+                "[DIAG-NET] ${record.method} ${record.url} → ${record.statusCode} ${record.durationMs}ms" +
+                    (record.error?.let { " err=$it" } ?: ""),
+            )
+        }
     }
+
+    /** 慢网络请求阈值（毫秒），超过则记入日志。 */
+    private const val SLOW_NET_MS = 3_000L
 
     @Synchronized
     fun snapshot(): List<RequestRecord> = records.toList()
