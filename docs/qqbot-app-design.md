@@ -459,7 +459,7 @@ Android 应用沙箱隔离，附属应用**无法访问**主应用的 Keystore �
 - 运行时安装、协议端供给/进程、登录编排各层日志统一汇入 `log/QBotLogBus`（内存环形缓冲 + 脱敏），日志区**实时**消费（不再是「跑完才一次性回显」）；
 - 供给脚本按进度契约输出 `[qbot-step] i/n 说明` 阶段标记，客户端解析为主区**确定进度条**与步骤文案；
 - 日志区默认展开，避免长耗时下载期间用户误以为「卡死」；
-- 首启绝大部分体积（系统镜像 + 协议端本体）已随包分发，容器内只需下载系统依赖与官方 QQ 客户端（§8.2）。
+- 首启供给**零网络下载**：容器内所需外部件全部随包分发（系统镜像、协议端本体、系统依赖闭包、官方 QQ 客户端、协议端启动器），首启仅做本地解压与本地安装（§8.2）。
 
 **环境检查页的判定口径**（与登录链路共用同一份状态源，不新增编排）：
 
@@ -539,15 +539,33 @@ UI 纪律（沿用主应用规范）：
 
 > 启动时机：登录宿主前台服务仅由用户动作触发（「初始化运行环境 / 启动登录 / 重试」按钮经 `MainActivity` 拉起），不在应用打开时自动下载运行时。
 
-### 8.2 协议端供给脚本（新增资产）
+### 8.2 协议端供给脚本与随包离线资产
 
+**供给脚本**
 - **位置**：`qbot-app/src/main/assets/qbot/provision-protocol.sh`；运行时由 `QBotRuntimeInstaller` 提取到协议端数据目录，经 `proot -b` 映射为容器内可见。
 - **运行位置**：PRoot 容器内，伪 root（`proot -0`）执行，工作目录即协议端数据目录。
-- **契约**（环境变量，由 `QBotProtocolProcessManager` 注入，勿随意更改）：`QBOT_DATA_DIR` / `QBOT_ONEBOT_PORT` / `QBOT_ONEBOT_TOKEN` / `QBOT_WEBUI_PORT` / `QBOT_WEBUI_TOKEN` / `QBOT_ALPINE_MIRROR`。
+- **契约**（环境变量，由 `QBotProtocolProcessManager` 注入，勿随意更改）：`QBOT_DATA_DIR` / `QBOT_ONEBOT_PORT` / `QBOT_ONEBOT_TOKEN` / `QBOT_WEBUI_PORT` / `QBOT_WEBUI_TOKEN` / `QBOT_APT_MIRROR`。
 - **进度契约**：脚本每阶段开始时输出 `[qbot-step] i/n 说明`，`QBotProtocolProcessManager` 解析为 `QBotProvisionProgress` 驱动登录页确定进度条；`QBotContainerExecutor.exec` 的 `onLine` 回调使脚本输出**逐行实时**进入日志总线。调整阶段须同步维护 `n` 并保持格式一致。
 - **幂等**：成功完成后写出 `$QBOT_DATA_DIR/.provisioned`（内容为 `PROVISION_VERSION`），该版本号须与 `QBotProtocolProcessManager.PROVISION_VERSION` **严格一致**；调用方据此跳过重复供给。
 - **目录约定**（登录链路依赖，勿改）：`napcat/`（NapCat 工作目录）、`napcat/cache/qrcode.png`（扫码二维码落盘位置）、`napcat/config/onebot11.json`（OneBot 配置）。
+- **供给策略（离线优先）**：优先消费随包离线资产，**首启零网络**；仅当离线件缺失或本地安装失败时才回退联网路径（apt 多镜像回退、QQ 地址动态解析、下载退避重试）。回退路径是为「资产不完整」兜底，正常发版包不会触达。
 - **不确定性**：脚本依赖 NapCat 与官方 QQ Linux arm64 客户端（§11 V1）。若真机验证发现安装 / 启动方式变化，只需修订本脚本，代码侧契约不变。
+
+**随包离线资产**（`qbot-app/src/_qbotAssets/`，挂进 assets，首启由 `QBotRuntimeInstaller` 落盘到 `files/qbot/offline/` 供容器内消费）
+
+| 资产 | 路径 | 体积量级 | 是否入库 |
+|------|------|----------|----------|
+| 容器底座（Ubuntu base arm64，gzip） | `rootfs/ubuntu-22.04-arm64-rootfs.bin` | 约 27 MB | 入库 |
+| 协议端本体（NapCat Shell 包） | `napcat/NapCat.Shell.zip` | 约 29 MB | 入库 |
+| 系统依赖闭包（jammy arm64 `.deb` 集，gzip tar） | `apt/pool.bin` | 约 76 MB | 不入库，构建期抓取 |
+| 官方 QQ Linux 客户端（arm64 deb） | `qq/linuxqq-arm64.deb` | 约 200 MB | 不入库，构建期抓取 |
+| 协议端启动器（预编译 glibc arm64 `.so`） | `launcher/libnapcat_launcher.so` | 约 70 KB | 入库 |
+
+- **抓取脚本**：`scripts/dev/fetch-qbot-offline-assets.py`（分类 `--only rootfs|napcat|apt|qq|launcher`，幂等跳过已存在项）。apt 闭包以「隔离 apt 状态」下载，基准取自底座内 `var/lib/dpkg/status`，因此得到的是**增量闭包**（不重复下载容器已装的基础库）。
+- **为何不全部入库**：`apt/pool.bin` 与 QQ deb 体积大且超过 GitHub 单文件 100 MB 上限，入库会永久撑大仓库，改由 CI 在打包前抓取（`.github/workflows/qbot-release.yml`）。
+- **失败点前移**：`:qbot-app` 的 `preBuild` 依赖 `verifyQbotOfflineAssets` 任务，任一资产缺失即构建失败并提示抓取命令，避免发出「静默退化为首启需联网」的包。
+- **为何预编译启动器**：启动器原需在容器内 `g++` 编译，会牵连约 58 MB 编译工具链依赖；改为随包分发预编译 `.so`，连带 apt 闭包里也不必包含 `g++` / `libc6-dev`。
+- **体积代价**：离线资产合计约 330 MB，APK 因此显著增大（约 340 MB），换取首启零网络与首启耗时可控；这是本方案的既定取舍。
 
 ---
 

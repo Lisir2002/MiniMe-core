@@ -50,6 +50,13 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # 补齐随包离线资产（首启「零网络」的全部外部件）：
+      #   容器底座 + 协议端本体 + 协议端启动器已入库，脚本自动跳过；
+      #   apt 依赖闭包（~80MB）与官方 QQ 客户端 deb（~200MB）体积超 GitHub 单文件 100MB 上限，
+      #   无法入库，故在 CI 侧抓取后打进 APK（:qbot-app 的 preBuild 会硬校验其齐备，缺失即失败）。
+      - name: Fetch QBot offline assets
+        run: python3 scripts/dev/fetch-qbot-offline-assets.py
+
       # 校验 versionCode 单调递增：QBot 的 versionCode = 三段版本号映射
       #   A*1000000 + B*1000 + C（与 qbot-app/build.gradle.kts qbotGitVersionCode() 一致）。
       # prev tag 必须按本应用前缀 qbot-v 过滤，避免被主应用 / Logviewer 的 tag 干扰。

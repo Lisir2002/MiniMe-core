@@ -39,5 +39,16 @@ build-dist/
 mise.toml
 .tool-versions
 
+# Python 脚本运行产物
+__pycache__/
+*.pyc
+
 # Native build intermediates (AGP/CMake)
 app/.cxx/
+
+# QBot 随包离线资产：apt 依赖闭包 / 官方 QQ 客户端 deb 体积大（合计约 280MB）且后者超
+# GitHub 单文件 100MB 上限，不入库；构建期由 scripts/dev/fetch-qbot-offline-assets.py 抓取
+# （CI 在打包前执行，:qbot-app 的 verifyQbotOfflineAssets 会硬校验其齐备）。
+# 容器底座、协议端本体与预编译启动器体积小且版本固定，仍然入库。
+qbot-app/src/_qbotAssets/apt/
+qbot-app/src/_qbotAssets/qq/
