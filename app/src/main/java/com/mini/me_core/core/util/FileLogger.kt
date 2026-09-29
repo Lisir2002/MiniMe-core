@@ -166,19 +166,19 @@ object FileLogger : Logger {
         enqueue(LogLevel.INFO, "INFO", tag, message, null)
     }
 
-    override fun w(tag: String, message: String, throwable: Throwable? = null) {
+    override fun w(tag: String, message: String, throwable: Throwable?) {
         if (!shouldLog(LogLevel.WARN)) return
         Log.w(tag, message, throwable)
         enqueue(LogLevel.WARN, "WARN", tag, message, throwable)
     }
 
-    override fun e(tag: String, message: String, throwable: Throwable? = null) {
+    override fun e(tag: String, message: String, throwable: Throwable?) {
         if (!shouldLog(LogLevel.ERROR)) return
         Log.e(tag, message, throwable)
         enqueue(LogLevel.ERROR, "ERROR", tag, message, throwable)
     }
 
-    override fun fatal(tag: String, message: String, throwable: Throwable? = null) {
+    override fun fatal(tag: String, message: String, throwable: Throwable?) {
         if (!shouldLog(LogLevel.FATAL)) return
         // logcat 没有 FATAL 等级，用 ERROR 镜像（Android 崩溃本身走 Error 级别）。
         Log.e(tag, message, throwable)
