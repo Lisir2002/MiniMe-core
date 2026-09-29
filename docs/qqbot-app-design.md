@@ -1,7 +1,7 @@
 # MiniMe-QBot 附属应用设计文档（第一阶段：登录）
 
-> 文档版本：v1.2
-> 状态：设计阶段（第一阶段未落地）
+> 文档版本：v1.3
+> 状态：设计阶段（第一阶段进行中：`:qbot-app` 最小骨架已落地，登录链路未实现）
 > 最后更新：2026-09-29
 > 替代关系：本文档**全面替代**已废弃的 `qq-bot-integration-design.md`（旧方案为 LLBot + OneBot 11 反向 WS 嵌入主应用容器，整体舍弃）
 
@@ -169,13 +169,27 @@ arrayOf("git", "describe", "--tags", "--always", "--dirty")
 | `app/build.gradle.kts` | 主应用版本推导加 `--match "v[0-9]*"`，隔离其它应用 tag | ✅ 已完成（§2.6.1 前置缺陷已修） |
 | `scripts/gitops/check-release-format.py` | 增加 `qbot → "MiniMe-QBot"`、`APP_TAG_PREFIXES` 映射表、`--app qbot`；并把标题正则改为兼容**三段版本号**（顺带修掉 MiniMe Logs 三段版本号此前必然校验失败的问题） | ✅ 已完成 |
 | `scripts/gitops/release-log.py` | 增加 `--app`（决定 tag 前缀与版本日志路径）与 `--path`（按目录隔离提交范围，避免把主应用提交混入附属应用日志）；默认 prev 按本应用 tag 前缀过滤 | ✅ 已完成 |
-| `.github/workflows/qbot-release.yml` | 新建 QBot 构建/发布 workflow（tag `qbot-v*`，产物 `MiniMe-QBot-v{版本}-{变体}.apk`）；已含 `fetch-depth: 0` | ✅ 已创建（**休眠**：待 `:qbot-app` 存在后才可用） |
+| `.github/workflows/qbot-release.yml` | 新建 QBot 构建/发布 workflow（tag `qbot-v*`，产物 `MiniMe-QBot-v{版本}-{变体}.apk`）；已含 `fetch-depth: 0` | ✅ 已创建（`:qbot-app` 已落地，可随首个 `qbot-v*` tag 启用；发版前须先建 `CHANGELOG-qbot.md`） |
 | `docs/Version Log/CHANGELOG-qbot.md` | QBot 独立版本日志（`release-log.py --app qbot` 的权威来源） | ⬜ 待建（首个版本发版前创建） |
-| `qbot-app/build.gradle.kts` | 版本推导须为 `git describe --match "qbot-v[0-9]*"`，versionCode 用**独立的 `0.0.1` 递增公式**（不与主应用 `0.0.0.x` 号段混算） | ⬜ 待建（随模块一起落地） |
+| `qbot-app/build.gradle.kts` | 版本推导为 `git describe --match "qbot-v[0-9]*"`，versionCode 用**独立的 `0.0.1` 递增公式**（不与主应用 `0.0.0.x` 号段混算） | ✅ 已完成（最小骨架落地，见 §2.6.3） |
 | release workflow | versionCode 单调校验需**按 app 隔离** | ⬜ 待建 |
 
-> 上述"待建"项均随 `:qbot-app` 模块落地一并完成；在此之前 QBot 无法合规发版。
+> 上述模块侧项目（版本推导 / 签名 / 日志层）已随最小骨架落地；`CHANGELOG-qbot.md` 与 workflow 的按 app 隔离校验仍待完成，在此之前 QBot 无法合规发版。
 > 完整发版规则见 AGENTS「发版流程」与 [docs/ci-release.md](file:///workspace/docs/ci-release.md)。
+
+#### 2.6.3 最小骨架落地内容（已完成）
+
+`:qbot-app` 已登记进 `settings.gradle.kts`，最小骨架（仅"能编译、能装、有占位页"，不含登录链路）：
+
+| 项 | 落地内容 |
+|----|----------|
+| 模块与构建 | 新增 `:qbot-app`（与 `:logviewer-app` 同级）；`namespace` / `applicationId` = `com.mini.qbot`；`minSdk 26` / `targetSdk 28` / `compileSdk 36`；debug 加 `.debug` 后缀与 release 同机共存 |
+| 版本推导 | `git describe --match "qbot-v[0-9]*"`；三段 versionCode 公式 `A*1_000_000 + B*1_000 + C`（`0.0.1` → `1`），无 tag 回退 `10_000_000 + 提交数` |
+| 签名 | 复用主应用唯一官方密钥（`app/keystore.properties` → `app/minime.jks`），与主应用共用签名；不新增明文密钥 |
+| 日志层 | 构建期 Copy 主应用日志层 11 个文件到 generated sourceSet（主应用只读、零改动）；Copy 任务后追加清单校验，缺失即 `GradleException` 并列出缺失项 |
+| 应用骨架 | `QBotApplication`（Hilt 入口）+ `MainActivity`（`@AndroidEntryPoint`）+ `LoginScreen` 占位页；文案走 `strings.xml` 中英双份 |
+
+> 尚未实现（第一阶段后续）：运行时（PRoot + rootfs）、协议端（NapCat）、登录状态机、二维码、前台服务与保活。
 
 > 注意：MiniMe Logs 目前采用**硬编码** `versionCode/versionName`（`8` / `"0.0.8"`），本案**不沿用**该做法——AGENTS 要求版本以 Git Tag 为唯一事实源，硬编码易忘记递增。
 
@@ -461,7 +475,7 @@ UI 纪律（沿用主应用规范）：
     └── (第三阶段) ipc/  IPC 访问层（AIDL / ContentProvider / 本地 HTTP 客户端）
 ```
 
-需在 `settings.gradle.kts` 的 `include(...)` 中登记 `:qbot-app`（当前模块清单见 [settings.gradle.kts](file:///workspace/settings.gradle.kts#L42-L48)）。
+已在 `settings.gradle.kts` 的 `include(...)` 中登记 `:qbot-app`（与 `:logviewer-app` 同级，见 [settings.gradle.kts](file:///workspace/settings.gradle.kts#L44-L49)）。
 
 命名纪律：统一 MiniMecore 命名体系；release 签名 secrets 不入库（吸取 `:logviewer-app` 明文密码的教训）。
 
