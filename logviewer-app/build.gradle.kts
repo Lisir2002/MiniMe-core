@@ -12,7 +12,7 @@ val referencedSrcDir = layout.buildDirectory.dir("generated/source/referenced/ma
 val stageReferencedSources by tasks.registering(Copy::class) {
     from("../app/src/main/java")
     include(
-        // 日志核心（8 个文件）
+        // 日志核心（11 个文件）
         "com/mini/me_core/core/util/FileLogger.kt",
         "com/mini/me_core/core/util/AILogger.kt",
         "com/mini/me_core/core/util/LogLineParser.kt",
@@ -21,6 +21,13 @@ val stageReferencedSources by tasks.registering(Copy::class) {
         "com/mini/me_core/core/util/LogSanitizer.kt",
         "com/mini/me_core/core/util/LogStats.kt",
         "com/mini/me_core/core/util/Logger.kt",
+        // 日志基础设施（日志层协调能力审计后新增，FileLogger/AILogger 依赖）：
+        //   LogFiles        —— 文件命名 / 日期解析 / 排序 的单一真源
+        //   LogLevelController —— 含 LogDirResolver（目录解析与权限口径的共用实现）
+        //   DiagnosticCleanup  —— 过期日志 / 崩溃现场清理规则的共用实现
+        "com/mini/me_core/core/util/LogFiles.kt",
+        "com/mini/me_core/core/util/LogLevelController.kt",
+        "com/mini/me_core/core/util/DiagnosticCleanup.kt",
         // 主题令牌（10 个文件）
         "com/mini/me_core/core/theme/tokens/PrimitiveColors.kt",
         "com/mini/me_core/core/theme/tokens/SemanticColors.kt",
