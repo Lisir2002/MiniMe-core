@@ -1,6 +1,6 @@
 # MiniMe-QBot 附属应用设计文档（第一阶段：登录）
 
-> 文档版本：v1.4
+> 文档版本：v1.5
 > 状态：**部分落地**（第一阶段登录链路代码已落地，真机 V1/V2/V3 待实测）
 > 最后更新：2026-09-29
 > 替代关系：本文档**全面替代**已废弃的 `qq-bot-integration-design.md`（旧方案为 LLBot + OneBot 11 反向 WS 嵌入主应用容器，整体舍弃）
@@ -9,7 +9,7 @@
 
 | 阶段 | 状态 | 说明 |
 |------|------|------|
-| 第一阶段：登录 | **代码已落地** | 运行环境安装、NapCat 供给与进程管理、OneBot 11 客户端、二维码获取、登录状态机、登录态加密持久化、前台服务保活、单页登录屏 UI 均已完成；`./gradlew :qbot-app:assembleDebug` 通过 |
+| 第一阶段：登录 | **代码已落地** | 运行环境安装、NapCat 供给与进程管理、OneBot 11 客户端、二维码获取、登录状态机、登录态加密持久化、前台服务保活、单页登录屏 UI、首次启动实时日志与阶段进度均已完成；`./gradlew :qbot-app:assembleDebug` 通过 |
 | 第一阶段待闭环 | 待实测 | §十一 V1（PRoot 内 NapCat + 官方 QQ 客户端可登录）、V2（国产 ROM 后台存活率）、V3（首次初始化耗时/体积）只能由真机验证关闭 |
 | 第二～五阶段 | 未开始 | 见 §九 |
 
@@ -428,12 +428,19 @@ QBot 登录页
 │   └── 连接：未连接 / 已连接 / 掉线
 ├── 主区（随状态切换）
 │   ├── 未初始化 → 「初始化运行环境」按钮 + 进度
+│   ├── 初始化中 → 不确定进度条 + 当前阶段 + 首次启动耗时提示
+│   ├── 供给中   → 确定进度条（i/n）+ 当前步骤说明 + 首次启动耗时提示
 │   ├── 待登录   → 「获取登录二维码」按钮
 │   ├── 等扫码   → 二维码 + 倒计时 + 「刷新二维码」
 │   ├── 已登录   → QQ 头像 + 昵称 + QQ 号 + 「退出登录」
 │   └── 异常     → 错误原因 + 重试 + 「查看日志」
-└── 底部日志区（可折叠，最近 N 行，自动滚动）
+└── 底部日志区（可折叠，**首次进入默认展开**，实时流式追加、最近 N 行、自动滚动）
 ```
+
+**首次启动可观测性（本版新增）**：
+- 运行时安装、协议端供给/进程、登录编排各层日志统一汇入 `log/QBotLogBus`（内存环形缓冲 + 脱敏），登录页日志区**实时**消费（不再是「跑完才一次性回显」）；
+- 供给脚本按进度契约输出 `[qbot-step] i/n 说明` 阶段标记，客户端解析为主区**确定进度条**与步骤文案；
+- 日志区默认展开，避免长耗时下载期间用户误以为「卡死」。
 
 UI 纪律（沿用主应用规范）：
 - 所有用户可见文案**必须**走 `strings.xml`（中英双份），禁止在 `.kt` 中硬编码中文；
@@ -497,6 +504,7 @@ UI 纪律（沿用主应用规范）：
 | `runtime/` | `QBotRuntimePaths` / `QBotRuntimeState` / `QBotRuntimeInstaller` / `QBotContainerExecutor` | 资产安装（PRoot + Alpine rootfs）、容器内命令执行；协议端数据目录持久映射为容器内 `/root/qbot`，rootfs 重装不丢登录态 |
 | `protocol/` | `QBotProtocolConfig` / `QBotProtocolProcessManager` / `OneBotClient` / `QBotQrCodeSource` | 协议端配置（端口 / token，端口冲突自动后探）、NapCat 幂等供给与进程守护（退避重启上限 5 次）、OneBot 11 接口调用、二维码获取（原生接口优先、日志解析兜底） |
 | `login/` | `QBotLoginState` / `QBotLoginRepository` / `QBotLoginCoordinator` | 登录状态机、登录态加密持久化、登录链路编排（免扫码恢复、掉线监控与恢复） |
+| `log/` | `QBotLogBus` | 运行日志总线（内存环形缓冲 + token/base64 脱敏），汇聚运行时/协议端/登录各层可观测信息，供登录页实时订阅；写入同时经主应用日志层落盘 |
 | `security/` | `QBotSecretStore` | 自建 Keystore 字段级加密（alias `minime_qbot_master_key`，与主应用密钥严格隔离） |
 | `service/` | `QBotLoginService` | 前台服务保活（常驻通知 + WakeLock + `START_STICKY`），驱动登录协调器 |
 | `ui/` | `QBotLoginViewModel` / `LoginScreen` | 单页登录屏（顶部状态条 + 随状态切换的主区 + 可折叠日志区），文案走 `strings.xml` 中英双份 |
@@ -508,6 +516,7 @@ UI 纪律（沿用主应用规范）：
 - **位置**：`qbot-app/src/main/assets/qbot/provision-protocol.sh`；运行时由 `QBotRuntimeInstaller` 提取到协议端数据目录，经 `proot -b` 映射为容器内可见。
 - **运行位置**：PRoot 容器内，伪 root（`proot -0`）执行，工作目录即协议端数据目录。
 - **契约**（环境变量，由 `QBotProtocolProcessManager` 注入，勿随意更改）：`QBOT_DATA_DIR` / `QBOT_ONEBOT_PORT` / `QBOT_ONEBOT_TOKEN` / `QBOT_WEBUI_PORT` / `QBOT_WEBUI_TOKEN` / `QBOT_ALPINE_MIRROR`。
+- **进度契约**：脚本每阶段开始时输出 `[qbot-step] i/n 说明`，`QBotProtocolProcessManager` 解析为 `QBotProvisionProgress` 驱动登录页确定进度条；`QBotContainerExecutor.exec` 的 `onLine` 回调使脚本输出**逐行实时**进入日志总线。调整阶段须同步维护 `n` 并保持格式一致。
 - **幂等**：成功完成后写出 `$QBOT_DATA_DIR/.provisioned`（内容为 `PROVISION_VERSION`），该版本号须与 `QBotProtocolProcessManager.PROVISION_VERSION` **严格一致**；调用方据此跳过重复供给。
 - **目录约定**（登录链路依赖，勿改）：`napcat/`（NapCat 工作目录）、`napcat/cache/qrcode.png`（扫码二维码落盘位置）、`napcat/config/onebot11.json`（OneBot 配置）。
 - **不确定性**：脚本依赖 NapCat 与官方 QQ Linux arm64 客户端（§11 V1）。若真机验证发现安装 / 启动方式变化，只需修订本脚本，代码侧契约不变。
