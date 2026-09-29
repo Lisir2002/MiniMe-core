@@ -39,7 +39,7 @@
 |------|------|------|------|
 | Native 查看器/编辑器设计 | `docs/native-viewer-design.md` | 已落地（第一阶段） | C++ so 自研查看器核心，tree-sitter 语法高亮，PDFium 内置，代码查看器/编辑器统一设计 |
 | 插件体系设计 | `docs/plugin-system-design.md` | 设计阶段（未落地） | 四类插件分类（文件查看器/主题字体/MCP工具/环境容器），通用框架架构，按需下载瘦身 |
-| QBot 附属应用设计 | `docs/qqbot-app-design.md` | 设计阶段（未落地） | 独立附属应用，OneBot 11 契约 + 可插拔协议端，第一阶段只做个人号扫码登录 |
+| MiniMe-QBot 附属应用设计 | `docs/qqbot-app-design.md` | 设计阶段（未落地） | 独立附属应用（`com.mini.qbot`），OneBot 11 契约 + 可插拔协议端，第一阶段只做个人号扫码登录 |
 
 ### 2.2 UI 与交互规范
 

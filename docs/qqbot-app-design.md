@@ -1,15 +1,25 @@
-# MiniMe QBot 附属应用设计文档（第一阶段：登录）
+# MiniMe-QBot 附属应用设计文档（第一阶段：登录）
 
-> 版本：v1.0
+> 文档版本：v1.1
 > 状态：设计阶段（第一阶段未落地）
 > 最后更新：2026-09-29
 > 替代关系：本文档**全面替代**已废弃的 `qq-bot-integration-design.md`（旧方案为 LLBot + OneBot 11 反向 WS 嵌入主应用容器，整体舍弃）
+
+**应用标识**
+
+| 项 | 值 |
+|----|----|
+| 应用名称 | `MiniMe-QBot` |
+| 包名 / namespace / applicationId | `com.mini.qbot` |
+| Gradle 模块 | `:qbot-app` |
+| 版本 | 从 `0.0.1` 起独立递增（不共享主应用版本号段） |
+| targetSdk | `28`（运行 Linux 二进制约束） |
 
 ## 一、背景与目标
 
 ### 1.1 目标
 
-为 MiniMe 生态提供一个**独立附属应用**（与 `MiniMe Logs` 同级），使应用能够以**普通个人 QQ 号**登录（非官方机器人账号），并以标准协议对外提供能力。
+为 MiniMe 生态提供独立附属应用 **MiniMe-QBot**（与 `MiniMe Logs` 同级，包名 `com.mini.qbot`），使其能够以**普通个人 QQ 号**登录（非官方机器人账号），并以标准协议对外提供能力。
 
 第一阶段只解决一件事：
 
@@ -109,13 +119,63 @@
 
 **决策**：第一阶段**只做扫码登录**。密码登录依赖的验证分支多、失败面大，待扫码链路稳定后按需补充。
 
+### 2.5 命名与包名
+
+- 应用名 **MiniMe-QBot**，包名 **`com.mini.qbot`**，与 `com.mini.me_core`（主应用）、`com.mini.logs`（MiniMe Logs）构成同一命名家族，符合仓库命名纪律。
+- `namespace` 与 `applicationId` 保持一致（与 MiniMe Logs 的做法对齐）。
+
+### 2.6 版本策略：独立命名空间
+
+应用版本从 `0.0.1` 起独立递增，**不与主应用的 `0.0.0.x` 号段混用**。
+
+| 项 | 规则 |
+|----|------|
+| Tag 前缀 | `qbot-v0.0.1`（参照 `logviewer-v0.0.8` 先例） |
+| versionName | 由 `gitVersionName()` 按 `qbot-v*` 前缀过滤后动态推导，**不手写** |
+| versionCode | 由该前缀对应的**独立公式**生成，保证在本应用内单调递增 |
+| 发版校验 | CI 走 `check-release-format.py --app qbot` 分支 |
+
+> 注意：MiniMe Logs 目前采用**硬编码** `versionCode/versionName`（`8` / `"0.0.8"`），本案**不沿用**该做法——AGENTS 要求版本以 Git Tag 为唯一事实源，硬编码易忘记递增。
+
+### 2.7 日志层复用：沿用主应用日志层（源码复制）
+
+按决策，MiniMe-QBot **直接沿用主应用的日志层实现**，采用与 MiniMe Logs 相同的 Gradle `Copy` 任务方式将日志源码暂存进本模块 sourceSet：主应用文件保持只读、零改动，构建时自动同步最新版本。
+
+- 参照实现：[`logviewer-app/build.gradle.kts`](file:///workspace/logviewer-app/build.gradle.kts) 的 `stageReferencedSources` 任务。
+- 复用范围：日志核心（`FileLogger` / `AILogger` / `LogLineParser` / `LogLevel` / `LogConfig` / `LogSanitizer` / `LogStats` / `Logger`）及日志基础设施（`LogFiles` / `LogLevelController` / `DiagnosticCleanup`）。
+- **已知代价**：复制方案下，主应用日志文件若改名/移位，本模块会在编译期报 unresolved（可见但定位成本高）。此代价已知并接受；若后续复制项膨胀或频繁踩坑，再评估抽公共库模块。
+
+### 2.8 数据归属与访问：主应用持有，QBot 经 IPC 访问
+
+**核心原则：数据与密钥由主应用唯一持有，QBot 不直接触碰主应用的数据层与加密库。**
+
+理由（Android 层面的硬约束）：
+
+1. **沙箱隔离**：两个独立 `applicationId` 的 APK 私有目录互不可见。
+2. **密钥不可导出**：主应用数据层为 SQLCipher 加密，密钥由 Android Keystore（硬件 backing、与 UID 绑定、不可导出）派生。QBot **物理上无法获得**该密钥，即使拿到 DB 文件也只会得到"假损坏"（`file is not a database`）。
+3. **单写者原则**：主应用每次打开库都会执行 `MigrationEngine` 的快照与 schema 自愈。若两个应用各自对同一库文件跑迁移，快照/回滚会互相踩踏，存在触发隔离重建甚至清库的风险。
+
+因此：
+
+| 明确否决 | 原因 |
+|----------|------|
+| `android:sharedUserId` 共 UID 共享目录 | API 29+ 已弃用，要求同签名，未来版本随时失效 |
+| 公共存储目录共享加密库 | Android 10+ 分区存储隔离，且属安全降级 |
+| QBot 直接打开主应用的加密数据库 | 密钥不可得，必然"假损坏" |
+
+**访问方式**：QBot 需要主应用数据时，经 **IPC 访问层**（AIDL bound service / ContentProvider / 本地回环 HTTP，三选一在实施时定），主应用作为**唯一数据提供方与写入方**。
+
+**QBot 本地数据**：仅保留登录态等**极少量自身数据**（见 §五），使用 QBot 自己的 Keystore 密钥体系加密，与主应用数据完全分离。
+
+> 第一阶段（登录）**不涉及**跨应用数据访问，IPC 访问层归属第三阶段（Agent 集成与统一管理）再落地。
+
 ---
 
 ## 三、总体架构
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│  MiniMe QBot（独立附属应用 APK）                               │
+│  MiniMe-QBot（独立附属应用 APK）                              │
 │                                                               │
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │  QBotLoginService（前台服务 · 生命周期宿主）              │  │
@@ -150,6 +210,10 @@
 ```
 
 **通信方式**：协议端与应用同机通信，走**本地回环**（HTTP API + WebSocket），不暴露公网，不依赖外部网络。
+
+**日志层**：通过 Gradle 源码复制沿用主应用日志层（§2.7），本应用内的运行日志与主应用同构。
+
+**数据边界**：第一阶段本应用**自带全部所需数据**（仅登录态），与主应用无数据往来。第三阶段起，跨应用数据统一经 **IPC 访问层**由主应用提供（§2.8），图中未画出以免与第一阶段范围混淆。
 
 ---
 
@@ -238,6 +302,15 @@ OneBot 11 标准不含扫码登录接口，协议端实现各异，必须抽象�
 
 ## 五、数据与安全
 
+### 5.0 数据归属原则（贯穿）
+
+| 数据类别 | 归属 | 存储位置 | 访问方式 |
+|----------|------|----------|----------|
+| 主应用业务数据（对话、设置、凭据等） | **主应用唯一持有** | 主应用加密库 | QBot 经 IPC 访问（第三阶段起） |
+| QBot 自身数据（登录态、协议端配置、日志） | QBot 自己持有 | QBot 私有目录 | QBot 内部直接访问 |
+
+原则：**QBot 永不直接打开主应用的加密数据库**（密钥不可得，见 §2.8）。
+
 ### 5.1 本地数据
 
 第一阶段数据量极小，仅需：
@@ -250,7 +323,7 @@ OneBot 11 标准不含扫码登录接口，协议端实现各异，必须抽象�
 
 ### 5.2 密钥体系（自建，不可复用主应用）
 
-Android 应用沙箱隔离，附属应用**无法访问** MiniMe-core 的 Keystore 与 `EncryptedSharedPreferences`。因此需**自建**一套同思路的密钥体系：
+Android 应用沙箱隔离，附属应用**无法访问**主应用的 Keystore 与 `EncryptedSharedPreferences`。因此需**自建**一套同思路的密钥体系，**仅用于保护 QBot 自身的少量数据**（不涉及主应用数据）：
 
 - MasterKey：Android Keystore（AES-256-GCM，硬件 backing），alias 独立命名（如 `minime_qbot_master_key`）；
 - 字段级 DEK：存储于本应用私有的加密 SharedPreferences；
@@ -261,7 +334,8 @@ Android 应用沙箱隔离，附属应用**无法访问** MiniMe-core 的 Keysto
 - 所有端口**仅监听回环**，禁止 `0.0.0.0`；
 - 协议端本地通信带 token 鉴权；
 - 日志**不得**输出密码、token、session、二维码原始内容；
-- 第一阶段**不开放任何对外网络服务**给主应用或第三方。
+- 第一阶段**不开放任何对外网络服务**给主应用或第三方；
+- 第三阶段开放的 IPC 访问层必须**限定调用方**（签名校验 / 权限声明），并默认只读，写操作需显式授权。
 
 ---
 
@@ -310,24 +384,30 @@ UI 纪律（沿用主应用规范）：
 
 ## 八、模块与代码结构
 
-新增独立 Gradle 应用模块（与 `:logviewer-app` 同级，但**不做源码复制**，完全独立）：
+新增独立 Gradle 应用模块 `:qbot-app`（与 `:logviewer-app` 同级；除**日志层源码复制**外，其余代码完全独立）：
 
 ```
-:qqbot-app
-├── applicationId：com.mini.me_core.qqbot
-├── 应用显示名：MiniMe QBot
+:qbot-app
+├── namespace / applicationId：com.mini.qbot
+├── 应用显示名：MiniMe-QBot
+├── versionName / versionCode：由 qbot-v* Tag 动态推导（§2.6）
+├── targetSdk = 28（运行 Linux 二进制约束）
 ├── buildTypes：debug / release（release 签名独立，secrets 不入库）
+├── 日志层：Gradle Copy 任务复制主应用日志源码（§2.7，参照 :logviewer-app）
 └── sourceSet
     ├── QBotApplication（Hilt 入口）
     ├── runtime/        RuntimeManager、RuntimeInstaller、HealthCheck
-    ├── protocol/       ProtocolProcessManager、ProtocolEndpoint、OneBot11 客户端、LogQrCodeSource/NativeApiQrCodeSource
+    ├── protocol/       ProtocolProcessManager、ProtocolEndpoint、OneBot11 客户端、NativeApiQrCodeSource/LogQrCodeSource
     ├── login/          LoginCoordinator、LoginStateMachine、LoginStateRepository
     ├── service/        QBotLoginService（前台服务）
     ├── ui/             LoginScreen、LoginViewModel、组件
-    └── di/             QBotModule（Hilt）
+    ├── di/             QBotModule（Hilt）
+    └── (第三阶段) ipc/  IPC 访问层（AIDL / ContentProvider / 本地 HTTP 客户端）
 ```
 
-命名纪律：统一 MiniMecore 命名体系；`targetSdk = 28`（运行时约束）；release 签名 secrets 不入库（吸取 `:logviewer-app` 明文密码的教训）。
+需在 `settings.gradle.kts` 的 `include(...)` 中登记 `:qbot-app`（当前模块清单见 [settings.gradle.kts](file:///workspace/settings.gradle.kts#L42-L48)）。
+
+命名纪律：统一 MiniMecore 命名体系；release 签名 secrets 不入库（吸取 `:logviewer-app` 明文密码的教训）。
 
 ---
 
@@ -337,12 +417,14 @@ UI 纪律（沿用主应用规范）：
 |------|------|------|
 | **第一阶段（本文档）** | **登录** | 附属应用可完成扫码登录，登录态可持久化/可恢复，状态可观测 |
 | 第二阶段 | 消息链路 | OneBot 11 事件接收、私聊/群@触发、文本收发 |
-| 第三阶段 | Agent 集成 | 接入 MiniMe-core Agent，实现 AI 回复（通过 OneBot 11 解耦对接） |
+| 第三阶段 | Agent 集成与统一管理 | 落地 **IPC 访问层**（主应用持有数据、QBot 经 IPC 访问）；接入主应用 Agent 实现 AI 回复；主应用可管理 QBot |
 | 第四阶段 | 会话与群能力 | 会话上下文、聊天记录页面、群管理 |
 | 第五阶段 | 高级能力 | 多账号、密码登录、Satori/Milky 协议 |
 | **风控专题（贯穿，非独立阶段，延后）** | 降低封号风险 | 限速器、熔断退避、被动优先、内容审核、失败降频 |
 
 > 风控策略层按决策**延后**，不在第一阶段实现；但第一阶段的数据模型与发送路径（未来）需预留挂载点。
+>
+> IPC 访问层按决策归属**第三阶段**：第一阶段 QBot 只持有自己的登录态数据，不与主应用发生数据往来。
 
 ---
 
@@ -355,7 +437,10 @@ UI 纪律（沿用主应用规范）：
 | Android 后台杀进程 | 高 | 前台服务 + 守护 + WakeLock；引导关电池优化 |
 | 运行时体积大 / 冷启动慢 | 中 | 首次初始化提示；R2 轻量化；启动状态可见不阻塞 UI |
 | `targetSdk = 28` 约束 | 中 | 作为既定约束接受，与主应用保持一致 |
-| 无法复用主应用密钥体系 | 中 | 自建独立密钥体系（§5.2），格式对齐便于未来迁移 |
+| 无法直接共享主应用数据与密钥 | 高 | **设计上即不允许**；数据归主应用，QBot 经 IPC 访问（§2.8），第一阶段无此需求 |
+| IPC 边界被越权调用 | 中 | 限定调用方（签名校验 / 权限声明）+ 默认只读 + 写操作显式授权（§5.3） |
+| 日志层源码复制脆弱（主应用改名/移位） | 中 | 已知并接受；复制项失控或频繁踩坑时改抽公共库模块（§2.7） |
+| 版本命名空间与主应用冲突 | 中 | 独立 Tag 前缀 `qbot-v*` + 独立 versionCode 公式（§2.6） |
 | 扫码能力无标准接口 | 中 | `QrCodeSource` 抽象 + 按协议端适配，原生接口优先 |
 | 个人号登录封号 | 高 | 风控专题处理（延后）；第一阶段明确提示用户风险 |
 
@@ -369,3 +454,6 @@ UI 纪律（沿用主应用规范）：
 - Lagrange.Core：https://github.com/LagrangeDev/Lagrange.Core
 - OpenShamrock（已归档，仅供背景了解）：https://github.com/whitechi73/OpenShamrock
 - 主应用容器链路：`app/src/main/java/com/mini/me_core/feature/agent/domain/container/`
+- 主应用 MCP 服务端（第三阶段接入候选）：`app/src/main/java/com/mini/me_core/feature/agent/domain/execution/mcp/server/`
+- 主应用加密体系（数据不可共享的依据）：`app/src/main/java/com/mini/me_core/datalayer/encryption/`
+- 附属应用先例（日志层源码复制、独立签名）：`logviewer-app/build.gradle.kts`
