@@ -71,7 +71,7 @@ object FileLogger : Logger {
      * 超过 [MAX_PENDING_LINES] 时新行被丢弃并累加 [droppedLines]，进程恢复后由 ioExecutor 补一条汇总提示。
      * 取舍：宁可丢日志也不崩应用。
      */
-    private val pending = java.util.concurrent.ConcurrentLinkedQueue<String>()
+    private val pending = java.util.concurrent.ConcurrentLinkedQueue<QueuedLine>()
 
     private const val MAX_PENDING_LINES = 8192
 
@@ -166,19 +166,19 @@ object FileLogger : Logger {
         enqueue(LogLevel.INFO, "INFO", tag, message, null)
     }
 
-    override fun w(tag: String, message: String, throwable: Throwable?) {
+    override fun w(tag: String, message: String, throwable: Throwable? = null) {
         if (!shouldLog(LogLevel.WARN)) return
         Log.w(tag, message, throwable)
         enqueue(LogLevel.WARN, "WARN", tag, message, throwable)
     }
 
-    override fun e(tag: String, message: String, throwable: Throwable?) {
+    override fun e(tag: String, message: String, throwable: Throwable? = null) {
         if (!shouldLog(LogLevel.ERROR)) return
         Log.e(tag, message, throwable)
         enqueue(LogLevel.ERROR, "ERROR", tag, message, throwable)
     }
 
-    override fun fatal(tag: String, message: String, throwable: Throwable?) {
+    override fun fatal(tag: String, message: String, throwable: Throwable? = null) {
         if (!shouldLog(LogLevel.FATAL)) return
         // logcat 没有 FATAL 等级，用 ERROR 镜像（Android 崩溃本身走 Error 级别）。
         Log.e(tag, message, throwable)
@@ -390,7 +390,7 @@ object FileLogger : Logger {
     fun listLogFiles(): List<File> {
         flush()
         val dir = logDir ?: return emptyList()
-        val files = dir.listFiles { f -> f.isFile && f.name.startsWith(APP_LOG_PREFIX) && f.name.endsWith(".txt") }
+        val files = dir.listFiles { f -> f.isFile && f.name.startsWith(LogFiles.APP_LOG_PREFIX) && f.name.endsWith(".txt") }
             ?.toList()
             ?: return emptyList()
         return LogFiles.sortAppLogFiles(files)

@@ -43,13 +43,13 @@ class TestLogger : Logger {
     override fun v(tag: String, message: String) { entries.add(Entry(LogLevel.VERBOSE, tag, message, null)) }
     override fun d(tag: String, message: String) { entries.add(Entry(LogLevel.DEBUG, tag, message, null)) }
     override fun i(tag: String, message: String) { entries.add(Entry(LogLevel.INFO, tag, message, null)) }
-    override fun w(tag: String, message: String, throwable: Throwable?) {
+    override fun w(tag: String, message: String, throwable: Throwable? = null) {
         entries.add(Entry(LogLevel.WARN, tag, message, throwable))
     }
-    override fun e(tag: String, message: String, throwable: Throwable?) {
+    override fun e(tag: String, message: String, throwable: Throwable? = null) {
         entries.add(Entry(LogLevel.ERROR, tag, message, throwable))
     }
-    override fun fatal(tag: String, message: String, throwable: Throwable?) {
+    override fun fatal(tag: String, message: String, throwable: Throwable? = null) {
         entries.add(Entry(LogLevel.FATAL, tag, message, throwable))
     }
 
