@@ -271,12 +271,29 @@ def _extract_rootfs_dpkg_status(out_dir: str) -> str:
     return ""
 
 
+def _best_effort_rmtree(path: str) -> None:
+    """尽力删除隔离 apt 状态目录，绝不因清理失败中断发版。
+
+    apt 在非 root（本脚本经 `sudo` 执行）时会按内核惯例把**下载沙箱**切到 `_apt` 用户，
+    在隔离状态目录里留下 `_apt` 所属、mode 0700 的 `lists/partial`。当前进程（CI runner 用户）
+    无权进入该目录，直接 rmtree 会抛 PermissionError（本地以 root 执行时不触发，故本地难复现）。
+    先普通删除，残留再用 sudo（CI runner 免密）兜底；两者都失败也只会在 /tmp 留下残留。
+    """
+    shutil.rmtree(path, ignore_errors=True)
+    if not os.path.exists(path):
+        return
+    prefix = [] if os.geteuid() == 0 else ["sudo", "-n"]
+    subprocess.run(prefix + ["rm", "-rf", path], check=False)
+
+
 def _apt_download_and_pack(mirror: str, dest: str, status_src: str) -> int:
     """以「隔离 apt 状态」下载 arm64 增量闭包并直接打包为 [dest]（gzip tar），返回包数。
 
     全程重定向 `Dir::State` / `Dir::Cache` 到临时目录，不读写宿主 sources.list 与已装包状态。
     """
-    with tempfile.TemporaryDirectory(prefix="qbot-apt-") as tmp:
+    # ignore_cleanup_errors：见 _best_effort_rmtree 的说明——`_apt` 所属子目录会让默认清理抛异常，
+    # 而清理失败与供给结果无关，绝不能因此让整个发版失败。
+    with tempfile.TemporaryDirectory(prefix="qbot-apt-", ignore_cleanup_errors=True) as tmp:
         lists = os.path.join(tmp, "lists")
         pool = os.path.join(tmp, "pool")
         cache = os.path.join(tmp, "cache")
@@ -337,6 +354,7 @@ def _apt_download_and_pack(mirror: str, dest: str, status_src: str) -> int:
             for deb in debs:
                 tar.add(deb, arcname="./" + os.path.basename(deb))
         os.replace(tmp_tar, dest)
+        _best_effort_rmtree(tmp)
         return len(debs)
 
 
