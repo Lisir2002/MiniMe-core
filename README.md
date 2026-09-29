@@ -212,7 +212,7 @@ app/src/main/java/com/mini/me_core/
 | [docs/ui-standards.md](./docs/ui-standards.md) | UI 设计规范：页面槽位、统一组件、颜色间距字体、禁止事项 |
 | [docs/native-viewer-design.md](./docs/native-viewer-design.md) | Native 查看器/编辑器设计：C++ so 核心、tree-sitter、PDFium |
 | [docs/plugin-system-design.md](./docs/plugin-system-design.md) | 插件体系设计：四类插件、通用框架、按需下载瘦身 |
-| [docs/qq-bot-integration-design.md](./docs/qq-bot-integration-design.md) | QQ 机器人对接设计：LLBot + OneBot11、无感容器、进程持久化 |
+| [docs/qqbot-app-design.md](./docs/qqbot-app-design.md) | QBot 附属应用设计：独立应用、OneBot 11 契约、可插拔协议端、第一阶段登录 |
 | [SECURITY.md](./SECURITY.md) | 安全策略与漏洞报告 |
 | `app/src/main/assets/docs/` | App 内置帮助文档（运行时可在「设置 → 帮助」查看） |
 
