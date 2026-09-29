@@ -119,6 +119,8 @@ class WorkspaceRepository(private val db: WorkspaceDb) {
         limit: Long,
     ): List<com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs> =
         withContext(Dispatchers.IO) {
+            // 待确认2：空列表会生成 `IN ()`（语义为 false → 返回空），显式短路避免歧义与无谓查询。
+            if (categories.isEmpty() || successes.isEmpty()) return@withContext emptyList()
             q.selectAuditLogsFiltered(categories, successes.map { if (it) 1L else 0L }, sinceMs, limit).executeAsList()
         }
 
@@ -146,6 +148,8 @@ class WorkspaceRepository(private val db: WorkspaceDb) {
         categories: List<String>, offset: Long, limit: Long,
     ): List<com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs> =
         withContext(Dispatchers.IO) {
+            // 待确认2：空列表 → `IN ()` 语义为 false，显式短路返回空。
+            if (categories.isEmpty()) return@withContext emptyList()
             q.selectAuditLogsByCategoriesPage(categories, limit, offset).executeAsList()
         }
 
@@ -154,6 +158,8 @@ class WorkspaceRepository(private val db: WorkspaceDb) {
         actions: List<String>, offset: Long, limit: Long,
     ): List<com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs> =
         withContext(Dispatchers.IO) {
+            // 待确认2：空列表 → `IN ()` 语义为 false，显式短路返回空。
+            if (actions.isEmpty()) return@withContext emptyList()
             q.selectAuditLogsByActionsPage(actions, limit, offset).executeAsList()
         }
 

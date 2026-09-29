@@ -1,0 +1,7 @@
+-- v1 → v2 迁移（M10）：大对象落盘，DB 仅存路径。
+--
+-- blob_store 新增 path 列（可空）：≤ 256KB 的小对象直接存 data 列；更大的对象落盘到应用私有
+-- 目录，DB 只保留相对路径，避免重型 BLOB 长期占用单连接写锁（审计 M10）。
+-- 可空 = 旧记录 / 小对象该行恒为 NULL，由 BlobStore 按 path 是否为空决定读库还是读文件。
+
+ALTER TABLE blob_store ADD COLUMN path TEXT;

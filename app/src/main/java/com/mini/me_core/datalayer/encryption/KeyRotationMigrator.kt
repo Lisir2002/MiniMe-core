@@ -54,15 +54,6 @@ class KeyRotationMigrator(private val context: Context) {
         private const val TEMP_SUFFIX = ".enc.tmp"
 
         /**
-         * 行数快照里「该表无法统计」的哨兵值。
-         * 少数虚拟表（contentless FTS5 等）会拒绝 `COUNT(*)`，这类表只跳过、不判失败。
-         */
-        private const val COUNT_UNSUPPORTED = -1L
-
-        /** 行数快照写日志时的表数上限，避免超大库刷屏。 */
-        private const val MAX_LOGGED_TABLES = 20
-
-        /**
          * 「明文 → 加密」这一档的标识。
          * 其状态键刻意沿用旧版 `migration_<dbId>_completed`，保证已升级的设备不会重跑迁移。
          */
@@ -160,8 +151,8 @@ class KeyRotationMigrator(private val context: Context) {
 
             // Step 1.5: 抓源库逐表行数快照 —— 迁移后要比对的基准。
             // 必须在 export 之前、源库仍打开时抓，否则源库被替换后无从比对。
-            val sourceCounts = snapshotRowCounts(src)
-            FileLogger.d(TAG, "[${definition.id}] 源库行数快照: ${formatCounts(sourceCounts)}")
+            val sourceCounts = SqliteIntrospect.snapshotRowCounts(src)
+            FileLogger.d(TAG, "[${definition.id}] 源库行数快照: ${SqliteIntrospect.formatCounts(sourceCounts)}")
 
             // Step 3: ATTACH 目标形态临时库（口令中的单引号需转义）
             val escaped = targetPassphrase.replace("'", "''")
@@ -185,21 +176,21 @@ class KeyRotationMigrator(private val context: Context) {
             // Step 7: 用 to 口令验证目标库
             // 同一份只读句柄里做完三件事：表数 > 0、逐表行数快照、与源库快照比对。
             FileLogger.d(TAG, "[${definition.id}] Step5: 验证目标库")
-            withReadable(tempFile, targetPassphrase) { targetDb ->
-                val tableCount = countUserTables(targetDb)
+            SqliteIntrospect.withReadable(context, tempFile, targetPassphrase) { targetDb ->
+                val tableCount = SqliteIntrospect.countUserTables(targetDb)
                 if (tableCount == 0L) {
                     throw DatabaseEncryptionException("迁移验证失败：目标库中没有任何用户表")
                 }
-                val targetCounts = snapshotRowCounts(targetDb)
-                FileLogger.d(TAG, "[${definition.id}] 目标库行数快照: ${formatCounts(targetCounts)}")
-                val mismatch = diffCounts(sourceCounts, targetCounts)
+                val targetCounts = SqliteIntrospect.snapshotRowCounts(targetDb)
+                FileLogger.d(TAG, "[${definition.id}] 目标库行数快照: ${SqliteIntrospect.formatCounts(targetCounts)}")
+                val mismatch = SqliteIntrospect.diffCounts(sourceCounts, targetCounts)
                 if (mismatch != null) {
                     throw DatabaseEncryptionException("迁移数据校验失败：$mismatch（已中止迁移，源库原样保留）")
                 }
                 FileLogger.d(
                     TAG,
                     "[${definition.id}] 目标库校验通过，共 $tableCount 个表，" +
-                        "行数与源库一致（${sourceCounts.values.filter { it >= 0 }.sum()} 行）",
+                        "行数与源库一致（${SqliteIntrospect.totalRows(sourceCounts)} 行）",
                 )
             }
 
@@ -237,109 +228,20 @@ class KeyRotationMigrator(private val context: Context) {
     /**
      * 试探性只读打开：验证该文件确处于「[passphrase] 形态」。
      * 仅 open 成功不算数——错误口令下 SQLCipher 可能在首次读页才失败，故补一次轻量查询。
-     */
-    /**
-     * 试探性只读打开：验证该文件确处于「[passphrase] 形态」。
-     * 仅 open 成功不算数——错误口令下 SQLCipher 可能在首次读页才失败，故补一次轻量查询。
+     *
+     * 只读通道统一走 [SqliteIntrospect]：不进 ConnectionPool、不触发 schema 迁移与自愈，
+     * 因此探测本身不会改动被探测的库。
      */
     private fun canOpen(file: File, passphrase: String): Boolean {
         return try {
-            withReadable(file, passphrase) { db -> queryLong(db, "SELECT count(*) FROM sqlite_master") }
+            SqliteIntrospect.withReadable(context, file, passphrase) { db ->
+                SqliteIntrospect.queryLong(db, "SELECT count(*) FROM sqlite_master")
+            }
             true
         } catch (e: Exception) {
             FileLogger.d(TAG, "形态探测失败：${file.name}（${e.javaClass.simpleName}）")
             false
         }
-    }
-
-    /** 以只读方式打开一次库执行 [block]，无论成败都保证关闭。 */
-    private fun <T> withReadable(
-        file: File,
-        passphrase: String,
-        block: (SQLiteDatabase) -> T,
-    ): T {
-        val db = SQLiteDatabase.openDatabase(
-            file.absolutePath,
-            passphrase,
-            null,
-            SQLiteDatabase.OPEN_READONLY,
-        )
-        return try {
-            block(db)
-        } finally {
-            runCatching { db.close() }
-        }
-    }
-
-    private fun countUserTables(db: SQLiteDatabase): Long =
-        queryLong(
-            db,
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
-        )
-
-    private fun queryLong(db: SQLiteDatabase, sql: String): Long {
-        val cursor = db.rawQuery(sql, null)
-        return try {
-            if (cursor.moveToFirst()) cursor.getLong(0) else 0L
-        } finally {
-            runCatching { cursor.close() }
-        }
-    }
-
-    /**
-     * 抓逐表行数快照：`表名 → COUNT(*)`。
-     *
-     * 迁移前后各抓一次用于比对（见类注释 Step 6）。无法统计的虚拟表记
-     * [COUNT_UNSUPPORTED] 哨兵，比对时跳过。
-     */
-    private fun snapshotRowCounts(db: SQLiteDatabase): Map<String, Long> {
-        val tables = mutableListOf<String>()
-        val cursor = db.rawQuery(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-            null,
-        )
-        try {
-            while (cursor.moveToNext()) tables.add(cursor.getString(0))
-        } finally {
-            runCatching { cursor.close() }
-        }
-        val counts = LinkedHashMap<String, Long>(tables.size)
-        for (table in tables) {
-            val quoted = "\"${table.replace("\"", "\"\"")}\""
-            counts[table] = runCatching { queryLong(db, "SELECT COUNT(*) FROM $quoted") }
-                .getOrDefault(COUNT_UNSUPPORTED)
-        }
-        return counts
-    }
-
-    /**
-     * 比对两份行数快照。
-     *
-     * @return null = 一致；否则返回首个不一致处的可读描述（调用方据此中止迁移）。
-     */
-    private fun diffCounts(source: Map<String, Long>, target: Map<String, Long>): String? {
-        for ((table, srcCount) in source) {
-            if (srcCount == COUNT_UNSUPPORTED) continue
-            val dstCount = target[table]
-            if (dstCount == null) return "目标库缺少表 $table"
-            if (dstCount == COUNT_UNSUPPORTED) continue
-            if (dstCount != srcCount) return "表 $table 行数不一致：源 $srcCount → 目标 $dstCount"
-        }
-        val srcTotal = source.values.filter { it >= 0 }.sum()
-        val dstTotal = target.values.filter { it >= 0 }.sum()
-        if (srcTotal > 0L && dstTotal == 0L) {
-            return "目标库总行数为 0，而源库有 $srcTotal 行（导出疑似未落数据）"
-        }
-        return null
-    }
-
-    /** 快照的日志形式：只打前 [MAX_LOGGED_TABLES] 张表 + 总行数，避免超大库刷屏。 */
-    private fun formatCounts(counts: Map<String, Long>): String {
-        if (counts.isEmpty()) return "(空)"
-        val head = counts.entries.take(MAX_LOGGED_TABLES)
-            .joinToString(", ") { (t, c) -> "$t=${if (c < 0) "n/a" else c.toString()}" }
-        val more = if (counts.size > MAX_LOGGED_TABLES) ", …(+${counts.size - MAX_LOGGED_TABLES})" else ""
-        return "$head$more"
     }
 
     // ── 迁移状态 ──

@@ -222,8 +222,9 @@ UPDATE agent_message SET content = ?, is_error = 1 WHERE role = ? AND content LI
 
 -- P1 修复：原全局 LIKE 搜索无 LIMIT，大库下返回海量行导致 OOM。
 -- 加 LIMIT 500 防止内存溢出；全局搜索场景下 500 条足够展示。
+-- M7：加 ESCAPE '\'，调用方对用户输入中的 \ % _ 转义，避免被当作通配符导致结果膨胀。
 searchMessages:
-SELECT * FROM agent_message WHERE content LIKE '%' || ? || '%' ORDER BY seq ASC LIMIT 500;
+SELECT * FROM agent_message WHERE content LIKE '%' || ? || '%' ESCAPE '\' ORDER BY seq ASC LIMIT 500;
 
 selectAllMessages:
 SELECT * FROM agent_message ORDER BY seq ASC;

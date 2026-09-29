@@ -1,0 +1,57 @@
+-- infra 初始 schema（v0 → v1）。
+-- 与 infra 各 .sq 的 CREATE TABLE 一致（不含 v2 才新增的 blob_store.path）。
+-- 供「创建于迁移系统之前」的旧库从空库重建到 v1；新库由 .sq create() 直接落到 v2。
+
+CREATE TABLE blob_store (
+  id          INTEGER PRIMARY KEY,
+  mime        TEXT,
+  size        INTEGER NOT NULL,
+  data        BLOB    NOT NULL,
+  created_at  INTEGER NOT NULL
+);
+
+CREATE TABLE doc_store (
+  id          INTEGER PRIMARY KEY,
+  collection  TEXT    NOT NULL,
+  key         TEXT    NOT NULL,
+  doc_json    TEXT    NOT NULL,
+  version     INTEGER NOT NULL DEFAULT 1,
+  updated_at  INTEGER NOT NULL,
+  deleted     INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (collection, key)
+);
+
+CREATE TABLE kv_store (
+  id          INTEGER PRIMARY KEY,
+  namespace   TEXT    NOT NULL,
+  key         TEXT    NOT NULL,
+  type        TEXT    NOT NULL,
+  string_val  TEXT,
+  int_val     INTEGER,
+  bool_val    INTEGER,
+  json_val    TEXT,
+  updated_at  INTEGER NOT NULL,
+  deleted     INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (namespace, key)
+);
+
+CREATE TABLE queue_store (
+  id          INTEGER PRIMARY KEY,
+  topic       TEXT    NOT NULL,
+  payload     TEXT    NOT NULL,
+  status      TEXT    NOT NULL,
+  attempt     INTEGER NOT NULL DEFAULT 0,
+  next_run    INTEGER NOT NULL,
+  error_msg   TEXT,
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX queue_store_pending_idx ON queue_store (topic, status, next_run);
+
+CREATE TABLE ts_store (
+  id            INTEGER PRIMARY KEY,
+  ts            INTEGER NOT NULL,
+  type          TEXT    NOT NULL,
+  payload_json  TEXT    NOT NULL,
+  meta          TEXT
+);
+CREATE INDEX ts_store_type_ts_idx ON ts_store (type, ts);

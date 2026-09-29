@@ -37,4 +37,21 @@ object CipherPassphrase {
 
     /** DEK → passphrase 字符串。调用方须在用完后 `dek.fill(0)` 擦除。 */
     fun encode(dek: ByteArray): String = Base64.encodeToString(dek, Base64.NO_WRAP)
+
+    /**
+     * 打开库所需的口令「两态」：probe 用 [passphrase] 字符串，driver 用其 [bytes]（UTF-8 字节）。
+     *
+     * 两者必须同源——过去 driver 取 `encode(dek)` 的 UTF-8 字节、probe 取 `encode(dek)` 字符串，
+     * 靠「SQLCipher 对 String 按 UTF-8 取字节」的隐式约定保证一致；一旦任一端改了编码，
+     * 就出现「driver 能开、probe 打不开」的假损坏（审计 L2）。本方法从同一个 [passphrase]
+     * 派生两态，从根上消除漂移空间。
+     */
+    data class OpenParams(val passphrase: String, val bytes: ByteArray) {
+        override fun equals(other: Any?): Boolean =
+            other is OpenParams && passphrase == other.passphrase && bytes.contentEquals(other.bytes)
+        override fun hashCode(): Int = 31 * passphrase.hashCode() + bytes.contentHashCode()
+    }
+
+    /** 从已编码的 passphrase 字符串派生「字符串 + UTF-8 字节」两态（见 [OpenParams]）。 */
+    fun openParams(passphrase: String): OpenParams = OpenParams(passphrase, passphrase.toByteArray(Charsets.UTF_8))
 }

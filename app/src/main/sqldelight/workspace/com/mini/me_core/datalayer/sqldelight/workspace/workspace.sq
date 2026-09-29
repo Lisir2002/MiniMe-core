@@ -218,10 +218,10 @@ WHERE action IN ?
 ORDER BY created_at DESC
 LIMIT ? OFFSET ?;
 
--- 全局搜索：动作 / 连接名 / 主机 / 消息（LIKE，调用方拼 %kw%）。
+-- 全局搜索：动作 / 连接名 / 主机 / 消息（LIKE，调用方拼 %kw% 并对 \ % _ 转义）。
 selectAuditLogsSearchPage:
 SELECT * FROM remote_audit_logs
-WHERE action LIKE ? OR connection_name LIKE ? OR remote_host LIKE ? OR message LIKE ?
+WHERE action LIKE ? ESCAPE '\' OR connection_name LIKE ? ESCAPE '\' OR remote_host LIKE ? ESCAPE '\' OR message LIKE ? ESCAPE '\'
 ORDER BY created_at DESC
 LIMIT ? OFFSET ?;
 

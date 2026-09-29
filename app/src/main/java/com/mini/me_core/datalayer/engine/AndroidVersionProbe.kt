@@ -91,21 +91,28 @@ class AndroidVersionProbe(
     private fun readVersionEncrypted(file: File, lib: LibName): Int {
         val km = keyManager
         if (km == null) {
-            // 未注入密钥管理器（如 JVM/特殊环境）：无法解密探测，保守按 0 处理。
-            FileLogger.w(TAG, "readVersion($lib): 加密库但未注入 UnifiedKeyManager，按 0 处理")
-            return 0
+            // L1：未注入密钥管理器（如 JVM/特殊环境）：加密库无法解密探测。
+            // ⚠️ 必须 fail-close 返回 UNREADABLE，**绝不能返回 0（FRESH）**——
+            // 否则该库会被当作「全新库」静默重建，历史数据全丢（正是 v0.5.0 事故同类路径）。
+            // 上层对 UNREADABLE 会先快照再隔离，至少把原文件保住，绝不偷偷覆盖。
+            FileLogger.e(
+                TAG,
+                "readVersion($lib): 加密库但未注入 UnifiedKeyManager，无法解密探测，返回 UNREADABLE（fail-close）",
+            )
+            return VERSION_UNREADABLE
         }
         var cipherDb: CipherSQLiteDatabase? = null
         return try {
             // purpose 与 passphrase 必须与 EncryptedDriverFactory 完全一致（共用 CipherPassphrase），
             // 否则会出现「driver 能开、probe 打不开」的假损坏。
             val dek = runBlocking(Dispatchers.IO) { km.getOrCreateDek(CipherPassphrase.purpose(lib)) }
-            val passphrase = CipherPassphrase.encode(dek)
+            // L2：从同一来源派生「字符串 + 字节」两态，保证与 driver 侧的口令完全一致。
+            val open = CipherPassphrase.openParams(CipherPassphrase.encode(dek))
             dek.fill(0)
             CipherSQLiteDatabase.loadLibs(context)
             val opened = CipherSQLiteDatabase.openDatabase(
                 file.absolutePath,
-                passphrase,
+                open.passphrase,
                 null,
                 CipherSQLiteDatabase.OPEN_READONLY,
             )

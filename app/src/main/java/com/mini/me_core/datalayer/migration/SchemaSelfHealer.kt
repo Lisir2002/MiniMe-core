@@ -66,6 +66,15 @@ object SchemaSelfHealer {
     private const val AGENT_MESSAGE_SESSION_IDX =
         "CREATE INDEX agent_message_session_idx ON agent_message (session_id, seq);"
 
+    /**
+     * agent_session 的排序索引（与 `agent.sq` 的 `agent_session_updated_idx` 一致）。
+     *
+     * ⚠️ 自愈时必须一并重建：旧表被 DROP 后索引随之消失，少了这一条会话列表会退化为全表扫描
+     * （历史上 `healAgentSession` 未传 indexSqls，索引永久丢失）。
+     */
+    private const val AGENT_SESSION_UPDATED_IDX =
+        "CREATE INDEX agent_session_updated_idx ON agent_session (updated_at);"
+
     // ── agent_session 目标结构（与 sqldelight/agent/agent.sq 保持一致）──────────
     // agent_session 与 agent_message 同属 P2-3「对齐全表」的演进表，结构漂移风险同类，一并自愈。
 
@@ -96,7 +105,13 @@ object SchemaSelfHealer {
     /** 修复 agent_message 缺 id（或其他目标列）的历史库。打开 AgentDb 后调用一次。 */
     fun healAgentMessage(driver: SqlDriver) {
         FileLogger.i(TAG, "healAgentMessage 开始")
-        healTable(driver, "agent_message", AGENT_MESSAGE_COLUMNS, AGENT_MESSAGE_CREATE, listOf(AGENT_MESSAGE_SESSION_IDX))
+        healTable(
+            driver = driver,
+            table = "agent_message",
+            targetColumns = AGENT_MESSAGE_COLUMNS,
+            createSql = AGENT_MESSAGE_CREATE,
+            indexSqls = listOf(AGENT_MESSAGE_SESSION_IDX),
+        )
     }
 
     /**
@@ -110,7 +125,13 @@ object SchemaSelfHealer {
             return
         }
         FileLogger.w(TAG, "agent_message.id 仍缺失！强制再次重建")
-        healTable(driver, "agent_message", AGENT_MESSAGE_COLUMNS, AGENT_MESSAGE_CREATE, listOf(AGENT_MESSAGE_SESSION_IDX))
+        healTable(
+            driver = driver,
+            table = "agent_message",
+            targetColumns = AGENT_MESSAGE_COLUMNS,
+            createSql = AGENT_MESSAGE_CREATE,
+            indexSqls = listOf(AGENT_MESSAGE_SESSION_IDX),
+        )
         if (!hasColumn(driver, "agent_message", "id")) {
             val cols = runCatching { tableColumns(driver, "agent_message").joinToString() }.getOrDefault("?")
             val legacyCols = runCatching { tableColumns(driver, "agent_message_legacy").joinToString() }.getOrDefault("?")
@@ -131,10 +152,16 @@ object SchemaSelfHealer {
     fun hasColumn(driver: SqlDriver, table: String, column: String): Boolean =
         tableColumns(driver, table).contains(column)
 
-    /** 与 agent_message 同风险的 agent_session 结构自愈。 */
+    /** 与 agent_message 同风险的 agent_session 结构自愈（含索引重建，见 [AGENT_SESSION_UPDATED_IDX]）。 */
     fun healAgentSession(driver: SqlDriver) {
         FileLogger.i(TAG, "healAgentSession 开始")
-        healTable(driver, "agent_session", AGENT_SESSION_COLUMNS, AGENT_SESSION_CREATE)
+        healTable(
+            driver = driver,
+            table = "agent_session",
+            targetColumns = AGENT_SESSION_COLUMNS,
+            createSql = AGENT_SESSION_CREATE,
+            indexSqls = listOf(AGENT_SESSION_UPDATED_IDX),
+        )
     }
 
     /** agent_session 保证性复核（同 [ensureAgentMessageUsable]）。 */
@@ -144,7 +171,13 @@ object SchemaSelfHealer {
             return
         }
         FileLogger.w(TAG, "agent_session.id 仍缺失！强制再次重建")
-        healTable(driver, "agent_session", AGENT_SESSION_COLUMNS, AGENT_SESSION_CREATE)
+        healTable(
+            driver = driver,
+            table = "agent_session",
+            targetColumns = AGENT_SESSION_COLUMNS,
+            createSql = AGENT_SESSION_CREATE,
+            indexSqls = listOf(AGENT_SESSION_UPDATED_IDX),
+        )
         if (!hasColumn(driver, "agent_session", "id")) {
             val cols = runCatching { tableColumns(driver, "agent_session").joinToString() }.getOrDefault("?")
             FileLogger.e(TAG, "agent_session 自愈后仍缺 id 列！当前列: [$cols]")
@@ -166,7 +199,20 @@ object SchemaSelfHealer {
      *  - 索引名冲突：SQLite 中 RENAME 后的旧表会保留原索引名，随后 CREATE INDEX 同名会抛 "index already exists"。
      *    这里在建新表前 DROP INDEX IF EXISTS 预清理（旧索引随旧表删表一并消失，属于待回收资源，先删安全）。
      *  - 缺列回填：被缺的 NOT NULL 无默认列（典型即 PK `id`）若直接省略则 INSERT 抛 "NOT NULL constraint failed"。
-     *    迁移时对缺失列按「先自身 DEFAULT、再 id→生成 UUID、再按类型兜底」回填，保证不丢行、不撞约束。
+     *    迁移时对缺失列按「先自身 DEFAULT、再 id→由 rowid 推导、再按类型兜底」回填，保证不丢行、不撞约束。
+     *
+     * **事务性（致命项 F1 修复，必须保持）**：
+     *  旧实现 RENAME → CREATE → INSERT → DROP 全程裸奔：INSERT 一旦失败（单行约束冲突/磁盘满/进程被杀），
+     *  新表列齐全 → 下次启动 `missing.isEmpty()` 直接跳过 → `*_legacy` 里的历史数据**永远读不出来且无人知晓**。
+     *  现在整段包在事务里：失败即回滚，旧表恢复原名，下次启动可重试；并在 DROP 前断言
+     *  `COUNT(新表) == COUNT(legacy)`，不等则中止并保留 legacy。
+     *
+     * **外键安全（审计报告「待确认 1」的结论）**：
+     *  SQLite 3.25+ 的 `ALTER TABLE ... RENAME` 会**改写其它表的 FK 定义**指向新名（`*_legacy`），
+     *  随后 DROP 掉 legacy 就留下悬空 FK；开启 `foreign_keys` 后子表 INSERT 会直接失败。
+     *  故自愈期间：① 先 `PRAGMA legacy_alter_table=ON`（让 RENAME 不改写引用，子表 FK 继续指向新表）；
+     *  ② 临时关闭 `foreign_keys`（重建期间强制 FK 没有意义，且 `legacy_alter_table` 不可用时用它兜底）；
+     *  ③ 结束后恢复。两个 PRAGMA 都包 `runCatching`——设备 SQLite 版本不支持时降级，不阻断自愈。
      *
      * v2-full-takeover P3 诊断加固：全节点输出 FileLogger，让崩溃快照里能看到 existing / missing /
      *  RENAME / CREATE / INSERT / DROP 的每一步状态。
@@ -217,45 +263,121 @@ object SchemaSelfHealer {
             /* 删除失败不阻断主流，RENAME 前再试 */
         }
 
-        FileLogger.i(TAG, "  ALTER TABLE $table RENAME TO $legacy")
-        exec(driver, "ALTER TABLE $table RENAME TO $legacy;")
+        // ── FK/ALTER 兼容开关：必须在 BEGIN 之前（事务内 PRAGMA foreign_keys 是 no-op）──
+        val fkWasOn = foreignKeysEnabled(driver)
+        if (fkWasOn) runCatching { exec(driver, "PRAGMA foreign_keys = OFF;") }
+        runCatching { exec(driver, "PRAGMA legacy_alter_table = ON;") }
 
-        FileLogger.i(TAG, "  CREATE TABLE $table")
-        exec(driver, createSql)
+        val txStarted = beginImmediate(driver)
+        try {
+            FileLogger.i(TAG, "  ALTER TABLE $table RENAME TO $legacy")
+            exec(driver, "ALTER TABLE $table RENAME TO $legacy;")
 
-        val meta = columnMeta(createSql)
-        // 迁移：常见列透传，缺失列按默认/类型兜底回填（不丢旧行、不撞 NOT NULL 约束）。
-        val insertCols = ArrayList(targetColumns)
-        val selectExprs = ArrayList<String>(targetColumns.size)
-        for (col in targetColumns) {
-            if (col in existing) {
-                selectExprs += "\"$col\""
-            } else {
-                val m = meta[col]
-                selectExprs += when {
-                    col == "id" -> "lower(hex(randomblob(16)))"          // 主键 UUID，保证唯一且非空
-                    m?.default != null -> m.default                       // 优先表定义 DEFAULT
-                    m?.notNull == true -> if ((m.type ?: "").startsWith("INT")) "0" else "''" // 按类型兜底
-                    else -> "NULL"
+            FileLogger.i(TAG, "  CREATE TABLE $table")
+            exec(driver, createSql)
+
+            val meta = columnMeta(createSql)
+            // 迁移：常见列透传，缺失列按默认/类型兜底回填（不丢旧行、不撞 NOT NULL 约束）。
+            val insertCols = ArrayList(targetColumns)
+            val selectExprs = ArrayList<String>(targetColumns.size)
+            val synthetic = ArrayList<String>()
+            for (col in targetColumns) {
+                if (col in existing) {
+                    selectExprs += "\"$col\""
+                } else {
+                    val m = meta[col]
+                    selectExprs += when {
+                        // 主键缺失：用 rowid 推导而非随机 UUID —— 随机会让这批行与
+                        // task_id / tool_call_id / chunk_group_id 的追溯链彻底断裂，
+                        // 而 rowid 推导值可反查回 legacy 表（审计报告 H2）。
+                        col == "id" -> {
+                            synthetic += col
+                            syntheticIdExpr(table, existing)
+                        }
+                        m?.default != null -> m.default                    // 优先表定义 DEFAULT
+                        m?.notNull == true -> if ((m.type ?: "").startsWith("INT")) "0" else "''" // 按类型兜底
+                        else -> "NULL"
+                    }
                 }
             }
-        }
-        val cols = insertCols.joinToString(",") { "\"$it\"" }
-        val exprs = selectExprs.joinToString(",")
-        FileLogger.i(TAG, "  INSERT INTO $table ($cols) SELECT $exprs FROM $legacy")
-        exec(driver, "INSERT INTO $table ($cols) SELECT $exprs FROM $legacy;")
+            if (synthetic.isNotEmpty()) {
+                FileLogger.w(
+                    TAG,
+                    "  $table 缺主键，按行序推导回填（可反查 $legacy 的 rowid）: ${synthetic.joinToString()}",
+                )
+            }
+            val cols = insertCols.joinToString(",") { "\"$it\"" }
+            val exprs = selectExprs.joinToString(",")
+            FileLogger.i(TAG, "  INSERT INTO $table ($cols) SELECT $exprs FROM $legacy")
+            exec(driver, "INSERT INTO $table ($cols) SELECT $exprs FROM $legacy;")
 
-        indexSqls.forEach {
-            FileLogger.i(TAG, "  CREATE INDEX: ${it.take(80)}...")
-            exec(driver, it)
-        }
+            indexSqls.forEach {
+                FileLogger.i(TAG, "  CREATE INDEX: ${it.take(80)}...")
+                exec(driver, it)
+            }
 
-        FileLogger.i(TAG, "  DROP TABLE $legacy")
-        exec(driver, "DROP TABLE $legacy;")
+            // DROP 前行数断言：行数对不上说明数据没搬全，绝不能删 legacy（删了就永久丢）。
+            val newCount = countRows(driver, table)
+            val legacyCount = countRows(driver, legacy)
+            if (newCount != legacyCount) {
+                throw IllegalStateException(
+                    "自愈行数校验失败：$table=$newCount 行，但 $legacy=$legacyCount 行；" +
+                        "已回滚并保留 $legacy，请人工检查后重试",
+                )
+            }
+
+            FileLogger.i(TAG, "  DROP TABLE $legacy（行数校验通过：两者均 $newCount 行）")
+            exec(driver, "DROP TABLE $legacy;")
+
+            if (txStarted) exec(driver, "COMMIT;")
+        } catch (t: Throwable) {
+            if (txStarted) runCatching { exec(driver, "ROLLBACK;") }
+            FileLogger.e(TAG, "healTable($table) 失败，已回滚：$table 恢复原状，下次启动可重试", t)
+            throw t
+        } finally {
+            runCatching { exec(driver, "PRAGMA legacy_alter_table = OFF;") }
+            if (fkWasOn) runCatching { exec(driver, "PRAGMA foreign_keys = ON;") }
+        }
 
         val afterCols = tableColumns(driver, table)
         FileLogger.i(TAG, "healTable($table) 完成，当前列: ${afterCols.joinToString()}")
     }
+
+    /**
+     * 主键缺失时的回填表达式：**由 rowid 推导**而非 `randomblob`。
+     *
+     * 旧实现用 `lower(hex(randomblob(16)))`，每次自愈结果都不同，这批行与
+     * `task_id` / `tool_call_id` / `chunk_group_id` 的关联链彻底断裂且无法回溯。
+     * 用 `session_id#rowid`（无 session_id 时退化为 `表名#rowid`）既能保证唯一非空，
+     * 又能在需要时反查 `*_legacy` 的原始行。
+     */
+    private fun syntheticIdExpr(table: String, existing: Set<String>): String =
+        if ("session_id" in existing) "COALESCE(\"session_id\", '') || '#' || rowid"
+        else "'$table' || '#' || rowid"
+
+    /** 开启 IMMEDIATE 事务；已在事务中（嵌套）时返回 false，由外层负责提交/回滚。 */
+    private fun beginImmediate(driver: SqlDriver): Boolean =
+        try {
+            exec(driver, "BEGIN IMMEDIATE TRANSACTION;")
+            true
+        } catch (e: Exception) {
+            FileLogger.w(TAG, "  开启事务失败（多半已在事务中，交由外层管理）: ${e.message}")
+            false
+        }
+
+    private fun foreignKeysEnabled(driver: SqlDriver): Boolean =
+        runCatching {
+            driver.executeQuery(null, "PRAGMA foreign_keys", { cursor ->
+                val v = if (cursor.next().value) cursor.getLong(0) ?: 0L else 0L
+                QueryResult.Value(v == 1L)
+            }, 0, null).value
+        }.getOrDefault(false)
+
+    private fun countRows(driver: SqlDriver, table: String): Long =
+        driver.executeQuery(null, "SELECT COUNT(*) FROM \"$table\"", { cursor ->
+            val v = if (cursor.next().value) cursor.getLong(0) ?: 0L else 0L
+            QueryResult.Value(v)
+        }, 0, null).value
 
     /**
      * 解析 CREATE TABLE 的列元数据：name → (type, notNull(含 DEFAULT), default 字面量或 null)。
@@ -296,7 +418,12 @@ object SchemaSelfHealer {
         return QueryResult.Value(names)
     }
 
+    /**
+     * 执行单条 SQL：**统一剥离尾部分号**。
+     * `AGENTS.md` 的迁移 SQL 纪律要求字面量不含 `;`（防切分器误切多语句），
+     * 这里在出口统一处理，调用方保持既有书写习惯即可（审计报告 L3）。
+     */
     private fun exec(driver: SqlDriver, sql: String) {
-        driver.execute(null, sql, 0, null)
+        driver.execute(null, sql.trim().removeSuffix(";"), 0, null)
     }
 }

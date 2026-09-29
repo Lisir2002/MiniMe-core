@@ -3,6 +3,9 @@ package com.mini.me_core.datalayer.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import com.mini.me_core.datalayer.exception.DataLayerErrorCode
+import com.mini.me_core.datalayer.exception.DataLayerException
+import com.mini.me_core.datalayer.util.escapeSqlLike
 import com.mini.mecore.datalayer.sqldelight.AgentDb
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_message
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session
@@ -181,7 +184,8 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
         withContext(Dispatchers.IO) { q.markPendingToolsInterrupted(interruptedContent, toolRole, pendingPrefix).value }
 
     suspend fun searchMessages(query: String): List<Agent_message> =
-        withContext(Dispatchers.IO) { q.searchMessages(query).executeAsList() }
+        // M7：转义用户输入中的 \ % _，配合 .sq 的 `LIKE ... ESCAPE '\'`，避免被当通配符。
+        withContext(Dispatchers.IO) { q.searchMessages(escapeSqlLike(query)).executeAsList() }
 
     suspend fun getAllMessagesOnce(): List<Agent_message> =
         withContext(Dispatchers.IO) { q.selectAllMessages().executeAsList() }
@@ -777,6 +781,9 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
 
     override suspend fun markWakeItemsConsumedBatch(ids: List<String>, status: String): Unit =
         withContext(Dispatchers.IO) {
+            // 待确认2：SQLDelight 对空列表生成 `IN ()`，SQLite 允许但语义为 false（不更新任何行）。
+            // 显式短路，避免「空列表被误当成全量」的歧义，也省一次无意义的写事务。
+            if (ids.isEmpty()) return@withContext
             q.markWakeItemsConsumedBatch(status, ids)
             Unit
         }
@@ -929,10 +936,19 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
      * 在单事务内执行 [block]（同线程顺序执行，SQLDelight 2.2.1 的 ThreadLocal 事务）。
      * 供 SessionUseCase.deleteSession 等「多表原子写」使用；事务块内只能用 [AgentTx] 暴露的
      * 阻塞方法（不得调用本 Repository 的 suspend 方法，否则 withContext 会跳线程破坏事务绑定）。
+     *
+     * ⚠️ **必须是 suspend + 切到 [Dispatchers.IO]**（H6）：
+     * 过去它是**阻塞 `fun`**，而 `deleteSession` / `deleteSessionsByWorkspace` 是 `suspend fun`
+     * 且内部没有 `withContext`——12 张表级联 DELETE 的事务就跑在调用方调度器上，
+     * ViewModel 场景即 **Main 线程**，SQLCipher 加密库上必 ANR。
+     * 现在整段（含事务开闭）都在 IO 线程内完成：SQLDelight 的事务是 ThreadLocal 绑定，
+     * 只要 block 内不再切线程，绑定始终成立。
      */
-    fun runInTx(block: (AgentTx) -> Unit) {
-        db.transaction {
-            block(AgentTx(q))
+    suspend fun runInTx(block: (AgentTx) -> Unit) {
+        withContext(Dispatchers.IO) {
+            db.transaction {
+                block(AgentTx(q))
+            }
         }
     }
 }
@@ -968,7 +984,20 @@ class AgentTx internal constructor(private val q: com.mini.mecore.datalayer.sqld
         parentGoalId: String, roundSeq: Long, createdAtMs: Long, updatedAtMs: Long,
     ) {
         old?.let { o ->
-            q.casUpdateGoalStatusAndText("ABANDONED", o.text, o.revision + 1, updatedAtMs, o.goal_id, o.revision)
+            // M9：CAS 的**受影响行数必须判等 1**。
+            // 过去返回值被丢弃，一旦 revision 被并发改掉（CAS 未命中，返回 0），
+            // 旧 ACTIVE 目标不会被放弃，而新目标照常插入 —— 同一会话出现两个 ACTIVE 目标，
+            // Agent 行为随之分裂。现在未命中即抛 CONCURRENT_ACCESS，整事务回滚，由调用方重试。
+            val affected = q.casUpdateGoalStatusAndText(
+                "ABANDONED", o.text, o.revision + 1, updatedAtMs, o.goal_id, o.revision,
+            ).value
+            if (affected != 1L) {
+                throw DataLayerException(
+                    "放弃旧 ACTIVE 目标失败（CAS 未命中，revision 疑似被并发修改）：" +
+                        "goal=${o.goal_id}, expectedRevision=${o.revision}, affected=$affected",
+                    DataLayerErrorCode.CONCURRENT_ACCESS,
+                )
+            }
         }
         q.upsertGoal(goalId, sessionId, text, status, revision, parentGoalId, roundSeq, createdAtMs, updatedAtMs)
     }

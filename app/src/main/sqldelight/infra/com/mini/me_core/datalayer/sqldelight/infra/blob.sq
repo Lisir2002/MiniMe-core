@@ -1,24 +1,31 @@
--- infra / BlobStore v1 schema（设计文档 §6.4 / §6.6）
+-- infra / BlobStore schema（设计文档 §6.4 / §6.6）
 -- 生成类：InfraDb / BlobQueries
+--
+-- v2（M10）新增 path 列：≤ 256KB 的小对象直接存 data 列；更大的对象落盘到应用私有目录，
+-- DB 仅存相对路径 path，避免重型 BLOB 长期占用单连接写锁（审计 M10）。
 
 CREATE TABLE blob_store (
   id          INTEGER PRIMARY KEY,
   mime        TEXT,
   size        INTEGER NOT NULL,
   data        BLOB    NOT NULL,
-  created_at  INTEGER NOT NULL
+  created_at  INTEGER NOT NULL,
+  path        TEXT
 );
 
 -- ── queries ──
 insertBlob:
-INSERT INTO blob_store (mime, size, data, created_at)
-VALUES (?, ?, ?, ?);
+INSERT INTO blob_store (mime, size, data, path, created_at)
+VALUES (?, ?, ?, ?, ?);
 
 selectBlob:
 SELECT * FROM blob_store WHERE id = ?;
 
 selectBlobMeta:
-SELECT id, mime, size, created_at FROM blob_store WHERE id = ?;
+SELECT id, mime, size, path, created_at FROM blob_store WHERE id = ?;
+
+updateBlobPath:
+UPDATE blob_store SET path = ? WHERE id = ?;
 
 deleteBlob:
 DELETE FROM blob_store WHERE id = ?;

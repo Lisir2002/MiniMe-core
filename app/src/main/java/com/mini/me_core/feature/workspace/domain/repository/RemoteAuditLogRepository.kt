@@ -2,6 +2,7 @@ package com.mini.me_core.feature.workspace.domain.repository
 
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.WorkspaceRepository as V2WorkspaceRepository
+import com.mini.me_core.datalayer.util.escapeSqlLike
 import com.mini.me_core.feature.workspace.data.local.entity.RemoteAuditLogEntity
 import com.mini.me_core.feature.workspace.domain.RemoteAuditAction
 import com.mini.me_core.feature.workspace.domain.RemoteAuditCategory
@@ -138,7 +139,8 @@ class RemoteAuditLogRepository @Inject constructor(
      */
     suspend fun search(query: String, page: Int, pageSize: Int = 50): List<RemoteAuditLogEntity> =
         withContext(Dispatchers.IO) {
-            val kw = "%${query.trim()}%"
+            // M7：转义用户输入中的 \ % _ 并配合 .sq 的 `LIKE ... ESCAPE '\'`，避免被当通配符。
+            val kw = "%${escapeSqlLike(query.trim())}%"
             v2Workspace.searchAuditLogs(kw, page * pageSize.toLong(), pageSize.toLong())
                 .map { it.toEntity() }
         }

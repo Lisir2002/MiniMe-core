@@ -8,6 +8,7 @@ import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.engine.DatabasePathProvider
 import com.mini.me_core.datalayer.engine.LibName
 import java.io.File
+import java.util.Collections
 
 /**
  * 迁移引擎（设计 §5：数据保护核心）。
@@ -31,6 +32,15 @@ class MigrationEngine(
         override fun readVersion(lib: LibName): Int = 0
     },
 ) {
+
+    /**
+     * 本进程内已拍过快照的库（M2）。
+     *
+     * 一次冷启动里 [preOpen] 与 [withSnapshotGuard] 会各请求一次快照，而两者抓的都是
+     * 「迁移前」的同一现场；重复快照不仅多花一倍 IO，还会让轮转多淘汰一代，
+     * 真正的迁移前现场反而更快消失。去重后 `<name>.bak` 保住的是更早、更干净的那份。
+     */
+    private val snapshottedThisProcess = Collections.synchronizedSet(mutableSetOf<LibName>())
 
     companion object {
         const val TAG = "MigrationEngine"
@@ -75,15 +85,31 @@ class MigrationEngine(
             }
             PreOpenAction.DOWNGRADE -> {
                 // 提前到打开前拒绝，避免用低版本 schema 打开高版本数据造成损坏。
-                error("[$lib] 检测到版本回退：$current > $target，拒绝打开以防数据损坏")
+                // ⚠️ 抛 [MigrationRejectedException]（H5）：调用方必须让它终止启动，
+                //    不能像"快照失败"那样记个日志就继续——继续即数据损坏。
+                throw MigrationRejectedException(
+                    "[$lib] 检测到版本回退：$current > $target，拒绝打开以防数据损坏",
+                    MigrationRejectedException.RejectReason.VERSION_DOWNGRADE,
+                )
             }
             PreOpenAction.UNREADABLE -> {
                 // 文件存在但打不开（损坏 / 密钥不匹配 / 迁移半成品）。
-                // 顺序不可颠倒：先快照（复制到 backup/ 保命）→ 再隔离（重命名主库），
-                // 之后 driver 才能以全新库重建，且原始文件仍在，可人工恢复。
-                FileLogger.e(TAG, "  $lib 库文件存在但无法打开（损坏/密钥不匹配）：先快照保命，再隔离原文件")
-                snapshot(lib, heavy)
+                // ⚠️ 顺序不可颠倒：先把现场复制到 backup/ 保命 → 再隔离（重命名主库），
+                //    之后 driver 才能以全新库重建，且原始文件仍在，可人工恢复。
+                //
+                // M1：这里**不再**占用 `<name>.bak`（唯一回滚位）。坏库若写进 .bak，
+                // 上一份好快照会被轮转为历史、3 代后淘汰——安全网在真正需要它的那刻失效。
+                // 坏库改落 backup/<name>.broken-<ts>.bak；quarantine 本身也保留原件。
+                FileLogger.e(TAG, "  $lib 库文件存在但无法打开（损坏/密钥不匹配）：先另存现场，再隔离原文件")
                 preservePlaintextBackup(lib)
+                val safetySaved = preserveBrokenCopy(lib)
+                if (!safetySaved) {
+                    // 现场没保住就绝不能隔离重建——那等于静默清空用户数据（H5）。
+                    throw MigrationRejectedException(
+                        "[$lib] 库不可读且现场另存失败，拒绝隔离重建以免数据静默丢失",
+                        MigrationRejectedException.RejectReason.UNREADABLE_NO_SAFETY_COPY,
+                    )
+                }
                 quarantine(lib)
             }
         }
@@ -120,7 +146,10 @@ class MigrationEngine(
                     .sortedBy { it.from }
                     .forEach { it.block(driver) }
             }
-            else -> error("[$lib] 检测到版本回退：$current > $target，拒绝打开以防数据损坏")
+            else -> throw MigrationRejectedException(
+                "[$lib] 检测到版本回退：$current > $target，拒绝打开以防数据损坏",
+                MigrationRejectedException.RejectReason.VERSION_DOWNGRADE,
+            )
         }
     }
 
@@ -140,8 +169,17 @@ class MigrationEngine(
      * 轮转语义：写入新快照**前**，先把上一份 `<name>.bak` 另存为 `<name>.<时间戳>.bak`，
      * 再按 [MAX_SNAPSHOTS] 淘汰最旧的历史快照。
      * `<name>.bak` 始终是「最近一次」，[restoreSnapshot] 的回滚目标不变。
+     *
+     * ⚠️ **每进程每库只快照一次**（M2）：一次冷启动里 `preOpen` 会快照一次、
+     * [withSnapshotGuard] 又快照一次，两次都是「迁移前」的同一现场，却吃掉两代轮转，
+     * 让真正的迁移前现场更快被淘汰，还多花一倍 IO。故用 [snapshottedThisProcess] 去重，
+     * 需要强制再拍一份（运维/导出场景）时显式传 `force = true`。
      */
-    fun snapshot(lib: LibName, heavy: Boolean) {
+    fun snapshot(lib: LibName, heavy: Boolean, force: Boolean = false) {
+        if (!force && lib in snapshottedThisProcess) {
+            FileLogger.d(TAG, "  $lib 本进程已快照过，跳过重复快照（M2）")
+            return
+        }
         val main = pathProvider.mainDb(lib)
         if (!main.exists()) return
         val bak = pathProvider.snapshotFile(lib)
@@ -149,6 +187,7 @@ class MigrationEngine(
         main.copyTo(bak, overwrite = true)
         copySidecar(main, bak, "wal")
         copySidecar(main, bak, "shm")
+        snapshottedThisProcess += lib
         pruneSnapshots(lib)
         if (heavy) {
             // 重版本/危险迁移：此处叠加逻辑备份（SQL dump / 表级导出），当前留扩展位。
@@ -251,10 +290,45 @@ class MigrationEngine(
     }
 
     /**
+     * 把不可读的主库另存到 backup 目录：`<fileName>.broken-<时间戳>.bak`（M1）。
+     *
+     * 为什么不写进 `<name>.bak`：那是 [restoreSnapshot] 的**唯一回滚位**，
+     * 把坏库写进去会顶掉上一份好快照（它被轮转为历史、3 代后淘汰），
+     * 安全网恰在最需要时失效。坏库单独落 `broken-<ts>.bak`，与好快照互不干扰。
+     * [quarantine] 仍会把原件留在原目录，这里是便于导出的第二份。
+     *
+     * @return true = 现场已安全另存（或本来就没有文件可存）；false = 另存失败，
+     *         调用方必须据此**拒绝继续**（见 [MigrationRejectedException.RejectReason.UNREADABLE_NO_SAFETY_COPY]）。
+     */
+    fun preserveBrokenCopy(lib: LibName): Boolean {
+        val main = pathProvider.mainDb(lib)
+        if (!main.exists()) return true
+        val dir = pathProvider.backupDir()
+        if (!dir.isDirectory && !dir.mkdirs()) {
+            FileLogger.e(TAG, "backup 目录不可用，无法另存不可读库现场：${dir.absolutePath}")
+            return false
+        }
+        val dest = dir.resolve("${lib.fileName}.broken-${System.currentTimeMillis()}.bak")
+        return runCatching {
+            main.copyTo(dest, overwrite = true)
+            copySidecar(main, dest, "wal")
+            copySidecar(main, dest, "shm")
+            FileLogger.i(TAG, "不可读库现场已另存：${dest.absolutePath}（${main.length()} 字节，可人工恢复）")
+            true
+        }.getOrElse { e ->
+            FileLogger.e(TAG, "不可读库现场另存失败：${main.absolutePath}", e)
+            false
+        }
+    }
+
+    /**
      * 抢救密钥形态迁移留下的源形态备份 `<name>.pre_enc.bak`（KeyRotationMigrator Step8 产物）。
      *
      * 该文件是加密迁移**之前**的明文库，若完整则是损坏现场唯一可直接读取的原始数据。
-     * 复制到 backup 目录统一保管：既不覆盖任何现有文件，又让它与快照并列、便于导出恢复。
+     * 复制到 backup 目录的 `<fileName>.pre_enc.bak` 统一保管，与快照并列、便于导出恢复。
+     *
+     * 覆盖语义（L4 注释与实现对齐）：目标是**固定名**，故用 `overwrite = true` 让每次抢救
+     * 都留下最新一份；它只覆盖同名的上一份抢救产物，**不会**碰主库、快照或其它文件。
      *
      * @return 是否发现并保存了明文备份。
      */

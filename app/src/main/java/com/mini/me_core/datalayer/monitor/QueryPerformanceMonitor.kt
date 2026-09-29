@@ -43,6 +43,13 @@ object QueryPerformanceMonitor {
 
     private const val MAX_SLOW_QUERIES = 1000
 
+    /**
+     * 慢查询阈值（ms）。记录入环形缓冲与 [getSlowQueries] 的过滤阈值共用同一常量，
+     * 杜绝「记录用 100、查询传 50 却拿不到 50–100ms 记录」的自相矛盾（审计 L5）。
+     * 调用方若需更细粒度，须同时把相同阈值传给 [recordQuery] 与 [getSlowQueries]。
+     */
+    const val SLOW_QUERY_THRESHOLD_MS = 100
+
     // 慢查询环形缓冲区
     private val slowQueries = ArrayDeque<SlowQueryEntry>()
     private val slowLock = Any()
@@ -78,8 +85,8 @@ object QueryPerformanceMonitor {
             if (durationMs > agg.maxDurationMs) agg.maxDurationMs = durationMs
         }
 
-        // 慢查询单独记录（阈值 100ms）
-        if (durationMs > 100) {
+        // 慢查询单独记录（阈值见 SLOW_QUERY_THRESHOLD_MS）
+        if (durationMs >= SLOW_QUERY_THRESHOLD_MS) {
             synchronized(statsLock) {
                 val agg = queryStats[key]!!
                 agg.slowCount++
@@ -95,8 +102,8 @@ object QueryPerformanceMonitor {
         }
     }
 
-    /** 获取慢查询列表（最新在前）。 */
-    fun getSlowQueries(thresholdMs: Long = 100): List<SlowQueryEntry> {
+    /** 获取慢查询列表（最新在前）。[thresholdMs] 应与 [recordQuery] 的慢查询阈值一致。 */
+    fun getSlowQueries(thresholdMs: Long = SLOW_QUERY_THRESHOLD_MS): List<SlowQueryEntry> {
         synchronized(slowLock) {
             return slowQueries.filter { it.durationMs >= thresholdMs }.reversed()
         }

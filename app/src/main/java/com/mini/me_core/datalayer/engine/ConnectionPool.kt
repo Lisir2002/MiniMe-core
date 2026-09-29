@@ -1,6 +1,7 @@
 package com.mini.me_core.datalayer.engine
 
 import app.cash.sqldelight.db.SqlDriver
+import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.encryption.EncryptedDatabaseManager
 
 /**
@@ -14,6 +15,13 @@ import com.mini.me_core.datalayer.encryption.EncryptedDatabaseManager
  *
  * 新架构（db-encryption-redesign）：driver 创建统一走 [EncryptedDatabaseManager]，
  * 所有数据库默认加密，无明文/加密路由。
+ *
+ * ⚠️ **缓存写入顺序（H4）**：必须「先自愈成功、再 put 缓存」。
+ * 过去的写法是 `drivers[lib] = created` 之后才 `onOpened?.invoke()`，一旦自愈/ensureSchema
+ * 抛异常，缓存里留下的是**未自愈的半成品 driver**，而异常被上层记为 warn 后继续运行；
+ * 之后每次 `pool.driver(lib)` 都直接命中缓存返回，preOpen / ensureSchema / 自愈**永久跳过**，
+ * 表现为「启动日志干净，但数据就是不对」。现在失败即关闭连接、不写缓存、异常继续上抛，
+ * 下次访问会重新走完整流程（自愈可重试）。
  *
  * @param openGuard 包裹「driver 创建」的守卫（默认 null = 不守卫）。由
  *   [com.mini.me_core.datalayer.migration.MigrationEngine.withSnapshotGuard] 提供：
@@ -38,9 +46,20 @@ class ConnectionPool(
         // dbId（而非 name.lowercase()）：与 DatabaseDefinition.id 同一真源，且与设备区域无关
         val open: () -> SqlDriver = { encryptedManager.getDriverBlocking(lib.dbId) }
         val created = openGuard?.invoke(lib, open) ?: open()
+        // 先自愈、后缓存：失败即关连接，绝不留半成品在缓存里（H4）
+        try {
+            // 立即对齐 schema + 自愈，再让任何业务代码访问。
+            onOpened?.invoke(lib, created)
+        } catch (t: Throwable) {
+            runCatching { created.close() }
+            FileLogger.e(
+                TAG,
+                "onOpened($lib) 失败：已关闭该连接且不写入缓存，下次访问将重跑 preOpen/ensureSchema/自愈",
+                t,
+            )
+            throw t
+        }
         drivers[lib] = created
-        // 立即对齐 schema + 自愈，再让任何业务代码访问。
-        onOpened?.invoke(lib, created)
         return created
     }
 
@@ -48,5 +67,9 @@ class ConnectionPool(
     fun closeAll() {
         drivers.values.forEach { runCatching { it.close() } }
         drivers.clear()
+    }
+
+    companion object {
+        private const val TAG = "ConnectionPool"
     }
 }

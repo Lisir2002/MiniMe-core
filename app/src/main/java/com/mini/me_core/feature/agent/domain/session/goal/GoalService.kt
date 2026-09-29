@@ -1,5 +1,8 @@
 package com.mini.me_core.feature.agent.domain.session.goal
 
+import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.datalayer.exception.DataLayerErrorCode
+import com.mini.me_core.datalayer.exception.DataLayerException
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_goals as V2AgentGoal
 import com.mini.me_core.feature.agent.data.local.entity.GoalEntity
@@ -26,7 +29,14 @@ class GoalService @Inject constructor(
 
     /**
      * 激活新目标（会话内幂等替换）：事务内把旧 ACTIVE 目标置 ABANDONED，再插入新 ACTIVE 目标。
+     *
+     * ⚠️ M9 配套：[AgentTx.activateGoal] 现在会校验 CAS 受影响行数，未命中即抛
+     * [DataLayerException]（[DataLayerErrorCode.CONCURRENT_ACCESS]）并**整事务回滚**。
+     * 回滚后状态干净，故这里重读一次旧目标再跑一遍（最多重试 1 次），
+     * 而不是像过去那样"CAS 失败也照常插入"，导致同会话出现两个 ACTIVE 目标。
+     *
      * @return 新激活的目标实体。
+     * @throws DataLayerException 重试后仍冲突（或发生其它数据层错误）。
      */
     suspend fun activate(sessionId: String, text: String, roundSeq: Int = 0): GoalEntity {
         val now = System.currentTimeMillis()
@@ -41,21 +51,34 @@ class GoalService @Inject constructor(
             createdAtMs = now,
             updatedAtMs = now
         )
-        v2Agent.runInTx { tx ->
-                tx.activateGoal(
-                    sessionId = sessionId,
-                    old = v2Agent.getActiveGoalBySessionBlocking(sessionId),
-                    goalId = entity.goalId,
-                    text = entity.text,
-                    status = entity.status,
-                    revision = entity.revision.toLong(),
-                    parentGoalId = entity.parentGoalId,
-                    roundSeq = entity.roundSeq.toLong(),
-                    createdAtMs = entity.createdAtMs,
-                    updatedAtMs = entity.updatedAtMs
-                )
+        var lastError: DataLayerException? = null
+        repeat(MAX_ACTIVATE_ATTEMPTS) { attempt ->
+            try {
+                v2Agent.runInTx { tx ->
+                    tx.activateGoal(
+                        sessionId = sessionId,
+                        old = v2Agent.getActiveGoalBySessionBlocking(sessionId),
+                        goalId = entity.goalId,
+                        text = entity.text,
+                        status = entity.status,
+                        revision = entity.revision.toLong(),
+                        parentGoalId = entity.parentGoalId,
+                        roundSeq = entity.roundSeq.toLong(),
+                        createdAtMs = entity.createdAtMs,
+                        updatedAtMs = entity.updatedAtMs
+                    )
+                }
+                return entity
+            } catch (e: DataLayerException) {
+                if (e.errorCode != DataLayerErrorCode.CONCURRENT_ACCESS) throw e
+                lastError = e
+                FileLogger.w(TAG, "activate($sessionId) CAS 冲突（并发改了 revision），重试 ${attempt + 1}/$MAX_ACTIVATE_ATTEMPTS")
             }
-        return entity
+        }
+        throw lastError ?: DataLayerException(
+            "activate($sessionId) 失败（无异常信息）",
+            DataLayerErrorCode.CONCURRENT_ACCESS,
+        )
     }
 
     /** 按 id 读取目标。 */

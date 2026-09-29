@@ -18,6 +18,7 @@ import com.mini.me_core.datalayer.engine.DatabasePathProvider
 import com.mini.me_core.datalayer.engine.LibName
 import com.mini.me_core.datalayer.health.DatabaseHealthChecker
 import com.mini.me_core.datalayer.migration.MigrationEngine
+import com.mini.me_core.datalayer.migration.MigrationRejectedException
 import com.mini.me_core.datalayer.migration.SchemaSelfHealer
 import com.mini.me_core.datalayer.monitor.QueryPerformanceMonitor
 import com.mini.me_core.datalayer.repository.AgentRepository
@@ -145,11 +146,18 @@ object DataLayerModule {
                 return@preOpenHook
             }
             FileLogger.d(TAG, "preOpen($lib) target=${schema.version}")
-            runCatching {
+            try {
                 engine.preOpen(lib, schema)
                 FileLogger.v(TAG, "preOpen($lib) 完成")
-            }.onFailure {
-                FileLogger.e(TAG, "preOpen($lib) 失败（忽略，driver 打开后由 ensureSchema 兜底）", it)
+            } catch (t: Throwable) {
+                // H5：致命拒绝必须终止，不能像"快照失败"那样记个日志就继续。
+                //   · VERSION_DOWNGRADE：低版本 schema 打开高版本库 = 必然损坏；
+                //   · UNREADABLE_NO_SAFETY_COPY：坏库现场没保住就隔离重建 = 静默清空。
+                if (t is MigrationRejectedException) {
+                    FileLogger.e(TAG, "preOpen($lib) 致命拒绝（${t.reason}），终止启动", t)
+                    throw t
+                }
+                FileLogger.e(TAG, "preOpen($lib) 失败（非致命，driver 打开后由 ensureSchema 兜底）", t)
             }
         }
 
@@ -160,11 +168,16 @@ object DataLayerModule {
                 return@hook
             }
             FileLogger.d(TAG, "ensureSchema($lib) target=${schema.version}")
-            runCatching {
+            try {
                 engine.ensureSchema(lib, driver, schema)
                 FileLogger.v(TAG, "ensureSchema($lib) 完成")
-            }.onFailure {
-                FileLogger.e(TAG, "ensureSchema($lib) 失败（忽略，下次打开重试）", it)
+            } catch (t: Throwable) {
+                // 同 preOpen：版本回退等致命拒绝必须上抛（H5），其余留给下次打开重试。
+                if (t is MigrationRejectedException) {
+                    FileLogger.e(TAG, "ensureSchema($lib) 致命拒绝（${t.reason}），终止启动", t)
+                    throw t
+                }
+                FileLogger.e(TAG, "ensureSchema($lib) 失败（忽略，下次打开重试）", t)
             }
 
             // 对 AGENT 库额外跑 SchemaSelfHealer 自愈
@@ -266,7 +279,10 @@ object DataLayerModule {
 
     @Provides
     @Singleton
-    fun provideBlobStore(db: InfraDb): BlobStore = BlobStore(db)
+    fun provideBlobStore(db: InfraDb, @ApplicationContext context: Context): BlobStore =
+        // M10：落盘目录用应用私有 filesDir，与 DB 同属进程私有、随卸载清理；
+        // 大对象写此处、DB 仅存相对路径，缩短单连接写锁占用。
+        BlobStore(db, context.filesDir)
 
     @Provides
     @Singleton
@@ -314,7 +330,11 @@ object DataLayerModule {
         @ApplicationContext context: Context,
         registry: DatabaseRegistry,
         pool: ConnectionPool,
-    ): DatabaseBackupManager = DatabaseBackupManager(context, registry, pool)
+        keyManager: UnifiedKeyManager,
+    ): DatabaseBackupManager =
+        // 注入 keyManager：恢复后的完整性校验走「只读打开」通道，必须能取到本机 DEK；
+        // 取不到（跨设备备份）即判定为无法解密并回滚，而不是绕过校验（审计 F4 / M5）。
+        DatabaseBackupManager(context, registry, pool, keyManager)
 
     @Provides
     @Singleton

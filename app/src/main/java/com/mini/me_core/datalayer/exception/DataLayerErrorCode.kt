@@ -33,6 +33,9 @@ enum class DataLayerErrorCode(val code: Int, val userMessage: String) {
     CONSTRAINT_VIOLATION(1014, "数据约束违反，操作被拒绝"),
     CONCURRENT_ACCESS(1015, "数据库并发访问冲突，请稍后重试"),
 
+    // 全文检索（1017）
+    FTS_QUERY_ERROR(1017, "全文检索语法错误，请简化检索词"),
+
     // 清理（1016）
     CLEANUP_FAILED(1016, "数据库清理失败"),
 

@@ -2,7 +2,10 @@ package com.mini.me_core.datalayer.store
 
 import app.cash.sqldelight.coroutines.asFlow
 import com.mini.mecore.datalayer.sqldelight.InfraDb
+import com.mini.me_core.core.util.FileLogger
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 
 /**
@@ -21,6 +24,10 @@ data class KvEntry(
 )
 
 class KVStore(private val db: InfraDb) {
+
+    private companion object {
+        const val TAG = "KVStore"
+    }
 
     private val queries get() = db.kvQueries
 
@@ -42,15 +49,40 @@ class KVStore(private val db: InfraDb) {
     fun getAll(namespace: String): List<KvEntry> =
         queries.selectKvByNamespace(namespace).executeAsList().map { it.toEntry() }
 
-    /** 类型化 get 便捷方法：比 get().xVal?.let 更简洁。 */
-    fun getString(namespace: String, key: String): String? = get(namespace, key)?.stringVal
-    fun getInt(namespace: String, key: String): Long? = get(namespace, key)?.intVal
-    fun getBool(namespace: String, key: String): Boolean? = get(namespace, key)?.boolVal?.let { it != 0L }
-    fun getJson(namespace: String, key: String): String? = get(namespace, key)?.jsonVal
+    /**
+     * 类型化 get 便捷方法。
+     *
+     * ⚠️ **类型校验（审计 H7）**：读取时必须比对存储的 `type` 列，类型不符即返回 null 并告警。
+     * 过去 `putString` 后 `getInt` 会静默返回 null——历史上「设置项重启丢失」正是这一模式
+     * （写入的类型与读取的类型不一致，调用方误以为没值）。类型守卫让这种不一致显式暴露，
+     * 而不是表现得像「键不存在」。
+     */
+    fun getString(namespace: String, key: String): String? = typedGet(namespace, key, "string")?.stringVal
+    fun getInt(namespace: String, key: String): Long? = typedGet(namespace, key, "int")?.intVal
+    fun getBool(namespace: String, key: String): Boolean? =
+        typedGet(namespace, key, "bool")?.boolVal?.let { it != 0L }
+    fun getJson(namespace: String, key: String): String? = typedGet(namespace, key, "json")?.jsonVal
+
+    /** 类型守卫：类型匹配返回条目，否则记 warn 并返回 null。 */
+    private fun typedGet(namespace: String, key: String, expected: String): KvEntry? {
+        val e = get(namespace, key) ?: return null
+        if (e.type != expected) {
+            FileLogger.w(
+                TAG,
+                "KV 类型不匹配：key=$namespace:$key 实际存为 ${e.type}，按 $expected 读取，返回 null",
+            )
+            return null
+        }
+        return e
+    }
 
     /** 响应式观察（替代 DataStore.data）。 */
     fun observe(namespace: String, key: String): Flow<KvEntry?> =
-        queries.selectKv(namespace, key).asFlow().map { it.executeAsOneOrNull()?.toEntry() }
+        queries.selectKv(namespace, key)
+            .asFlow()
+            .map { it.executeAsOneOrNull()?.toEntry() }
+            // H7：查询在 IO 线程执行，避免 UI 收集时在主线程读加密库（与 repository 内 mapToList(IO) 一致）。
+            .flowOn(Dispatchers.IO)
 
     /** 类型化 observe 便捷方法：直接 Flow<String?> / Flow<Long?> / Flow<Boolean?>。 */
     fun observeString(namespace: String, key: String): Flow<String?> =
