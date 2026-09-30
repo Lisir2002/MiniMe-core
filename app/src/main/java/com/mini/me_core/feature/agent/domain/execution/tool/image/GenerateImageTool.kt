@@ -12,7 +12,7 @@ import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionPolicy
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolStreamEvent
 import com.mini.me_core.feature.agent.domain.execution.tool.StreamingAgentTool
-import com.mini.me_core.feature.t2i.data.local.entity.T2ITaskEntity
+import com.mini.mecore.datalayer.sqldelight.t2i.T2i_task
 import com.mini.me_core.feature.t2i.data.remote.ImageGenerator
 import com.mini.me_core.feature.t2i.domain.permission.T2IPermissionPolicyEngine
 import com.mini.me_core.feature.t2i.domain.repository.T2IRepository
@@ -207,21 +207,32 @@ class GenerateImageTool @Inject constructor(
             activeProvider.endpoint_mode, ImageGenerator.EndpointMode.AUTO,
             tag = "GenerateImageTool.endpointMode"
         ).name
-        val pending = T2ITaskEntity(
+        val pending = T2i_task(
             id = taskId,
-            sessionId = sessionId,
-            messageId = "",
+            session_id = sessionId,
+            message_id = "",
             prompt = prompt,
-            negativePrompt = negativePrompt,
-            width = width, height = height, steps = steps, hd = hd,
-            providerId = activeProvider.id,
-            modelId = targetModel?.model_id ?: desiredModel,
-            endpointModeRef = endpointModeRef,
+            negative_prompt = negativePrompt,
+            width = width.toLong(), height = height.toLong(), steps = steps.toLong(),
+            seed = 0L, hd = if (hd) 1L else 0L,
+            provider_id = activeProvider.id,
+            model_id = targetModel?.model_id ?: desiredModel,
+            provider_ref = "",
+            endpoint_mode_ref = endpointModeRef,
             status = "RUNNING",
-            permissionDecision = perm.verdict.name,
-            quotaDeductedTokens = perm.tokensToDeduct,
-            createdAtMs = now,
-            updatedAtMs = now,
+            image_path = "",
+            thumbnail_path = "",
+            remote_task_id = "",
+            progress_percent = 0L,
+            retry_count = 0L,
+            max_retries = 3L,
+            error_code = "",
+            error_message = "",
+            permission_decision = perm.verdict.name,
+            quota_deducted_tokens = perm.tokensToDeduct.toLong(),
+            created_at_ms = now,
+            updated_at_ms = now,
+            completed_at_ms = 0L,
         )
         t2iRepository.insertTask(pending)
 
@@ -270,8 +281,8 @@ class GenerateImageTool @Inject constructor(
                 put("thumbnailPath", res.thumbnailPath)
                 put("taskId", taskId)
                 put("markdown", mdPreview)
-                put("attempts", pending.retryCount + 1)
-                put("failures", pending.retryCount)
+                put("attempts", pending.retry_count.toInt() + 1)
+                put("failures", pending.retry_count.toInt())
                 // V-3：工作区副本路径（容器视角）与提示信息
                 workspaceCopyPath?.let { put("outputPath", it) }
                 copyNote?.let { put("note", it) }
@@ -300,7 +311,7 @@ class GenerateImageTool @Inject constructor(
                 runCatching {
                     t2iRepository.setTaskPermissionDecision(
                         taskId,
-                        decision = "REFUNDED_${pending.permissionDecision}",
+                        decision = "REFUNDED_${pending.permission_decision}",
                         deducted = 0,
                         updatedAtMs = System.currentTimeMillis()
                     )
@@ -313,11 +324,11 @@ class GenerateImageTool @Inject constructor(
      * 落盘失败/待重试任务行，返回本次尝试序号（nextRetry = retryCount + 1），供调用方拼接错误提示。
      */
     private suspend fun handleFailure(
-        taskId: String, pending: T2ITaskEntity,
+        taskId: String, pending: T2i_task,
         tokensDeducted: Int, code: String, msg: String,
         maxRetries: Int,
     ): Int {
-        val nextRetry = pending.retryCount + 1
+        val nextRetry = pending.retry_count.toInt() + 1
         val finalStatus = if (nextRetry < maxRetries) "PENDING_RETRY" else "FAILED"
         t2iRepository.markTaskFailedOrRetry(
             id = taskId,

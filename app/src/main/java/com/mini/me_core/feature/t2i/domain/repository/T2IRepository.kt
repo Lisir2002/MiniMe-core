@@ -2,7 +2,7 @@ package com.mini.me_core.feature.t2i.domain.repository
 
 import com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models
 import com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers
-import com.mini.me_core.feature.t2i.data.local.entity.T2ITaskEntity
+import com.mini.mecore.datalayer.sqldelight.t2i.T2i_task
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -36,10 +36,10 @@ interface T2IRepository {
 
     // ── Task ──
 
-    suspend fun insertTask(task: T2ITaskEntity)
-    suspend fun getTaskById(id: String): T2ITaskEntity?
-    suspend fun getTaskByMessageId(messageId: String): T2ITaskEntity?
-    suspend fun listDanglingTasks(cutoffMs: Long): List<T2ITaskEntity>
+    suspend fun insertTask(task: T2i_task)
+    suspend fun getTaskById(id: String): T2i_task?
+    suspend fun getTaskByMessageId(messageId: String): T2i_task?
+    suspend fun listDanglingTasks(cutoffMs: Long): List<T2i_task>
     suspend fun markTaskSuccess(id: String, imagePath: String, thumbnailPath: String, completedAtMs: Long)
     suspend fun markTaskFailedOrRetry(
         id: String, finalStatus: String, errorCode: String, errorMessage: String, retryCount: Int, updatedAtMs: Long,

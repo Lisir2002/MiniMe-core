@@ -4,7 +4,7 @@ import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.T2iRepository as V2T2iRepository
 import com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models
 import com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers
-import com.mini.me_core.feature.t2i.data.local.entity.T2ITaskEntity
+import com.mini.mecore.datalayer.sqldelight.t2i.T2i_task
 import com.mini.me_core.feature.t2i.domain.repository.T2IRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -102,26 +102,26 @@ class T2IRepositoryV2Impl @Inject constructor(
 
     // ── Task ──
 
-    override suspend fun insertTask(task: T2ITaskEntity) {
+    override suspend fun insertTask(task: T2i_task) {
         v2.insertTask(
-            id = task.id, sessionId = task.sessionId, messageId = task.messageId,
-            prompt = task.prompt, negativePrompt = task.negativePrompt,
-            width = task.width.toLong(), height = task.height.toLong(), steps = task.steps.toLong(),
-            seed = task.seed.toLong(), hd = if (task.hd) 1L else 0L,
-            providerId = task.providerId, modelId = task.modelId,
-            providerRef = task.providerRef, endpointModeRef = task.endpointModeRef,
-            status = task.status, imagePath = task.imagePath, thumbnailPath = task.thumbnailPath,
-            remoteTaskId = task.remoteTaskId, progressPercent = task.progressPercent.toLong(),
-            retryCount = task.retryCount.toLong(), maxRetries = task.maxRetries.toLong(),
-            errorCode = task.errorCode, errorMessage = task.errorMessage,
-            permissionDecision = task.permissionDecision, quotaDeductedTokens = task.quotaDeductedTokens.toLong(),
-            createdAtMs = task.createdAtMs, updatedAtMs = task.updatedAtMs, completedAtMs = task.completedAtMs,
+            id = task.id, sessionId = task.session_id, messageId = task.message_id,
+            prompt = task.prompt, negativePrompt = task.negative_prompt,
+            width = task.width, height = task.height, steps = task.steps,
+            seed = task.seed, hd = task.hd,
+            providerId = task.provider_id, modelId = task.model_id,
+            providerRef = task.provider_ref, endpointModeRef = task.endpoint_mode_ref,
+            status = task.status, imagePath = task.image_path, thumbnailPath = task.thumbnail_path,
+            remoteTaskId = task.remote_task_id, progressPercent = task.progress_percent,
+            retryCount = task.retry_count, maxRetries = task.max_retries,
+            errorCode = task.error_code, errorMessage = task.error_message,
+            permissionDecision = task.permission_decision, quotaDeductedTokens = task.quota_deducted_tokens,
+            createdAtMs = task.created_at_ms, updatedAtMs = task.updated_at_ms, completedAtMs = task.completed_at_ms,
         )
     }
 
-    override suspend fun getTaskById(id: String): T2ITaskEntity? = v2.getTask(id)?.toEntity()
-    override suspend fun getTaskByMessageId(messageId: String): T2ITaskEntity? = v2.getTaskByMessageId(messageId)?.toEntity()
-    override suspend fun listDanglingTasks(cutoffMs: Long): List<T2ITaskEntity> = v2.listDanglingTasks(cutoffMs).map { it.toEntity() }
+    override suspend fun getTaskById(id: String): T2i_task? = v2.getTask(id)
+    override suspend fun getTaskByMessageId(messageId: String): T2i_task? = v2.getTaskByMessageId(messageId)
+    override suspend fun listDanglingTasks(cutoffMs: Long): List<T2i_task> = v2.listDanglingTasks(cutoffMs)
     override suspend fun markTaskSuccess(id: String, imagePath: String, thumbnailPath: String, completedAtMs: Long) {
         v2.markTaskSuccess(id, imagePath, thumbnailPath, completedAtMs)
     }
@@ -145,37 +145,4 @@ class T2IRepositoryV2Impl @Inject constructor(
     override suspend fun sumDeductedTokensSince(dayStartMs: Long): Long = v2.sumDeductedTokensSince(dayStartMs)
     override suspend fun sumDeductedTokensForSession(sessionId: String): Long = v2.sumDeductedTokensForSession(sessionId)
     override suspend fun countSuccessfulImagesSince(dayStartMs: Long): Long = v2.countSuccessfulImagesSince(dayStartMs)
-
-    // ── 映射 ──
-
-    private fun com.mini.mecore.datalayer.sqldelight.t2i.T2i_task.toEntity() = T2ITaskEntity(
-        id = id,
-        sessionId = session_id,
-        messageId = message_id,
-        prompt = prompt,
-        negativePrompt = negative_prompt,
-        width = width.toInt(),
-        height = height.toInt(),
-        steps = steps.toInt(),
-        seed = seed.toInt(),
-        hd = hd == 1L,
-        providerId = provider_id,
-        modelId = model_id,
-        providerRef = provider_ref,
-        endpointModeRef = endpoint_mode_ref,
-        status = status,
-        imagePath = image_path,
-        thumbnailPath = thumbnail_path,
-        remoteTaskId = remote_task_id,
-        progressPercent = progress_percent.toInt(),
-        retryCount = retry_count.toInt(),
-        maxRetries = max_retries.toInt(),
-        errorCode = error_code,
-        errorMessage = error_message,
-        permissionDecision = permission_decision,
-        quotaDeductedTokens = quota_deducted_tokens.toInt(),
-        createdAtMs = created_at_ms,
-        updatedAtMs = updated_at_ms,
-        completedAtMs = completed_at_ms,
-    )
 }
