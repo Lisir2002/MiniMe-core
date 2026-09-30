@@ -31,7 +31,6 @@ import com.mini.me_core.feature.backup.domain.RestoreMode
 import com.mini.me_core.feature.backup.domain.RestoreStats
 import com.mini.me_core.feature.backup.domain.TodoItemDto
 import com.mini.me_core.feature.backup.domain.toMetadata
-import com.mini.me_core.feature.credentials.data.local.entity.GitCredentialEntity
 import com.mini.me_core.feature.settings.data.local.entity.AIProviderEntity
 import com.mini.me_core.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.KeepaliveSettingsRepository
@@ -903,43 +902,6 @@ class BackupManagerImpl @Inject constructor(
             isEnabled = isEnabled,
             useFullUrl = useFullUrl,
             useResponseApi = useResponseApi
-        )
-    }
-
-    private suspend fun GitCredentialEntity.toDto(): GitCredentialDto {
-        // RC68 SCHEMA 38：Entity.token 已删除，只剩 encryptedToken；createdAt/updatedAt → Ms 后缀。
-        val resolvedToken = if (encryptedToken.isNotEmpty()) {
-            runCatching { encryptor.decrypt(encryptedToken) }
-                .onFailure { FileLogger.w(TAG, "toDto GitCredential 解密 encryptedToken 失败：${it.message}") }
-                .getOrDefault("")
-        } else ""
-        return GitCredentialDto(
-            id = id,
-            host = host,
-            username = username,
-            token = resolvedToken,
-            label = label,
-            isDefault = isDefault,
-            createdAt = createdAtMs,
-            updatedAt = updatedAtMs
-        )
-    }
-
-    private suspend fun GitCredentialDto.toEntity(): GitCredentialEntity {
-        val encrypted = if (token.isNotEmpty()) {
-            runCatching { encryptor.encrypt(token) }
-                .onFailure { FileLogger.w(TAG, "toEntity GitCredential 加密 token 失败：${it.message}") }
-                .getOrDefault("")
-        } else ""
-        return GitCredentialEntity(
-            id = id,
-            host = host,
-            username = username,
-            encryptedToken = encrypted,
-            label = label,
-            isDefault = isDefault,
-            createdAtMs = createdAt,
-            updatedAtMs = updatedAt
         )
     }
 
