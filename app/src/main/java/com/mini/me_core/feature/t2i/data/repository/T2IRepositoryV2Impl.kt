@@ -38,8 +38,7 @@ class T2IRepositoryV2Impl @Inject constructor(
 
     override suspend fun upsertProvider(provider: T2i_providers) {
         val now = System.currentTimeMillis()
-        // 激活互斥：置 active 前先清全部（与 Room 仓储级 invariant 一致），单事务原子。
-        if (provider.is_active == 1L) v2.deactivateAllT2iProviders()
+        // 激活互斥（deactivateAll + upsert）已在 T2iRepository.upsertT2iProvider 单事务内原子完成。
         v2.upsertT2iProvider(
             id = provider.id,
             name = provider.name,

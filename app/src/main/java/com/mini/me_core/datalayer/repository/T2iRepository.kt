@@ -121,12 +121,20 @@ class T2iRepository(private val db: T2iDb) {
         q.insertT2iProvider(id, name, type, baseUrl, encryptedApiKey, endpointMode, isActive, priority, isEnabled, extraHeadersJson, createdAtMs, updatedAtMs)
     }
 
+    /**
+     * 保存 T2I Provider（对齐 Room @Insert(onConflict = REPLACE)）。
+     * isActive=1 时先 deactivateAll —— 复刻 active 互斥不变量（全库最多一行 active），
+     * 且两步收进单事务，消除「deactivateAll 后崩溃 → 无 active provider」的窗口。
+     */
     suspend fun upsertT2iProvider(
         id: String, name: String, type: String, baseUrl: String, encryptedApiKey: String,
         endpointMode: String, isActive: Long, priority: Long, isEnabled: Long,
         extraHeadersJson: String, createdAtMs: Long, updatedAtMs: Long,
     ) = withContext(Dispatchers.IO) {
-        q.insertOrReplaceT2iProvider(id, name, type, baseUrl, encryptedApiKey, endpointMode, isActive, priority, isEnabled, extraHeadersJson, createdAtMs, updatedAtMs)
+        db.transaction {
+            if (isActive == 1L) q.deactivateAllT2iProviders()
+            q.insertOrReplaceT2iProvider(id, name, type, baseUrl, encryptedApiKey, endpointMode, isActive, priority, isEnabled, extraHeadersJson, createdAtMs, updatedAtMs)
+        }
     }
 
     suspend fun getT2iProvider(id: String): com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers? =
@@ -141,8 +149,13 @@ class T2iRepository(private val db: T2iDb) {
     suspend fun deactivateAllT2iProviders() =
         withContext(Dispatchers.IO) { q.deactivateAllT2iProviders() }
 
-    suspend fun setActiveT2iProvider(id: String) =
-        withContext(Dispatchers.IO) { q.setT2iProviderActive(id) }
+    /** 切换激活（active 互斥不变量事务化：清全部 + 置指定，一步到位）。 */
+    suspend fun setActiveT2iProvider(id: String) = withContext(Dispatchers.IO) {
+        db.transaction {
+            q.deactivateAllT2iProviders()
+            q.setT2iProviderActive(id)
+        }
+    }
 
     suspend fun setT2iProviderEnabled(id: String, isEnabled: Boolean, updatedAtMs: Long) =
         withContext(Dispatchers.IO) { q.setT2iProviderEnabled(if (isEnabled) 1L else 0L, updatedAtMs, id) }
@@ -153,8 +166,16 @@ class T2iRepository(private val db: T2iDb) {
     suspend fun updateT2iProviderEncryptedApiKey(id: String, encryptedApiKey: String, updatedAtMs: Long) =
         withContext(Dispatchers.IO) { q.updateT2iProviderEncryptedApiKey(encryptedApiKey, updatedAtMs, id) }
 
-    suspend fun deleteT2iProvider(id: String) =
-        withContext(Dispatchers.IO) { q.deleteT2iProvider(id) }
+    /**
+     * 删除 Provider：先删关联 models（外键约束无 ON DELETE CASCADE，
+     * foreign_keys=ON 下直接删 provider 会抛 SQLiteConstraintException）。
+     */
+    suspend fun deleteT2iProvider(id: String) = withContext(Dispatchers.IO) {
+        db.transaction {
+            q.deleteT2iProviderModels(id)
+            q.deleteT2iProvider(id)
+        }
+    }
 
     suspend fun insertT2iProviderModel(
         id: String, providerId: String, modelId: String, displayName: String, supportsHd: Long,
