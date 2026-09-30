@@ -6,16 +6,20 @@
 
 ```
 Version Log/
-├── CHANGELOG.md                    # 主应用（MiniMe-core）版本日志（所有版本汇总，倒序排列）
-├── CHANGELOG-qbot.md               # 附属应用（QQ 机器人）版本日志
-├── CHANGELOG-qbot-injector.md      # 附属应用（QBot 环境注入器）版本日志
-├── MiniMe-core v-Logs/             # 主应用各版本独立日志
+├── CHANGELOG.md                           # 主应用（MiniMe-core）版本日志（所有版本汇总，倒序排列）
+├── CHANGELOG-qbot.md                      # 附属应用（MiniMe-QBot）版本日志
+├── CHANGELOG-qbot-injector.md             # 附属应用（MiniMe-QBot 环境注入器）版本日志
+├── MiniMe-core v-Logs/                    # 主应用各版本独立日志
 │   ├── MiniMe-core 0.0.0.01 Version Log.md
-│   ├── MiniMe-core 0.0.0.02 Version Log.md
 │   └── ...
-└── MiniMe-Logs v-Logs/             # 附属应用（日志查看器）各版本独立日志
-    ├── MiniMe-Logs 0.0.01 Version Log.md
-    ├── MiniMe-Logs 0.0.02 Version Log.md
+├── MiniMe-Logs v-Logs/                    # 附属应用（MiniMe Logs）各版本独立日志
+│   ├── MiniMe-Logs 0.0.01 Version Log.md
+│   └── ...
+├── MiniMe-QBot v-Logs/                    # 附属应用（MiniMe-QBot）各版本独立日志
+│   ├── MiniMe-QBot 0.0.01-rc1 Version Log.md
+│   └── ...
+└── MiniMe-QBot Injector v-Logs/           # 附属应用（MiniMe-QBot 环境注入器）各版本独立日志
+    ├── MiniMe-QBot Injector 0.0.01 Version Log.md
     └── ...
 ```
 

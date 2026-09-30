@@ -61,7 +61,11 @@ MiniMe-core 是一款在 Android 手机上运行的 AI 编程工具，将大语�
 
 | 应用 | 说明 | 最新版本 |
 |------|------|----------|
-| **MiniMe Logs** | 独立日志查看附属应用，读取主应用运行日志，支持等级筛选、关键词搜索、实时尾随、崩溃分析、长按菜单等专业功能 | [v0.0.6](https://github.com/Lisir2002/MiniMe-core/releases/tag/logviewer-v0.0.6) |
+| **MiniMe Logs** | 独立日志查看附属应用，读取主应用运行日志，支持等级筛选、关键词搜索、实时尾随、崩溃分析、长按菜单等专业功能 | [v0.0.8](https://github.com/Lisir2002/MiniMe-core/releases/tag/logviewer-v0.0.8) |
+| **MiniMe-QBot** | 独立 QQ 机器人附属应用：在手机上扫码登录个人 QQ 号，登录态自动保存、掉线自动恢复，为后续消息与智能回复能力打基础 | [v0.0.1-rc22](https://github.com/Lisir2002/MiniMe-core/releases/tag/qbot-v0.0.1-rc22) |
+| **MiniMe-QBot 环境注入器** | 为 MiniMe-QBot 一次性注入运行所需的大体积环境资源，避免机器人应用重复下载与更新大包 | [v0.0.7-rc1](https://github.com/Lisir2002/MiniMe-core/releases/tag/qbot-injector-v0.0.7-rc1) |
+
+> **MiniMe-QBot 与「环境注入器」独立发版**（谁有更新发谁），首次使用须先安装并运行「环境注入器」完成一次环境注入，再回到 MiniMe-QBot 使用。
 
 ## 安装
 
@@ -212,7 +216,8 @@ app/src/main/java/com/mini/me_core/
 | [docs/ui-standards.md](./docs/ui-standards.md) | UI 设计规范：页面槽位、统一组件、颜色间距字体、禁止事项 |
 | [docs/native-viewer-design.md](./docs/native-viewer-design.md) | Native 查看器/编辑器设计：C++ so 核心、tree-sitter、PDFium |
 | [docs/plugin-system-design.md](./docs/plugin-system-design.md) | 插件体系设计：四类插件、通用框架、按需下载瘦身 |
-| [docs/qqbot-app-design.md](./docs/qqbot-app-design.md) | MiniMe-QBot 附属应用设计：独立应用（`com.mini.qbot`）、OneBot 11 契约、可插拔协议端、第一阶段登录 |
+| [docs/qbot-app-design.md](./docs/qbot-app-design.md) | MiniMe-QBot 附属应用设计：独立应用（`com.mini.qbot`）、OneBot 11 契约、可插拔协议端、第一阶段登录 |
+| [docs/qbot-injector-design.md](./docs/qbot-injector-design.md) | MiniMe-QBot 环境注入器设计：大体积环境资源外置、注入包契约号与 QBot 的解耦发版 |
 | [SECURITY.md](./SECURITY.md) | 安全策略与漏洞报告 |
 | `app/src/main/assets/docs/` | App 内置帮助文档（运行时可在「设置 → 帮助」查看） |
 

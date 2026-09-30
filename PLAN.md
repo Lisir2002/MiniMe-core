@@ -37,9 +37,11 @@
 
 | 文档 | 路径 | 状态 | 说明 |
 |------|------|------|------|
+| 架构文档 | `docs/architecture.md` | 已落地 | 模块依赖图与端到端数据流 |
 | Native 查看器/编辑器设计 | `docs/native-viewer-design.md` | 已落地（第一阶段） | C++ so 自研查看器核心，tree-sitter 语法高亮，PDFium 内置，代码查看器/编辑器统一设计 |
 | 插件体系设计 | `docs/plugin-system-design.md` | 设计阶段（未落地） | 四类插件分类（文件查看器/主题字体/MCP工具/环境容器），通用框架架构，按需下载瘦身 |
-| MiniMe-QBot 附属应用设计 | `docs/qqbot-app-design.md` | 设计阶段（未落地） | 独立附属应用（`com.mini.qbot`），OneBot 11 契约 + 可插拔协议端，第一阶段只做个人号扫码登录 |
+| MiniMe-QBot 附属应用设计 | `docs/qbot-app-design.md` | 已落地（第一阶段登录），真机验证待闭环 | 独立附属应用（`com.mini.qbot`），OneBot 11 契约 + 可插拔协议端，个人号扫码登录 |
+| MiniMe-QBot 环境注入器设计 | `docs/qbot-injector-design.md` | 已落地（阶段一），阶段二/三可选未落地 | 大体积环境资源外置，注入包契约号保证与 QBot 解耦发版 |
 
 ### 2.2 UI 与交互规范
 
@@ -77,8 +79,10 @@
 | 目录 | 路径 | 说明 |
 |------|------|------|
 | 版本日志总目录 | `docs/Version Log/` | 包含 CHANGELOG.md 和按软件分的版本文档 |
-| MiniMe-core 版本日志 | `docs/Version Log/MiniMe-core v-Logs/` | 每个版本一个 md，命名 `MiniMe-core v0.0.0.XX Version Log.md` |
-| MiniMe-Logs 版本日志 | `docs/Version Log/MiniMe-Logs v-Logs/` | 附属应用版本日志 |
+| MiniMe-core 版本日志 | `docs/Version Log/MiniMe-core v-Logs/` | 主应用版本日志，每个版本一个 md，命名 `MiniMe-core 0.0.0.X Version Log.md` |
+| MiniMe-Logs 版本日志 | `docs/Version Log/MiniMe-Logs v-Logs/` | 附属应用（日志查看器）版本日志 |
+| MiniMe-QBot 版本日志 | `docs/Version Log/MiniMe-QBot v-Logs/` | 附属应用（QQ 机器人）版本日志，`CHANGELOG-qbot.md` 的逐版本拆分 |
+| MiniMe-QBot Injector 版本日志 | `docs/Version Log/MiniMe-QBot Injector v-Logs/` | 附属应用（QQ 机器人环境注入器）版本日志 |
 
 > **设计文档清理规则**：一次性设计文档（`*-design.md`）在全部落地后必须删除；部分落地的保留并标注进度。规范文档和版本日志永久保留。
 
@@ -165,7 +169,7 @@
 | ATTACH/DETACH 用 rawExecSQL | 可能同样 error 100 | 用 rawQuery |
 | Gradle 并发编译 | daemon 锁冲突 + OOM | 串行编译，--no-daemon |
 | 本地 release build | 违反发版硬性规则 | 推送 tag → 云端 CI 构建 |
-| PMHQ 有头模式在 Android | 容器内无法运行桌面 QQ | 用 LLBot 无头纯协议模式 |
+| 在 Android 上运行有头桌面 QQ | 容器内无法运行桌面 QQ 客户端 | 用 NapCat 无头协议端（OneBot 11） |
 
 ---
 
@@ -184,7 +188,7 @@
 | 资源 | 链接 |
 |------|------|
 | GitHub 仓库 | https://github.com/Lisir2002/MiniMe-core |
-| 附属应用 | MiniMe-Logs（日志查看器） |
-| LLBot 文档 | https://github.com/LLOneBot/LuckyLilliaDoc |
+| 附属应用 | MiniMe-Logs（日志查看器）、MiniMe-QBot（QQ 机器人）、MiniMe-QBot 环境注入器 |
+| NapCat 文档 | https://napneko.github.io/ |
 | OneBot 11 协议 | https://11.onebot.dev/ |
 | UI 组件库 | 项目内 `core/theme/components/` |
