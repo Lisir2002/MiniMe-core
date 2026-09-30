@@ -68,11 +68,18 @@ class CredentialsRepository(private val db: CredentialsDb) {
 
     // ── P0-2 补齐列级 setter 与 REPLACE 语义 ──
 
+    /**
+     * Upsert Git 凭据：isDefault=true 时先清同 host 默认，再写入，单事务原子。
+     * 避免「clearDefault 后崩溃 → host 内无默认凭据」或「upsert 后崩溃 → 多条默认」。
+     */
     suspend fun upsertGitCredential(
         id: String, host: String, username: String, encryptedToken: String, label: String,
-        isDefault: Long, createdAtMs: Long, updatedAtMs: Long,
+        isDefault: Boolean, createdAtMs: Long, updatedAtMs: Long,
     ) = withContext(Dispatchers.IO) {
-        q.insertOrReplaceGitCredential(id, host, username, encryptedToken, label, isDefault, createdAtMs, updatedAtMs)
+        db.transaction {
+            if (isDefault) q.clearDefaultForHost(host)
+            q.insertOrReplaceGitCredential(id, host, username, encryptedToken, label, if (isDefault) 1L else 0L, createdAtMs, updatedAtMs)
+        }
     }
 
     suspend fun findGitCredentialByHost(host: String): com.mini.mecore.datalayer.sqldelight.credentials.Git_credentials? =
@@ -81,8 +88,14 @@ class CredentialsRepository(private val db: CredentialsDb) {
     suspend fun clearDefaultForHost(host: String) =
         withContext(Dispatchers.IO) { q.clearDefaultForHost(host) }
 
-    suspend fun setGitCredentialDefault(id: String, isDefault: Boolean) =
-        withContext(Dispatchers.IO) { q.setDefault(if (isDefault) 1L else 0L, id) }
+    /** 切换默认凭据：isDefault=true 时先清同 host 默认，再置位，单事务原子。 */
+    suspend fun setGitCredentialDefault(id: String, host: String, isDefault: Boolean) =
+        withContext(Dispatchers.IO) {
+            db.transaction {
+                if (isDefault) q.clearDefaultForHost(host)
+                q.setDefault(if (isDefault) 1L else 0L, id)
+            }
+        }
 
     suspend fun updateGitCredentialEncryptedToken(id: String, newEncrypted: String) =
         withContext(Dispatchers.IO) { q.updateEncryptedToken(newEncrypted, id) }

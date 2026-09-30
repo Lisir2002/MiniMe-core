@@ -49,14 +49,14 @@ class CredentialRepositoryV2Impl @Inject constructor(
             v2.getGitCredential(credential.id)?.encrypted_token ?: ""
         }.getOrDefault("")
         val encrypted = encryptTokenOrThrow(credential.token, existingEncrypted)
-        if (credential.isDefault) v2.clearDefaultForHost(host)
+        // clearDefaultForHost + upsert 已在 CredentialsRepository.upsertGitCredential 单事务内原子完成。
         v2.upsertGitCredential(
             id = credential.id,
             host = host,
             username = credential.username,
             encryptedToken = encrypted,
             label = credential.label,
-            isDefault = if (credential.isDefault) 1L else 0L,
+            isDefault = credential.isDefault,
             createdAtMs = if (credential.createdAt == 0L) now else credential.createdAt,
             updatedAtMs = now,
         )
@@ -70,8 +70,8 @@ class CredentialRepositoryV2Impl @Inject constructor(
     override suspend fun setDefault(id: String, isDefault: Boolean) {
         FileLogger.i(TAG, "切换默认凭据 id=$id default=$isDefault")
         val row = v2.getGitCredential(id) ?: return
-        if (isDefault) v2.clearDefaultForHost(row.host)
-        v2.setGitCredentialDefault(id, isDefault)
+        // clearDefaultForHost + setDefault 已在 CredentialsRepository.setGitCredentialDefault 单事务内原子完成。
+        v2.setGitCredentialDefault(id, row.host, isDefault)
     }
 
     /**

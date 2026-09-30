@@ -711,7 +711,7 @@ class BackupManagerImpl @Inject constructor(
                     credentialsRepo.upsertGitCredential(
                         id = c.id, host = c.host, username = c.username,
                         encryptedToken = encrypted, label = c.label,
-                        isDefault = if (c.isDefault) 1L else 0L,
+                        isDefault = c.isDefault,
                         createdAtMs = c.createdAt, updatedAtMs = c.updatedAt,
                     )
                 }
