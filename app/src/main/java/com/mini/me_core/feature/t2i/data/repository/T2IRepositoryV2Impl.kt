@@ -2,7 +2,7 @@ package com.mini.me_core.feature.t2i.data.repository
 
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.T2iRepository as V2T2iRepository
-import com.mini.me_core.feature.t2i.data.local.entity.T2IProviderEntity
+import com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers
 import com.mini.me_core.feature.t2i.data.local.entity.T2IProviderModelEntity
 import com.mini.me_core.feature.t2i.data.local.entity.T2ITaskEntity
 import com.mini.me_core.feature.t2i.domain.repository.T2IRepository
@@ -27,31 +27,31 @@ class T2IRepositoryV2Impl @Inject constructor(
 
     // ── Provider ──
 
-    override suspend fun getActiveProvider(): T2IProviderEntity? =
-        v2.getActiveT2iProvider()?.toEntity()
+    override suspend fun getActiveProvider(): T2i_providers? =
+        v2.getActiveT2iProvider()
 
-    override suspend fun getEnabledProviders(): List<T2IProviderEntity> =
-        v2.listT2iProviders().filter { it.is_enabled == 1L }.map { it.toEntity() }
+    override suspend fun getEnabledProviders(): List<T2i_providers> =
+        v2.listT2iProviders().filter { it.is_enabled == 1L }
 
-    override suspend fun getProviderById(id: String): T2IProviderEntity? =
-        v2.getT2iProvider(id)?.toEntity()
+    override suspend fun getProviderById(id: String): T2i_providers? =
+        v2.getT2iProvider(id)
 
-    override suspend fun upsertProvider(provider: T2IProviderEntity) {
+    override suspend fun upsertProvider(provider: T2i_providers) {
         val now = System.currentTimeMillis()
         // 激活互斥：置 active 前先清全部（与 Room 仓储级 invariant 一致），单事务原子。
-        if (provider.isActive) v2.deactivateAllT2iProviders()
+        if (provider.is_active == 1L) v2.deactivateAllT2iProviders()
         v2.upsertT2iProvider(
             id = provider.id,
             name = provider.name,
             type = provider.type,
-            baseUrl = provider.baseUrl,
-            encryptedApiKey = provider.encryptedApiKey,
-            endpointMode = provider.endpointMode,
-            isActive = if (provider.isActive) 1L else 0L,
-            priority = provider.priority.toLong(),
-            isEnabled = if (provider.isEnabled) 1L else 0L,
-            extraHeadersJson = provider.extraHeadersJson,
-            createdAtMs = if (provider.createdAtMs == 0L) now else provider.createdAtMs,
+            baseUrl = provider.base_url,
+            encryptedApiKey = provider.encrypted_api_key,
+            endpointMode = provider.endpoint_mode,
+            isActive = provider.is_active,
+            priority = provider.priority,
+            isEnabled = provider.is_enabled,
+            extraHeadersJson = provider.extra_headers_json,
+            createdAtMs = if (provider.created_at_ms == 0L) now else provider.created_at_ms,
             updatedAtMs = now,
         )
     }
@@ -147,21 +147,6 @@ class T2IRepositoryV2Impl @Inject constructor(
     override suspend fun countSuccessfulImagesSince(dayStartMs: Long): Long = v2.countSuccessfulImagesSince(dayStartMs)
 
     // ── 映射 ──
-
-    private fun com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers.toEntity() = T2IProviderEntity(
-        id = id,
-        name = name,
-        type = type,
-        baseUrl = base_url,
-        encryptedApiKey = encrypted_api_key,
-        endpointMode = endpoint_mode,
-        isActive = is_active == 1L,
-        priority = priority.toInt(),
-        isEnabled = is_enabled == 1L,
-        extraHeadersJson = extra_headers_json,
-        createdAtMs = created_at_ms,
-        updatedAtMs = updated_at_ms,
-    )
 
     private fun com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models.toEntity() = T2IProviderModelEntity(
         id = id,

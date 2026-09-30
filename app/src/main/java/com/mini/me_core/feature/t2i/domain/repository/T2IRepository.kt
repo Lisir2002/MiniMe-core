@@ -1,6 +1,6 @@
 package com.mini.me_core.feature.t2i.domain.repository
 
-import com.mini.me_core.feature.t2i.data.local.entity.T2IProviderEntity
+import com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers
 import com.mini.me_core.feature.t2i.data.local.entity.T2IProviderModelEntity
 import com.mini.me_core.feature.t2i.data.local.entity.T2ITaskEntity
 import kotlinx.coroutines.flow.Flow
@@ -18,10 +18,10 @@ interface T2IRepository {
 
     // ── Provider ──
 
-    suspend fun getActiveProvider(): T2IProviderEntity?
-    suspend fun getEnabledProviders(): List<T2IProviderEntity>
-    suspend fun getProviderById(id: String): T2IProviderEntity?
-    suspend fun upsertProvider(provider: T2IProviderEntity)
+    suspend fun getActiveProvider(): T2i_providers?
+    suspend fun getEnabledProviders(): List<T2i_providers>
+    suspend fun getProviderById(id: String): T2i_providers?
+    suspend fun upsertProvider(provider: T2i_providers)
     suspend fun deleteProvider(id: String)
     suspend fun deactivateAllProviders()
     suspend fun activateProvider(id: String)

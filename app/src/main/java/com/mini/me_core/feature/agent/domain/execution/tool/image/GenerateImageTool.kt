@@ -148,7 +148,7 @@ class GenerateImageTool @Inject constructor(
             }
 
         val apiKey = try {
-            credentialEncryptor.decrypt(activeProvider.encryptedApiKey)
+            credentialEncryptor.decrypt(activeProvider.encrypted_api_key)
         } catch (t: Throwable) {
             FileLogger.w(TAG, "解密 API Key 失败: ${t.message}")
             ""
@@ -204,7 +204,7 @@ class GenerateImageTool @Inject constructor(
         val now = System.currentTimeMillis()
         val outputDir = File(context.filesDir, OUTPUT_DIR_NAME)
         val endpointModeRef = EnumSafe.valueOf(
-            activeProvider.endpointMode, ImageGenerator.EndpointMode.AUTO,
+            activeProvider.endpoint_mode, ImageGenerator.EndpointMode.AUTO,
             tag = "GenerateImageTool.endpointMode"
         ).name
         val pending = T2ITaskEntity(
@@ -234,7 +234,7 @@ class GenerateImageTool @Inject constructor(
         var refundable = true
         try {
             if (imageGenerator is com.mini.me_core.feature.t2i.data.remote.OpenAiCompatibleImageGenerator) {
-                imageGenerator.setRuntimeConfig(activeProvider.baseUrl, apiKey)
+                imageGenerator.setRuntimeConfig(activeProvider.base_url, apiKey)
             }
             val res = imageGenerator.generate(
                 ImageGenerator.Request(
@@ -245,7 +245,7 @@ class GenerateImageTool @Inject constructor(
                 )
             )
             t2iRepository.markTaskSuccess(taskId, res.imagePath, res.thumbnailPath, System.currentTimeMillis())
-            if (activeProvider.endpointMode == "AUTO" && res.modeUsed != ImageGenerator.EndpointMode.AUTO) {
+            if (activeProvider.endpoint_mode == "AUTO" && res.modeUsed != ImageGenerator.EndpointMode.AUTO) {
                 runCatching { t2iRepository.updateProviderEndpointMode(activeProvider.id, res.modeUsed.name) }
                     .onFailure { FileLogger.w(TAG, "写回 endpointMode 失败: ${it.message}") }
             }
