@@ -82,9 +82,11 @@
 | 用途 | 接口 | 说明 |
 |------|------|------|
 | 登录信息校验 | `get_login_info` | 登录成功后校验 QQ 号与昵称 |
-| 运行状态 | `get_status` | 判定协议端是否就绪 |
+| 运行状态 | `get_status` | 判定协议端是否在线（**仅登录后可用**，见下方注） |
 | 登录态 | `get_login_state` / 协议端原生登录接口 | 获取/驱动登录流程 |
 
+> 注（登录前后能力差异，NapCat 实测）：OneBot 适配器与网络配置（`onebot11_<QQ号>.json`）**要等 QQ 账号登录成功后才初始化**，登录前只有 WebUI 与登录流程可用。因此**登录前的「协议端就绪」判据必须用 WebUI 可达性**，不能用 OneBot 接口——否则会形成「接口等登录 → 登录等登录页 → 登录页等接口」的死锁。OneBot 接口只用于登录后的闭环校验与在线监控。
+>
 > 注：OneBot 11 标准未定义"扫码登录"接口，扫码能力属**协议端私有扩展**（见 §4.3）。因此登录能力需通过 `ProtocolEndpoint` 抽象层隔离，标准接口走 OneBot 11，私有接口按协议端适配。
 
 ### 2.2 协议端选型：可插拔，默认 **NapCat**（Linux arm64）
@@ -305,11 +307,11 @@ arrayOf("git", "describe", "--tags", "--always", "--dirty")
 用户打开附属应用（首次）
   → 环境检查页（登录前门禁页）：检查设备架构 / 存储空间 / 运行环境 / 协议端可用性
   → 环境不可用：就地给出原因与处置（不支持 arm64 / 空间不足），不放行进入登录页
-  → 未就绪：点「开始环境检查」初始化（安装运行时 → 供给协议端 → 等待接口就绪），同屏展示确定进度 + 实时日志
+  → 未就绪：点「开始环境检查」初始化（安装运行时 → 供给协议端 → 等待协议端就绪），同屏展示确定进度 + 实时日志
   → 全部通过：出现「进入登录页」，由用户确认后进入登录页
   → 进入登录页后启动 QBotLoginService（前台通知）
   → RuntimeManager 拉起协议端进程
-  → 等待 ProtocolEndpoint 就绪（轮询 get_status / WS 连接成功）
+  → 等待协议端就绪（轮询 WebUI 可达；登录前 OneBot 适配器尚未初始化，不能以接口为准）
   → 请求登录：ProtocolEndpoint 触发扫码登录
   → QrCodeSource 取二维码 → 渲染到页面（含倒计时）
   → 用户用手机 QQ 扫码 → 协议端上报状态变化
@@ -322,7 +324,7 @@ arrayOf("git", "describe", "--tags", "--always", "--dirty")
 ```
 NotInitialized ──初始化完成──► RuntimeReady
 RuntimeReady ──启动协议端──► StartingProtocol
-StartingProtocol ──接口就绪──► AwaitingLogin
+StartingProtocol ──WebUI 就绪──► AwaitingLogin
 StartingProtocol ──超时/失败──► Failed
 AwaitingLogin ──请求二维码──► WaitingForQr
 WaitingForQr ──取到二维码──► WaitingForScan
@@ -468,7 +470,7 @@ Android 应用沙箱隔离，附属应用**无法访问**主应用的 Keystore �
 | 设备架构 | `Build.SUPPORTED_ABIS` 含 `arm64-v8a` |
 | 存储空间 | `filesDir` 可用空间 ≥ 1 GB |
 | 运行环境 | 运行时安装完成（`QBotRuntimeState.Ready`） |
-| 协议端可用性 | 供给完成、协议端进程运行中且 OneBot 接口就绪 |
+| 协议端可用性 | 供给完成、协议端进程运行中且 WebUI（登录通道）可达（登录前 OneBot 接口尚不可用） |
 
 UI 纪律（沿用主应用规范）：
 - 所有用户可见文案**必须**走 `strings.xml`（中英双份），禁止在 `.kt` 中硬编码中文；
