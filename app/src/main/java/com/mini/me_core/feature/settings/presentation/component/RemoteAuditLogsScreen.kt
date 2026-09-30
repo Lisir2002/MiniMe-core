@@ -69,7 +69,7 @@ import com.mini.me_core.core.theme.components.AppSectionHeader
 import com.mini.me_core.core.theme.components.AppSegmentedControl
 import com.mini.me_core.core.theme.components.AppStatusDot
 import com.mini.me_core.core.theme.components.AppStatusDotColor
-import com.mini.me_core.feature.workspace.data.local.entity.RemoteAuditLogEntity
+import com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs
 import com.mini.me_core.feature.workspace.domain.RemoteAuditCategory
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -218,13 +218,13 @@ fun RemoteAuditLogsScreen(
 /** 列表项：日期分组标题或单条日志。 */
 private sealed interface MiniMeAuditListItem {
     data class DayHeader(val dayStartMs: Long) : MiniMeAuditListItem
-    data class Entry(val log: RemoteAuditLogEntity) : MiniMeAuditListItem
+    data class Entry(val log: Remote_audit_logs) : MiniMeAuditListItem
 }
 
 @Composable
 private fun AuditLogList(
     stats: AuditLogsViewModel.Stats,
-    logs: List<RemoteAuditLogEntity>,
+    logs: List<Remote_audit_logs>,
     listState: LazyListState,
     english: Boolean,
     searchActive: Boolean,
@@ -242,7 +242,7 @@ private fun AuditLogList(
             buildList<MiniMeAuditListItem> {
                 var lastDay = -1L
                 for (log in logs) {
-                    val day = startOfDay(log.createdAt)
+                    val day = startOfDay(log.created_at)
                     if (day != lastDay) {
                         add(MiniMeAuditListItem.DayHeader(day))
                         lastDay = day
@@ -405,7 +405,7 @@ private fun StatCard(
 
 @Composable
 private fun AuditLogCard(
-    log: RemoteAuditLogEntity,
+    log: Remote_audit_logs,
     english: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -414,8 +414,9 @@ private fun AuditLogCard(
     val categoryText = AuditActionMapper.categoryLabel(log.category, log.action, english)
     val categoryIcon = auditCategoryIcon(log.category, log.action)
     // 成功=tertiary(绿)，失败=error(红)。
-    val barColor = if (log.success) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
-    val titleColor = if (log.success) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
+    val isSuccess = log.success == 1L
+    val barColor = if (isSuccess) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
+    val titleColor = if (isSuccess) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
 
     AppCard(modifier = modifier.then(Modifier.clickable { expanded = !expanded })) {
         Row(modifier = Modifier.height(IntrinsicSize.Min)) {
@@ -428,7 +429,7 @@ private fun AuditLogCard(
             Column(modifier = Modifier.padding(Spacing.sm)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     AppStatusDot(
-                        if (log.success) AppStatusDotColor.Success else AppStatusDotColor.Error,
+                        if (isSuccess) AppStatusDotColor.Success else AppStatusDotColor.Error,
                     )
                     Spacer(Modifier.width(Spacing.xs))
                     Text(
@@ -439,7 +440,7 @@ private fun AuditLogCard(
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        text = eventTimeLabel(log.createdAt, english),
+                        text = eventTimeLabel(log.created_at, english),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -453,7 +454,7 @@ private fun AuditLogCard(
                         icon = categoryIcon,
                     )
                     Spacer(Modifier.width(Spacing.sm))
-                    val host = listOfNotNull(log.connectionName, log.remoteHost)
+                    val host = listOfNotNull(log.connection_name, log.remote_host)
                         .filter { it.isNotBlank() }
                         .joinToString(" · ")
                     if (host.isNotEmpty()) {
@@ -475,8 +476,8 @@ private fun AuditLogCard(
                 }
                 if (expanded) {
                     Spacer(Modifier.height(Spacing.sm))
-                    AuditDetailRow(stringResource(R.string.audit_detail_source_ip), log.sourceIp)
-                    AuditDetailRow(stringResource(R.string.audit_detail_connection_id), log.connectionId)
+                    AuditDetailRow(stringResource(R.string.audit_detail_source_ip), log.source_ip)
+                    AuditDetailRow(stringResource(R.string.audit_detail_connection_id), log.connection_id)
                 }
             }
         }

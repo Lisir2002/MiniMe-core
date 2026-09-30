@@ -5,8 +5,8 @@ import android.content.Context
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.workspace.data.local.entity.RemoteAuditLogEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.FileOutputStream
@@ -39,7 +39,7 @@ class AuditCsvExporter @Inject constructor(
     }
 
     /** 导出日志列表为 CSV，返回 [Result]。 */
-    fun export(logs: List<RemoteAuditLogEntity>): Result = runCatching {
+    fun export(logs: List<Remote_audit_logs>): Result = runCatching {
         val timestamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         val name = "audit-$timestamp.csv"
         val content = buildCsv(logs)
@@ -54,17 +54,17 @@ class AuditCsvExporter @Inject constructor(
         Result.Failure(it.message ?: "unknown")
     }
 
-    private fun buildCsv(logs: List<RemoteAuditLogEntity>): String {
+    private fun buildCsv(logs: List<Remote_audit_logs>): String {
         val timeFmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
         val sb = StringBuilder()
         sb.append("时间,分类,动作,连接名,主机,成功,消息\n")
         for (log in logs) {
-            sb.append(timeFmt.format(Date(log.createdAt))).append(',')
+            sb.append(timeFmt.format(Date(log.created_at))).append(',')
                 .append(csvCell(log.category)).append(',')
                 .append(csvCell(AuditActionMapper.displayName(log.action))).append(',')
-                .append(csvCell(log.connectionName)).append(',')
-                .append(csvCell(log.remoteHost)).append(',')
-                .append(if (log.success) "1" else "0").append(',')
+                .append(csvCell(log.connection_name)).append(',')
+                .append(csvCell(log.remote_host)).append(',')
+                .append(if (log.success == 1L) "1" else "0").append(',')
                 .append(csvCell(log.message)).append('\n')
         }
         return sb.toString()

@@ -3,7 +3,6 @@ package com.mini.me_core.feature.workspace.domain.repository
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.WorkspaceRepository as V2WorkspaceRepository
 import com.mini.me_core.datalayer.util.escapeSqlLike
-import com.mini.me_core.feature.workspace.data.local.entity.RemoteAuditLogEntity
 import com.mini.me_core.feature.workspace.domain.RemoteAuditAction
 import com.mini.me_core.feature.workspace.domain.RemoteAuditCategory
 import kotlinx.coroutines.Dispatchers
@@ -76,10 +75,9 @@ class RemoteAuditLogRepository @Inject constructor(
         }
     }
 
-    suspend fun pageDesc(page: Int, pageSize: Int = 50): List<RemoteAuditLogEntity> =
+    suspend fun pageDesc(page: Int, pageSize: Int = 50): List<com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs> =
         withContext(Dispatchers.IO) {
             v2Workspace.pageAuditLogs(offset = page * pageSize.toLong(), limit = pageSize.toLong())
-                .map { it.toEntity() }
         }
 
     // ============== 操作审计页面重构（MiniMe）==============
@@ -107,7 +105,7 @@ class RemoteAuditLogRepository @Inject constructor(
         category: String?,
         page: Int,
         pageSize: Int = 50,
-    ): List<RemoteAuditLogEntity> = withContext(Dispatchers.IO) {
+    ): List<com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs> = withContext(Dispatchers.IO) {
         val offset = page * pageSize.toLong()
         val limit = pageSize.toLong()
         val rows = when (category) {
@@ -130,19 +128,18 @@ class RemoteAuditLogRepository @Inject constructor(
             )
             else -> v2Workspace.pageAuditLogs(offset, limit)
         }
-        rows.map { it.toEntity() }
+        rows
     }
 
     /**
      * 全局搜索（忽略分类 Tab）：在连接名 / 主机 / 消息 / 原始动作上做 LIKE 匹配，降序分页。
      * 中文动作名匹配由表现层配合 AuditActionMapper 二次过滤。
      */
-    suspend fun search(query: String, page: Int, pageSize: Int = 50): List<RemoteAuditLogEntity> =
+    suspend fun search(query: String, page: Int, pageSize: Int = 50): List<com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs> =
         withContext(Dispatchers.IO) {
             // M7：转义用户输入中的 \ % _ 并配合 .sq 的 `LIKE ... ESCAPE '\'`，避免被当通配符。
             val kw = "%${escapeSqlLike(query.trim())}%"
             v2Workspace.searchAuditLogs(kw, page * pageSize.toLong(), pageSize.toLong())
-                .map { it.toEntity() }
         }
 
     /** 清空全部审计日志，返回删除条数。 */
@@ -150,9 +147,9 @@ class RemoteAuditLogRepository @Inject constructor(
         v2Workspace.deleteAllAuditLogs()
     }
 
-    suspend fun listByConnection(connectionId: String, limit: Int = 200): List<RemoteAuditLogEntity> =
+    suspend fun listByConnection(connectionId: String, limit: Int = 200): List<com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs> =
         withContext(Dispatchers.IO) {
-            v2Workspace.pageAuditLogsByConnection(connectionId, limit.toLong()).map { it.toEntity() }
+            v2Workspace.pageAuditLogsByConnection(connectionId, limit.toLong())
         }
 
     suspend fun filter(
@@ -160,14 +157,14 @@ class RemoteAuditLogRepository @Inject constructor(
         onlyFailures: Boolean = false,
         sinceMs: Long = 0L,
         limit: Int = 500
-    ): List<RemoteAuditLogEntity> = withContext(Dispatchers.IO) {
+    ): List<com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs> = withContext(Dispatchers.IO) {
         val cats = if (categories.isEmpty()) {
             v2Workspace.listAuditCategories().ifEmpty { listOf("") }
         } else {
             categories
         }
         val successes = if (onlyFailures) listOf(false) else listOf(true, false)
-        v2Workspace.filterAuditLogs(cats, successes, sinceMs, limit.toLong()).map { it.toEntity() }
+        v2Workspace.filterAuditLogs(cats, successes, sinceMs, limit.toLong())
     }
 
     /**
@@ -198,12 +195,12 @@ class RemoteAuditLogRepository @Inject constructor(
                 "id" to log.id,
                 "category" to log.category,
                 "action" to log.action,
-                "connectionId" to log.connectionId,
-                "connectionName" to log.connectionName,
-                "remoteHost" to log.remoteHost,
-                "success" to log.success,
+                "connectionId" to log.connection_id,
+                "connectionName" to log.connection_name,
+                "remoteHost" to log.remote_host,
+                "success" to (log.success == 1L),
                 "message" to log.message,
-                "createdAt" to log.createdAt
+                "createdAt" to log.created_at
             )
         })
     }
@@ -241,16 +238,4 @@ class RemoteAuditLogRepository @Inject constructor(
         }
     }
 
-    private fun com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs.toEntity() = RemoteAuditLogEntity(
-        id = id,
-        category = category,
-        action = action,
-        connectionId = connection_id,
-        connectionName = connection_name,
-        remoteHost = remote_host,
-        success = success == 1L,
-        message = message,
-        sourceIp = source_ip,
-        createdAt = created_at,
-    )
 }

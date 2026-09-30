@@ -2,7 +2,7 @@ package com.mini.me_core.feature.settings.presentation.component
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mini.me_core.feature.workspace.data.local.entity.RemoteAuditLogEntity
+import com.mini.mecore.datalayer.sqldelight.workspace.Remote_audit_logs
 import com.mini.me_core.feature.workspace.domain.repository.RemoteAuditLogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -46,7 +46,7 @@ class AuditLogsViewModel @Inject constructor(
         val error: String? = null,
         val stats: Stats = Stats(),
         val selectedTab: Int = 0,
-        val logs: List<RemoteAuditLogEntity> = emptyList(),
+        val logs: List<Remote_audit_logs> = emptyList(),
         val endReached: Boolean = false,
         val exporting: Boolean = false,
     )
@@ -165,7 +165,7 @@ class AuditLogsViewModel @Inject constructor(
     }
 
     /** 全局搜索：SQL 命中主机/连接名/消息，叠加中文动作名命中，按时间去重排序。 */
-    private suspend fun searchLogs(q: String): List<RemoteAuditLogEntity> {
+    private suspend fun searchLogs(q: String): List<Remote_audit_logs> {
         val sqlHits = repo.search(q, 0, 200)
         val recent = repo.pageDesc(0, 500)
         val nameHits = recent.filter {
@@ -173,7 +173,7 @@ class AuditLogsViewModel @Inject constructor(
         }
         return (sqlHits + nameHits)
             .distinctBy { it.id }
-            .sortedByDescending { it.createdAt }
+            .sortedByDescending { it.created_at }
     }
 
     /** 清理保留期外的日志。 */
