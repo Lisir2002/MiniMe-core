@@ -87,12 +87,12 @@ APT_MIRRORS = [
 APT_POOL_NAME = "pool.bin"
 
 # ── 官方 QQ Linux 客户端 ──────────────────────────────────────────────────
-# 优先从官方 pcConfig.json 动态解析最新 arm64 deb（与供给脚本同源），解析失败回退下方镜像
-# （GitHub 上的第三方归档仓，路径稳定、可用性优于腾讯 CDN 的历史版本目录）。
+# 固定使用 QQ 3.2.29-49738（buildVersion=49738，NapCat 兼容范围 28060-49738 上限）。
+# 优先从 Rodert/qq-versions 历史归档下载；动态解析（pcConfig.json）仅作兜底（可能拿到超出兼容范围的最新版）。
 QQ_CONFIG_URL = "https://cdn-go.cn/qq-web/im.qq.com_new/latest/rainbow/pcConfig.json"
 QQ_DEB_MIRROR_URL = (
-    "https://github.com/xiaocongyu66/termux-yunzai-qqpkg/releases/download/"
-    "linuxqq-3.2.30/linuxqq_3.2.30-50828_arm64.deb"
+    "https://github.com/Rodert/qq-versions/releases/download/"
+    "qq-packages-20260528-3e8913a2/QQ_3.2.29_260528_arm64_01.deb"
 )
 QQ_DEB_NAME = "linuxqq-arm64.deb"
 
@@ -379,20 +379,20 @@ def _apt_download_and_pack(mirror: str, dest: str, status_src: str) -> int:
 
 
 def resolve_qq_urls() -> list:
-    """返回候选下载地址（按优先级）：官方 pcConfig.json 动态解析 → 镜像归档。
+    """返回候选下载地址（按优先级）：固定兼容版本镜像 → 官方 pcConfig.json 动态解析。
 
+    固定使用 QQ 3.2.29-49738（NapCat 兼容范围上限）；动态解析仅作兜底（可能拿到超出兼容范围的最新版）。
     注意：官方 CDN（qqdl.gtimg.cn）对直连**时好时坏**（实测同一地址先 200 后 403，
     带防盗链特征），故不能只信「能解析出地址」——必须逐个候选真正下载，首个成功者胜出。
     """
-    urls = []
+    urls = [QQ_DEB_MIRROR_URL]
     try:
         data = http_get(QQ_CONFIG_URL, timeout=60)
         match = re.search(r'https://[^"\s]*arm64_01\.deb', data.decode("utf-8", "replace"))
         if match:
             urls.append(match.group(0))
     except SystemExit:
-        log("[warn] 官方 pcConfig.json 解析失败，直接使用镜像归档地址")
-    urls.append(QQ_DEB_MIRROR_URL)
+        log("[warn] 官方 pcConfig.json 解析失败，仅使用固定镜像地址")
     # 去重且保序
     seen = set()
     return [u for u in urls if not (u in seen or seen.add(u))]
