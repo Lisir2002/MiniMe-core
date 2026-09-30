@@ -11,9 +11,17 @@
   qbot-app/src/_qbotAssets/manifest.json        注入器随包读取（资产来源目录）
   qbot-app/src/main/assets/qbot/pack-manifest.json  QBot 随包读取（期望清单，体积极小）
 
-`packVersion` 由资产内容派生（非人工维护）：把各资产的 sha256 按 name 排序拼接后再取
-sha256 的前 12 位，前缀 `p-`。任一份资产字节变化即得到新的 packVersion，两侧各自计算
-必然一致，无需人工同步版本号。
+清单里有两个版本概念，职责**必须分清**：
+
+  contractVersion  人工维护的「契约号」（本脚本常量）。只在**资产种类或目录布局变化**
+                   （增删资产、改落盘路径、改 kind）时才 +1。QBot 用它判断注入包能否被
+                   自己使用：契约相等即接受，**与资产内容无关**。
+  packVersion      资产内容的哈希指纹（非人工维护）：把各资产的 sha256 按 name 排序拼接后
+                   再取 sha256 前 12 位，前缀 `p-`。只用于标识「这是哪一版注入包」，
+                   **不再作为 QBot 的准入条件**——否则环境资源一更新，用户就必须连 QBot
+                   一起更新，注入器「环境只下载一次」的意义就没了。
+
+因此：注入器单独更新资源（如 QQ 升级）时，只要契约号不变，旧版 QBot 仍可直接使用新注入包。
 
 用法（仓库根执行）：
   python3 scripts/dev/gen-qbot-pack-manifest.py
@@ -28,11 +36,14 @@ import json
 import os
 import sys
 import tarfile
-from datetime import datetime, timezone
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ASSETS_DIR = os.path.join(REPO_ROOT, "qbot-app", "src", "_qbotAssets")
 QBOT_MANIFEST = os.path.join(REPO_ROOT, "qbot-app", "src", "main", "assets", "qbot", "pack-manifest.json")
+
+# 人工维护的「契约号」：只在**资产种类或目录布局变化**（增删资产、改落盘路径、改 kind）时 +1。
+# QBot 用它判断注入包能否被自己使用（契约相等即接受，与资产内容无关）。
+CONTRACT_VERSION = "1"
 
 # 资产定义（顺序即清单顺序）：
 #   name      资产标识（两侧契约，勿随意改名）
@@ -105,8 +116,8 @@ def build_manifest() -> dict:
         entries.append(entry)
 
     return {
+        "contractVersion": CONTRACT_VERSION,
         "packVersion": derive_pack_version(entries),
-        "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "assets": entries,
     }
 
@@ -132,7 +143,7 @@ def main() -> int:
     with open(QBOT_MANIFEST, "w", encoding="utf-8") as fh:
         fh.write(text)
 
-    print(f"[manifest] packVersion={manifest['packVersion']}")
+    print(f"[manifest] contractVersion={manifest['contractVersion']} packVersion={manifest['packVersion']}")
     for e in manifest["assets"]:
         size = e.get("size")
         detail = f"{size} bytes" if size is not None else f"{e.get('count')} 个 deb"
