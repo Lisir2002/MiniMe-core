@@ -3,7 +3,6 @@ package com.mini.me_core.feature.agent.domain.execution.tool.file
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.core.util.LineDiff
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.me_core.feature.agent.data.local.entity.FileEditHunkEntity
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
@@ -156,7 +155,7 @@ class ReadFileTool @Inject constructor(
         newContent: String
     ) {
         try {
-            val entity = FileEditHunkEntity(
+            v2Agent.insertFileEditHunk(
                 id = "hunk_${UUID.randomUUID().toString().replace("-", "")}",
                 sessionId = sessionId,
                 filePath = path,
@@ -165,12 +164,6 @@ class ReadFileTool @Inject constructor(
                 oldContent = oldContent.take(HUNK_SNAPSHOT_MAX_CHARS),
                 newContent = newContent.take(HUNK_SNAPSHOT_MAX_CHARS),
                 createdAtMs = System.currentTimeMillis()
-            )
-            v2Agent.insertFileEditHunk(
-                id = entity.id, sessionId = entity.sessionId, filePath = entity.filePath,
-                operation = entity.operation, hunk = entity.hunk,
-                oldContent = entity.oldContent, newContent = entity.newContent,
-                createdAtMs = entity.createdAtMs
             )
         } catch (e: Exception) {
             FileLogger.w(TAG, "记录文件 hunk 失败: $path", e)
@@ -284,21 +277,15 @@ class WriteFileTool @Inject constructor(
             // F-3：write 落库快照（operation=write，含旧→新差异），支撑「撤销编辑」。
             if (sessionId != null) {
                 try {
-                    val hunkEntity = FileEditHunkEntity(
-                        id = "hunk_${UUID.randomUUID().toString().replace("-", "")}",
-                        sessionId = sessionId,
-                        filePath = path,
-                        operation = "write",
-                        hunk = diff,
-                        oldContent = oldContent.take(HUNK_SNAPSHOT_MAX_CHARS),
-                        newContent = content.take(HUNK_SNAPSHOT_MAX_CHARS),
-                        createdAtMs = System.currentTimeMillis()
-                    )
                     v2Agent.insertFileEditHunk(
-                            id = hunkEntity.id, sessionId = hunkEntity.sessionId, filePath = hunkEntity.filePath,
-                            operation = hunkEntity.operation, hunk = hunkEntity.hunk,
-                            oldContent = hunkEntity.oldContent, newContent = hunkEntity.newContent,
-                            createdAtMs = hunkEntity.createdAtMs
+                            id = "hunk_${UUID.randomUUID().toString().replace("-", "")}",
+                            sessionId = sessionId,
+                            filePath = path,
+                            operation = "write",
+                            hunk = diff,
+                            oldContent = oldContent.take(HUNK_SNAPSHOT_MAX_CHARS),
+                            newContent = content.take(HUNK_SNAPSHOT_MAX_CHARS),
+                            createdAtMs = System.currentTimeMillis()
                         )
                     } catch (e: Exception) {
                     FileLogger.w(TAG, "记录文件 hunk 失败: $path", e)

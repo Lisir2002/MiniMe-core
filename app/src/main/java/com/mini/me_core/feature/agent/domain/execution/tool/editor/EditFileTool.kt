@@ -12,7 +12,6 @@ import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.core.util.LineDiff
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.me_core.feature.agent.data.local.entity.FileEditHunkEntity
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.workspace.domain.FileAccessProvider
 import kotlinx.serialization.json.JsonArray
@@ -219,25 +218,15 @@ class EditFileTool @Inject constructor(
             // F-3：edit 落库快照（operation=edit，含差异 hunk），支撑「撤销编辑」。
             if (sessionId != null) {
                 try {
-                    val hunkEntity = FileEditHunkEntity(
-                        id = "hunk_${UUID.randomUUID().toString().replace("-", "")}",
-                        sessionId = sessionId,
-                        filePath = path,
-                        operation = "edit",
-                        hunk = hunksJson.toString(),
-                        oldContent = originalContent.take(HUNK_SNAPSHOT_MAX_CHARS),
-                        newContent = content.take(HUNK_SNAPSHOT_MAX_CHARS),
-                        createdAtMs = System.currentTimeMillis()
-                    )
                     v2Agent.insertFileEditHunk(
-                            id = hunkEntity.id,
-                            sessionId = hunkEntity.sessionId,
-                            filePath = hunkEntity.filePath,
-                            operation = hunkEntity.operation,
-                            hunk = hunkEntity.hunk,
-                            oldContent = hunkEntity.oldContent,
-                            newContent = hunkEntity.newContent,
-                            createdAtMs = hunkEntity.createdAtMs
+                            id = "hunk_${UUID.randomUUID().toString().replace("-", "")}",
+                            sessionId = sessionId,
+                            filePath = path,
+                            operation = "edit",
+                            hunk = hunksJson.toString(),
+                            oldContent = originalContent.take(50_000),
+                            newContent = content.take(50_000),
+                            createdAtMs = System.currentTimeMillis()
                         )
                     } catch (e: Exception) {
                     FileLogger.w(TAG, "记录文件 hunk 失败: $path", e)
