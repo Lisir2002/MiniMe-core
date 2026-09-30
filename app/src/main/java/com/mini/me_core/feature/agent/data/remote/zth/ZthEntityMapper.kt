@@ -2,7 +2,6 @@ package com.mini.me_core.feature.agent.data.remote.zth
 
 import com.mini.me_core.core.security.ZthSensitiveColumnCrypto
 import com.mini.me_core.feature.agent.data.local.entity.L0SoftCompactRestoreLogEntity
-import com.mini.me_core.feature.agent.data.local.entity.UserConfirmedSentinelEntity
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,46 +21,6 @@ class ZthEntityMapper @Inject constructor(
     @Suppress("unused") // Phase 4 Syncer 启用二次加密时使用；目前强制注入保证依赖图编译
     private val crypto: ZthSensitiveColumnCrypto
 ) {
-
-    // ── Sentinel ───────────────────────────────────────────────────────────
-
-    fun toDto(e: UserConfirmedSentinelEntity): ZthSentinelFirestoreDto = ZthSentinelFirestoreDto(
-        id = e.id,
-        sessionId = e.sessionId,
-        linkageVersion = e.linkageVersion,
-        chainId = e.chainId,
-        chainIndex = e.chainIndex,
-        cardTemplateId = e.cardTemplateId,
-        triggerSubClass = e.triggerSubClass,
-        planPayloadCiphertext = e.s_planPayloadCiphertext,
-        userTextCiphertext = e.s_userTextCiphertext,
-        cardPayloadCiphertext = e.s_cardPayloadCiphertext,
-        userChoice = e.userChoice,
-        swipeVerified = e.swipeVerified,
-        modifiedPlanCiphertext = e.s_modifiedPlanCiphertext,
-        expireAtMs = e.expireAtMs,
-        rollbackFlag = e.rollbackFlag,
-        createdAtMs = e.createdAtMs
-    )
-
-    fun toEntity(d: ZthSentinelFirestoreDto): UserConfirmedSentinelEntity = UserConfirmedSentinelEntity(
-        id = d.id,
-        sessionId = d.sessionId,
-        linkageVersion = d.linkageVersion,
-        chainId = d.chainId,
-        chainIndex = d.chainIndex,
-        cardTemplateId = d.cardTemplateId,
-        triggerSubClass = d.triggerSubClass,
-        s_planPayloadCiphertext = d.planPayloadCiphertext,
-        s_userTextCiphertext = d.userTextCiphertext,
-        s_cardPayloadCiphertext = d.cardPayloadCiphertext,
-        userChoice = d.userChoice,
-        swipeVerified = d.swipeVerified,
-        s_modifiedPlanCiphertext = d.modifiedPlanCiphertext,
-        expireAtMs = d.expireAtMs,
-        rollbackFlag = d.rollbackFlag,
-        createdAtMs = d.createdAtMs
-    )
 
     // ── L0 Restore Log ─────────────────────────────────────────────────────
 

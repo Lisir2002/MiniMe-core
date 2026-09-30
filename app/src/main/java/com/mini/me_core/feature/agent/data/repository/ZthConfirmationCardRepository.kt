@@ -2,9 +2,8 @@ package com.mini.me_core.feature.agent.data.repository
 
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Zth_sentinel_plan_rejection_audits as V2RejectionAudit
-import com.mini.me_core.feature.agent.data.local.entity.UserConfirmedSentinelEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_user_confirmed_sentinels as V2Sentinel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,17 +30,17 @@ class ZthConfirmationCardRepository @Inject constructor(
 ) {
 
     /** Phase 5 Facade：弹卡前查询 chainId 是否已决策（已存在 → 直接复用 choice，不重复弹卡）。 */
-    suspend fun getSentinelsByChain(chainId: String): List<UserConfirmedSentinelEntity> =
-        v2Agent.listSentinelsByChain(chainId).map { it.toEntity() }
+    suspend fun getSentinelsByChain(chainId: String): List<V2Sentinel> =
+        v2Agent.listSentinelsByChain(chainId)
 
     /** UI 时间线：流式观察会话内所有 sentinel（新→旧）。 */
-    fun observeSentinelsBySession(sessionId: String): Flow<List<UserConfirmedSentinelEntity>> =
-        v2Agent.observeSentinelsBySession(sessionId).map { list -> list.map { it.toEntity() } }
+    fun observeSentinelsBySession(sessionId: String): Flow<List<V2Sentinel>> =
+        v2Agent.observeSentinelsBySession(sessionId)
 
     /** C.4.3 崩溃恢复：会话下所有未过期 sentinel（expireAtMs=-1 永不过期）。 */
     suspend fun listUnexpiredBySession(sessionId: String, nowMs: Long = System.currentTimeMillis()):
-            List<UserConfirmedSentinelEntity> =
-        v2Agent.listSentinelsUnexpiredBySession(sessionId, nowMs).map { it.toEntity() }
+            List<V2Sentinel> =
+        v2Agent.listSentinelsUnexpiredBySession(sessionId, nowMs)
 
     /** C.4.2 Red Banner 一键回滚：标记会话内所有 sentinel rollbackFlag=true。 */
     suspend fun markAllRollbackBySession(sessionId: String) {
@@ -63,34 +62,36 @@ class ZthConfirmationCardRepository @Inject constructor(
     // ── Phase 4.2 Firestore：Sentinel + RejectionAudit ↔ Dto 映射 ────────
     // CARD-REPO-INV-2：不跨设备同步 s_* 加密列（本地 Keystore-only）；同步只含元数据。
 
-    fun sentinelToDto(e: UserConfirmedSentinelEntity): Map<String, Any?> = mapOf(
-        "id" to e.id, "sessionId" to e.sessionId,
-        "linkageVersion" to e.linkageVersion, "chainId" to e.chainId,
-        "chainIndex" to e.chainIndex, "cardTemplateId" to e.cardTemplateId,
-        "triggerSubClass" to e.triggerSubClass, "userChoice" to e.userChoice,
-        "swipeVerified" to e.swipeVerified, "expireAtMs" to e.expireAtMs,
-        "rollbackFlag" to e.rollbackFlag, "createdAtMs" to e.createdAtMs,
+    fun sentinelToDto(e: V2Sentinel): Map<String, Any?> = mapOf(
+        "id" to e.id, "sessionId" to e.session_id,
+        "linkageVersion" to e.linkage_version, "chainId" to e.chain_id,
+        "chainIndex" to e.chain_index, "cardTemplateId" to e.card_template_id,
+        "triggerSubClass" to e.trigger_sub_class, "userChoice" to e.user_choice,
+        "swipeVerified" to (e.swipe_verified != 0L), "expireAtMs" to e.expire_at_ms,
+        "rollbackFlag" to (e.rollback_flag != 0L), "createdAtMs" to e.created_at_ms,
         "_lwwMs" to System.currentTimeMillis()
         // 注意：s_planPayloadCiphertext / s_userTextCiphertext / s_cardPayloadCiphertext /
         // s_modifiedPlanCiphertext 不同步（CARD-REPO-INV-2）
     )
 
-    fun sentinelFromDto(m: Map<String, Any?>): UserConfirmedSentinelEntity =
-        UserConfirmedSentinelEntity(
+    fun sentinelFromDto(m: Map<String, Any?>): V2Sentinel =
+        V2Sentinel(
             id = m["id"] as? String ?: "",
-            sessionId = m["sessionId"] as? String ?: "",
-            linkageVersion = (m["linkageVersion"] as? Number)?.toLong() ?: 0L,
-            chainId = m["chainId"] as? String ?: "",
-            chainIndex = (m["chainIndex"] as? Number)?.toInt() ?: 1,
-            cardTemplateId = m["cardTemplateId"] as? String ?: "",
-            triggerSubClass = m["triggerSubClass"] as? String ?: "",
+            session_id = m["sessionId"] as? String ?: "",
+            linkage_version = (m["linkageVersion"] as? Number)?.toLong() ?: 0L,
+            chain_id = m["chainId"] as? String ?: "",
+            chain_index = (m["chainIndex"] as? Number)?.toLong() ?: 1L,
+            card_template_id = m["cardTemplateId"] as? String ?: "",
+            trigger_sub_class = m["triggerSubClass"] as? String ?: "",
             s_planPayloadCiphertext = "", // 跨设备拉到后空值（不影响只读决策展示）
+            s_userTextCiphertext = null,
             s_cardPayloadCiphertext = "",
-            userChoice = m["userChoice"] as? String ?: "CONFIRM",
-            swipeVerified = (m["swipeVerified"] as? Boolean) ?: false,
-            expireAtMs = (m["expireAtMs"] as? Number)?.toLong() ?: -1L,
-            rollbackFlag = (m["rollbackFlag"] as? Boolean) ?: false,
-            createdAtMs = (m["createdAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
+            user_choice = m["userChoice"] as? String ?: "CONFIRM",
+            swipe_verified = if ((m["swipeVerified"] as? Boolean) ?: false) 1L else 0L,
+            s_modifiedPlanCiphertext = null,
+            expire_at_ms = (m["expireAtMs"] as? Number)?.toLong() ?: -1L,
+            rollback_flag = if ((m["rollbackFlag"] as? Boolean) ?: false) 1L else 0L,
+            created_at_ms = (m["createdAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
         )
 
     fun rejectionAuditToDto(e: V2RejectionAudit): Map<String, Any?> = mapOf(
@@ -112,30 +113,9 @@ class ZthConfirmationCardRepository @Inject constructor(
 
     // ── Phase 4.2 Sync 辅助：批量全量拉（push 到 Firestore） ─────────
 
-    suspend fun getAllSentinels(): List<UserConfirmedSentinelEntity> =
-        v2Agent.listAllSentinels().map { it.toEntity() }
+    suspend fun getAllSentinels(): List<V2Sentinel> =
+        v2Agent.listAllSentinels()
 
     suspend fun getAllRejectionAudits(): List<V2RejectionAudit> =
         v2Agent.listAllRejectionAudits()
-
-    // ── 内部映射 ─────────────────────────────────────────────────────
-
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Zth_user_confirmed_sentinels.toEntity() = UserConfirmedSentinelEntity(
-        id = id,
-        sessionId = session_id,
-        linkageVersion = linkage_version,
-        chainId = chain_id,
-        chainIndex = chain_index.toInt(),
-        cardTemplateId = card_template_id,
-        triggerSubClass = trigger_sub_class,
-        s_planPayloadCiphertext = s_planPayloadCiphertext,
-        s_userTextCiphertext = s_userTextCiphertext,
-        s_cardPayloadCiphertext = s_cardPayloadCiphertext,
-        userChoice = user_choice,
-        swipeVerified = swipe_verified == 1L,
-        s_modifiedPlanCiphertext = s_modifiedPlanCiphertext,
-        expireAtMs = expire_at_ms,
-        rollbackFlag = rollback_flag == 1L,
-        createdAtMs = created_at_ms,
-    )
 }
