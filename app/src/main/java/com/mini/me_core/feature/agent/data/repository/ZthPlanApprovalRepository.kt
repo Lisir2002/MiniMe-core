@@ -2,7 +2,7 @@ package com.mini.me_core.feature.agent.data.repository
 
 import com.mini.me_core.core.security.ZthSensitiveColumnCrypto
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.me_core.feature.agent.data.local.entity.HardConstraintDeleteAuditEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_hard_constraint_delete_audits as V2DeleteAudit
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -52,8 +52,8 @@ class ZthPlanApprovalRepository @Inject constructor(
     }
 
     /** C.4.11 DB Migration 兜底：扫所有 rollbackApplied=0 的删除审计 → 调用者做回滚。 */
-    suspend fun listPendingRollbacks(): List<HardConstraintDeleteAuditEntity> =
-        v2Agent.listDeleteAuditsPendingRollback().map { it.toEntity() }
+    suspend fun listPendingRollbacks(): List<V2DeleteAudit> =
+        v2Agent.listDeleteAuditsPendingRollback()
 
     /** 回滚成功后：标记 rollbackApplied=1（PA-INV-2 单向）。 */
     suspend fun markRolledBack(auditId: String) =
@@ -62,34 +62,23 @@ class ZthPlanApprovalRepository @Inject constructor(
     // ── Phase 4.2 Firestore：HardConstraintDelete ↔ Dto 映射 ──────────
     // 说明：跨设备同步不存 s_affectedKeysCiphertext（只有本地 Keystore 能解开；同步只用于「统计与通知」）。
 
-    fun deleteAuditToDto(e: HardConstraintDeleteAuditEntity): Map<String, Any?> = mapOf(
-        "id" to e.id, "sessionId" to e.sessionId,
-        "affectedTableName" to e.affectedTableName,
-        "triggerSubClass" to e.triggerSubClass,
-        "rollbackApplied" to e.rollbackApplied,
-        "createdAtMs" to e.createdAtMs,
+    fun deleteAuditToDto(e: V2DeleteAudit): Map<String, Any?> = mapOf(
+        "id" to e.id, "sessionId" to e.session_id,
+        "affectedTableName" to e.affected_table_name,
+        "triggerSubClass" to e.trigger_sub_class,
+        "rollbackApplied" to (e.rollback_applied != 0L),
+        "createdAtMs" to e.created_at_ms,
         "_lwwMs" to System.currentTimeMillis()
         // 注意：s_affectedKeysCiphertext 不跨设备同步（本地加密）
     )
 
-    fun deleteAuditFromDto(m: Map<String, Any?>): HardConstraintDeleteAuditEntity =
-        HardConstraintDeleteAuditEntity(
-            id = m["id"] as? String ?: "",
-            sessionId = m["sessionId"] as? String ?: "",
-            affectedTableName = m["affectedTableName"] as? String ?: "",
-            s_affectedKeysCiphertext = "", // 跨设备拉到后无明文意义（保留空）
-            triggerSubClass = m["triggerSubClass"] as? String ?: "",
-            rollbackApplied = (m["rollbackApplied"] as? Boolean) ?: false,
-            createdAtMs = (m["createdAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
-        )
-
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Zth_hard_constraint_delete_audits.toEntity() = HardConstraintDeleteAuditEntity(
-        id = id,
-        sessionId = session_id,
-        affectedTableName = affected_table_name,
-        s_affectedKeysCiphertext = s_affectedKeysCiphertext,
-        triggerSubClass = trigger_sub_class,
-        rollbackApplied = rollback_applied == 1L,
-        createdAtMs = created_at_ms,
+    fun deleteAuditFromDto(m: Map<String, Any?>): V2DeleteAudit = V2DeleteAudit(
+        id = m["id"] as? String ?: "",
+        session_id = m["sessionId"] as? String ?: "",
+        affected_table_name = m["affectedTableName"] as? String ?: "",
+        s_affectedKeysCiphertext = "", // 跨设备拉到后无明文意义（保留空）
+        trigger_sub_class = m["triggerSubClass"] as? String ?: "",
+        rollback_applied = if ((m["rollbackApplied"] as? Boolean) ?: false) 1L else 0L,
+        created_at_ms = (m["createdAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
     )
 }

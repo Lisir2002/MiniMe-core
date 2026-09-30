@@ -1,7 +1,6 @@
 package com.mini.me_core.feature.agent.data.remote.zth
 
 import com.mini.me_core.core.security.ZthSensitiveColumnCrypto
-import com.mini.me_core.feature.agent.data.local.entity.HardConstraintDeleteAuditEntity
 import com.mini.me_core.feature.agent.data.local.entity.L0SoftCompactRestoreLogEntity
 import com.mini.me_core.feature.agent.data.local.entity.SentinelPlanRejectionAuditEntity
 import com.mini.me_core.feature.agent.data.local.entity.UserConfirmedSentinelEntity
@@ -84,30 +83,6 @@ class ZthEntityMapper @Inject constructor(
             rejectionType = d.rejectionType,
             s_reasonCiphertext = d.reasonCiphertext,
             s_rejectedPlanSnapshotCiphertext = d.rejectedPlanSnapshotCiphertext,
-            createdAtMs = d.createdAtMs
-        )
-
-    // ── Hard Delete Audit ──────────────────────────────────────────────────
-
-    fun toDto(e: HardConstraintDeleteAuditEntity): ZthHardDeleteAuditFirestoreDto =
-        ZthHardDeleteAuditFirestoreDto(
-            id = e.id,
-            sessionId = e.sessionId,
-            affectedTableName = e.affectedTableName,
-            affectedKeysCiphertext = e.s_affectedKeysCiphertext,
-            triggerSubClass = e.triggerSubClass,
-            rollbackApplied = e.rollbackApplied,
-            createdAtMs = e.createdAtMs
-        )
-
-    fun toEntity(d: ZthHardDeleteAuditFirestoreDto): HardConstraintDeleteAuditEntity =
-        HardConstraintDeleteAuditEntity(
-            id = d.id,
-            sessionId = d.sessionId,
-            affectedTableName = d.affectedTableName,
-            s_affectedKeysCiphertext = d.affectedKeysCiphertext,
-            triggerSubClass = d.triggerSubClass,
-            rollbackApplied = d.rollbackApplied,
             createdAtMs = d.createdAtMs
         )
 
