@@ -37,7 +37,6 @@ import com.mini.me_core.feature.settings.data.repository.LogSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.SyncSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.ThemeSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.VisionModelSettingsRepository
-import com.mini.me_core.feature.workspace.data.local.entity.RemoteMountEntity
 import com.mini.me_core.feature.workspace.data.repository.WorkspaceRepository
 import com.mini.me_core.datalayer.repository.WorkspaceRepository as V2WorkspaceRepository
 import com.mini.me_core.feature.workspace.domain.model.RemoteProtocol
@@ -852,9 +851,6 @@ class BackupManagerImpl @Inject constructor(
 
     private fun com.mini.mecore.datalayer.sqldelight.workspace.Remote_mounts.toV2Dto() =
         RemoteMountDto(id, connection_id, remote_path, local_mount_path, is_active == 1L, auto_connect == 1L)
-
-    private fun RemoteMountEntity.toDto() = RemoteMountDto(id, connectionId, remotePath, localMountPath, isActive, autoConnect)
-    private fun RemoteMountDto.toEntity() = RemoteMountEntity(id, connectionId, remotePath, localMountPath, isActive, autoConnect)
 
     private fun ChatSessionEntity.toDto() = ChatSessionDto(
         id = id, title = title,

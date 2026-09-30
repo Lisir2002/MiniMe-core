@@ -3,7 +3,6 @@ package com.mini.me_core.feature.workspace.domain.repository
 import com.mini.me_core.core.security.CredentialEncryptor
 import com.mini.me_core.core.security.HostKeyManager
 import com.mini.me_core.datalayer.repository.WorkspaceRepository as V2WorkspaceRepository
-import com.mini.me_core.feature.workspace.data.local.entity.RemoteMountEntity
 import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
 import com.mini.me_core.feature.workspace.domain.model.RemoteMount
 import com.mini.me_core.feature.workspace.domain.model.RemoteProtocol
@@ -36,8 +35,8 @@ class RemoteRepository @Inject constructor(
     private suspend fun getConnectionRow(id: String): com.mini.mecore.datalayer.sqldelight.workspace.Remote_connections? =
         v2Workspace.getRemoteConnection(id)
 
-    private suspend fun getMountEntity(id: String): RemoteMountEntity? =
-        v2Workspace.getRemoteMount(id)?.toEntity()
+    private suspend fun getMountRow(id: String): com.mini.mecore.datalayer.sqldelight.workspace.Remote_mounts? =
+        v2Workspace.getRemoteMount(id)
 
     fun getConnections(): Flow<List<RemoteConnection>> =
         v2Workspace.observeAllRemoteConnections().map { list ->
@@ -67,11 +66,10 @@ class RemoteRepository @Inject constructor(
         ) { list, activeIds ->
             buildList {
                 for (row in list) {
-                    val entity = row.toEntity()
-                    val connRow = v2Workspace.getRemoteConnection(entity.connectionId)
+                    val connRow = v2Workspace.getRemoteConnection(row.connection_id)
                     val conn = connRow?.toDomainModel()
-                    add(entity.toDomainModel(conn).copy(
-                        isActive = activeIds.contains(entity.id)
+                    add(row.toDomainModel(conn).copy(
+                        isActive = activeIds.contains(row.id)
                     ))
                 }
             }
@@ -136,56 +134,42 @@ class RemoteRepository @Inject constructor(
     }
 
     suspend fun addMount(mount: RemoteMount) {
-        val entity = RemoteMountEntity(
-            id = mount.id,
-            connectionId = mount.connectionId,
-            remotePath = mount.remotePath,
-            localMountPath = mount.localMountPath,
-            autoConnect = mount.autoConnect
-        )
         v2Workspace.upsertRemoteMount(
-                id = entity.id,
-                connectionId = entity.connectionId,
-                remotePath = entity.remotePath,
-                localMountPath = entity.localMountPath,
-                isActive = if (entity.isActive) 1L else 0L,
-                autoConnect = if (entity.autoConnect) 1L else 0L,
+                id = mount.id,
+                connectionId = mount.connectionId,
+                remotePath = mount.remotePath,
+                localMountPath = mount.localMountPath,
+                isActive = 0L,
+                autoConnect = if (mount.autoConnect) 1L else 0L,
             )
     }
 
     suspend fun updateMount(mount: RemoteMount) {
-        val entity = RemoteMountEntity(
-            id = mount.id,
-            connectionId = mount.connectionId,
-            remotePath = mount.remotePath,
-            localMountPath = mount.localMountPath,
-            autoConnect = mount.autoConnect
-        )
         v2Workspace.updateRemoteMount(
-                id = entity.id,
-                connectionId = entity.connectionId,
-                remotePath = entity.remotePath,
-                localMountPath = entity.localMountPath,
-                isActive = if (entity.isActive) 1L else 0L,
-                autoConnect = if (entity.autoConnect) 1L else 0L,
+                id = mount.id,
+                connectionId = mount.connectionId,
+                remotePath = mount.remotePath,
+                localMountPath = mount.localMountPath,
+                isActive = 0L,
+                autoConnect = if (mount.autoConnect) 1L else 0L,
             )
     }
 
     suspend fun deleteMount(mountId: String) {
         disconnectMount(mountId)
-        val entity = getMountEntity(mountId)
-        if (entity != null) {
+        val row = getMountRow(mountId)
+        if (row != null) {
             v2Workspace.deleteRemoteMount(mountId)
         }
     }
 
     suspend fun connectMount(mountId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val mountEntity = getMountEntity(mountId) ?: return@withContext Result.failure(Exception("Mount not found"))
-            val connRow = getConnectionRow(mountEntity.connectionId) ?: return@withContext Result.failure(Exception("Connection not found"))
+            val mountRow = getMountRow(mountId) ?: return@withContext Result.failure(Exception("Mount not found"))
+            val connRow = getConnectionRow(mountRow.connection_id) ?: return@withContext Result.failure(Exception("Connection not found"))
 
             val conn = connRow.toDomainModel()
-            val mount = mountEntity.toDomainModel(conn)
+            val mount = mountRow.toDomainModel(conn)
 
             val client = when (conn.protocol) {
                 RemoteProtocol.SFTP -> SftpSyncClient(hostKeyManager.createVerifier())
@@ -326,25 +310,14 @@ class RemoteRepository @Inject constructor(
         password = if (isPasswordAuth(auth_type)) decryptCredential(auth_data) else ""
     )
 
-    private fun RemoteMountEntity.toDomainModel(conn: RemoteConnection?) = RemoteMount(
-        id = id,
-        connectionId = connectionId,
-        remotePath = remotePath,
-        localMountPath = localMountPath,
-        isActive = isActive,
-        autoConnect = autoConnect,
-        connection = conn
-    )
-
-    // ── V2 行 → Room Entity 映射 ────────────────────────────────────────
-
-    private fun com.mini.mecore.datalayer.sqldelight.workspace.Remote_mounts.toEntity() = RemoteMountEntity(
+    private fun com.mini.mecore.datalayer.sqldelight.workspace.Remote_mounts.toDomainModel(conn: RemoteConnection?) = RemoteMount(
         id = id,
         connectionId = connection_id,
         remotePath = remote_path,
         localMountPath = local_mount_path,
         isActive = is_active == 1L,
         autoConnect = auto_connect == 1L,
+        connection = conn
     )
 
     // ── authType 新旧值兼容辅助 ──────────────────────────────────────────
