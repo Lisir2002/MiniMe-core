@@ -2,7 +2,6 @@ package com.mini.me_core.feature.agent.domain.session.trajectory
 
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_trajectories as V2Trajectory
-import com.mini.me_core.feature.agent.data.local.entity.TrajectoryEntity
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolResultTypeRegistry
 import kotlinx.serialization.json.JsonElement
@@ -74,35 +73,20 @@ class TrajectoryService @Inject constructor(
         tokensOut: Int
     ) {
         if (sessionId == null) return
-        val entity = TrajectoryEntity(
+        v2Agent.insertTrajectory(
             trajectoryId = "trj_${UUID.randomUUID().toString().replace("-", "")}",
             sessionId = sessionId,
             taskId = taskId.orEmpty(),
-            turnIndex = turnIndex,
+            turnIndex = turnIndex.toLong(),
             kind = KIND_TOOL,
             toolName = toolName,
             argsHash = argsHash(args),
             resultSummary = buildSummary(toolName, args, result),
-            isError = isError,
+            isError = if (isError) 1L else 0L,
             durationMs = durationMs.coerceAtLeast(0),
-            tokensIn = tokensIn,
-            tokensOut = tokensOut,
+            tokensIn = tokensIn.toLong(),
+            tokensOut = tokensOut.toLong(),
             ts = System.currentTimeMillis()
-        )
-        v2Agent.insertTrajectory(
-            trajectoryId = entity.trajectoryId,
-            sessionId = entity.sessionId,
-            taskId = entity.taskId,
-            turnIndex = entity.turnIndex.toLong(),
-            kind = entity.kind,
-            toolName = entity.toolName,
-            argsHash = entity.argsHash,
-            resultSummary = entity.resultSummary,
-            isError = if (entity.isError) 1L else 0L,
-            durationMs = entity.durationMs,
-            tokensIn = entity.tokensIn.toLong(),
-            tokensOut = entity.tokensOut.toLong(),
-            ts = entity.ts
         )
     }
 
@@ -117,38 +101,27 @@ class TrajectoryService @Inject constructor(
         tokensOut: Int = 0
     ) {
         if (sessionId == null) return
-        val entity = TrajectoryEntity(
+        v2Agent.insertTrajectory(
             trajectoryId = "trj_${UUID.randomUUID().toString().replace("-", "")}",
             sessionId = sessionId,
             taskId = taskId.orEmpty(),
-            turnIndex = turnIndex,
+            turnIndex = turnIndex.toLong(),
             kind = kind,
+            toolName = "",
+            argsHash = "",
             resultSummary = summary,
-            tokensIn = tokensIn,
-            tokensOut = tokensOut,
+            isError = 0L,
+            durationMs = 0L,
+            tokensIn = tokensIn.toLong(),
+            tokensOut = tokensOut.toLong(),
             ts = System.currentTimeMillis()
-        )
-        v2Agent.insertTrajectory(
-            trajectoryId = entity.trajectoryId,
-            sessionId = entity.sessionId,
-            taskId = entity.taskId,
-            turnIndex = entity.turnIndex.toLong(),
-            kind = entity.kind,
-            toolName = entity.toolName,
-            argsHash = entity.argsHash,
-            resultSummary = entity.resultSummary,
-            isError = if (entity.isError) 1L else 0L,
-            durationMs = entity.durationMs,
-            tokensIn = entity.tokensIn.toLong(),
-            tokensOut = entity.tokensOut.toLong(),
-            ts = entity.ts
         )
     }
 
     /** 本回合（taskId 分组）用量：主显每回合增量（D2-4 数据源）。 */
     suspend fun turnUsage(sessionId: String?, taskId: String?): TurnUsage {
         if (sessionId == null || taskId.isNullOrBlank()) return TurnUsage()
-        val entries = v2Agent.listTrajectoriesByTask(taskId).map { it.toEntity() }
+        val entries = v2Agent.listTrajectoriesByTask(taskId)
         if (entries.isEmpty()) return TurnUsage()
         return entries.aggregateUsage()
     }
@@ -164,19 +137,19 @@ class TrajectoryService @Inject constructor(
     /** 已做动作摘要（D2-5：3.7 强制收敛返回 / Playbook 阶段总结 / 审计）。 */
     suspend fun buildActionSummary(sessionId: String?, maxItems: Int = ACTION_SUMMARY_MAX_ITEMS): String {
         if (sessionId == null) return ""
-        val tools = v2Agent.listTrajectories(sessionId).map { it.toEntity() }.filter { it.kind == KIND_TOOL }.takeLast(maxItems)
+        val tools = v2Agent.listTrajectories(sessionId).filter { it.kind == KIND_TOOL }.takeLast(maxItems)
         if (tools.isEmpty()) return ""
         return tools.joinToString("\n") { t ->
-            val marker = if (t.isError) "❌" else "•"
-            val dur = if (t.durationMs > 0) " (${t.durationMs}ms)" else ""
-            "$marker ${t.toolName}${if (t.toolName.isNotEmpty()) ": " else ""}${t.resultSummary}$dur"
+            val marker = if (t.is_error != 0L) "❌" else "•"
+            val dur = if (t.duration_ms > 0) " (${t.duration_ms}ms)" else ""
+            "$marker ${t.tool_name}${if (t.tool_name.isNotEmpty()) ": " else ""}${t.result_summary}$dur"
         }
     }
 
     /** 审计回放：按会话查完整轨迹（时间升序）。 */
-    suspend fun getTrajectory(sessionId: String?): List<TrajectoryEntity> {
+    suspend fun getTrajectory(sessionId: String?): List<V2Trajectory> {
         if (sessionId == null) return emptyList()
-        return v2Agent.listTrajectories(sessionId).map { it.toEntity() }
+        return v2Agent.listTrajectories(sessionId)
     }
 
     /** 会话最近一个回合（taskId + turnIndex），供 UI 用量卡片定位。 */
@@ -187,15 +160,15 @@ class TrajectoryService @Inject constructor(
         return taskId to turnIndex
     }
 
-    private fun List<TrajectoryEntity>.aggregateUsage(): TurnUsage {
+    private fun List<V2Trajectory>.aggregateUsage(): TurnUsage {
         var tokensIn = 0L
         var tokensOut = 0L
         var durationMs = 0L
         var toolCalls = 0
         for (e in this) {
-            tokensIn += e.tokensIn
-            tokensOut += e.tokensOut
-            durationMs += e.durationMs
+            tokensIn += e.tokens_in
+            tokensOut += e.tokens_out
+            durationMs += e.duration_ms
             if (e.kind == KIND_TOOL) toolCalls++
         }
         return TurnUsage(
@@ -206,24 +179,6 @@ class TrajectoryService @Inject constructor(
             toolCalls = toolCalls
         )
     }
-
-    // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
-
-    private fun V2Trajectory.toEntity() = TrajectoryEntity(
-        trajectoryId = trajectory_id,
-        sessionId = session_id,
-        taskId = task_id,
-        turnIndex = turn_index.toInt(),
-        kind = kind,
-        toolName = tool_name,
-        argsHash = args_hash,
-        resultSummary = result_summary,
-        isError = is_error != 0L,
-        durationMs = duration_ms,
-        tokensIn = tokens_in.toInt(),
-        tokensOut = tokens_out.toInt(),
-        ts = ts
-    )
 }
 
 /**
