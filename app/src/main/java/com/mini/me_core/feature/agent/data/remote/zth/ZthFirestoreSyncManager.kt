@@ -40,7 +40,6 @@ import kotlinx.coroutines.withContext
 @Singleton
 class ZthFirestoreSyncManager @Inject constructor(
     private val keyStore: ZthSharedSyncKeyStore,
-    private val mapper: ZthEntityMapper,
     private val sentinelRepo: ZthConfirmationCardRepository,
     private val fuseRepo: ZthCircuitBreakerRepository,
     private val planRepo: ZthPlanApprovalRepository,

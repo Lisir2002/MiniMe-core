@@ -1,7 +1,7 @@
 package com.mini.me_core.feature.agent.data.repository
 
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.me_core.feature.agent.data.local.entity.L0SoftCompactRestoreLogEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_l0_soft_compact_restore_logs as V2L0Log
 import com.mini.me_core.feature.agent.domain.zth.ZthCapabilityAuditResult
 import com.mini.me_core.feature.agent.domain.zth.ZthPresetTier
 import javax.inject.Inject
@@ -67,16 +67,16 @@ class ZthCapabilityAuditRepository @Inject constructor(
 
     // ── L0 软压缩还原日志（崩溃恢复 + LINK-INV 校验） ────────────────
 
-    suspend fun insertL0Log(log: L0SoftCompactRestoreLogEntity) {
+    suspend fun insertL0Log(log: V2L0Log) {
         v2Agent.insertRestoreLog(
-            id = log.id, sessionId = log.sessionId,
-            firstMessageId = log.firstMessageId, lastMessageId = log.lastMessageId,
-            originalRowCount = log.originalRowCount.toLong(),
-            tokensBefore = log.tokensBefore.toLong(), tokensAfter = log.tokensAfter.toLong(),
+            id = log.id, sessionId = log.session_id,
+            firstMessageId = log.first_message_id, lastMessageId = log.last_message_id,
+            originalRowCount = log.original_row_count,
+            tokensBefore = log.tokens_before, tokensAfter = log.tokens_after,
             sCompactSourceDigestCiphertext = log.s_compactSourceDigestCiphertext,
-            expireAtMs = log.expireAtMs,
-            restoredFlag = if (log.restoredFlag) 1L else 0L,
-            createdAtMs = log.createdAtMs,
+            expireAtMs = log.expire_at_ms,
+            restoredFlag = log.restored_flag,
+            createdAtMs = log.created_at_ms,
         )
     }
 
@@ -86,56 +86,42 @@ class ZthCapabilityAuditRepository @Inject constructor(
 
     /** C.4.3 崩溃恢复：列出会话下所有未过期 L0 压缩（用 getBySession 再 filter，DAO 未提供专用查询）。 */
     suspend fun listUnexpiredL0(sessionId: String, nowMs: Long = System.currentTimeMillis()):
-            List<L0SoftCompactRestoreLogEntity> =
-        v2Agent.listRestoreLogs(sessionId).map { it.toEntity() }.filter {
-            it.expireAtMs == -1L || it.expireAtMs > nowMs
+            List<V2L0Log> =
+        v2Agent.listRestoreLogs(sessionId).filter {
+            it.expire_at_ms == -1L || it.expire_at_ms > nowMs
         }
 
     /** 崩溃恢复专用：列出已过期但未 restoredFlag=1 的（DAO 已有此查询）。 */
     suspend fun listExpiredNotRestored(nowMs: Long = System.currentTimeMillis()):
-            List<L0SoftCompactRestoreLogEntity> =
-        v2Agent.listRestoreLogsExpiredNotRestored(nowMs).map { it.toEntity() }
+            List<V2L0Log> =
+        v2Agent.listRestoreLogsExpiredNotRestored(nowMs)
 
 
     // ── Phase 4.2 Firestore：L0 ↔ Dto 映射 ──────────────────────────
 
-    fun l0ToDto(e: L0SoftCompactRestoreLogEntity): Map<String, Any?> = mapOf(
-        "id" to e.id, "sessionId" to e.sessionId,
-        "firstMessageId" to e.firstMessageId, "lastMessageId" to e.lastMessageId,
-        "originalRowCount" to e.originalRowCount,
-        "tokensBefore" to e.tokensBefore, "tokensAfter" to e.tokensAfter,
-        "expireAtMs" to e.expireAtMs, "restoredFlag" to e.restoredFlag,
-        "createdAtMs" to e.createdAtMs,
+    fun l0ToDto(e: V2L0Log): Map<String, Any?> = mapOf(
+        "id" to e.id, "sessionId" to e.session_id,
+        "firstMessageId" to e.first_message_id, "lastMessageId" to e.last_message_id,
+        "originalRowCount" to e.original_row_count,
+        "tokensBefore" to e.tokens_before, "tokensAfter" to e.tokens_after,
+        "expireAtMs" to e.expire_at_ms, "restoredFlag" to (e.restored_flag != 0L),
+        "createdAtMs" to e.created_at_ms,
         "_lwwMs" to System.currentTimeMillis()
     )
 
-    fun l0FromDto(m: Map<String, Any?>): L0SoftCompactRestoreLogEntity =
-        L0SoftCompactRestoreLogEntity(
+    fun l0FromDto(m: Map<String, Any?>): V2L0Log =
+        V2L0Log(
             id = m["id"] as? String ?: "",
-            sessionId = m["sessionId"] as? String ?: "",
-            firstMessageId = m["firstMessageId"] as? String ?: "",
-            lastMessageId = m["lastMessageId"] as? String ?: "",
-            originalRowCount = (m["originalRowCount"] as? Number)?.toInt() ?: 0,
-            tokensBefore = (m["tokensBefore"] as? Number)?.toInt() ?: 0,
-            tokensAfter = (m["tokensAfter"] as? Number)?.toInt() ?: 0,
+            session_id = m["sessionId"] as? String ?: "",
+            first_message_id = m["firstMessageId"] as? String ?: "",
+            last_message_id = m["lastMessageId"] as? String ?: "",
+            original_row_count = (m["originalRowCount"] as? Number)?.toLong() ?: 0L,
+            tokens_before = (m["tokensBefore"] as? Number)?.toLong() ?: 0L,
+            tokens_after = (m["tokensAfter"] as? Number)?.toLong() ?: 0L,
             // 跨设备 s_compactSourceDigestCiphertext 不同步（本地解密才有用）
             s_compactSourceDigestCiphertext = "",
-            expireAtMs = (m["expireAtMs"] as? Number)?.toLong() ?: -1L,
-            restoredFlag = (m["restoredFlag"] as? Boolean) ?: false,
-            createdAtMs = (m["createdAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
+            expire_at_ms = (m["expireAtMs"] as? Number)?.toLong() ?: -1L,
+            restored_flag = if ((m["restoredFlag"] as? Boolean) ?: false) 1L else 0L,
+            created_at_ms = (m["createdAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
         )
-
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Zth_l0_soft_compact_restore_logs.toEntity() = L0SoftCompactRestoreLogEntity(
-        id = id,
-        sessionId = session_id,
-        firstMessageId = first_message_id,
-        lastMessageId = last_message_id,
-        originalRowCount = original_row_count.toInt(),
-        tokensBefore = tokens_before.toInt(),
-        tokensAfter = tokens_after.toInt(),
-        s_compactSourceDigestCiphertext = s_compactSourceDigestCiphertext,
-        expireAtMs = expire_at_ms,
-        restoredFlag = restored_flag == 1L,
-        createdAtMs = created_at_ms,
-    )
 }
