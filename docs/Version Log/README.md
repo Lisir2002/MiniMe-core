@@ -49,13 +49,14 @@ Version Log/
 
 本目录下所有文档（CHANGELOG.md、各独立版本文档）以及 GitHub Release 正文必须严格遵循 AGENTS.md 中的格式规范，保持三处一致。
 
-## 绑定发版（强制）
+## 独立发版
 
-**MiniMe-QBot（`qbot-v*`）与 MiniMe-QBot 环境注入器（`qbot-injector-v*`）为绑定应用**：二者共享同一套运行环境资产，不可单独升级。
+**MiniMe-QBot（`qbot-v*`）与 MiniMe-QBot 环境注入器（`qbot-injector-v*`）各自独立发版**：谁有更新就推谁的 Tag，只发该应用。
 
-- **每次发版必须同批一起发布两款最新版**，即使其中一方当次无改动，也要一并重新打 Tag 发布。
-- 两份版本日志（`CHANGELOG-qbot.md` 与 `CHANGELOG-qbot-injector.md`）须同批一并更新，并在各自头部互相交叉引用。
-- 两枚 Tag 必须打在**同一个提交**上，一次 push 一并推送；CI 由**同一个工作流**（`.github/workflows/qbot-release.yml`）一次抓取资产、生成清单并同批构建两款 APK，推 `qbot-v*` 触发，缺少配对的 `qbot-injector-v*` Tag 时配对门禁失败。
+- 两份版本日志（`CHANGELOG-qbot.md` 与 `CHANGELOG-qbot-injector.md`）各自更新，**不要求同批**。
+- 两侧运行环境资源的兼容由**注入包契约号**（注入器写入注入包的 `manifest.json` 中的 `contractVersion`）保证：注入器仅更新环境资源（内容变化、契约号不变）时，旧版 QBot 可直接使用新注入包，无需同步发版。
+- 仅当**资产种类 / 目录布局变化**（契约号 +1）时，才需 QBot 一并发版。
+- CI 由同一个工作流（`.github/workflows/qbot-release.yml`）按 Tag 前缀分流：推 `qbot-v*` 只构建发布 QBot，推 `qbot-injector-v*` 只构建发布注入器（仅注入器需抓取体积资产）。
 
 ## 发版流程
 
