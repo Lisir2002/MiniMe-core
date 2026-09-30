@@ -268,6 +268,19 @@ jobs:
           echo "  PASS: 无 emoji"
           echo "--- 硬校验完成 ---"
 
+      # 预发布标记：tag 含 -rc/-dev/-beta/-alpha 后缀时标记为 prerelease
+      - name: Determine prerelease flag
+        id: prerelease
+        run: |
+          tag="${{ steps.target.outputs.tag }}"
+          if [[ "$tag" =~ -(rc|dev|beta|alpha)([.0-9]*)?$ ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "检测到预发布后缀，标记为 pre-release"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "正式版，不标记 pre-release"
+          fi
+
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -275,6 +288,7 @@ jobs:
           # 标题基础格式「{软件名} v{版本号}」，发版后必须手动补充「— 更新内容概括」（≤20字，用户语言）
           name: ${{ steps.preserve.outputs.name }}
           body: ${{ steps.preserve.outputs.body }}
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           files: |
             ${{ steps.rename.outputs.apk }}
         env:
