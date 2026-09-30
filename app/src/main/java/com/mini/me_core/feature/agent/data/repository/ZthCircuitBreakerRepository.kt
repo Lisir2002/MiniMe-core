@@ -2,10 +2,9 @@ package com.mini.me_core.feature.agent.data.repository
 
 
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.me_core.feature.agent.data.local.entity.HallucinationFuseEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_hallucination_fuses as V2Fuse
 import com.mini.me_core.feature.agent.domain.execution.permission.FuseState
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,38 +28,38 @@ class ZthCircuitBreakerRepository @Inject constructor(
 ) {
 
     /** UI Red Banner：实时观察全局 + 会话级 fuse。 */
-    fun observeGlobalAndSession(sessionId: String): Flow<List<HallucinationFuseEntity>> =
-        v2Agent.observeAllFuses().map { list -> list.map { it.toEntity() } }
+    fun observeGlobalAndSession(sessionId: String): Flow<List<V2Fuse>> =
+        v2Agent.observeAllFuses()
 
     /** Phase 4.2 Sync：全量拉取本地（push 到 Firestore）。 */
-    suspend fun getAll(): List<HallucinationFuseEntity> =
-        v2Agent.listAllFuses().map { it.toEntity() }
+    suspend fun getAll(): List<V2Fuse> =
+        v2Agent.listAllFuses()
 
     /** Phase 4.2 Sync：Firestore pull → 本地合并（按 KILL-1 不变性过滤 killSwitch1=true）。 */
-    suspend fun mergeFromRemote(remoteList: List<HallucinationFuseEntity>) {
-        val locals = getAll().associateBy { it.scope to it.scopeId }
-        val toUpsert = mutableListOf<HallucinationFuseEntity>()
+    suspend fun mergeFromRemote(remoteList: List<V2Fuse>) {
+        val locals = getAll().associateBy { it.scope to it.scope_id }
+        val toUpsert = mutableListOf<V2Fuse>()
         for (r in remoteList) {
-            val l = locals[r.scope to r.scopeId]
+            val l = locals[r.scope to r.scope_id]
             if (l == null) {
                 toUpsert.add(r)
                 continue
             }
             // FUSE-REPO-INV-2：本地 killSwitch1Triggered=true → 拒绝远程覆盖为 false
-            val merged = if (l.killSwitch1Triggered && !r.killSwitch1Triggered) {
-                r.copy(killSwitch1Triggered = true, state = FuseState.OPEN.name)
+            val merged = if (l.kill_switch1_triggered != 0L && r.kill_switch1_triggered == 0L) {
+                r.copy(kill_switch1_triggered = 1L, state = FuseState.OPEN.name)
             } else r
             toUpsert.add(merged)
         }
         if (toUpsert.isNotEmpty()) {
             for (e in toUpsert) {
                 v2Agent.upsertFuse(
-                    id = e.id, scope = e.scope, scopeId = e.scopeId, state = e.state,
-                    linkageVersion = e.linkageVersion, failureCount = e.failureCount.toLong(),
-                    openSinceMs = e.openSinceMs, lastProbeAtMs = e.lastProbeAtMs,
-                    killSwitch1Triggered = if (e.killSwitch1Triggered) 1L else 0L,
-                    killSwitch2SoftDisabled = if (e.killSwitch2SoftDisabled) 1L else 0L,
-                    lastTripSubclass = e.lastTripSubclass, updatedAtMs = e.updatedAtMs,
+                    id = e.id, scope = e.scope, scopeId = e.scope_id, state = e.state,
+                    linkageVersion = e.linkage_version, failureCount = e.failure_count,
+                    openSinceMs = e.open_since_ms, lastProbeAtMs = e.last_probe_at_ms,
+                    killSwitch1Triggered = e.kill_switch1_triggered,
+                    killSwitch2SoftDisabled = e.kill_switch2_soft_disabled,
+                    lastTripSubclass = e.last_trip_subclass, updatedAtMs = e.updated_at_ms,
                 )
             }
         }
@@ -68,44 +67,33 @@ class ZthCircuitBreakerRepository @Inject constructor(
 
     // ── Phase 4.2 Firestore：Entity ↔ Dto 映射 ─────────────────────────
 
-    fun toDto(e: HallucinationFuseEntity): Map<String, Any?> = mapOf(
-        "id" to e.id, "scope" to e.scope, "scopeId" to e.scopeId,
-        "state" to e.state, "linkageVersion" to e.linkageVersion,
-        "failureCount" to e.failureCount, "openSinceMs" to e.openSinceMs,
-        "lastProbeAtMs" to e.lastProbeAtMs,
-        "killSwitch1Triggered" to e.killSwitch1Triggered,
-        "killSwitch2SoftDisabled" to e.killSwitch2SoftDisabled,
-        "lastTripSubclass" to e.lastTripSubclass, "updatedAtMs" to e.updatedAtMs,
+    fun toDto(e: V2Fuse): Map<String, Any?> = mapOf(
+        "id" to e.id, "scope" to e.scope, "scopeId" to e.scope_id,
+        "state" to e.state, "linkageVersion" to e.linkage_version,
+        "failureCount" to e.failure_count, "openSinceMs" to e.open_since_ms,
+        "lastProbeAtMs" to e.last_probe_at_ms,
+        "killSwitch1Triggered" to (e.kill_switch1_triggered != 0L),
+        "killSwitch2SoftDisabled" to (e.kill_switch2_soft_disabled != 0L),
+        "lastTripSubclass" to e.last_trip_subclass, "updatedAtMs" to e.updated_at_ms,
         "_lwwMs" to System.currentTimeMillis()
     )
 
-    fun fromDto(m: Map<String, Any?>): HallucinationFuseEntity = HallucinationFuseEntity(
+    fun fromDto(m: Map<String, Any?>): V2Fuse = V2Fuse(
         id = m["id"] as? String ?: "",
         scope = m["scope"] as? String ?: "GLOBAL",
-        scopeId = m["scopeId"] as? String ?: HallucinationFuseEntity.GLOBAL_SCOPE_ID,
+        scope_id = m["scopeId"] as? String ?: GLOBAL_SCOPE_ID,
         state = m["state"] as? String ?: FuseState.CLOSED.name,
-        linkageVersion = (m["linkageVersion"] as? Number)?.toLong() ?: 0L,
-        failureCount = (m["failureCount"] as? Number)?.toInt() ?: 0,
-        openSinceMs = (m["openSinceMs"] as? Number)?.toLong() ?: 0L,
-        lastProbeAtMs = (m["lastProbeAtMs"] as? Number)?.toLong() ?: 0L,
-        killSwitch1Triggered = (m["killSwitch1Triggered"] as? Boolean) ?: false,
-        killSwitch2SoftDisabled = (m["killSwitch2SoftDisabled"] as? Boolean) ?: false,
-        lastTripSubclass = m["lastTripSubclass"] as? String,
-        updatedAtMs = (m["updatedAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
+        linkage_version = (m["linkageVersion"] as? Number)?.toLong() ?: 0L,
+        failure_count = (m["failureCount"] as? Number)?.toLong() ?: 0L,
+        open_since_ms = (m["openSinceMs"] as? Number)?.toLong() ?: 0L,
+        last_probe_at_ms = (m["lastProbeAtMs"] as? Number)?.toLong() ?: 0L,
+        kill_switch1_triggered = if ((m["killSwitch1Triggered"] as? Boolean) ?: false) 1L else 0L,
+        kill_switch2_soft_disabled = if ((m["killSwitch2SoftDisabled"] as? Boolean) ?: false) 1L else 0L,
+        last_trip_subclass = m["lastTripSubclass"] as? String,
+        updated_at_ms = (m["updatedAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
     )
 
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Zth_hallucination_fuses.toEntity() = HallucinationFuseEntity(
-        id = id,
-        scope = scope,
-        scopeId = scope_id,
-        state = state,
-        linkageVersion = linkage_version,
-        failureCount = failure_count.toInt(),
-        openSinceMs = open_since_ms,
-        lastProbeAtMs = last_probe_at_ms,
-        killSwitch1Triggered = kill_switch1_triggered == 1L,
-        killSwitch2SoftDisabled = kill_switch2_soft_disabled == 1L,
-        lastTripSubclass = last_trip_subclass,
-        updatedAtMs = updated_at_ms,
-    )
+    companion object {
+        const val GLOBAL_SCOPE_ID = "__zth_global__"
+    }
 }

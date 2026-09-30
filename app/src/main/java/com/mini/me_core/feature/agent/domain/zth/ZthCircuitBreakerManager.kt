@@ -2,7 +2,7 @@ package com.mini.me_core.feature.agent.domain.zth
 
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.me_core.feature.agent.data.local.entity.HallucinationFuseEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_hallucination_fuses as V2Fuse
 import com.mini.me_core.feature.agent.domain.execution.permission.FailureClassification
 import com.mini.me_core.feature.agent.domain.execution.permission.FuseState
 import javax.inject.Inject
@@ -40,12 +40,15 @@ class ZthCircuitBreakerManager @Inject constructor(
         val T_COOL_MIN_BY_TIER: Map<Int, Long> = mapOf(1 to 5L, 2 to 3L, 3 to 2L)
         const val HALF_OPEN_MAX_PROBE_FAILURES = 1 // 半开 1 次探针失败立即回 OPEN
         const val HALF_OPEN_PROBE_SUCCESSES_TO_CLOSE = 1 // 半开成功 1 次回 CLOSED
+        const val GLOBAL_SCOPE_ID = "__zth_global__"
+        fun composeGlobalId(): String = "GLOBAL:$GLOBAL_SCOPE_ID"
+        fun composeSessionId(sessionId: String): String = "SESSION:$sessionId"
     }
 
-    // 读取 Entity.state（String）→ FuseState；因为 Room 持久化存的是 .name（C.4.6 不变性）
-    private val HallucinationFuseEntity.fuseState: FuseState
+    // 读取 V2.state（String）→ FuseState；因为 SQLite 持久化存的是 .name（C.4.6 不变性）
+    private val V2Fuse.fuseState: FuseState
         get() = runCatching { FuseState.valueOf(state) }.getOrElse {
-            FileLogger.w(TAG, "Entity $id fuseState=$state 无法解析 FuseState，兜底 CLOSED（可能 schema 迁移中）")
+            FileLogger.w(TAG, "Fuse $id fuseState=$state 无法解析 FuseState，兜底 CLOSED（可能 schema 迁移中）")
             FuseState.CLOSED
         }
 
@@ -64,7 +67,7 @@ class ZthCircuitBreakerManager @Inject constructor(
         if (tier == ZthPresetTier.DISABLED) return AllowanceResult.ALLOW
         val global = loadOrCreateGlobal()
         // kill-switch-1 单向置位：永远 BLOCK（不变性 KILL-1：不能自动清）
-        if (global.killSwitch1Triggered) return AllowanceResult(
+        if (global.kill_switch1_triggered != 0L) return AllowanceResult(
             false, FuseState.OPEN, "ZTH 全局 kill-switch-1 已激活，红横幅上点「一键回滚+重置」后才能恢复。"
         )
         // 冷却到期自动从 OPEN 切 HALF_OPEN（T_cool tier 分钟）
@@ -75,7 +78,7 @@ class ZthCircuitBreakerManager @Inject constructor(
         val cooledSession = tryAutoCoolDown(sessionEntity, tier)
         // 双 scope：任何一方 OPEN / TRANSITIONING → BLOCK
         return when {
-            cooledSession.killSwitch1Triggered -> AllowanceResult(false, FuseState.OPEN,
+            cooledSession.kill_switch1_triggered != 0L -> AllowanceResult(false, FuseState.OPEN,
                 "会话级 kill-switch-1 已激活。"
             )
             cooledSession.fuseState == FuseState.OPEN || cooledSession.fuseState == FuseState.TRANSITIONING ->
@@ -105,11 +108,11 @@ class ZthCircuitBreakerManager @Inject constructor(
 
     suspend fun recordHalfOpenProbeFail(sessionId: String?, tier: ZthPresetTier, subClass: String) {
         val g = loadOrCreateGlobal()
-        if (g.fuseState == FuseState.HALF_OPEN) transitionTo(g.copy(failureCount = g.failureCount + 1, lastTripSubclass = subClass),
+        if (g.fuseState == FuseState.HALF_OPEN) transitionTo(g.copy(failure_count = g.failure_count + 1, last_trip_subclass = subClass),
             FuseState.OPEN, TierContext(tier, sessionId))
         if (sessionId != null) {
             val s = loadOrCreateSession(sessionId)
-            if (s.fuseState == FuseState.HALF_OPEN) transitionTo(s.copy(failureCount = s.failureCount + 1, lastTripSubclass = subClass),
+            if (s.fuseState == FuseState.HALF_OPEN) transitionTo(s.copy(failure_count = s.failure_count + 1, last_trip_subclass = subClass),
                 FuseState.OPEN, TierContext(tier, sessionId))
         }
     }
@@ -117,12 +120,12 @@ class ZthCircuitBreakerManager @Inject constructor(
     // ── 外部入口 5：用户强制 RESET（Banner 按钮 / kill-switch-2） ────────────────
 
     suspend fun userRequestedReset(sessionId: String?, tier: ZthPresetTier): Boolean {
-        val list = mutableListOf<HallucinationFuseEntity>()
+        val list = mutableListOf<V2Fuse>()
         list.add(loadOrCreateGlobal())
         if (sessionId != null) list.add(loadOrCreateSession(sessionId))
         var allOk = true
         for (e in list) {
-            if (e.killSwitch1Triggered) {
+            if (e.kill_switch1_triggered != 0L) {
                 allOk = false
                 continue // kill-switch-1 不能自动清（KILL-1 不变性）
             }
@@ -146,14 +149,14 @@ class ZthCircuitBreakerManager @Inject constructor(
         } else loadOrCreateSession(sessionId) to "session#$sessionId"
 
         val threshold = FAIL_TRIP_BY_TIER[tier.tier.coerceIn(1, 3)] ?: return
-        val newCount = entity.failureCount + 1
+        val newCount = entity.failure_count + 1
         val updated = entity.copy(
-            failureCount = newCount,
-            lastTripSubclass = subClass
+            failure_count = newCount,
+            last_trip_subclass = subClass
         )
         if (entity.fuseState == FuseState.CLOSED && newCount >= threshold) {
             // 超阈值 → 切 OPEN + 写 openSinceMs
-            val tripped = updated.copy(state = FuseState.OPEN.name, openSinceMs = System.currentTimeMillis())
+            val tripped = updated.copy(state = FuseState.OPEN.name, open_since_ms = System.currentTimeMillis())
             upsertFuse(tripped)
             FileLogger.i(TAG, "[$scopeLabel] 熔断 OPEN：failureCount=$newCount ≥ threshold=$threshold subClass=$subClass")
         } else {
@@ -166,7 +169,7 @@ class ZthCircuitBreakerManager @Inject constructor(
     private data class TierContext(val tier: ZthPresetTier, val sessionId: String?)
 
     private suspend fun transitionTo(
-        entity: HallucinationFuseEntity,
+        entity: V2Fuse,
         target: FuseState,
         ctx: TierContext,
         clearFailures: Boolean = false
@@ -178,7 +181,7 @@ class ZthCircuitBreakerManager @Inject constructor(
             val current = v2Agent.getFuseVersion(entity.id)
             if (current == null) {
                 // 不存在 → 先插初始
-                upsertFuse(createInitial(entity.id, entity.scope, entity.scopeId))
+                upsertFuse(createInitial(entity.id, entity.scope, entity.scope_id))
                 continue
             }
             val rows = v2Agent.casUpdateFuseState(entity.id, expectedVersion = current, target.name, nowMs)
@@ -186,9 +189,9 @@ class ZthCircuitBreakerManager @Inject constructor(
                 // CAS 成功：再把附加字段（clearFailures/killSwitch 不用）写一次
                 val e = loadEntityById(entity.id) ?: return true
                 val fix = when {
-                    clearFailures -> e.copy(failureCount = 0, lastProbeAtMs = nowMs)
-                    target == FuseState.OPEN -> e.copy(openSinceMs = nowMs)
-                    target == FuseState.HALF_OPEN -> e.copy(lastProbeAtMs = nowMs)
+                    clearFailures -> e.copy(failure_count = 0, last_probe_at_ms = nowMs)
+                    target == FuseState.OPEN -> e.copy(open_since_ms = nowMs)
+                    target == FuseState.HALF_OPEN -> e.copy(last_probe_at_ms = nowMs)
                     else -> e
                 }
                 upsertFuse(fix)
@@ -206,14 +209,14 @@ class ZthCircuitBreakerManager @Inject constructor(
 
     // ── 内部工具：T_cool 到期自动从 OPEN → HALF_OPEN（必经 LINK-INV CAS） ──────
 
-    private suspend fun tryAutoCoolDown(entity: HallucinationFuseEntity, tier: ZthPresetTier): HallucinationFuseEntity {
+    private suspend fun tryAutoCoolDown(entity: V2Fuse, tier: ZthPresetTier): V2Fuse {
         if (entity.fuseState != FuseState.OPEN) return entity
         val tMin = T_COOL_MIN_BY_TIER[tier.tier.coerceIn(1, 3)] ?: return entity
         val needMs = tMin * 60_000L
-        val since = entity.openSinceMs
+        val since = entity.open_since_ms
         if (since <= 0L || System.currentTimeMillis() - since < needMs) return entity
         // 自动冷却：先 TRANSITIONING → HALF_OPEN
-        val ctx = TierContext(tier, if (entity.scope == "SESSION") entity.scopeId else null)
+        val ctx = TierContext(tier, if (entity.scope == "SESSION") entity.scope_id else null)
         transitionTo(entity, FuseState.TRANSITIONING, ctx)
         val t = loadEntityById(entity.id) ?: return entity
         if (t.fuseState == FuseState.TRANSITIONING) {
@@ -230,56 +233,47 @@ class ZthCircuitBreakerManager @Inject constructor(
 
     // ── 懒创建初始实体（scope=GLOBAL/SESSION scopeId 锁死 composeGlobalId/composeSessionId）
 
-    private suspend fun loadOrCreateGlobal(): HallucinationFuseEntity =
-        v2Agent.getFuse("GLOBAL", HallucinationFuseEntity.GLOBAL_SCOPE_ID)?.toEntity()
-            ?: createInitial(HallucinationFuseEntity.composeGlobalId(), "GLOBAL", HallucinationFuseEntity.GLOBAL_SCOPE_ID).also { upsertFuse(it) }
+    private suspend fun loadOrCreateGlobal(): V2Fuse =
+        v2Agent.getFuse("GLOBAL", GLOBAL_SCOPE_ID)
+            ?: createInitial(composeGlobalId(), "GLOBAL", GLOBAL_SCOPE_ID).also { upsertFuse(it) }
 
-    private suspend fun loadOrCreateSession(sessionId: String): HallucinationFuseEntity =
-        v2Agent.getFuse("SESSION", sessionId)?.toEntity()
-            ?: createInitial(HallucinationFuseEntity.composeSessionId(sessionId), "SESSION", sessionId).also { upsertFuse(it) }
+    private suspend fun loadOrCreateSession(sessionId: String): V2Fuse =
+        v2Agent.getFuse("SESSION", sessionId)
+            ?: createInitial(composeSessionId(sessionId), "SESSION", sessionId).also { upsertFuse(it) }
 
-    private suspend fun loadEntityById(id: String): HallucinationFuseEntity? =
-        v2Agent.listAllFuses().firstOrNull { it.id == id }?.toEntity()
+    private suspend fun loadEntityById(id: String): V2Fuse? =
+        v2Agent.listAllFuses().firstOrNull { it.id == id }
 
-    private fun createInitial(id: String, scope: String, scopeId: String) = HallucinationFuseEntity(
+    private fun createInitial(id: String, scope: String, scopeId: String) = V2Fuse(
         id = id,
         scope = scope,
-        scopeId = scopeId,
+        scope_id = scopeId,
         state = FuseState.CLOSED.name,
-        linkageVersion = 0L,
-        failureCount = 0
+        linkage_version = 0L,
+        failure_count = 0L,
+        open_since_ms = 0L,
+        last_probe_at_ms = 0L,
+        kill_switch1_triggered = 0L,
+        kill_switch2_soft_disabled = 0L,
+        last_trip_subclass = null,
+        updated_at_ms = System.currentTimeMillis()
     )
 
-    // ── V2 写入 / 映射 ────────────────────────────────────────────────
+    // ── V2 写入 ────────────────────────────────────────────────
 
-    private suspend fun upsertFuse(e: HallucinationFuseEntity) {
+    private suspend fun upsertFuse(e: V2Fuse) {
         v2Agent.upsertFuse(
-            id = e.id, scope = e.scope, scopeId = e.scopeId,
-            state = e.state, linkageVersion = e.linkageVersion,
-            failureCount = e.failureCount.toLong(),
-            openSinceMs = e.openSinceMs,
-            lastProbeAtMs = e.lastProbeAtMs,
-            killSwitch1Triggered = if (e.killSwitch1Triggered) 1L else 0L,
-            killSwitch2SoftDisabled = if (e.killSwitch2SoftDisabled) 1L else 0L,
-            lastTripSubclass = e.lastTripSubclass,
-            updatedAtMs = e.updatedAtMs
+            id = e.id, scope = e.scope, scopeId = e.scope_id,
+            state = e.state, linkageVersion = e.linkage_version,
+            failureCount = e.failure_count,
+            openSinceMs = e.open_since_ms,
+            lastProbeAtMs = e.last_probe_at_ms,
+            killSwitch1Triggered = e.kill_switch1_triggered,
+            killSwitch2SoftDisabled = e.kill_switch2_soft_disabled,
+            lastTripSubclass = e.last_trip_subclass,
+            updatedAtMs = e.updated_at_ms
         )
     }
-
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Zth_hallucination_fuses.toEntity() = HallucinationFuseEntity(
-        id = id,
-        scope = scope,
-        scopeId = scope_id,
-        state = state,
-        linkageVersion = linkage_version,
-        failureCount = failure_count.toInt(),
-        openSinceMs = open_since_ms,
-        lastProbeAtMs = last_probe_at_ms,
-        killSwitch1Triggered = kill_switch1_triggered != 0L,
-        killSwitch2SoftDisabled = kill_switch2_soft_disabled != 0L,
-        lastTripSubclass = last_trip_subclass,
-        updatedAtMs = updated_at_ms
-    )
 }
 
 /**

@@ -1,7 +1,6 @@
 package com.mini.me_core.feature.agent.data.remote.zth
 
 import com.mini.me_core.core.security.ZthSensitiveColumnCrypto
-import com.mini.me_core.feature.agent.data.local.entity.HallucinationFuseEntity
 import com.mini.me_core.feature.agent.data.local.entity.HardConstraintDeleteAuditEntity
 import com.mini.me_core.feature.agent.data.local.entity.L0SoftCompactRestoreLogEntity
 import com.mini.me_core.feature.agent.data.local.entity.SentinelPlanRejectionAuditEntity
@@ -64,38 +63,6 @@ class ZthEntityMapper @Inject constructor(
         expireAtMs = d.expireAtMs,
         rollbackFlag = d.rollbackFlag,
         createdAtMs = d.createdAtMs
-    )
-
-    // ── Fuse ───────────────────────────────────────────────────────────────
-
-    fun toDto(e: HallucinationFuseEntity): ZthFuseFirestoreDto = ZthFuseFirestoreDto(
-        id = e.id,
-        scope = e.scope,
-        scopeId = e.scopeId,
-        state = e.state,
-        linkageVersion = e.linkageVersion,
-        failureCount = e.failureCount,
-        openSinceMs = e.openSinceMs,
-        lastProbeAtMs = e.lastProbeAtMs,
-        killSwitch1Triggered = e.killSwitch1Triggered,
-        killSwitch2SoftDisabled = e.killSwitch2SoftDisabled,
-        lastTripSubclass = e.lastTripSubclass,
-        updatedAtMs = e.updatedAtMs
-    )
-
-    fun toEntity(d: ZthFuseFirestoreDto): HallucinationFuseEntity = HallucinationFuseEntity(
-        id = d.id,
-        scope = d.scope,
-        scopeId = d.scopeId,
-        state = d.state,
-        linkageVersion = d.linkageVersion,
-        failureCount = d.failureCount,
-        openSinceMs = d.openSinceMs,
-        lastProbeAtMs = d.lastProbeAtMs,
-        killSwitch1Triggered = d.killSwitch1Triggered,
-        killSwitch2SoftDisabled = d.killSwitch2SoftDisabled,
-        lastTripSubclass = d.lastTripSubclass,
-        updatedAtMs = d.updatedAtMs
     )
 
     // ── Rejection Audit ────────────────────────────────────────────────────
