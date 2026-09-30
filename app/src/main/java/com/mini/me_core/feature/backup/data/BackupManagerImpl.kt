@@ -31,7 +31,6 @@ import com.mini.me_core.feature.backup.domain.RestoreMode
 import com.mini.me_core.feature.backup.domain.RestoreStats
 import com.mini.me_core.feature.backup.domain.TodoItemDto
 import com.mini.me_core.feature.backup.domain.toMetadata
-import com.mini.me_core.feature.settings.data.local.entity.AIProviderEntity
 import com.mini.me_core.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.LogSettingsRepository
@@ -854,56 +853,6 @@ class BackupManagerImpl @Inject constructor(
 
     private fun com.mini.mecore.datalayer.sqldelight.workspace.Remote_mounts.toV2Dto() =
         RemoteMountDto(id, connection_id, remote_path, local_mount_path, is_active == 1L, auto_connect == 1L)
-
-    private suspend fun AIProviderEntity.toDto(): ProviderDto {
-        // RC68 SCHEMA 38 后：Entity 中已无 apiKey/selectedModel 列。
-        //  - ProviderDto.apiKey（备份明文）：从 encryptedApiKey 解密
-        //  - ProviderDto.selectedModel（冗余语义，为旧备份格式兼容保留字段）：
-        //    当前 defaultModel 就等于「当前选中的模型」，所以 selectedModel 与 defaultModel 同值
-        val resolvedKey = if (encryptedApiKey.isNotEmpty()) {
-            runCatching { encryptor.decrypt(encryptedApiKey) }
-                .onFailure { FileLogger.w(TAG, "toDto 解密 encryptedApiKey 失败，导出空串: ${it.message}") }
-                .getOrDefault("")
-        } else ""
-        return ProviderDto(
-            id = id,
-            name = name,
-            type = type,
-            apiKey = resolvedKey,
-            baseUrl = baseUrl,
-            defaultModel = defaultModel,
-            isActive = isActive,
-            models = models,
-            selectedModel = defaultModel, // RC68 合并：与 defaultModel 语义一致
-            isEnabled = isEnabled,
-            useFullUrl = useFullUrl,
-            useResponseApi = useResponseApi
-        )
-    }
-
-    private suspend fun ProviderDto.toEntity(): AIProviderEntity {
-        // RC68 SCHEMA 38 后：Entity 只接受 encryptedApiKey，不写 apiKey/selectedModel。
-        val encrypted = if (apiKey.isNotEmpty()) {
-            runCatching { encryptor.encrypt(apiKey) }
-                .onFailure { FileLogger.w(TAG, "toEntity 加密 apiKey 失败：${it.message}（encryptedApiKey 落库为空串）") }
-                .getOrDefault("")
-        } else ""
-        // selectedModel 非空时它就是「用户当前选中的模型」，否则用 defaultModel。
-        val mergedModel = selectedModel.ifBlank { defaultModel }
-        return AIProviderEntity(
-            id = id,
-            name = name,
-            type = type,
-            encryptedApiKey = encrypted,
-            baseUrl = baseUrl,
-            defaultModel = mergedModel,
-            isActive = isActive,
-            models = models,
-            isEnabled = isEnabled,
-            useFullUrl = useFullUrl,
-            useResponseApi = useResponseApi
-        )
-    }
 
     private suspend fun RemoteConnectionEntity.toDto(): RemoteConnectionDto {
         // 备份导出明文：跨设备迁移时备份用户自己保管，恢复时用新设备的 Keystore 重新加密。
