@@ -6,7 +6,6 @@ import com.mini.me_core.feature.agent.data.local.entity.HardConstraintDeleteAudi
 import com.mini.me_core.feature.agent.data.local.entity.L0SoftCompactRestoreLogEntity
 import com.mini.me_core.feature.agent.data.local.entity.SentinelPlanRejectionAuditEntity
 import com.mini.me_core.feature.agent.data.local.entity.UserConfirmedSentinelEntity
-import com.mini.me_core.feature.agent.data.local.entity.ZthTelemetryEventEntity
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -177,33 +176,4 @@ class ZthEntityMapper @Inject constructor(
             createdAtMs = d.createdAtMs
         )
 
-    // ── Telemetry（默认不同步，仅留接口）─────────────────────────────────────
-
-    fun toDto(e: ZthTelemetryEventEntity): ZthTelemetryEventFirestoreDto = ZthTelemetryEventFirestoreDto(
-        id = e.id,
-        eventKind = e.eventKind,
-        eventSubKind = e.eventSubKind,
-        severityTier = e.severityTier,
-        sessionSha256Prefix = e.sessionSha256Prefix,
-        latencyMs = e.latencyMs,
-        flagA = e.flagA,
-        flagB = e.flagB,
-        metricA = e.metricA,
-        metricB = e.metricB,
-        createdAtMs = e.createdAtMs
-    )
-
-    fun toEntity(d: ZthTelemetryEventFirestoreDto): ZthTelemetryEventEntity = ZthTelemetryEventEntity(
-        id = d.id,
-        eventKind = d.eventKind,
-        eventSubKind = d.eventSubKind,
-        severityTier = d.severityTier,
-        sessionSha256Prefix = d.sessionSha256Prefix,
-        latencyMs = d.latencyMs,
-        flagA = d.flagA,
-        flagB = d.flagB,
-        metricA = d.metricA,
-        metricB = d.metricB,
-        createdAtMs = d.createdAtMs
-    )
 }

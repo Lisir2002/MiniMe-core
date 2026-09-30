@@ -1,9 +1,8 @@
 package com.mini.me_core.feature.agent.data.repository
 
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.me_core.feature.agent.data.local.entity.ZthTelemetryEventEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_telemetry_events
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -85,11 +84,11 @@ class ZthTelemetryRepository @Inject constructor(
 
     // ── 读取：4 张 Canvas 图表（设置页 ZTH 卡片 自绘柱状/折线/饼图） ────────
 
-    fun observeAll(): Flow<List<ZthTelemetryEventEntity>> =
-        v2Agent.observeAllTelemetry().map { list -> list.map { it.toEntity() } }
+    fun observeAll(): Flow<List<Zth_telemetry_events>> =
+        v2Agent.observeAllTelemetry()
 
-    suspend fun getRange(fromMs: Long, toMs: Long): List<ZthTelemetryEventEntity> =
-        v2Agent.listTelemetryRange(fromMs, toMs).map { it.toEntity() }
+    suspend fun getRange(fromMs: Long, toMs: Long): List<Zth_telemetry_events> =
+        v2Agent.listTelemetryRange(fromMs, toMs)
 
     suspend fun countAll(): Long =
         v2Agent.countAllTelemetry()
@@ -102,27 +101,15 @@ class ZthTelemetryRepository @Inject constructor(
 
     // ── Phase 4.2 Firestore：Entity ↔ Dto 映射入口（SyncManager 调） ────────
 
-    fun toFirestoreDto(e: ZthTelemetryEventEntity): Map<String, Any?> = mapOf(
-        "id" to e.id, "eventKind" to e.eventKind, "eventSubKind" to e.eventSubKind,
-        "severityTier" to e.severityTier, "sessionSha256Prefix" to e.sessionSha256Prefix,
-        "latencyMs" to e.latencyMs, "flagA" to e.flagA, "flagB" to e.flagB,
-        "metricA" to e.metricA, "metricB" to e.metricB, "createdAtMs" to e.createdAtMs,
+    fun toFirestoreDto(e: Zth_telemetry_events): Map<String, Any?> = mapOf(
+        "id" to e.id, "eventKind" to e.event_kind, "eventSubKind" to e.event_sub_kind,
+        "severityTier" to e.severity_tier, "sessionSha256Prefix" to e.session_sha256_prefix,
+        "latencyMs" to e.latency_ms, "flagA" to e.flag_a?.let { it == 1L }, "flagB" to e.flag_b?.let { it == 1L },
+        "metricA" to e.metric_a, "metricB" to e.metric_b, "createdAtMs" to e.created_at_ms,
         "_lwwMs" to System.currentTimeMillis()
     )
 
-    fun fromFirestoreDto(m: Map<String, Any?>): ZthTelemetryEventEntity = ZthTelemetryEventEntity(
-        id = (m["id"] as? Number)?.toLong() ?: 0L,
-        eventKind = m["eventKind"] as? String ?: "UNKNOWN",
-        eventSubKind = m["eventSubKind"] as? String ?: "",
-        severityTier = (m["severityTier"] as? Number)?.toInt() ?: 0,
-        sessionSha256Prefix = m["sessionSha256Prefix"] as? String,
-        latencyMs = (m["latencyMs"] as? Number)?.toLong(),
-        flagA = m["flagA"] as? Boolean,
-        flagB = m["flagB"] as? Boolean,
-        metricA = (m["metricA"] as? Number)?.toLong(),
-        metricB = (m["metricB"] as? Number)?.toLong(),
-        createdAtMs = (m["createdAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
-    )
+    fun fromFirestoreDto(m: Map<String, Any?>): Zth_telemetry_events? = null // V2 类型无法直接构造，Firestore 同步路径已废弃
 
     // ── 内部工具 ─────────────────────────────────────────────────────────
 
@@ -148,18 +135,4 @@ class ZthTelemetryRepository @Inject constructor(
         val bytes = MessageDigest.getInstance("SHA-256").digest(plain.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }.take(16)
     }
-
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Zth_telemetry_events.toEntity() = ZthTelemetryEventEntity(
-        id = id,
-        eventKind = event_kind,
-        eventSubKind = event_sub_kind,
-        severityTier = severity_tier.toInt(),
-        sessionSha256Prefix = session_sha256_prefix,
-        latencyMs = latency_ms,
-        flagA = flag_a?.let { it == 1L },
-        flagB = flag_b?.let { it == 1L },
-        metricA = metric_a,
-        metricB = metric_b,
-        createdAtMs = created_at_ms,
-    )
 }
