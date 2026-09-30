@@ -1,7 +1,7 @@
 package com.mini.me_core.feature.agent.data.repository
 
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.me_core.feature.agent.data.local.entity.SentinelPlanRejectionAuditEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_sentinel_plan_rejection_audits as V2RejectionAudit
 import com.mini.me_core.feature.agent.data.local.entity.UserConfirmedSentinelEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -49,8 +49,8 @@ class ZthConfirmationCardRepository @Inject constructor(
     }
 
     /** 审计查询：某 sentinel 的拒绝/修改理由（外键）。 */
-    suspend fun getRejectionAudit(sentinelId: String): SentinelPlanRejectionAuditEntity? =
-        v2Agent.listRejectionAudits(sentinelId).firstOrNull()?.toEntity()
+    suspend fun getRejectionAudit(sentinelId: String): V2RejectionAudit? =
+        v2Agent.listRejectionAudits(sentinelId).firstOrNull()
 
     /** Manager 写入成功后，打一条 CARD.DECISION 遥测（Phase 4.1 14 指标写入路径之一）。 */
     suspend fun recordDecisionTelemetry(
@@ -93,21 +93,21 @@ class ZthConfirmationCardRepository @Inject constructor(
             createdAtMs = (m["createdAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
         )
 
-    fun rejectionAuditToDto(e: SentinelPlanRejectionAuditEntity): Map<String, Any?> = mapOf(
-        "id" to e.id, "sentinelId" to e.sentinelId,
-        "rejectionType" to e.rejectionType, "createdAtMs" to e.createdAtMs,
+    fun rejectionAuditToDto(e: V2RejectionAudit): Map<String, Any?> = mapOf(
+        "id" to e.id, "sentinelId" to e.sentinel_id,
+        "rejectionType" to e.rejection_type, "createdAtMs" to e.created_at_ms,
         "_lwwMs" to System.currentTimeMillis()
         // s_reasonCiphertext / s_rejectedPlanSnapshotCiphertext 不同步
     )
 
-    fun rejectionAuditFromDto(m: Map<String, Any?>): SentinelPlanRejectionAuditEntity =
-        SentinelPlanRejectionAuditEntity(
+    fun rejectionAuditFromDto(m: Map<String, Any?>): V2RejectionAudit =
+        V2RejectionAudit(
             id = m["id"] as? String ?: "",
-            sentinelId = m["sentinelId"] as? String ?: "",
-            rejectionType = m["rejectionType"] as? String ?: "REJECT",
+            sentinel_id = m["sentinelId"] as? String ?: "",
+            rejection_type = m["rejectionType"] as? String ?: "REJECT",
             s_reasonCiphertext = null,
             s_rejectedPlanSnapshotCiphertext = "",
-            createdAtMs = (m["createdAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
+            created_at_ms = (m["createdAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
         )
 
     // ── Phase 4.2 Sync 辅助：批量全量拉（push 到 Firestore） ─────────
@@ -115,8 +115,8 @@ class ZthConfirmationCardRepository @Inject constructor(
     suspend fun getAllSentinels(): List<UserConfirmedSentinelEntity> =
         v2Agent.listAllSentinels().map { it.toEntity() }
 
-    suspend fun getAllRejectionAudits(): List<SentinelPlanRejectionAuditEntity> =
-        v2Agent.listAllRejectionAudits().map { it.toEntity() }
+    suspend fun getAllRejectionAudits(): List<V2RejectionAudit> =
+        v2Agent.listAllRejectionAudits()
 
     // ── 内部映射 ─────────────────────────────────────────────────────
 
@@ -136,15 +136,6 @@ class ZthConfirmationCardRepository @Inject constructor(
         s_modifiedPlanCiphertext = s_modifiedPlanCiphertext,
         expireAtMs = expire_at_ms,
         rollbackFlag = rollback_flag == 1L,
-        createdAtMs = created_at_ms,
-    )
-
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Zth_sentinel_plan_rejection_audits.toEntity() = SentinelPlanRejectionAuditEntity(
-        id = id,
-        sentinelId = sentinel_id,
-        rejectionType = rejection_type,
-        s_reasonCiphertext = s_reasonCiphertext,
-        s_rejectedPlanSnapshotCiphertext = s_rejectedPlanSnapshotCiphertext,
         createdAtMs = created_at_ms,
     )
 }

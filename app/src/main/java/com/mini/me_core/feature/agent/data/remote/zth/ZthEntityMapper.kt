@@ -2,7 +2,6 @@ package com.mini.me_core.feature.agent.data.remote.zth
 
 import com.mini.me_core.core.security.ZthSensitiveColumnCrypto
 import com.mini.me_core.feature.agent.data.local.entity.L0SoftCompactRestoreLogEntity
-import com.mini.me_core.feature.agent.data.local.entity.SentinelPlanRejectionAuditEntity
 import com.mini.me_core.feature.agent.data.local.entity.UserConfirmedSentinelEntity
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -63,28 +62,6 @@ class ZthEntityMapper @Inject constructor(
         rollbackFlag = d.rollbackFlag,
         createdAtMs = d.createdAtMs
     )
-
-    // ── Rejection Audit ────────────────────────────────────────────────────
-
-    fun toDto(e: SentinelPlanRejectionAuditEntity): ZthRejectionAuditFirestoreDto =
-        ZthRejectionAuditFirestoreDto(
-            id = e.id,
-            sentinelId = e.sentinelId,
-            rejectionType = e.rejectionType,
-            reasonCiphertext = e.s_reasonCiphertext,
-            rejectedPlanSnapshotCiphertext = e.s_rejectedPlanSnapshotCiphertext,
-            createdAtMs = e.createdAtMs
-        )
-
-    fun toEntity(d: ZthRejectionAuditFirestoreDto): SentinelPlanRejectionAuditEntity =
-        SentinelPlanRejectionAuditEntity(
-            id = d.id,
-            sentinelId = d.sentinelId,
-            rejectionType = d.rejectionType,
-            s_reasonCiphertext = d.reasonCiphertext,
-            s_rejectedPlanSnapshotCiphertext = d.rejectedPlanSnapshotCiphertext,
-            createdAtMs = d.createdAtMs
-        )
 
     // ── L0 Restore Log ─────────────────────────────────────────────────────
 
