@@ -2,6 +2,7 @@ package com.mini.me_core.feature.credentials.data.repository
 
 import com.mini.me_core.core.security.CredentialEncryptor
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.datalayer.isDefault
 import com.mini.me_core.datalayer.repository.CredentialsRepository as V2CredentialsRepository
 import com.mini.me_core.feature.credentials.domain.model.GitCredential
 import com.mini.me_core.feature.credentials.domain.repository.CredentialRepository
@@ -106,7 +107,7 @@ class CredentialRepositoryV2Impl @Inject constructor(
             username = username,
             token = decryptToken(encrypted_token),
             label = label,
-            isDefault = is_default == 1L,
+            isDefault = isDefault,
             createdAt = created_at_ms,
             updatedAt = updated_at_ms,
         )

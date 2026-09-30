@@ -3,6 +3,10 @@ package com.mini.me_core.feature.settings.data.repository
 import com.mini.me_core.core.security.CredentialEncryptor
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.core.util.EnumSafe
+import com.mini.me_core.datalayer.isActive
+import com.mini.me_core.datalayer.isEnabled
+import com.mini.me_core.datalayer.useFullUrl
+import com.mini.me_core.datalayer.useResponseApi
 import com.mini.me_core.datalayer.repository.SettingsRepository as V2SettingsRepository
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ProviderType
@@ -147,13 +151,13 @@ class AIProviderRepositoryV2Impl @Inject constructor(
             apiKey = decryptApiKey(encrypted_api_key),
             baseUrl = base_url,
             defaultModel = default_model,
-            isActive = is_active == 1L,
+            isActive = isActive,
             models = modelList,
             // RC68 SCHEMA 38：selectedModel 冗余概念已合并进 defaultModel（UI 上同一语义）。
             selectedModel = default_model,
-            isEnabled = is_enabled == 1L,
-            useFullUrl = use_full_url == 1L,
-            useResponseApi = use_response_api == 1L,
+            isEnabled = isEnabled,
+            useFullUrl = useFullUrl,
+            useResponseApi = useResponseApi,
             temperature = temperature.toFloat(),
             topP = top_p.toFloat(),
             maxTokens = max_tokens?.toInt(),

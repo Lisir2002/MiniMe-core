@@ -2,6 +2,8 @@ package com.mini.me_core.feature.workspace.domain.repository
 
 import com.mini.me_core.core.security.CredentialEncryptor
 import com.mini.me_core.core.security.HostKeyManager
+import com.mini.me_core.datalayer.autoConnect
+import com.mini.me_core.datalayer.isActive
 import com.mini.me_core.datalayer.repository.WorkspaceRepository as V2WorkspaceRepository
 import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
 import com.mini.me_core.feature.workspace.domain.model.RemoteMount
@@ -315,8 +317,8 @@ class RemoteRepository @Inject constructor(
         connectionId = connection_id,
         remotePath = remote_path,
         localMountPath = local_mount_path,
-        isActive = is_active == 1L,
-        autoConnect = auto_connect == 1L,
+        isActive = isActive,
+        autoConnect = autoConnect,
         connection = conn
     )
 

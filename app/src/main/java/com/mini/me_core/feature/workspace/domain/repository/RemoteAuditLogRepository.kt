@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.workspace.domain.repository
 
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.datalayer.isSuccess
 import com.mini.me_core.datalayer.repository.WorkspaceRepository as V2WorkspaceRepository
 import com.mini.me_core.datalayer.util.escapeSqlLike
 import com.mini.me_core.feature.workspace.domain.RemoteAuditAction
@@ -198,7 +199,7 @@ class RemoteAuditLogRepository @Inject constructor(
                 "connectionId" to log.connection_id,
                 "connectionName" to log.connection_name,
                 "remoteHost" to log.remote_host,
-                "success" to (log.success == 1L),
+                "success" to log.isSuccess,
                 "message" to log.message,
                 "createdAt" to log.created_at
             )

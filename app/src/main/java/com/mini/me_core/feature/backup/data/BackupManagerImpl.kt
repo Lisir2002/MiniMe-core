@@ -3,6 +3,12 @@ package com.mini.me_core.feature.backup.data
 import android.content.Context
 import com.mini.me_core.core.data.DataBlob
 import com.mini.me_core.core.data.DataRegistry
+import com.mini.me_core.datalayer.autoConnect
+import com.mini.me_core.datalayer.isActive
+import com.mini.me_core.datalayer.isDefault
+import com.mini.me_core.datalayer.isEnabled
+import com.mini.me_core.datalayer.useFullUrl
+import com.mini.me_core.datalayer.useResponseApi
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_message as V2AgentMessage
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
@@ -797,12 +803,12 @@ class BackupManagerImpl @Inject constructor(
             apiKey = resolvedKey,
             baseUrl = base_url,
             defaultModel = default_model,
-            isActive = is_active == 1L,
+            isActive = isActive,
             models = models,
             selectedModel = default_model,
-            isEnabled = is_enabled == 1L,
-            useFullUrl = use_full_url == 1L,
-            useResponseApi = use_response_api == 1L
+            isEnabled = isEnabled,
+            useFullUrl = useFullUrl,
+            useResponseApi = useResponseApi
         )
     }
 
@@ -818,7 +824,7 @@ class BackupManagerImpl @Inject constructor(
             username = username,
             token = resolvedToken,
             label = label,
-            isDefault = is_default == 1L,
+            isDefault = isDefault,
             createdAt = created_at_ms,
             updatedAt = updated_at_ms
         )
@@ -850,7 +856,7 @@ class BackupManagerImpl @Inject constructor(
     }
 
     private fun com.mini.mecore.datalayer.sqldelight.workspace.Remote_mounts.toV2Dto() =
-        RemoteMountDto(id, connection_id, remote_path, local_mount_path, is_active == 1L, auto_connect == 1L)
+        RemoteMountDto(id, connection_id, remote_path, local_mount_path, isActive, autoConnect)
 
     private fun ChatSessionEntity.toDto() = ChatSessionDto(
         id = id, title = title,
