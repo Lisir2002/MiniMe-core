@@ -1,0 +1,13 @@
+-- v7 → v8 迁移（P3 数据层加固：Zth 子域补全缺失索引）
+--
+-- 审计发现 Zth 子域 3 个高频查询字段缺少索引，导致全表扫描。
+-- 全部使用 CREATE INDEX IF NOT EXISTS，对已迁移库幂等。
+
+-- zth_user_confirmed_sentinels.listSentinelsByChain(chainId)：弹卡前幂等检查
+CREATE INDEX IF NOT EXISTS idx_zth_sentinels_chain ON zth_user_confirmed_sentinels (chain_id);
+
+-- zth_sentinel_plan_rejection_audits.listRejectionAudits(sentinelId)：FK 外键查询
+CREATE INDEX IF NOT EXISTS idx_zth_rejection_audits_sentinel ON zth_sentinel_plan_rejection_audits (sentinel_id);
+
+-- zth_telemetry_events.listTelemetryRange(fromMs, toMs)：范围查询（90 天数据量）
+CREATE INDEX IF NOT EXISTS idx_zth_telemetry_created_at ON zth_telemetry_events (created_at_ms);
