@@ -3,7 +3,6 @@ package com.mini.me_core.feature.workspace.domain.repository
 import com.mini.me_core.core.security.CredentialEncryptor
 import com.mini.me_core.core.security.HostKeyManager
 import com.mini.me_core.datalayer.repository.WorkspaceRepository as V2WorkspaceRepository
-import com.mini.me_core.feature.workspace.data.local.entity.RemoteConnectionEntity
 import com.mini.me_core.feature.workspace.data.local.entity.RemoteMountEntity
 import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
 import com.mini.me_core.feature.workspace.domain.model.RemoteMount
@@ -34,21 +33,20 @@ class RemoteRepository @Inject constructor(
     private val activeEngines = ConcurrentHashMap<String, SyncEngine>()
     private val activeEngineIds = MutableStateFlow<Set<String>>(emptySet())
 
-    private suspend fun getConnectionEntity(id: String): RemoteConnectionEntity? =
-        v2Workspace.getRemoteConnection(id)?.toEntity()
+    private suspend fun getConnectionRow(id: String): com.mini.mecore.datalayer.sqldelight.workspace.Remote_connections? =
+        v2Workspace.getRemoteConnection(id)
 
     private suspend fun getMountEntity(id: String): RemoteMountEntity? =
         v2Workspace.getRemoteMount(id)?.toEntity()
 
     fun getConnections(): Flow<List<RemoteConnection>> =
         v2Workspace.observeAllRemoteConnections().map { list ->
-            list.map { it.toEntity().toDomainModel() }
+            list.map { it.toDomainModel() }
         }
 
     /** 按 id 一次性读（用于冷启动 SSH 连接组装、Profile 激活时查主机配置）。 */
     suspend fun getConnectionById(id: String): RemoteConnection? {
-        val entity = getConnectionEntity(id) ?: return null
-        return entity.toDomainModel()
+        return getConnectionRow(id)?.toDomainModel()
     }
 
     /** 按 id 一次性读出带原始 RemoteAuth（含密码或私钥+passphrase）的完整配置。
@@ -59,20 +57,23 @@ class RemoteRepository @Inject constructor(
      * authType 兼容：rc60 之前存小写 "password"/"key"，rc60+ 统一写大写
      * "PASSWORD"/"PRIVATE_KEY"；读取时两种都认，老用户升级不丢认证。 */
     suspend fun getAuthById(id: String): RemoteAuth? {
-        val entity = getConnectionEntity(id) ?: return null
-        return resolveAuth(entity.authType, entity.authData, entity.passphrase)
+        val row = getConnectionRow(id) ?: return null
+        return resolveAuth(row.auth_type, row.auth_data, row.passphrase)
     }
 
     fun getMounts(): Flow<List<RemoteMount>> = combine(
             v2Workspace.observeAllRemoteMounts(),
             activeEngineIds
         ) { list, activeIds ->
-            list.map { row ->
-                val entity = row.toEntity()
-                val connEntity = v2Workspace.getRemoteConnection(entity.connectionId)?.toEntity()
-                entity.toDomainModel(connEntity?.toDomainModel()).copy(
-                    isActive = activeIds.contains(entity.id)
-                )
+            buildList {
+                for (row in list) {
+                    val entity = row.toEntity()
+                    val connRow = v2Workspace.getRemoteConnection(entity.connectionId)
+                    val conn = connRow?.toDomainModel()
+                    add(entity.toDomainModel(conn).copy(
+                        isActive = activeIds.contains(entity.id)
+                    ))
+                }
             }
         }
 
@@ -126,8 +127,8 @@ class RemoteRepository @Inject constructor(
     }
 
     suspend fun deleteConnection(id: String) {
-        val entity = getConnectionEntity(id)
-        if (entity != null) {
+        val row = getConnectionRow(id)
+        if (row != null) {
             // Associated mounts will cascade delete in DB, but we should disconnect them
             activeEngines.keys.forEach { mountId -> disconnectMount(mountId) }
             v2Workspace.deleteRemoteConnection(id)
@@ -181,9 +182,9 @@ class RemoteRepository @Inject constructor(
     suspend fun connectMount(mountId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val mountEntity = getMountEntity(mountId) ?: return@withContext Result.failure(Exception("Mount not found"))
-            val connEntity = getConnectionEntity(mountEntity.connectionId) ?: return@withContext Result.failure(Exception("Connection not found"))
+            val connRow = getConnectionRow(mountEntity.connectionId) ?: return@withContext Result.failure(Exception("Connection not found"))
 
-            val conn = connEntity.toDomainModel()
+            val conn = connRow.toDomainModel()
             val mount = mountEntity.toDomainModel(conn)
 
             val client = when (conn.protocol) {
@@ -192,7 +193,7 @@ class RemoteRepository @Inject constructor(
                 RemoteProtocol.LOCAL -> LocalSyncClient()
             }
 
-            val auth = resolveAuth(connEntity.authType, connEntity.authData, connEntity.passphrase)
+            val auth = resolveAuth(connRow.auth_type, connRow.auth_data, connRow.passphrase)
 
             client.connect(conn.host, conn.port, conn.username, auth)
 
@@ -268,15 +269,15 @@ class RemoteRepository @Inject constructor(
     /** 按已保存连接的 id 测试连通性（加载凭据后短连短断）。 */
     suspend fun testConnectionById(connectionId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val connEntity = getConnectionEntity(connectionId) ?: return@withContext Result.failure(Exception("Connection not found"))
-            val conn = connEntity.toDomainModel()
+            val connRow = getConnectionRow(connectionId) ?: return@withContext Result.failure(Exception("Connection not found"))
+            val conn = connRow.toDomainModel()
 
             val client = when (conn.protocol) {
                 RemoteProtocol.SFTP -> SftpSyncClient(hostKeyManager.createVerifier())
                 RemoteProtocol.FTP -> FtpSyncClient()
                 RemoteProtocol.LOCAL -> LocalSyncClient()
             }
-            val auth = resolveAuth(connEntity.authType, connEntity.authData, connEntity.passphrase)
+            val auth = resolveAuth(connRow.auth_type, connRow.auth_data, connRow.passphrase)
 
             client.connect(conn.host, conn.port, conn.username, auth)
             client.disconnect()
@@ -288,15 +289,15 @@ class RemoteRepository @Inject constructor(
 
     suspend fun listRemoteDirectories(connectionId: String, path: String): Result<List<String>> = withContext(Dispatchers.IO) {
         try {
-            val connEntity = getConnectionEntity(connectionId) ?: return@withContext Result.failure(Exception("Connection not found"))
-            val conn = connEntity.toDomainModel()
+            val connRow = getConnectionRow(connectionId) ?: return@withContext Result.failure(Exception("Connection not found"))
+            val conn = connRow.toDomainModel()
 
             val client = when (conn.protocol) {
                 RemoteProtocol.SFTP -> SftpSyncClient(hostKeyManager.createVerifier())
                 RemoteProtocol.FTP -> FtpSyncClient()
                 RemoteProtocol.LOCAL -> LocalSyncClient()
             }
-            val auth = resolveAuth(connEntity.authType, connEntity.authData, connEntity.passphrase)
+            val auth = resolveAuth(connRow.auth_type, connRow.auth_data, connRow.passphrase)
 
             client.connect(conn.host, conn.port, conn.username, auth)
             val files = client.listFiles(path).filter { it.isDirectory }.map { it.name }
@@ -308,21 +309,21 @@ class RemoteRepository @Inject constructor(
     }
 
     /**
-     * 从 Entity 构造 Domain Model：密码字段已解密（只填到 RemoteConnection.password，
+     * 从 V2 行构造 Domain Model：密码字段已解密（只填到 RemoteConnection.password，
      * PASSWORD 类型为密码，PRIVATE_KEY 类型为空字符串，避免泄漏私钥 passphrase）。
      * 私钥 passphrase 只在真正构造 RemoteAuth 用于连接的地方 decrypt，不在 Domain 层
      * 暴露，减少内存明文驻留点。
      *
      * authType 兼容：新大写 PASSWORD/PRIVATE_KEY 与 旧小写 password/key 都认。
      */
-    private suspend fun RemoteConnectionEntity.toDomainModel() = RemoteConnection(
+    private suspend fun com.mini.mecore.datalayer.sqldelight.workspace.Remote_connections.toDomainModel() = RemoteConnection(
         id = id,
         name = name,
-        protocol = protocol,
+        protocol = runCatching { RemoteProtocol.valueOf(protocol) }.getOrDefault(RemoteProtocol.SFTP),
         host = host,
-        port = port,
+        port = port.toInt(),
         username = username,
-        password = if (isPasswordAuth(authType)) decryptCredential(authData) else ""
+        password = if (isPasswordAuth(auth_type)) decryptCredential(auth_data) else ""
     )
 
     private fun RemoteMountEntity.toDomainModel(conn: RemoteConnection?) = RemoteMount(
@@ -336,18 +337,6 @@ class RemoteRepository @Inject constructor(
     )
 
     // ── V2 行 → Room Entity 映射 ────────────────────────────────────────
-
-    private fun com.mini.mecore.datalayer.sqldelight.workspace.Remote_connections.toEntity() = RemoteConnectionEntity(
-        id = id,
-        name = name,
-        protocol = runCatching { RemoteProtocol.valueOf(protocol) }.getOrDefault(RemoteProtocol.SFTP),
-        host = host,
-        port = port.toInt(),
-        username = username,
-        authType = auth_type,
-        authData = auth_data,
-        passphrase = passphrase,
-    )
 
     private fun com.mini.mecore.datalayer.sqldelight.workspace.Remote_mounts.toEntity() = RemoteMountEntity(
         id = id,
