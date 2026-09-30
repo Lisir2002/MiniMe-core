@@ -2,8 +2,8 @@ package com.mini.me_core.feature.t2i.data.repository
 
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.T2iRepository as V2T2iRepository
+import com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models
 import com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers
-import com.mini.me_core.feature.t2i.data.local.entity.T2IProviderModelEntity
 import com.mini.me_core.feature.t2i.data.local.entity.T2ITaskEntity
 import com.mini.me_core.feature.t2i.domain.repository.T2IRepository
 import javax.inject.Inject
@@ -76,26 +76,26 @@ class T2IRepositoryV2Impl @Inject constructor(
 
     // ── Provider Model ──
 
-    override suspend fun getModelsForProvider(providerId: String): List<T2IProviderModelEntity> =
-        v2.listT2iModels(providerId).map { it.toEntity() }
+    override suspend fun getModelsForProvider(providerId: String): List<T2i_provider_models> =
+        v2.listT2iModels(providerId)
 
-    override suspend fun getModel(providerId: String, modelId: String): T2IProviderModelEntity? =
-        v2.listT2iModels(providerId).firstOrNull { it.model_id == modelId }?.toEntity()
+    override suspend fun getModel(providerId: String, modelId: String): T2i_provider_models? =
+        v2.listT2iModels(providerId).firstOrNull { it.model_id == modelId }
 
-    override suspend fun upsertModel(model: T2IProviderModelEntity) {
+    override suspend fun upsertModel(model: T2i_provider_models) {
         v2.upsertT2iProviderModel(
             id = model.id,
-            providerId = model.providerId,
-            modelId = model.modelId,
-            displayName = model.displayName,
-            supportsHd = if (model.supportsHd) 1L else 0L,
-            supportsInpaint = if (model.supportsInpaint) 1L else 0L,
-            defaultWidth = model.defaultWidth.toLong(),
-            defaultHeight = model.defaultHeight.toLong(),
-            maxSteps = model.maxSteps.toLong(),
-            defaultSteps = model.defaultSteps.toLong(),
-            costPerImageTokens = model.costPerImageTokens.toLong(),
-            createdAtMs = model.createdAtMs,
+            providerId = model.provider_id,
+            modelId = model.model_id,
+            displayName = model.display_name,
+            supportsHd = model.supports_hd,
+            supportsInpaint = model.supports_inpaint,
+            defaultWidth = model.default_width,
+            defaultHeight = model.default_height,
+            maxSteps = model.max_steps,
+            defaultSteps = model.default_steps,
+            costPerImageTokens = model.cost_per_image_tokens,
+            createdAtMs = model.created_at_ms,
             updatedAtMs = System.currentTimeMillis(),
         )
     }
@@ -147,22 +147,6 @@ class T2IRepositoryV2Impl @Inject constructor(
     override suspend fun countSuccessfulImagesSince(dayStartMs: Long): Long = v2.countSuccessfulImagesSince(dayStartMs)
 
     // ── 映射 ──
-
-    private fun com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models.toEntity() = T2IProviderModelEntity(
-        id = id,
-        providerId = provider_id,
-        modelId = model_id,
-        displayName = display_name,
-        supportsHd = supports_hd == 1L,
-        supportsInpaint = supports_inpaint == 1L,
-        defaultWidth = default_width.toInt(),
-        defaultHeight = default_height.toInt(),
-        maxSteps = max_steps.toInt(),
-        defaultSteps = default_steps.toInt(),
-        costPerImageTokens = cost_per_image_tokens.toInt(),
-        createdAtMs = created_at_ms,
-        updatedAtMs = updated_at_ms,
-    )
 
     private fun com.mini.mecore.datalayer.sqldelight.t2i.T2i_task.toEntity() = T2ITaskEntity(
         id = id,

@@ -1,7 +1,7 @@
 package com.mini.me_core.feature.t2i.domain.repository
 
+import com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models
 import com.mini.mecore.datalayer.sqldelight.t2i.T2i_providers
-import com.mini.me_core.feature.t2i.data.local.entity.T2IProviderModelEntity
 import com.mini.me_core.feature.t2i.data.local.entity.T2ITaskEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -30,9 +30,9 @@ interface T2IRepository {
 
     // ── Provider Model ──
 
-    suspend fun getModelsForProvider(providerId: String): List<T2IProviderModelEntity>
-    suspend fun getModel(providerId: String, modelId: String): T2IProviderModelEntity?
-    suspend fun upsertModel(model: T2IProviderModelEntity)
+    suspend fun getModelsForProvider(providerId: String): List<T2i_provider_models>
+    suspend fun getModel(providerId: String, modelId: String): T2i_provider_models?
+    suspend fun upsertModel(model: T2i_provider_models)
 
     // ── Task ──
 

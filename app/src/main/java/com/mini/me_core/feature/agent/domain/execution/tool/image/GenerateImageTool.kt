@@ -166,7 +166,7 @@ class GenerateImageTool @Inject constructor(
         } else {
             firstModel
         }
-        val costPerImage = targetModel?.costPerImageTokens ?: 100
+        val costPerImage = targetModel?.cost_per_image_tokens?.toInt() ?: 100
 
         emit(ToolStreamEvent.Progress("评估额度与安全策略..."))
         val perm = permission.evaluate(
@@ -215,7 +215,7 @@ class GenerateImageTool @Inject constructor(
             negativePrompt = negativePrompt,
             width = width, height = height, steps = steps, hd = hd,
             providerId = activeProvider.id,
-            modelId = targetModel?.modelId ?: desiredModel,
+            modelId = targetModel?.model_id ?: desiredModel,
             endpointModeRef = endpointModeRef,
             status = "RUNNING",
             permissionDecision = perm.verdict.name,
@@ -240,7 +240,7 @@ class GenerateImageTool @Inject constructor(
                 ImageGenerator.Request(
                     prompt = prompt, negativePrompt = negativePrompt,
                     width = width, height = height, steps = steps, seed = 0, hd = hd,
-                    model = targetModel?.modelId ?: desiredModel,
+                    model = targetModel?.model_id ?: desiredModel,
                     outputDir = outputDir, taskId = taskId,
                 )
             )
