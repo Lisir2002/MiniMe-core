@@ -1,12 +1,9 @@
 package com.mini.me_core.feature.agent.domain.knowledge.playbook
 
+import com.mini.me_core.core.util.EnumSafe
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_playbook_runs as V2PlaybookRun
-import com.mini.me_core.feature.agent.data.local.entity.PlaybookRunEntity
-import com.mini.me_core.feature.agent.data.local.entity.PlaybookRunStatus
-import com.mini.me_core.feature.agent.data.local.entity.PlaybookStageState
-import com.mini.me_core.feature.agent.data.local.entity.PlaybookStageStatus
 import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalChoice
 import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalManager
 import com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository
@@ -23,7 +20,7 @@ import javax.inject.Singleton
 /**
  * Playbook 剧本运行状态机（D5-3，对齐 norm-chain-design.md §3.3.3 / 3.3.4 / 3.3.5 / 3.3.6）：
  *
- * 承接 [PlaybookRunEntity] 的双状态机推进：
+ * 承接 [V2PlaybookRun] 的双状态机推进：
  * - **运行级** [PlaybookRunStatus]：RUNNING / COMPLETED / ABORTED / INTERRUPTED；
  * - **阶段级** [PlaybookStageStatus]：PENDING / ACTIVE / DONE / FAILED（存于 stageStatuses JSON）。
  *
@@ -110,7 +107,7 @@ class PlaybookExecutor @Inject constructor(
             return PlaybookOpResult.Error("剧本「${asset.name}」没有可执行阶段", "PLAYBOOK_NO_STAGES")
         }
         // 覆盖旧运行：会话既有 RUNNING / INTERRUPTED 运行置 ABORTED。
-        val latest = v2Agent.getLatestPlaybookBySession(sessionId)?.toEntity()
+        val latest = v2Agent.getLatestPlaybookBySession(sessionId)
         latest?.let { existing ->
             if (existing.statusEnum() == PlaybookRunStatus.RUNNING ||
                 existing.statusEnum() == PlaybookRunStatus.INTERRUPTED
@@ -126,15 +123,15 @@ class PlaybookExecutor @Inject constructor(
                 status = if (i == 0) PlaybookStageStatus.ACTIVE.name else PlaybookStageStatus.PENDING.name
             )
         }
-        val run = PlaybookRunEntity(
-            playbookRunId = UUID.randomUUID().toString(),
-            sessionId = sessionId,
-            playbookName = asset.name,
-            currentStageIndex = 0,
-            stageStatuses = encodeStages(stageStates),
+        val run = V2PlaybookRun(
+            playbook_run_id = UUID.randomUUID().toString(),
+            session_id = sessionId,
+            playbook_name = asset.name,
+            current_stage_index = 0,
+            stage_statuses = encodeStages(stageStates),
             status = PlaybookRunStatus.RUNNING.name,
-            createdAtMs = now,
-            updatedAtMs = now
+            created_at_ms = now,
+            updated_at_ms = now
         )
         upsertRun(run)
         idleRounds[sessionId] = 0
@@ -170,13 +167,13 @@ class PlaybookExecutor @Inject constructor(
                 "当前没有正在进行的剧本运行" + if (runId != null) "（$runId）" else "，请先 playbook_start 启动",
                 "PLAYBOOK_NOT_RUNNING"
             )
-        val asset = playbookRegistry.findByName(run.playbookName)
-            ?: return PlaybookOpResult.Error("剧本资产「${run.playbookName}」不存在", "PLAYBOOK_NOT_FOUND")
-        if (run.currentStageIndex >= asset.stages.size) {
+        val asset = playbookRegistry.findByName(run.playbook_name)
+            ?: return PlaybookOpResult.Error("剧本资产「${run.playbook_name}」不存在", "PLAYBOOK_NOT_FOUND")
+        if (run.current_stage_index.toInt() >= asset.stages.size) {
             return PlaybookOpResult.Error("运行已超出剧本阶段范围", "PLAYBOOK_STAGE_RANGE")
         }
-        val stageStates = decodeStages(run.stageStatuses)
-        val current = stageStates.getOrNull(run.currentStageIndex)
+        val stageStates = decodeStages(run.stage_statuses)
+        val current = stageStates.getOrNull(run.current_stage_index.toInt())
 
         // D5-9：`!` 标记跳过 approval gate——用户消息首 token `!` 置位后，本次推进消费（读后清除）。
         // 显式参数优先，其次会话强制标记；均永不绕过权限系统。
@@ -191,41 +188,41 @@ class PlaybookExecutor @Inject constructor(
 
     /** 恢复本会话最近一次 INTERRUPTED 运行（进程回收 / SessionStop 中断后继续）。 */
     suspend fun resume(sessionId: String): PlaybookOpResult {
-        val run = v2Agent.getLatestPlaybookBySessionAndStatus(sessionId, PlaybookRunStatus.INTERRUPTED.name)?.toEntity()
+        val run = v2Agent.getLatestPlaybookBySessionAndStatus(sessionId, PlaybookRunStatus.INTERRUPTED.name)
             ?: return PlaybookOpResult.Error("当前会话没有可恢复的中断运行，请先 playbook_start", "PLAYBOOK_NO_INTERRUPTED")
-        val asset = playbookRegistry.findByName(run.playbookName)
-            ?: return PlaybookOpResult.Error("剧本资产「${run.playbookName}}」不存在", "PLAYBOOK_NOT_FOUND")
-        if (run.currentStageIndex >= asset.stages.size) {
+        val asset = playbookRegistry.findByName(run.playbook_name)
+            ?: return PlaybookOpResult.Error("剧本资产「${run.playbook_name}}」不存在", "PLAYBOOK_NOT_FOUND")
+        if (run.current_stage_index.toInt() >= asset.stages.size) {
             return PlaybookOpResult.Error("运行已超出剧本阶段范围", "PLAYBOOK_STAGE_RANGE")
         }
-        val stageStates = decodeStages(run.stageStatuses)
+        val stageStates = decodeStages(run.stage_statuses)
         // 中断发生在阶段执行中：运行置 RUNNING，当前阶段保持 ACTIVE。
         val now = System.currentTimeMillis()
-        upsertRun(run.copy(status = PlaybookRunStatus.RUNNING.name, updatedAtMs = now))
+        upsertRun(run.copy(status = PlaybookRunStatus.RUNNING.name, updated_at_ms = now))
         idleRounds[sessionId] = 0
-        FileLogger.i(TAG, "resume: session=$sessionId playbook=${asset.name} 阶段=${run.currentStageIndex}")
+        FileLogger.i(TAG, "resume: session=$sessionId playbook=${asset.name} 阶段=${run.current_stage_index.toInt()}")
 
-        val stage = asset.stages[run.currentStageIndex]
+        val stage = asset.stages[run.current_stage_index.toInt()]
         // D5-6/7：恢复的阶段若声明 agents[]，同步重跑子代理（§3.6 阶段激活自动生成；产出按内容写入幂等）。
         val subAgents = runStageSubAgents(sessionId, stage)
         return PlaybookOpResult.Stage(
-            view = stageView(asset.name, asset.stages, run.currentStageIndex),
-            message = "已恢复剧本「${asset.name}」。\n【当前阶段 ${run.currentStageIndex + 1}/${asset.stages.size}】" +
+            view = stageView(asset.name, asset.stages, run.current_stage_index.toInt()),
+            message = "已恢复剧本「${asset.name}」。\n【当前阶段 ${run.current_stage_index.toInt() + 1}/${asset.stages.size}】" +
                 "${stage.name}：${stage.description}${stageSuffix(stage)}" +
-                artifactsHint(stageStates, run.currentStageIndex) + subAgentSummary(subAgents)
+                artifactsHint(stageStates, run.current_stage_index.toInt()) + subAgentSummary(subAgents)
         )
     }
 
     /** 从本会话最近一次 ABORTED 运行的 FAILED 阶段恢复（该阶段置回 ACTIVE，已完成阶段保留）。 */
     suspend fun retry(sessionId: String): PlaybookOpResult {
-        val run = v2Agent.getLatestPlaybookBySessionAndStatus(sessionId, PlaybookRunStatus.ABORTED.name)?.toEntity()
+        val run = v2Agent.getLatestPlaybookBySessionAndStatus(sessionId, PlaybookRunStatus.ABORTED.name)
             ?: return PlaybookOpResult.Error("当前会话没有可重试的失败运行，请先 playbook_start", "PLAYBOOK_NO_ABORTED")
-        val asset = playbookRegistry.findByName(run.playbookName)
-            ?: return PlaybookOpResult.Error("剧本资产「${run.playbookName}}」不存在", "PLAYBOOK_NOT_FOUND")
-        val stageStates = decodeStages(run.stageStatuses)
+        val asset = playbookRegistry.findByName(run.playbook_name)
+            ?: return PlaybookOpResult.Error("剧本资产「${run.playbook_name}}」不存在", "PLAYBOOK_NOT_FOUND")
+        val stageStates = decodeStages(run.stage_statuses)
         // 定位 FAILED 阶段：若 currentStageIndex 指向 FAILED 则从该阶段恢复，否则回退找最近 FAILED。
         val failIndex = stageStates.indexOfFirst { it.status == PlaybookStageStatus.FAILED.name }
-            .takeIf { it >= 0 } ?: run.currentStageIndex
+            .takeIf { it >= 0 } ?: run.current_stage_index.toInt()
         if (failIndex >= asset.stages.size) {
             return PlaybookOpResult.Error("运行已超出剧本阶段范围", "PLAYBOOK_STAGE_RANGE")
         }
@@ -236,9 +233,9 @@ class PlaybookExecutor @Inject constructor(
         upsertRun(
             run.copy(
                 status = PlaybookRunStatus.RUNNING.name,
-                currentStageIndex = failIndex,
-                stageStatuses = encodeStages(restored),
-                updatedAtMs = now
+                current_stage_index = failIndex.toLong(),
+                stage_statuses = encodeStages(restored),
+                updated_at_ms = now
             )
         )
         idleRounds[sessionId] = 0
@@ -260,12 +257,12 @@ class PlaybookExecutor @Inject constructor(
         val run = resolveRunning(sessionId, runId)
             ?: return PlaybookOpResult.Error("当前没有正在进行的剧本运行，无需中止", "PLAYBOOK_NOT_RUNNING")
         val now = System.currentTimeMillis()
-        upsertRun(run.copy(status = PlaybookRunStatus.ABORTED.name, updatedAtMs = now))
+        upsertRun(run.copy(status = PlaybookRunStatus.ABORTED.name, updated_at_ms = now))
         idleRounds.remove(sessionId)
-        FileLogger.i(TAG, "abort: session=$sessionId playbook=${run.playbookName}")
+        FileLogger.i(TAG, "abort: session=$sessionId playbook=${run.playbook_name}")
         return PlaybookOpResult.Ok(
-            message = "剧本「${run.playbookName}」已中止。可 playbook_start 从头重跑，或 playbook_retry 从失败阶段恢复。",
-            playbookName = run.playbookName
+            message = "剧本「${run.playbook_name}」已中止。可 playbook_start 从头重跑，或 playbook_retry 从失败阶段恢复。",
+            playbookName = run.playbook_name
         )
     }
 
@@ -275,29 +272,29 @@ class PlaybookExecutor @Inject constructor(
      * 无 RUNNING 运行或已有更旧运行时空操作（幂等）。
      */
     suspend fun interrupt(sessionId: String) {
-        val run = v2Agent.getLatestPlaybookBySessionAndStatus(sessionId, PlaybookRunStatus.RUNNING.name)?.toEntity() ?: return
+        val run = v2Agent.getLatestPlaybookBySessionAndStatus(sessionId, PlaybookRunStatus.RUNNING.name) ?: return
         val now = System.currentTimeMillis()
-        upsertRun(run.copy(status = PlaybookRunStatus.INTERRUPTED.name, updatedAtMs = now))
+        upsertRun(run.copy(status = PlaybookRunStatus.INTERRUPTED.name, updated_at_ms = now))
         idleRounds.remove(sessionId)
-        FileLogger.i(TAG, "interrupt: session=$sessionId playbook=${run.playbookName}（SessionStop）")
+        FileLogger.i(TAG, "interrupt: session=$sessionId playbook=${run.playbook_name}（SessionStop）")
     }
 
     /** 查询本会话最近一次运行的状态（playbook_status / PlaybookStageSource 用）。 */
-    suspend fun status(sessionId: String): PlaybookRunEntity? =
-        v2Agent.getLatestPlaybookBySession(sessionId)?.toEntity()
+    suspend fun status(sessionId: String): V2PlaybookRun? =
+        v2Agent.getLatestPlaybookBySession(sessionId)
 
     /** 本会话最近一次运行的人类可读状态文本（/playbook status 用）。 */
     suspend fun statusText(sessionId: String): String {
-        val run = v2Agent.getLatestPlaybookBySession(sessionId)?.toEntity()
+        val run = v2Agent.getLatestPlaybookBySession(sessionId)
             ?: return "当前会话没有剧本运行记录"
-        val stageStates = decodeStages(run.stageStatuses)
+        val stageStates = decodeStages(run.stage_statuses)
         return buildString {
-            appendLine("剧本「${run.playbookName}」 状态=${run.statusEnum().name.lowercase()}")
+            appendLine("剧本「${run.playbook_name}」 状态=${run.statusEnum().name.lowercase()}")
             if (stageStates.isEmpty()) {
                 appendLine("（无阶段状态记录）")
             } else {
                 stageStates.forEachIndexed { i, s ->
-                    val mark = if (i == run.currentStageIndex) "→ " else "  "
+                    val mark = if (i == run.current_stage_index.toInt()) "→ " else "  "
                     append(mark).append("阶段 ${i + 1}. ${s.name} [${s.status.lowercase()}]")
                     if (s.artifacts.isNotEmpty()) append(" 产物: ${s.artifacts.joinToString()}")
                     appendLine()
@@ -308,10 +305,10 @@ class PlaybookExecutor @Inject constructor(
 
     /** 本会话最近一次 RUNNING 运行的当前阶段视图（无运行返回 null）。 */
     suspend fun currentStageView(sessionId: String): PlaybookStageView? {
-        val run = v2Agent.getLatestPlaybookBySessionAndStatus(sessionId, PlaybookRunStatus.RUNNING.name)?.toEntity() ?: return null
-        val asset = playbookRegistry.findByName(run.playbookName) ?: return null
-        if (run.currentStageIndex >= asset.stages.size) return null
-        return stageView(asset.name, asset.stages, run.currentStageIndex)
+        val run = v2Agent.getLatestPlaybookBySessionAndStatus(sessionId, PlaybookRunStatus.RUNNING.name) ?: return null
+        val asset = playbookRegistry.findByName(run.playbook_name) ?: return null
+        if (run.current_stage_index.toInt() >= asset.stages.size) return null
+        return stageView(asset.name, asset.stages, run.current_stage_index.toInt())
     }
 
     // ── 完成判定护栏（§3.3.3）：workflow 侧按轮上报实质动作/空转 ──
@@ -336,13 +333,13 @@ class PlaybookExecutor @Inject constructor(
 
     private suspend fun advanceDone(
         sessionId: String,
-        run: PlaybookRunEntity,
+        run: V2PlaybookRun,
         asset: PlaybookAsset,
         stageStates: List<PlaybookStageState>,
         artifacts: List<String>,
         skipApproval: Boolean
     ): PlaybookOpResult {
-        val currentIndex = run.currentStageIndex
+        val currentIndex = run.current_stage_index.toInt()
         val current = stageStates[currentIndex]
         // 完成判定护栏：连续 N 轮无实质动作就声明完成 → advisory 提醒确认产出物，不推进。
         if ((idleRounds[sessionId] ?: 0) >= IDLE_ROUND_THRESHOLD) {
@@ -365,8 +362,8 @@ class PlaybookExecutor @Inject constructor(
             upsertRun(
                 run.copy(
                     status = PlaybookRunStatus.COMPLETED.name,
-                    stageStatuses = encodeStages(finalStates),
-                    updatedAtMs = now
+                    stage_statuses = encodeStages(finalStates),
+                    updated_at_ms = now
                 )
             )
             idleRounds.remove(sessionId)
@@ -381,7 +378,7 @@ class PlaybookExecutor @Inject constructor(
         val nextIndex = currentIndex + 1
         val nextStage = asset.stages[nextIndex]
         if (nextStage.gates == PlaybookGate.APPROVAL && !skipApproval) {
-            val approved = awaitStageApproval(sessionId, run.playbookName, nextStage)
+            val approved = awaitStageApproval(sessionId, run.playbook_name, nextStage)
             if (!approved) {
                 // 审批拒绝：当前 DONE，下一阶段 FAILED，运行 ABORTED。
                 val rejectedStates = stageStates.mapIndexed { i, s ->
@@ -395,14 +392,14 @@ class PlaybookExecutor @Inject constructor(
                 upsertRun(
                     run.copy(
                         status = PlaybookRunStatus.ABORTED.name,
-                        currentStageIndex = nextIndex,
-                        stageStatuses = encodeStages(rejectedStates),
-                        updatedAtMs = now
+                        current_stage_index = nextIndex.toLong(),
+                        stage_statuses = encodeStages(rejectedStates),
+                        updated_at_ms = now
                     )
                 )
                 idleRounds.remove(sessionId)
                 return PlaybookOpResult.Aborted(
-                    message = "用户拒绝了阶段「${nextStage.name}」的审批，剧本「${run.playbookName}」已中止。" +
+                    message = "用户拒绝了阶段「${nextStage.name}」的审批，剧本「${run.playbook_name}」已中止。" +
                         "可 playbook_start 从头重跑，或 playbook_retry 从失败阶段恢复。"
                 )
             }
@@ -418,9 +415,9 @@ class PlaybookExecutor @Inject constructor(
         val now = System.currentTimeMillis()
         upsertRun(
             run.copy(
-                currentStageIndex = nextIndex,
-                stageStatuses = encodeStages(advancedStates),
-                updatedAtMs = now
+                current_stage_index = nextIndex.toLong(),
+                stage_statuses = encodeStages(advancedStates),
+                updated_at_ms = now
             )
         )
         idleRounds[sessionId] = 0
@@ -438,20 +435,20 @@ class PlaybookExecutor @Inject constructor(
 
     private suspend fun advanceFail(
         sessionId: String,
-        run: PlaybookRunEntity,
+        run: V2PlaybookRun,
         asset: PlaybookAsset,
         stageStates: List<PlaybookStageState>,
         current: PlaybookStageState?
     ): PlaybookOpResult {
         val failedStates = stageStates.mapIndexed { i, s ->
-            if (i == run.currentStageIndex) s.copy(status = PlaybookStageStatus.FAILED.name) else s
+            if (i == run.current_stage_index.toInt()) s.copy(status = PlaybookStageStatus.FAILED.name) else s
         }
         val now = System.currentTimeMillis()
         upsertRun(
             run.copy(
                 status = PlaybookRunStatus.ABORTED.name,
-                stageStatuses = encodeStages(failedStates),
-                updatedAtMs = now
+                stage_statuses = encodeStages(failedStates),
+                updated_at_ms = now
             )
         )
         idleRounds.remove(sessionId)
@@ -471,34 +468,34 @@ class PlaybookExecutor @Inject constructor(
         return choice == PlanApprovalChoice.APPROVE
     }
 
-    private suspend fun resolveRunning(sessionId: String, runId: String?): PlaybookRunEntity? {
+    private suspend fun resolveRunning(sessionId: String, runId: String?): V2PlaybookRun? {
         if (runId != null) {
-            val byId = v2Agent.getPlaybookRunById(runId)?.toEntity()
-            return byId?.takeIf { it.sessionId == sessionId && it.statusEnum() == PlaybookRunStatus.RUNNING }
+            val byId = v2Agent.getPlaybookRunById(runId)
+            return byId?.takeIf { it.session_id == sessionId && it.statusEnum() == PlaybookRunStatus.RUNNING }
         }
-        return v2Agent.getLatestPlaybookBySessionAndStatus(sessionId, PlaybookRunStatus.RUNNING.name)?.toEntity()
+        return v2Agent.getLatestPlaybookBySessionAndStatus(sessionId, PlaybookRunStatus.RUNNING.name)
     }
 
-    private suspend fun abortExisting(existing: PlaybookRunEntity) {
+    private suspend fun abortExisting(existing: V2PlaybookRun) {
         upsertRun(
             existing.copy(
                 status = PlaybookRunStatus.ABORTED.name,
-                updatedAtMs = System.currentTimeMillis()
+                updated_at_ms = System.currentTimeMillis()
             )
         )
     }
 
     /** V2 upsert。 */
-    private suspend fun upsertRun(run: PlaybookRunEntity) {
+    private suspend fun upsertRun(run: V2PlaybookRun) {
         v2Agent.upsertPlaybookRun(
-            playbookRunId = run.playbookRunId,
-            sessionId = run.sessionId,
-            playbookName = run.playbookName,
-            currentStageIndex = run.currentStageIndex.toLong(),
-            stageStatuses = run.stageStatuses,
+            playbookRunId = run.playbook_run_id,
+            sessionId = run.session_id,
+            playbookName = run.playbook_name,
+            currentStageIndex = run.current_stage_index,
+            stageStatuses = run.stage_statuses,
             status = run.status,
-            createdAtMs = run.createdAtMs,
-            updatedAtMs = run.updatedAtMs
+            createdAtMs = run.created_at_ms,
+            updatedAtMs = run.updated_at_ms
         )
     }
 
@@ -575,19 +572,46 @@ class PlaybookExecutor @Inject constructor(
             }
     }
 
-    // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
-
-    private fun V2PlaybookRun.toEntity() = PlaybookRunEntity(
-        playbookRunId = playbook_run_id,
-        sessionId = session_id,
-        playbookName = playbook_name,
-        currentStageIndex = current_stage_index.toInt(),
-        stageStatuses = stage_statuses,
-        status = status,
-        createdAtMs = created_at_ms,
-        updatedAtMs = updated_at_ms
-    )
 }
+
+// ── Playbook 枚举与扩展 ──────────────────────────────────────
+
+/** Playbook 运行级状态（D5-3，双状态机之一；对齐 norm-chain §3.3.4）。 */
+enum class PlaybookRunStatus {
+    /** 运行中（阶段推进中）。 */
+    RUNNING,
+    /** 全部阶段 DONE，正常完成。 */
+    COMPLETED,
+    /** 阶段失败（模型声明失败/审批拒绝），运行中止；可 `playbook_retry` 从 FAILED 阶段恢复。 */
+    ABORTED,
+    /** 被中断（进程回收/SessionStop），可 `playbook_resume` 继续。 */
+    INTERRUPTED
+}
+
+/** Playbook 阶段级状态（D5-3，双状态机之二；对齐 norm-chain §3.3.4）。 */
+enum class PlaybookStageStatus {
+    /** 未开始。 */
+    PENDING,
+    /** 进行中（当前阶段）。 */
+    ACTIVE,
+    /** 已完成（advance done）。 */
+    DONE,
+    /** 失败（advance fail / 审批拒绝）。 */
+    FAILED
+}
+
+/**
+ * 单个阶段的持久化状态（D5-3，序列化进 stage_statuses 的 JSON 数组元素）。
+ */
+@kotlinx.serialization.Serializable
+data class PlaybookStageState(
+    val name: String,
+    val status: String = PlaybookStageStatus.PENDING.name,
+    val artifacts: List<String> = emptyList()
+)
+
+internal fun V2PlaybookRun.statusEnum(): PlaybookRunStatus =
+    EnumSafe.valueOf(status, PlaybookRunStatus.RUNNING, tag = "Agent_playbook_runs.status")
 
 /** Playbook 执行结果（工具层据此转 ToolResult.Success / ToolResult.Error）。 */
 sealed class PlaybookOpResult {

@@ -1,7 +1,8 @@
 package com.mini.me_core.feature.agent.domain.execution.tool.playbook
 
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.data.local.entity.PlaybookRunEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_playbook_runs as V2PlaybookRun
+import com.mini.me_core.feature.agent.domain.knowledge.playbook.statusEnum
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookExecutor
 import com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookOpResult
@@ -235,14 +236,14 @@ class PlaybookStatusTool @Inject constructor(
         }
     }
 
-    private fun runJson(run: PlaybookRunEntity): JsonObject {
-        val stages = run.stageStatuses.ifBlank { "[]" }
+    private fun runJson(run: V2PlaybookRun): JsonObject {
+        val stages = run.stage_statuses.ifBlank { "[]" }
         return JsonObject(
             mapOf(
                 "running" to JsonPrimitive(run.statusEnum().name == "RUNNING"),
-                "playbook" to JsonPrimitive(run.playbookName),
+                "playbook" to JsonPrimitive(run.playbook_name),
                 "status" to JsonPrimitive(run.statusEnum().name.lowercase()),
-                "current_stage_index" to JsonPrimitive(run.currentStageIndex + 1),
+                "current_stage_index" to JsonPrimitive(run.current_stage_index.toInt() + 1),
                 "stage_statuses" to JsonPrimitive(stages)
             )
         )
