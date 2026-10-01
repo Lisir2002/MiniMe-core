@@ -2,6 +2,8 @@ package com.mini.me_core.datalayer
 
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules
 import com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides
+import com.mini.mecore.datalayer.sqldelight.agent.Skill_conversation_state
+import com.mini.mecore.datalayer.sqldelight.agent.Skill_state
 import com.mini.mecore.datalayer.sqldelight.credentials.Git_credentials
 import com.mini.mecore.datalayer.sqldelight.settings.Ai_providers
 import com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models
@@ -58,3 +60,7 @@ val Model_capability_overrides.overrideVideoBool: Boolean? get() = override_vide
 val Model_capability_overrides.overrideAudioBool: Boolean? get() = override_audio?.let { it != 0L }
 val Model_capability_overrides.overrideCodeBool: Boolean? get() = override_code?.let { it != 0L }
 val Model_capability_overrides.overrideStructuredOutputBool: Boolean? get() = override_structured_output?.let { it != 0L }
+
+// skill_state / skill_conversation_state
+val Skill_state.isEnabled: Boolean get() = enabled == 1L
+val Skill_conversation_state.isEnabled: Boolean get() = enabled == 1L

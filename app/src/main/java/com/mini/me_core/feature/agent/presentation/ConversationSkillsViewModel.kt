@@ -3,7 +3,8 @@ package com.mini.me_core.feature.agent.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.data.local.entity.SkillConversationStateEntity
+import com.mini.me_core.datalayer.isEnabled
+import com.mini.mecore.datalayer.sqldelight.agent.Skill_conversation_state as V2ConvState
 import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
 import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillScope
 import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillStateRepository
@@ -62,18 +63,18 @@ class ConversationSkillsViewModel @Inject constructor(
 
         val convStates = runCatching { skillStateRepository.listConversationStates(sessionId) }
             .getOrDefault(emptyList())
-            .associateBy { it.skillId }
+            .associateBy { it.skill_id }
 
         // 本对话被临时禁用的技能（enabled=false 绑定）：GLOBAL/AGENT 技能在此展示供恢复。
         _disabledInConversation.value = all.filter { skill ->
-            skill.enabled && convStates[skill.id]?.enabled == false &&
+            skill.enabled && convStates[skill.id]?.isEnabled == false &&
                 skill.scope != SkillScope.CONVERSATION
         }
 
         // 未添加的 CONVERSATION 技能（无绑定或绑定为 false）。
         _addableConversationSkills.value = all.filter { skill ->
             skill.enabled && skill.scope == SkillScope.CONVERSATION &&
-                convStates[skill.id]?.enabled != true
+                convStates[skill.id]?.isEnabled != true
         }
     }
 

@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.agent.domain.execution.tool.skill
 
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.datalayer.isEnabled
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
 import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillExecutionContext
@@ -147,7 +148,7 @@ class SkillInvocationResolver @Inject constructor(
         // 对话级禁用优先给出明确提示（用户可见、可即时恢复）。
         if (sessionId != null) {
             val conv = runCatching { skillStateRepository.getConversationState(skill.id, sessionId) }.getOrNull()
-            if (conv?.enabled == false) {
+            if (conv?.isEnabled == false) {
                 return "技能「${skill.name}」在当前对话中已被禁用，请到对话技能面板重新启用后再使用" to "SKILL_CONVERSATION_DISABLED"
             }
         }
