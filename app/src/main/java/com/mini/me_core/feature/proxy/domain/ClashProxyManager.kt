@@ -301,6 +301,11 @@ class ClashProxyManager @Inject constructor(
             FileLogger.w(TAG, "订阅源 YAML 解析失败（${e.message}），仅生成 DIRECT 兜底配置")
         }
         if (clean["rules"] == null) clean["rules"] = listOf("MATCH,DIRECT")
+        // DNS 防泄露（P0-1）：无论订阅自带什么 dns 配置，一律覆盖为 fake-ip + 国内 DoH 主 / 海外 DoH
+        // fallback。fake-ip 模式下命中代理规则的域名由远端代理解析，本机不再发出明文 DNS 查询；
+        // fallback-filter 按 geoip=CN 分流：国内域名走国内 DoH，海外域名走 Cloudflare DoH，
+        // 避免「订阅商 DNS 被劫持 / 本机 DNS 泄露真实访问目标」。
+        clean["dns"] = buildFixedDnsConfig()
         val body = Yaml().dump(clean)
         return buildString {
             appendLine("mixed-port: $MIXED_PORT")
@@ -315,6 +320,46 @@ class ClashProxyManager @Inject constructor(
             appendLine()
         }
     }
+
+    /**
+     * 固定 DNS 配置（P0-1 防泄露）。
+     *
+     * - enhanced-mode=fake-ip：命中代理规则的域名直接返回 198.18.0.0/16 假地址，真实域名由远端代理
+     *   出口解析，本机不发明文 DNS；
+     * - default-nameserver：纯 IP 明文 DNS，仅用于引导 DoH 域名本身的解析（bootstrap），
+     *   用国内可达的阿里/腾讯 DoH 前置解析；
+     * - nameserver（主）：国内 DoH（阿里 223.5.5.5 / 腾讯 1.12.12.12），国内域名低延迟；
+     * - fallback（备）：海外 DoH（Cloudflare 1.1.1.1 / Google 8.8.8.8），国内主 DNS 被污染时兜底；
+     * - fallback-filter.geoip-code=CN：仅当解析结果地理归属不在 CN 时采用 fallback 答案，
+     *   实现「国内域名国内解、海外域名海外解」的分流，避免 DNS 泄露。
+     * - ipv6=false：关闭 IPv6 DNS，避免 IPv6 隧道绕过代理造成泄露。
+     */
+    private fun buildFixedDnsConfig(): Map<String, Any?> = linkedMapOf(
+        "enable" to true,
+        "ipv6" to false,
+        "enhanced-mode" to "fake-ip",
+        "fake-ip-range" to "198.18.0.1/16",
+        "default-nameserver" to listOf("223.5.5.5", "119.29.29.29"),
+        "nameserver" to listOf(
+            "https://223.5.5.5/dns-query",
+            "https://1.12.12.12/dns-query",
+        ),
+        "fallback" to listOf(
+            "https://1.1.1.1/dns-query",
+            "https://8.8.8.8/dns-query",
+        ),
+        "fallback-filter" to linkedMapOf(
+            "geoip" to true,
+            "geoip-code" to "CN",
+            "ipcidr" to listOf("240.0.0.0/4"),
+        ),
+        "fake-ip-filter" to listOf(
+            "*.lan",
+            "*.local",
+            "+.internal",
+            "localhost.ptlogin2.qq.com",
+        ),
+    )
 
     /** 订阅 URL 全文抓取（拉取远端订阅 YAML）。失败返回 null。 */
     suspend fun fetchSubscriptionYaml(url: String): String? = withContext(Dispatchers.IO) {
