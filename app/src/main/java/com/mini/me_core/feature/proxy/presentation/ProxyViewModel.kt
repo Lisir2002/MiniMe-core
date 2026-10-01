@@ -6,6 +6,8 @@ import com.mini.me_core.feature.proxy.data.ProxySettingsRepository
 import com.mini.me_core.feature.proxy.domain.ClashConfigSummary
 import com.mini.me_core.feature.proxy.domain.ClashProxiesSnapshot
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
+import com.mini.me_core.feature.proxy.domain.ProxyConnectivityTester
+import com.mini.me_core.feature.proxy.domain.ProxyDiagnosticResult
 import com.mini.me_core.feature.proxy.domain.ProxyRuntimeState
 import com.mini.me_core.feature.proxy.domain.ProxySubscription
 import com.mini.me_core.feature.proxy.domain.ProxyTraffic
@@ -75,6 +77,7 @@ data class ProxyGroupsView(
 class ProxyViewModel @Inject constructor(
     private val repository: ProxySettingsRepository,
     private val manager: ClashProxyManager,
+    private val connectivityTester: ProxyConnectivityTester,
 ) : ViewModel() {
 
     /** 已播种的订阅/manual/list（脱敏，cipher 不解密返回）。 */
@@ -95,6 +98,9 @@ class ProxyViewModel @Inject constructor(
 
     /** 运行态（含 mode / controller 可达性）。 */
     val runtime: StateFlow<ProxyRuntimeState> = manager.state
+
+    /** P1-9：最近一次连接诊断结果（交通灯数据源）。 */
+    val diagnostic: StateFlow<ProxyDiagnosticResult?> = connectivityTester.result
 
     /** 最近一次预检结果。 */
     private val _preview = MutableStateFlow<ProxyPreview?>(null)
@@ -130,8 +136,10 @@ class ProxyViewModel @Inject constructor(
             }
             val id = activeProfileId.value ?: list.first().id
             val result = manager.on(id, null)
-            if (result == "ok") _events.send("代理已启用")
-            else _events.send(result)
+            if (result == "ok") {
+                _events.send("代理已启用")
+                connectivityTester.runDiagnostics()
+            } else _events.send(result)
         }
     }
 
@@ -148,6 +156,7 @@ class ProxyViewModel @Inject constructor(
         viewModelScope.launch {
             val result = manager.on(id, null)
             _events.send(if (result == "ok") "已切换活跃配置" else result)
+            if (result == "ok") connectivityTester.runDiagnostics()
         }
     }
 
@@ -158,6 +167,11 @@ class ProxyViewModel @Inject constructor(
             if (activeProfileId.value == id) repository.setActiveProfile(null)
             _events.send("已删除")
         }
+    }
+
+    /** P1-9：手动重跑连接诊断。 */
+    fun retestConnectivity() {
+        viewModelScope.launch { connectivityTester.runDiagnostics() }
     }
 
     /** P1-7：手动刷新某订阅型 profile（拉最新 YAML，活跃则热重载）。 */

@@ -99,6 +99,7 @@ fun ProxyConfigScreen(
     val preview by viewModel.preview.collectAsStateWithLifecycle()
     val nodesView by viewModel.profileNodes.collectAsStateWithLifecycle()
     val groupsView by viewModel.groups.collectAsStateWithLifecycle()
+    val diagnostic by viewModel.diagnostic.collectAsStateWithLifecycle()
 
     var expandedId by remember { mutableStateOf<String?>(null) }
     var expandedTab by remember { mutableStateOf(0) }
@@ -143,6 +144,13 @@ fun ProxyConfigScreen(
                         activeProfileId = activeProfileId,
                         onToggle = viewModel::toggleEnabled
                     )
+                }
+
+                // P1-9：连接诊断交通灯（启用后显示，点击重测）。
+                if (enabled) {
+                    item {
+                        DiagnosticCard(diagnostic = diagnostic, onRetest = viewModel::retestConnectivity)
+                    }
                 }
 
                 // 网络层优化 C5：模型接口直连/代理分流开关（默认关，需先开启代理才可切换）。
@@ -381,10 +389,58 @@ private fun NodesEntryCard(
     }
 }
 
+/** P1-9：连接诊断交通灯卡片。 */
+@Composable
+private fun DiagnosticCard(
+    diagnostic: com.mini.me_core.feature.proxy.domain.ProxyDiagnosticResult?,
+    onRetest: () -> Unit,
+) {
+    val light = diagnostic?.light
+    val dotColor = when (light) {
+        com.mini.me_core.feature.proxy.domain.TrafficLight.GREEN -> androidx.compose.ui.graphics.Color(0xFF2E7D32)
+        com.mini.me_core.feature.proxy.domain.TrafficLight.YELLOW -> androidx.compose.ui.graphics.Color(0xFFF9A825)
+        com.mini.me_core.feature.proxy.domain.TrafficLight.RED -> androidx.compose.ui.graphics.Color(0xFFC62828)
+        null -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            androidx.compose.foundation.Canvas(modifier = Modifier.size(12.dp)) {
+                drawCircle(dotColor)
+            }
+            Spacer(Modifier.width(Spacing.sm))
+            Column(modifier = Modifier.weight(1f)) {
+                val title = when (light) {
+                    com.mini.me_core.feature.proxy.domain.TrafficLight.GREEN -> "连接正常"
+                    com.mini.me_core.feature.proxy.domain.TrafficLight.YELLOW -> "部分异常"
+                    com.mini.me_core.feature.proxy.domain.TrafficLight.RED -> "连接不通"
+                    null -> "未诊断"
+                }
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                if (diagnostic != null) {
+                    val lat = diagnostic.outboundLatencyMs
+                    Text(
+                        "进程:${if (diagnostic.processAlive) "✓" else "✗"} 控制面:${if (diagnostic.controllerReachable) "✓" else "✗"} " +
+                            "出口:${lat?.let { "${it}ms" } ?: "✗"} DNS:${if (diagnostic.dnsOk) "✓" else "✗"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            TextButton(onClick = onRetest) { Text("重测") }
+        }
+    }
+}
+
 @Composable
 private fun ImportEditor(
-    preview: ProxyPreview?,
-    onPreview: (String?, String?) -> Unit,
+    preview: ProxyPreview?,    onPreview: (String?, String?) -> Unit,
     onCommit: (String, String, String, Boolean) -> Unit
 ) {
     var mode by remember { mutableStateOf(ImportMode.SUBSCRIPTION) }

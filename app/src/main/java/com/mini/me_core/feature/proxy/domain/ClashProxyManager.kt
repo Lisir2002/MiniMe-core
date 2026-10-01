@@ -290,6 +290,21 @@ class ClashProxyManager @Inject constructor(
     /** 供容器/上层读取的启用态（同步、非挂起）。 */
     fun isEnabled(): Boolean = enabledCache
 
+    /** P1-9：mihomo 内核进程是否存活（诊断用，同步非挂起）。 */
+    fun isKernelAlive(): Boolean = mihomoProcess?.isAlive == true
+
+    /** P1-9：经内核真实出口测 generate_204 延迟（ms）；控制器不可达/超时返回 null。 */
+    suspend fun testOutboundLatency(): Long? {
+        ensureSecretLoaded()
+        val resp = controllerRequest(
+            "GET",
+            "/proxies/GLOBAL/delay?url=http://www.gstatic.com/generate_204&timeout=5000"
+        ) ?: return null
+        return runCatching {
+            kotlinx.serialization.json.Json.parseToJsonElement(resp).jsonObject["delay"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+        }.getOrNull()
+    }
+
     /** 控制器地址 "127.0.0.1:port"。 */
     fun controllerAddress(): String = "$CONTROLLER_HOST:$CONTROLLER_PORT"
 
