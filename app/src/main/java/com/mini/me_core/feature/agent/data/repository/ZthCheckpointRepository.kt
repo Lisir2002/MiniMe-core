@@ -3,7 +3,6 @@ package com.mini.me_core.feature.agent.data.repository
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Checkpoint_file_snapshots as V2Snapshot
 import com.mini.mecore.datalayer.sqldelight.agent.Session_checkpoints as V2Checkpoint
-import com.mini.me_core.feature.agent.data.local.entity.CheckpointFileSnapshotEntity
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -58,9 +57,9 @@ class ZthCheckpointRepository @Inject constructor(
 
     /** Phase 5 Postflight 失败：列出 checkpoint + 所有快照（用于文件还原）。 */
     suspend fun getCheckpointWithSnapshots(checkpointId: String):
-            Pair<V2Checkpoint, List<CheckpointFileSnapshotEntity>>? {
+            Pair<V2Checkpoint, List<V2Snapshot>>? {
         val ck = v2Agent.getCheckpointById(checkpointId) ?: return null
-        val snaps = v2Agent.listCheckpointFileSnapshots(checkpointId).map { it.toEntity() }
+        val snaps = v2Agent.listCheckpointFileSnapshots(checkpointId)
         return ck to snaps
     }
 
@@ -81,7 +80,7 @@ class ZthCheckpointRepository @Inject constructor(
         v2Agent.deleteCheckpointsBefore(cutoffTimestamp)
     }
 
-    // ── Phase 4.2 Firestore：Entity ↔ Dto 映射入口 ─────────────────
+    // ── Phase 4.2 Firestore：V2 ↔ Dto 映射入口 ─────────────────
 
     fun checkpointToDto(e: V2Checkpoint): Map<String, Any?> = mapOf(
         "id" to e.id, "sessionId" to e.session_id, "userMessageId" to e.user_message_id,
@@ -97,30 +96,18 @@ class ZthCheckpointRepository @Inject constructor(
         created_at_ms = (m["createdAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
     )
 
-    fun snapshotToDto(e: CheckpointFileSnapshotEntity): Map<String, Any?> = mapOf(
-        "id" to e.id, "checkpointId" to e.checkpointId, "filePath" to e.filePath,
-        "snapshotRelativePath" to e.snapshotRelativePath, "changeType" to e.changeType,
-        "createdAt" to e.createdAt, "_lwwMs" to System.currentTimeMillis()
+    fun snapshotToDto(e: V2Snapshot): Map<String, Any?> = mapOf(
+        "id" to e.id, "checkpointId" to e.checkpoint_id, "filePath" to e.file_path,
+        "snapshotRelativePath" to e.snapshot_relative_path, "changeType" to e.change_type,
+        "createdAt" to e.created_at, "_lwwMs" to System.currentTimeMillis()
     )
 
-    fun snapshotFromDto(m: Map<String, Any?>): CheckpointFileSnapshotEntity =
-        CheckpointFileSnapshotEntity(
-            id = m["id"] as? String ?: "",
-            checkpointId = m["checkpointId"] as? String ?: "",
-            filePath = m["filePath"] as? String ?: "",
-            snapshotRelativePath = m["snapshotRelativePath"] as? String ?: "",
-            changeType = m["changeType"] as? String ?: "MODIFY",
-            createdAt = (m["createdAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
-        )
-
-    // ── 内部映射 ─────────────────────────────────────────────────────
-
-    private fun V2Snapshot.toEntity() = CheckpointFileSnapshotEntity(
-        id = id,
-        checkpointId = checkpoint_id,
-        filePath = file_path,
-        snapshotRelativePath = snapshot_relative_path,
-        changeType = change_type,
-        createdAt = created_at,
+    fun snapshotFromDto(m: Map<String, Any?>): V2Snapshot = V2Snapshot(
+        id = m["id"] as? String ?: "",
+        checkpoint_id = m["checkpointId"] as? String ?: "",
+        file_path = m["filePath"] as? String ?: "",
+        snapshot_relative_path = m["snapshotRelativePath"] as? String ?: "",
+        change_type = m["changeType"] as? String ?: "MODIFY",
+        created_at = (m["createdAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
     )
 }

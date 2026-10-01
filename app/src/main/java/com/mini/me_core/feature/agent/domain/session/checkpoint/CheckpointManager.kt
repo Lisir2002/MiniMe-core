@@ -4,7 +4,6 @@ import android.content.Context
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Checkpoint_file_snapshots as V2Snapshot
 import com.mini.mecore.datalayer.sqldelight.agent.Session_checkpoints as V2Checkpoint
-import com.mini.me_core.feature.agent.data.local.entity.CheckpointFileSnapshotEntity
 import com.mini.me_core.feature.workspace.domain.FileAccessProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -119,20 +118,20 @@ class CheckpointManager @Inject constructor(
         var restoredFileCount = 0
 
         for (cp in checkpointsToRollback) {
-            val snapshots = v2Agent.listCheckpointFileSnapshots(cp.id).map { it.toEntity() }
+            val snapshots = v2Agent.listCheckpointFileSnapshots(cp.id)
             for (snapshot in snapshots) {
-                val snapshotFile = File(baseCheckpointDir, snapshot.snapshotRelativePath)
+                val snapshotFile = File(baseCheckpointDir, snapshot.snapshot_relative_path)
 
-                if (snapshot.changeType == "MODIFY") {
+                if (snapshot.change_type == "MODIFY") {
                     if (snapshotFile.exists()) {
                         val content = snapshotFile.readText()
-                        fileAccess.writeFile(snapshot.filePath, content, overwrite = true)
+                        fileAccess.writeFile(snapshot.file_path, content, overwrite = true)
                         restoredFileCount++
                     }
-                } else if (snapshot.changeType == "CREATE") {
+                } else if (snapshot.change_type == "CREATE") {
                     // 若是原先新建的文件，回滚时安全删除
-                    if (fileAccess.exists(snapshot.filePath)) {
-                        fileAccess.delete(snapshot.filePath)
+                    if (fileAccess.exists(snapshot.file_path)) {
+                        fileAccess.delete(snapshot.file_path)
                         restoredFileCount++
                     }
                 }
@@ -153,13 +152,4 @@ class CheckpointManager @Inject constructor(
         }
     }
 
-    // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
-
-    private fun V2Snapshot.toEntity() = CheckpointFileSnapshotEntity(
-        id = id,
-        checkpointId = checkpoint_id,
-        filePath = file_path,
-        snapshotRelativePath = snapshot_relative_path,
-        changeType = change_type
-    )
 }

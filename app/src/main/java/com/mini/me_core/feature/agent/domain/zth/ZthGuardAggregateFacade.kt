@@ -389,9 +389,9 @@ class ZthGuardAggregateFacade @Inject constructor(
         var allMatch = true
         val mismatches = mutableListOf<String>()
         for (s in snaps) {
-            if (!compareHash(s.filePath)) {
+            if (!compareHash(s.file_path)) {
                 allMatch = false
-                mismatches.add(s.filePath)
+                mismatches.add(s.file_path)
             }
         }
         return if (allMatch) PostflightResult.Passed
