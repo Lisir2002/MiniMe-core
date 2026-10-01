@@ -1,7 +1,8 @@
 package com.mini.me_core.feature.agent.data.repository
 
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.me_core.feature.agent.data.local.entity.CheckpointEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Checkpoint_file_snapshots as V2Snapshot
+import com.mini.mecore.datalayer.sqldelight.agent.Session_checkpoints as V2Checkpoint
 import com.mini.me_core.feature.agent.data.local.entity.CheckpointFileSnapshotEntity
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,7 +33,7 @@ class ZthCheckpointRepository @Inject constructor(
         userMessageId: String,
         promptSnippet: String
     ): String {
-        val existing = v2Agent.getCheckpointByMessageId(userMessageId)?.toEntity()
+        val existing = v2Agent.getCheckpointByMessageId(userMessageId)
         if (existing != null) return existing.id
         v2Agent.insertCheckpointFull(
             id = checkpointId, sessionId = sessionId, userMessageId = userMessageId,
@@ -57,17 +58,17 @@ class ZthCheckpointRepository @Inject constructor(
 
     /** Phase 5 Postflight 失败：列出 checkpoint + 所有快照（用于文件还原）。 */
     suspend fun getCheckpointWithSnapshots(checkpointId: String):
-            Pair<CheckpointEntity, List<CheckpointFileSnapshotEntity>>? {
-        val ck = v2Agent.getCheckpointById(checkpointId)?.toEntity() ?: return null
+            Pair<V2Checkpoint, List<CheckpointFileSnapshotEntity>>? {
+        val ck = v2Agent.getCheckpointById(checkpointId) ?: return null
         val snaps = v2Agent.listCheckpointFileSnapshots(checkpointId).map { it.toEntity() }
         return ck to snaps
     }
 
-    suspend fun getByMessageId(messageId: String): CheckpointEntity? =
-        v2Agent.getCheckpointByMessageId(messageId)?.toEntity()
+    suspend fun getByMessageId(messageId: String): V2Checkpoint? =
+        v2Agent.getCheckpointByMessageId(messageId)
 
-    suspend fun listForSession(sessionId: String): List<CheckpointEntity> =
-        v2Agent.listCheckpointsForSession(sessionId).map { it.toEntity() }
+    suspend fun listForSession(sessionId: String): List<V2Checkpoint> =
+        v2Agent.listCheckpointsForSession(sessionId)
 
     /** 会话关闭 / 用户手动：清空 session 所有 checkpoint + 快照。 */
     suspend fun clearSession(sessionId: String) {
@@ -82,18 +83,18 @@ class ZthCheckpointRepository @Inject constructor(
 
     // ── Phase 4.2 Firestore：Entity ↔ Dto 映射入口 ─────────────────
 
-    fun checkpointToDto(e: CheckpointEntity): Map<String, Any?> = mapOf(
-        "id" to e.id, "sessionId" to e.sessionId, "userMessageId" to e.userMessageId,
-        "promptSnippet" to e.promptSnippet.take(200), "createdAt" to e.createdAtMs,
+    fun checkpointToDto(e: V2Checkpoint): Map<String, Any?> = mapOf(
+        "id" to e.id, "sessionId" to e.session_id, "userMessageId" to e.user_message_id,
+        "promptSnippet" to e.prompt_snippet.take(200), "createdAt" to e.created_at_ms,
         "_lwwMs" to System.currentTimeMillis()
     )
 
-    fun checkpointFromDto(m: Map<String, Any?>): CheckpointEntity = CheckpointEntity(
+    fun checkpointFromDto(m: Map<String, Any?>): V2Checkpoint = V2Checkpoint(
         id = m["id"] as? String ?: "",
-        sessionId = m["sessionId"] as? String ?: "",
-        userMessageId = m["userMessageId"] as? String ?: "",
-        promptSnippet = m["promptSnippet"] as? String ?: "",
-        createdAtMs = (m["createdAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
+        session_id = m["sessionId"] as? String ?: "",
+        user_message_id = m["userMessageId"] as? String ?: "",
+        prompt_snippet = m["promptSnippet"] as? String ?: "",
+        created_at_ms = (m["createdAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
     )
 
     fun snapshotToDto(e: CheckpointFileSnapshotEntity): Map<String, Any?> = mapOf(
@@ -114,15 +115,7 @@ class ZthCheckpointRepository @Inject constructor(
 
     // ── 内部映射 ─────────────────────────────────────────────────────
 
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Session_checkpoints.toEntity() = CheckpointEntity(
-        id = id,
-        sessionId = session_id,
-        userMessageId = user_message_id,
-        promptSnippet = prompt_snippet,
-        createdAtMs = created_at_ms,
-    )
-
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Checkpoint_file_snapshots.toEntity() = CheckpointFileSnapshotEntity(
+    private fun V2Snapshot.toEntity() = CheckpointFileSnapshotEntity(
         id = id,
         checkpointId = checkpoint_id,
         filePath = file_path,

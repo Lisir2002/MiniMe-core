@@ -4,7 +4,6 @@ import android.content.Context
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Checkpoint_file_snapshots as V2Snapshot
 import com.mini.mecore.datalayer.sqldelight.agent.Session_checkpoints as V2Checkpoint
-import com.mini.me_core.feature.agent.data.local.entity.CheckpointEntity
 import com.mini.me_core.feature.agent.data.local.entity.CheckpointFileSnapshotEntity
 import com.mini.me_core.feature.workspace.domain.FileAccessProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -35,23 +34,24 @@ class CheckpointManager @Inject constructor(
         sessionId: String,
         userMessageId: String,
         prompt: String
-    ): CheckpointEntity = withContext(Dispatchers.IO) {
+    ): V2Checkpoint = withContext(Dispatchers.IO) {
         val checkpointId = UUID.randomUUID().toString()
         val snippet = if (prompt.length > 60) prompt.take(60) + "..." else prompt
+        val now = System.currentTimeMillis()
         v2Agent.insertCheckpointFull(
             id = checkpointId,
             sessionId = sessionId,
             userMessageId = userMessageId,
             promptSnippet = snippet,
-            createdAtMs = System.currentTimeMillis()
+            createdAtMs = now
         )
         activeCheckpointId = checkpointId
-        CheckpointEntity(
+        V2Checkpoint(
             id = checkpointId,
-            sessionId = sessionId,
-            userMessageId = userMessageId,
-            promptSnippet = snippet,
-            createdAtMs = System.currentTimeMillis()
+            session_id = sessionId,
+            user_message_id = userMessageId,
+            prompt_snippet = snippet,
+            created_at_ms = now
         )
     }
 
@@ -110,7 +110,7 @@ class CheckpointManager @Inject constructor(
         sessionId: String,
         targetCheckpointId: String
     ): Int = withContext(Dispatchers.IO) {
-        val allCheckpoints = v2Agent.listCheckpointsForSession(sessionId).map { it.toEntity() }
+        val allCheckpoints = v2Agent.listCheckpointsForSession(sessionId)
         val targetIndex = allCheckpoints.indexOfFirst { it.id == targetCheckpointId }
         if (targetIndex == -1) return@withContext 0
 
@@ -154,14 +154,6 @@ class CheckpointManager @Inject constructor(
     }
 
     // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
-
-    private fun V2Checkpoint.toEntity() = CheckpointEntity(
-        id = id,
-        sessionId = session_id,
-        userMessageId = user_message_id,
-        promptSnippet = prompt_snippet,
-        createdAtMs = created_at_ms
-    )
 
     private fun V2Snapshot.toEntity() = CheckpointFileSnapshotEntity(
         id = id,
