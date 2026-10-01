@@ -1,7 +1,7 @@
 package com.mini.me_core.core.security
 
 import android.content.Context
-import com.mini.me_core.core.db.entity.CredentialEncryptionStateEntity
+import com.mini.mecore.datalayer.sqldelight.workspace.Credential_encryption_state as V2EncryptionState
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.encryption.UnifiedKeyManager
 import com.mini.me_core.datalayer.repository.WorkspaceRepository as V2WorkspaceRepository
@@ -57,21 +57,21 @@ class CredentialEncryptor @Inject constructor(
         const val LEGACY_MASTER_ALIAS = "minime_credential_masterkey"
     }
 
-    private suspend fun getState(): CredentialEncryptionStateEntity? =
-        v2Workspace.getEncryptionState()?.toEntity()
+    private suspend fun getState(): V2EncryptionState? =
+        v2Workspace.getEncryptionState()
 
     /** 供 UI 读取当前加密状态。 */
-    suspend fun encryptionState(): CredentialEncryptionStateEntity? = getState()
+    suspend fun encryptionState(): V2EncryptionState? = getState()
 
-    private suspend fun upsertState(e: CredentialEncryptionStateEntity) {
+    private suspend fun upsertState(e: V2EncryptionState) {
         v2Workspace.upsertEncryptionState(
-            masterKeyFingerprint = e.masterKeyFingerprint,
-            dekCiphertext = e.dekCiphertext,
-            encScheme = e.encScheme,
-            lastRotatedAt = e.lastRotatedAt,
-            rotationCounter = e.rotationCounter.toLong(),
-            biometricRequired = if (e.biometricRequired) 1L else 0L,
-            migratedFromV1 = if (e.migratedFromV1) 1L else 0L,
+            masterKeyFingerprint = e.master_key_fingerprint,
+            dekCiphertext = e.dek_ciphertext,
+            encScheme = e.enc_scheme,
+            lastRotatedAt = e.last_rotated_at,
+            rotationCounter = e.rotation_counter,
+            biometricRequired = e.biometric_required,
+            migratedFromV1 = e.migrated_from_v1,
         )
     }
 
@@ -117,12 +117,15 @@ class CredentialEncryptor @Inject constructor(
                 val existing = getState()
                 if (existing == null) {
                     upsertState(
-                        CredentialEncryptionStateEntity(
-                            masterKeyFingerprint = "unified-v1",
-                            dekCiphertext = "",
-                            encScheme = "V2",
-                            lastRotatedAt = System.currentTimeMillis(),
-                            migratedFromV1 = true,
+                        V2EncryptionState(
+                            id = 1,
+                            master_key_fingerprint = "unified-v1",
+                            dek_ciphertext = "",
+                            enc_scheme = "V2",
+                            last_rotated_at = System.currentTimeMillis(),
+                            rotation_counter = 0L,
+                            biometric_required = 0L,
+                            migrated_from_v1 = 1L,
                         )
                     )
                 }
@@ -146,7 +149,7 @@ class CredentialEncryptor @Inject constructor(
 
         try {
             val existing = getState() ?: return
-            val oldCiphertext = existing.dekCiphertext
+            val oldCiphertext = existing.dek_ciphertext
             if (oldCiphertext.isBlank()) return
 
             // 获取旧版MasterKey
@@ -251,14 +254,15 @@ class CredentialEncryptor @Inject constructor(
 
             val existing = getState()
             upsertState(
-                CredentialEncryptionStateEntity(
-                    masterKeyFingerprint = "unified-v1",
-                    dekCiphertext = "",
-                    encScheme = "V2",
-                    lastRotatedAt = startMs,
-                    rotationCounter = (existing?.rotationCounter ?: 0) + 1,
-                    biometricRequired = existing?.biometricRequired ?: false,
-                    migratedFromV1 = existing?.migratedFromV1 ?: true,
+                V2EncryptionState(
+                    id = 1,
+                    master_key_fingerprint = "unified-v1",
+                    dek_ciphertext = "",
+                    enc_scheme = "V2",
+                    last_rotated_at = startMs,
+                    rotation_counter = (existing?.rotation_counter ?: 0L) + 1L,
+                    biometric_required = existing?.biometric_required ?: 0L,
+                    migrated_from_v1 = existing?.migrated_from_v1 ?: 1L,
                 )
             )
 
@@ -275,7 +279,7 @@ class CredentialEncryptor @Inject constructor(
             OperationResult.success(
                 RotationReport(
                     rotatedAtMs = startMs,
-                    rotationCounter = (existing?.rotationCounter ?: 0) + 1,
+                    rotationCounter = ((existing?.rotation_counter ?: 0L) + 1L).toInt(),
                     affectedTables = emptyList(),
                     durationMs = 0,
                 )
@@ -298,14 +302,15 @@ class CredentialEncryptor @Inject constructor(
             FileLogger.i(TAG, "生物识别保护切换为: $required（新架构由系统统一管理，记录状态）")
             val existing = getState()
             upsertState(
-                CredentialEncryptionStateEntity(
-                    masterKeyFingerprint = "unified-v1",
-                    dekCiphertext = existing?.dekCiphertext ?: "",
-                    encScheme = "V2",
-                    lastRotatedAt = existing?.lastRotatedAt ?: System.currentTimeMillis(),
-                    rotationCounter = existing?.rotationCounter ?: 0,
-                    biometricRequired = required,
-                    migratedFromV1 = existing?.migratedFromV1 ?: true,
+                V2EncryptionState(
+                    id = 1,
+                    master_key_fingerprint = "unified-v1",
+                    dek_ciphertext = existing?.dek_ciphertext ?: "",
+                    enc_scheme = "V2",
+                    last_rotated_at = existing?.last_rotated_at ?: System.currentTimeMillis(),
+                    rotation_counter = existing?.rotation_counter ?: 0L,
+                    biometric_required = if (required) 1L else 0L,
+                    migrated_from_v1 = existing?.migrated_from_v1 ?: 1L,
                 )
             )
             OperationResult.success(Unit)
@@ -327,14 +332,15 @@ class CredentialEncryptor @Inject constructor(
         ensureInitialized()
 
         upsertState(
-            CredentialEncryptionStateEntity(
-                masterKeyFingerprint = "unified-v1",
-                dekCiphertext = "",
-                encScheme = "V2",
-                lastRotatedAt = startMs,
-                rotationCounter = 0,
-                biometricRequired = false,
-                migratedFromV1 = false,
+            V2EncryptionState(
+                id = 1,
+                master_key_fingerprint = "unified-v1",
+                dek_ciphertext = "",
+                enc_scheme = "V2",
+                last_rotated_at = startMs,
+                rotation_counter = 0L,
+                biometric_required = 0L,
+                migrated_from_v1 = 0L,
             )
         )
 
@@ -426,19 +432,6 @@ class CredentialEncryptor @Inject constructor(
             HealthCheckResult(healthy = false, problems = problems)
         }
     }
-
-    // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun com.mini.mecore.datalayer.sqldelight.workspace.Credential_encryption_state.toEntity() = CredentialEncryptionStateEntity(
-        id = id.toInt(),
-        masterKeyFingerprint = master_key_fingerprint,
-        dekCiphertext = dek_ciphertext,
-        encScheme = enc_scheme,
-        lastRotatedAt = last_rotated_at,
-        rotationCounter = rotation_counter.toInt(),
-        biometricRequired = biometric_required == 1L,
-        migratedFromV1 = migrated_from_v1 == 1L,
-    )
 
     // ============== 数据类 ==============
 

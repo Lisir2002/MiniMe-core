@@ -142,16 +142,16 @@ class SecuritySettingsViewModel @Inject constructor(
                 val state = encryptor.encryptionState()
                 if (state != null) {
                     val now = System.currentTimeMillis()
-                    val fresh = SecurityScoreCalculator.Inputs.isKeyFresh(state.lastRotatedAt, now)
+                    val fresh = SecurityScoreCalculator.Inputs.isKeyFresh(state.last_rotated_at, now)
                     _baseState.value = _baseState.value.copy(
-                        biometricRequired = state.biometricRequired,
-                        rotationCounter = state.rotationCounter,
-                        lastRotatedAt = state.lastRotatedAt,
+                        biometricRequired = state.biometric_required != 0L,
+                        rotationCounter = state.rotation_counter.toInt(),
+                        lastRotatedAt = state.last_rotated_at,
                         keyStale = !fresh,
                         rotationHistory = listOf(
                             RotationHistoryEntry(
-                                atMs = state.lastRotatedAt,
-                                version = state.rotationCounter,
+                                atMs = state.last_rotated_at,
+                                version = state.rotation_counter.toInt(),
                             )
                         ).filter { it.atMs > 0L },
                     )
