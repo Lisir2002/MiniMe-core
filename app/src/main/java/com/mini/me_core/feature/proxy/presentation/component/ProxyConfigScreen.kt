@@ -156,7 +156,11 @@ fun ProxyConfigScreen(
                 // P1-9：连接诊断交通灯（启用后显示，点击重测）。
                 if (enabled) {
                     item {
-                        DiagnosticCard(diagnostic = diagnostic, onRetest = viewModel::retestConnectivity)
+                        DiagnosticCard(
+                            diagnostic = diagnostic,
+                            onRetest = viewModel::retestConnectivity,
+                            todayTotal = trafficToday.upBytes + trafficToday.downBytes
+                        )
                     }
                 }
 
@@ -407,6 +411,7 @@ private fun NodesEntryCard(
 private fun DiagnosticCard(
     diagnostic: com.mini.me_core.feature.proxy.domain.ProxyDiagnosticResult?,
     onRetest: () -> Unit,
+    todayTotal: Long? = null,
 ) {
     val light = diagnostic?.light
     val dotColor = when (light) {
@@ -430,14 +435,20 @@ private fun DiagnosticCard(
             Spacer(Modifier.width(Spacing.sm))
             Column(modifier = Modifier.weight(1f)) {
                 val title = when (light) {
-                    com.mini.me_core.feature.proxy.domain.TrafficLight.GREEN -> "连接正常"
+                    com.mini.me_core.feature.proxy.domain.TrafficLight.GREEN -> "已连接"
                     com.mini.me_core.feature.proxy.domain.TrafficLight.YELLOW -> "部分异常"
                     com.mini.me_core.feature.proxy.domain.TrafficLight.RED -> "连接不通"
                     null -> "未诊断"
                 }
-                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                // P2-16：状态行合一：状态 · 延迟 · 今日用量。
+                val lat = diagnostic?.outboundLatencyMs
+                val summary = buildString {
+                    append(title)
+                    if (lat != null && light == com.mini.me_core.feature.proxy.domain.TrafficLight.GREEN) append(" · ${lat}ms")
+                    todayTotal?.let { append(" · 今日 ${formatBytes(it)}") }
+                }
+                Text(summary, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 if (diagnostic != null) {
-                    val lat = diagnostic.outboundLatencyMs
                     Text(
                         "进程:${if (diagnostic.processAlive) "✓" else "✗"} 控制面:${if (diagnostic.controllerReachable) "✓" else "✗"} " +
                             "出口:${lat?.let { "${it}ms" } ?: "✗"} DNS:${if (diagnostic.dnsOk) "✓" else "✗"}",
