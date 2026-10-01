@@ -190,10 +190,6 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 |---|---|---|---|---|
 | MiniMe-core（主应用） | `MiniMe-core` | `v` | `MiniMe-v{版本}-{变体}.apk` | `docs/Version Log/CHANGELOG.md` |
 | MiniMe Logs（日志查看器） | `MiniMe Logs` | `logviewer-v` | `minime-logs-v{版本}.apk` | `docs/Version Log/CHANGELOG-logviewer.md` |
-| MiniMe-QBot（QQ 机器人） | `MiniMe-QBot` | `qbot-v` | `MiniMe-QBot-v{版本}-{变体}.apk` | `docs/Version Log/CHANGELOG-qbot.md` |
-| MiniMe-QBot 环境注入器 | `MiniMe-QBot Injector` | `qbot-injector-v` | `MiniMe-QBot-Injector-v{版本}-{变体}.apk` | `docs/Version Log/CHANGELOG-qbot-injector.md` |
-
-> **独立发版**：`MiniMe-QBot`（`qbot-v*`）与 `MiniMe-QBot 环境注入器`（`qbot-injector-v*`）**各自独立发版**——谁有更新就推谁的 Tag，只构建并发布该应用，两份版本日志各自更新，不再要求同批发布。两侧运行环境资源的兼容由**注入包契约号**（注入器写入注入包的 `manifest.json` 中的 `contractVersion`）保证：注入器仅更新环境资源（内容变化、契约号不变）时，旧版 QBot 可直接使用新注入包，无需同步发版；仅当资产种类 / 目录布局变化（契约号 +1）时才需 QBot 一并发版。CI 由同一个工作流（`.github/workflows/qbot-release.yml`）按 Tag 前缀分流，分别抓取资产（仅注入器需要）、构建并发布对应应用。
 
 #### 2. 发版页面标题格式
 

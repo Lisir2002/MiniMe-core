@@ -7,19 +7,11 @@
 ```
 Version Log/
 ├── CHANGELOG.md                           # 主应用（MiniMe-core）版本日志（所有版本汇总，倒序排列）
-├── CHANGELOG-qbot.md                      # 附属应用（MiniMe-QBot）版本日志
-├── CHANGELOG-qbot-injector.md             # 附属应用（MiniMe-QBot 环境注入器）版本日志
 ├── MiniMe-core v-Logs/                    # 主应用各版本独立日志
 │   ├── MiniMe-core 0.0.0.01 Version Log.md
 │   └── ...
-├── MiniMe-Logs v-Logs/                    # 附属应用（MiniMe Logs）各版本独立日志
-│   ├── MiniMe-Logs 0.0.01 Version Log.md
-│   └── ...
-├── MiniMe-QBot v-Logs/                    # 附属应用（MiniMe-QBot）各版本独立日志
-│   ├── MiniMe-QBot 0.0.01-rc1 Version Log.md
-│   └── ...
-└── MiniMe-QBot Injector v-Logs/           # 附属应用（MiniMe-QBot 环境注入器）各版本独立日志
-    ├── MiniMe-QBot Injector 0.0.01 Version Log.md
+└── MiniMe-Logs v-Logs/                    # 附属应用（MiniMe Logs）各版本独立日志
+    ├── MiniMe-Logs 0.0.01 Version Log.md
     └── ...
 ```
 
@@ -39,7 +31,7 @@ Version Log/
 - 文档内容中的版本号、Tag、APK 命名均使用原格式，不补零
 - 主应用：`0.0.0.1`、`0.0.0.17`
 - 附属应用：`0.0.1`、`0.0.7`
-- Tag 命名：主应用 `v{版本号}`（如 `v0.0.0.17`）；附属应用 MiniMe Logs 用 `logviewer-v{版本号}`（如 `logviewer-v0.0.7`），MiniMe-QBot 用 `qbot-v{版本号}`（如 `qbot-v0.0.1`），QBot 环境注入器用 `qbot-injector-v{版本号}`（如 `qbot-injector-v0.0.1`）
+- Tag 命名：主应用 `v{版本号}`（如 `v0.0.0.17`）；附属应用 MiniMe Logs 用 `logviewer-v{版本号}`（如 `logviewer-v0.0.7`）
 
 ## 格式规范
 
@@ -52,15 +44,6 @@ Version Log/
 - 用户可感知边界判定
 
 本目录下所有文档（CHANGELOG.md、各独立版本文档）以及 GitHub Release 正文必须严格遵循 AGENTS.md 中的格式规范，保持三处一致。
-
-## 独立发版
-
-**MiniMe-QBot（`qbot-v*`）与 MiniMe-QBot 环境注入器（`qbot-injector-v*`）各自独立发版**：谁有更新就推谁的 Tag，只发该应用。
-
-- 两份版本日志（`CHANGELOG-qbot.md` 与 `CHANGELOG-qbot-injector.md`）各自更新，**不要求同批**。
-- 两侧运行环境资源的兼容由**注入包契约号**（注入器写入注入包的 `manifest.json` 中的 `contractVersion`）保证：注入器仅更新环境资源（内容变化、契约号不变）时，旧版 QBot 可直接使用新注入包，无需同步发版。
-- 仅当**资产种类 / 目录布局变化**（契约号 +1）时，才需 QBot 一并发版。
-- CI 由同一个工作流（`.github/workflows/qbot-release.yml`）按 Tag 前缀分流：推 `qbot-v*` 只构建发布 QBot，推 `qbot-injector-v*` 只构建发布注入器（仅注入器需抓取体积资产）。
 
 ## 发版流程
 

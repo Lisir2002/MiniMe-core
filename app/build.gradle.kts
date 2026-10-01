@@ -40,7 +40,7 @@ val BASE_VERSION = "0.0.1"
 //   "0.0.0.1-rcN-<n>-g<hash>[dirty]" → "0.0.0.1-rcN-dev.<n>+<hash>[dirty]"。
 //   其余（旧三段 tag 如 1.x / 0.6.0-rc 等、无 v 前缀、无 git）一律 fallback，防版本号回跳。
 //   【必须 --match "v[0-9]*"】git describe 默认不区分 tag 来源、只取「最近任意 tag」，
-//   仓库内其它应用（logviewer-v* / qbot-v*）的 tag 一旦成为最近 tag，本函数正则即失配、
+//   仓库内其它应用（logviewer-v*）的 tag 一旦成为最近 tag，本函数正则即失配、
 //   版本号被静默降级为 dev 值（versionCode 同时从 tag 公式退化为提交数公式，破坏单调性）。
 //   加 --match 把候选限定为主应用自己的 v<数字>* tag，隔离其它应用的 tag 命名空间。
 fun gitVersionName(): String = try {
