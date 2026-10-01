@@ -1,6 +1,6 @@
 package com.mini.me_core.feature.agent.domain.session
 
-import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_message as V2AgentMessage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -73,9 +73,9 @@ class MessagePersistenceUseCaseTest {
         assertEquals("第一块-第二块-第三块", merged[0].content)
         // 主行元数据保留，chunk 字段清零
         assertEquals(gid, merged[0].id)
-        assertEquals("t1", merged[0].taskId)
-        assertEquals("", merged[0].chunkGroupId)
-        assertEquals(0, merged[0].chunkIndex)
+        assertEquals("t1", merged[0].task_id)
+        assertEquals("", merged[0].chunk_group_id)
+        assertEquals(0L, merged[0].chunk_index)
     }
 
     @Test
@@ -118,7 +118,7 @@ class MessagePersistenceUseCaseTest {
         assertEquals("正文0正文1", merged[0].content)
         assertEquals("思考0-思考1", merged[0].reasoning)
         // 主行工具调用元数据保留
-        assertEquals("[{\"id\":\"tc1\"}]", merged[0].toolCallsJson)
+        assertEquals("[{\"id\":\"tc1\"}]", merged[0].tool_calls_json)
     }
 
     @Test
@@ -141,21 +141,33 @@ class MessagePersistenceUseCaseTest {
         sessionId: String,
         content: String,
         chunkGroupId: String = "",
-        chunkIndex: Int = 0,
+        chunkIndex: Long = 0L,
         taskId: String = "",
         role: String = "ASSISTANT",
         reasoning: String? = null,
         toolCallsJson: String? = null
-    ) = AgentMessageEntity(
+    ) = V2AgentMessage(
         id = id,
-        sessionId = sessionId,
-        taskId = taskId,
+        session_id = sessionId,
         role = role,
+        seq = 0L,
+        created_at = 0L,
+        task_id = taskId,
         content = content,
-        timestamp = 0L,
-        chunkGroupId = chunkGroupId,
-        chunkIndex = chunkIndex,
+        tool_calls_json = toolCallsJson,
+        tool_call_id = null,
+        tool_name = null,
+        tool_args = null,
+        is_error = 0L,
         reasoning = reasoning,
-        toolCallsJson = toolCallsJson
+        signature = null,
+        attachments_json = null,
+        is_compacted = 0L,
+        is_context_summary = 0L,
+        is_compaction_marker = 0L,
+        input_tokens = 0L,
+        output_tokens = 0L,
+        chunk_group_id = chunkGroupId,
+        chunk_index = chunkIndex
     )
 }
