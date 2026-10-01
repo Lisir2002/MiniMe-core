@@ -259,6 +259,27 @@ fun ProxyConfigScreen(
                                 onToggle = viewModel::toggleAiHostsDirect
                             )
                         }
+                        item { SectionHeader("系统级代理（TUN）") }
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(LocalCornerRadius.current.xl),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                )
+                            ) {
+                                Column(Modifier.padding(Spacing.md)) {
+                                    Text("TUN 全局模式（暂不可用）",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(Modifier.height(Spacing.xs))
+                                    Text("当前为独立 mihomo 子进程，FD 跨进程传递受 CLOEXEC 限制。待内核改为 gomobile AAR 库后支持系统级 VPN 接管。",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
                     }
 
                     // profile 列表仅在「订阅」Tab 渲染。
