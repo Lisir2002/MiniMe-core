@@ -103,6 +103,8 @@ fun ProxyConfigScreen(
     val nodesView by viewModel.profileNodes.collectAsStateWithLifecycle()
     val groupsView by viewModel.groups.collectAsStateWithLifecycle()
     val diagnostic by viewModel.diagnostic.collectAsStateWithLifecycle()
+    val trafficToday by viewModel.trafficToday.collectAsStateWithLifecycle()
+    val trafficWeek by viewModel.trafficWeek.collectAsStateWithLifecycle()
 
     var expandedId by remember { mutableStateOf<String?>(null) }
     var expandedTab by remember { mutableStateOf(0) }
@@ -113,6 +115,7 @@ fun ProxyConfigScreen(
             if (msg.isNotBlank()) snackbarHostState.showSnackbar(msg)
         }
     }
+    LaunchedEffect(Unit) { viewModel.refreshTrafficUsage() }
 
     var showImport by remember { mutableStateOf(false) }
 
@@ -154,6 +157,11 @@ fun ProxyConfigScreen(
                     item {
                         DiagnosticCard(diagnostic = diagnostic, onRetest = viewModel::retestConnectivity)
                     }
+                }
+
+                // P1-8：流量用量（今日 / 本周）。
+                item {
+                    TrafficUsageCard(today = trafficToday, week = trafficWeek)
                 }
 
                 // 网络层优化 C5：模型接口直连/代理分流开关（默认关，需先开启代理才可切换）。
@@ -437,6 +445,28 @@ private fun DiagnosticCard(
                 }
             }
             TextButton(onClick = onRetest) { Text("重测") }
+        }
+    }
+}
+
+/** P1-8：流量用量卡片（今日 / 本周）。 */
+@Composable
+private fun TrafficUsageCard(
+    today: com.mini.me_core.datalayer.store.TrafficUsage,
+    week: com.mini.me_core.datalayer.store.TrafficUsage,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+    ) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
+            Text("流量用量", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(Spacing.xs))
+            Text("今日：↑ ${formatBytes(today.upBytes)}  ↓ ${formatBytes(today.downBytes)}",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("本周：↑ ${formatBytes(week.upBytes)}  ↓ ${formatBytes(week.downBytes)}",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -1155,8 +1185,7 @@ private fun formatSpeed(bytes: Long): String {
     }
 }
 /** P1-7：把时间戳格式化为「x分钟前/x小时前/x天前」。 */
-private fun relativeAgo(ts: Long): String {
-    val diff = System.currentTimeMillis() - ts
+private fun relativeAgo(ts: Long): String {    val diff = System.currentTimeMillis() - ts
     if (diff < 60_000L) return "刚刚"
     val minutes = diff / 60_000L
     if (minutes < 60) return "${minutes}分钟前"
@@ -1164,4 +1193,15 @@ private fun relativeAgo(ts: Long): String {
     if (hours < 24) return "${hours}小时前"
     val days = hours / 24
     return "${days}天前"
+}
+
+/** P1-8：字节格式化为人类可读。 */
+private fun formatBytes(bytes: Long): String {
+    val b = bytes.toDouble()
+    return when {
+        b >= 1024.0 * 1024 * 1024 -> "%.2f GB".format(b / (1024.0 * 1024 * 1024))
+        b >= 1024.0 * 1024 -> "%.1f MB".format(b / (1024.0 * 1024))
+        b >= 1024 -> "%.1f KB".format(b / 1024.0)
+        else -> "${bytes} B"
+    }
 }

@@ -3,10 +3,13 @@ package com.mini.me_core.feature.proxy.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.feature.proxy.data.ProxySettingsRepository
+import com.mini.me_core.datalayer.store.ProxyTrafficRepository
+import com.mini.me_core.datalayer.store.TrafficUsage
 import com.mini.me_core.feature.proxy.domain.ClashConfigSummary
 import com.mini.me_core.feature.proxy.domain.ClashProxiesSnapshot
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
 import com.mini.me_core.feature.proxy.domain.ProxyConnectivityTester
+import com.mini.me_core.feature.proxy.domain.ProxyTrafficSampler
 import com.mini.me_core.feature.proxy.domain.ProxyDiagnosticResult
 import com.mini.me_core.feature.proxy.domain.ProxyRuntimeState
 import com.mini.me_core.feature.proxy.domain.ProxySubscription
@@ -78,6 +81,8 @@ class ProxyViewModel @Inject constructor(
     private val repository: ProxySettingsRepository,
     private val manager: ClashProxyManager,
     private val connectivityTester: ProxyConnectivityTester,
+    private val trafficSampler: ProxyTrafficSampler,
+    private val trafficRepo: ProxyTrafficRepository,
 ) : ViewModel() {
 
     /** 已播种的订阅/manual/list（脱敏，cipher 不解密返回）。 */
@@ -101,6 +106,23 @@ class ProxyViewModel @Inject constructor(
 
     /** P1-9：最近一次连接诊断结果（交通灯数据源）。 */
     val diagnostic: StateFlow<ProxyDiagnosticResult?> = connectivityTester.result
+
+    /** P1-8：今日/本周/累计流量用量。 */
+    private val _trafficToday = MutableStateFlow(TrafficUsage(0, 0))
+    val trafficToday: StateFlow<TrafficUsage> = _trafficToday
+    private val _trafficWeek = MutableStateFlow(TrafficUsage(0, 0))
+    val trafficWeek: StateFlow<TrafficUsage> = _trafficWeek
+    private val _trafficTotal = MutableStateFlow(TrafficUsage(0, 0))
+    val trafficTotal: StateFlow<TrafficUsage> = _trafficTotal
+
+    /** P1-8：刷新流量用量展示（进入页面 / 手动刷新时调）。 */
+    fun refreshTrafficUsage() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _trafficToday.value = trafficRepo.todayUsage()
+            _trafficWeek.value = trafficRepo.weekUsage()
+            _trafficTotal.value = trafficRepo.totalUsage()
+        }
+    }
 
     /** 最近一次预检结果。 */
     private val _preview = MutableStateFlow<ProxyPreview?>(null)

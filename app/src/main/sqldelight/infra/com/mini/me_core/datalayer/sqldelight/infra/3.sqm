@@ -1,0 +1,11 @@
+-- v2 → v3 迁移（P1-8）：新建代理流量采样表。
+-- 新建表，不改动既有表；旧库升级时仅执行此 DDL，无数据迁移。
+
+CREATE TABLE proxy_traffic (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  timestamp        INTEGER NOT NULL,
+  up_bytes         INTEGER NOT NULL,
+  down_bytes       INTEGER NOT NULL,
+  sample_period_ms INTEGER NOT NULL
+);
+CREATE INDEX proxy_traffic_ts_idx ON proxy_traffic (timestamp);

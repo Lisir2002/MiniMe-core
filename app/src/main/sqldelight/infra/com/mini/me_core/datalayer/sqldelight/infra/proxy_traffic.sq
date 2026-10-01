@@ -1,0 +1,35 @@
+-- infra / 代理流量采样 v3 schema（P1-8）
+-- 生成类：InfraDb / ProxyTrafficQueries
+-- 每 60s 由 ProxyTrafficSampler 调 mihomo /connections 累加 up/down 差值写入一行采样。
+
+CREATE TABLE proxy_traffic (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  timestamp        INTEGER NOT NULL,
+  up_bytes         INTEGER NOT NULL,
+  down_bytes       INTEGER NOT NULL,
+  sample_period_ms INTEGER NOT NULL
+);
+CREATE INDEX proxy_traffic_ts_idx ON proxy_traffic (timestamp);
+
+-- ── queries ──
+insertSample:
+INSERT INTO proxy_traffic (timestamp, up_bytes, down_bytes, sample_period_ms)
+VALUES (?, ?, ?, ?);
+
+-- 指定时间戳之后累计上行 / 下行（今日、本周查询复用：传今日0点/本周一0点）。
+sumUpSince:
+SELECT COALESCE(SUM(up_bytes), 0) AS total FROM proxy_traffic WHERE timestamp >= ?;
+
+sumDownSince:
+SELECT COALESCE(SUM(down_bytes), 0) AS total FROM proxy_traffic WHERE timestamp >= ?;
+
+-- 全量累计（总用量）。
+sumUpAll:
+SELECT COALESCE(SUM(up_bytes), 0) AS total FROM proxy_traffic;
+
+sumDownAll:
+SELECT COALESCE(SUM(down_bytes), 0) AS total FROM proxy_traffic;
+
+-- 清理过期采样（例如保留 90 天，控制表体积）。
+deleteOlderThan:
+DELETE FROM proxy_traffic WHERE timestamp < ?;

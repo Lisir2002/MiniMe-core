@@ -305,6 +305,21 @@ class ClashProxyManager @Inject constructor(
         }.getOrNull()
     }
 
+    /**
+     * P1-8：读 mihomo 累计流量计数 [uploadTotal, downloadTotal]（/connections 顶层字段，自内核启动起累计）。
+     * 控制器不可达返回 null。差值由调用方（采样器）计算。
+     */
+    suspend fun readTrafficCounters(): Pair<Long, Long>? {
+        ensureSecretLoaded()
+        val resp = controllerRequest("GET", "/connections") ?: return null
+        return runCatching {
+            val obj = kotlinx.serialization.json.Json.parseToJsonElement(resp).jsonObject
+            val up = obj["uploadTotal"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 0L
+            val down = obj["downloadTotal"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 0L
+            up to down
+        }.getOrNull()
+    }
+
     /** 控制器地址 "127.0.0.1:port"。 */
     fun controllerAddress(): String = "$CONTROLLER_HOST:$CONTROLLER_PORT"
 
