@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -50,8 +51,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -109,9 +112,16 @@ fun ProxyConfigScreen(
     val warmupState by viewModel.warmupState.collectAsStateWithLifecycle()
     val connLogEnabled by viewModel.connLogEnabled.collectAsStateWithLifecycle()
     val connLogs by viewModel.connLogs.collectAsStateWithLifecycle()
+    val runtime by viewModel.runtime.collectAsStateWithLifecycle()
+
+    val activeProfileName = remember(profiles, activeProfileId) {
+        val id = activeProfileId ?: return@remember null
+        profiles.firstOrNull { it.id == id }?.name?.ifBlank { id }
+    }
 
     var expandedId by remember { mutableStateOf<String?>(null) }
     var expandedTab by remember { mutableStateOf(0) }
+    var tab by remember { mutableStateOf(0) }   // 0=概览 1=订阅 2=高级
 
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
@@ -135,114 +145,125 @@ fun ProxyConfigScreen(
                 navigationContentDescription = stringResource(R.string.ui____5f411223)
             )
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            val listState = rememberPersistentLazyListState("proxy_config")
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
             ) {
-                item {
-                    MasterToggle(
-                        enabled = enabled,
-                        activeProfileId = activeProfileId,
-                        onToggle = viewModel::toggleEnabled
-                    )
-                }
+                // 3 Tab：概览 / 订阅 / 高级
+                ProxyTabBar(tab = tab, onTabChange = { tab = it })
 
-                // P1-9：连接诊断交通灯（启用后显示，点击重测）。
-                if (enabled) {
-                    item {
-                        DiagnosticCard(
-                            diagnostic = diagnostic,
-                            onRetest = viewModel::retestConnectivity,
-                            todayTotal = trafficToday.upBytes + trafficToday.downBytes
-                        )
-                    }
-                }
-
-                // P1-8：流量用量（今日 / 本周）。
-                item {
-                    TrafficUsageCard(today = trafficToday, week = trafficWeek, port = viewModel.proxyPort)
-                }
-
-                // P3-19：连接审计日志开关 + 列表。
-                item {
-                    ConnLogCard(
-                        enabled = connLogEnabled,
-                        logs = connLogs,
-                        onToggle = viewModel::setConnLogEnabled,
-                        onRefresh = { viewModel.refreshConnLogs() }
-                    )
-                }
-
-                // 网络层优化 C5：模型接口直连/代理分流开关（默认关，需先开启代理才可切换）。
-                item {
-                    AiHostsDirectToggle(
-                        checked = aiHostsDirect,
-                        enabled = enabled,
-                        onToggle = viewModel::toggleAiHostsDirect
-                    )
-                }
-
-                // 独立入口：节点管理整页（分组/节点/状态/测速/切换 一站式操作）。
-                item {
-                    NodesEntryCard(
-                        enabled = enabled,
-                        profileCount = profiles.size,
-                        onClick = onNavigateToNodes
-                    )
-                }
-
-                item {
-                    Button(
-                        onClick = { showImport = !showImport },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(if (showImport) stringResource(R.string.ui________8e335748) else "导入配置（订阅 / 手动 / 文件）") }
-                }
-
-                if (showImport) {
-                    item {
-                        ImportEditor(
-                            preview = preview,
-                            onPreview = viewModel::runPreview,
-                            onCommit = { name, kind, secret, enableNow ->
-                                viewModel.commitProfile(name, kind, secret, enableNow)
-                                showImport = false
+                val listState = rememberPersistentLazyListState("proxy_config_$tab")
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(Spacing.md),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    // ── Tab 0 · 概览 ──
+                    if (tab == 0) {
+                        item {
+                            MasterToggle(
+                                enabled = enabled,
+                                reachable = runtime.controllerReachable,
+                                activeProfileName = activeProfileName,
+                                port = viewModel.proxyPort,
+                                onToggle = viewModel::toggleEnabled
+                            )
+                        }
+                        if (enabled) {
+                            item {
+                                DiagnosticCard(
+                                    diagnostic = diagnostic,
+                                    onRetest = viewModel::retestConnectivity,
+                                    todayTotal = trafficToday.upBytes + trafficToday.downBytes
+                                )
                             }
-                        )
+                        }
+                        // 进入节点管理独立页
+                        item {
+                            NodesEntryCard(
+                                enabled = enabled,
+                                profileCount = profiles.size,
+                                onClick = onNavigateToNodes
+                            )
+                        }
                     }
-                }
 
-                item { OverrideCard() }
+                    // ── Tab 1 · 订阅 ──
+                    if (tab == 1) {
+                        item {
+                            Button(
+                                onClick = { showImport = !showImport },
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text(if (showImport) "收起导入" else "导入配置（订阅 / 手动 / 直接代理）") }
+                        }
 
-                if (profiles.isEmpty()) {
-                    item {
-                        Text(
-                            text = "还没有已保存的配置。先「导入配置」播种一次，之后模型可用 network_proxy 接管启用/切节点/测速。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (showImport) {
+                            item {
+                                ImportEditor(
+                                    preview = preview,
+                                    onPreview = viewModel::runPreview,
+                                    onCommit = { name, kind, secret, enableNow ->
+                                        viewModel.commitProfile(name, kind, secret, enableNow)
+                                        showImport = false
+                                    }
+                                )
+                            }
+                        }
+
+                        item { OverrideCard() }
+
+                        if (profiles.isEmpty()) {
+                            item {
+                                Text(
+                                    text = "还没有已保存的配置。先「导入配置」播种一次，之后模型可用 network_proxy 接管启用/切节点/测速。",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+
+                        item {
+                            Text(
+                                text = "已保存配置（${profiles.size}）",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
-                }
 
-                item {
-                    Text(
-                        text = "已保存配置（${profiles.size}）",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+                    // ── Tab 2 · 高级 ──
+                    if (tab == 2) {
+                        item { SectionHeader("流量统计") }
+                        item {
+                            TrafficUsageCard(today = trafficToday, week = trafficWeek, port = viewModel.proxyPort)
+                        }
+                        item { SectionHeader("连接审计") }
+                        item {
+                            ConnLogCard(
+                                enabled = connLogEnabled,
+                                logs = connLogs,
+                                onToggle = viewModel::setConnLogEnabled,
+                                onRefresh = { viewModel.refreshConnLogs() }
+                            )
+                        }
+                        item { SectionHeader("分流与监控") }
+                        item {
+                            AiHostsDirectToggle(
+                                checked = aiHostsDirect,
+                                enabled = enabled,
+                                onToggle = viewModel::toggleAiHostsDirect
+                            )
+                        }
+                    }
 
-                items(profiles, key = { it.id }) { p ->
+                    // profile 列表仅在「订阅」Tab 渲染。
+                    if (tab == 1) {
+                        items(profiles, key = { it.id }) { p ->
                     ProfileRow(
                         profile = p,
                         isActive = p.id == activeProfileId,
@@ -277,18 +298,80 @@ fun ProxyConfigScreen(
                             viewModel.selectGroupNode(group, node)
                         }
                     )
+                    }
                 }
             }
         }
     }
 }
 
+// ─────────────────────────── 3 Tab 切换 ───────────────────────────
+
+@Composable
+private fun ProxyTabBar(tab: Int, onTabChange: (Int) -> Unit) {
+    val labels = listOf("概览", "订阅", "高级")
+    Row(
+        modifier = Modifier
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                RoundedCornerShape(LocalCornerRadius.current.xl)
+            )
+            .padding(Spacing.xs)
+    ) {
+        labels.forEachIndexed { idx, label ->
+            val selected = tab == idx
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.map(9.dp)))
+                    .then(if (selected) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)) else Modifier)
+                    .clickable { onTabChange(idx) }
+                    .padding(vertical = Spacing.sm),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────── 区块分组标题 ───────────────────────────
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = Spacing.xs, top = Spacing.sm, bottom = 2.dp)
+    )
+}
+
+/**
+ * 全局开关卡片：顶部状态卡。
+ * 显示 运行状态灯 + 活跃 profile 名（而非 UUID）+ 实际代理端口。
+ */
 @Composable
 private fun MasterToggle(
     enabled: Boolean,
-    activeProfileId: String?,
+    reachable: Boolean,
+    activeProfileName: String?,
+    port: Int,
     onToggle: (Boolean) -> Unit
 ) {
+    val statusColor = when {
+        enabled && reachable -> MaterialTheme.colorScheme.primary
+        enabled -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(LocalCornerRadius.current.xl),
@@ -300,6 +383,13 @@ private fun MasterToggle(
             modifier = Modifier.fillMaxWidth().padding(Spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(statusColor)
+            )
+            Spacer(Modifier.width(Spacing.sm))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = if (enabled) stringResource(R.string.ui_______4d1f56d6) else stringResource(R.string.ui_______b5fb1ee7),
@@ -308,9 +398,15 @@ private fun MasterToggle(
                 )
                 Spacer(Modifier.height(Spacing.xs))
                 Text(
-                    text = activeProfileId?.let { "活跃配置：#$it" } ?: stringResource(R.string.ui________ae157e74),
+                    text = if (!activeProfileName.isNullOrBlank()) {
+                        "${activeProfileName} · 127.0.0.1:$port"
+                    } else {
+                        stringResource(R.string.ui________ae157e74)
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             Switch(checked = enabled, onCheckedChange = onToggle)
