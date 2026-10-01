@@ -106,6 +106,7 @@ fun ProxyConfigScreen(
     val trafficToday by viewModel.trafficToday.collectAsStateWithLifecycle()
     val trafficWeek by viewModel.trafficWeek.collectAsStateWithLifecycle()
     val nodeHealth by viewModel.nodeHealth.collectAsStateWithLifecycle()
+    val warmupState by viewModel.warmupState.collectAsStateWithLifecycle()
 
     var expandedId by remember { mutableStateOf<String?>(null) }
     var expandedTab by remember { mutableStateOf(0) }
@@ -239,6 +240,7 @@ fun ProxyConfigScreen(
                         nodesView = nodesView?.takeIf { it.profileId == p.id },
                         groupsView = groupsView?.takeIf { it.profileId == p.id },
                         nodeHealth = nodeHealth,
+                        warming = warmupState.warmProfileId == p.id && warmupState.warming,
                         onActivate = { viewModel.activate(p.id) },
                         onDelete = { viewModel.delete(p.id) },
                         onRefresh = { viewModel.refreshSubscription(p.id) },
@@ -770,6 +772,7 @@ private fun ProfileRow(
     nodesView: ProfileNodesView?,
     groupsView: ProxyGroupsView?,
     nodeHealth: Map<String, Boolean>,
+    warming: Boolean = false,
     onActivate: () -> Unit,
     onDelete: () -> Unit,
     onRefresh: () -> Unit,
@@ -802,6 +805,20 @@ private fun ProfileRow(
                         modifier = Modifier
                             .background(
                                 MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                RoundedCornerShape(LocalCornerRadius.current.sm)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+                if (warming && !isActive) {
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text(
+                        text = "预热中",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier
+                            .background(
+                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f),
                                 RoundedCornerShape(LocalCornerRadius.current.sm)
                             )
                             .padding(horizontal = 6.dp, vertical = 2.dp)

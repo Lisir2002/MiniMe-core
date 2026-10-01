@@ -97,6 +97,19 @@ data class ProxyTraffic(
     val down: Long,
 )
 
+/** P3-18：预热实例状态（UI 在 profile 列表展示 运行中/预热中/未启动）。 */
+data class WarmupState(
+    val warmProfileId: String? = null,
+    val warming: Boolean = false,
+) {
+    /** 该 profileId 当前是「运行中」（活跃）/「预热中」/否则「未启动」。 */
+    fun statusOf(id: String, activeId: String?): String = when {
+        id == activeId -> "运行中"
+        id == warmProfileId && warming -> "预热中"
+        else -> "未启动"
+    }
+}
+
 /**
  * 容器内 mihomo 代理引擎管理器（生命周期仿 [com.mini.me_core.feature.agent.domain.container.bridge.RcbBridge]）。
  *
@@ -216,6 +229,23 @@ class ClashProxyManager @Inject constructor(
     /** P2-15：是否因端口冲突避让过（供 UI 提示「7890 被占用」）。 */
     @Volatile
     private var mixedPortWasAdjusted: Boolean = false
+
+    /**
+     * P3-18：多实例预热池（最多 1 个预热实例，LRU）。
+     * 活跃 profile 接流量；上一个用过的 profile 在后台预热启动（独立端口/配置目录/进程，不接流量）。
+     * 切换回它时直接「提升」为主进程，省去冷启动。
+     */
+    @Volatile private var warmProfileId: String? = null
+    @Volatile private var warmProcess: Process? = null
+    @Volatile private var warmMixedPort: Int = 0
+    @Volatile private var warmControllerPort: Int = 0
+
+    /** P3-18：上一次活跃 profile id（on() 成功后记录，供下次预热）。 */
+    @Volatile private var lastActiveProfileId: String? = null
+
+    /** P3-18：预热实例状态（UI 显示 运行中/预热中/未启动）。 */
+    private val _warmupState = MutableStateFlow(WarmupState())
+    val warmupState: kotlinx.coroutines.flow.StateFlow<WarmupState> = _warmupState.asStateFlow()
 
     /**
      * 下载 mihomo 二进制用的**直连** OkHttp：强制 Proxy.NO_PROXY 覆盖共享 client 的 ProxySelector。
@@ -1128,16 +1158,24 @@ class ClashProxyManager @Inject constructor(
         // 否则 App 流量会被 routeHolder 打进无人监听的 7890（`Failed to connect to /127.0.0.1:7890`）。
         // P1-11：内核已在运行时优先热重载（不杀进程、不断连）；热重载失败才回退到 restart。
         // P2-15：启动前检测/避让端口冲突（内核未在跑时才需要；已在跑则端口已定）。
+        // P3-18：内核未在跑时，若目标 profile 已预热，直接提升预热进程为主进程（零冷启动）。
         val wasAlive = mihomoProcess?.isAlive == true
-        if (!wasAlive) ensurePortsSelected()
-        val kernelOk = if (wasAlive) {
-            val reloaded = reloadConfig(config)
-            if (reloaded) true else {
-                FileLogger.w(TAG, "on(): 热重载失败，回退到重启内核")
-                ensureKernelRunning(restart = true)
+        val kernelOk = when {
+            wasAlive -> {
+                val reloaded = reloadConfig(config)
+                if (reloaded) true else {
+                    FileLogger.w(TAG, "on(): 热重载失败，回退到重启内核")
+                    ensureKernelRunning(restart = true)
+                }
             }
-        } else {
-            ensureKernelRunning(restart = false)
+            promoteWarmIfMatches(profileId) -> {
+                FileLogger.i(TAG, "on(): 命中预热实例，零冷启动切换")
+                waitControllerReady(10)
+            }
+            else -> {
+                ensurePortsSelected()
+                ensureKernelRunning(restart = false)
+            }
         }
         if (!kernelOk) {
             FileLogger.w(TAG, "on(): mihomo 内核未就绪，代理保持关闭")
@@ -1154,6 +1192,15 @@ class ClashProxyManager @Inject constructor(
         _state.update { it.copy(enabled = true, activeProfileId = profileId, recovering = false, recoveryAttempt = 0) }
         // P2-14：进入前台保活通知。
         runCatching { ProxyForegroundService.start(context, runtimeMixedPort) }
+        // P3-18：记录本次活跃 profile；若有上一个不同的 profile，后台预热它（延迟 8s，不阻塞 on() 返回）。
+        val previous = lastActiveProfileId
+        lastActiveProfileId = profileId
+        if (previous != null && previous != profileId) {
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                delay(8_000)
+                if (enabledCache && lastActiveProfileId == profileId) warmupProfile(previous)
+            }
+        }
         FileLogger.i(TAG, "network_proxy ON (profile=$profileId inline=${inlineYaml != null})")
         return "ok"
     }
@@ -1161,6 +1208,7 @@ class ClashProxyManager @Inject constructor(
     /** 关闭代理：先停内核，再翻转开关（env 也随之不再注入）。 */
     suspend fun off() {
         stopKernel()
+        stopWarmup()
         repository.setProxyEnabled(false)
         // 同步写位（同 on()），不等 flow 异步 emit。
         enabledCache = false
@@ -1171,6 +1219,85 @@ class ClashProxyManager @Inject constructor(
         // P2-14：退出前台保活。
         runCatching { ProxyForegroundService.stop(context) }
         FileLogger.i(TAG, "network_proxy OFF")
+    }
+
+    // ── P3-18：多实例预热 ────────────────────────────────────────────────────────
+
+    private fun warmupDir(): java.io.File = java.io.File(configDir(), "warmup").apply { mkdirs() }
+
+    /**
+     * 预热某个 profile：独立配置目录 + 独立端口 + 独立进程，后台跑起来但不接 App 流量。
+     * 最多保留 1 个（新预热前先停旧的）。失败静默（预热是优化，失败不影响主链路）。
+     */
+    private suspend fun warmupProfile(profileId: String) = withContext(Dispatchers.IO) {
+        if (profileId == lastActiveProfileId) return@withContext
+        stopWarmup()
+        runCatching {
+            ensureSecretLoaded()
+            val revealed = repository.revealSecret(profileId) ?: return@withContext
+            val trimmed = revealed.trim()
+            val source = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+                fetchSubscriptionYaml(trimmed) ?: return@withContext
+            } else trimmed
+            if (source.isBlank()) return@withContext
+
+            // 为预热实例分配独立端口（避开主实例已占用的端口）。
+            val wMixed = pickFreePort(runtimeMixedPort + 1, MIXED_PORT + 1)
+            val wCtrl = pickFreePort(runtimeControllerPort + 1, CONTROLLER_PORT + 1)
+            // 合成配置时临时切到预热端口，再切回（synthesizeConfig 读 runtime 字段）。
+            val savedM = runtimeMixedPort; val savedC = runtimeControllerPort
+            runtimeMixedPort = wMixed; runtimeControllerPort = wCtrl
+            val config = synthesizeConfig(source)
+            runtimeMixedPort = savedM; runtimeControllerPort = savedC
+
+            val dir = warmupDir()
+            val cfgFile = java.io.File(dir, "config.yaml")
+            cfgFile.writeText(config, Charsets.UTF_8)
+            val bin = mihomoBinary()
+            if (!bin.isFile) return@withContext
+            val logFile = java.io.File(dir, "mihomo.log")
+            val pb = ProcessBuilder(bin.absolutePath, "-d", dir.absolutePath, "-f", cfgFile.absolutePath)
+            pb.redirectErrorStream(true); pb.redirectOutput(logFile)
+            val p = pb.start()
+            warmProcess = p
+            warmProfileId = profileId
+            warmMixedPort = wMixed
+            warmControllerPort = wCtrl
+            _warmupState.value = WarmupState(profileId, warming = true)
+            FileLogger.i(TAG, "预热实例启动: profile=$profileId port=$wMixed ctrl=$wCtrl")
+        }.onFailure { FileLogger.w(TAG, "预热失败: ${it.message}") }
+    }
+
+    /** 停止并清理预热实例。 */
+    private fun stopWarmup() {
+        val p = warmProcess
+        warmProcess = null
+        warmProfileId = null
+        _warmupState.value = WarmupState()
+        if (p != null && p.isAlive) runCatching { p.destroy() }
+    }
+
+    /**
+     * P3-18：切换时若目标正是预热实例，直接提升为主进程（零冷启动）。
+     * @return true=已提升（调用方跳过正常启动流程）。
+     */
+    private fun promoteWarmIfMatches(profileId: String?): Boolean {
+        if (profileId == null) return false
+        val p = warmProcess
+        if (profileId != warmProfileId || p == null || !p.isAlive) return false
+        // 提升：预热进程变主进程，端口/控制器/配置目录全部接管。
+        mihomoProcess = p
+        runtimeMixedPort = warmMixedPort
+        runtimeControllerPort = warmControllerPort
+        // 预热配置已在 warmup/config.yaml；复制为主 config.yaml（主目录）。
+        runCatching {
+            val src = java.io.File(warmupDir(), "config.yaml")
+            if (src.isFile) src.copyTo(java.io.File(configDir(), CONFIG_FILE), overwrite = true)
+        }
+        FileLogger.i(TAG, "预热实例提升为主进程: profile=$profileId port=$warmMixedPort")
+        warmProcess = null; warmProfileId = null
+        _warmupState.value = WarmupState()
+        return true
     }
 
     /**

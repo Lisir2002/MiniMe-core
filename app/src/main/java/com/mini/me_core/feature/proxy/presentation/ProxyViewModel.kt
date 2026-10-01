@@ -123,6 +123,9 @@ class ProxyViewModel @Inject constructor(
     /** P2-15：实际代理端口（冲突避让后）。 */
     val proxyPort: Int get() = manager.mixedPort()
 
+    /** P3-18：预热实例状态。 */
+    val warmupState = manager.warmupState
+
     /** P1-8：今日/本周/累计流量用量。 */
     private val _trafficToday = MutableStateFlow(TrafficUsage(0, 0))
     val trafficToday: StateFlow<TrafficUsage> = _trafficToday
