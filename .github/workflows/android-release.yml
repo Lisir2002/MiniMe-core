@@ -193,8 +193,11 @@ jobs:
 
       # 构建通用 release APK（双 ABI：arm64-v8a + x86_64，见 build.gradle.kts abiFilters 与 sourceSets）
       # --warning-mode=all + --stacktrace：失败时完整输出，便于在 CI 一眼定位 R8/打包/OOM 根因
+      # 只构建 :app 及其依赖（core/terminal-*）：不构建 :injector-app / :qbot-app / :logviewer-app。
+      # 注入器资产（rootfs/napcat/qq .deb/pool.bin/manifest）为 gitignore 的体积型资产，
+      # 仅由注入器/QBot 各自的 release workflow 拉取，主应用 APK 不消费，故在此收窄任务避免被资产硬校验拖住。
       - name: Build Release APK
-        run: ./gradlew --warning-mode=all assembleRelease --stacktrace
+        run: ./gradlew --warning-mode=all :app:assembleRelease --stacktrace
 
       # 重命名 APK 为「软件名-版本号-变体」格式（品牌前缀来自 branding.gradle.kts 的 APK_PREFIX）：
       #   MiniMe-v0.0.15-release.apk（正式版）
