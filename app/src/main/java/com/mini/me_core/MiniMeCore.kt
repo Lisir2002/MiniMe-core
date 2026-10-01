@@ -525,6 +525,16 @@ class MiniMeCore : Application() {
                 setShowBadge(false)
             }
             notificationManager.createNotificationChannel(channel)
+            // P2-14：代理前台保活通道。
+            val proxyChannel = NotificationChannel(
+                "proxy_service",
+                "Proxy Service",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Notifications while the proxy is running"
+                setShowBadge(false)
+            }
+            notificationManager.createNotificationChannel(proxyChannel)
         }
     }
 

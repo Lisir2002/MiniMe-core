@@ -1079,6 +1079,8 @@ class ClashProxyManager @Inject constructor(
         crashRestartAttempts = 0
         routeHolder.update(true, "127.0.0.1:$MIXED_PORT")
         _state.update { it.copy(enabled = true, activeProfileId = profileId, recovering = false, recoveryAttempt = 0) }
+        // P2-14：进入前台保活通知。
+        runCatching { ProxyForegroundService.start(context, MIXED_PORT) }
         FileLogger.i(TAG, "network_proxy ON (profile=$profileId inline=${inlineYaml != null})")
         return "ok"
     }
@@ -1093,6 +1095,8 @@ class ClashProxyManager @Inject constructor(
         crashRestartAttempts = 0
         routeHolder.update(false, "127.0.0.1:$MIXED_PORT")
         _state.update { it.copy(enabled = false, recovering = false, recoveryAttempt = 0) }
+        // P2-14：退出前台保活。
+        runCatching { ProxyForegroundService.stop(context) }
         FileLogger.i(TAG, "network_proxy OFF")
     }
 
