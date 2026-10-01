@@ -1,11 +1,10 @@
 package com.mini.me_core.feature.agent.domain.schedule
 
+import com.mini.me_core.core.util.EnumSafe
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.datalayer.isEnabled
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules as V2Schedule
-import com.mini.me_core.feature.agent.data.local.entity.ScheduleEntity
-import com.mini.me_core.feature.agent.data.local.entity.ScheduleRule
-import com.mini.me_core.feature.agent.data.local.entity.ScheduleStatus
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -14,6 +13,26 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import java.util.UUID
 import javax.inject.Inject
+
+/** 定时规则类型（对齐 DSH schedule rule）。 */
+enum class ScheduleRule {
+    /** 延迟指定毫秒后触发一次（args.delayMs）。 */
+    AFTER,
+    /** 到指定时间戳触发一次（args.atMs）。 */
+    AT,
+    /** 按周期毫秒循环触发（args.intervalMs）。 */
+    EVERY
+}
+
+/** 定时项生命周期状态。 */
+enum class ScheduleStatus {
+    /** 等待触发。 */
+    PENDING,
+    /** 已触发（一次性规则触发后置此态）。 */
+    FIRED,
+    /** 已取消。 */
+    CANCELLED
+}
 
 /**
  * 会话级「定时提醒」服务（对齐 DSH schedule 契约）。
@@ -52,47 +71,38 @@ class ScheduleService @Inject constructor(
     }
 
     /** 创建定时项。rule 为 AFTER/AT/EVERY 名称（大写），args 为对应规则参数。 */
-    suspend fun create(sessionId: String, rule: ScheduleRule, args: ScheduleArgs): ScheduleEntity {
+    suspend fun create(sessionId: String, rule: ScheduleRule, args: ScheduleArgs): V2Schedule {
         val now = System.currentTimeMillis()
-        val entity = ScheduleEntity(
-            scheduleId = UUID.randomUUID().toString(),
+        val scheduleId = UUID.randomUUID().toString()
+        v2Agent.upsertSchedule(
+            scheduleId = scheduleId,
             sessionId = sessionId,
             rule = rule.name,
             args = args.toJson(),
             status = ScheduleStatus.PENDING.name,
-            enabled = 1,
+            enabled = 1L,
             createdAtMs = now,
             lastFiredAtMs = null,
             updatedAtMs = now
         )
-        v2Agent.upsertSchedule(
-            scheduleId = entity.scheduleId,
-            sessionId = entity.sessionId,
-            rule = entity.rule,
-            args = entity.args,
-            status = entity.status,
-            enabled = entity.enabled.toLong(),
-            createdAtMs = entity.createdAtMs,
-            lastFiredAtMs = entity.lastFiredAtMs,
-            updatedAtMs = entity.updatedAtMs
-        )
-        FileLogger.d(TAG, "create: session=$sessionId rule=${rule.name} scheduleId=${entity.scheduleId}")
-        return entity
+        FileLogger.d(TAG, "create: session=$sessionId rule=${rule.name} scheduleId=$scheduleId")
+        return v2Agent.getScheduleById(scheduleId)
+            ?: error("upsert 后立即查询失败: $scheduleId")
     }
 
     /** 列出会话全部定时项（按创建时间升序）。 */
-    suspend fun list(sessionId: String): List<ScheduleEntity> =
-        v2Agent.listSchedules(sessionId).map { it.toEntity() }
+    suspend fun list(sessionId: String): List<V2Schedule> =
+        v2Agent.listSchedules(sessionId)
 
     /** 取消定时项（置 CANCELLED）；不存在返回 false。 */
     suspend fun cancel(scheduleId: String): Boolean {
-        val existing = v2Agent.getScheduleById(scheduleId)?.toEntity() ?: return false
+        val existing = v2Agent.getScheduleById(scheduleId) ?: return false
         if (existing.statusEnum() == ScheduleStatus.CANCELLED) return true
         v2Agent.updateScheduleState(
             scheduleId = scheduleId,
             status = ScheduleStatus.CANCELLED.name,
-            enabled = 0,
-            lastFiredAtMs = existing.lastFiredAtMs,
+            enabled = 0L,
+            lastFiredAtMs = existing.last_fired_at_ms,
             updatedAtMs = System.currentTimeMillis()
         )
         FileLogger.d(TAG, "cancel: scheduleId=$scheduleId")
@@ -100,7 +110,7 @@ class ScheduleService @Inject constructor(
     }
 
     /** 解析 args 字符串为结构化参数。 */
-    fun parseArgs(entity: ScheduleEntity): ScheduleArgs =
+    fun parseArgs(entity: V2Schedule): ScheduleArgs =
         runCatching {
             val obj = kotlinx.serialization.json.Json.parseToJsonElement(entity.args) as JsonObject
             ScheduleArgs(
@@ -110,7 +120,7 @@ class ScheduleService @Inject constructor(
                 prompt = obj["prompt"]?.jsonPrimitive?.contentOrNull.orEmpty()
             )
         }.getOrElse {
-            FileLogger.w(TAG, "解析 schedule args 失败，按空参数处理: scheduleId=${entity.scheduleId}", it)
+            FileLogger.w(TAG, "解析 schedule args 失败，按空参数处理: scheduleId=${entity.schedule_id}", it)
             ScheduleArgs()
         }
 
@@ -120,57 +130,51 @@ class ScheduleService @Inject constructor(
      * - AT：定点时间戳 <= now；
      * - EVERY：上次触发（无则创建时刻）+ 周期 <= now。
      */
-    fun isDue(entity: ScheduleEntity, nowMs: Long): Boolean {
+    fun isDue(entity: V2Schedule, nowMs: Long): Boolean {
         val args = parseArgs(entity)
         return when (entity.ruleEnum()) {
-            ScheduleRule.AFTER -> args.delayMs > 0 && entity.createdAtMs + args.delayMs <= nowMs
+            ScheduleRule.AFTER -> args.delayMs > 0 && entity.created_at_ms + args.delayMs <= nowMs
             ScheduleRule.AT -> args.atMs > 0 && args.atMs <= nowMs
             ScheduleRule.EVERY -> {
                 if (args.intervalMs <= 0) return false
-                val anchor = entity.lastFiredAtMs ?: entity.createdAtMs
+                val anchor = entity.last_fired_at_ms ?: entity.created_at_ms
                 anchor + args.intervalMs <= nowMs
             }
         }
     }
 
     /** 扫描全部到点的待投递项（status=PENDING 且启用）。 */
-    suspend fun dueAt(nowMs: Long): List<ScheduleEntity> =
-        v2Agent.getPendingSchedules().map { it.toEntity() }.filter { isDue(it, nowMs) }
+    suspend fun dueAt(nowMs: Long): List<V2Schedule> =
+        v2Agent.getPendingSchedules().filter { isDue(it, nowMs) }
 
     /**
      * 投递后更新状态：一次性规则（AFTER/AT）置 FIRED；周期规则（EVERY）保持 PENDING
      * 并推进 lastFiredAtMs（供下一周期锚定）。返回更新后的实体。
      */
-    suspend fun markFired(scheduleId: String, nowMs: Long): ScheduleEntity? {
-        val existing = v2Agent.getScheduleById(scheduleId)?.toEntity() ?: return null
+    suspend fun markFired(scheduleId: String, nowMs: Long): V2Schedule? {
+        val existing = v2Agent.getScheduleById(scheduleId) ?: return null
         val nextStatus = if (existing.ruleEnum() == ScheduleRule.EVERY) {
             ScheduleStatus.PENDING.name
         } else {
             ScheduleStatus.FIRED.name
         }
-        val nextEnabled = if (existing.ruleEnum() == ScheduleRule.EVERY) 1 else 0
+        val nextEnabled = if (existing.ruleEnum() == ScheduleRule.EVERY) 1L else 0L
         v2Agent.updateScheduleState(
             scheduleId = scheduleId,
             status = nextStatus,
-            enabled = nextEnabled.toLong(),
+            enabled = nextEnabled,
             lastFiredAtMs = nowMs,
             updatedAtMs = nowMs
         )
         FileLogger.d(TAG, "markFired: scheduleId=$scheduleId → $nextStatus")
-        return v2Agent.getScheduleById(scheduleId)?.toEntity()
+        return v2Agent.getScheduleById(scheduleId)
     }
-
-    // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
-
-    private fun V2Schedule.toEntity() = ScheduleEntity(
-        scheduleId = schedule_id,
-        sessionId = session_id,
-        rule = rule,
-        args = args,
-        status = status,
-        enabled = enabled.toInt(),
-        createdAtMs = created_at_ms,
-        lastFiredAtMs = last_fired_at_ms,
-        updatedAtMs = updated_at_ms
-    )
 }
+
+// ── V2（SQLDelight）扩展函数 ──────────────────────────────────
+
+private fun V2Schedule.ruleEnum(): ScheduleRule =
+    EnumSafe.valueOf(rule, ScheduleRule.EVERY, tag = "Agent_schedules.rule")
+
+internal fun V2Schedule.statusEnum(): ScheduleStatus =
+    EnumSafe.valueOf(status, ScheduleStatus.PENDING, tag = "Agent_schedules.status")

@@ -1,16 +1,18 @@
 package com.mini.me_core.feature.agent.domain.execution.tool.schedule
 
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.data.local.entity.ScheduleEntity
-import com.mini.me_core.feature.agent.data.local.entity.ScheduleRule
+import com.mini.me_core.datalayer.isEnabled
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
+import com.mini.me_core.feature.agent.domain.schedule.ScheduleRule
 import com.mini.me_core.feature.agent.domain.schedule.ScheduleService
+import com.mini.me_core.feature.agent.domain.schedule.statusEnum
 import com.mini.me_core.feature.agent.domain.execution.tool.AbstractContextualTool
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolParameter
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionPolicy
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules as V2Schedule
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -159,19 +161,19 @@ class ScheduleTool @Inject constructor(
         }
 
         val entity = scheduleService.create(sessionId, rule, sArgs)
-        FileLogger.d(TAG, "create: session=$sessionId rule=${rule.name} scheduleId=${entity.scheduleId}")
+        FileLogger.d(TAG, "create: session=$sessionId rule=${rule.name} scheduleId=${entity.schedule_id}")
         return ToolResult.Success(JsonObject(mapOf(
             "schedule" to scheduleJson(entity)
         )))
     }
 
-    private fun scheduleJson(entity: ScheduleEntity): JsonObject = buildJsonObject {
-        put("schedule_id", JsonPrimitive(entity.scheduleId))
-        put("rule", JsonPrimitive(entity.ruleEnum().name.lowercase()))
+    private fun scheduleJson(entity: V2Schedule): JsonObject = buildJsonObject {
+        put("schedule_id", JsonPrimitive(entity.schedule_id))
+        put("rule", JsonPrimitive(entity.rule.lowercase()))
         put("status", JsonPrimitive(entity.statusEnum().name.lowercase()))
         put("enabled", JsonPrimitive(entity.isEnabled))
         put("prompt", JsonPrimitive(scheduleService.parseArgs(entity).prompt))
-        put("created_at", JsonPrimitive(entity.createdAtMs))
-        put("last_fired_at", entity.lastFiredAtMs?.let { JsonPrimitive(it) } ?: JsonPrimitive(null))
+        put("created_at", JsonPrimitive(entity.created_at_ms))
+        put("last_fired_at", entity.last_fired_at_ms?.let { JsonPrimitive(it) } ?: JsonPrimitive(null))
     }
 }

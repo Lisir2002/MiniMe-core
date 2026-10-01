@@ -1,5 +1,6 @@
 package com.mini.me_core.datalayer
 
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules
 import com.mini.mecore.datalayer.sqldelight.credentials.Git_credentials
 import com.mini.mecore.datalayer.sqldelight.settings.Ai_providers
 import com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models
@@ -43,3 +44,7 @@ val T2i_provider_models.supportsHd: Boolean get() = supports_hd == 1L
 val T2i_provider_models.supportsInpaint: Boolean get() = supports_inpaint == 1L
 
 val T2i_task.isHd: Boolean get() = hd == 1L
+
+// ── agent ─────────────────────────────────────────────────────
+
+val Agent_schedules.isEnabled: Boolean get() = enabled == 1L

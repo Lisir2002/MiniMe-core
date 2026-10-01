@@ -72,22 +72,22 @@ class ScheduleScheduler @Inject constructor(
         val due = scheduleService.dueAt(now)
         if (due.isEmpty()) return
         for (entity in due) {
-            val listener = listeners[entity.sessionId]
+            val listener = listeners[entity.session_id]
             if (listener == null) {
                 // 会话未打开：不投递不消费，保留 PENDING 待补投（持久化屏障）。
-                FileLogger.d(TAG, "到点但会话无监听，保留待投: scheduleId=${entity.scheduleId} session=${entity.sessionId}")
+                FileLogger.d(TAG, "到点但会话无监听，保留待投: scheduleId=${entity.schedule_id} session=${entity.session_id}")
                 continue
             }
             val prompt = scheduleService.parseArgs(entity).prompt
             if (prompt.isBlank()) {
                 // 无提醒正文：无意义，直接消费防止反复扫描。
-                scheduleService.markFired(entity.scheduleId, now)
+                scheduleService.markFired(entity.schedule_id, now)
                 continue
             }
-            runCatching { listener.onScheduleFired(entity.scheduleId, prompt) }
-                .onSuccess { scheduleService.markFired(entity.scheduleId, now) }
+            runCatching { listener.onScheduleFired(entity.schedule_id, prompt) }
+                .onSuccess { scheduleService.markFired(entity.schedule_id, now) }
                 .onFailure { e ->
-                    FileLogger.w(TAG, "定时投递失败，保留待下次重试: scheduleId=${entity.scheduleId}", e)
+                    FileLogger.w(TAG, "定时投递失败，保留待下次重试: scheduleId=${entity.schedule_id}", e)
                 }
         }
     }
