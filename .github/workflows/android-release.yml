@@ -119,6 +119,19 @@ jobs:
           echo "tag version (without v) = $tag_ver"
           echo "✓ tag 将直接驱动应用 versionName ($tag_ver)"
 
+      # RC 版拒绝门禁：主应用只发正式版（vX.Y.Z），不再发任何 -rc/-beta/-alpha/-dev 预发布 tag。
+      # 误打/误推预发布 tag 时在此直接失败并给出明确提示，避免产生 prerelease Release。
+      - name: Reject pre-release tags (main app ships formal only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -e
+          tag="${GITHUB_REF_NAME}"
+          if [[ "$tag" =~ -(rc|beta|alpha|dev)([0-9.]*)$ ]]; then
+            echo "::error::主应用不发预发布 tag（$tag）。主应用只接受形如 vX.Y.Z 的正式版 tag（不含 -rc/-beta/-alpha/-dev 后缀），请改用正式 tag 触发发布。"
+            exit 1
+          fi
+          echo "✓ tag 为正式版格式：$tag"
+
       # 校验 versionCode 单调递增：versionCode = git tag 四段版本号映射（见 build.gradle.kts gitVersionCode()），
       # 与提交数无关，rebase/squash 改写历史不影响单调性；此处按同一映射比较当前 tag 与上个 Release tag。
       # 允许相等：rc 转正式版时常在同一提交上打 tag，versionCode 相等是正常的。
@@ -199,6 +212,13 @@ jobs:
       # --warning-mode=all + --stacktrace：失败时完整输出弃用告警与异常栈，避免在 CI 再猜。
       - name: Run unit tests (release)
         run: ./gradlew --warning-mode=all :app:testReleaseUnitTest --stacktrace
+
+      # Lint 门禁（baseline 渐进式）：app/lint-baseline.xml 收录存量 229 个 error 视为已知，
+      # abortOnError=true 下任何「新增 error」都会让本步骤失败、阻断发版；warning 不阻断。
+      # 与 assembleRelease 解耦：checkReleaseBuilds=false 保证打包阶段不自动跑 lint（避免 OOM），
+      # lint 仅在此显式步骤执行。该步骤失败 = 不允许发版。
+      - name: Lint (release, baseline gate)
+        run: ./gradlew --warning-mode=all :app:lintRelease --stacktrace
 
       # 构建通用 release APK（双 ABI：arm64-v8a + x86_64，见 build.gradle.kts abiFilters 与 sourceSets）
       # --warning-mode=all + --stacktrace：失败时完整输出，便于在 CI 一眼定位 R8/打包/OOM 根因

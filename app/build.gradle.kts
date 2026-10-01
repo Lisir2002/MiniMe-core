@@ -342,7 +342,14 @@ android {
     lint {
         disable += "ExpiredTargetSdkVersion"
         checkReleaseBuilds = false
-        abortOnError = false
+        // baseline 渐进式：现有 229 个 error 全部录入 app/lint-baseline.xml 视为「已知存量」。
+        // CI 显式跑 :app:lintRelease 时，baseline 内的既有 issue 被抑制，任何「新增 error」直接 fail。
+        // checkReleaseBuilds=false 仍保证 assembleRelease 不自动跑 lint（避免 2 核 runner OOM），
+        // lintVital 仍在下方禁用；lint 门禁只通过 CI 显式步骤触发。
+        baseline = file("lint-baseline.xml")
+        // baseline 已生成（收录现有 229 个 error）。开启 abortOnError：CI 显式跑 :app:lintRelease 时，
+        // baseline 内既有 issue 被抑制，任何「新增 error」直接 fail。warning 不触发 abort。
+        abortOnError = true
     }
 }
 
@@ -374,6 +381,10 @@ androidComponents {
 val ALLOWED_APPLICATION_IDS = setOf("com.mini.me_core", "com.mini.me_core.debug")
 
 dependencies {
+    // custom_lint 框架：加载 :lint-checks 模块注册的自定义规则，:app:lintRelease 时自动执行。
+    // 该依赖只在 lint 任务 classpath 生效，不打进 APK、不影响运行时。
+    lintChecks(project(":lint-checks"))
+
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material3)
