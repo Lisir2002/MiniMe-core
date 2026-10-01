@@ -6,9 +6,13 @@ import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepositor
 import com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides as V2ModelCapabilityOverride
 import com.mini.mecore.datalayer.sqldelight.agent.Model_custom_configs as V2ModelCustomConfig
 import com.mini.mecore.datalayer.sqldelight.agent.Model_sampling_configs as V2ModelSamplingConfig
-import com.mini.me_core.feature.agent.data.local.entity.ModelCapabilityOverrideEntity
-import com.mini.me_core.feature.agent.data.local.entity.ModelCustomConfigEntity
-import com.mini.me_core.feature.agent.data.local.entity.ModelSamplingConfigEntity
+import com.mini.me_core.datalayer.overrideAudioBool
+import com.mini.me_core.datalayer.overrideCodeBool
+import com.mini.me_core.datalayer.overrideReasoningBool
+import com.mini.me_core.datalayer.overrideStructuredOutputBool
+import com.mini.me_core.datalayer.overrideToolsBool
+import com.mini.me_core.datalayer.overrideVideoBool
+import com.mini.me_core.datalayer.overrideVisionBool
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
 import com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepository
 import com.mini.me_core.feature.settings.data.repository.DefaultPolicy
@@ -339,19 +343,19 @@ class ModelMetadataService @Inject constructor(
 
         // 阶段 4 ④：单模型复选框覆盖（优先级最高）。MODELS_DEV 与 INFERRED 源都允许。
         val overrideRow = runCatching {
-            v2Agent.getCapabilityOverride(type.name, modelId)?.toEntity()
+            v2Agent.getCapabilityOverride(type.name, modelId)
         }.onFailure {
             FileLogger.w(TAG, "读取单模型能力覆盖失败(type=${type.name}, id=$modelId)", it)
         }.getOrNull()
 
         val override = overrideRow
-        val vision = override?.overrideVision ?: afterPolicy.supportsVision
-        val tools = override?.overrideTools ?: afterPolicy.supportsTools
-        val reasoning = override?.overrideReasoning ?: afterPolicy.supportsReasoning
-        val video = override?.overrideVideo ?: afterPolicy.supportsVideo
-        val audio = override?.overrideAudio ?: afterPolicy.supportsAudio
-        val code = override?.overrideCode ?: afterPolicy.supportsCode
-        val structuredOutput = override?.overrideStructuredOutput ?: afterPolicy.supportsStructuredOutput
+        val vision = override?.overrideVisionBool ?: afterPolicy.supportsVision
+        val tools = override?.overrideToolsBool ?: afterPolicy.supportsTools
+        val reasoning = override?.overrideReasoningBool ?: afterPolicy.supportsReasoning
+        val video = override?.overrideVideoBool ?: afterPolicy.supportsVideo
+        val audio = override?.overrideAudioBool ?: afterPolicy.supportsAudio
+        val code = override?.overrideCodeBool ?: afterPolicy.supportsCode
+        val structuredOutput = override?.overrideStructuredOutputBool ?: afterPolicy.supportsStructuredOutput
         val originReason = afterPolicy.inferenceReason ?: ModelMetadata.InferenceReason()
         val afterOverride = afterPolicy.copy(
             supportsVision = vision,
@@ -362,26 +366,26 @@ class ModelMetadataService @Inject constructor(
             supportsCode = code,
             supportsStructuredOutput = structuredOutput,
             inferenceReason = originReason.copy(
-                overrideVision = override?.overrideVision,
-                overrideTools = override?.overrideTools,
-                overrideReasoning = override?.overrideReasoning,
-                overrideVideo = override?.overrideVideo,
-                overrideAudio = override?.overrideAudio,
-                overrideCode = override?.overrideCode,
-                overrideStructuredOutput = override?.overrideStructuredOutput
+                overrideVision = override?.overrideVisionBool,
+                overrideTools = override?.overrideToolsBool,
+                overrideReasoning = override?.overrideReasoningBool,
+                overrideVideo = override?.overrideVideoBool,
+                overrideAudio = override?.overrideAudioBool,
+                overrideCode = override?.overrideCodeBool,
+                overrideStructuredOutput = override?.overrideStructuredOutputBool
             )
         )
 
         // 模型自定义配置：用户手动覆盖输入/输出 token 上限。
         val customConfig = runCatching {
-            v2Agent.getCustomConfig(type.name, modelId)?.toCustomConfigEntity()
+            v2Agent.getCustomConfig(type.name, modelId)
         }.onFailure {
             FileLogger.w(TAG, "读取模型自定义配置失败(type=${type.name}, id=$modelId)", it)
         }.getOrNull()
 
         if (customConfig != null) {
-            val finalInputTokens = customConfig.customInputTokens ?: afterOverride.inputTokens ?: afterOverride.contextTokens
-            val finalOutputTokens = customConfig.customOutputTokens ?: afterOverride.outputTokens
+            val finalInputTokens = customConfig.custom_input_tokens?.toInt() ?: afterOverride.inputTokens ?: afterOverride.contextTokens
+            val finalOutputTokens = customConfig.custom_output_tokens?.toInt() ?: afterOverride.outputTokens
             // contextTokens 保持模型原生总上下文窗口，不被用户自定义输入上限覆盖。
             // 用户输入上限由 inputTokens 承载，上下文压缩阈值在 ContextCompactor 中取 min(contextTokens, inputTokens)。
             val finalContextTokens = afterOverride.contextTokens
@@ -409,29 +413,17 @@ class ModelMetadataService @Inject constructor(
         code: Boolean?,
         structuredOutput: Boolean?
     ) = withContext(Dispatchers.IO) {
-        val entity = ModelCapabilityOverrideEntity(
-            id = ModelCapabilityOverrideEntity.composeId(type.name, modelId),
+        v2Agent.upsertCapabilityOverride(
+            id = "${type.name}:$modelId",
             providerType = type.name,
             modelId = modelId,
-            overrideVision = vision,
-            overrideTools = tools,
-            overrideReasoning = reasoning,
-            overrideVideo = video,
-            overrideAudio = audio,
-            overrideCode = code,
-            overrideStructuredOutput = structuredOutput
-        )
-        v2Agent.upsertCapabilityOverride(
-            id = entity.id,
-            providerType = entity.providerType,
-            modelId = entity.modelId,
-            overrideVision = entity.overrideVision?.let { if (it) 1L else 0L },
-            overrideTools = entity.overrideTools?.let { if (it) 1L else 0L },
-            overrideReasoning = entity.overrideReasoning?.let { if (it) 1L else 0L },
-            overrideVideo = entity.overrideVideo?.let { if (it) 1L else 0L },
-            overrideAudio = entity.overrideAudio?.let { if (it) 1L else 0L },
-            overrideCode = entity.overrideCode?.let { if (it) 1L else 0L },
-            overrideStructuredOutput = entity.overrideStructuredOutput?.let { if (it) 1L else 0L },
+            overrideVision = vision?.let { if (it) 1L else 0L },
+            overrideTools = tools?.let { if (it) 1L else 0L },
+            overrideReasoning = reasoning?.let { if (it) 1L else 0L },
+            overrideVideo = video?.let { if (it) 1L else 0L },
+            overrideAudio = audio?.let { if (it) 1L else 0L },
+            overrideCode = code?.let { if (it) 1L else 0L },
+            overrideStructuredOutput = structuredOutput?.let { if (it) 1L else 0L },
             updatedAtMs = System.currentTimeMillis()
         )
     }
@@ -442,26 +434,19 @@ class ModelMetadataService @Inject constructor(
     }
 
     /** 流式观察单模型覆盖（设置页 UI 观察后实时刷新标签角标）。 */
-    fun observeOverride(type: ProviderType, modelId: String): Flow<ModelCapabilityOverrideEntity?> =
-        v2Agent.observeCapabilityOverride(type.name, modelId).map { list -> list.firstOrNull()?.toEntity() }
+    fun observeOverride(type: ProviderType, modelId: String): Flow<V2ModelCapabilityOverride?> =
+        v2Agent.observeCapabilityOverride(type.name, modelId).map { list -> list.firstOrNull() }
 
     // ── 模型自定义配置（输入/输出 token 上限覆盖）──────────────────────
 
     /** 保存模型自定义输入/输出 token 上限；传 null 表示不覆盖该字段。 */
     suspend fun saveCustomConfig(type: ProviderType, modelId: String, inputTokens: Int?, outputTokens: Int?) = withContext(Dispatchers.IO) {
-        val entity = ModelCustomConfigEntity(
-            id = ModelCustomConfigEntity.composeId(type.name, modelId),
+        v2Agent.upsertCustomConfig(
+            id = "${type.name}:$modelId",
             providerType = type.name,
             modelId = modelId,
-            customInputTokens = inputTokens,
-            customOutputTokens = outputTokens
-        )
-        v2Agent.upsertCustomConfig(
-            id = entity.id,
-            providerType = entity.providerType,
-            modelId = entity.modelId,
-            customInputTokens = entity.customInputTokens?.toLong(),
-            customOutputTokens = entity.customOutputTokens?.toLong(),
+            customInputTokens = inputTokens?.toLong(),
+            customOutputTokens = outputTokens?.toLong(),
             updatedAtMs = System.currentTimeMillis()
         )
     }
@@ -472,8 +457,8 @@ class ModelMetadataService @Inject constructor(
     }
 
     /** 流式观察模型自定义配置。 */
-    fun observeCustomConfig(type: ProviderType, modelId: String): Flow<ModelCustomConfigEntity?> =
-        v2Agent.observeCustomConfig(type.name, modelId).map { it?.toCustomConfigEntity() }
+    fun observeCustomConfig(type: ProviderType, modelId: String): Flow<V2ModelCustomConfig?> =
+        v2Agent.observeCustomConfig(type.name, modelId)
 
     // ── 模型级采样参数覆盖（temperature/topP/maxTokens）────────────────────
     // 【物理隔离】只读写 model_sampling_configs 表，绝不修改 AIProviderConfig。
@@ -481,21 +466,13 @@ class ModelMetadataService @Inject constructor(
 
     /** 保存模型级采样参数覆盖；传 null 表示不覆盖该字段（保持继承供应商级默认）。 */
     suspend fun saveSamplingConfig(type: ProviderType, modelId: String, temperature: Float?, topP: Float?, maxTokens: Int?) = withContext(Dispatchers.IO) {
-        val entity = ModelSamplingConfigEntity(
-            id = ModelSamplingConfigEntity.composeId(type.name, modelId),
+        v2Agent.upsertSamplingConfig(
+            id = "${type.name}:$modelId",
             providerType = type.name,
             modelId = modelId,
-            customTemperature = temperature,
-            customTopP = topP,
-            customMaxTokens = maxTokens
-        )
-        v2Agent.upsertSamplingConfig(
-            id = entity.id,
-            providerType = entity.providerType,
-            modelId = entity.modelId,
-            customTemperature = entity.customTemperature?.toDouble(),
-            customTopP = entity.customTopP?.toDouble(),
-            customMaxTokens = entity.customMaxTokens?.toLong(),
+            customTemperature = temperature?.toDouble(),
+            customTopP = topP?.toDouble(),
+            customMaxTokens = maxTokens?.toLong(),
             updatedAtMs = System.currentTimeMillis()
         )
     }
@@ -506,8 +483,8 @@ class ModelMetadataService @Inject constructor(
     }
 
     /** 流式观察模型级采样参数覆盖。 */
-    fun observeSamplingConfig(type: ProviderType, modelId: String): Flow<ModelSamplingConfigEntity?> =
-        v2Agent.observeSamplingConfig(type.name, modelId).map { it?.toSamplingConfigEntity() }
+    fun observeSamplingConfig(type: ProviderType, modelId: String): Flow<V2ModelSamplingConfig?> =
+        v2Agent.observeSamplingConfig(type.name, modelId)
 
     // ── 供应商级联清理：删除供应商时清理其下所有模型级配置（三张独立表）────────────
 
@@ -537,11 +514,11 @@ class ModelMetadataService @Inject constructor(
      */
     fun resolveSamplingParams(
         providerConfig: AIProviderConfig,
-        modelSamplingConfig: ModelSamplingConfigEntity?
+        modelSamplingConfig: V2ModelSamplingConfig?
     ): ResolvedSamplingParams = ResolvedSamplingParams(
-        temperature = modelSamplingConfig?.customTemperature ?: providerConfig.temperature,
-        topP = modelSamplingConfig?.customTopP ?: providerConfig.topP,
-        maxTokens = modelSamplingConfig?.customMaxTokens ?: providerConfig.maxTokens
+        temperature = modelSamplingConfig?.custom_temperature?.toFloat() ?: providerConfig.temperature,
+        topP = modelSamplingConfig?.custom_top_p?.toFloat() ?: providerConfig.topP,
+        maxTokens = modelSamplingConfig?.custom_max_tokens?.toInt() ?: providerConfig.maxTokens
     )
 
     /** 解析后的最终采样参数（已确定具体值，不再含 null 覆盖语义）。 */
@@ -602,41 +579,6 @@ class ModelMetadataService @Inject constructor(
     private data class Cache(
         val loadedAtMs: Long,
         val catalog: Map<String, Map<String, ModelMetadata>>
-    )
-
-    // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
-
-    private fun V2ModelCapabilityOverride.toEntity() = ModelCapabilityOverrideEntity(
-        id = id,
-        providerType = provider_type,
-        modelId = model_id,
-        overrideVision = override_vision?.let { it != 0L },
-        overrideTools = override_tools?.let { it != 0L },
-        overrideReasoning = override_reasoning?.let { it != 0L },
-        overrideVideo = override_video?.let { it != 0L },
-        overrideAudio = override_audio?.let { it != 0L },
-        overrideCode = override_code?.let { it != 0L },
-        overrideStructuredOutput = override_structured_output?.let { it != 0L },
-        updatedAtMs = updated_at_ms
-    )
-
-    private fun V2ModelCustomConfig.toCustomConfigEntity() = ModelCustomConfigEntity(
-        id = id,
-        providerType = provider_type,
-        modelId = model_id,
-        customInputTokens = custom_input_tokens?.toInt(),
-        customOutputTokens = custom_output_tokens?.toInt(),
-        updatedAtMs = updated_at_ms
-    )
-
-    private fun V2ModelSamplingConfig.toSamplingConfigEntity() = ModelSamplingConfigEntity(
-        id = id,
-        providerType = provider_type,
-        modelId = model_id,
-        customTemperature = custom_temperature?.toFloat(),
-        customTopP = custom_top_p?.toFloat(),
-        customMaxTokens = custom_max_tokens?.toInt(),
-        updatedAtMs = updated_at_ms
     )
 
     private fun buildModelDescription(idLower: String): String = when {

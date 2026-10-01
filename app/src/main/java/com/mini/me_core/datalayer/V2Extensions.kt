@@ -1,6 +1,7 @@
 package com.mini.me_core.datalayer
 
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules
+import com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides
 import com.mini.mecore.datalayer.sqldelight.credentials.Git_credentials
 import com.mini.mecore.datalayer.sqldelight.settings.Ai_providers
 import com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models
@@ -48,3 +49,12 @@ val T2i_task.isHd: Boolean get() = hd == 1L
 // ── agent ─────────────────────────────────────────────────────
 
 val Agent_schedules.isEnabled: Boolean get() = enabled == 1L
+
+// model_capability_overrides: nullable Boolean? 覆盖字段（Long? 0/1/null）
+val Model_capability_overrides.overrideVisionBool: Boolean? get() = override_vision?.let { it != 0L }
+val Model_capability_overrides.overrideToolsBool: Boolean? get() = override_tools?.let { it != 0L }
+val Model_capability_overrides.overrideReasoningBool: Boolean? get() = override_reasoning?.let { it != 0L }
+val Model_capability_overrides.overrideVideoBool: Boolean? get() = override_video?.let { it != 0L }
+val Model_capability_overrides.overrideAudioBool: Boolean? get() = override_audio?.let { it != 0L }
+val Model_capability_overrides.overrideCodeBool: Boolean? get() = override_code?.let { it != 0L }
+val Model_capability_overrides.overrideStructuredOutputBool: Boolean? get() = override_structured_output?.let { it != 0L }

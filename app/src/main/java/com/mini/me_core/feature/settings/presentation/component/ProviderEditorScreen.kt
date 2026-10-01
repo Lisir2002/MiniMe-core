@@ -107,7 +107,7 @@ import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.ui.rememberPersistentScrollState
-import com.mini.me_core.feature.agent.data.local.entity.ModelCapabilityOverrideEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides as V2ModelCapabilityOverride
 import com.mini.me_core.feature.settings.data.remote.ModelTestResult
 import com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepository
 import com.mini.me_core.feature.settings.data.repository.DefaultPolicy
@@ -197,22 +197,22 @@ fun ProviderEditorScreen(
     val modelSnapshot = models.toList()
 
     /** RC63 ④ 单模型覆盖：ProviderModelRow 每个模型 hasOverride 的即时快照（Flow -> State）。 */
-    val overridesMap: Map<String, ModelCapabilityOverrideEntity> by remember(type, models) {
+    val overridesMap: Map<String, V2ModelCapabilityOverride> by remember(type, models) {
         // 注意 1：下面每一步都显式标注类型，原因是 CI（Kotlin 2.1.20 + AGP 8.9.3）对
         // "combine(List<Flow<Pair<A,B?>>>)" 这种嵌套泛型 + lambda 的推断会失败，
         // 报错 "Cannot infer type for type parameter T / R / B / K / V"，IDE 的 Kotlin 插件反而可以过。
         // 注意 2：必须使用 combine(flowList) { values: Array<T> -> ... } 这种「Flow 列表 + transform」
         // 三参/二参重载，避免 combine(vararg flows: Flow<T>) { ... } 推断不出来。
-        val flowsMap: Map<String, kotlinx.coroutines.flow.Flow<ModelCapabilityOverrideEntity?>> =
+        val flowsMap: Map<String, kotlinx.coroutines.flow.Flow<V2ModelCapabilityOverride?>> =
             models.associateWith { modelId -> viewModel.observeCapabilityOverride(type, modelId) }
         val modelIds: List<String> = flowsMap.keys.toList()
-        val flowList: List<kotlinx.coroutines.flow.Flow<ModelCapabilityOverrideEntity?>> =
+        val flowList: List<kotlinx.coroutines.flow.Flow<V2ModelCapabilityOverride?>> =
             modelIds.map { id -> flowsMap.getValue(id) }
-        val combined: kotlinx.coroutines.flow.Flow<Map<String, ModelCapabilityOverrideEntity>> =
+        val combined: kotlinx.coroutines.flow.Flow<Map<String, V2ModelCapabilityOverride>> =
             kotlinx.coroutines.flow.combine(
                 flows = flowList
-            ) { values: Array<ModelCapabilityOverrideEntity?> ->
-                val out: MutableMap<String, ModelCapabilityOverrideEntity> = linkedMapOf()
+            ) { values: Array<V2ModelCapabilityOverride?> ->
+                val out: MutableMap<String, V2ModelCapabilityOverride> = linkedMapOf()
                 values.forEachIndexed { index, entity ->
                     if (entity != null) out[modelIds[index]] = entity
                 }

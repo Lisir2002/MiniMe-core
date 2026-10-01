@@ -102,9 +102,16 @@ import androidx.compose.ui.window.PopupProperties
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.data.local.entity.ModelCapabilityOverrideEntity
-import com.mini.me_core.feature.agent.data.local.entity.ModelCustomConfigEntity
-import com.mini.me_core.feature.agent.data.local.entity.ModelSamplingConfigEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides as V2ModelCapabilityOverride
+import com.mini.mecore.datalayer.sqldelight.agent.Model_custom_configs as V2ModelCustomConfig
+import com.mini.mecore.datalayer.sqldelight.agent.Model_sampling_configs as V2ModelSamplingConfig
+import com.mini.me_core.datalayer.overrideAudioBool
+import com.mini.me_core.datalayer.overrideCodeBool
+import com.mini.me_core.datalayer.overrideReasoningBool
+import com.mini.me_core.datalayer.overrideStructuredOutputBool
+import com.mini.me_core.datalayer.overrideToolsBool
+import com.mini.me_core.datalayer.overrideVideoBool
+import com.mini.me_core.datalayer.overrideVisionBool
 import com.mini.me_core.feature.settings.data.remote.ModelTestResult
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.domain.model.ProviderType
@@ -814,9 +821,9 @@ internal fun ModelSettingsSheet(
     providerType: ProviderType,
     modelId: String,
     metadata: ModelMetadata?,
-    overrideFlow: kotlinx.coroutines.flow.Flow<ModelCapabilityOverrideEntity?>,
-    customConfigFlow: kotlinx.coroutines.flow.Flow<ModelCustomConfigEntity?>,
-    samplingConfigFlow: kotlinx.coroutines.flow.Flow<ModelSamplingConfigEntity?>,
+    overrideFlow: kotlinx.coroutines.flow.Flow<V2ModelCapabilityOverride?>,
+    customConfigFlow: kotlinx.coroutines.flow.Flow<V2ModelCustomConfig?>,
+    samplingConfigFlow: kotlinx.coroutines.flow.Flow<V2ModelSamplingConfig?>,
     providerDefaultTemperature: Float,
     providerDefaultTopP: Float,
     providerDefaultMaxTokens: Int?,
@@ -829,26 +836,26 @@ internal fun ModelSettingsSheet(
     val samplingConfig by samplingConfigFlow.collectAsStateWithLifecycleCompat(initial = null)
 
     // 本地三态（UI 编辑的草稿）：初始值从 overrideFlow 读，避免打开面板时丢失已有的覆盖。
-    var draftVision by remember(override) { mutableStateOf(override?.overrideVision) }
-    var draftTools by remember(override) { mutableStateOf(override?.overrideTools) }
-    var draftReasoning by remember(override) { mutableStateOf(override?.overrideReasoning) }
-    var draftVideo by remember(override) { mutableStateOf(override?.overrideVideo) }
-    var draftAudio by remember(override) { mutableStateOf(override?.overrideAudio) }
-    var draftCode by remember(override) { mutableStateOf(override?.overrideCode) }
-    var draftStructuredOutput by remember(override) { mutableStateOf(override?.overrideStructuredOutput) }
+    var draftVision by remember(override) { mutableStateOf(override?.overrideVisionBool) }
+    var draftTools by remember(override) { mutableStateOf(override?.overrideToolsBool) }
+    var draftReasoning by remember(override) { mutableStateOf(override?.overrideReasoningBool) }
+    var draftVideo by remember(override) { mutableStateOf(override?.overrideVideoBool) }
+    var draftAudio by remember(override) { mutableStateOf(override?.overrideAudioBool) }
+    var draftCode by remember(override) { mutableStateOf(override?.overrideCodeBool) }
+    var draftStructuredOutput by remember(override) { mutableStateOf(override?.overrideStructuredOutputBool) }
 
     // 上下文长度草稿：文本框内容，空串表示不覆盖（留空用自动检测值）。
     var draftInputTokens by remember(customConfig) {
-        mutableStateOf(customConfig?.customInputTokens?.toString() ?: "")
+        mutableStateOf(customConfig?.custom_input_tokens?.toInt()?.toString() ?: "")
     }
     var draftOutputTokens by remember(customConfig) {
-        mutableStateOf(customConfig?.customOutputTokens?.toString() ?: "")
+        mutableStateOf(customConfig?.custom_output_tokens?.toInt()?.toString() ?: "")
     }
 
     // 采样参数草稿：null 表示未覆盖（继承供应商级默认），非 null 表示已覆盖。
-    var draftTemperature by remember(samplingConfig) { mutableStateOf(samplingConfig?.customTemperature) }
-    var draftTopP by remember(samplingConfig) { mutableStateOf(samplingConfig?.customTopP) }
-    var draftMaxTokens by remember(samplingConfig) { mutableStateOf(samplingConfig?.customMaxTokens?.toString()) }
+    var draftTemperature by remember(samplingConfig) { mutableStateOf(samplingConfig?.custom_temperature?.toFloat()) }
+    var draftTopP by remember(samplingConfig) { mutableStateOf(samplingConfig?.custom_top_p?.toFloat()) }
+    var draftMaxTokens by remember(samplingConfig) { mutableStateOf(samplingConfig?.custom_max_tokens?.toInt()?.toString()) }
 
     // 自动检测值（来自 metadata），用于 placeholder 和换算显示。
     val autoInputTokens = metadata?.inputTokens ?: metadata?.contextTokens
