@@ -142,6 +142,12 @@ fun ProviderEditorScreen(
     var useResponseApi by remember { mutableStateOf(initialProvider?.useResponseApi ?: false) }
     var isEnabled by remember { mutableStateOf(initialProvider?.isEnabled ?: true) }
     var type by remember { mutableStateOf(initialProvider?.type ?: ProviderType.OPENAI) }
+    // 需要代理：编辑已有读配置；新建按 ProviderType 给默认值（海外官方模型默认 true）。
+    var needsProxy by remember {
+        mutableStateOf(initialProvider?.needsProxy ?: when (type) {
+            ProviderType.OPENAI, ProviderType.ANTHROPIC, ProviderType.GEMINI -> true
+        })
+    }
     var showApiKey by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val providerId = remember { initialProvider?.id ?: UUID.randomUUID().toString() }
@@ -274,6 +280,8 @@ fun ProviderEditorScreen(
         fallbackProviderId = fallbackProviderId?.takeIf { it.isNotBlank() && it != providerId },
         favoriteModels = localFavorites,
         modelOrder = initialProvider?.modelOrder ?: emptyList(),
+        // 是否走代理出口：海外模型默认开启，国内兼容端点可手动关闭。
+        needsProxy = needsProxy,
     )
 
     // 新建场景下判断用户是否填写了实质内容：名称、API Key、Base URL 任一非空白，或已添加模型。
@@ -626,6 +634,28 @@ fun ProviderEditorScreen(
                                         onCheckedChange = { useResponseApi = it }
                                     )
                                 }
+                            }
+
+                            // ── 需要代理出口（阶段2新增）──
+                            // 开启后该 Provider 的 API 请求走 proxyClient（挂载 proxySelector）；
+                            // 关闭后走 directClient 直连。海外官方模型默认开启，国内兼容端点可手动关闭。
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("需要代理", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        "开启后 API 请求经本地代理出口；关闭则直连。海外模型建议开启，国内模型可关闭以降低延迟。",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = needsProxy,
+                                    onCheckedChange = { needsProxy = it }
+                                )
                             }
 
                             // ── 能力判定策略子组（原独立区块移入高级参数） ──

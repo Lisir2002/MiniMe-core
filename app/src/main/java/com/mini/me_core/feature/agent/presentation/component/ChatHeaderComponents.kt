@@ -65,7 +65,6 @@ internal fun ChatHeader(
     onNavigateToTerminal: () -> Unit,
     onNavigateToGit: () -> Unit,
     onNavigateToBrowser: () -> Unit = {},
-    contextWindow: Int = 0,
     connectionState: com.mini.me_core.feature.agent.domain.container.ConnectionState? = null
 ) {
     Surface(
@@ -114,14 +113,6 @@ internal fun ChatHeader(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        // F2.6：Token 消耗指示器（紧邻模型名）
-                        if (contextWindow > 0 && inputTokens > 0) {
-                            TokenUsageIndicator(
-                                inputTokens = inputTokens,
-                                outputTokens = outputTokens,
-                                contextWindow = contextWindow,
-                            )
-                        }
                     }
                 }
                 IconButton(

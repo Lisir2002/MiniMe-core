@@ -18,16 +18,16 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -45,7 +45,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -64,12 +63,7 @@ import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
-import com.mini.me_core.feature.proxy.domain.ProxyGroupInfo
-import com.mini.me_core.feature.proxy.domain.ProxyNodeInfo
 import com.mini.me_core.feature.proxy.domain.ProxySubscription
-import com.mini.me_core.feature.proxy.domain.ProxyTraffic
-import com.mini.me_core.feature.proxy.presentation.ProfileNodesView
-import com.mini.me_core.feature.proxy.presentation.ProxyGroupsView
 import com.mini.me_core.feature.proxy.presentation.ProxyPreview
 import com.mini.me_core.feature.proxy.presentation.ProxyViewModel
 import androidx.compose.material.icons.Icons
@@ -83,10 +77,6 @@ import kotlinx.coroutines.withContext
 
 /** 导入来源模式。 */
 private enum class ImportMode { SUBSCRIPTION, MANUAL, FILE, DIRECT }
-
-private const val FIXED_OVERRIDE_HINT =
-    "external-controller 127.0.0.1:9090 · secret 随机会话 · mode rule · 内网 DIRECT 兜底" +
-        "external-controller 127.0.0.1:9090 · secret 随机会话 · mode rule · 内网 DIRECT 兜底"
 
 /**
  * 网络代理配置/导入页：管理已播种 profile、导入订阅/手动/文件、预检、开关。
@@ -103,13 +93,9 @@ fun ProxyConfigScreen(
     val aiHostsDirect by viewModel.aiHostsDirect.collectAsStateWithLifecycle()
     val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
     val preview by viewModel.preview.collectAsStateWithLifecycle()
-    val nodesView by viewModel.profileNodes.collectAsStateWithLifecycle()
-    val groupsView by viewModel.groups.collectAsStateWithLifecycle()
     val diagnostic by viewModel.diagnostic.collectAsStateWithLifecycle()
     val trafficToday by viewModel.trafficToday.collectAsStateWithLifecycle()
     val trafficWeek by viewModel.trafficWeek.collectAsStateWithLifecycle()
-    val nodeHealth by viewModel.nodeHealth.collectAsStateWithLifecycle()
-    val warmupState by viewModel.warmupState.collectAsStateWithLifecycle()
     val connLogEnabled by viewModel.connLogEnabled.collectAsStateWithLifecycle()
     val connLogs by viewModel.connLogs.collectAsStateWithLifecycle()
     val runtime by viewModel.runtime.collectAsStateWithLifecycle()
@@ -119,9 +105,8 @@ fun ProxyConfigScreen(
         profiles.firstOrNull { it.id == id }?.name?.ifBlank { id }
     }
 
-    var expandedId by remember { mutableStateOf<String?>(null) }
-    var expandedTab by remember { mutableStateOf(0) }
     var tab by remember { mutableStateOf(0) }   // 0=概览 1=订阅 2=高级
+    var deletingProfile by remember { mutableStateOf<ProxySubscription?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
@@ -288,41 +273,32 @@ fun ProxyConfigScreen(
                     ProfileRow(
                         profile = p,
                         isActive = p.id == activeProfileId,
-                        isEnabled = enabled,
-                        expanded = expandedId == p.id,
-                        expandedTab = expandedTab,
-                        nodesView = nodesView?.takeIf { it.profileId == p.id },
-                        groupsView = groupsView?.takeIf { it.profileId == p.id },
-                        nodeHealth = nodeHealth,
-                        warming = warmupState.warmProfileId == p.id && warmupState.warming,
                         onActivate = { viewModel.activate(p.id) },
-                        onDelete = { viewModel.delete(p.id) },
-                        onRefresh = { viewModel.refreshSubscription(p.id) },
-                        onToggleExpand = {
-                            if (expandedId == p.id) {
-                                expandedId = null
-                                viewModel.closeInspect()
-                                viewModel.closeGroups()
-                            } else {
-                                expandedId = p.id
-                                expandedTab = 0
-                                viewModel.inspectProfile(p.id)
-                            }
-                        },
-                        onTabChange = { t ->
-                            if (t == 1 && expandedTab != 1) viewModel.openGroups(p.id)
-                            if (t == 0 && expandedTab == 1) viewModel.closeGroups()
-                            expandedTab = t
-                        },
-                        onTestLatency = { viewModel.testProfileLatency(p.id) },
-                        onSelectGroupNode = { group, node ->
-                            viewModel.selectGroupNode(group, node)
-                        }
+                        onDelete = { deletingProfile = p },
+                        onRefresh = { viewModel.refreshSubscription(p.id) }
                     )
                     }
                 }
             }
         }
+    }
+
+    // 删除二次确认对话框
+    deletingProfile?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deletingProfile = null },
+            title = { Text("删除配置") },
+            text = { Text("确定要删除「${target.name.ifBlank { target.id }}」吗？此操作不可撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.delete(target.id)
+                    deletingProfile = null
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingProfile = null }) { Text("取消") }
+            }
+        )
     }
 }
 
@@ -910,29 +886,84 @@ private fun OverrideCard() {
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         )
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.md),
-            verticalAlignment = Alignment.Top
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Lock,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(Modifier.width(Spacing.sm))
-            Column {
+        Column(modifier = Modifier.fillMaxWidth().padding(Spacing.md)) {
+            // 标题行：图标 + 标题 + 状态标签
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            RoundedCornerShape(LocalCornerRadius.current.sm)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Spacer(Modifier.width(Spacing.sm))
                 Text(
                     text = stringResource(R.string.ui_______79cf38fa),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
                 )
-                Spacer(Modifier.height(Spacing.xs))
                 Text(
-                    text = FIXED_OVERRIDE_HINT,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "系统锁定",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            RoundedCornerShape(LocalCornerRadius.current.sm)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
+            }
+            Spacer(Modifier.height(Spacing.sm))
+            // 简短说明
+            Text(
+                text = "这是应用内置的默认代理配置，用于保证核心功能在任何情况下都能正常运行。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(Spacing.sm))
+            // 关键特性列表
+            val features = listOf(
+                "模型不可修改" to "由系统自动生成和维护，用户无法编辑",
+                "优先于用户配置" to "当所有自定义配置均不可用时自动兜底",
+                "内网直连" to "局域网流量始终走 DIRECT，不受代理规则影响",
+                "本地控制面" to "127.0.0.1:9090 控制端口，随机会话密钥"
+            )
+            features.forEach { (title, desc) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        text = "·",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    Column {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = desc,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
     }
@@ -942,502 +973,129 @@ private fun OverrideCard() {
 private fun ProfileRow(
     profile: ProxySubscription,
     isActive: Boolean,
-    isEnabled: Boolean,
-    expanded: Boolean,
-    expandedTab: Int,
-    nodesView: ProfileNodesView?,
-    groupsView: ProxyGroupsView?,
-    nodeHealth: Map<String, Boolean>,
-    warming: Boolean = false,
     onActivate: () -> Unit,
     onDelete: () -> Unit,
-    onRefresh: () -> Unit,
-    onToggleExpand: () -> Unit,
-    onTabChange: (Int) -> Unit,
-    onTestLatency: () -> Unit,
-    onSelectGroupNode: (String, String) -> Unit
+    onRefresh: () -> Unit
 ) {
+    val borderColor = if (isActive) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        )
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(Spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = profile.name.ifBlank { profile.id },
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Monospace
-                )
-                Spacer(Modifier.width(Spacing.sm))
-                if (isActive) {
-                    Text(
-                        text = stringResource(R.string.ui____fe32def4),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .background(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                RoundedCornerShape(LocalCornerRadius.current.sm)
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-                if (warming && !isActive) {
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text(
-                        text = "预热中",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier
-                            .background(
-                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f),
-                                RoundedCornerShape(LocalCornerRadius.current.sm)
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.height(Spacing.xs))
-            Text(
-                text = when (profile.kind) {
-                    ProxySubscription.KIND_SUBSCRIPTION -> stringResource(R.string.ui____adfb869d)
-                    ProxySubscription.KIND_MANUAL -> stringResource(R.string.ui____9c4530f5)
-                    ProxySubscription.KIND_DIRECT -> "直接代理"
-                    else -> "来源：${profile.kind}"
-                } + (if (isEnabled && isActive) stringResource(R.string.ui_____0ddc086b) else ""),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            // P1-7：显示上次更新时间（订阅型）；manual 型不显示。
-            if (profile.kind == ProxySubscription.KIND_SUBSCRIPTION && profile.updatedAt > 0L) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = "上次更新：${relativeAgo(profile.updatedAt)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                )
-            }
-            Spacer(Modifier.height(Spacing.sm))
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedButton(onClick = onActivate, enabled = !isActive) {
-                    Text(if (isActive) stringResource(R.string.ui____fe32def4_2) else stringResource(R.string.ui______f67c4924))
-                }
-                OutlinedButton(onClick = onRefresh, enabled = profile.kind == ProxySubscription.KIND_SUBSCRIPTION) {
-                    Text("刷新")
-                }
-                OutlinedButton(onClick = onDelete) { Text(stringResource(R.string.ui____2f4aaddd)) }
-                OutlinedButton(onClick = onToggleExpand) {
-                    Text(if (expanded) stringResource(R.string.ui____def9e98b_2) else stringResource(R.string.ui______47434b27))
-                }
-            }
-            if (expanded) {
-                Spacer(Modifier.height(Spacing.sm))
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    TabChip(stringResource(R.string.ui______ce9e92bd), selected = expandedTab == 0) { onTabChange(0) }
-                    TabChip(stringResource(R.string.ui____76992f37), selected = expandedTab == 1) { onTabChange(1) }
-                }
-                Spacer(Modifier.height(Spacing.sm))
-                when (expandedTab) {
-                    0 -> NodeListView(view = nodesView, onTestLatency = onTestLatency)
-                    1 -> GroupsTrafficView(
-                        view = groupsView,
-                        isActive = isActive,
-                        health = nodeHealth,
-                        onSelectGroupNode = onSelectGroupNode
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** 展开区内的子 Tab（节点列表 / 分组·流量）。 */
-@Composable
-private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    TextButton(onClick = onClick) {
-        Text(
-            text = label,
-            color = if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-        )
-    }
-}
-
-/** 展开区：加载状态 / 节点列表 + 测速状态（对齐 Clash 配置详情）。 */
-@Composable
-private fun NodeListView(view: ProfileNodesView?, onTestLatency: () -> Unit) {
-    when {
-        view == null || view.loading -> {
-            Text(
-                text = stringResource(R.string.ui_______3fd48e2f),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        view.error != null -> {
-            Text(
-                text = view.error,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
-            )
-        }
-        else -> {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = buildString {
-                            append("节点 ${view.summary.nodes.size}")
-                            append(" · 分组 ${view.summary.groups.size}")
-                            if (view.summary.providerCount > 0) {
-                                append(" · provider ${view.summary.providerCount}")
-                            }
-                        },
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedButton(
-                        onClick = onTestLatency,
-                        enabled = view.summary.nodes.isNotEmpty() && !view.testing
-                    ) {
-                        Text(if (view.testing) stringResource(R.string.ui_____7765b216) else stringResource(R.string.ui____c7f8d9cc))
-                    }
-                }
-                Spacer(Modifier.height(Spacing.sm))
-                if (view.summary.nodes.isEmpty()) {
-                    Text(
-                        text = if (view.summary.providerCount > 0) {
-                            stringResource(R.string.ui______18fa8b71)
-                        } else {
-                            stringResource(R.string.ui___________ff57a25f)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    // P1-10：排序模式 / 协议筛选 / 地区筛选（本地 UI 状态；测速结果已缓存在 view.latencies）。
-                    var sortMode by rememberSaveable { mutableStateOf(0) } // 0=默认 1=延迟升 2=延迟降
-                    var protocolFilter by rememberSaveable { mutableStateOf("全部") }
-                    var regionFilter by rememberSaveable { mutableStateOf("全部") }
-
-                    val allNodes = view.summary.nodes
-                    val protocols = remember(allNodes) {
-                        (listOf("全部") + allNodes.map { it.type }.distinct()).take(8)
-                    }
-                    val regions = remember(allNodes) {
-                        // 从节点名解析地区关键词（常见中文/英文地区名）。
-                        val known = listOf("香港", "台湾", "日本", "新加坡", "美国", "韩国", "德国", "英国", "伊朗")
-                        val found = allNodes.mapNotNull { n ->
-                            known.firstOrNull { kw -> n.name.contains(kw, ignoreCase = false) }
-                        }.distinct()
-                        (listOf("全部") + found)
-                    }
-                    val visible = remember(allNodes, view.latencies, sortMode, protocolFilter, regionFilter) {
-                        var list = allNodes.asSequence()
-                        if (protocolFilter != "全部") list = list.filter { it.type.equals(protocolFilter, ignoreCase = true) }
-                        if (regionFilter != "全部") list = list.filter { it.name.contains(regionFilter) }
-                        list = when (sortMode) {
-                            1 -> list.sortedBy { view.latencies[it.name] ?: Long.MAX_VALUE }
-                            2 -> list.sortedByDescending { view.latencies[it.name] ?: -1L }
-                            else -> list
-                        }
-                        list.toList()
-                    }
-
-                    // 排序/筛选 Chip 行
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                        listOf("默认", "延迟↑", "延迟↓").forEachIndexed { i, label ->
-                            FilterChip(
-                                selected = sortMode == i,
-                                onClick = { sortMode = i },
-                                label = { Text(label, style = MaterialTheme.typography.labelSmall) }
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(Spacing.xs))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                        protocols.forEach { p ->
-                            FilterChip(
-                                selected = protocolFilter == p,
-                                onClick = { protocolFilter = p },
-                                label = { Text(p, style = MaterialTheme.typography.labelSmall) }
-                            )
-                        }
-                    }
-                    if (regions.size > 1) {
-                        Spacer(Modifier.height(Spacing.xs))
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                            regions.forEach { r ->
-                                FilterChip(
-                                    selected = regionFilter == r,
-                                    onClick = { regionFilter = r },
-                                    label = { Text(r, style = MaterialTheme.typography.labelSmall) }
-                                )
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(Spacing.sm))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 300.dp)
-                    ) {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            itemsIndexed(visible) { _, node ->
-                                NodeRow(
-                                    node = node,
-                                    tested = view.latencies.containsKey(node.name),
-                                    delay = view.latencies[node.name]
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun NodeRow(node: ProxyNodeInfo, tested: Boolean, delay: Long?) {
-    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = node.name,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
-                fontFamily = FontFamily.Monospace
-            )
-            Text(
-                text = "${node.type} · ${node.server}:${node.port}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        LatencyBadge(tested = tested, delayMs = delay)
-    }
-}
-
-/** 测速状态徽标：未测（灰）→ 延迟 ms（绿）/ 超时（红），对齐 Clash 的节点健康色。 */
-@Composable
-private fun LatencyBadge(tested: Boolean, delayMs: Long?) {
-    val (text, color) = when {
-        !tested -> stringResource(R.string.ui____21df949d) to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-        delayMs == null -> stringResource(R.string.ui____e944c7c9) to MaterialTheme.colorScheme.error
-        else -> "${delayMs} ms" to MaterialTheme.colorScheme.tertiary
-    }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = color
-    )
-}
-
-/** 展开区「分组 · 流量」：实时流量卡片 + 分组树（类型/选中项/成员），需代理运行中。 */
-@Composable
-private fun GroupsTrafficView(
-    view: ProxyGroupsView?,
-    isActive: Boolean,
-    health: Map<String, Boolean>,
-    onSelectGroupNode: (String, String) -> Unit
-) {
-    when {
-        view == null || view.loading -> {
-            Text(
-                text = stringResource(R.string.ui______6f516f09),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        !view.running -> {
-            Text(
-                text = stringResource(R.string.ui_______e1a5bd7a),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        view.error != null -> {
-            Text(
-                text = "加载失败：${view.error}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
-            )
-        }
-        else -> {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                if (!isActive) {
-                    Text(
-                        text = stringResource(R.string.ui__________154de4a1),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(Spacing.xs))
-                }
-                TrafficCard(traffic = view.traffic)
-                Spacer(Modifier.height(Spacing.sm))
-                Text(
-                    text = "分组树（${view.snapshot?.groups?.size ?: 0}）· 点选切换节点",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(Spacing.xs))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 360.dp)
-                ) {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        view.snapshot?.groups?.forEach { group ->
-                            item(key = group.name) {
-                                GroupNodeCard(group = group, health = health, onSelectGroupNode = onSelectGroupNode)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** 实时流量卡（/traffic WS 推流，零轮询）。 */
-@Composable
-private fun TrafficCard(traffic: ProxyTraffic?) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
+            .clickable { onActivate() },
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            containerColor = if (isActive)
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (isActive) 2.dp else 1.dp,
+            color = borderColor
         )
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.sm),
+            modifier = Modifier.fillMaxWidth().padding(Spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = stringResource(R.string.ui______c1fbcbfb),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = if (traffic == null) {
-                    "—"
-                } else {
-                    "↓ ${formatSpeed(traffic.down)}/s · ↑ ${formatSpeed(traffic.up)}/s"
-                },
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
-
-/** 单个分组卡：类型 + 健康检查延迟 + 当前选中项，成员可点选切换（对齐 Clash）。 */
-@Composable
-private fun GroupNodeCard(
-    group: ProxyGroupInfo,
-    health: Map<String, Boolean>,
-    onSelectGroupNode: (String, String) -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalCornerRadius.current.lg),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        )
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(Spacing.sm)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // 左侧选中指示器
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .background(
+                        if (isActive) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isActive) {
+                    Text(
+                        text = "✓",
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Spacer(Modifier.width(Spacing.sm))
+            // 中间信息区
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = profile.name.ifBlank { profile.id },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (isActive) {
+                        Spacer(Modifier.width(Spacing.xs))
+                        Text(
+                            text = stringResource(R.string.ui____fe32def4),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    text = group.name,
+                    text = when (profile.kind) {
+                        ProxySubscription.KIND_SUBSCRIPTION -> stringResource(R.string.ui____adfb869d)
+                        ProxySubscription.KIND_MANUAL -> stringResource(R.string.ui____9c4530f5)
+                        ProxySubscription.KIND_DIRECT -> "直接代理"
+                        else -> "来源：${profile.kind}"
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = group.type,
-                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.width(Spacing.sm))
-                group.delay?.let {
+                if (profile.kind == ProxySubscription.KIND_SUBSCRIPTION && profile.updatedAt > 0L) {
+                    Spacer(Modifier.height(1.dp))
                     Text(
-                        text = "${it} ms",
+                        text = "上次更新：${relativeAgo(profile.updatedAt)}",
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.tertiary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     )
                 }
             }
-            Spacer(Modifier.height(Spacing.xs))
-            Text(
-                text = "当前：${group.now ?: "—"}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(Spacing.xs))
-            group.all.forEach { member ->
-                val selected = member == group.now
-                // P2-13：连续超时被健康监控标记为不可用的节点置灰（仍可手动点选）。
-                val unhealthy = health[member] == false
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onSelectGroupNode(group.name, member) }
-                        .padding(vertical = Spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically
+            Spacer(Modifier.width(Spacing.sm))
+            // 右侧按钮区
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Button(
+                    onClick = onActivate,
+                    enabled = !isActive,
+                    contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = 0.dp),
+                    modifier = Modifier.height(32.dp)
                 ) {
                     Text(
-                        text = if (selected) "● " else "○ ",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (selected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                        if (isActive) stringResource(R.string.ui____fe32def4_2)
+                        else stringResource(R.string.ui______f67c4924),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    if (profile.kind == ProxySubscription.KIND_SUBSCRIPTION) {
+                        OutlinedButton(
+                            onClick = onRefresh,
+                            contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = 0.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("更新", style = MaterialTheme.typography.labelSmall)
                         }
-                    )
-                    Text(
-                        text = member,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = when {
-                            selected -> MaterialTheme.colorScheme.primary
-                            unhealthy -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-                            else -> MaterialTheme.colorScheme.onSurface
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (unhealthy) {
-                        Text(
-                            text = "不可用",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                        )
                     }
-                    if (selected) {
-                        Text(
-                            text = stringResource(R.string.ui____7bf54e28),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
+                    OutlinedButton(
+                        onClick = onDelete,
+                        contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = 0.dp),
+                        modifier = Modifier.height(28.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
                         )
+                    ) {
+                        Text(stringResource(R.string.ui____2f4aaddd), style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -1445,15 +1103,6 @@ private fun GroupNodeCard(
     }
 }
 
-/** 字节/秒 → 可读速率（B/KB/MB/s）。 */
-private fun formatSpeed(bytes: Long): String {
-    val b = bytes.toDouble()
-    return when {
-        b >= 1024 * 1024 -> "%.1f MB/s".format(b / (1024.0 * 1024.0))
-        b >= 1024 -> "%.1f KB/s".format(b / 1024.0)
-        else -> "%.0f B/s".format(b)
-    }
-}
 /** P1-7：把时间戳格式化为「x分钟前/x小时前/x天前」。 */
 private fun relativeAgo(ts: Long): String {    val diff = System.currentTimeMillis() - ts
     if (diff < 60_000L) return "刚刚"

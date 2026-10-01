@@ -501,7 +501,6 @@ fun AIChatPanel(
                 onNavigateToTerminal = onNavigateToTerminal,
                 onNavigateToGit = onNavigateToGit,
                 onNavigateToBrowser = onNavigateToBrowser,
-                contextWindow = activeModelMetadata?.contextTokens ?: 0,
                 connectionState = connectionState?.takeIf { isRemote }
             )
         }
