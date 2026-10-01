@@ -554,14 +554,13 @@ class ClashProxyManager @Inject constructor(
         }
         runCatching {
             okHttp.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) {
-                    _state.update { it.copy(controllerReachable = true) }
-                    null
-                } else {
-                    _state.update { it.copy(controllerReachable = true) }
-                    resp.body?.string()
-                }
+                // 能拿到任何 HTTP 响应（即使 4xx/5xx）都说明控制器进程在监听 → reachable=true。
+                _state.update { it.copy(controllerReachable = true) }
+                if (!resp.isSuccessful) null else resp.body?.string()
             }
+        }.onFailure {
+            // 连接被拒/超时/网络错 → 控制器不可达，及时翻为 false（否则状态会残留为上一次的 true）。
+            _state.update { it.copy(controllerReachable = false) }
         }.getOrNull()
     }
 
