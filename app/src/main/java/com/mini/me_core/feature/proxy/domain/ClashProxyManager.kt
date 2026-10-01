@@ -2,12 +2,16 @@ package com.mini.me_core.feature.proxy.domain
 
 import android.content.Context
 import android.os.Build
+import com.mini.me_core.core.security.CredentialEncryptor
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.datalayer.store.KVStore
 import java.io.IOException
+import com.mini.me_core.feature.proxy.data.PROXY_NS
 import com.mini.me_core.feature.proxy.data.ProxySettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -114,6 +118,8 @@ class ClashProxyManager @Inject constructor(
     private val okHttp: OkHttpClient,
     private val repository: ProxySettingsRepository,
     private val routeHolder: ProxyRouteHolder,
+    private val credentialEncryptor: CredentialEncryptor,
+    private val kv: KVStore,
 ) {
     companion object {
         private const val TAG = "ClashProxyManager"
@@ -123,6 +129,9 @@ class ClashProxyManager @Inject constructor(
         private const val CONFIG_DIR = "proxy"
         private const val CONFIG_FILE = "config.yaml"
         private const val SECRET_FILE = "secret"
+
+        /** P0-5：control secret 在 KVStore 中的键（密文形式，与订阅 secret 同一套 CredentialEncryptor）。 */
+        private const val CONTROL_SECRET_KEY = "control_secret"
 
         /** 被覆盖块接管、需从源配置剥离的顶层键（避免与 fixed override 冲突或被恶意夹带）。 */
         val OVERRIDDEN_KEYS = listOf(
@@ -201,13 +210,23 @@ class ClashProxyManager @Inject constructor(
     @Volatile
     private var secret: String = ""
 
+    /** P0-5：secret 异步加载完成信号（加密存储需在协程中解密；suspend 调用方据此等待）。 */
+    private val secretReady = CompletableDeferred<Unit>()
+
     /** 全局开关缓存：buildContainerEnv 是同步方法，不能在其中挂起读 DataStore，故用 flow 预热。 */
     @Volatile
     private var enabledCache: Boolean = false
 
     init {
-        secret = loadOrCreateSecret()
+        // P0-5：secret 改为加密存储（CredentialEncryptor + KVStore），需在协程中异步解密。
+        // 必须先于任何内核拉起/控制面请求完成——on()/controllerRequest 等 suspend 入口会 await secretReady。
+        secret = ""
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            runCatching { loadOrCreateSecretEncrypted() }
+                .onSuccess { s -> secret = s }
+                .onFailure { FileLogger.w(TAG, "加载加密 control secret 失败: ${it.message}") }
+            secretReady.complete(Unit)
+
             // 首帧：上次若为启用态，先拉起内核、确认控制面就绪，再同步开关。
             // 顺序不可反——先置 enabled 会让共享 OkHttp 把流量打进还没人监听的 7890（对应
             // ModelMetadataService 那类 `Failed to connect to /127.0.0.1:7890`），必须内核先起。
@@ -264,30 +283,60 @@ class ClashProxyManager @Inject constructor(
 
     fun controllerSecret(): String = secret
 
+    /** P0-5：等待加密 secret 加载完成（所有用到 [secret] 的 suspend 入口先调用）。 */
+    private suspend fun ensureSecretLoaded() {
+        if (secret.isEmpty()) secretReady.await()
+    }
+
     private fun configDir(): java.io.File =
         java.io.File(java.io.File(context.filesDir, "minime"), CONFIG_DIR)
 
-    private fun loadOrCreateSecret(): String {
-        return try {
-            val dir = configDir().apply { mkdirs() }
-            val f = java.io.File(dir, SECRET_FILE)
-            if (f.exists()) {
-                f.readText().trim().ifBlank { newSecret(f) }
-            } else {
-                newSecret(f)
-            }
-        } catch (e: Exception) {
-            FileLogger.w(TAG, "读取代理 secret 失败: ${e.message}")
-            ""
+    /**
+     * P0-5：加载或创建 control secret，加密存储在 KVStore（与订阅 secret 同一套 CredentialEncryptor）。
+     *
+     * 迁移路径：
+     *  1. KVStore 已有密文 → 解密返回；
+     *  2. 否则旧版明文文件 `filesDir/minime/proxy/secret` 仍在 → 读明文、加密写 KV、删明文文件；
+     *  3. 都没有 → 生成新随机 secret，加密写 KV。
+     * 避免把鉴权令牌以明文落在 filesDir（任意拿到 App 沙箱读权限的进程/备份可读）。
+     */
+    private suspend fun loadOrCreateSecretEncrypted(): String {
+        // 1. 已迁移到加密存储
+        kv.getString(PROXY_NS, CONTROL_SECRET_KEY)?.takeIf { it.isNotBlank() }?.let { cipher ->
+            runCatching { credentialEncryptor.decrypt(cipher, "proxy_control_secret") }
+                .getOrNull()
+                ?.takeIf { it.isNotBlank() }
+                ?.let { return it }
+            FileLogger.w(TAG, "KV 中的 control secret 解密失败，回退到明文文件/重建")
         }
+        // 2. 旧版明文文件迁移
+        val dir = configDir().apply { mkdirs() }
+        val legacy = java.io.File(dir, SECRET_FILE)
+        if (legacy.isFile) {
+            val plain = runCatching { legacy.readText().trim() }.getOrNull().orEmpty()
+            if (plain.isNotBlank()) {
+                runCatching {
+                    val cipher = credentialEncryptor.encrypt(plain)
+                    kv.putString(PROXY_NS, CONTROL_SECRET_KEY, cipher)
+                    legacy.delete()
+                }
+                FileLogger.i(TAG, "已把旧明文 control secret 迁移到加密存储并删除明文文件")
+                return plain
+            }
+        }
+        // 3. 生成新 secret
+        val s = generateRandomSecret()
+        runCatching {
+            val cipher = credentialEncryptor.encrypt(s)
+            kv.putString(PROXY_NS, CONTROL_SECRET_KEY, cipher)
+        }.onFailure { FileLogger.w(TAG, "加密保存 control secret 失败: ${it.message}") }
+        FileLogger.i(TAG, "已生成新的代理 control secret（加密存储）")
+        return s
     }
 
-    private fun newSecret(f: java.io.File): String {
+    private fun generateRandomSecret(): String {
         val pool = "abcdefghijklmnopqrstuvwxyz0123456789"
-        val s = (0 until 24).joinToString("") { pool[kotlin.random.Random.nextInt(pool.length)].toString() }
-        runCatching { f.writeText(s) }
-        FileLogger.i(TAG, "已生成代理 control secret")
-        return s
+        return (0 until 24).joinToString("") { pool[kotlin.random.Random.nextInt(pool.length)].toString() }
     }
 
     /**
@@ -468,6 +517,7 @@ class ClashProxyManager @Inject constructor(
      * 订阅型需重新拉远端 YAML，网络不可达时返回 false，自动恢复跳过。
      */
     private suspend fun rebuildConfigFromActiveProfile(): Boolean {
+        ensureSecretLoaded()
         val activeId = repository.activeProfileIdFlow.first() ?: return false
         return try {
             val revealed = repository.revealSecret(activeId) ?: return false
@@ -492,6 +542,7 @@ class ClashProxyManager @Inject constructor(
         path: String,
         body: String? = null,
     ): String? = withContext(Dispatchers.IO) {
+        ensureSecretLoaded()
         val url = "http://$CONTROLLER_HOST:$CONTROLLER_PORT$path"
         val requestBody = body?.toRequestBody("application/json".toMediaType())
             ?: ByteArray(0).toRequestBody(null)
@@ -556,6 +607,7 @@ class ClashProxyManager @Inject constructor(
      * 每次 collect 建立一条 WS；collect 取消即关闭（awaitClose 里 ws.cancel()），失败自动结束流。
      */
     fun trafficFlow(): Flow<ProxyTraffic> = callbackFlow {
+        ensureSecretLoaded()
         val req = Request.Builder()
             .url("http://$CONTROLLER_HOST:$CONTROLLER_PORT/traffic")
             .header("Authorization", "Bearer $secret")
@@ -875,6 +927,7 @@ class ClashProxyManager @Inject constructor(
 
     /** 拉起代理：由已播种 profile（[profileId]）或临时 inline（[inlineYaml]）合成配置、落盘、拉起内核、置开关。 */
     suspend fun on(profileId: String?, inlineYaml: String?): String {
+        ensureSecretLoaded()
         if (profileId == null && inlineYaml == null) return "需要 profile_id 或 inline yaml"
         val source = when {
             inlineYaml != null -> inlineYaml
