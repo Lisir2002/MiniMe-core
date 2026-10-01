@@ -32,5 +32,7 @@ data class ProxySubscription(
     companion object {
         const val KIND_SUBSCRIPTION = "subscription"
         const val KIND_MANUAL = "manual"
+        /** P2-12：直接代理（socks5/http 单跳），secretCipher 存合成后的最小 YAML（同 manual）。 */
+        const val KIND_DIRECT = "direct"
     }
 }

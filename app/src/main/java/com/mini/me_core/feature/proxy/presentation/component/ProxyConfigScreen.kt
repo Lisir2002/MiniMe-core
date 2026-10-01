@@ -79,7 +79,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** 导入来源模式。 */
-private enum class ImportMode { SUBSCRIPTION, MANUAL, FILE }
+private enum class ImportMode { SUBSCRIPTION, MANUAL, FILE, DIRECT }
 
 private const val FIXED_OVERRIDE_HINT =
     "external-controller 127.0.0.1:9090 · secret 随机会话 · mode rule · 内网 DIRECT 兜底" +
@@ -480,6 +480,12 @@ private fun ImportEditor(
     var nameField by remember { mutableStateOf("") }
     var urlField by remember { mutableStateOf("") }
     var yamlField by remember { mutableStateOf("") }
+    // P2-12：直接代理表单字段。
+    var dpProtocol by remember { mutableStateOf("socks5") }
+    var dpHost by remember { mutableStateOf("") }
+    var dpPort by remember { mutableStateOf("") }
+    var dpUser by remember { mutableStateOf("") }
+    var dpPass by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -528,6 +534,7 @@ private fun ImportEditor(
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 ModeChip(stringResource(R.string.ui____701515e9), selected = mode == ImportMode.SUBSCRIPTION, enabled = !busy) { mode = ImportMode.SUBSCRIPTION }
                 ModeChip(stringResource(R.string.ui____601a29b5), selected = mode == ImportMode.MANUAL, enabled = !busy) { mode = ImportMode.MANUAL }
+                ModeChip("直接代理", selected = mode == ImportMode.DIRECT, enabled = !busy) { mode = ImportMode.DIRECT }
                 ModeChip(stringResource(R.string.ui_______d9a6706f), selected = false, enabled = !busy) { filePicker.launch("*/*") }
             }
 
@@ -582,6 +589,33 @@ private fun ImportEditor(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                ImportMode.DIRECT -> {
+                    // 协议选择
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        listOf("socks5", "http").forEach { p ->
+                            FilterChip(selected = dpProtocol == p, onClick = { dpProtocol = p },
+                                label = { Text(p, style = MaterialTheme.typography.labelSmall) })
+                        }
+                    }
+                    Spacer(Modifier.height(Spacing.sm))
+                    OutlinedTextField(value = dpHost, onValueChange = { dpHost = it },
+                        label = { Text("主机") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    Spacer(Modifier.height(Spacing.sm))
+                    OutlinedTextField(value = dpPort, onValueChange = { dpPort = it },
+                        label = { Text("端口") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    Spacer(Modifier.height(Spacing.sm))
+                    OutlinedTextField(value = dpUser, onValueChange = { dpUser = it },
+                        label = { Text("用户名（可选）") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    Spacer(Modifier.height(Spacing.sm))
+                    OutlinedTextField(value = dpPass, onValueChange = { dpPass = it },
+                        label = { Text("密码（可选）") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    Spacer(Modifier.height(Spacing.sm))
+                    OutlinedButton(
+                        onClick = { onPreview(null, buildDirectYaml(dpProtocol, dpHost, dpPort, dpUser, dpPass)) },
+                        enabled = dpHost.isNotBlank() && dpPort.toIntOrNull() != null && !busy
+                    ) { Text(stringResource(R.string.ui____bb872a0c_2)) }
+                    SaveHint()
+                }
             }
 
             preview?.let { p ->
@@ -591,9 +625,17 @@ private fun ImportEditor(
 
             preview?.takeIf { it.ok }?.let { p ->
                 Spacer(Modifier.height(Spacing.md))
-                val isSubscription = !urlField.isBlank()
-                val kind = if (isSubscription) ProxySubscription.KIND_SUBSCRIPTION else ProxySubscription.KIND_MANUAL
-                val secret = if (isSubscription) urlField.trim() else yamlField
+                // P2-12：按当前导入模式决定 kind/secret；direct 存合成后的最小 YAML。
+                val kind = when (mode) {
+                    ImportMode.SUBSCRIPTION -> ProxySubscription.KIND_SUBSCRIPTION
+                    ImportMode.DIRECT -> ProxySubscription.KIND_DIRECT
+                    else -> ProxySubscription.KIND_MANUAL
+                }
+                val secret = when (mode) {
+                    ImportMode.SUBSCRIPTION -> urlField.trim()
+                    ImportMode.DIRECT -> buildDirectYaml(dpProtocol, dpHost, dpPort, dpUser, dpPass)
+                    else -> yamlField
+                }
                 val resolvedSource = !p.resolvedYaml.isBlank()
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     OutlinedButton(
@@ -752,6 +794,7 @@ private fun ProfileRow(
                 text = when (profile.kind) {
                     ProxySubscription.KIND_SUBSCRIPTION -> stringResource(R.string.ui____adfb869d)
                     ProxySubscription.KIND_MANUAL -> stringResource(R.string.ui____9c4530f5)
+                    ProxySubscription.KIND_DIRECT -> "直接代理"
                     else -> "来源：${profile.kind}"
                 } + (if (isEnabled && isActive) stringResource(R.string.ui_____0ddc086b) else ""),
                 style = MaterialTheme.typography.bodySmall,
@@ -1204,4 +1247,23 @@ private fun formatBytes(bytes: Long): String {
         b >= 1024 -> "%.1f KB".format(b / 1024.0)
         else -> "${bytes} B"
     }
+}
+
+/** P2-12：由 socks5/http 单跳参数合成最小 Clash YAML。 */
+private fun buildDirectYaml(protocol: String, host: String, port: String, user: String, pass: String): String {
+    val sb = StringBuilder()
+    sb.appendLine("proxies:")
+    sb.appendLine("  - name: direct-proxy")
+    sb.appendLine("    type: $protocol")
+    sb.appendLine("    server: \"${host.trim()}\"")
+    sb.appendLine("    port: ${port.trim().toIntOrNull() ?: 0}")
+    if (user.isNotBlank()) sb.appendLine("    username: \"${user.trim()}\"")
+    if (pass.isNotBlank()) sb.appendLine("    password: \"${pass.trim()}\"")
+    sb.appendLine("proxy-groups:")
+    sb.appendLine("  - name: PROXY")
+    sb.appendLine("    type: select")
+    sb.appendLine("    proxies: [direct-proxy]")
+    sb.appendLine("rules:")
+    sb.appendLine("  - MATCH,PROXY")
+    return sb.toString()
 }
