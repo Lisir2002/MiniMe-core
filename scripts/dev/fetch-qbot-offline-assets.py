@@ -226,18 +226,35 @@ def fetch_apt(out_dir: str, force: bool) -> None:
 
     在 amd64 构建机上以「隔离 apt 状态目录」完成：不改宿主 sources.list、不改宿主已装包，
     仅把 arm64 的包索引与 .deb 落到临时目录（`Dir::State` / `Dir::Cache` 全部重定向）。
+
+    闭包策略（第三层修复）：固定使用**空 dpkg 清单**做基准，apt 下载目标包的**全量传递依赖**，
+    不再从 rootfs 抽取增量清单——消除「rootfs 版本与闭包版本错位导致缺依赖」的风险。
+    `_extract_rootfs_dpkg_status()` 保留待用但本函数不再调用。
+    全量闭包体积约 ~160MB（旧增量版 ~80MB），属预期代价。
+
+    版本绑定（第二层修复）：若随包 rootfs 比已有 pool.bin 新，强制重新生成闭包，
+    即使传了 --only/未传 --force 也重抓，确保离线依赖包随容器底座同步更新。
     """
     dest = os.path.join(out_dir, "apt", APT_POOL_NAME)
+
+    # rootfs 比 pool.bin 新 => 强制重抓闭包（版本绑定），覆盖 _already() 的跳过逻辑。
+    rootfs = os.path.join(out_dir, "rootfs", ROOTFS_NAME)
+    if not force and os.path.exists(dest) and os.path.exists(rootfs) \
+            and os.path.getmtime(rootfs) > os.path.getmtime(dest):
+        log(f"[apt] 检测到 rootfs（{os.path.basename(rootfs)}）比 pool.bin 新，强制重新生成闭包")
+        force = True
+
     if _already(dest, force):
         return
     _require_apt()
 
     os.makedirs(os.path.dirname(dest), exist_ok=True)
-    status_src = _extract_rootfs_dpkg_status(out_dir)
+    # 全量闭包：传空字符串作为 dpkg 基准清单，apt 自动补齐全部传递依赖。
+    status_src = ""
     try:
         last_err = None
         for mirror in APT_MIRRORS:
-            log(f"[apt] 解析 arm64 依赖闭包：{mirror}")
+            log(f"[apt] 解析 arm64 依赖闭包（全量）：{mirror}")
             try:
                 count = _apt_download_and_pack(mirror, dest, status_src)
             except SystemExit as exc:
@@ -255,7 +272,10 @@ def fetch_apt(out_dir: str, force: bool) -> None:
 def _extract_rootfs_dpkg_status(out_dir: str) -> str:
     """从随包 rootfs 里取出容器实际的 dpkg 已装清单（作为依赖解析基准）。
 
-    这是本函数的关键：apt 的闭包 = 「目标包集合」−「容器里已装的包」。若拿空清单当基准，
+    【保留待用，当前不被调用】第三层修复后 `fetch_apt()` 固定传空清单生成全量闭包，
+    以彻底消除 rootfs 与闭包版本错位的缺依赖风险；本函数留作未来增量优化的入口。
+
+    历史逻辑：apt 的闭包 = 「目标包集合」−「容器里已装的包」。若拿空清单当基准，
     apt 会把 libc6/perl/base-files 等基础包也当成待装而全部下载（体积翻倍，且容器内
     重装基础包会执行 postinst，风险高）。用真实 rootfs 的 status 才能得到**增量闭包**。
     """
@@ -312,7 +332,7 @@ def _apt_download_and_pack(mirror: str, dest: str, status_src: str) -> int:
             for suite in (APT_SUITE, f"{APT_SUITE}-updates", f"{APT_SUITE}-security"):
                 fh.write(f"deb [arch=arm64] {mirror} {suite} main restricted universe multiverse\n")
 
-        # dpkg 已装清单：优先用容器底座的真实清单（增量闭包），否则退化为空清单（全量闭包）。
+        # dpkg 已装清单：当前固定传空清单（全量闭包，fetch_apt 不再抽取 rootfs 增量清单）。
         status = os.path.join(tmp, "status")
         if status_src and os.path.exists(status_src):
             shutil.copyfile(status_src, status)
