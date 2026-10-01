@@ -2,7 +2,7 @@ package com.mini.me_core.feature.agent.domain.execution.tool.job
 
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.domain.execution.job.JobService
-import com.mini.me_core.feature.agent.data.local.entity.JobEntity
+import com.mini.me_core.feature.agent.domain.execution.job.statusEnum
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.execution.tool.AbstractContextualTool
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
@@ -10,6 +10,7 @@ import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolParameter
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionPolicy
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_jobs as V2Job
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -84,7 +85,7 @@ class JobStartTool @Inject constructor(
 
         return try {
             val job = jobService.start(sessionId, kind, title, command, timeoutMs)
-            FileLogger.i(TAG, "后台任务已启动 jobId=${job.jobId} title=$title timeout=${timeoutMs}ms")
+            FileLogger.i(TAG, "后台任务已启动 jobId=${job.job_id} title=$title timeout=${timeoutMs}ms")
             ToolResult.Success(jobJson(job))
         } catch (e: Exception) {
             FileLogger.e(TAG, "启动后台任务失败: $command", e)
@@ -92,9 +93,9 @@ class JobStartTool @Inject constructor(
         }
     }
 
-    private fun jobJson(job: JobEntity): JsonObject = JsonObject(
+    private fun jobJson(job: V2Job): JsonObject = JsonObject(
         mapOf(
-            "job_id" to JsonPrimitive(job.jobId),
+            "job_id" to JsonPrimitive(job.job_id),
             "status" to JsonPrimitive(job.statusEnum().name.lowercase()),
             "title" to JsonPrimitive(job.title),
             "kind" to JsonPrimitive(job.kind)
@@ -154,10 +155,10 @@ class JobStatusTool @Inject constructor(
         }
     }
 
-    private fun statusLine(job: JobEntity): String {
-        val exit = job.exitCode?.let { " exit=$it" } ?: ""
-        val finished = job.finishedAtMs?.let { " finished=${it}" } ?: ""
-        return "${job.jobId}  [${job.statusEnum().name.lowercase()}]  ${job.title}$exit$finished"
+    private fun statusLine(job: V2Job): String {
+        val exit = job.exit_code?.let { " exit=${it.toInt()}" } ?: ""
+        val finished = job.finished_at_ms?.let { " finished=$it" } ?: ""
+        return "${job.job_id}  [${job.statusEnum().name.lowercase()}]  ${job.title}$exit$finished"
     }
 }
 

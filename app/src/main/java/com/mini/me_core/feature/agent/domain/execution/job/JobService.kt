@@ -1,10 +1,9 @@
 package com.mini.me_core.feature.agent.domain.execution.job
 
+import com.mini.me_core.core.util.EnumSafe
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_jobs as V2Job
-import com.mini.me_core.feature.agent.data.local.entity.JobEntity
-import com.mini.me_core.feature.agent.data.local.entity.JobStatus
 import com.mini.me_core.feature.agent.domain.container.BoundedOutput
 import com.mini.me_core.feature.agent.domain.container.CommandEngine
 import com.mini.me_core.feature.agent.domain.container.CommandEvent
@@ -20,10 +19,24 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** 后台任务生命周期状态（对齐 DSH job status）。 */
+enum class JobStatus {
+    /** 运行中（或已启动未结束）。 */
+    RUNNING,
+    /** 正常完成（exitCode == 0 语义由调用方保证）。 */
+    DONE,
+    /** 执行失败。 */
+    FAILED,
+    /** 被 kill（job_kill）。 */
+    KILLED,
+    /** 进程被回收/宿主不可用导致中断，恢复需重跑。 */
+    INTERRUPTED
+}
+
 /**
  * 会话级「后台任务」服务（对齐 DSH JobStart/JobRegistry）：
  *
- * - 长任务（容器内编译/测试/构建、远程同步）状态落库 [JobEntity]，App 切后台/进程回收不丢；
+ * - 长任务（容器内编译/测试/构建、远程同步）状态落库 [V2Job]，App 切后台/进程回收不丢；
  * - 进程句柄与输出缓冲放内存注册表（[runningHandles] / [buffers]）；进程被回收即恢复时状态置
  *   [JobStatus.INTERRUPTED]，提示重跑；
  * - 重复 start 幂等（first-wins）：同 jobId 已存在且 RUNNING 时直接返回既有任务；
@@ -72,14 +85,14 @@ class JobService @Inject constructor(
         command: String,
         timeoutMs: Long = DEFAULT_TIMEOUT_MS,
         jobId: String = UUID.randomUUID().toString()
-    ): JobEntity {
+    ): V2Job {
         // first-wins：同 jobId 已存在且仍 RUNNING → 直接复用，不重复启动。
         runningHandles[jobId]?.let {
-            val existing = v2Agent.getJobById(jobId)?.toEntity()
+            val existing = v2Agent.getJobById(jobId)
             if (existing?.statusEnum() == JobStatus.RUNNING) return existing
         }
         val now = System.currentTimeMillis()
-        val entity = JobEntity(
+        v2Agent.upsertJob(
             jobId = jobId,
             sessionId = sessionId,
             kind = kind,
@@ -91,18 +104,7 @@ class JobService @Inject constructor(
             finishedAtMs = null,
             updatedAtMs = now
         )
-        v2Agent.upsertJob(
-            jobId = entity.jobId,
-            sessionId = entity.sessionId,
-            kind = entity.kind,
-            title = entity.title,
-            status = entity.status,
-            exitCode = entity.exitCode?.toLong(),
-            outputLocator = entity.outputLocator,
-            createdAtMs = entity.createdAtMs,
-            finishedAtMs = entity.finishedAtMs,
-            updatedAtMs = entity.updatedAtMs
-        )
+        val job = v2Agent.getJobById(jobId)!!
         val buffer = BoundedOutput()
         buffers[jobId] = buffer
         val handle = scope.launch {
@@ -139,19 +141,19 @@ class JobService @Inject constructor(
             buffers.remove(jobId)
         }
         runningHandles[jobId] = handle
-        return entity
+        return job
     }
 
     /** 读取任务状态；不存在返回 null。 */
-    suspend fun getStatus(jobId: String, sessionId: String): JobEntity? {
-        val entity = v2Agent.getJobById(jobId)?.toEntity() ?: return null
+    suspend fun getStatus(jobId: String, sessionId: String): V2Job? {
+        val job = v2Agent.getJobById(jobId) ?: return null
         // owner/session 隔离：仅同会话可读。
-        return entity.takeIf { it.sessionId == sessionId }
+        return job.takeIf { it.session_id == sessionId }
     }
 
     /** 列出某会话的全部任务（新→旧）。 */
-    suspend fun listBySession(sessionId: String): List<JobEntity> =
-        v2Agent.listJobs(sessionId).map { it.toEntity() }
+    suspend fun listBySession(sessionId: String): List<V2Job> =
+        v2Agent.listJobs(sessionId)
 
     /**
      * 终止任务：置 KILLED 并取消运行协程（容器命令随之被杀）。
@@ -159,11 +161,11 @@ class JobService @Inject constructor(
      * @return 是否成功 kill 一个仍 RUNNING 的任务。
      */
     suspend fun kill(jobId: String, sessionId: String): Boolean {
-        val entity = v2Agent.getJobById(jobId)?.toEntity() ?: return false
-        if (entity.sessionId != sessionId) return false
-        if (entity.statusEnum() != JobStatus.RUNNING) return false
+        val job = v2Agent.getJobById(jobId) ?: return false
+        if (job.session_id != sessionId) return false
+        if (job.statusEnum() != JobStatus.RUNNING) return false
         val now = System.currentTimeMillis()
-        v2Agent.updateJobResult(jobId, JobStatus.KILLED.name, entity.exitCode?.toLong(), now, now)
+        v2Agent.updateJobResult(jobId, JobStatus.KILLED.name, job.exit_code, now, now)
         runningHandles.remove(jobId)?.let { handle ->
             scope.launch { runCatching { handle.cancelAndJoin() } }
         }
@@ -177,8 +179,8 @@ class JobService @Inject constructor(
      * 仅同会话可读。
      */
     suspend fun readLog(jobId: String, sessionId: String, maxChars: Int = LOG_TAIL_CHARS): String? {
-        val entity = v2Agent.getJobById(jobId)?.toEntity() ?: return null
-        if (entity.sessionId != sessionId) return null
+        val job = v2Agent.getJobById(jobId) ?: return null
+        if (job.session_id != sessionId) return null
         val buffer = buffers[jobId] ?: return null
         val text = buffer.build()
         return if (text.length <= maxChars) text else text.takeLast(maxChars)
@@ -191,12 +193,12 @@ class JobService @Inject constructor(
     suspend fun markInterruptedOnBoot() {
         try {
             val now = System.currentTimeMillis()
-            val running = v2Agent.listRunningJobs().map { it.toEntity() }
+            val running = v2Agent.listRunningJobs()
             running.forEach { job ->
                 // 内存注册表里仍存活的任务不误标（正常情况启动时注册表为空）。
-                if (runningHandles.containsKey(job.jobId)) return@forEach
-                v2Agent.updateJobResult(job.jobId, JobStatus.INTERRUPTED.name, null, now, now)
-                FileLogger.w(TAG, "启动恢复：任务 ${job.jobId}（${job.title}）标记为 INTERRUPTED，需重跑")
+                if (runningHandles.containsKey(job.job_id)) return@forEach
+                v2Agent.updateJobResult(job.job_id, JobStatus.INTERRUPTED.name, null, now, now)
+                FileLogger.w(TAG, "启动恢复：任务 ${job.job_id}（${job.title}）标记为 INTERRUPTED，需重跑")
             }
         } catch (e: CancellationException) {
             throw e
@@ -209,19 +211,9 @@ class JobService @Inject constructor(
         val now = System.currentTimeMillis()
         v2Agent.updateJobResult(jobId, status.name, exitCode?.toLong(), now, now)
     }
-
-    // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
-
-    private fun V2Job.toEntity() = JobEntity(
-        jobId = job_id,
-        sessionId = session_id,
-        kind = kind,
-        title = title,
-        status = status,
-        exitCode = exit_code?.toInt(),
-        outputLocator = output_locator,
-        createdAtMs = created_at_ms,
-        finishedAtMs = finished_at_ms,
-        updatedAtMs = updated_at_ms
-    )
 }
+
+// ── V2（SQLDelight）扩展函数 ──────────────────────────────────
+
+internal fun V2Job.statusEnum(): JobStatus =
+    EnumSafe.valueOf(status, JobStatus.RUNNING, tag = "Agent_jobs.status")
