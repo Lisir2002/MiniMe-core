@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -42,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -834,13 +837,75 @@ private fun NodeListView(view: ProfileNodesView?, onTestLatency: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
+                    // P1-10：排序模式 / 协议筛选 / 地区筛选（本地 UI 状态；测速结果已缓存在 view.latencies）。
+                    var sortMode by rememberSaveable { mutableStateOf(0) } // 0=默认 1=延迟升 2=延迟降
+                    var protocolFilter by rememberSaveable { mutableStateOf("全部") }
+                    var regionFilter by rememberSaveable { mutableStateOf("全部") }
+
+                    val allNodes = view.summary.nodes
+                    val protocols = remember(allNodes) {
+                        (listOf("全部") + allNodes.map { it.type }.distinct()).take(8)
+                    }
+                    val regions = remember(allNodes) {
+                        // 从节点名解析地区关键词（常见中文/英文地区名）。
+                        val known = listOf("香港", "台湾", "日本", "新加坡", "美国", "韩国", "德国", "英国", "伊朗")
+                        val found = allNodes.mapNotNull { n ->
+                            known.firstOrNull { kw -> n.name.contains(kw, ignoreCase = false) }
+                        }.distinct()
+                        (listOf("全部") + found)
+                    }
+                    val visible = remember(allNodes, view.latencies, sortMode, protocolFilter, regionFilter) {
+                        var list = allNodes.asSequence()
+                        if (protocolFilter != "全部") list = list.filter { it.type.equals(protocolFilter, ignoreCase = true) }
+                        if (regionFilter != "全部") list = list.filter { it.name.contains(regionFilter) }
+                        list = when (sortMode) {
+                            1 -> list.sortedBy { view.latencies[it.name] ?: Long.MAX_VALUE }
+                            2 -> list.sortedByDescending { view.latencies[it.name] ?: -1L }
+                            else -> list
+                        }
+                        list.toList()
+                    }
+
+                    // 排序/筛选 Chip 行
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        listOf("默认", "延迟↑", "延迟↓").forEachIndexed { i, label ->
+                            FilterChip(
+                                selected = sortMode == i,
+                                onClick = { sortMode = i },
+                                label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(Spacing.xs))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        protocols.forEach { p ->
+                            FilterChip(
+                                selected = protocolFilter == p,
+                                onClick = { protocolFilter = p },
+                                label = { Text(p, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+                    if (regions.size > 1) {
+                        Spacer(Modifier.height(Spacing.xs))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                            regions.forEach { r ->
+                                FilterChip(
+                                    selected = regionFilter == r,
+                                    onClick = { regionFilter = r },
+                                    label = { Text(r, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(Spacing.sm))
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 300.dp)
                     ) {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            itemsIndexed(view.summary.nodes) { _, node ->
+                            itemsIndexed(visible) { _, node ->
                                 NodeRow(
                                     node = node,
                                     tested = view.latencies.containsKey(node.name),
