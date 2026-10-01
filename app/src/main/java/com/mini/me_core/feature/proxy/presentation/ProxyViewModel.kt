@@ -9,6 +9,7 @@ import com.mini.me_core.feature.proxy.domain.ClashConfigSummary
 import com.mini.me_core.feature.proxy.domain.ClashProxiesSnapshot
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
 import com.mini.me_core.feature.proxy.domain.ProxyConnectivityTester
+import com.mini.me_core.feature.proxy.domain.ProxyNodeHealthMonitor
 import com.mini.me_core.feature.proxy.domain.ProxyTrafficSampler
 import com.mini.me_core.feature.proxy.domain.ProxyDiagnosticResult
 import com.mini.me_core.feature.proxy.domain.ProxyRuntimeState
@@ -83,6 +84,7 @@ class ProxyViewModel @Inject constructor(
     private val connectivityTester: ProxyConnectivityTester,
     private val trafficSampler: ProxyTrafficSampler,
     private val trafficRepo: ProxyTrafficRepository,
+    private val nodeHealthMonitor: ProxyNodeHealthMonitor,
 ) : ViewModel() {
 
     /** 已播种的订阅/manual/list（脱敏，cipher 不解密返回）。 */
@@ -106,6 +108,17 @@ class ProxyViewModel @Inject constructor(
 
     /** P1-9：最近一次连接诊断结果（交通灯数据源）。 */
     val diagnostic: StateFlow<ProxyDiagnosticResult?> = connectivityTester.result
+
+    /** P2-13：节点健康状态（nodeName -> 是否健康）。 */
+    val nodeHealth: StateFlow<Map<String, Boolean>> = nodeHealthMonitor.health
+
+    /** P2-13：自动切换到最快节点开关（默认关）。 */
+    private val _autoSwitchFastest = MutableStateFlow(false)
+    val autoSwitchFastest: StateFlow<Boolean> = _autoSwitchFastest
+    fun setAutoSwitchFastest(enabled: Boolean) {
+        _autoSwitchFastest.value = enabled
+        nodeHealthMonitor.autoSwitchFastest = enabled
+    }
 
     /** P1-8：今日/本周/累计流量用量。 */
     private val _trafficToday = MutableStateFlow(TrafficUsage(0, 0))

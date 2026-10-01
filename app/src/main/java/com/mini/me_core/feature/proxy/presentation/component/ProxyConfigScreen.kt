@@ -105,6 +105,7 @@ fun ProxyConfigScreen(
     val diagnostic by viewModel.diagnostic.collectAsStateWithLifecycle()
     val trafficToday by viewModel.trafficToday.collectAsStateWithLifecycle()
     val trafficWeek by viewModel.trafficWeek.collectAsStateWithLifecycle()
+    val nodeHealth by viewModel.nodeHealth.collectAsStateWithLifecycle()
 
     var expandedId by remember { mutableStateOf<String?>(null) }
     var expandedTab by remember { mutableStateOf(0) }
@@ -233,6 +234,7 @@ fun ProxyConfigScreen(
                         expandedTab = expandedTab,
                         nodesView = nodesView?.takeIf { it.profileId == p.id },
                         groupsView = groupsView?.takeIf { it.profileId == p.id },
+                        nodeHealth = nodeHealth,
                         onActivate = { viewModel.activate(p.id) },
                         onDelete = { viewModel.delete(p.id) },
                         onRefresh = { viewModel.refreshSubscription(p.id) },
@@ -751,6 +753,7 @@ private fun ProfileRow(
     expandedTab: Int,
     nodesView: ProfileNodesView?,
     groupsView: ProxyGroupsView?,
+    nodeHealth: Map<String, Boolean>,
     onActivate: () -> Unit,
     onDelete: () -> Unit,
     onRefresh: () -> Unit,
@@ -834,6 +837,7 @@ private fun ProfileRow(
                     1 -> GroupsTrafficView(
                         view = groupsView,
                         isActive = isActive,
+                        health = nodeHealth,
                         onSelectGroupNode = onSelectGroupNode
                     )
                 }
@@ -1039,6 +1043,7 @@ private fun LatencyBadge(tested: Boolean, delayMs: Long?) {
 private fun GroupsTrafficView(
     view: ProxyGroupsView?,
     isActive: Boolean,
+    health: Map<String, Boolean>,
     onSelectGroupNode: (String, String) -> Unit
 ) {
     when {
@@ -1089,7 +1094,7 @@ private fun GroupsTrafficView(
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         view.snapshot?.groups?.forEach { group ->
                             item(key = group.name) {
-                                GroupNodeCard(group = group, onSelectGroupNode = onSelectGroupNode)
+                                GroupNodeCard(group = group, health = health, onSelectGroupNode = onSelectGroupNode)
                             }
                         }
                     }
@@ -1136,7 +1141,11 @@ private fun TrafficCard(traffic: ProxyTraffic?) {
 
 /** 单个分组卡：类型 + 健康检查延迟 + 当前选中项，成员可点选切换（对齐 Clash）。 */
 @Composable
-private fun GroupNodeCard(group: ProxyGroupInfo, onSelectGroupNode: (String, String) -> Unit) {
+private fun GroupNodeCard(
+    group: ProxyGroupInfo,
+    health: Map<String, Boolean>,
+    onSelectGroupNode: (String, String) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(LocalCornerRadius.current.lg),
@@ -1178,6 +1187,8 @@ private fun GroupNodeCard(group: ProxyGroupInfo, onSelectGroupNode: (String, Str
             Spacer(Modifier.height(Spacing.xs))
             group.all.forEach { member ->
                 val selected = member == group.now
+                // P2-13：连续超时被健康监控标记为不可用的节点置灰（仍可手动点选）。
+                val unhealthy = health[member] == false
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1198,13 +1209,20 @@ private fun GroupNodeCard(group: ProxyGroupInfo, onSelectGroupNode: (String, Str
                         text = member,
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
-                        color = if (selected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
+                        color = when {
+                            selected -> MaterialTheme.colorScheme.primary
+                            unhealthy -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                            else -> MaterialTheme.colorScheme.onSurface
                         },
                         modifier = Modifier.weight(1f)
                     )
+                    if (unhealthy) {
+                        Text(
+                            text = "不可用",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                        )
+                    }
                     if (selected) {
                         Text(
                             text = stringResource(R.string.ui____7bf54e28),
