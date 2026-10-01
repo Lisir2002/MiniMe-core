@@ -15,7 +15,6 @@ import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSessio
 import com.mini.mecore.datalayer.sqldelight.agent.Todo_items as V2TodoItem
 import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
 import com.mini.me_core.feature.agent.data.local.entity.ChatSessionEntity
-import com.mini.me_core.feature.agent.data.local.entity.TodoItemEntity
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpConfigRepository
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpManager
 import com.mini.me_core.feature.agent.domain.execution.permission.PermissionRulesRepository
@@ -179,10 +178,9 @@ class BackupManagerImpl @Inject constructor(
                                         "getTodoPageAfter_$sessionId",
                                         emptyList()
                                     ) { v2Agent.getTodoPageBySessionAfter(sessionId, lastCreatedAtMs, lastId, PAGE_SIZE.toLong()) }
-                                        .map { it.toEntity() }
                                     if (batch.isEmpty()) break
                                     batch.forEach { writer.writeLine(json.encodeToString(TodoItemDto.serializer(), it.toDto())) }
-                                    lastCreatedAtMs = batch.last().createdAtMs
+                                    lastCreatedAtMs = batch.last().created_at_ms
                                     lastId = batch.last().id
                                 }
                             }
@@ -378,10 +376,9 @@ class BackupManagerImpl @Inject constructor(
                                         "getTodoPageAfter",
                                         emptyList()
                                     ) { v2Agent.getTodoPageAfter(lastCreatedAtMs, lastId, PAGE_SIZE.toLong()) }
-                                        .map { it.toEntity() }
                                 if (batch.isEmpty()) break
                                 batch.forEach { writer.writeLine(json.encodeToString(TodoItemDto.serializer(), it.toDto())) }
-                                lastCreatedAtMs = batch.last().createdAtMs
+                                lastCreatedAtMs = batch.last().created_at_ms
                                 lastId = batch.last().id
                             }
                         }
@@ -546,8 +543,8 @@ class BackupManagerImpl @Inject constructor(
                             onClear = { if (mode == RestoreMode.OVERWRITE) safeDaoSuspend("clearTodos", Unit) { v2Agent.deleteAllTodos() } },
                             insert = { dtos ->
                                 safeDaoSuspend("upsertTodos", 0) {
-                                    val mapped = dtos.map { it.toEntity() }
-                                    v2Agent.upsertAllTodos(mapped.map { it.toV2() })
+                                    val mapped = dtos.map { it.toV2() }
+                                    v2Agent.upsertAllTodos(mapped)
                                     dtos.size
                                 }
                             }
@@ -670,8 +667,8 @@ class BackupManagerImpl @Inject constructor(
         if (snapshot.todoItems.isNotEmpty()) {
             if (mode == RestoreMode.OVERWRITE) safeDaoSuspend("legacyClearTodos", Unit) { v2Agent.deleteAllTodos() }
             safeDaoSuspend("legacyUpsertTodos", Unit) {
-                val mapped = snapshot.todoItems.map { it.toEntity() }
-                v2Agent.upsertAllTodos(mapped.map { it.toV2() })
+                val mapped = snapshot.todoItems.map { it.toV2() }
+                v2Agent.upsertAllTodos(mapped)
             }
         }
         return stats + RestoreStats(
@@ -928,27 +925,15 @@ class BackupManagerImpl @Inject constructor(
         chunk_group_id = chunkGroupId, chunk_index = chunkIndex.toLong()
     )
 
-    private fun V2TodoItem.toEntity() = TodoItemEntity(
+    private fun V2TodoItem.toDto() = TodoItemDto(
         id = id, sessionId = session_id, subject = subject, description = description,
         status = status, priority = priority.toInt(), order = sort_order.toInt(),
-        createdAtMs = created_at_ms, updatedAtMs = updated_at_ms
+        createdAt = created_at_ms, updatedAt = updated_at_ms
     )
-
-    private fun TodoItemEntity.toV2() = V2TodoItem(
+    private fun TodoItemDto.toV2() = V2TodoItem(
         id = id, session_id = sessionId, subject = subject, description = description,
         status = status, priority = priority.toLong(), sort_order = order.toLong(),
-        created_at_ms = createdAtMs, updated_at_ms = updatedAtMs
-    )
-
-    private fun TodoItemEntity.toDto() = TodoItemDto(
-        id = id, sessionId = sessionId, subject = subject, description = description,
-        status = status, priority = priority, order = order,
-        createdAt = createdAtMs, updatedAt = updatedAtMs
-    )
-    private fun TodoItemDto.toEntity() = TodoItemEntity(
-        id = id, sessionId = sessionId, subject = subject, description = description,
-        status = status, priority = priority, order = order,
-        createdAtMs = createdAt, updatedAtMs = updatedAt
+        created_at_ms = createdAt, updated_at_ms = updatedAt
     )
 
     private companion object {

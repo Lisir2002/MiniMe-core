@@ -3,7 +3,6 @@ package com.mini.me_core.feature.agent.domain.execution.tool.todo
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Todo_items as V2TodoItem
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.data.local.entity.TodoItemEntity
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.core.model.TodoItem
 import com.mini.me_core.feature.agent.domain.core.model.TodoStatus
@@ -118,18 +117,18 @@ class TodoTool @Inject constructor(
 
     /** 刷新 [AgentContext.sessionState] 的待办快照（L2 共享会话状态）。 */
     private suspend fun refreshSnapshot(context: AgentContext, sessionId: String) {
-        val items = v2Agent.listTodos(sessionId).map { it.toEntity() }
-        context.sessionState?.todoSnapshot = items.map { entity ->
+        val items = v2Agent.listTodos(sessionId)
+        context.sessionState?.todoSnapshot = items.map { v ->
             TodoItem(
-                id = entity.id,
+                id = v.id,
                 sessionId = sessionId,
-                subject = entity.subject,
-                description = entity.description,
-                status = runCatching { TodoStatus.valueOf(entity.status) }.getOrDefault(TodoStatus.PENDING),
-                priority = entity.priority,
-                order = entity.order,
-                createdAt = entity.createdAtMs,
-                updatedAt = entity.updatedAtMs
+                subject = v.subject,
+                description = v.description,
+                status = runCatching { TodoStatus.valueOf(v.status) }.getOrDefault(TodoStatus.PENDING),
+                priority = v.priority.toInt(),
+                order = v.sort_order.toInt(),
+                createdAt = v.created_at_ms,
+                updatedAt = v.updated_at_ms
             )
         }
     }
@@ -137,11 +136,11 @@ class TodoTool @Inject constructor(
     private suspend fun replaceTodos(args: Map<String, JsonElement>, sessionId: String): ToolResult {
         val itemElements = args["items"] as? JsonArray
             ?: return ToolResult.Error("需要 items 数组", "MISSING_ITEMS")
-        val existingBySubject = v2Agent.listTodos(sessionId).map { it.toEntity() }
+        val existingBySubject = v2Agent.listTodos(sessionId)
             .groupBy { normalizeSubject(it.subject) }
             .mapValues { (_, items) -> items.toMutableList() }
         val now = System.currentTimeMillis()
-        val entities = mutableListOf<TodoItemEntity>()
+        val entities = mutableListOf<V2TodoItem>()
 
         for ((idx, element) in itemElements.withIndex()) {
             // D-3：先做 status 显式校验，非法值时返回明确错误码，避免被外层吞成模糊错误
@@ -161,28 +160,28 @@ class TodoTool @Inject constructor(
             )
             val previous = existingBySubject[normalizeSubject(draft.subject)]?.removeFirstOrNull()
 
-            entities.add(TodoItemEntity(
+            entities.add(V2TodoItem(
                 id = previous?.id ?: UUID.randomUUID().toString(),
-                sessionId = sessionId,
+                session_id = sessionId,
                 subject = draft.subject,
                 description = draft.description,
                 status = draft.status.name,
-                priority = draft.priority,
-                order = idx,
-                createdAtMs = previous?.createdAtMs ?: now,
-                updatedAtMs = now
+                priority = draft.priority.toLong(),
+                sort_order = idx.toLong(),
+                created_at_ms = previous?.created_at_ms ?: now,
+                updated_at_ms = now
             ))
         }
 
         // D-1：delete + upsert 包事务，避免中间失败丢全部待办（AgentTx 同线程事务）
-        v2Agent.runInTx { tx -> tx.replaceTodos(sessionId, entities.map { it.toV2() }) }
+        v2Agent.runInTx { tx -> tx.replaceTodos(sessionId, entities) }
         FileLogger.d(TAG, "todo replace: 同步了 ${entities.size} 项待办")
 
         return listTodos(sessionId)
     }
 
     private suspend fun listTodos(sessionId: String): ToolResult {
-        val items = v2Agent.listTodos(sessionId).map { it.toEntity() }
+        val items = v2Agent.listTodos(sessionId)
         val total = items.size
         val completed = items.count { it.status == "COMPLETED" }
 
@@ -190,17 +189,16 @@ class TodoTool @Inject constructor(
             "total" to JsonPrimitive(total),
             "completed" to JsonPrimitive(completed),
             "items" to kotlinx.serialization.json.JsonArray(
-                items.map { entity ->
+                items.map { v ->
                     JsonObject(mapOf(
-                        "id" to JsonPrimitive(entity.id),
-                        "subject" to JsonPrimitive(entity.subject),
-                        "description" to JsonPrimitive(entity.description),
-                        "status" to JsonPrimitive(entity.status.lowercase()),
-                        "priority" to JsonPrimitive(entity.priority),
-                        "order" to JsonPrimitive(entity.order),
-                        // D-2：回传创建/更新时间，供 AI 判断待办新鲜度与完成时序
-                        "created_at" to JsonPrimitive(entity.createdAtMs),
-                        "updated_at" to JsonPrimitive(entity.updatedAtMs)
+                        "id" to JsonPrimitive(v.id),
+                        "subject" to JsonPrimitive(v.subject),
+                        "description" to JsonPrimitive(v.description),
+                        "status" to JsonPrimitive(v.status.lowercase()),
+                        "priority" to JsonPrimitive(v.priority.toInt()),
+                        "order" to JsonPrimitive(v.sort_order.toInt()),
+                        "created_at" to JsonPrimitive(v.created_at_ms),
+                        "updated_at" to JsonPrimitive(v.updated_at_ms)
                     ))
                 }
             )
@@ -241,20 +239,6 @@ class TodoTool @Inject constructor(
     private fun normalizeSubject(subject: String): String {
         return subject.trim().lowercase()
     }
-
-    // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
-
-    private fun V2TodoItem.toEntity() = TodoItemEntity(
-        id = id, sessionId = session_id, subject = subject, description = description,
-        status = status, priority = priority.toInt(), order = sort_order.toInt(),
-        createdAtMs = created_at_ms, updatedAtMs = updated_at_ms
-    )
-
-    private fun TodoItemEntity.toV2() = V2TodoItem(
-        id = id, session_id = sessionId, subject = subject, description = description,
-        status = status, priority = priority.toLong(), sort_order = order.toLong(),
-        created_at_ms = createdAtMs, updated_at_ms = updatedAtMs
-    )
 }
 
 private data class TodoDraft(
