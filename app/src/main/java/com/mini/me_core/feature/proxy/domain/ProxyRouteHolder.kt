@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.proxy.domain
 
+import com.mini.me_core.core.util.FileLogger
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -51,6 +52,23 @@ class ProxyRouteHolder @Inject constructor() {
         this.aiHostsDirect = value
     }
 
+    // ───────────────── P0-4：代理连接熔断（circuit breaker） ─────────────────
+
+    /** 连续连接到本机代理地址失败的次数；达到 [FAIL_TRIP_THRESHOLD] 次触发临时直连。 */
+    @Volatile
+    private var proxyFailCount: Int = 0
+
+    /** 熔断截止时间戳（毫秒）；在此之前 [selector.select] 一律返回直连。 */
+    @Volatile
+    private var bypassUntilMs: Long = 0L
+
+    /** 上一次代理连接失败时间戳；超过 [FAIL_WINDOW_MS] 的失败不计入「连续」。 */
+    @Volatile
+    private var lastProxyFailMs: Long = 0L
+
+    /** 当前是否处于熔断临时直连窗口内。 */
+    fun isBypassing(): Boolean = System.currentTimeMillis() < bypassUntilMs
+
     /**
      * 供共享 OkHttp 注入的 [ProxySelector]：未启用直连；启用时走 mihomo mixed-port，
      * 但 loopback 与内网保持直连（[isNoProxy]），避免把自己服务代理出去；
@@ -59,6 +77,13 @@ class ProxyRouteHolder @Inject constructor() {
     val selector: ProxySelector = object : ProxySelector() {
         override fun select(uri: URI): List<Proxy> {
             if (!this@ProxyRouteHolder.enabled) return listOf(Proxy.NO_PROXY)
+            val now = System.currentTimeMillis()
+            // P0-4：熔断窗口内一律直连，避免代理挂掉后所有请求继续打进无人监听的端口。
+            if (now < bypassUntilMs) return listOf(Proxy.NO_PROXY)
+            // 超过失败窗口的旧计数清零：只统计「近期连续」失败。
+            if (lastProxyFailMs != 0L && now - lastProxyFailMs > FAIL_WINDOW_MS) {
+                proxyFailCount = 0
+            }
             val host = uri.host ?: return listOf(Proxy.NO_PROXY)
             if (host.isBlank() || isNoProxy(host)) return listOf(Proxy.NO_PROXY)
             // C5：分流开启且命中已知 AI host → 直连（省代理一跳）
@@ -74,7 +99,42 @@ class ProxyRouteHolder @Inject constructor() {
         }
 
         override fun connectFailed(uri: URI?, sa: SocketAddress?, ioe: IOException?) {
-            // 关代理即直连，connectFailed 无需处理
+            // P0-4：仅统计「连接到本机代理地址」失败；直连目标本身失败不算代理的锅。
+            if (!this@ProxyRouteHolder.enabled) return
+            val now = System.currentTimeMillis()
+            if (now < bypassUntilMs) return // 已在熔断窗口，忽略
+            val remote = sa as? InetSocketAddress ?: return
+            if (!matchesOurProxy(remote)) return
+            proxyFailCount++
+            lastProxyFailMs = now
+            FileLogger.w(
+                TAG,
+                "代理连接失败 count=$proxyFailCount/$FAIL_TRIP_THRESHOLD sa=$sa err=${ioe?.message}"
+            )
+            if (proxyFailCount >= FAIL_TRIP_THRESHOLD) {
+                bypassUntilMs = now + BYPASS_DURATION_MS
+                proxyFailCount = 0
+                FileLogger.w(
+                    TAG,
+                    "代理连续 $FAIL_TRIP_THRESHOLD 次连接失败，临时直连 ${BYPASS_DURATION_MS / 1000}s（circuit breaker）"
+                )
+            }
+        }
+
+        /** [sa] 是否就是我们配置的本机 mihomo 代理地址（host+port 双匹配）。 */
+        private fun matchesOurProxy(sa: InetSocketAddress): Boolean {
+            val expectedHost = hostPart()
+            val expectedPort = portPart()
+            // host 比较：InetSocketAddress 可能是字面 IP 或主机名；宽松比较。
+            val actualHost = try {
+                sa.address?.hostAddress ?: sa.hostString
+            } catch (_: Exception) {
+                sa.hostString
+            }
+            return sa.port == expectedPort && (
+                actualHost == expectedHost ||
+                    actualHost == "127.0.0.1" && expectedHost == "127.0.0.1"
+                )
         }
 
         private fun hostPart(): String {
@@ -113,6 +173,17 @@ class ProxyRouteHolder @Inject constructor() {
     }
 
     companion object {
+        private const val TAG = "ProxyRouteHolder"
+
+        /** P0-4：连续失败多少次触发熔断。 */
+        private const val FAIL_TRIP_THRESHOLD = 3
+
+        /** P0-4：熔断后临时直连的时长。 */
+        private const val BYPASS_DURATION_MS = 30_000L
+
+        /** P0-4：失败计数的时间窗口：超过此间隔的旧失败不计入连续失败。 */
+        private const val FAIL_WINDOW_MS = 30_000L
+
         /**
          * 已知模型接口 host（与 ConnectionPrewarmer 的默认预热列表保持一致）。
          * 分流（[aiHostsDirect]）开启时这些 host 直连、跳过代理；用户自定义 base URL 的 host
