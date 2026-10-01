@@ -137,7 +137,7 @@ jobs:
           }
           cur_tag="${GITHUB_REF_NAME}"
           # 取「本应用（主应用）」的上一个 tag：必须用 ^v[0-9] 过滤，
-          # 否则会取到其它应用（logviewer-v* / qbot-v*）的 tag，导致 versionCode 校验与
+          # 否则会取到其它应用（logviewer-v*）的 tag，导致 versionCode 校验与
           # applicationId 对比失去意义、Release 提交范围错乱。
           prev_tag=$(git tag --sort=-creatordate | grep -E '^v[0-9]' | grep -vE "^${cur_tag}$" | head -1)
           if [[ -z "$prev_tag" ]]; then
@@ -174,7 +174,7 @@ jobs:
           set -e
           cur_tag="${GITHUB_REF_NAME}"
           # 取「本应用（主应用）」的上一个 tag：必须用 ^v[0-9] 过滤，
-          # 否则会取到其它应用（logviewer-v* / qbot-v*）的 tag，导致 versionCode 校验与
+          # 否则会取到其它应用（logviewer-v*）的 tag，导致 versionCode 校验与
           # applicationId 对比失去意义、Release 提交范围错乱。
           prev_tag=$(git tag --sort=-creatordate | grep -E '^v[0-9]' | grep -vE "^${cur_tag}$" | head -1)
           if [[ -z "$prev_tag" ]]; then
@@ -202,9 +202,7 @@ jobs:
 
       # 构建通用 release APK（双 ABI：arm64-v8a + x86_64，见 build.gradle.kts abiFilters 与 sourceSets）
       # --warning-mode=all + --stacktrace：失败时完整输出，便于在 CI 一眼定位 R8/打包/OOM 根因
-      # 只构建 :app 及其依赖（core/terminal-*）：不构建 :injector-app / :qbot-app / :logviewer-app。
-      # 注入器资产（rootfs/napcat/qq .deb/pool.bin/manifest）为 gitignore 的体积型资产，
-      # 仅由注入器/QBot 各自的 release workflow 拉取，主应用 APK 不消费，故在此收窄任务避免被资产硬校验拖住。
+      # 只构建 :app 及其依赖（core/terminal-*）。
       - name: Build Release APK
         run: ./gradlew --warning-mode=all :app:assembleRelease --stacktrace
 
@@ -305,7 +303,7 @@ jobs:
         run: |
           cur_tag="${GITHUB_REF_NAME}"
           # 取「本应用（主应用）」的上一个 tag：必须用 ^v[0-9] 过滤，
-          # 否则会取到其它应用（logviewer-v* / qbot-v*）的 tag，导致 versionCode 校验与
+          # 否则会取到其它应用（logviewer-v*）的 tag，导致 versionCode 校验与
           # applicationId 对比失去意义、Release 提交范围错乱。
           prev_tag=$(git tag --sort=-creatordate | grep -E '^v[0-9]' | grep -vE "^${cur_tag}$" | head -1)
           version="${cur_tag#v}"

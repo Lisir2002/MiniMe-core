@@ -23,7 +23,6 @@ GitHub Release 正文草稿。
 用法（仓库根执行）：
   python3 scripts/gitops/release-log.py --prev v0.0.0.14 --cur v0.0.0.15
   python3 scripts/gitops/release-log.py --version 0.0.0.15 --date 2026-09-25
-  python3 scripts/gitops/release-log.py --prev qbot-v0.0.1 --cur qbot-v0.0.2 --app qbot --path qbot-app
 
 设计约束：
   - 仅为正文草稿，永不替代人工复核：简介价值化润色、条目小标题提炼仍需人工完成。
@@ -69,14 +68,6 @@ APP_CONFIG = {
     "logviewer": {
         "tag_prefix": "logviewer-v",
         "changelog_paths": ["docs/Version Log/CHANGELOG-logviewer.md"],
-    },
-    "qbot": {
-        "tag_prefix": "qbot-v",
-        "changelog_paths": ["docs/Version Log/CHANGELOG-qbot.md"],
-    },
-    "injector": {
-        "tag_prefix": "qbot-injector-v",
-        "changelog_paths": ["docs/Version Log/CHANGELOG-qbot-injector.md"],
     },
 }
 
@@ -442,7 +433,7 @@ def main():
     parser.add_argument("--app", choices=sorted(APP_CONFIG.keys()), default="main",
                         help="应用类型（决定默认 tag 前缀与版本日志路径）")
     parser.add_argument("--path", default=None,
-                        help="仅统计该路径下的提交（如 qbot-app），隔离多应用仓库的提交范围")
+                        help="仅统计该路径下的提交，隔离多应用仓库的提交范围")
     parser.add_argument("--title-summary", action="store_true",
                         help="仅输出标题更新概括（10-20字），不输出完整正文")
     args = parser.parse_args()
@@ -451,7 +442,7 @@ def main():
         Path(run(["git", "rev-parse", "--show-toplevel"], Path.cwd()))
 
     # 解析 prev=最近 tag（若未给）：必须按本应用的 tag 前缀过滤，否则会取到
-    # 其它应用（logviewer-v* / qbot-v*）的 tag，生成错乱的提交范围。
+    # 其它应用（logviewer-v*）的 tag，生成错乱的提交范围。
     prev = args.prev
     if not prev:
         tag_prefix = APP_CONFIG[args.app]["tag_prefix"]

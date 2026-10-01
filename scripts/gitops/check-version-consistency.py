@@ -11,7 +11,6 @@ check-version-consistency.py — MiniMe-core 发版前版本号一致性校验�
 
 用法：
   python3 scripts/gitops/check-version-consistency.py --tag v0.0.0.40-rc1
-  python3 scripts/gitops/check-version-consistency.py --tag qbot-v0.0.1-rc30 --app qbot
   python3 scripts/gitops/check-version-consistency.py --latest  # 校验最新 tag
 
 校验不通过时输出具体不合规项和修复建议，退出码非零。
@@ -35,20 +34,10 @@ APPS = {
         "changelog": "docs/Version Log/CHANGELOG.md",
         "version_pattern": re.compile(r"^(\d+)\.(\d+)\.(\d+)\.(\d+)(-rc\d+)?$"),
     },
-    "qbot": {
-        "tag_prefix": "qbot-v",
-        "changelog": "docs/Version Log/CHANGELOG-qbot.md",
-        "version_pattern": re.compile(r"^(\d+)\.(\d+)\.(\d+)(-rc\d+)?$"),
-    },
     "logviewer": {
         "tag_prefix": "logviewer-v",
         "changelog": "docs/Version Log/CHANGELOG-logviewer.md",
         "version_pattern": re.compile(r"^(\d+)\.(\d+)\.(\d+)$"),
-    },
-    "injector": {
-        "tag_prefix": "qbot-injector-v",
-        "changelog": "docs/Version Log/CHANGELOG-qbot-injector.md",
-        "version_pattern": re.compile(r"^(\d+)\.(\d+)\.(\d+)(-rc\d+)?$"),
     },
 }
 

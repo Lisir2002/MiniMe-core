@@ -10,7 +10,6 @@ check-release-format.py — MiniMe-core 发版格式校验脚本。
   python3 scripts/gitops/check-release-format.py --tag v0.0.0.19
   python3 scripts/gitops/check-release-format.py --latest
   python3 scripts/gitops/check-release-format.py --tag logviewer-v0.0.8 --app logviewer
-  python3 scripts/gitops/check-release-format.py --tag qbot-v0.0.1 --app qbot
 
 校验项：
   1. 标题格式：{软件名} v{版本} — {更新概括}（概括≤20字）
@@ -35,16 +34,12 @@ from pathlib import Path
 APP_NAMES = {
     "main": "MiniMe-core",
     "logviewer": "MiniMe Logs",
-    "qbot": "MiniMe-QBot",
-    "injector": "MiniMe-QBot Injector",
 }
 
 # 各应用的 Tag 前缀（与各自 build.gradle.kts 的 `git describe --match` 保持一致）
 APP_TAG_PREFIXES = {
     "main": "v",
     "logviewer": "logviewer-v",
-    "qbot": "qbot-v",
-    "injector": "qbot-injector-v",
 }
 
 # emoji 正则（覆盖常见 emoji 范围）
@@ -256,7 +251,7 @@ def main():
     parser.add_argument("--tag", help="校验指定 tag 的 Release")
     parser.add_argument("--latest", action="store_true", help="校验最新正式 Release")
     parser.add_argument("--app", choices=sorted(APP_NAMES.keys()), default="main",
-                        help="应用类型（main=主应用, logviewer=MiniMe Logs, qbot=MiniMe-QBot, injector=MiniMe-QBot 环境注入器）")
+                        help="应用类型（main=主应用, logviewer=MiniMe Logs）")
     parser.add_argument("--repo", default=None, help="仓库根路径")
     args = parser.parse_args()
 

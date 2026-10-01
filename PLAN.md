@@ -165,7 +165,6 @@
 | ATTACH/DETACH 用 rawExecSQL | 可能同样 error 100 | 用 rawQuery |
 | Gradle 并发编译 | daemon 锁冲突 + OOM | 串行编译，--no-daemon |
 | 本地 release build | 违反发版硬性规则 | 推送 tag → 云端 CI 构建 |
-| 在 Android 上运行有头桌面 QQ | 容器内无法运行桌面 QQ 客户端 | 用 NapCat 无头协议端（OneBot 11） |
 
 ---
 
