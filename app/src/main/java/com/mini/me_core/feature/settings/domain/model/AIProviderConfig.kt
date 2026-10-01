@@ -24,6 +24,14 @@ data class AIProviderConfig(
     val fallbackProviderId: String? = null,
     val favoriteModels: List<String> = emptyList(),
     val modelOrder: List<String> = emptyList(),
+    /**
+     * 该 Provider 的 API 请求是否需要走代理出口。
+     * - true：走 proxyClient（挂载 proxySelector，代理启用时经 mihomo 出口）
+     * - false：走 directClient（直连出网）
+     * 默认 false（国内模型直连）；OpenAI/Anthropic/Gemini 等海外模型预设为 true。
+     * 持久化方式：KVStore（namespace="provider", key="needs_proxy_<id>"），与核心 provider 数据解耦。
+     */
+    val needsProxy: Boolean = false,
 ) {
     /** 实际生效的模型：优先 selectedModel，其次 defaultModel。 */
     val effectiveModel: String

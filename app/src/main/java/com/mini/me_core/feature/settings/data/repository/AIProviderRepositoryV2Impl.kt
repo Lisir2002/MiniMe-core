@@ -8,6 +8,7 @@ import com.mini.me_core.datalayer.isEnabled
 import com.mini.me_core.datalayer.useFullUrl
 import com.mini.me_core.datalayer.useResponseApi
 import com.mini.me_core.datalayer.repository.SettingsRepository as V2SettingsRepository
+import com.mini.me_core.datalayer.store.KVStore
 import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ProviderType
 import com.mini.me_core.feature.settings.domain.repository.AIProviderRepository
@@ -29,10 +30,24 @@ import javax.inject.Singleton
 class AIProviderRepositoryV2Impl @Inject constructor(
     private val v2: V2SettingsRepository,
     private val encryptor: CredentialEncryptor,
+    private val kv: KVStore,
 ) : AIProviderRepository {
 
     private companion object {
         const val TAG = "AIProviderRepoV2"
+        /** KVStore namespace：存储各 Provider 的 needsProxy 等辅助配置。 */
+        const val KV_NAMESPACE = "provider"
+        /** KVStore key 前缀：needs_proxy_<providerId> → Boolean。 */
+        const val KV_KEY_NEEDS_PROXY_PREFIX = "needs_proxy_"
+    }
+
+    /** 读取某 Provider 的 needsProxy 配置；未设置时按类型给默认值（海外模型默认 true）。 */
+    private fun readNeedsProxy(providerId: String, type: ProviderType): Boolean {
+        kv.getBool(KV_NAMESPACE, KV_KEY_NEEDS_PROXY_PREFIX + providerId)?.let { return it }
+        // 未显式设置时：海外官方模型默认需要代理，国内兼容端点默认直连。
+        return when (type) {
+            ProviderType.OPENAI, ProviderType.ANTHROPIC, ProviderType.GEMINI -> true
+        }
     }
 
     override fun getAllProviders(): Flow<List<AIProviderConfig>> {
@@ -83,6 +98,8 @@ class AIProviderRepositoryV2Impl @Inject constructor(
             favoriteModels = provider.favoriteModels.joinToString(","),
             modelOrder = provider.modelOrder.joinToString(","),
         )
+        // needsProxy：写入 KVStore（与核心 provider 表解耦，避免 SQLDelight schema migration）。
+        kv.putBool(KV_NAMESPACE, KV_KEY_NEEDS_PROXY_PREFIX + provider.id, provider.needsProxy)
     }
 
     override suspend fun deleteProvider(id: String) {
@@ -144,10 +161,11 @@ class AIProviderRepositoryV2Impl @Inject constructor(
 
     private suspend fun com.mini.mecore.datalayer.sqldelight.settings.Ai_providers.toDomainModel(): AIProviderConfig {
         val modelList = models.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+        val providerType = EnumSafe.valueOf(type, ProviderType.OPENAI, tag = "V2 Ai_providers.type")
         return AIProviderConfig(
             id = id,
             name = name,
-            type = EnumSafe.valueOf(type, ProviderType.OPENAI, tag = "V2 Ai_providers.type"),
+            type = providerType,
             apiKey = decryptApiKey(encrypted_api_key),
             baseUrl = base_url,
             defaultModel = default_model,
@@ -167,6 +185,8 @@ class AIProviderRepositoryV2Impl @Inject constructor(
             fallbackProviderId = fallback_provider_id,
             favoriteModels = favorite_models.split(",").filter { it.isNotEmpty() },
             modelOrder = model_order.split(",").filter { it.isNotEmpty() },
+            // needsProxy：从 KVStore 读取，未设置时按 ProviderType 给默认值。
+            needsProxy = readNeedsProxy(id, providerType),
         )
     }
 }

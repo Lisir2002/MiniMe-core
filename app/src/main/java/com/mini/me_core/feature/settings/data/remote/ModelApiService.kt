@@ -15,6 +15,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /** 测试模型连通性的结果。 */
@@ -30,7 +31,7 @@ data class ModelTestResult(
  */
 @Singleton
 class ModelApiService @Inject constructor(
-    private val client: OkHttpClient
+    @Named("direct") private val client: OkHttpClient
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 

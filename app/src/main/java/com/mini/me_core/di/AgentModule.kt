@@ -86,10 +86,18 @@ object AgentModule {
     fun provideT2IModelProbeService(impl: com.mini.me_core.feature.t2i.data.remote.T2IModelProbeService):
             com.mini.me_core.feature.t2i.data.remote.T2IModelProbeService = impl
 
+    // ══════════════════════════════════════════════════════════
+    // 阶段1：双 OkHttpClient 实例隔离
+    //   - directClient（@Named("direct")）：直连，不走代理。用于国内模型、压缩/识图等子模型。
+    //   - proxyClient（@Named("proxy")）：走 proxySelector。用于需要代理的国外模型（OpenAI/Anthropic/Gemini）。
+    //   代理不通时由 ProxyHealthMonitor + ProxyRouteHolder 自动降级为直连（见阶段4）。
+    // ══════════════════════════════════════════════════════════
+
+    /** 直连 OkHttpClient：不挂载 proxySelector，所有请求直接出网。 */
     @Provides
     @Singleton
-    fun provideOkHttpClient(
-        proxyRouteHolder: com.mini.me_core.feature.proxy.domain.ProxyRouteHolder,
+    @Named("direct")
+    fun provideDirectOkHttpClient(
         httpWarningBridge: com.mini.me_core.core.network.HttpWarningBridge
     ): OkHttpClient {
         // 流式 SSE 下读超时是「相邻数据块之间」的等待上限；120s 给慢启动/长思考留足空间，
@@ -107,9 +115,6 @@ object AgentModule {
                     addInterceptor(com.mini.me_core.core.performance.NetworkMonitorInterceptor())
                 }
             }
-            // 网络代理（§4.2）：注入 ProxyRouteHolder 的路由选择器，启用时代理走 mihomo mixed-port，
-            // 未启用直连；以 @Singleton 无依赖 Holder 避免与 ClashProxyManager 成环。
-            .proxySelector(proxyRouteHolder.selector)
             // 网络层优化 C2：连接池调优（默认 5 连接 / 5min 保活）。模型接口常往返复用，
             // 放宽到 8 连接 / 15min 提升长连接复用率，降低首字节（TTFT）延迟。
             .connectionPool(okhttp3.ConnectionPool(8, 15, TimeUnit.MINUTES))
@@ -120,10 +125,51 @@ object AgentModule {
             .build()
     }
 
+    /** 代理 OkHttpClient：挂载 proxySelector，代理启用时走 mihomo mixed-port，未启用时直连。 */
+    @Provides
+    @Singleton
+    @Named("proxy")
+    fun provideProxyOkHttpClient(
+        proxyRouteHolder: com.mini.me_core.feature.proxy.domain.ProxyRouteHolder,
+        httpWarningBridge: com.mini.me_core.core.network.HttpWarningBridge
+    ): OkHttpClient {
+        // 配置与 directClient 完全一致，唯一区别是挂载了 proxySelector。
+        // 后续阶段（阶段4）proxySelector 会感知 ProxyHealthMonitor，代理不通时自动降级直连。
+        return OkHttpClient.Builder()
+            .connectTimeout(120, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .writeTimeout(120, TimeUnit.SECONDS)
+            .addInterceptor(com.mini.me_core.core.network.HttpWarningInterceptor(httpWarningBridge))
+            .apply {
+                if (com.mini.me_core.BuildConfig.DEBUG) {
+                    addInterceptor(com.mini.me_core.core.performance.NetworkMonitorInterceptor())
+                }
+            }
+            // 网络代理（§4.2）：注入 ProxyRouteHolder 的路由选择器，启用时代理走 mihomo mixed-port，
+            // 未启用直连；以 @Singleton 无依赖 Holder 避免与 ClashProxyManager 成环。
+            .proxySelector(proxyRouteHolder.selector)
+            .connectionPool(okhttp3.ConnectionPool(8, 15, TimeUnit.MINUTES))
+            .dns(com.mini.me_core.core.network.PublicDnsFallback(com.mini.me_core.core.network.CachingDns()))
+            .build()
+    }
+
+    /**
+     * 匿名默认 OkHttpClient：委托给 direct client。
+     * 保留双实例隔离前的裸注入兼容（BrowserController / BrowserDownloadManager /
+     * WebTranslator / ClashProxyManager / ConnectionPrewarmer 等工具类），这些组件本应直连，
+     * 且 ClashProxyManager 自身就是代理管理者，不能再挂载 proxySelector 否则成环。
+     */
+    @Provides
+    @Singleton
+    fun provideDefaultOkHttpClient(
+        @Named("direct") direct: OkHttpClient
+    ): OkHttpClient = direct
+
     @Provides
     @Singleton
     @Named("OpenAI")
-    fun provideOpenAIRetrofit(client: OkHttpClient): Retrofit {
+    fun provideOpenAIRetrofit(@Named("direct") client: OkHttpClient): Retrofit {
+        // 阶段1：暂时统一用 direct client，后续阶段按 needsProxy 配置路由到 proxyClient。
         return Retrofit.Builder()
             .baseUrl("https://api.openai.com/")
             .client(client)
@@ -134,7 +180,8 @@ object AgentModule {
     @Provides
     @Singleton
     @Named("Anthropic")
-    fun provideAnthropicRetrofit(client: OkHttpClient): Retrofit {
+    fun provideAnthropicRetrofit(@Named("direct") client: OkHttpClient): Retrofit {
+        // 阶段1：暂时统一用 direct client，后续阶段按 needsProxy 配置路由到 proxyClient。
         return Retrofit.Builder()
             .baseUrl("https://api.anthropic.com/")
             .client(client)
@@ -157,7 +204,8 @@ object AgentModule {
     @Provides
     @Singleton
     @Named("Gemini")
-    fun provideGeminiRetrofit(client: OkHttpClient): Retrofit {
+    fun provideGeminiRetrofit(@Named("direct") client: OkHttpClient): Retrofit {
+        // 阶段1：暂时统一用 direct client，后续阶段按 needsProxy 配置路由到 proxyClient。
         return Retrofit.Builder()
             .baseUrl("https://generativelanguage.googleapis.com/")
             .client(client)
@@ -405,7 +453,8 @@ object AgentModule {
         openAIApi: OpenAIApi,
         anthropicApi: AnthropicApi,
         geminiApi: GeminiApi,
-        okHttpClient: OkHttpClient,
+        @Named("direct") okHttpClient: OkHttpClient,
+        proxyHealthMonitor: com.mini.me_core.feature.proxy.domain.ProxyHealthMonitor,
         promptProvider: SystemPromptProvider,
         permissionManager: ToolPermissionManager,
         policyEngine: ToolPermissionPolicyEngine,
@@ -444,6 +493,7 @@ object AgentModule {
             anthropicApi,
             geminiApi,
             okHttpClient,
+            proxyHealthMonitor,
             promptProvider,
             permissionManager,
             policyEngine,

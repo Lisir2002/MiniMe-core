@@ -18,6 +18,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import javax.inject.Named
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +64,7 @@ private val OPENAI_RESPONSES_STREAM_PATHS: List<List<String>> = listOf(
 
 class OpenAIAdapter @Inject constructor(
     private val api: OpenAIApi,
-    private val okHttpClient: OkHttpClient
+    @Named("direct") private val okHttpClient: OkHttpClient
 ) : AIProvider {
 
     override var apiKey = ""

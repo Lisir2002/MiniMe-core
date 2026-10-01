@@ -33,6 +33,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -65,7 +66,7 @@ class SubAgentRunner @Inject constructor(
     private val openAIApi: OpenAIApi,
     private val anthropicApi: AnthropicApi,
     private val geminiApi: GeminiApi,
-    private val okHttpClient: OkHttpClient,
+    @Named("direct") private val okHttpClient: OkHttpClient,
     private val agentAssetRegistry: AgentAssetRegistry,
     private val policyEngine: ToolPermissionPolicyEngine,
     private val messagePersistenceUseCase: MessagePersistenceUseCase,

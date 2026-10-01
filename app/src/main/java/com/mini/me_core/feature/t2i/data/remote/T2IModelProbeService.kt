@@ -10,6 +10,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -24,7 +25,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class T2IModelProbeService @Inject constructor(
-    private val client: OkHttpClient,
+    @Named("direct") private val client: OkHttpClient,
 ) {
     private companion object {
         /** 常见 T2I 模型名候选：用户把「只部署文生图的代理」当成 LLM Provider 添加时，

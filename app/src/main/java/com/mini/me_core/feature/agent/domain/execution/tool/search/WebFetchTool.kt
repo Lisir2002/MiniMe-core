@@ -21,6 +21,7 @@ import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.inject.Inject
+import javax.inject.Named
 import javax.net.ssl.SSLException
 
 /**
@@ -31,7 +32,7 @@ import javax.net.ssl.SSLException
  * 正文提取能力两者兼得。
  */
 class WebFetchTool @Inject constructor(
-    private val client: OkHttpClient
+    @Named("direct") private val client: OkHttpClient
 ) : AgentTool() {
 
     private companion object {

@@ -52,6 +52,29 @@ class ProxyRouteHolder @Inject constructor() {
         this.aiHostsDirect = value
     }
 
+    // ── 阶段4：代理健康自动降级（ProxyHealthMonitor 反向写入） ──
+
+    /**
+     * 代理出口是否健康（由 [ProxyHealthMonitor] 主动探测后写入）。
+     * true = 代理链路通，正常走代理；false = 代理不通，自动降级直连。
+     * 与 P0-4 熔断不同：熔断是被动的（OkHttp 连接失败触发），这个是主动探测（30s 轮询）。
+     */
+    @Volatile
+    var healthDegraded: Boolean = false
+        private set
+
+    /** 由 [ProxyHealthMonitor] 在健康状态变化时写入。 */
+    fun setHealthDegraded(degraded: Boolean) {
+        if (healthDegraded != degraded) {
+            healthDegraded = degraded
+            if (degraded) {
+                FileLogger.w(TAG, "代理健康检测：出口不可用，自动降级直连")
+            } else {
+                FileLogger.i(TAG, "代理健康检测：出口恢复，切回代理")
+            }
+        }
+    }
+
     // ───────────────── P0-4：代理连接熔断（circuit breaker） ─────────────────
 
     /** 连续连接到本机代理地址失败的次数；达到 [FAIL_TRIP_THRESHOLD] 次触发临时直连。 */
@@ -78,6 +101,8 @@ class ProxyRouteHolder @Inject constructor() {
         override fun select(uri: URI): List<Proxy> {
             if (!this@ProxyRouteHolder.enabled) return listOf(Proxy.NO_PROXY)
             val now = System.currentTimeMillis()
+            // 阶段4：健康检测降级 —— 代理出口探测不通时，自动直连，避免所有请求打进死路。
+            if (healthDegraded) return listOf(Proxy.NO_PROXY)
             // P0-4：熔断窗口内一律直连，避免代理挂掉后所有请求继续打进无人监听的端口。
             if (now < bypassUntilMs) return listOf(Proxy.NO_PROXY)
             // 超过失败窗口的旧计数清零：只统计「近期连续」失败。

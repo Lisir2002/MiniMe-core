@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import javax.inject.Inject
+import javax.inject.Named
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -55,7 +56,7 @@ private val ANTHROPIC_STREAM_PATHS: List<List<String>> = listOf(
 
 class AnthropicAdapter @Inject constructor(
     private val api: AnthropicApi,
-    private val okHttpClient: OkHttpClient
+    @Named("direct") private val okHttpClient: OkHttpClient
 ) : AIProvider {
 
     override var apiKey = ""

@@ -14,6 +14,7 @@ import org.json.JSONObject
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -103,7 +104,7 @@ interface ImageGenerator {
 @Singleton
 class OpenAiCompatibleImageGenerator @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val okHttpClient: OkHttpClient,
+    @Named("direct") private val okHttpClient: OkHttpClient,
 ) : ImageGenerator {
 
     private companion object {

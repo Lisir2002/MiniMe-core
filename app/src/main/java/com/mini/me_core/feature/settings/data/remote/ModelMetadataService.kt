@@ -42,6 +42,7 @@ import okhttp3.Request
 import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Singleton
@@ -58,7 +59,7 @@ class ModelMetadataService @Inject constructor(
      * 继承其 ProxySelector（代理启用时 models.dev 也走 mihomo mixed-port，而非直连），
      * 同时覆写回短超时，避免占用共享 client 的 120s 流式超时语义。
      */
-    private val okHttp: OkHttpClient,
+    @Named("direct") private val okHttp: OkHttpClient,
     /**
      * 代理引擎管理器：监听其状态，当代理（mihomo 内核控制面）就绪后自动补拉元数据。
      * 解决「App 启动即拉取、此时代理尚未自动恢复完成 → 直连 models.dev 超时 → 永不重试」的问题。

@@ -103,6 +103,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import javax.inject.Inject
+import javax.inject.Named
 
 /**
  * 阶段三重构 (完全版)：基于不可变状态 (Immutable State) 与 MVI 架构的 Agent 工作流引擎。
@@ -115,7 +116,9 @@ class StatefulAgentWorkflow @Inject constructor(
     private val openAIApi: OpenAIApi,
     private val anthropicApi: AnthropicApi,
     private val geminiApi: GeminiApi,
-    private val okHttpClient: OkHttpClient,
+    @Named("direct") private val okHttpClient: OkHttpClient,
+    // 阶段5：代理健康检测器，模型请求失败时自动诊断代理状态。
+    private val proxyHealthMonitor: com.mini.me_core.feature.proxy.domain.ProxyHealthMonitor,
     private val promptProvider: SystemPromptProvider,
     private val permissionManager: ToolPermissionManager,
     private val policyEngine: ToolPermissionPolicyEngine,
@@ -1001,6 +1004,11 @@ class StatefulAgentWorkflow @Inject constructor(
                                     throw e
                                 } catch (e: Exception) {
                                     coroutineContext.ensureActive()
+                                    // 阶段5：网络错误时自动诊断代理（不经过模型调用，避免模型绕圈子）。
+                                    if (isRetriableNetworkError(e) && activeConfig.needsProxy) {
+                                        FileLogger.w(TAG, "模型请求网络错误，自动触发代理健康诊断: ${e.message}")
+                                        proxyHealthMonitor.forceCheck()
+                                    }
                                     // 仅在首字节前（未输出任何文本/思考）且错误可重试时才故障转移
                                     if (!fallbackUsed && acc.text.isEmpty() && reasoningAcc.text.isEmpty()
                                         && isRetriableNetworkError(e)

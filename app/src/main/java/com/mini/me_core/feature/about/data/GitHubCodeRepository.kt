@@ -14,6 +14,7 @@ import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -50,7 +51,7 @@ data class SourceDownloadProgress(
  */
 @Singleton
 class GitHubCodeRepository @Inject constructor(
-    private val client: OkHttpClient,
+    @Named("direct") private val client: OkHttpClient,
     @param:ApplicationContext private val context: Context,
 ) {
     companion object {

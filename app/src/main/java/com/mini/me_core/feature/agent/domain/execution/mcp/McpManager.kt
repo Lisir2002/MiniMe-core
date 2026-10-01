@@ -19,6 +19,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 data class McpServerStatus(
@@ -36,7 +37,7 @@ data class McpServerStatus(
 class McpManager @Inject constructor(
     private val configRepository: McpConfigRepository,
     private val toolRegistry: ToolRegistry,
-    private val okHttpClient: OkHttpClient,
+    @Named("direct") private val okHttpClient: OkHttpClient,
     private val containerEngine: LinuxContainerEngine,
     private val workspaceRepository: WorkspaceRepository
 ) {

@@ -31,6 +31,7 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -64,7 +65,7 @@ data class DownloadProgress(
  */
 @Singleton
 class GitHubReleaseRepository @Inject constructor(
-    private val client: OkHttpClient,
+    @Named("direct") private val client: OkHttpClient,
     private val kv: KVStore,
     @param:ApplicationContext private val context: Context,
 ) {
