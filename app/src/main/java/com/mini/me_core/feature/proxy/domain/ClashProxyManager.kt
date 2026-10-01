@@ -124,7 +124,11 @@ class ClashProxyManager @Inject constructor(
         val OVERRIDDEN_KEYS = listOf(
             "mixed-port", "port", "socks-port", "redir-port",
             "tproxy-port", "external-controller", "external-ui",
-            "secret", "allow-lan", "bind-address", "mode"
+            "secret", "allow-lan", "bind-address", "mode",
+            // P0-2：危险/不可信顶层键补全剥离。dns 由固定防泄露块接管；script 可执行内联脚本；
+            // profile 控制持久化行为；geodata-mode 影响 geoip 判定。这些键此前只在 dangerScan
+            // 提示而未实际剥离，订阅可夹带恶意配置绕过沙箱，现统一在合成阶段剥离。
+            "dns", "script", "profile", "geodata-mode"
         )
 
         /** /proxies 中被视为「分组」的 type：mihomo 五类策略组 + 内置直达/拒绝等（对齐 Clash 分组树）。 */

@@ -400,9 +400,11 @@ class ProxyViewModel @Inject constructor(
     private fun generateId(): String =
         "prof-" + java.util.UUID.randomUUID().toString().replace("-", "").take(8)
 
-    /** 危险/覆盖键扫描：提示哪些字段将从配置中剥离。 */
+    /** 危险/覆盖键扫描：提示哪些字段将从配置中剥离（与 synthesizeConfig 实际剥离的键集保持一致）。 */
     private fun dangerScan(yaml: String): List<String> {
-        val danger = ClashProxyManager.OVERRIDDEN_KEYS + listOf("dns", "script")
+        // P0-2：dns/script/profile/geodata-mode 已并入 OVERRIDDEN_KEYS，直接复用，
+        // 避免「提示要剥离但实际没剥」与「实际剥离但没提示」的不一致。
+        val danger = ClashProxyManager.OVERRIDDEN_KEYS
         return yaml.lines().map { it.trimStart() }
             .filter { it.isNotEmpty() }
             .distinct()
