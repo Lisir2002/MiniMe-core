@@ -273,6 +273,18 @@ class ClashProxyManager @Inject constructor(
                 routeHolder.setAiHostsDirect(direct)
             }
         }
+        // P1-7：订阅自动更新周期检查（每 15 分钟扫描一次，按各 profile 的 updateIntervalHours 决定是否到期）。
+        // 沿用 appScope 协程周期循环模式（与 scheduleScheduler 一致）；mihomo 仅在本进程存活时运行，
+        // 进程死亡时热重载无意义，故不引入 WorkManager。
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            // 启动后先等 secret 就绪，再开始周期扫描
+            secretReady.await()
+            while (true) {
+                delay(15 * 60 * 1000L)
+                runCatching { autoUpdateDueSubscriptions() }
+                    .onFailure { FileLogger.w(TAG, "订阅自动更新周期扫描异常: ${it.message}") }
+            }
+        }
     }
 
     /** 供容器/上层读取的启用态（同步、非挂起）。 */
@@ -440,6 +452,47 @@ class ClashProxyManager @Inject constructor(
                 resp.body?.string()
             }
         }.getOrNull()
+    }
+
+    /**
+     * P1-7：手动/自动刷新某个订阅型 profile。
+     *
+     * 拉取远端最新 YAML → 更新 updatedAt（URL 不变故 cipher 不换）→ 若该 profile 正是当前活跃且内核
+     * 在跑，热重载新配置（不杀进程）。manual 型 / 拉取失败返回 false，不影响其他 profile。
+     */
+    suspend fun refreshSubscriptionNow(id: String): Boolean {
+        ensureSecretLoaded()
+        val sub = repository.subscriptionsFlow.first().firstOrNull { it.id == id } ?: return false
+        if (sub.kind != ProxySubscription.KIND_SUBSCRIPTION) return false
+        val url = repository.revealSecret(id)?.trim() ?: return false
+        val fresh = fetchSubscriptionYaml(url) ?: run {
+            FileLogger.w(TAG, "刷新订阅 $id 失败：拉取 YAML 返回空")
+            return false
+        }
+        repository.refreshSubscription(id, url)
+        val activeId = repository.activeProfileIdFlow.first()
+        if (activeId == id && enabledCache && mihomoProcess?.isAlive == true) {
+            val config = synthesizeConfig(fresh)
+            writeConfigFile(config)
+            reloadConfig(config)
+            FileLogger.i(TAG, "活跃订阅 $id 已热重载最新配置")
+        }
+        FileLogger.i(TAG, "订阅 $id 更新成功（updatedAt=${System.currentTimeMillis()}）")
+        return true
+    }
+
+    /** P1-7：周期检查所有 autoUpdate 订阅型 profile 是否到期，逐个刷新（失败隔离，不影响其他）。 */
+    private suspend fun autoUpdateDueSubscriptions() {
+        val now = System.currentTimeMillis()
+        val subs = runCatching { repository.subscriptionsFlow.first() }.getOrDefault(emptyList())
+        subs.filter { it.kind == ProxySubscription.KIND_SUBSCRIPTION && it.autoUpdate }.forEach { sub ->
+            val elapsed = if (sub.updatedAt == 0L) Long.MAX_VALUE else now - sub.updatedAt
+            val due = elapsed >= sub.updateIntervalHours * 3600_000L
+            if (due) {
+                runCatching { refreshSubscriptionNow(sub.id) }
+                    .onFailure { FileLogger.w(TAG, "自动更新订阅 ${sub.id} 失败: ${it.message}") }
+            }
+        }
     }
 
     /**

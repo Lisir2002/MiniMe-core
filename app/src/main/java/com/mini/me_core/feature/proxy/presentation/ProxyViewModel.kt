@@ -160,6 +160,14 @@ class ProxyViewModel @Inject constructor(
         }
     }
 
+    /** P1-7：手动刷新某订阅型 profile（拉最新 YAML，活跃则热重载）。 */
+    fun refreshSubscription(id: String) {
+        viewModelScope.launch {
+            val ok = manager.refreshSubscriptionNow(id)
+            _events.send(if (ok) "订阅已刷新" else "刷新失败（仅订阅型可手动刷新，或网络异常）")
+        }
+    }
+
     /** 预检：订阅 URL 或手动 YAML → 解析概览（不落盘不启用）。 */
     fun runPreview(url: String?, yaml: String?) {
         viewModelScope.launch {

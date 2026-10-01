@@ -22,6 +22,12 @@ data class ProxySubscription(
     /** 加密后的敏感内容：subscription=订阅 URL；manual=完整 YAML。 */
     val secretCipher: String,
     val createdAt: Long,
+    /** P1-7：上次成功更新时间戳（ms）。旧数据无此字段时反序列化为 0。 */
+    val updatedAt: Long = 0L,
+    /** P1-7：是否自动更新（仅订阅型有意义）。默认 true。 */
+    val autoUpdate: Boolean = true,
+    /** P1-7：自动更新间隔小时数，默认 24h。 */
+    val updateIntervalHours: Int = 24,
 ) {
     companion object {
         const val KIND_SUBSCRIPTION = "subscription"

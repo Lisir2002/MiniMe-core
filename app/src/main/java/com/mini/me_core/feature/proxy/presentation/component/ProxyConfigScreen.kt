@@ -216,6 +216,7 @@ fun ProxyConfigScreen(
                         groupsView = groupsView?.takeIf { it.profileId == p.id },
                         onActivate = { viewModel.activate(p.id) },
                         onDelete = { viewModel.delete(p.id) },
+                        onRefresh = { viewModel.refreshSubscription(p.id) },
                         onToggleExpand = {
                             if (expandedId == p.id) {
                                 expandedId = null
@@ -621,6 +622,7 @@ private fun ProfileRow(
     groupsView: ProxyGroupsView?,
     onActivate: () -> Unit,
     onDelete: () -> Unit,
+    onRefresh: () -> Unit,
     onToggleExpand: () -> Unit,
     onTabChange: (Int) -> Unit,
     onTestLatency: () -> Unit,
@@ -666,10 +668,22 @@ private fun ProfileRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // P1-7：显示上次更新时间（订阅型）；manual 型不显示。
+            if (profile.kind == ProxySubscription.KIND_SUBSCRIPTION && profile.updatedAt > 0L) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "上次更新：${relativeAgo(profile.updatedAt)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                )
+            }
             Spacer(Modifier.height(Spacing.sm))
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 OutlinedButton(onClick = onActivate, enabled = !isActive) {
                     Text(if (isActive) stringResource(R.string.ui____fe32def4_2) else stringResource(R.string.ui______f67c4924))
+                }
+                OutlinedButton(onClick = onRefresh, enabled = profile.kind == ProxySubscription.KIND_SUBSCRIPTION) {
+                    Text("刷新")
                 }
                 OutlinedButton(onClick = onDelete) { Text(stringResource(R.string.ui____2f4aaddd)) }
                 OutlinedButton(onClick = onToggleExpand) {
@@ -1018,4 +1032,15 @@ private fun formatSpeed(bytes: Long): String {
         b >= 1024 -> "%.1f KB/s".format(b / 1024.0)
         else -> "%.0f B/s".format(b)
     }
+}
+/** P1-7：把时间戳格式化为「x分钟前/x小时前/x天前」。 */
+private fun relativeAgo(ts: Long): String {
+    val diff = System.currentTimeMillis() - ts
+    if (diff < 60_000L) return "刚刚"
+    val minutes = diff / 60_000L
+    if (minutes < 60) return "${minutes}分钟前"
+    val hours = minutes / 60
+    if (hours < 24) return "${hours}小时前"
+    val days = hours / 24
+    return "${days}天前"
 }
