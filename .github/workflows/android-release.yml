@@ -155,6 +155,15 @@ jobs:
           fi
           echo "✓ versionCode 单调递增: $prev_vc -> $cur_vc"
 
+      # 发版前版本号一致性校验：tag 格式 + CHANGELOG 条目 + 版本语义推进。
+      # 使用 scripts/gitops/check-version-consistency.py，确保发版前 CHANGELOG 已更新。
+      # 仅打 tag 触发时校验；workflow_dispatch（手动，无 tag）跳过。
+      - name: Verify version & CHANGELOG consistency
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -e
+          python3 scripts/gitops/check-version-consistency.py --tag "${GITHUB_REF_NAME}" --app main
+
       # 数据保全门禁：校验 applicationId（包名）与上个 Release 一致。
       # 背景：包名（applicationId）变更在 Android 眼里是"全新安装"，私有数据目录随之隔离，
       #       用户历史对话会全部"消失"。因此发版必须保持同包名，不一致直接阻断。

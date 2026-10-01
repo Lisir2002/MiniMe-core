@@ -142,6 +142,16 @@ jobs:
           fi
           echo "[$APP_NAME] ✓ versionCode 单调递增: $prev_vc -> $cur_vc"
 
+      # 发版前版本号一致性校验：tag 格式 + CHANGELOG 条目 + 版本语义推进。
+      # 使用 scripts/gitops/check-version-consistency.py，确保发版前 CHANGELOG 已更新。
+      - name: Verify version & CHANGELOG consistency
+        env:
+          APP_PREFIX: ${{ steps.target.outputs.prefix }}
+          APP: ${{ steps.target.outputs.app }}
+        run: |
+          set -e
+          python3 scripts/gitops/check-version-consistency.py --tag "${APP_PREFIX}${{ steps.target.outputs.ver }}" --app "$APP"
+
       # ── 以下两步仅注入器需要：体积资产不入库（GitHub 单文件 100MB 上限），
       #    构建机侧抓取 apt 依赖闭包（~80MB）与官方 QQ 客户端 deb（~200MB）；
       #    容器底座 / 协议端本体 / 启动器已入库，脚本自动跳过（幂等）。QBot 不含这些大件，
