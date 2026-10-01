@@ -10,6 +10,7 @@ import com.mini.me_core.feature.agent.domain.session.SessionUseCase
 import com.mini.me_core.feature.agent.domain.session.MessagePersistenceUseCase
 import com.mini.me_core.feature.agent.domain.session.checkpoint.CheckpointManager
 import com.mini.me_core.feature.agent.domain.session.goal.GoalService
+import com.mini.me_core.feature.agent.domain.session.plan.statusEnum
 import com.mini.me_core.feature.agent.domain.core.guard.FileObservationGuard
 import com.mini.me_core.feature.agent.domain.core.guard.ToolGuard
 import com.mini.me_core.feature.agent.domain.core.guard.ToolGuardContext
@@ -887,10 +888,10 @@ class StatefulAgentWorkflow @Inject constructor(
                             withContext(Dispatchers.IO) {
                                 currentContext.sessionId?.let { sid ->
                                     planService.getLatest(sid)?.takeIf { plan ->
-                                        plan.pendingSelection.isNotBlank() &&
-                                            plan.statusEnum() != com.mini.me_core.feature.agent.data.local.entity.PlanStatus.COMPLETED &&
-                                            plan.statusEnum() != com.mini.me_core.feature.agent.data.local.entity.PlanStatus.ABANDONED
-                                    }?.pendingSelection
+                                        plan.pending_selection.isNotBlank() &&
+                                            plan.statusEnum() != com.mini.me_core.feature.agent.domain.session.plan.PlanStatus.COMPLETED &&
+                                            plan.statusEnum() != com.mini.me_core.feature.agent.domain.session.plan.PlanStatus.ABANDONED
+                                    }?.pending_selection
                                 }
                             }?.takeIf { it.isNotBlank() }
                         } catch (e: CancellationException) {

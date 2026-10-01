@@ -1,10 +1,11 @@
 package com.mini.me_core.feature.agent.domain.execution.tool.plan
 
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.data.local.entity.PlanEntity
-import com.mini.me_core.feature.agent.data.local.entity.PlanStatus
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_plans as V2AgentPlan
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.session.plan.PlanService
+import com.mini.me_core.feature.agent.domain.session.plan.PlanStatus
+import com.mini.me_core.feature.agent.domain.session.plan.statusEnum
 import com.mini.me_core.feature.agent.domain.execution.tool.AbstractContextualTool
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
@@ -122,7 +123,7 @@ class PlanTool @Inject constructor(
                         return ToolResult.Error("steps 必须是 JSON 数组文本（如 [{\"text\":\"...\",\"status\":\"pending\"}]）", "INVALID_STEPS")
                     }
                     val plan = planService.propose(sessionId, title, steps, pendingSelection.orEmpty())
-                    FileLogger.d(TAG, "plan propose: session=$sessionId planId=${plan.planId}")
+                    FileLogger.d(TAG, "plan propose: session=$sessionId planId=${plan.plan_id}")
                     successPlan(plan)
                 }
                 "get" -> {
@@ -140,9 +141,9 @@ class PlanTool @Inject constructor(
                     if (!isStepsJson(steps)) {
                         return ToolResult.Error("steps 必须是 JSON 数组文本", "INVALID_STEPS")
                     }
-                    val targetId = planId ?: planService.getLatest(sessionId)?.planId
+                    val targetId = planId ?: planService.getLatest(sessionId)?.plan_id
                         ?: return ToolResult.Error("当前会话无计划，请先用 action=propose 提议", "NO_PLAN")
-                    val updated = updatePlan(targetId) { it.copy(steps = steps, updatedAtMs = System.currentTimeMillis()) }
+                    val updated = updatePlan(targetId) { it.copy(steps = steps, updated_at_ms = System.currentTimeMillis()) }
                         ?: return ToolResult.Error("计划不存在或已处于终态（COMPLETED/ABANDONED），无法修改", "PLAN_UPDATE_FAILED")
                     successPlan(updated)
                 }
@@ -150,14 +151,14 @@ class PlanTool @Inject constructor(
                     if (pendingSelection.isNullOrBlank()) {
                         return ToolResult.Error("action=set_pending_selection 需要非空 pending_selection", "MISSING_PENDING_SELECTION")
                     }
-                    val targetId = planId ?: planService.getLatest(sessionId)?.planId
+                    val targetId = planId ?: planService.getLatest(sessionId)?.plan_id
                         ?: return ToolResult.Error("当前会话无计划，请先用 action=propose 提议", "NO_PLAN")
-                    val updated = updatePlan(targetId) { it.copy(pendingSelection = pendingSelection, updatedAtMs = System.currentTimeMillis()) }
+                    val updated = updatePlan(targetId) { it.copy(pending_selection = pendingSelection, updated_at_ms = System.currentTimeMillis()) }
                         ?: return ToolResult.Error("计划不存在或已处于终态（COMPLETED/ABANDONED），无法修改", "PLAN_UPDATE_FAILED")
                     successPlan(updated)
                 }
                 "approve", "abandon" -> {
-                    val targetId = planId ?: planService.getLatest(sessionId)?.planId
+                    val targetId = planId ?: planService.getLatest(sessionId)?.plan_id
                         ?: return ToolResult.Error("当前会话无计划", "NO_PLAN")
                     val status = if (action == "approve") PlanStatus.APPROVED else PlanStatus.ABANDONED
                     val updated = if (status == PlanStatus.APPROVED) {
@@ -184,8 +185,8 @@ class PlanTool @Inject constructor(
      */
     private suspend fun updatePlan(
         planId: String,
-        transform: (PlanEntity) -> PlanEntity
-    ): PlanEntity? {
+        transform: (V2AgentPlan) -> V2AgentPlan
+    ): V2AgentPlan? {
         val existing = planService.getById(planId) ?: return null
         val status = existing.statusEnum()
         if (status == PlanStatus.COMPLETED || status == PlanStatus.ABANDONED) return null
@@ -200,16 +201,16 @@ class PlanTool @Inject constructor(
         false
     }
 
-    private fun successPlan(plan: PlanEntity): ToolResult.Success = ToolResult.Success(
+    private fun successPlan(plan: V2AgentPlan): ToolResult.Success = ToolResult.Success(
         JsonObject(mapOf(
             "plan" to JsonObject(mapOf(
-                "plan_id" to JsonPrimitive(plan.planId),
+                "plan_id" to JsonPrimitive(plan.plan_id),
                 "title" to JsonPrimitive(plan.title),
                 "status" to JsonPrimitive(plan.statusEnum().name.lowercase()),
                 "steps" to parseSteps(plan.steps),
-                "pending_selection" to JsonPrimitive(plan.pendingSelection),
-                "created_at" to JsonPrimitive(plan.createdAtMs),
-                "updated_at" to JsonPrimitive(plan.updatedAtMs)
+                "pending_selection" to JsonPrimitive(plan.pending_selection),
+                "created_at" to JsonPrimitive(plan.created_at_ms),
+                "updated_at" to JsonPrimitive(plan.updated_at_ms)
             ))
         ))
     )
