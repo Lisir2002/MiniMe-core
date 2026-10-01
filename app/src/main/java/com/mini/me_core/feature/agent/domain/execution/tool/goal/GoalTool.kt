@@ -1,9 +1,10 @@
 package com.mini.me_core.feature.agent.domain.execution.tool.goal
 
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.data.local.entity.GoalEntity
-import com.mini.me_core.feature.agent.data.local.entity.GoalStatus
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_goals as V2AgentGoal
 import com.mini.me_core.feature.agent.domain.session.goal.GoalService
+import com.mini.me_core.feature.agent.domain.session.goal.GoalStatus
+import com.mini.me_core.feature.agent.domain.session.goal.statusEnum
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.execution.tool.AbstractContextualTool
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
@@ -86,7 +87,7 @@ class GoalTool @Inject constructor(
                     // roundSeq 归因：用会话工具输出计数近似当前轮次（ToolSessionState.outputCount）
                     val roundSeq = context.sessionState?.outputCount ?: 0
                     val goal = goalService.activate(sessionId, text, roundSeq)
-                    FileLogger.d(TAG, "goal set: session=$sessionId goalId=${goal.goalId}")
+                    FileLogger.d(TAG, "goal set: session=$sessionId goalId=${goal.goal_id}")
                     successGoal(goal)
                 }
                 "get" -> {
@@ -101,7 +102,7 @@ class GoalTool @Inject constructor(
                     if (text.isNullOrBlank()) {
                         return ToolResult.Error("action=update 需要非空 text", "MISSING_TEXT")
                     }
-                    val targetId = goalId ?: goalService.getActive(sessionId)?.goalId
+                    val targetId = goalId ?: goalService.getActive(sessionId)?.goal_id
                         ?: return ToolResult.Error("当前会话无 ACTIVE 目标，请先用 action=set 设定", "NO_ACTIVE_GOAL")
                     val updated = goalService.updateText(targetId, text)
                     if (updated == null) {
@@ -110,7 +111,7 @@ class GoalTool @Inject constructor(
                     successGoal(updated)
                 }
                 "done", "abandon" -> {
-                    val targetId = goalId ?: goalService.getActive(sessionId)?.goalId
+                    val targetId = goalId ?: goalService.getActive(sessionId)?.goal_id
                         ?: return ToolResult.Error("当前会话无 ACTIVE 目标", "NO_ACTIVE_GOAL")
                     val status = if (action == "done") GoalStatus.DONE else GoalStatus.ABANDONED
                     val updated = goalService.setStatus(targetId, status)
@@ -146,15 +147,15 @@ class GoalTool @Inject constructor(
         )
     }
 
-    private fun successGoal(goal: GoalEntity): ToolResult.Success = ToolResult.Success(
+    private fun successGoal(goal: V2AgentGoal): ToolResult.Success = ToolResult.Success(
         JsonObject(mapOf(
             "goal" to JsonObject(mapOf(
-                "goal_id" to JsonPrimitive(goal.goalId),
+                "goal_id" to JsonPrimitive(goal.goal_id),
                 "text" to JsonPrimitive(goal.text),
                 "status" to JsonPrimitive(goal.statusEnum().name.lowercase()),
-                "revision" to JsonPrimitive(goal.revision),
-                "created_at" to JsonPrimitive(goal.createdAtMs),
-                "updated_at" to JsonPrimitive(goal.updatedAtMs)
+                "revision" to JsonPrimitive(goal.revision.toInt()),
+                "created_at" to JsonPrimitive(goal.created_at_ms),
+                "updated_at" to JsonPrimitive(goal.updated_at_ms)
             ))
         ))
     )
