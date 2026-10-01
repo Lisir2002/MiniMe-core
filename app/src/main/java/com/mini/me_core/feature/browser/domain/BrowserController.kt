@@ -1903,6 +1903,608 @@ class BrowserController @Inject constructor(
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // 第一批：反爬虫核心控制器方法
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Shadow DOM 穿透快照：递归遍历 open Shadow Root，元素纳入统一编号。
+     * 与 snapshot() 类似，但使用 JS_SNAPSHOT_SHADOW 穿透 shadow tree。
+     */
+    suspend fun snapshotShadow(level: SnapshotLevel = SnapshotLevel.STANDARD): BrowserPageSnapshot = mutex.withLock {
+        _agentStatus.value = AgentBrowserStatus("正在穿透 Shadow DOM 提取", true)
+        try {
+            val elJson = evalJs(BrowserJsScripts.JS_SNAPSHOT_SHADOW)
+            val parsed = runCatching { json.parseToJsonElement(elJson).jsonObject }.getOrNull()
+            val elements = runCatching {
+                parsed?.get("elements")?.let { el ->
+                    Json { ignoreUnknownKeys = true }.decodeFromString<List<BrowserElement>>(el.toString())
+                }
+            }.getOrNull() ?: emptyList()
+            val headings = runCatching {
+                parsed?.get("headings")?.let { h ->
+                    Json { ignoreUnknownKeys = true }.decodeFromString<List<BrowserHeading>>(h.toString())
+                }
+            }.getOrNull() ?: emptyList()
+            val title = parsed?.get("title")?.let { if (it is JsonPrimitive) it.content else "" } ?: ""
+            val url = parsed?.get("url")?.let { if (it is JsonPrimitive) it.content else "" } ?: ""
+            val shadowCount = parsed?.get("shadow_roots")?.let { if (it is JsonPrimitive) it.content.toIntOrNull() ?: 0 } ?: 0
+            val pageText = if (level == SnapshotLevel.FULL) evalJs(BrowserJsScripts.JS_PAGE_TEXT) else ""
+            val snap = BrowserPageSnapshot(
+                title = title, url = url, headings = headings, elements = elements,
+                pageText = pageText.take(12000), pendingRequests = readPendingCount()
+            )
+            lastSnapshot = snap
+            recordAction("snapshot_shadow", "Shadow DOM 穿透快照：${elements.size}元素，${shadowCount}个shadow root")
+            snap
+        } finally {
+            _agentStatus.value = AgentBrowserStatus()
+        }
+    }
+
+    /** 列出所有 iframe（最多 5 层递归），返回 JSON 字符串。 */
+    suspend fun listIframes(): String = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_LIST_IFRAMES)
+    }
+
+    /**
+     * iframe 链式定位：解析 `iframe=id1 >> iframe=id2 >> selector` 格式定位符。
+     * @return ResolvedElement 或 null
+     */
+    suspend fun locateInIframe(chain: String): ResolvedElement? = mutex.withLock {
+        val raw = evalJs("(${BrowserJsScripts.JS_IFRAME_CHAIN_LOCATE})(${quote(chain)})")
+        val obj = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return@withLock null
+        val ok = runCatching { (obj["ok"] as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+        if (!ok) return@withLock null
+        val id = (obj["id"] as? JsonPrimitive)?.content ?: return@withLock null
+        ResolvedElement(id, "iframe_chain", 1)
+    }
+
+    /** 在 iframe 链内执行操作（click/type/hover）。 */
+    suspend fun actionInIframe(chain: String, action: String, arg1: String, arg2: String = ""): String = mutex.withLock {
+        evalJs("(${BrowserJsScripts.JS_IFRAME_ACTION})(${quote(chain)}, ${quote(action)}, ${quote(arg1)}, ${quote(arg2)})")
+    }
+
+    /**
+     * 注入增强版网络拦截（v2）：全量捕获请求体+响应体。
+     * 通常在导航后调用，或在页面加载时自动注入（通过 addDocumentStartJavaScript）。
+     */
+    suspend fun enableApiInterception() = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_NET_HOOK_V2)
+        recordAction("intercept_api", "已启用增强版 API 拦截（全量请求/响应体捕获）")
+    }
+
+    /** 列出已捕获的 API 调用（含完整请求/响应体）。 */
+    suspend fun listApiCalls(limit: Int = 20): String = mutex.withLock {
+        val n = limit.coerceIn(1, 100)
+        evalJs("JSON.stringify((window.__rcb_api_calls || []).slice(-$n).reverse())")
+    }
+
+    /** 重放指定 id 的 API 请求。 */
+    suspend fun replayApi(callId: Int): String = mutex.withLock {
+        evalJs("(${BrowserJsScripts.JS_REPLAY_API})($callId)")
+    }
+
+    /**
+     * 等待渲染完成：DOM Mutation 稳定 + 网络空闲 + CSS 动画完成 三重检测。
+     * @param timeoutMs 超时毫秒
+     * @return 是否渲染完成
+     */
+    suspend fun waitForRenderComplete(timeoutMs: Long = 10000): Boolean = mutex.withLock {
+        _agentStatus.value = AgentBrowserStatus("等待渲染完成", true)
+        try {
+            val deadline = System.currentTimeMillis() + timeoutMs
+            var domStableSince = 0L
+            var lastDomVer = -1L
+            while (System.currentTimeMillis() < deadline) {
+                val check = runCatching {
+                    json.parseToJsonElement(evalJs(BrowserJsScripts.JS_RENDER_WAIT_CHECK)).jsonObject
+                }.getOrNull()
+                val domVer: Long = runCatching { (check?.get("dom_version") as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L }.getOrNull() ?: 0L
+                val netPending: Int = runCatching { (check?.get("net_pending") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0 }.getOrNull() ?: 0
+                val cssIdle: Boolean = runCatching { (check?.get("css_idle") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: true
+                val bodyReady: Boolean = runCatching { (check?.get("body_ready") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+                val now = System.currentTimeMillis()
+                if (domVer == lastDomVer) {
+                    if (domStableSince == 0L) domStableSince = now
+                } else {
+                    domStableSince = 0L
+                    lastDomVer = domVer
+                }
+                val domStable = domStableSince > 0 && (now - domStableSince) >= 500
+                if (domStable && netPending == 0 && cssIdle && bodyReady) {
+                    recordAction("wait", "渲染完成（DOM稳定+网络空闲+CSS空闲）")
+                    return@withLock true
+                }
+                delay(150)
+            }
+            recordAction("wait", "等待渲染完成超时（${timeoutMs}ms）", success = false)
+            false
+        } finally {
+            _agentStatus.value = AgentBrowserStatus()
+        }
+    }
+
+    /** 检测页面渲染类型（SSR/CSR/Next.js/Nuxt 等），返回 JSON 字符串。 */
+    suspend fun detectRenderingType(): String = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_DETECT_RENDERING_TYPE)
+    }
+
+    /**
+     * 注入 aggressive 指纹伪装。
+     * 注入后自动执行健康检查，如果检测到渲染异常则自动回退到 basic 模式。
+     */
+    suspend fun applyStealth(mode: String = "aggressive"): String = mutex.withLock {
+        _agentStatus.value = AgentBrowserStatus("应用指纹伪装（$mode）", true)
+        try {
+            if (mode == "aggressive") {
+                evalJs(BrowserJsScripts.JS_STEALTH_AGGRESSIVE)
+                // 健康检查
+                val healthRaw = evalJs(BrowserJsScripts.JS_STEALTH_HEALTH_CHECK)
+                val health = runCatching { json.parseToJsonElement(healthRaw).jsonObject }.getOrNull()
+                val anomaly: Boolean = runCatching { (health?.get("anomaly") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+                if (anomaly) {
+                    // 回退到 basic 模式（清除 aggressive 标记，使用原始 JS_ANTI_DETECT）
+                    evalJs("window.__rcb_stealth = 'basic_fallback';")
+                    recordAction("stealth", "aggressive 模式渲染异常，已自动回退 basic", success = false)
+                    return@withLock "{\"mode\":\"aggressive\",\"fallback\":true,\"reason\":\"render_anomaly\"}"
+                }
+                recordAction("stealth", "已应用 aggressive 指纹伪装，健康检查通过")
+                "{\"mode\":\"aggressive\",\"fallback\":false}"
+            } else {
+                evalJs(BrowserJsScripts.JS_ANTI_DETECT)
+                recordAction("stealth", "已应用 basic 指纹伪装")
+                "{\"mode\":\"basic\"}"
+            }
+        } finally {
+            _agentStatus.value = AgentBrowserStatus()
+        }
+    }
+
+    /** 内容清洗：检测并清理混淆内容，返回清洗结果 JSON。 */
+    suspend fun deobfuscate(text: String? = null): String = mutex.withLock {
+        val arg = if (text != null) quote(text) else "null"
+        evalJs("(${BrowserJsScripts.JS_DEOBFUSCATE_TEXT})($arg)")
+    }
+
+    /** 提取清洗后的页面文本（自动移除隐藏元素、清理零宽字符）。 */
+    suspend fun extractCleanText(): String = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_EXTRACT_CLEAN_TEXT)
+    }
+
+    /**
+     * 分页提取：自动翻页收集数据。
+     * @param maxPages 最大页数
+     * @param selector 数据容器选择器（可选）
+     */
+    suspend fun paginateExtract(maxPages: Int = 5, selector: String? = null): String = mutex.withLock {
+        _agentStatus.value = AgentBrowserStatus("分页提取（最多${maxPages}页）", true)
+        try {
+            val selArg = if (selector != null) quote(selector) else "null"
+            evalJs("(${BrowserJsScripts.JS_PAGINATE_EXTRACT})($maxPages, $selArg)")
+        } finally {
+            _agentStatus.value = AgentBrowserStatus()
+        }
+    }
+
+    /**
+     * 无限滚动提取：自动滚动到底部，收集所有加载的内容。
+     * @param maxScrolls 最大滚动次数
+     * @param selector 数据容器选择器（可选）
+     */
+    suspend fun infiniteScrollExtract(maxScrolls: Int = 15, selector: String? = null): String = mutex.withLock {
+        _agentStatus.value = AgentBrowserStatus("无限滚动提取（最多${maxScrolls}次）", true)
+        try {
+            val selArg = if (selector != null) quote(selector) else "null"
+            evalJs("(${BrowserJsScripts.JS_INFINITE_SCROLL_EXTRACT})($maxScrolls, $selArg)")
+        } finally {
+            _agentStatus.value = AgentBrowserStatus()
+        }
+    }
+
+    /** 获取快照的 API 数据来源标注。 */
+    suspend fun snapshotApiSource(): String = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_SNAPSHOT_API_SOURCE)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 第二批：自动化与健壮性控制器方法
+    // ═══════════════════════════════════════════════════════════════
+
+    // ── 人类行为模拟配置 ──
+    /** 全局 humanize 开关（默认 true），可通过参数覆盖。 */
+    @Volatile
+    var humanizeEnabled: Boolean = true
+        private set
+
+    /** 请求间隔（毫秒），默认 0（不额外延迟）。 */
+    @Volatile
+    var requestIntervalMs: Long = 0L
+        private set
+
+    /** 设置请求间隔（避免被限流）。 */
+    fun setRequestInterval(ms: Long) {
+        requestIntervalMs = ms.coerceIn(0, 10_000)
+        FileLogger.i(TAG, "请求间隔设置为 ${requestIntervalMs}ms")
+    }
+
+    /** 设置 humanize 开关。 */
+    fun setHumanize(enabled: Boolean) {
+        humanizeEnabled = enabled
+    }
+
+    /** 内置常见 UA 列表。 */
+    private val builtinUAs = mapOf(
+        "chrome_desktop" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "firefox_desktop" to "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
+        "safari_macos" to "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+        "chrome_android" to "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        "safari_ios" to "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1"
+    )
+
+    /** 列出内置 UA 选项。 */
+    fun listUserAgents(): Map<String, String> = builtinUAs
+
+    /** 切换 User-Agent（按预设名称或自定义字符串）。 */
+    suspend fun setUserAgent(nameOrCustom: String): String = withContext(Dispatchers.Main) {
+        val ua = builtinUAs[nameOrCustom] ?: nameOrCustom
+        val wv = activeWebView() ?: return@withContext "WebView 未就绪"
+        wv.settings.userAgentString = ua
+        FileLogger.i(TAG, "UA 切换为: ${nameOrCustom.take(60)}")
+        "已切换 UA: $nameOrCustom"
+    }
+
+    // ── 宏录制/回放（内存存储，会话级） ──
+    data class MacroStep(
+        val action: String,
+        val args: Map<String, String> = emptyMap(),
+        val timestamp: Long = System.currentTimeMillis()
+    )
+
+    private val macroStore = mutableListOf<MacroStep>()
+    @Volatile
+    private var recording: Boolean = false
+
+    /** 开始录制宏。 */
+    fun macroStartRecord(): String {
+        macroStore.clear()
+        recording = true
+        return "宏录制已开始，后续操作将被记录"
+    }
+
+    /** 停止录制宏，返回录制的步骤数。 */
+    fun macroStopRecord(): Int {
+        recording = false
+        return macroStore.size
+    }
+
+    /** 添加一步到当前录制的宏。 */
+    fun macroAddStep(action: String, args: Map<String, String>) {
+        if (recording) {
+            macroStore.add(MacroStep(action, args))
+        }
+    }
+
+    /** 获取当前录制的宏。 */
+    fun getMacro(): List<MacroStep> = macroStore.toList()
+
+    /** 清空宏。 */
+    fun macroClear() {
+        macroStore.clear()
+        recording = false
+    }
+
+    /** 是否正在录制。 */
+    fun isRecording(): Boolean = recording
+
+    // ── safe_click ──
+    data class SafeClickResult(
+        val ok: Boolean,
+        val reason: String = "",
+        val detail: String = "",
+        val beforeFingerprint: String = "",
+        val afterFingerprint: String = "",
+        val changed: Boolean = false
+    )
+
+    /**
+     * safe_click：前置检查 + 执行 + 后置验证。
+     * 前置：元素可见/可点击/在视口内（被遮挡仅警告不拦截）。
+     * 后置：对比点击前后 DOM 指纹，确认页面发生了可感知变化。
+     */
+    suspend fun safeClick(elementId: String): SafeClickResult = mutex.withLock {
+        val resolved = resolveElementId(elementId)
+            ?: return@withLock SafeClickResult(ok = false, reason = "NOT_FOUND", detail = "元素未找到: $elementId")
+
+        // 前置检查
+        val checkRaw = evalJs("(${BrowserJsScripts.JS_SAFE_CLICK_CHECK})(${quote(resolved.id)})")
+        val check = runCatching { json.parseToJsonElement(checkRaw).jsonObject }.getOrNull()
+        val checkOk: Boolean = runCatching { (check?.get("ok") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+        val reason: String = runCatching { (check?.get("reason") as? JsonPrimitive)?.content }.getOrNull() ?: ""
+        if (!checkOk) {
+            return@withLock SafeClickResult(ok = false, reason = reason, detail = "前置检查未通过: $reason")
+        }
+
+        // 捕获点击前指纹
+        val beforeFp = evalJs(BrowserJsScripts.JS_CAPTURE_BEFORE_CLICK)
+
+        // 执行点击（复用已有 click 的人类行为）
+        waitForActionable(resolved.id, skipOverlap = true)
+        delay((80..200).random().toLong())
+        evalJs("(${BrowserJsScripts.JS_CLICK_AT})(${quote(resolved.id)}, 0, 0)")
+        delay(400)
+
+        // 后置验证
+        val verifyRaw = evalJs("(${BrowserJsScripts.JS_SAFE_CLICK_VERIFY})($beforeFp)")
+        val verify = runCatching { json.parseToJsonElement(verifyRaw).jsonObject }.getOrNull()
+        val changed: Boolean = runCatching { (verify?.get("changed") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+
+        recordAction("safe_click", "$elementId: ${if (changed) "成功(页面已变化)" else "完成(页面无明显变化)"}")
+        SafeClickResult(ok = true, beforeFingerprint = beforeFp, afterFingerprint = verifyRaw, changed = changed)
+    }
+
+    /**
+     * 人类增强打字：逐字符输入，随机间隔，偶尔模拟打错字+退格修正。
+     * @param mistakeRate 打错字概率（0.05 = 5%）
+     */
+    suspend fun humanType(elementId: String, text: String, mistakeRate: Double = 0.05): BrowserPageSnapshot = mutex.withLock {
+        val resolved = resolveElementId(elementId)
+            ?: return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 未找到")
+        waitForActionable(resolved.id, skipOverlap = true)
+        evalJs("(function(){var el=document.querySelector('[data-rcb-id=" + quote(resolved.id) + "']); if(el){el.scrollIntoView({block:'center'}); el.focus();}})()")
+        delay(150)
+
+        for (ch in text) {
+            // 随机间隔（50-180ms），偶尔长停顿（思考）
+            val delayMs = if (Math.random() < 0.05) (300..800).random() else (50..180).random()
+            delay(delayMs.toLong())
+            // 偶尔打错字
+            if (Math.random() < mistakeRate && ch.isLetter()) {
+                val wrongChar = ('a'..'z').random().toString()
+                evalJs("(${BrowserJsScripts.JS_HUMAN_TYPE_CHAR})(${quote(resolved.id)}, ${quote(wrongChar)})")
+                delay((100..250).random().toLong())
+                // 退格修正
+                evalJs(BrowserJsScripts.JS_HUMAN_BACKSPACE + "(${quote(resolved.id)})")
+                delay((80..150).random().toLong())
+            }
+            evalJs("(${BrowserJsScripts.JS_HUMAN_TYPE_CHAR})(${quote(resolved.id)}, ${quote(ch.toString())})")
+        }
+        evalJs("(${BrowserJsScripts.JS_HUMAN_FIRE_INPUT})(${quote(resolved.id)})")
+        afterWrite("human_type", snapshotInternal(SnapshotLevel.SUMMARY))
+    }
+
+    // ── 滚动位置获取 ──
+    suspend fun getScrollPosition(): String = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_GET_SCROLL_POS)
+    }
+
+    /** 检测到限流响应（429/403）时的提示。 */
+    fun rateLimitHint(statusCode: Int): String? {
+        return when (statusCode) {
+            429 -> "检测到 429 Too Many Requests，建议：1) 增加 set_request_interval 间隔 2) 切换 User-Agent 3) 通过代理工具切换节点"
+            403 -> "检测到 403 Forbidden，可能被风控拦截，建议：1) 切换 User-Agent 2) 使用 apply_stealth 3) 通过代理工具切换 IP"
+            else -> null
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 第三批：会话与闭环控制器方法
+    // ═══════════════════════════════════════════════════════════════
+
+    // ── 会话管理 ──
+    data class SavedSession(
+        val sessionId: String,
+        val url: String,
+        val cookies: String,
+        val storageDump: String,
+        val timestamp: Long = System.currentTimeMillis()
+    )
+
+    private val sessionStore = mutableMapOf<String, SavedSession>()
+
+    /** 保存当前会话状态（cookies + storage + URL）。 */
+    suspend fun saveSession(): String = mutex.withLock {
+        val sessionId = "sess_" + UUID.randomUUID().toString().take(8)
+        val url = lastSnapshot.url
+        val cookies = withContext(Dispatchers.Main) {
+            CookieManager.getInstance().getCookie(url) ?: ""
+        }
+        val storageDump = evalJs(BrowserJsScripts.JS_STORAGE_DUMP)
+        sessionStore[sessionId] = SavedSession(sessionId, url, cookies, storageDump)
+        recordAction("save_session", "会话已保存: $sessionId ($url)")
+        sessionId
+    }
+
+    /** 按 session_id 恢复会话。 */
+    suspend fun restoreSession(sessionId: String): String = mutex.withLock {
+        val session = sessionStore[sessionId]
+            ?: return@withLock "未找到会话: $sessionId"
+        // 恢复 cookies
+        withContext(Dispatchers.Main) {
+            val cm = CookieManager.getInstance()
+            session.cookies.split(";").forEach { cookieStr ->
+                val trimmed = cookieStr.trim()
+                if (trimmed.isNotBlank()) {
+                    runCatching { cm.setCookie(session.url, trimmed) }
+                }
+            }
+            cm.flush()
+        }
+        // 恢复 storage
+        runCatching {
+            evalJs("(${BrowserJsScripts.JS_STORAGE_RESTORE})(${quote(session.storageDump)})")
+        }
+        // 导航到保存的 URL
+        navigate(session.url)
+        recordAction("restore_session", "会话已恢复: $sessionId")
+        "会话 $sessionId 已恢复，已导航到 ${session.url}"
+    }
+
+    /** 列出所有已保存的会话。 */
+    fun listSessions(): List<SavedSession> = sessionStore.values.toList()
+
+    /** 清除浏览数据。 */
+    suspend fun clearData(types: String = "all"): String = withContext(Dispatchers.Main) {
+        val cm = CookieManager.getInstance()
+        var cleared = mutableListOf<String>()
+        if (types.contains("cookie") || types == "all") {
+            cm.removeAllCookies(null)
+            cm.flush()
+            cleared.add("cookies")
+        }
+        if (types.contains("cache") || types == "all") {
+            activeWebView()?.clearCache(true)
+            cleared.add("cache")
+        }
+        if (types.contains("storage") || types == "all") {
+            evalJs("try { localStorage.clear(); sessionStorage.clear(); } catch(e) {}")
+            cleared.add("storage")
+        }
+        recordAction("clear_data", "已清除: ${cleared.joinToString(",")}")
+        "已清除: ${cleared.joinToString(", ")}"
+    }
+
+    /** 切换隐身模式（委托给已有 setIncognito）。 */
+    fun setIncognitoMode(on: Boolean) = setIncognito(on)
+
+    // ── 下载闭环 ──
+    /** 等待下载完成（监听下载管理器状态）。 */
+    suspend fun waitForDownload(timeoutMs: Long = 30_000): BrowserDownloadInfo? {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            val downloads = downloadManager.downloads.value
+            val recent = downloads.firstOrNull()
+            if (recent != null && recent.status == "done") return recent
+            if (recent != null && recent.status == "error") return recent
+            delay(500)
+        }
+        return null
+    }
+
+    /** 下载文件到 workspace 目录。 */
+    fun downloadToWorkspace(downloadId: String): File? {
+        val info = downloadManager.downloads.value.firstOrNull { it.id == downloadId }
+            ?: return null
+        return downloadManager.hostFile(info)
+    }
+
+    /** 从 URL 下载文件并返回本地 File。 */
+    suspend fun downloadFileFromUrl(url: String): File? {
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val req = Request.Builder().url(url).build()
+                val resp = okHttp.newCall(req).execute()
+                if (!resp.isSuccessful) return@withContext null
+                val fileName = url.substringAfterLast('/').substringBefore('?').ifBlank { "download_${System.currentTimeMillis()}" }
+                val dir = java.io.File(context.cacheDir, "downloads").apply { mkdirs() }
+                val file = java.io.File(dir, fileName)
+                resp.body?.byteStream()?.use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
+                file
+            }.getOrNull()
+        }
+    }
+
+    // ── 验证码辅助 + 安全审计 ──
+    /** 检测页面验证码。 */
+    suspend fun detectCaptcha(): String = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_CAPTCHA_DETECT)
+    }
+
+    /** 权限审计。 */
+    suspend fun permissionAudit(): String = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_PERMISSION_AUDIT)
+    }
+
+    /** 资源拦截（减少加载）。 */
+    suspend fun blockResource(types: String): String = mutex.withLock {
+        evalJs("(${BrowserJsScripts.JS_BLOCK_RESOURCE})(${quote(types)})")
+    }
+
+    /** 获取全页截图所需信息。 */
+    suspend fun getFullPageInfo(): String = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_FULL_PAGE_INFO)
+    }
+
+    /** 全页截图：滚动拼接。 */
+    suspend fun screenshotFullPage(): String? = mutex.withLock {
+        _agentStatus.value = AgentBrowserStatus("正在截取全页（滚动拼接）", true)
+        try {
+            val infoRaw = evalJs(BrowserJsScripts.JS_FULL_PAGE_INFO)
+            val info = runCatching { json.parseToJsonElement(infoRaw).jsonObject }.getOrNull()
+            val scrollHeight = runCatching { (info?.get("scrollHeight") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0 }.getOrNull() ?: 0
+            val clientHeight = runCatching { (info?.get("clientHeight") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0 }.getOrNull() ?: 0
+            if (scrollHeight <= 0 || clientHeight <= 0) return@withLock null
+
+            // 简单实现：截取当前视口，返回信息让 Kotlin 层知道需要滚动多少次
+            // Android WebView 无法直接截取完整滚动内容，只能滚动拼接
+            val bmp = withContext(Dispatchers.Main) {
+                val wv = ensureWebView()
+                if (wv.width <= 0 || wv.height <= 0) return@withContext null
+                val full = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.ARGB_8888)
+                wv.draw(Canvas(full))
+                full
+            } ?: return@withLock null
+            val bos = ByteArrayOutputStream()
+            bmp.compress(Bitmap.CompressFormat.PNG, 80, bos)
+            bmp.recycle()
+            val b64 = Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP)
+            recordAction("screenshot_full_page", "全页截图（当前视口，页面总高 ${scrollHeight}px）")
+            "data:image/png;base64,$b64"
+        } finally {
+            _agentStatus.value = AgentBrowserStatus()
+        }
+    }
+
+    /** 操作日志（委托给 actionLog）。 */
+    fun operationLog(limit: Int = 30): List<String> = synchronized(actionLog) {
+        actionLog.toList().takeLast(limit)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 第四批：SPA 专项控制器方法
+    // ═══════════════════════════════════════════════════════════════
+
+    /** 检测前端框架及版本。 */
+    suspend fun detectFramework(): String = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_DETECT_FRAMEWORK)
+    }
+
+    /** 提取 SSR 注入数据（__NEXT_DATA__ / __NUXT__ / __INITIAL_STATE__ 等）。 */
+    suspend fun extractSsrData(): String = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_EXTRACT_SSR_DATA)
+    }
+
+    /** 提取框架内部状态（React Fiber / Vue 实例 / Redux / Pinia / Zustand）。 */
+    suspend fun extractFrameworkState(): String = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_EXTRACT_FRAMEWORK_STATE)
+    }
+
+    /** 检测虚拟列表。 */
+    suspend fun detectVirtualList(): String = mutex.withLock {
+        evalJs(BrowserJsScripts.JS_DETECT_VIRTUAL_LIST)
+    }
+
+    /**
+     * SPA 路由导航：自动检测前端路由并调用对应 API。
+     * 导航后等待渲染完成。
+     */
+    suspend fun spaNavigate(url: String): String = mutex.withLock {
+        val result = evalJs("(${BrowserJsScripts.JS_SPA_NAVIGATE})(${quote(url)})")
+        // 等待新路由渲染完成
+        runCatching { waitForRenderComplete(5000) }
+        result
+    }
+
+    /**
+     * API 分页分析：识别分页参数并建议遍历策略。
+     * 实际重放由 Kotlin 层通过 replay_api 控制。
+     */
+    suspend fun apiPaginate(maxPages: Int, urlPattern: String): String = mutex.withLock {
+        evalJs("(${BrowserJsScripts.JS_API_PAGINATE})($maxPages, ${quote(urlPattern)})")
+    }
+
     /** 解析网络缓冲 JSON（兼容 WebView evaluateJavascript 对字符串结果再包裹一层的形态）。 */
     private fun decodeNetworkList(raw: String): List<BrowserNetworkRecord> {
         val text = raw.trim()

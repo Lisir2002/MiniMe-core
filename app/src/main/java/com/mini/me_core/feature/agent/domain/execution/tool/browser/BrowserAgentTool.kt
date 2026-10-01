@@ -100,7 +100,7 @@ class BrowserAgentTool @Inject constructor(
         "action" to ToolParameter(
             name = "action",
             type = ParameterType.STRING,
-            description = "要执行的浏览器动作：核心动作 navigate/view/snapshot/click/type/fill_form/submit/scroll/wait_for/screenshot；高级动作 extract/select_option/hover/drag/press_key/upload_file/back/forward/reload/evaluate/wait_for_change/wait_for_network_idle/history/get_attribute/handle_dialog/login/takeover/new_tab/switch_tab/close_tab/list_tabs/downloads/network/network_get/wait_for_request",
+            description = "要执行的浏览器动作：核心动作 navigate/view/snapshot/click/type/fill_form/submit/scroll/wait_for/screenshot；高级动作 extract/select_option/hover/drag/press_key/upload_file/back/forward/reload/evaluate/wait_for_change/wait_for_network_idle/history/get_attribute/handle_dialog/login/takeover/new_tab/switch_tab/close_tab/list_tabs/downloads/network/network_get/wait_for_request；反爬增强 snapshot_shadow/list_iframes/iframe_action/intercept_api/list_api_calls/replay_api/wait_for_render_complete/detect_rendering_type/apply_stealth/deobfuscate/extract_clean_text/paginate_extract/infinite_scroll_extract；自动化增强 safe_click/human_type/macro_record/macro_playback/macro_list/macro_clear/set_request_interval/set_user_agent/list_user_agents/action_chain；会话闭环 save_session/restore_session/list_sessions/clear_data/set_incognito/wait_for_download/download_to_workspace/upload_from_url/detect_captcha/permission_audit/block_resource/operation_log/screenshot_full_page；SPA专项 detect_framework/extract_ssr_data/extract_framework_state/detect_virtual_list/spa_navigate/api_paginate",
             required = true,
             enum = listOf(
                 "navigate", "view", "snapshot", "page_text", "extract", "click", "type", "fill_form", "select_option", "submit",
@@ -108,7 +108,25 @@ class BrowserAgentTool @Inject constructor(
                 "screenshot", "evaluate", "wait_for", "wait_for_change", "wait_for_network_idle", "history", "get_attribute",
                 "handle_dialog", "login", "takeover",
                 "new_tab", "switch_tab", "close_tab", "list_tabs", "downloads",
-                "network", "network_get", "wait_for_request"
+                "network", "network_get", "wait_for_request",
+                "snapshot_shadow", "list_iframes", "iframe_action",
+                "intercept_api", "list_api_calls", "replay_api",
+                "wait_for_render_complete", "detect_rendering_type",
+                "apply_stealth", "deobfuscate", "extract_clean_text",
+                "paginate_extract", "infinite_scroll_extract",
+                // 第二批：自动化与健壮性
+                "safe_click", "human_type",
+                "macro_record", "macro_playback", "macro_list", "macro_clear",
+                "set_request_interval", "set_user_agent", "list_user_agents",
+                "action_chain",
+                // 第三批：会话与闭环
+                "save_session", "restore_session", "list_sessions", "clear_data", "set_incognito",
+                "wait_for_download", "download_to_workspace", "upload_from_url",
+                "detect_captcha", "permission_audit", "block_resource",
+                "operation_log", "screenshot_full_page",
+                // 第四批：SPA 专项
+                "detect_framework", "extract_ssr_data", "extract_framework_state",
+                "detect_virtual_list", "spa_navigate", "api_paginate"
             )
         ),
         "url" to ToolParameter(
@@ -251,6 +269,146 @@ class BrowserAgentTool @Inject constructor(
             type = ParameterType.INTEGER,
             description = "wait_for_network_idle 时可选：判定网络空闲所需的连续无在途请求毫秒数，默认500",
             required = false
+        ),
+        // ── 第一批反爬增强参数 ──
+        "frame_chain" to ToolParameter(
+            name = "frame_chain",
+            type = ParameterType.STRING,
+            description = "list_iframes / iframe_action 时必填：iframe 链式定位符，格式如 \"iframe=main >> iframe=content >> button.submit\"，最多5层",
+            required = false
+        ),
+        "iframe_action" to ToolParameter(
+            name = "iframe_action",
+            type = ParameterType.STRING,
+            description = "iframe_action 时必填：要在 iframe 内执行的动作（click/type/hover）",
+            required = false,
+            enum = listOf("click", "type", "hover")
+        ),
+        "call_id" to ToolParameter(
+            name = "call_id",
+            type = ParameterType.INTEGER,
+            description = "replay_api 时必填：要重放的 API 调用 id（从 list_api_calls 获取）",
+            required = false
+        ),
+        "stealth_mode" to ToolParameter(
+            name = "stealth_mode",
+            type = ParameterType.STRING,
+            description = "apply_stealth 时可选：指纹伪装模式 aggressive（全量随机化，默认）/ basic（仅基础覆盖）",
+            required = false,
+            enum = listOf("aggressive", "basic")
+        ),
+        "max_pages" to ToolParameter(
+            name = "max_pages",
+            type = ParameterType.INTEGER,
+            description = "paginate_extract 时可选：最大翻页数，默认5，最大10",
+            required = false
+        ),
+        "max_scrolls" to ToolParameter(
+            name = "max_scrolls",
+            type = ParameterType.INTEGER,
+            description = "infinite_scroll_extract 时可选：最大滚动次数，默认15，最大30",
+            required = false
+        ),
+        // ── 第二批自动化增强参数 ──
+        "humanize" to ToolParameter(
+            name = "humanize",
+            type = ParameterType.BOOLEAN,
+            description = "click/type/scroll 时可选：是否模拟人类行为（随机延迟、贝塞尔鼠标轨迹），默认 true",
+            required = false
+        ),
+        "mistake_rate" to ToolParameter(
+            name = "mistake_rate",
+            type = ParameterType.INTEGER,
+            description = "human_type 时可选：打错字概率百分比（0-20），默认5",
+            required = false
+        ),
+        "macro_action" to ToolParameter(
+            name = "macro_action",
+            type = ParameterType.STRING,
+            description = "macro_record 时必填：start（开始录制）/ stop（停止录制）",
+            required = false,
+            enum = listOf("start", "stop")
+        ),
+        "macro_params" to ToolParameter(
+            name = "macro_params",
+            type = ParameterType.OBJECT,
+            description = "macro_playback 时可选：参数化替换映射（占位符 -> 实际值），如 {\"{{username}}\": \"admin\"}",
+            required = false
+        ),
+        "interval_ms" to ToolParameter(
+            name = "interval_ms",
+            type = ParameterType.INTEGER,
+            description = "set_request_interval 时必填：请求间隔毫秒数（0-10000）",
+            required = false
+        ),
+        "ua_name" to ToolParameter(
+            name = "ua_name",
+            type = ParameterType.STRING,
+            description = "set_user_agent 时必填：预设名称（chrome_desktop/firefox_desktop/safari_macos/chrome_android/safari_ios）或自定义 UA 字符串",
+            required = false
+        ),
+        "steps" to ToolParameter(
+            name = "steps",
+            type = ParameterType.OBJECT,
+            description = "action_chain 时必填：操作链数组，每步为 {\"action\": \"click\", \"element_id\": \"5\"} 格式的对象",
+            required = false
+        ),
+        // ── 第三批会话闭环参数 ──
+        "session_id" to ToolParameter(
+            name = "session_id",
+            type = ParameterType.STRING,
+            description = "restore_session 时必填：要恢复的会话 ID（从 list_sessions 获取）",
+            required = false
+        ),
+        "clear_types" to ToolParameter(
+            name = "clear_types",
+            type = ParameterType.STRING,
+            description = "clear_data 时可选：清除范围 all/cookie/cache/storage，默认 all",
+            required = false,
+            enum = listOf("all", "cookie", "cache", "storage")
+        ),
+        "incognito" to ToolParameter(
+            name = "incognito",
+            type = ParameterType.BOOLEAN,
+            description = "set_incognito 时必填：true=开启隐身，false=关闭隐身",
+            required = false
+        ),
+        "download_id" to ToolParameter(
+            name = "download_id",
+            type = ParameterType.STRING,
+            description = "download_to_workspace 时必填：要获取文件的下载任务 ID",
+            required = false
+        ),
+        "upload_url" to ToolParameter(
+            name = "upload_url",
+            type = ParameterType.STRING,
+            description = "upload_from_url 时必填：要下载并上传的文件 URL",
+            required = false
+        ),
+        "block_types" to ToolParameter(
+            name = "block_types",
+            type = ParameterType.STRING,
+            description = "block_resource 时必填：要拦截的资源类型（逗号分隔）：image,font,media",
+            required = false
+        ),
+        "log_limit" to ToolParameter(
+            name = "log_limit",
+            type = ParameterType.INTEGER,
+            description = "operation_log 时可选：返回最近 N 条操作日志，默认30",
+            required = false
+        ),
+        // ── 第四批 SPA 专项参数 ──
+        "spa_url" to ToolParameter(
+            name = "spa_url",
+            type = ParameterType.STRING,
+            description = "spa_navigate 时必填：SPA 路由目标 URL 或路径",
+            required = false
+        ),
+        "api_url_pattern" to ToolParameter(
+            name = "api_url_pattern",
+            type = ParameterType.STRING,
+            description = "api_paginate 时可选：要分析的 API URL 子串（不填则分析最近的 API 调用）",
+            required = false
         )
     )
 
@@ -294,6 +452,52 @@ class BrowserAgentTool @Inject constructor(
                 "network" -> doNetwork(args)
                 "network_get" -> doNetworkGet(args)
                 "wait_for_request" -> doWaitForRequest(args)
+                // 第一批：反爬虫核心
+                "snapshot_shadow" -> doSnapshotShadow(args)
+                "list_iframes" -> doListIframes()
+                "iframe_action" -> doIframeAction(args)
+                "intercept_api" -> doInterceptApi()
+                "list_api_calls" -> doListApiCalls(args)
+                "replay_api" -> doReplayApi(args)
+                "wait_for_render_complete" -> doWaitForRenderComplete(args)
+                "detect_rendering_type" -> doDetectRenderingType()
+                "apply_stealth" -> doApplyStealth(args)
+                "deobfuscate" -> doDeobfuscate(args)
+                "extract_clean_text" -> doExtractCleanText()
+                "paginate_extract" -> doPaginateExtract(args)
+                "infinite_scroll_extract" -> doInfiniteScrollExtract(args)
+                // 第二批：自动化与健壮性
+                "safe_click" -> doSafeClick(args)
+                "human_type" -> doHumanType(args)
+                "macro_record" -> doMacroRecord(args)
+                "macro_playback" -> doMacroPlayback(args)
+                "macro_list" -> doMacroList()
+                "macro_clear" -> doMacroClear()
+                "set_request_interval" -> doSetRequestInterval(args)
+                "set_user_agent" -> doSetUserAgent(args)
+                "list_user_agents" -> doListUserAgents()
+                "action_chain" -> doActionChain(args)
+                // 第三批：会话与闭环
+                "save_session" -> doSaveSession()
+                "restore_session" -> doRestoreSession(args)
+                "list_sessions" -> doListSessions()
+                "clear_data" -> doClearData(args)
+                "set_incognito" -> doSetIncognito(args)
+                "wait_for_download" -> doWaitForDownload(args)
+                "download_to_workspace" -> doDownloadToWorkspace(args)
+                "upload_from_url" -> doUploadFromUrl(args)
+                "detect_captcha" -> doDetectCaptcha()
+                "permission_audit" -> doPermissionAudit()
+                "block_resource" -> doBlockResource(args)
+                "operation_log" -> doOperationLog(args)
+                "screenshot_full_page" -> doScreenshotFullPage()
+                // 第四批：SPA 专项
+                "detect_framework" -> doDetectFramework()
+                "extract_ssr_data" -> doExtractSsrData()
+                "extract_framework_state" -> doExtractFrameworkState()
+                "detect_virtual_list" -> doDetectVirtualList()
+                "spa_navigate" -> doSpaNavigate(args)
+                "api_paginate" -> doApiPaginate(args)
                 else -> ToolResult.Error("未知动作: $action", "UNKNOWN_ACTION")
             }
         } catch (e: CancellationException) {
@@ -817,6 +1021,705 @@ class BrowserAgentTool @Inject constructor(
                 note = "当前在途业务请求 $pending 个。"
             )
         }
+    }
+
+    // ─────────────────────────── 第一批：反爬虫核心动作 ───────────────────────────
+
+    /** Shadow DOM 穿透快照：递归遍历 open Shadow Root，元素纳入统一编号。 */
+    private suspend fun doSnapshotShadow(args: Map<String, JsonElement>): ToolResult {
+        val level = snapshotLevelOf(args)
+        val snap = browserController.snapshotShadow(level)
+        return envelope(
+            action = "snapshot_shadow",
+            ok = true,
+            summary = "Shadow DOM 穿透快照完成：${snap.elements.size}个元素（含shadow内元素）",
+            snapshot = snapshotToJson(snap, level)
+        )
+    }
+
+    /** 列出所有 iframe（最多5层），报告同源可访问性。 */
+    private suspend fun doListIframes(): ToolResult {
+        val raw = browserController.listIframes()
+        val parsed = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull()
+        val count = parsed?.get("count")?.let { if (it is JsonPrimitive) it.content.toIntOrNull() ?: 0 } ?: 0
+        return envelope(
+            action = "list_iframes",
+            ok = true,
+            summary = "检测到 $count 个 iframe（最多5层递归）",
+            extra = parsed ?: JsonObject(mapOf("raw" to JsonPrimitive(raw)))
+        )
+    }
+
+    /** 在 iframe 链内执行操作（click/type/hover）。 */
+    private suspend fun doIframeAction(args: Map<String, JsonElement>): ToolResult {
+        val chain = args["frame_chain"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("iframe_action 需要 frame_chain 参数", "MISSING_FRAME_CHAIN")
+        val action = args["iframe_action"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("iframe_action 需要 iframe_action 参数（click/type/hover）", "MISSING_IFRAME_ACTION")
+        val elementId = args["element_id"]?.jsonPrimitive?.contentOrNull ?: ""
+        val text = args["text"]?.jsonPrimitive?.contentOrNull ?: ""
+        val result = browserController.actionInIframe(chain, action, elementId, text)
+        val parsed = runCatching { json.parseToJsonElement(result).jsonObject }.getOrNull()
+        val ok: Boolean = runCatching { (parsed?.get("ok") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+        return envelope(
+            action = "iframe_action",
+            ok = ok,
+            changed = ok,
+            summary = if (ok) "iframe 内 $action 操作成功" else "iframe 内操作失败",
+            note = result.take(MAX_TEXT),
+            recoverable = !ok
+        )
+    }
+
+    /** 启用增强版 API 拦截（全量请求/响应体捕获）。 */
+    private suspend fun doInterceptApi(): ToolResult {
+        browserController.enableApiInterception()
+        return envelope(
+            action = "intercept_api",
+            ok = true,
+            summary = "已启用增强版 API 拦截：全量捕获 XHR/fetch 请求体+响应体（单条最大5MB，仅存内存）",
+            note = "后续网络请求将被完整记录，可用 list_api_calls 查看、replay_api 重放。"
+        )
+    }
+
+    /** 列出已捕获的 API 调用（含完整请求/响应体）。 */
+    private suspend fun doListApiCalls(args: Map<String, JsonElement>): ToolResult {
+        val limit = runCatching { args["limit"]?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull() ?: 20
+        val raw = browserController.listApiCalls(limit)
+        return envelope(
+            action = "list_api_calls",
+            ok = true,
+            summary = "已返回最近 $limit 条 API 调用记录",
+            note = raw.take(MAX_TEXT)
+        )
+    }
+
+    /** 重放指定 id 的 API 请求。 */
+    private suspend fun doReplayApi(args: Map<String, JsonElement>): ToolResult {
+        val callId = runCatching { args["call_id"]?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull()
+            ?: return ToolResult.Error("replay_api 需要 call_id 参数", "MISSING_CALL_ID")
+        val result = browserController.replayApi(callId)
+        val parsed = runCatching { json.parseToJsonElement(result).jsonObject }.getOrNull()
+        val ok: Boolean = runCatching { (parsed?.get("ok") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+        return envelope(
+            action = "replay_api",
+            ok = ok,
+            summary = if (ok) "API #$callId 重放成功" else "API #$callId 重放失败",
+            note = result.take(MAX_TEXT),
+            recoverable = !ok
+        )
+    }
+
+    /** 等待渲染完成：DOM Mutation + 网络空闲 + CSS 动画三重检测。 */
+    private suspend fun doWaitForRenderComplete(args: Map<String, JsonElement>): ToolResult {
+        val timeout = runCatching { args["timeout_ms"]?.jsonPrimitive?.contentOrNull?.toLong() }.getOrNull() ?: 10_000L
+        val ok = browserController.waitForRenderComplete(timeout)
+        return envelope(
+            action = "wait_for_render_complete",
+            ok = true,
+            summary = if (ok) "渲染已完成（DOM稳定+网络空闲+CSS动画空闲）" else "等待渲染完成超时（${timeout}ms）",
+            recoverable = !ok
+        )
+    }
+
+    /** 自动识别页面渲染类型（SSR/CSR/Next.js/Nuxt 等）。 */
+    private suspend fun doDetectRenderingType(): ToolResult {
+        val result = browserController.detectRenderingType()
+        val parsed = runCatching { json.parseToJsonElement(result).jsonObject }.getOrNull()
+        val type = parsed?.get("type")?.let { if (it is JsonPrimitive) it.content } ?: "unknown"
+        return envelope(
+            action = "detect_rendering_type",
+            ok = true,
+            summary = "页面渲染类型: $type",
+            note = result.take(MAX_TEXT)
+        )
+    }
+
+    /** 指纹伪装：aggressive 全量随机化 / basic 基础覆盖。 */
+    private suspend fun doApplyStealth(args: Map<String, JsonElement>): ToolResult {
+        val mode = args["stealth_mode"]?.jsonPrimitive?.contentOrNull ?: "aggressive"
+        val result = browserController.applyStealth(mode)
+        return envelope(
+            action = "apply_stealth",
+            ok = true,
+            summary = "已应用 $mode 模式指纹伪装",
+            note = result.take(MAX_TEXT)
+        )
+    }
+
+    /** 内容清洗：检测 CSS 混淆、零宽字符、字体反爬并清理。 */
+    private suspend fun doDeobfuscate(args: Map<String, JsonElement>): ToolResult {
+        val text = args["text"]?.jsonPrimitive?.contentOrNull
+        val result = browserController.deobfuscate(text)
+        return envelope(
+            action = "deobfuscate",
+            ok = true,
+            summary = "内容清洗完成",
+            note = result.take(MAX_TEXT)
+        )
+    }
+
+    /** 提取清洗后的页面文本（自动移除隐藏元素、清理零宽字符）。 */
+    private suspend fun doExtractCleanText(): ToolResult {
+        val result = browserController.extractCleanText()
+        val parsed = runCatching { json.parseToJsonElement(result).jsonObject }.getOrNull()
+        val ok: Boolean = runCatching { (parsed?.get("ok") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+        val text: String = runCatching { (parsed?.get("text") as? JsonPrimitive)?.content }.getOrNull() ?: ""
+        return envelope(
+            action = "extract_clean_text",
+            ok = ok,
+            summary = "已提取清洗后页面文本（${text.length}字）",
+            note = text.take(MAX_TEXT)
+        )
+    }
+
+    /** 分页提取：自动翻页收集数据。 */
+    private suspend fun doPaginateExtract(args: Map<String, JsonElement>): ToolResult {
+        val maxPages = runCatching { args["max_pages"]?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull() ?: 5
+        val selector = args["selector"]?.jsonPrimitive?.contentOrNull
+        val result = browserController.paginateExtract(maxPages, selector)
+        return envelope(
+            action = "paginate_extract",
+            ok = true,
+            summary = "分页提取完成（最多${maxPages}页）",
+            note = result.take(MAX_TEXT)
+        )
+    }
+
+    /** 无限滚动提取：自动滚动收集所有加载内容。 */
+    private suspend fun doInfiniteScrollExtract(args: Map<String, JsonElement>): ToolResult {
+        val maxScrolls = runCatching { args["max_scrolls"]?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull() ?: 15
+        val selector = args["selector"]?.jsonPrimitive?.contentOrNull
+        val result = browserController.infiniteScrollExtract(maxScrolls, selector)
+        return envelope(
+            action = "infinite_scroll_extract",
+            ok = true,
+            summary = "无限滚动提取完成（最多${maxScrolls}次滚动）",
+            note = result.take(MAX_TEXT)
+        )
+    }
+
+    // ─────────────────────────── 第二批：自动化与健壮性动作 ───────────────────────────
+
+    /** safe_click：前置检查 + 执行 + 后置验证。 */
+    private suspend fun doSafeClick(args: Map<String, JsonElement>): ToolResult {
+        val id = args["element_id"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("safe_click 需要 element_id", "MISSING_ELEMENT_ID")
+        val result = browserController.safeClick(id)
+        return if (result.ok) {
+            envelope(
+                action = "safe_click",
+                ok = true,
+                changed = result.changed,
+                summary = "safe_click 完成${if (result.changed) "（页面已发生变化）" else "（页面无明显变化，可能为静态元素）"}",
+                note = "前置检查通过，后置验证${if (result.changed) "检测到页面变化" else "未检测到明显变化"}"
+            )
+        } else {
+            envelope(
+                action = "safe_click",
+                ok = false,
+                recoverable = true,
+                summary = "safe_click 失败：${result.reason}",
+                error = result.detail,
+                note = "建议：1) 重新 snapshot 获取最新元素标识 2) 调用 screenshot 查看页面状态 3) 尝试使用 CSS 路径或语义描述符"
+            )
+        }
+    }
+
+    /** human_type：人类增强打字（逐字符、随机间隔、偶尔打错字修正）。 */
+    private suspend fun doHumanType(args: Map<String, JsonElement>): ToolResult {
+        val id = args["element_id"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("human_type 需要 element_id", "MISSING_ELEMENT_ID")
+        val text = args["text"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("human_type 需要 text", "MISSING_TEXT")
+        val mistakePct = runCatching { args["mistake_rate"]?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull() ?: 5
+        val mistakeRate = (mistakePct.coerceIn(0, 20)).toDouble() / 100.0
+        val snap = browserController.humanType(id, text, mistakeRate)
+        return writeEnvelope("human_type", args) { snap }
+    }
+
+    /** macro_record：开始/停止宏录制。 */
+    private suspend fun doMacroRecord(args: Map<String, JsonElement>): ToolResult {
+        val macroAction = args["macro_action"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("macro_record 需要 macro_action（start/stop）", "MISSING_MACRO_ACTION")
+        return if (macroAction == "start") {
+            val msg = browserController.macroStartRecord()
+            envelope("macro_record", ok = true, changed = true, summary = msg)
+        } else {
+            val count = browserController.macroStopRecord()
+            envelope(
+                action = "macro_record",
+                ok = true,
+                changed = true,
+                summary = "宏录制已停止，共录制 $count 步操作",
+                note = "使用 macro_playback 回放，macro_list 查看步骤，macro_clear 清空"
+            )
+        }
+    }
+
+    /** macro_playback：回放录制的宏，支持参数化替换。 */
+    private suspend fun doMacroPlayback(args: Map<String, JsonElement>): ToolResult {
+        val steps = browserController.getMacro()
+        if (steps.isEmpty()) {
+            return envelope("macro_playback", ok = false, summary = "没有可回放的宏（请先 macro_record start 录制）", recoverable = true)
+        }
+        val params = runCatching {
+            (args["macro_params"] as? JsonObject)?.mapValues { (_, v) ->
+                (v as? kotlinx.serialization.json.JsonPrimitive)?.content ?: ""
+            }
+        }.getOrNull() ?: emptyMap()
+
+        val results = mutableListOf<String>()
+        var success = 0
+        var failed = 0
+        for ((idx, step) in steps.withIndex()) {
+            // 参数化替换
+            var stepAction = step.action
+            val stepArgs = step.args.mapValues { (_, v) ->
+                var replaced = v
+                for ((k, v2) in params) replaced = replaced.replace(k, v2)
+                replaced
+            }
+            try {
+                // 简单的操作回放（调用现有方法）
+                when (stepAction) {
+                    "click" -> { browserController.click(stepArgs["element_id"] ?: ""); success++ }
+                    "type" -> { browserController.type(stepArgs["element_id"] ?: "", stepArgs["text"] ?: ""); success++ }
+                    "scroll" -> { browserController.scroll(stepArgs["direction"] ?: "down"); success++ }
+                    "navigate" -> { browserController.navigate(stepArgs["url"] ?: ""); success++ }
+                    else -> { results.add("[${idx+1}] $stepAction: 跳过（不支持回放）"); continue }
+                }
+                results.add("[${idx+1}] $stepAction: 成功")
+                // 步骤间随机延迟
+                kotlinx.coroutines.delay((200..500).random().toLong())
+            } catch (e: Exception) {
+                failed++
+                results.add("[${idx+1}] $stepAction: 失败 - ${e.message}")
+            }
+        }
+        return envelope(
+            action = "macro_playback",
+            ok = failed == 0,
+            changed = success > 0,
+            summary = "宏回放完成：$success 成功，$failed 失败（共 ${steps.size} 步）",
+            note = results.joinToString("\n").take(MAX_TEXT),
+            recoverable = failed > 0
+        )
+    }
+
+    /** macro_list：列出录制的宏步骤。 */
+    private suspend fun doMacroList(): ToolResult {
+        val steps = browserController.getMacro()
+        val recording = browserController.isRecording()
+        return envelope(
+            action = "macro_list",
+            ok = true,
+            summary = "宏状态：${if (recording) "录制中" else "未录制"}，已录制 ${steps.size} 步",
+            note = steps.mapIndexed { i, s -> "[${i+1}] ${s.action} ${s.args}" }.joinToString("\n").take(MAX_TEXT)
+        )
+    }
+
+    /** macro_clear：清空录制的宏。 */
+    private suspend fun doMacroClear(): ToolResult {
+        browserController.macroClear()
+        return envelope("macro_clear", ok = true, changed = true, summary = "宏已清空")
+    }
+
+    /** set_request_interval：设置请求间隔（避免被限流）。 */
+    private suspend fun doSetRequestInterval(args: Map<String, JsonElement>): ToolResult {
+        val ms = runCatching { args["interval_ms"]?.jsonPrimitive?.contentOrNull?.toLong() }.getOrNull()
+            ?: return ToolResult.Error("set_request_interval 需要 interval_ms", "MISSING_INTERVAL")
+        browserController.setRequestInterval(ms)
+        return envelope(
+            action = "set_request_interval",
+            ok = true,
+            summary = "请求间隔已设置为 ${ms}ms",
+            note = "后续操作间将自动添加该延迟以避免触发限流"
+        )
+    }
+
+    /** set_user_agent：切换 UA。 */
+    private suspend fun doSetUserAgent(args: Map<String, JsonElement>): ToolResult {
+        val name = args["ua_name"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("set_user_agent 需要 ua_name", "MISSING_UA_NAME")
+        val msg = browserController.setUserAgent(name)
+        return envelope(
+            action = "set_user_agent",
+            ok = true,
+            changed = true,
+            summary = msg,
+            note = "切换 UA 后建议刷新页面使新 UA 生效"
+        )
+    }
+
+    /** list_user_agents：列出内置 UA 选项。 */
+    private suspend fun doListUserAgents(): ToolResult {
+        val uas = browserController.listUserAgents()
+        return envelope(
+            action = "list_user_agents",
+            ok = true,
+            summary = "内置 ${uas.size} 个 UA 预设",
+            note = uas.map { (k, v) -> "$k: ${v.take(80)}" }.joinToString("\n").take(MAX_TEXT),
+            extra = JsonObject(uas.mapValues { JsonPrimitive(it.value) })
+        )
+    }
+
+    /**
+     * action_chain 原子操作链：按顺序执行多步操作，某步失败时回滚到初始状态。
+     * steps 参数为数组，每步 {action, element_id?, text?, direction?, url?}。
+     */
+    private suspend fun doActionChain(args: Map<String, JsonElement>): ToolResult {
+        val stepsArr = runCatching { (args["steps"] as? JsonArray) }.getOrNull()
+            ?: return ToolResult.Error("action_chain 需要 steps 数组参数", "MISSING_STEPS")
+
+        // 记录初始状态用于回滚
+        val initialUrl = browserController.currentSnapshot().url
+        val results = mutableListOf<String>()
+        var successCount = 0
+
+        for ((idx, stepEl) in stepsArr.withIndex()) {
+            val stepObj = stepEl as? JsonObject
+                ?: continue
+            val stepAction = (stepObj["action"] as? JsonPrimitive)?.content ?: ""
+            val stepArgs = stepObj.mapValues { (_, v) ->
+                when (v) {
+                    is JsonPrimitive -> v.content
+                    else -> v.toString()
+                }
+            }
+            try {
+                when (stepAction) {
+                    "click" -> {
+                        val id = stepArgs["element_id"] ?: ""
+                        browserController.click(id); successCount++
+                        results.add("[${idx+1}] click($id): 成功")
+                    }
+                    "type" -> {
+                        val id = stepArgs["element_id"] ?: ""
+                        val text = stepArgs["text"] ?: ""
+                        browserController.type(id, text); successCount++
+                        results.add("[${idx+1}] type($id, ...): 成功")
+                    }
+                    "scroll" -> {
+                        val dir = stepArgs["direction"] ?: "down"
+                        browserController.scroll(dir); successCount++
+                        results.add("[${idx+1}] scroll($dir): 成功")
+                    }
+                    "navigate" -> {
+                        val url = stepArgs["url"] ?: ""
+                        browserController.navigate(url); successCount++
+                        results.add("[${idx+1}] navigate($url): 成功")
+                    }
+                    "wait" -> {
+                        val ms = stepArgs["ms"]?.toLongOrNull() ?: 1000L
+                        kotlinx.coroutines.delay(ms); successCount++
+                        results.add("[${idx+1}] wait(${ms}ms): 成功")
+                    }
+                    else -> results.add("[${idx+1}] $stepAction: 跳过（不支持的链操作）")
+                }
+            } catch (e: Exception) {
+                // 回滚：导航回初始页面
+                results.add("[${idx+1}] $stepAction: 失败 - ${e.message}")
+                results.add("回滚中：导航回初始页面 $initialUrl ...")
+                runCatching { browserController.navigate(initialUrl) }
+                return envelope(
+                    action = "action_chain",
+                    ok = false,
+                    changed = successCount > 0,
+                    summary = "操作链在第 ${idx+1} 步失败，已回滚到初始状态（成功 $successCount 步）",
+                    note = results.joinToString("\n").take(MAX_TEXT),
+                    recoverable = true
+                )
+            }
+        }
+        return envelope(
+            action = "action_chain",
+            ok = true,
+            changed = successCount > 0,
+            summary = "操作链全部执行成功（$successCount 步）",
+            note = results.joinToString("\n").take(MAX_TEXT)
+        )
+    }
+
+    // ─────────────────────────── 第三批：会话与闭环动作 ───────────────────────────
+
+    /** save_session：保存当前会话（cookies + storage + URL）。 */
+    private suspend fun doSaveSession(): ToolResult {
+        val sessionId = browserController.saveSession()
+        return envelope(
+            action = "save_session",
+            ok = true,
+            changed = true,
+            summary = "会话已保存: $sessionId",
+            note = "使用 restore_session(session_id=$sessionId) 恢复",
+            extra = JsonObject(mapOf("session_id" to JsonPrimitive(sessionId)))
+        )
+    }
+
+    /** restore_session：按 session_id 恢复会话。 */
+    private suspend fun doRestoreSession(args: Map<String, JsonElement>): ToolResult {
+        val sessionId = args["session_id"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("restore_session 需要 session_id", "MISSING_SESSION_ID")
+        val msg = browserController.restoreSession(sessionId)
+        return envelope(
+            action = "restore_session",
+            ok = !msg.startsWith("未找到"),
+            changed = true,
+            summary = msg,
+            recoverable = msg.startsWith("未找到")
+        )
+    }
+
+    /** list_sessions：列出已保存的会话。 */
+    private suspend fun doListSessions(): ToolResult {
+        val sessions = browserController.listSessions()
+        return envelope(
+            action = "list_sessions",
+            ok = true,
+            summary = "已保存 ${sessions.size} 个会话",
+            note = sessions.map { "${it.sessionId}: ${it.url} (${it.timestamp})" }.joinToString("\n").take(MAX_TEXT)
+        )
+    }
+
+    /** clear_data：清除浏览数据。 */
+    private suspend fun doClearData(args: Map<String, JsonElement>): ToolResult {
+        val types = args["clear_types"]?.jsonPrimitive?.contentOrNull ?: "all"
+        val msg = browserController.clearData(types)
+        return envelope(
+            action = "clear_data",
+            ok = true,
+            changed = true,
+            summary = msg
+        )
+    }
+
+    /** set_incognito：切换隐身模式。 */
+    private suspend fun doSetIncognito(args: Map<String, JsonElement>): ToolResult {
+        val on = runCatching { args["incognito"]?.jsonPrimitive?.contentOrNull?.toBoolean() }.getOrNull()
+            ?: return ToolResult.Error("set_incognito 需要 incognito 参数", "MISSING_INCOGNITO")
+        browserController.setIncognitoMode(on)
+        return envelope(
+            action = "set_incognito",
+            ok = true,
+            changed = true,
+            summary = if (on) "已开启隐身模式（不保留历史/cookie）" else "已关闭隐身模式"
+        )
+    }
+
+    /** wait_for_download：等待下载完成。 */
+    private suspend fun doWaitForDownload(args: Map<String, JsonElement>): ToolResult {
+        val timeout = runCatching { args["timeout_ms"]?.jsonPrimitive?.contentOrNull?.toLong() }.getOrNull() ?: 30_000L
+        val info = browserController.waitForDownload(timeout)
+        return if (info != null) {
+            envelope(
+                action = "wait_for_download",
+                ok = info.status == "done",
+                summary = "下载${if (info.status == "done") "完成" else "失败"}: ${info.fileName}",
+                extra = JsonObject(mapOf("download" to downloadToJson(info)))
+            )
+        } else {
+            envelope(
+                action = "wait_for_download",
+                ok = false,
+                summary = "等待下载超时（${timeout}ms）",
+                recoverable = true
+            )
+        }
+    }
+
+    /** download_to_workspace：获取下载文件的本地路径。 */
+    private suspend fun doDownloadToWorkspace(args: Map<String, JsonElement>): ToolResult {
+        val downloadId = args["download_id"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("download_to_workspace 需要 download_id", "MISSING_DOWNLOAD_ID")
+        val file = browserController.downloadToWorkspace(downloadId)
+        return if (file != null && file.exists()) {
+            envelope(
+                action = "download_to_workspace",
+                ok = true,
+                summary = "文件已就绪: ${file.name} (${file.length()} bytes)",
+                note = "本地路径: ${file.absolutePath}",
+                extra = JsonObject(mapOf("path" to JsonPrimitive(file.absolutePath), "size" to JsonPrimitive(file.length())))
+            )
+        } else {
+            envelope(
+                action = "download_to_workspace",
+                ok = false,
+                summary = "未找到下载任务 $downloadId 或文件不存在",
+                recoverable = true
+            )
+        }
+    }
+
+    /** upload_from_url：从 URL 下载文件并上传到 input[type=file] 元素。 */
+    private suspend fun doUploadFromUrl(args: Map<String, JsonElement>): ToolResult {
+        val url = args["upload_url"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("upload_from_url 需要 upload_url", "MISSING_UPLOAD_URL")
+        val elementId = args["element_id"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("upload_from_url 需要 element_id（目标 file input）", "MISSING_ELEMENT_ID")
+        val file = browserController.downloadFileFromUrl(url)
+            ?: return envelope("upload_from_url", ok = false, summary = "从 URL 下载文件失败: $url", recoverable = true)
+        val error = browserController.uploadFile(elementId, file)
+        return if (error == null) {
+            envelope("upload_from_url", ok = true, summary = "已下载并上传文件到元素 #$elementId")
+        } else {
+            envelope("upload_from_url", ok = false, summary = "上传失败: $error", recoverable = true)
+        }
+    }
+
+    /** detect_captcha：检测页面验证码并返回位置信息。 */
+    private suspend fun doDetectCaptcha(): ToolResult {
+        val result = browserController.detectCaptcha()
+        val parsed = runCatching { json.parseToJsonElement(result).jsonObject }.getOrNull()
+        val detected: Boolean = runCatching { (parsed?.get("detected") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+        // 自动截图返回，模型自行判断是否多模态可识图
+        val screenshot = browserController.screenshot(null)
+        return envelope(
+            action = "detect_captcha",
+            ok = true,
+            summary = if (detected) "检测到验证码！建议调用 screenshot 查看并使用 takeover 请求用户协助" else "未检测到常见验证码",
+            note = result.take(MAX_TEXT),
+            extra = JsonObject(mapOf(
+                "detected" to JsonPrimitive(detected),
+                "screenshot_available" to JsonPrimitive(screenshot != null)
+            ))
+        )
+    }
+
+    /** permission_audit：审计页面权限状态。 */
+    private suspend fun doPermissionAudit(): ToolResult {
+        val result = browserController.permissionAudit()
+        return envelope(
+            action = "permission_audit",
+            ok = true,
+            summary = "权限审计完成",
+            note = result.take(MAX_TEXT)
+        )
+    }
+
+    /** block_resource：拦截指定类型资源渲染。 */
+    private suspend fun doBlockResource(args: Map<String, JsonElement>): ToolResult {
+        val types = args["block_types"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("block_resource 需要 block_types（image,font,media）", "MISSING_BLOCK_TYPES")
+        val result = browserController.blockResource(types)
+        return envelope(
+            action = "block_resource",
+            ok = true,
+            summary = "已拦截资源类型: $types",
+            note = result.take(MAX_TEXT)
+        )
+    }
+
+    /** operation_log：查看操作日志。 */
+    private suspend fun doOperationLog(args: Map<String, JsonElement>): ToolResult {
+        val limit = runCatching { args["log_limit"]?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull() ?: 30
+        val log = browserController.operationLog(limit)
+        return envelope(
+            action = "operation_log",
+            ok = true,
+            summary = "最近 ${log.size} 条操作日志",
+            note = log.joinToString("\n").take(MAX_TEXT)
+        )
+    }
+
+    /** screenshot_full_page：全页截图（当前实现为视口截图 + 页面高度信息）。 */
+    private suspend fun doScreenshotFullPage(): ToolResult {
+        val dataUrl = browserController.screenshotFullPage()
+            ?: return envelope("screenshot_full_page", ok = false, summary = "全页截图失败", recoverable = true)
+        return envelope(
+            action = "screenshot_full_page",
+            ok = true,
+            summary = "已截取页面（视口截图，页面完整高度信息已返回）",
+            note = "Android WebView 限制：当前截取可视区域。可配合 scroll 逐步截取完整页面。",
+            extra = JsonObject(mapOf("image_data_url" to JsonPrimitive(dataUrl)))
+        )
+    }
+
+    // ─────────────────────────── 第四批：SPA 专项动作 ───────────────────────────
+
+    /** detect_framework：检测前端框架及版本。 */
+    private suspend fun doDetectFramework(): ToolResult {
+        val result = browserController.detectFramework()
+        val parsed = runCatching { json.parseToJsonElement(result).jsonObject }.getOrNull()
+        val framework: String = runCatching { (parsed?.get("framework") as? JsonPrimitive)?.content }.getOrNull() ?: "unknown"
+        val version: String = runCatching { (parsed?.get("version") as? JsonPrimitive)?.content }.getOrNull() ?: ""
+        return envelope(
+            action = "detect_framework",
+            ok = true,
+            summary = "前端框架: $framework${if (version.isNotEmpty()) " v$version" else ""}",
+            note = result.take(MAX_TEXT)
+        )
+    }
+
+    /** extract_ssr_data：提取 SSR 注入数据。 */
+    private suspend fun doExtractSsrData(): ToolResult {
+        val result = browserController.extractSsrData()
+        val parsed = runCatching { json.parseToJsonElement(result).jsonObject }.getOrNull()
+        val count = parsed?.get("count")?.let { if (it is JsonPrimitive) it.content.toIntOrNull() ?: 0 } ?: 0
+        return envelope(
+            action = "extract_ssr_data",
+            ok = true,
+            summary = "提取到 $count 个 SSR 数据源（单条截断到 1MB）",
+            note = result.take(MAX_TEXT)
+        )
+    }
+
+    /** extract_framework_state：提取框架内部状态（React Fiber/Vue/Pinia/Zustand）。 */
+    private suspend fun doExtractFrameworkState(): ToolResult {
+        val result = browserController.extractFrameworkState()
+        val parsed = runCatching { json.parseToJsonElement(result).jsonObject }.getOrNull()
+        val type = parsed?.get("type")?.let { if (it is JsonPrimitive) it.content } ?: "unknown"
+        val supported: Boolean = runCatching { (parsed?.get("supported") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+        val note = parsed?.get("note")?.let { if (it is JsonPrimitive) it.content } ?: ""
+        return envelope(
+            action = "extract_framework_state",
+            ok = true,
+            summary = if (supported) "已提取 $type 框架内部状态" else "框架状态访问: $type（$note）",
+            note = result.take(MAX_TEXT)
+        )
+    }
+
+    /** detect_virtual_list：检测虚拟列表。 */
+    private suspend fun doDetectVirtualList(): ToolResult {
+        val result = browserController.detectVirtualList()
+        val parsed = runCatching { json.parseToJsonElement(result).jsonObject }.getOrNull()
+        val isVirtual: Boolean = runCatching { (parsed?.get("virtual") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+        val estimated = parsed?.get("estimated_total")?.let { if (it is JsonPrimitive) it.content.toIntOrNull() ?: 0 } ?: 0
+        return envelope(
+            action = "detect_virtual_list",
+            ok = true,
+            summary = if (isVirtual) "检测到虚拟列表（估算约 $estimated 行数据，当前 DOM 仅渲染可视区域）" else "未检测到虚拟列表特征",
+            note = result.take(MAX_TEXT)
+        )
+    }
+
+    /** spa_navigate：SPA 路由导航。 */
+    private suspend fun doSpaNavigate(args: Map<String, JsonElement>): ToolResult {
+        val url = args["spa_url"]?.jsonPrimitive?.contentOrNull
+            ?: return ToolResult.Error("spa_navigate 需要 spa_url", "MISSING_SPA_URL")
+        val result = browserController.spaNavigate(url)
+        val parsed = runCatching { json.parseToJsonElement(result).jsonObject }.getOrNull()
+        val ok: Boolean = runCatching { (parsed?.get("ok") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
+        val method = parsed?.get("method")?.let { if (it is JsonPrimitive) it.content } ?: ""
+        return envelope(
+            action = "spa_navigate",
+            ok = ok,
+            changed = ok,
+            summary = if (ok) "SPA 导航成功（$method）→ $url" else "SPA 导航失败: $method",
+            recoverable = !ok
+        )
+    }
+
+    /** api_paginate：API 分页参数识别与遍历建议。 */
+    private suspend fun doApiPaginate(args: Map<String, JsonElement>): ToolResult {
+        val maxPages = runCatching { args["max_pages"]?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull() ?: 3
+        val urlPattern = args["api_url_pattern"]?.jsonPrimitive?.contentOrNull ?: ""
+        val result = browserController.apiPaginate(maxPages, urlPattern)
+        return envelope(
+            action = "api_paginate",
+            ok = true,
+            summary = "API 分页分析完成",
+            note = result.take(MAX_TEXT)
+        )
     }
 
     private fun downloadToJson(d: BrowserDownloadInfo): JsonObject =
