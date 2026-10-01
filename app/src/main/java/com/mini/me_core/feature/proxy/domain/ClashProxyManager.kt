@@ -49,6 +49,10 @@ data class ProxyRuntimeState(
     val controllerPort: Int = ClashProxyManager.CONTROLLER_PORT,
     /** 控制器最近一次是否连得上 mihomo。 */
     val controllerReachable: Boolean = false,
+    /** P0-3：内核崩溃后正在指数退避自动恢复中（UI 显示「内核异常恢复中」）。 */
+    val recovering: Boolean = false,
+    /** P0-3：当前是第几次崩溃自动重启（1 起；recovering=true 时有效）。 */
+    val recoveryAttempt: Int = 0,
 )
 
 /** 单个代理节点（解析自 Clash 配置，仅展示用）。 */
@@ -162,6 +166,9 @@ class ClashProxyManager @Inject constructor(
         const val MIHOMO_ARM64_GZ_SHA256 = "c896cbe91344124da0c8e0b93d77a11fae53fc16f49b1b8cd238b5008e336e5b"
         const val MIHOMO_AMD64_ASSET = "mihomo-android-amd64-$MIHOMO_VERSION.gz"
         const val MIHOMO_AMD64_GZ_SHA256 = "f930e62c24f6f6ae18790282963d47eadaeed61346a8d869ca899acdb8c7cf29"
+
+        /** P0-3：崩溃后最多自动重启次数（退避 1s→2s→4s 共 3 次，之后标记不可用）。 */
+        private const val MAX_CRASH_RESTARTS = 3
     }
 
     private val _state = MutableStateFlow(ProxyRuntimeState())
@@ -173,6 +180,14 @@ class ClashProxyManager @Inject constructor(
     /** 当前 mihomo 内核子进程（App 子进程，绑定 127.0.0.1:7890；App 进程存活则内核存活）。 */
     @Volatile
     private var mihomoProcess: Process? = null
+
+    /** P0-3：连续崩溃自动重启次数（成功拉起后清零；超过 [MAX_CRASH_RESTARTS] 放弃并标记不可用）。 */
+    @Volatile
+    private var crashRestartAttempts: Int = 0
+
+    /** P0-3：是否正在执行崩溃自动重启循环，防止退出监视协程重复调度。 */
+    @Volatile
+    private var crashRestartInProgress: Boolean = false
 
     /**
      * 下载 mihomo 二进制用的**直连** OkHttp：强制 Proxy.NO_PROXY 覆盖共享 client 的 ProxySelector。
@@ -676,6 +691,12 @@ class ClashProxyManager @Inject constructor(
                     mihomoProcess = null
                     FileLogger.w(TAG, "mihomo 内核进程退出 code=${p.exitValue()}（详见 mihomo.log）")
                     logKernelLogTail()
+                    // P0-3：用户仍要求代理开启时，指数退避自动重启（1s→2s→4s，最多 3 次）。
+                    // 主动 off()/on() 重启路径会先把 mihomoProcess 置 null，故此处 mihomoProcess===p
+                    // 即「非主动关闭的异常退出」，才进入自恢复。
+                    if (enabledCache && !crashRestartInProgress) {
+                        scheduleCrashRestart()
+                    }
                 }
             }
             true
@@ -770,6 +791,88 @@ class ClashProxyManager @Inject constructor(
         FileLogger.i(TAG, "mihomo 内核已停止")
     }
 
+    /**
+     * P0-3：mihomo 内核异常退出后的指数退避自动重启。
+     *
+     * 退避序列 1s → 2s → 4s，最多 [MAX_CRASH_RESTARTS] 次；每次拉起后轮询控制面就绪，
+     * 成功则清零计数并恢复 `_state`；连续失败耗尽则把代理标记为不可用（enabled=false +
+     * routeHolder 切直连兜底），避免把 App 流量持续打进无人监听的 7890。
+     *
+     * 全程持 [kernelMutex]，与 on()/off() 互斥；退避期间用户关闭代理会被 `enabledCache` 检查拦下。
+     */
+    private suspend fun scheduleCrashRestart() {
+        crashRestartInProgress = true
+        try {
+            kernelMutex.withLock {
+                // 双重确认：加锁期间用户可能已手动关闭/重开
+                if (!enabledCache) return@withLock
+                if (mihomoProcess?.isAlive == true) return@withLock
+
+                while (crashRestartAttempts < MAX_CRASH_RESTARTS) {
+                    crashRestartAttempts++
+                    val backoffMs = when (crashRestartAttempts) {
+                        1 -> 1000L
+                        2 -> 2000L
+                        else -> 4000L
+                    }
+                    _state.update { it.copy(recovering = true, recoveryAttempt = crashRestartAttempts) }
+                    FileLogger.w(TAG, "mihomo 崩溃自动重启：第 $crashRestartAttempts/$MAX_CRASH_RESTARTS 次，${backoffMs}ms 后拉起")
+                    delay(backoffMs)
+
+                    // 退避窗口内用户关闭了代理 → 放弃
+                    if (!enabledCache) {
+                        FileLogger.i(TAG, "崩溃恢复：退避期间代理已被用户关闭，放弃自动重启")
+                        _state.update { it.copy(recovering = false, recoveryAttempt = 0) }
+                        return@withLock
+                    }
+
+                    // 配置丢失则尽力重建（订阅拉取失败则跳过，startKernelProcess 会因配置缺失而失败进入下一轮）
+                    val cfgFile = java.io.File(configDir(), CONFIG_FILE)
+                    if (!cfgFile.isFile) {
+                        runCatching { rebuildConfigFromActiveProfile() }
+                    }
+
+                    if (!startKernelProcess()) {
+                        FileLogger.w(TAG, "mihomo 崩溃自动重启：startKernelProcess 失败，进入下一轮退避")
+                        continue
+                    }
+                    delay(300)
+                    if (mihomoProcess?.isAlive != true) {
+                        logKernelLogTail()
+                        FileLogger.w(TAG, "mihomo 崩溃自动重启：进程秒退，进入下一轮退避")
+                        continue
+                    }
+                    if (waitControllerReady(20)) {
+                        // 成功：清零计数，通知 UI 恢复正常
+                        crashRestartAttempts = 0
+                        _state.update {
+                            it.copy(recovering = false, recoveryAttempt = 0, controllerReachable = true)
+                        }
+                        FileLogger.i(TAG, "mihomo 崩溃自动重启成功")
+                        return@withLock
+                    } else {
+                        FileLogger.w(TAG, "mihomo 崩溃自动重启：进程存活但控制面未就绪，进入下一轮退避")
+                        // 进程可能稍后才崩，先停掉再重试，避免端口占用
+                        stopKernelLocked()
+                    }
+                }
+
+                // 耗尽重试：标记不可用
+                FileLogger.w(TAG, "mihomo 连续 $MAX_CRASH_RESTARTS 次崩溃自动重启失败，标记为不可用")
+                runCatching { repository.setProxyEnabled(false) }
+                enabledCache = false
+                _state.update {
+                    it.copy(enabled = false, recovering = false, recoveryAttempt = 0, controllerReachable = false)
+                }
+                routeHolder.update(false, "127.0.0.1:$MIXED_PORT")
+            }
+        } catch (t: Throwable) {
+            FileLogger.w(TAG, "崩溃自动重启异常: ${t.message}")
+        } finally {
+            crashRestartInProgress = false
+        }
+    }
+
     /** 拉起代理：由已播种 profile（[profileId]）或临时 inline（[inlineYaml]）合成配置、落盘、拉起内核、置开关。 */
     suspend fun on(profileId: String?, inlineYaml: String?): String {
         if (profileId == null && inlineYaml == null) return "需要 profile_id 或 inline yaml"
@@ -803,8 +906,10 @@ class ClashProxyManager @Inject constructor(
         // 同步写位：不等 DataStore flow 的异步 emit，消除「on() 返回后立刻发请求仍走直连」的竞态窗口。
         // 后续 flow 收集器也会写同一组值（幂等）。
         enabledCache = true
+        // P0-3：用户手动拉起成功视为新会话，清零崩溃退避计数并清除恢复中状态。
+        crashRestartAttempts = 0
         routeHolder.update(true, "127.0.0.1:$MIXED_PORT")
-        _state.update { it.copy(enabled = true, activeProfileId = profileId) }
+        _state.update { it.copy(enabled = true, activeProfileId = profileId, recovering = false, recoveryAttempt = 0) }
         FileLogger.i(TAG, "network_proxy ON (profile=$profileId inline=${inlineYaml != null})")
         return "ok"
     }
@@ -815,8 +920,10 @@ class ClashProxyManager @Inject constructor(
         repository.setProxyEnabled(false)
         // 同步写位（同 on()），不等 flow 异步 emit。
         enabledCache = false
+        // P0-3：用户主动关闭，重置崩溃退避计数与恢复中状态。
+        crashRestartAttempts = 0
         routeHolder.update(false, "127.0.0.1:$MIXED_PORT")
-        _state.update { it.copy(enabled = false) }
+        _state.update { it.copy(enabled = false, recovering = false, recoveryAttempt = 0) }
         FileLogger.i(TAG, "network_proxy OFF")
     }
 
