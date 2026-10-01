@@ -37,6 +37,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -119,10 +121,23 @@ class BrowserController @Inject constructor(
     @Volatile
     private var originalUserAgent: String? = null
 
+    /**
+     * P0-6：记录当前已下发给 WebView 进程的代理状态，避免重复 set/clear 造成竞态。
+     * null = 尚未下发 / WebView 不支持 PROXY_OVERRIDE。
+     */
+    @Volatile
+    private var webViewProxyApplied: Boolean? = null
+
     // 代理开关变化时，让已存在的 WebView 也跟上 mihomo 代理（新标签/导航天然生效）。
+    // P0-6：只对 enabled 边沿触发（distinctUntilChanged），避免 controllerReachable / recovering /
+    // activeProfileId 等字段的每次刷新都重复下发 setProxyOverride/clearProxyOverride——
+    // 这些异步操作若被连续多次调用，后发的 clear 可能晚于先发的 set 完成，导致代理状态错乱。
     init {
         scope.launch {
-            proxyManager.state.collect { applyWebViewProxy(null) }
+            proxyManager.state
+                .map { it.enabled }
+                .distinctUntilChanged()
+                .collect { applyWebViewProxy(null) }
         }
     }
 
@@ -133,17 +148,22 @@ class BrowserController @Inject constructor(
      * [ProxyController.setProxyOverride] 做进程级代理覆盖。
      * 代理开启时指向 mihomo mixed-port 并放行 loopback/内网（容器开发服务直连），
      * 关闭时清除覆盖回退系统默认网络。内部统一 post 到主线程执行。
+     *
+     * P0-6：[webViewProxyApplied] 去重——期望状态与已下发状态一致时直接跳过，杜绝重复下发
+     * 与异步回调交错导致的竞态。
      */
     private fun applyWebViewProxy(webView: WebView?) {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             FileLogger.w(TAG, "当前 WebView 不支持 PROXY_OVERRIDE，外网访问将走系统默认网络")
             return
         }
+        val desired = proxyManager.isEnabled()
+        if (webViewProxyApplied == desired) return // 状态未变，跳过重复下发
         // ProxyController 内部与 WebView 提供方通信，统一调度到主线程避免线程问题。
         val syncExecutor = Executor { it.run() }
         mainHandler.post {
             runCatching {
-                if (proxyManager.isEnabled()) {
+                if (desired) {
                     val config = ProxyConfig.Builder()
                         .addProxyRule("127.0.0.1:${ClashProxyManager.MIXED_PORT}")
                         .addBypassRule("localhost")
@@ -156,6 +176,9 @@ class BrowserController @Inject constructor(
                 } else {
                     ProxyController.getInstance().clearProxyOverride(syncExecutor, Runnable {})
                 }
+            }.onSuccess {
+                // P0-6：记录已下发状态，后续相同状态直接跳过（去重防竞态）。
+                webViewProxyApplied = desired
             }.onFailure {
                 FileLogger.w(TAG, "设置 WebView 代理失败: ${it.message}")
             }
