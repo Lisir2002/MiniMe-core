@@ -357,7 +357,7 @@ class StatefulAgentWorkflow @Inject constructor(
     private suspend fun resolveProviderConfig(sessionId: String?): AIProviderConfig? {
         if (sessionId != null) {
             val session = sessionUseCase.getSessionById(sessionId)
-            val boundProviderId = session?.providerId
+            val boundProviderId = session?.provider_id
             val boundModel = session?.model
             if (!boundProviderId.isNullOrBlank()) {
                 val config = aiProviderRepository.getProviderById(boundProviderId)

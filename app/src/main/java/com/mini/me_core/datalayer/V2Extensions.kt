@@ -1,9 +1,14 @@
 package com.mini.me_core.datalayer
 
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_session
 import com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides
 import com.mini.mecore.datalayer.sqldelight.agent.Skill_conversation_state
 import com.mini.mecore.datalayer.sqldelight.agent.Skill_state
+import com.mini.me_core.core.util.EnumSafe
+import com.mini.me_core.feature.agent.domain.core.model.AgentMode
+import com.mini.me_core.feature.agent.domain.core.model.ChatSession
+import com.mini.me_core.feature.agent.domain.core.model.ReasoningEffort
 import com.mini.mecore.datalayer.sqldelight.credentials.Git_credentials
 import com.mini.mecore.datalayer.sqldelight.settings.Ai_providers
 import com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models
@@ -64,3 +69,19 @@ val Model_capability_overrides.overrideStructuredOutputBool: Boolean? get() = ov
 // skill_state / skill_conversation_state
 val Skill_state.isEnabled: Boolean get() = enabled == 1L
 val Skill_conversation_state.isEnabled: Boolean get() = enabled == 1L
+
+// agent_session → ChatSession 领域模型
+fun Agent_session.toChatSession(): ChatSession = ChatSession(
+    id = id,
+    title = title ?: "",
+    createdAt = created_at,
+    updatedAt = updated_at,
+    workspacePath = workspace_path,
+    mode = EnumSafe.valueOf(mode, AgentMode.BUILD, tag = "agent_session.mode"),
+    reasoningEffort = EnumSafe.valueOf(reasoning_effort, ReasoningEffort.MEDIUM, tag = "agent_session.reasoning_effort"),
+    providerId = provider_id,
+    model = model,
+    totalInputTokens = total_input_tokens.toInt(),
+    totalOutputTokens = total_output_tokens.toInt(),
+    lastInputTokens = last_input_tokens.toInt(),
+)

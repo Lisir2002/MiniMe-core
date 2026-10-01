@@ -13,7 +13,7 @@ import com.mini.mecore.datalayer.sqldelight.agent.SelectAllSessionsWithCount as 
 import com.mini.me_core.feature.agent.domain.session.checkpoint.CheckpointManager
 import com.mini.me_core.feature.agent.data.local.dao.ChatSessionWithCount
 import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
-import com.mini.me_core.feature.agent.data.local.entity.ChatSessionEntity
+import com.mini.me_core.datalayer.toChatSession
 import com.mini.me_core.feature.agent.data.CodeChangeTracker
 import com.mini.me_core.feature.agent.domain.container.ContainerInitState
 import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
@@ -214,8 +214,8 @@ class AIAgentViewModel @Inject constructor(
         .flatMapLatest { path ->
             if (path.isBlank()) flowOf(emptyList())
             else v2Agent.observeAllSessions().map { list ->
-                list.map { it.toEntity() }.filter { it.workspacePath.isBlank() || it.workspacePath == path }
-                    .map { it.toDomain() }
+                list.filter { it.workspace_path.isBlank() || it.workspace_path == path }
+                    .map { it.toChatSession() }
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -941,8 +941,7 @@ class AIAgentViewModel @Inject constructor(
             }
             sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
 
-            val sessionEntity = sessionUseCase.getSessionById(sessionId)
-            val sessionDomain = sessionEntity?.toDomain()
+            val sessionDomain = sessionUseCase.getSessionById(sessionId)?.toChatSession()
             val mode = sessionDomain?.mode ?: AgentMode.BUILD
 
             val agentContext = AgentContext(
@@ -1741,7 +1740,7 @@ class AIAgentViewModel @Inject constructor(
      * 最近一次删除的会话数据（会话 + 全部消息），用于 Snackbar「撤销」恢复。
      * 单槽覆盖：仅保留最近一次删除；进程被杀/会话切走后缓存失效（撤销窗口短，低风险）。
      */
-    private var lastDeletedSession: Pair<ChatSessionEntity, List<AgentMessageEntity>>? = null
+    private var lastDeletedSession: Pair<V2AgentSession, List<AgentMessageEntity>>? = null
 
     fun deleteSession(id: String) = viewModelScope.launch {
         // 删除前缓存会话 + 消息，供 Snackbar「撤销」恢复（re-insert）
@@ -1813,7 +1812,7 @@ class AIAgentViewModel @Inject constructor(
      * 会话与工作区一对一绑定、不可中途切换；一个工作区可绑定多个会话。
      */
     suspend fun sessionsBoundToWorkspace(workspacePath: String): List<ChatSession> =
-        v2Agent.getAllSessionsByWorkspaceOnce(workspacePath).map { it.toEntity().toDomain() }
+        v2Agent.getAllSessionsByWorkspaceOnce(workspacePath).map { it.toChatSession() }
 
     /** 导出单个会话为无密码备份格式（tar.gz），流式写入 [output]（调用方打开，本方法负责关闭）。成功回调 true，失败回调 false。 */
     fun exportSession(sessionId: String, output: OutputStream, onResult: (Boolean) -> Unit) = viewModelScope.launch {
@@ -1849,8 +1848,8 @@ class AIAgentViewModel @Inject constructor(
      * 新会话初始**不绑定工作台**（workspacePath 为空）：工作台绑定发生在用户发第一条消息时自动绑定，
      * 或由用户在「更多配置 → 工作台绑定」手动绑定。
      */
-    private suspend fun createSession(): ChatSessionEntity {
-        val s = sessionUseCase.newSessionEntity("")
+    private suspend fun createSession(): V2AgentSession {
+        val s = sessionUseCase.newSession("")
         val providerId = defaultModelSettingsRepository.getDefaultProviderId()
         val model = defaultModelSettingsRepository.getDefaultModel()
         if (providerId.isNotBlank() && model.isNotBlank()) {
@@ -2054,21 +2053,6 @@ class AIAgentViewModel @Inject constructor(
     }
 
     // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun V2AgentSession.toEntity() = ChatSessionEntity(
-        id = id,
-        title = title ?: "",
-        createdAtMs = created_at,
-        updatedAtMs = updated_at,
-        workspacePath = workspace_path,
-        mode = mode,
-        reasoningEffort = reasoning_effort,
-        providerId = provider_id,
-        model = model,
-        totalInputTokens = total_input_tokens.toInt(),
-        totalOutputTokens = total_output_tokens.toInt(),
-        lastInputTokens = last_input_tokens.toInt(),
-    )
 
     private fun V2AgentMessage.toEntity() = AgentMessageEntity(
         id = id,

@@ -87,35 +87,17 @@ internal class AboutStatsViewModel @Inject constructor(
     private suspend fun load(): UsageStats = withContext(Dispatchers.IO) {
         val resetEpoch = kv.getInt(NS, KEY_STATS_RESET_EPOCH) ?: 0L
         val sessions = v2Agent.getAllOnce()
-            .map { it.toEntity() }
-            .filter { it.createdAtMs >= resetEpoch }
+            .filter { it.created_at >= resetEpoch }
         val messageCount = v2Agent.getAllMessagesOnce().size
 
         computeUsageStats(
             sessions = sessions.map {
-                SessionCountInput(it.createdAtMs, it.totalInputTokens.toLong(), it.totalOutputTokens.toLong())
+                SessionCountInput(it.created_at, it.total_input_tokens, it.total_output_tokens)
             },
             messageCount = messageCount,
             resetEpochMs = resetEpoch,
         )
     }
-
-    // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun V2AgentSession.toEntity() = com.mini.me_core.feature.agent.data.local.entity.ChatSessionEntity(
-        id = id,
-        title = title ?: "",
-        createdAtMs = created_at,
-        updatedAtMs = updated_at,
-        workspacePath = workspace_path,
-        mode = mode,
-        reasoningEffort = reasoning_effort,
-        providerId = provider_id,
-        model = model,
-        totalInputTokens = total_input_tokens.toInt(),
-        totalOutputTokens = total_output_tokens.toInt(),
-        lastInputTokens = last_input_tokens.toInt(),
-    )
 
     private fun com.mini.mecore.datalayer.sqldelight.agent.Agent_message.toEntity() = com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity(
         id = id,

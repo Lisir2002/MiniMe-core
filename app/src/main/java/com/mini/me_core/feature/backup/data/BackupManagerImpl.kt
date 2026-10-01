@@ -14,7 +14,6 @@ import com.mini.mecore.datalayer.sqldelight.agent.Agent_message as V2AgentMessag
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
 import com.mini.mecore.datalayer.sqldelight.agent.Todo_items as V2TodoItem
 import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
-import com.mini.me_core.feature.agent.data.local.entity.ChatSessionEntity
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpConfigRepository
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpManager
 import com.mini.me_core.feature.agent.domain.execution.permission.PermissionRulesRepository
@@ -140,7 +139,7 @@ class BackupManagerImpl @Inject constructor(
     override suspend fun exportSession(sessionId: String, output: OutputStream) {
         withContext(Dispatchers.IO) {
             val session =
-                safeDaoSuspend("getSessionById", null) { v2Agent.getSessionById(sessionId) }?.toEntity()
+                safeDaoSuspend("getSessionById", null) { v2Agent.getSessionById(sessionId) }
                     ?: error("Session not found: $sessionId")
             val temp = createTempFile()
             try {
@@ -346,10 +345,9 @@ class BackupManagerImpl @Inject constructor(
                                         "getSessionPageAfter",
                                         emptyList()
                                     ) { v2Agent.getSessionPageAfter(lastUpdatedAtMs, lastId, PAGE_SIZE.toLong()) }
-                                        .map { it.toEntity() }
                                 if (batch.isEmpty()) break
                                 batch.forEach { writer.writeLine(json.encodeToString(ChatSessionDto.serializer(), it.toDto())) }
-                                lastUpdatedAtMs = batch.last().updatedAtMs
+                                lastUpdatedAtMs = batch.last().updated_at
                                 lastId = batch.last().id
                             }
                         }
@@ -513,8 +511,8 @@ class BackupManagerImpl @Inject constructor(
                             onClear = { if (mode == RestoreMode.OVERWRITE) safeDaoSuspend("clearSessions", Unit) { v2Agent.deleteAllSessions() } },
                             insert = { dtos ->
                                 safeDaoSuspend("upsertSessions", 0) {
-                                    val mapped = dtos.map { it.copy(workspacePath = it.workspacePath.ifBlank { currentWorkspacePath }).toEntity() }
-                                    v2Agent.upsertAllSessions(mapped.map { it.toV2() })
+                                    val mapped = dtos.map { it.copy(workspacePath = it.workspacePath.ifBlank { currentWorkspacePath }).toV2() }
+                                    v2Agent.upsertAllSessions(mapped)
                                     dtos.size
                                 }
                             }
@@ -653,8 +651,8 @@ class BackupManagerImpl @Inject constructor(
         if (snapshot.chatSessions.isNotEmpty()) {
             if (mode == RestoreMode.OVERWRITE) safeDaoSuspend("legacyClearSessions", Unit) { v2Agent.deleteAllSessions() }
             safeDaoSuspend("legacyUpsertSessions", Unit) {
-                val mapped = snapshot.chatSessions.map { it.copy(workspacePath = it.workspacePath.ifBlank { currentWorkspacePath }).toEntity() }
-                v2Agent.upsertAllSessions(mapped.map { it.toV2() })
+                val mapped = snapshot.chatSessions.map { it.copy(workspacePath = it.workspacePath.ifBlank { currentWorkspacePath }).toV2() }
+                v2Agent.upsertAllSessions(mapped)
             }
         }
         if (snapshot.agentMessages.isNotEmpty()) {
@@ -855,17 +853,18 @@ class BackupManagerImpl @Inject constructor(
     private fun com.mini.mecore.datalayer.sqldelight.workspace.Remote_mounts.toV2Dto() =
         RemoteMountDto(id, connection_id, remote_path, local_mount_path, isActive, autoConnect)
 
-    private fun ChatSessionEntity.toDto() = ChatSessionDto(
-        id = id, title = title,
-        createdAt = createdAtMs, updatedAt = updatedAtMs,
-        workspacePath = workspacePath, mode = mode, reasoningEffort = reasoningEffort,
-        providerId = providerId, model = model
+    private fun V2AgentSession.toDto() = ChatSessionDto(
+        id = id, title = title ?: "",
+        createdAt = created_at, updatedAt = updated_at,
+        workspacePath = workspace_path, mode = mode, reasoningEffort = reasoning_effort,
+        providerId = provider_id, model = model
     )
-    private fun ChatSessionDto.toEntity() = ChatSessionEntity(
-        id = id, title = title,
-        createdAtMs = createdAt, updatedAtMs = updatedAt,
-        workspacePath = workspacePath, mode = mode, reasoningEffort = reasoningEffort,
-        providerId = providerId, model = model
+    private fun ChatSessionDto.toV2() = V2AgentSession(
+        id = id, title = title, mode = mode, model = model, status = "active",
+        created_at = createdAt, updated_at = updatedAt,
+        workspace_path = workspacePath, reasoning_effort = reasoningEffort,
+        provider_id = providerId,
+        total_input_tokens = 0L, total_output_tokens = 0L, last_input_tokens = 0L
     )
 
     private fun AgentMessageEntity.toDto() = AgentMessageDto(
@@ -881,26 +880,6 @@ class BackupManagerImpl @Inject constructor(
     )
 
     // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
-
-    private fun V2AgentSession.toEntity() = ChatSessionEntity(
-        id = id, title = title ?: "",
-        createdAtMs = created_at, updatedAtMs = updated_at,
-        workspacePath = workspace_path, mode = mode, reasoningEffort = reasoning_effort,
-        providerId = provider_id, model = model,
-        totalInputTokens = total_input_tokens.toInt(),
-        totalOutputTokens = total_output_tokens.toInt(),
-        lastInputTokens = last_input_tokens.toInt()
-    )
-
-    private fun ChatSessionEntity.toV2() = V2AgentSession(
-        id = id, title = title, mode = mode, model = model, status = "active",
-        created_at = createdAtMs, updated_at = updatedAtMs,
-        workspace_path = workspacePath, reasoning_effort = reasoningEffort,
-        provider_id = providerId,
-        total_input_tokens = totalInputTokens.toLong(),
-        total_output_tokens = totalOutputTokens.toLong(),
-        last_input_tokens = lastInputTokens.toLong()
-    )
 
     private fun V2AgentMessage.toEntity() = AgentMessageEntity(
         id = id, sessionId = session_id, taskId = task_id, role = role, content = content,

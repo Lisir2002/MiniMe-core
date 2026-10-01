@@ -2,7 +2,6 @@ package com.mini.me_core.feature.agent.domain.execution.tool.mode
 
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
-import com.mini.me_core.feature.agent.data.local.entity.ChatSessionEntity
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.core.model.AgentMode
 import com.mini.me_core.feature.agent.domain.execution.tool.AbstractContextualTool
@@ -96,23 +95,22 @@ class SwitchModeTool @Inject constructor(
             return ToolResult.Error("未关联会话 ID，无法切换模式", "NO_SESSION")
         }
 
-        val sessionEntity = v2Agent.getSessionById(sessionId)?.toEntity()
+        val session = v2Agent.getSessionById(sessionId)
             ?: return ToolResult.Error("找不到会话记录", "SESSION_NOT_FOUND")
 
         // G-3：频率限制——同会话 5 分钟内最多允许 2 次切换，防止 PLAN↔BUILD 抖动。
-        // 仅在真正执行切换前记录；「已处于目标模式」「校验失败」等分支已提前返回，不会记录。
         checkAndRecordSwitch(sessionId, context.mode)?.let { return it }
 
         // 切换模式并保存到数据库。UI 层通过 flow 监听，会自动更新外观与后续流程的上下文
         v2Agent.upsertSession(
-            id = sessionEntity.id, title = sessionEntity.title, mode = targetMode.name,
-            model = sessionEntity.model, status = "active",
-            createdAtMs = sessionEntity.createdAtMs, updatedAtMs = sessionEntity.updatedAtMs,
-            workspacePath = sessionEntity.workspacePath, reasoningEffort = sessionEntity.reasoningEffort,
-            providerId = sessionEntity.providerId,
-            totalInputTokens = sessionEntity.totalInputTokens.toLong(),
-            totalOutputTokens = sessionEntity.totalOutputTokens.toLong(),
-            lastInputTokens = sessionEntity.lastInputTokens.toLong(),
+            id = session.id, title = session.title, mode = targetMode.name,
+            model = session.model, status = session.status,
+            createdAtMs = session.created_at, updatedAtMs = session.updated_at,
+            workspacePath = session.workspace_path, reasoningEffort = session.reasoning_effort,
+            providerId = session.provider_id,
+            totalInputTokens = session.total_input_tokens,
+            totalOutputTokens = session.total_output_tokens,
+            lastInputTokens = session.last_input_tokens,
         )
 
         // G-1：记录本次切换历史到数据库（持久化，可用于回溯和频率统计）
@@ -170,21 +168,4 @@ class SwitchModeTool @Inject constructor(
             rememberablePatterns = emptyList()
         )
     }
-
-    // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun V2AgentSession.toEntity() = ChatSessionEntity(
-        id = id,
-        title = title ?: "",
-        createdAtMs = created_at,
-        updatedAtMs = updated_at,
-        workspacePath = workspace_path,
-        mode = mode,
-        reasoningEffort = reasoning_effort,
-        providerId = provider_id,
-        model = model,
-        totalInputTokens = total_input_tokens.toInt(),
-        totalOutputTokens = total_output_tokens.toInt(),
-        lastInputTokens = last_input_tokens.toInt(),
-    )
 }

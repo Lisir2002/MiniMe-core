@@ -2,7 +2,6 @@ package com.mini.me_core.feature.agent.domain.execution.tool.mode
 
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
-import com.mini.me_core.feature.agent.data.local.entity.ChatSessionEntity
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CompletableDeferred
@@ -29,16 +28,16 @@ class PlanApprovalManager @Inject constructor(
     private var currentDecision: CompletableDeferred<PlanApprovalChoice>? = null
     private var currentSessionId: String? = null
 
-    private suspend fun getSessionEntity(sid: String): ChatSessionEntity? =
-        v2Agent.getSessionById(sid)?.toEntity()
+    private suspend fun getSession(sid: String): V2AgentSession? =
+        v2Agent.getSessionById(sid)
 
-    private suspend fun upsertMode(sid: String, entity: ChatSessionEntity, mode: String) {
+    private suspend fun upsertMode(sid: String, session: V2AgentSession, mode: String) {
         v2Agent.upsertSession(
-            id = entity.id, title = entity.title, mode = mode, model = entity.model, status = "active",
-            createdAtMs = entity.createdAtMs, updatedAtMs = entity.updatedAtMs,
-            workspacePath = entity.workspacePath, reasoningEffort = entity.reasoningEffort,
-            providerId = entity.providerId, totalInputTokens = entity.totalInputTokens.toLong(),
-            totalOutputTokens = entity.totalOutputTokens.toLong(), lastInputTokens = entity.lastInputTokens.toLong(),
+            id = session.id, title = session.title, mode = mode, model = session.model, status = session.status,
+            createdAtMs = session.created_at, updatedAtMs = session.updated_at,
+            workspacePath = session.workspace_path, reasoningEffort = session.reasoning_effort,
+            providerId = session.provider_id, totalInputTokens = session.total_input_tokens,
+            totalOutputTokens = session.total_output_tokens, lastInputTokens = session.last_input_tokens,
         )
     }
 
@@ -67,9 +66,9 @@ class PlanApprovalManager @Inject constructor(
             val sid = currentSessionId
             if (sid != null) {
                 scope.launch {
-                    val entity = getSessionEntity(sid)
-                    if (entity != null && entity.mode != "PLAN") {
-                        upsertMode(sid, entity, "PLAN")
+                    val session = getSession(sid)
+                    if (session != null && session.mode != "PLAN") {
+                        upsertMode(sid, session, "PLAN")
                     }
                 }
             }
@@ -77,23 +76,6 @@ class PlanApprovalManager @Inject constructor(
 
         currentDecision?.complete(choice)
     }
-
-    // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun V2AgentSession.toEntity() = ChatSessionEntity(
-        id = id,
-        title = title ?: "",
-        createdAtMs = created_at,
-        updatedAtMs = updated_at,
-        workspacePath = workspace_path,
-        mode = mode,
-        reasoningEffort = reasoning_effort,
-        providerId = provider_id,
-        model = model,
-        totalInputTokens = total_input_tokens.toInt(),
-        totalOutputTokens = total_output_tokens.toInt(),
-        lastInputTokens = last_input_tokens.toInt(),
-    )
 }
 
 data class PlanApprovalRequest(val reason: String)
