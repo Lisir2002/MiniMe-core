@@ -602,6 +602,30 @@ class ClashProxyManager @Inject constructor(
     }
 
     /**
+     * P1-11：热重载配置（不杀进程、不断连）。
+     *
+     * mihomo external-controller `PUT /configs?force=true` 接受 JSON：
+     *   - `path`：从文件加载（这里传空，走 payload）；
+     *   - `payload`：内联 YAML 原文（**不是 base64**，mihomo 直接按 YAML 文本解析）。
+     * 切换 profile / 订阅更新后用本方法让内核重新加载 proxies/rules，避免 restart 造成的端口抖动与连接中断。
+     * 仅当 mixed-port/external-controller/secret 等固定覆盖块变化（本实现里这些恒不变）或热重载失败时，
+     * 才需要回退到重启内核。
+     *
+     * @return true=内核已接受新配置；false=控制面不可达或内核拒绝（调用方应回退重启）。
+     */
+    suspend fun reloadConfig(configYaml: String): Boolean {
+        ensureSecretLoaded()
+        // payload 必须是合法 JSON 字符串（YAML 原文里可能含引号/换行），用 JsonPrimitive 序列化转义。
+        val payload = kotlinx.serialization.json.JsonPrimitive(configYaml).toString()
+        val body = """{"path":"","payload":$payload,"force":true}"""
+        val resp = controllerRequest("PUT", "/configs?force=true", body)
+        // 成功返回 204（空 body）→ controllerRequest 返回 ""（非 null）；失败返回 null。
+        val ok = resp != null
+        FileLogger.i(TAG, if (ok) "mihomo 热重载配置成功" else "mihomo 热重载配置失败")
+        return ok
+    }
+
+    /**
      * /traffic WS 实时推流（零轮询，与 mihomo/CMA 的 flow 数据源一致）。
      * 每次 collect 建立一条 WS；collect 取消即关闭（awaitClose 里 ws.cancel()），失败自动结束流。
      */
@@ -948,7 +972,17 @@ class ClashProxyManager @Inject constructor(
         writeConfigFile(config)
         // 内核必须实际跑起来并让控制面就绪，才能把开关置为 enabled——
         // 否则 App 流量会被 routeHolder 打进无人监听的 7890（`Failed to connect to /127.0.0.1:7890`）。
-        val kernelOk = ensureKernelRunning(restart = true)
+        // P1-11：内核已在运行时优先热重载（不杀进程、不断连）；热重载失败才回退到 restart。
+        val wasAlive = mihomoProcess?.isAlive == true
+        val kernelOk = if (wasAlive) {
+            val reloaded = reloadConfig(config)
+            if (reloaded) true else {
+                FileLogger.w(TAG, "on(): 热重载失败，回退到重启内核")
+                ensureKernelRunning(restart = true)
+            }
+        } else {
+            ensureKernelRunning(restart = false)
+        }
         if (!kernelOk) {
             FileLogger.w(TAG, "on(): mihomo 内核未就绪，代理保持关闭")
             return "mihomo 内核启动失败（下载或启动异常，详见日志），代理未启用"
