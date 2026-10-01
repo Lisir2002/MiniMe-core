@@ -2,7 +2,6 @@ package com.mini.me_core.feature.agent.domain.session
 
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_message as V2AgentMessage
-import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
 import com.mini.me_core.feature.agent.domain.core.model.AgentMessage
 import com.mini.me_core.feature.agent.domain.core.model.CONTEXT_COMPACTION_MARKER
 import com.mini.me_core.feature.agent.domain.core.model.CONTEXT_SUMMARY_LEGACY_PREFIX
@@ -85,7 +84,7 @@ class MessagePersistenceUseCase @Inject constructor(
                     outputTokens = outputTokens,
                     isCompacted = isCompacted
                 )
-                v2Agent.insertMessage(entity.toV2())
+                v2Agent.insertMessage(entity)
             } else {
                 // 超长内容分块落库：主行（chunk 0）携带全部元数据，续块行仅携带内容。
                 // 全组共享同一 timestamp（块号递增），保证按时间序查询时块与块邻接、不被其它消息穿插，
@@ -116,7 +115,7 @@ class MessagePersistenceUseCase @Inject constructor(
                         isCompacted = isCompacted
                     )
                 }
-                v2Agent.insertAllMessages(rows.map { it.toV2() })
+                v2Agent.insertAllMessages(rows)
             }
         }
     }
@@ -141,26 +140,29 @@ class MessagePersistenceUseCase @Inject constructor(
         inputTokens: Int,
         outputTokens: Int,
         isCompacted: Boolean
-    ): AgentMessageEntity = AgentMessageEntity(
+    ): V2AgentMessage = V2AgentMessage(
         id = id,
-        sessionId = sessionId,
-        taskId = taskId,
+        session_id = sessionId,
         role = role.name,
+        seq = timestamp,
+        created_at = timestamp,
+        task_id = taskId,
         content = content,
-        timestamp = timestamp,
-        chunkGroupId = chunkGroupId,
-        chunkIndex = chunkIndex,
-        toolCallsJson = toolCallsJson,
-        toolCallId = toolCallId,
-        toolName = toolName,
-        toolArgs = toolArgs,
-        isError = isError,
+        tool_calls_json = toolCallsJson,
+        tool_call_id = toolCallId,
+        tool_name = toolName,
+        tool_args = toolArgs,
+        is_error = if (isError) 1L else 0L,
         reasoning = reasoning,
         signature = signature,
-        attachmentsJson = attachmentsJson,
-        inputTokens = inputTokens,
-        outputTokens = outputTokens,
-        isCompacted = isCompacted
+        attachments_json = attachmentsJson,
+        is_compacted = if (isCompacted) 1L else 0L,
+        is_context_summary = 0L,
+        is_compaction_marker = 0L,
+        input_tokens = inputTokens.toLong(),
+        output_tokens = outputTokens.toLong(),
+        chunk_group_id = chunkGroupId,
+        chunk_index = chunkIndex.toLong()
     )
 
     suspend fun updateContent(messageId: String, newContent: String) {
@@ -222,25 +224,24 @@ class MessagePersistenceUseCase @Inject constructor(
          * 未分块消息原样透传。用于 UI 流 / buildHistory 等所有读取侧。
          * 分页边界被截断的病态场景（单条 > 3M 字符）下按已加载块拼接，loadMore 拉全后自动补齐。
          */
-        internal fun mergeChunks(entities: List<AgentMessageEntity>): List<AgentMessageEntity> {
-            if (entities.none { it.chunkGroupId.isNotBlank() }) return entities
-            val byGroup = HashMap<String, MutableList<AgentMessageEntity>>()
+        internal fun mergeChunks(entities: List<V2AgentMessage>): List<V2AgentMessage> {
+            if (entities.none { it.chunk_group_id.isNotBlank() }) return entities
+            val byGroup = HashMap<String, MutableList<V2AgentMessage>>()
             for (e in entities) {
-                if (e.chunkGroupId.isNotBlank()) {
-                    byGroup.getOrPut(e.chunkGroupId) { mutableListOf() }.add(e)
+                if (e.chunk_group_id.isNotBlank()) {
+                    byGroup.getOrPut(e.chunk_group_id) { mutableListOf() }.add(e)
                 }
             }
             val emitted = HashSet<String>(byGroup.size)
-            val result = ArrayList<AgentMessageEntity>(entities.size)
+            val result = ArrayList<V2AgentMessage>(entities.size)
             for (e in entities) {
-                val gid = e.chunkGroupId
+                val gid = e.chunk_group_id
                 if (gid.isBlank()) {
                     result.add(e)
                     continue
                 }
-                // 同一分块组只合并一次，输出位置取该组首次出现的块（各块共享 timestamp，时间序一致）。
                 if (!emitted.add(gid)) continue
-                val group = byGroup.getValue(gid).sortedBy { it.chunkIndex }
+                val group = byGroup.getValue(gid).sortedBy { it.chunk_index }
                 val base = group.first()
                 val content = group.joinToString("") { it.content }
                 val reasoning = group.mapNotNull { it.reasoning }.joinToString("").ifEmpty { null }
@@ -248,8 +249,8 @@ class MessagePersistenceUseCase @Inject constructor(
                     base.copy(
                         content = content,
                         reasoning = reasoning,
-                        chunkGroupId = "",
-                        chunkIndex = 0
+                        chunk_group_id = "",
+                        chunk_index = 0L
                     )
                 )
             }
@@ -265,15 +266,15 @@ class MessagePersistenceUseCase @Inject constructor(
      */
     suspend fun buildHistory(sessionId: String, pendingToolMarker: String): List<AgentMessage> {
         // 先按 chunk_index 拼接分块消息（chunk 行共享 timestamp，压缩标记也是全组一致），再过滤已压缩行。
-        val raw = v2Agent.getMessagesBySessionOnce(sessionId).map { it.toEntity() }
-        val entities = mergeChunks(raw).filter { !it.isCompacted }
+        val raw = v2Agent.getMessagesBySessionOnce(sessionId)
+        val entities = mergeChunks(raw).filter { it.is_compacted == 0L }
 
         // 第一遍：求 assistant 声明的 toolCallId 与 tool 结果 toolCallId 的交集。
         val declaredIds = mutableSetOf<String>()
         val resultIds = mutableSetOf<String>()
         for (e in entities) {
             when (MessageRole.valueOf(e.role)) {
-                MessageRole.ASSISTANT -> e.toolCallsJson?.let {
+                MessageRole.ASSISTANT -> e.tool_calls_json?.let {
                     runCatching { json.decodeFromString<List<ToolCall>>(it) }
                         .getOrNull()?.forEach { tc -> declaredIds.add(tc.id) }
                 }
@@ -282,7 +283,7 @@ class MessagePersistenceUseCase @Inject constructor(
                     if (!e.content.startsWith(pendingToolMarker) &&
                         !e.content.startsWith(SessionUseCase.LEGACY_PENDING_TOOL_MARKER)
                     ) {
-                        e.toolCallId?.let { resultIds.add(it) }
+                        e.tool_call_id?.let { resultIds.add(it) }
                     }
                 }
                 else -> {}
@@ -295,9 +296,9 @@ class MessagePersistenceUseCase @Inject constructor(
         for (e in entities) {
             when (MessageRole.valueOf(e.role)) {
                 MessageRole.USER -> {
-                    val rawContent = if (e.isCompactionMarker) CONTEXT_COMPACTION_MARKER else e.content
-                    val attachments = if (!e.isCompactionMarker) {
-                        e.attachmentsJson?.let {
+                    val rawContent = if (e.is_compaction_marker != 0L) CONTEXT_COMPACTION_MARKER else e.content
+                    val attachments = if (e.is_compaction_marker == 0L) {
+                        e.attachments_json?.let {
                             runCatching { json.decodeFromString<List<AgentAttachment>>(it) }.getOrNull()
                         } ?: emptyList()
                     } else emptyList()
@@ -329,13 +330,13 @@ class MessagePersistenceUseCase @Inject constructor(
                     )
                 }
                 MessageRole.ASSISTANT -> {
-                    val toolCalls = e.toolCallsJson?.let {
+                    val toolCalls = e.tool_calls_json?.let {
                         runCatching { json.decodeFromString<List<ToolCall>>(it) }.getOrNull()
                     }?.filter { it.id in validIds } ?: emptyList()
                     if (e.content.isNotBlank() || toolCalls.isNotEmpty()) {
                         val previous = result.lastOrNull()
                         if (
-                            e.isContextSummary &&
+                            e.is_context_summary != 0L &&
                             !(previous is AgentMessage.UserMessage && previous.content == CONTEXT_COMPACTION_MARKER)
                         ) {
                             result.add(AgentMessage.UserMessage(content = CONTEXT_COMPACTION_MARKER))
@@ -352,12 +353,12 @@ class MessagePersistenceUseCase @Inject constructor(
                     }
                 }
                 MessageRole.TOOL -> {
-                    val tcId = e.toolCallId
+                    val tcId = e.tool_call_id
                     if (tcId != null && tcId in validIds) {
                         result.add(
                             AgentMessage.ToolResultMessage(
                                 id = tcId,
-                                toolName = e.toolName ?: "unknown",
+                                toolName = e.tool_name ?: "unknown",
                                 result = e.content
                             )
                         )
@@ -384,55 +385,4 @@ class MessagePersistenceUseCase @Inject constructor(
             null
         }
     }
-
-    // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun AgentMessageEntity.toV2() = V2AgentMessage(
-        id = id,
-        session_id = sessionId,
-        role = role,
-        seq = timestamp,
-        created_at = timestamp,
-        task_id = taskId,
-        content = content,
-        tool_calls_json = toolCallsJson,
-        tool_call_id = toolCallId,
-        tool_name = toolName,
-        tool_args = toolArgs,
-        is_error = if (isError) 1L else 0L,
-        reasoning = reasoning,
-        signature = signature,
-        attachments_json = attachmentsJson,
-        is_compacted = if (isCompacted) 1L else 0L,
-        is_context_summary = if (isContextSummary) 1L else 0L,
-        is_compaction_marker = if (isCompactionMarker) 1L else 0L,
-        input_tokens = inputTokens.toLong(),
-        output_tokens = outputTokens.toLong(),
-        chunk_group_id = chunkGroupId,
-        chunk_index = chunkIndex.toLong(),
-    )
-
-    private fun V2AgentMessage.toEntity() = AgentMessageEntity(
-        id = id,
-        sessionId = session_id,
-        taskId = task_id,
-        role = role,
-        content = content,
-        timestamp = seq,
-        toolCallsJson = tool_calls_json,
-        toolCallId = tool_call_id,
-        toolName = tool_name,
-        toolArgs = tool_args,
-        isError = is_error == 1L,
-        reasoning = reasoning,
-        signature = signature,
-        attachmentsJson = attachments_json,
-        isCompacted = is_compacted == 1L,
-        isContextSummary = is_context_summary == 1L,
-        isCompactionMarker = is_compaction_marker == 1L,
-        inputTokens = input_tokens.toInt(),
-        outputTokens = output_tokens.toInt(),
-        chunkGroupId = chunk_group_id,
-        chunkIndex = chunk_index.toInt(),
-    )
 }

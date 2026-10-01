@@ -99,30 +99,6 @@ internal class AboutStatsViewModel @Inject constructor(
         )
     }
 
-    private fun com.mini.mecore.datalayer.sqldelight.agent.Agent_message.toEntity() = com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity(
-        id = id,
-        sessionId = session_id,
-        taskId = task_id,
-        role = role,
-        content = content,
-        timestamp = seq,
-        toolCallsJson = tool_calls_json,
-        toolCallId = tool_call_id,
-        toolName = tool_name,
-        toolArgs = tool_args,
-        isError = is_error == 1L,
-        reasoning = reasoning,
-        signature = signature,
-        attachmentsJson = attachments_json,
-        isCompacted = is_compacted == 1L,
-        isContextSummary = is_context_summary == 1L,
-        isCompactionMarker = is_compaction_marker == 1L,
-        inputTokens = input_tokens.toInt(),
-        outputTokens = output_tokens.toInt(),
-        chunkGroupId = chunk_group_id,
-        chunkIndex = chunk_index.toInt(),
-    )
-
     private fun utcDayBucket(ms: Long): Long {
         val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
         cal.timeInMillis = ms

@@ -13,7 +13,6 @@ import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepositor
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_message as V2AgentMessage
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
 import com.mini.mecore.datalayer.sqldelight.agent.Todo_items as V2TodoItem
-import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpConfigRepository
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpManager
 import com.mini.me_core.feature.agent.domain.execution.permission.PermissionRulesRepository
@@ -162,10 +161,9 @@ class BackupManagerImpl @Inject constructor(
                                         "getMsgPageAfter_$sessionId",
                                         emptyList()
                                     ) { v2Agent.getPageBySessionAfter(sessionId, lastTs, lastId, PAGE_SIZE.toLong()) }
-                                        .map { it.toEntity() }
                                     if (batch.isEmpty()) break
                                     batch.forEach { writer.writeLine(json.encodeToString(AgentMessageDto.serializer(), it.toDto())) }
-                                    lastTs = batch.last().timestamp
+                                    lastTs = batch.last().created_at
                                     lastId = batch.last().id
                                 }
                             }
@@ -359,10 +357,9 @@ class BackupManagerImpl @Inject constructor(
                                         "getMsgPageAfter",
                                         emptyList()
                                     ) { v2Agent.getMessagePageAfter(lastTs, lastId, PAGE_SIZE.toLong()) }
-                                        .map { it.toEntity() }
                                 if (batch.isEmpty()) break
                                 batch.forEach { writer.writeLine(json.encodeToString(AgentMessageDto.serializer(), it.toDto())) }
-                                lastTs = batch.last().timestamp
+                                lastTs = batch.last().created_at
                                 lastId = batch.last().id
                             }
                         }
@@ -526,8 +523,8 @@ class BackupManagerImpl @Inject constructor(
                             onClear = { if (mode == RestoreMode.OVERWRITE) safeDaoSuspend("clearMessages", Unit) { v2Agent.deleteAllMessages() } },
                             insert = { dtos ->
                                 safeDaoSuspend("insertMessages", 0) {
-                                    val mapped = dtos.map { it.toEntity() }
-                                    v2Agent.insertAllMessages(mapped.map { it.toV2() })
+                                    val mapped = dtos.map { it.toV2() }
+                                    v2Agent.insertAllMessages(mapped)
                                     dtos.size
                                 }
                             }
@@ -658,8 +655,8 @@ class BackupManagerImpl @Inject constructor(
         if (snapshot.agentMessages.isNotEmpty()) {
             if (mode == RestoreMode.OVERWRITE) safeDaoSuspend("legacyClearMessages", Unit) { v2Agent.deleteAllMessages() }
             safeDaoSuspend("legacyInsertMessages", Unit) {
-                val mapped = snapshot.agentMessages.map { it.toEntity() }
-                v2Agent.insertAllMessages(mapped.map { it.toV2() })
+                val mapped = snapshot.agentMessages.map { it.toV2() }
+                v2Agent.insertAllMessages(mapped)
             }
         }
         if (snapshot.todoItems.isNotEmpty()) {
@@ -867,32 +864,13 @@ class BackupManagerImpl @Inject constructor(
         total_input_tokens = 0L, total_output_tokens = 0L, last_input_tokens = 0L
     )
 
-    private fun AgentMessageEntity.toDto() = AgentMessageDto(
-        id, sessionId, taskId, role, content, timestamp, toolCallsJson, toolCallId, toolName, toolArgs,
-        isError, reasoning, signature, attachmentsJson, isCompacted, isContextSummary, isCompactionMarker,
-        chunkGroupId, chunkIndex
+    private fun V2AgentMessage.toDto() = AgentMessageDto(
+        id, session_id, task_id, role, content, created_at, tool_calls_json, tool_call_id, tool_name, tool_args,
+        is_error != 0L, reasoning, signature, attachments_json, is_compacted != 0L, is_context_summary != 0L, is_compaction_marker != 0L,
+        chunk_group_id, chunk_index.toInt()
     )
 
-    private fun AgentMessageDto.toEntity() = AgentMessageEntity(
-        id, sessionId, taskId, role, content, timestamp, toolCallsJson, toolCallId, toolName, toolArgs,
-        isError, reasoning, signature, attachmentsJson, isCompacted, isContextSummary, isCompactionMarker,
-        inputTokens = 0, outputTokens = 0, chunkGroupId = chunkGroupId, chunkIndex = chunkIndex
-    )
-
-    // ── V2（SQLDelight）↔ Room Entity 映射 ──────────────────────────────
-
-    private fun V2AgentMessage.toEntity() = AgentMessageEntity(
-        id = id, sessionId = session_id, taskId = task_id, role = role, content = content,
-        timestamp = created_at, toolCallsJson = tool_calls_json, toolCallId = tool_call_id,
-        toolName = tool_name, toolArgs = tool_args, isError = is_error == 1L,
-        reasoning = reasoning, signature = signature, attachmentsJson = attachments_json,
-        isCompacted = is_compacted == 1L, isContextSummary = is_context_summary == 1L,
-        isCompactionMarker = is_compaction_marker == 1L,
-        inputTokens = input_tokens.toInt(), outputTokens = output_tokens.toInt(),
-        chunkGroupId = chunk_group_id, chunkIndex = chunk_index.toInt()
-    )
-
-    private fun AgentMessageEntity.toV2() = V2AgentMessage(
+    private fun AgentMessageDto.toV2() = V2AgentMessage(
         id = id, session_id = sessionId, role = role, seq = timestamp, created_at = timestamp,
         task_id = taskId, content = content, tool_calls_json = toolCallsJson,
         tool_call_id = toolCallId, tool_name = toolName, tool_args = toolArgs,
@@ -900,9 +878,11 @@ class BackupManagerImpl @Inject constructor(
         attachments_json = attachmentsJson, is_compacted = if (isCompacted) 1L else 0L,
         is_context_summary = if (isContextSummary) 1L else 0L,
         is_compaction_marker = if (isCompactionMarker) 1L else 0L,
-        input_tokens = inputTokens.toLong(), output_tokens = outputTokens.toLong(),
+        input_tokens = 0L, output_tokens = 0L,
         chunk_group_id = chunkGroupId, chunk_index = chunkIndex.toLong()
     )
+
+    // ── V2（SQLDelight）↔ DTO 映射 ──────────────────────────────────
 
     private fun V2TodoItem.toDto() = TodoItemDto(
         id = id, sessionId = session_id, subject = subject, description = description,

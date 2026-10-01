@@ -12,8 +12,8 @@ import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSessio
 import com.mini.mecore.datalayer.sqldelight.agent.SelectAllSessionsWithCount as V2SessionWithCount
 import com.mini.me_core.feature.agent.domain.session.checkpoint.CheckpointManager
 import com.mini.me_core.feature.agent.data.local.dao.ChatSessionWithCount
-import com.mini.me_core.feature.agent.data.local.entity.AgentMessageEntity
 import com.mini.me_core.datalayer.toChatSession
+import com.mini.me_core.datalayer.toUIMessage
 import com.mini.me_core.feature.agent.data.CodeChangeTracker
 import com.mini.me_core.feature.agent.domain.container.ContainerInitState
 import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
@@ -264,13 +264,10 @@ class AIAgentViewModel @Inject constructor(
         .flatMapLatest { (id, limit) ->
             if (id == null) flowOf(ChatMessagesState(null, emptyList(), loaded = false))
             else v2Agent.observeMessagesBySessionPaged(id, limit.toLong()).map { list ->
-                list.map { it.toEntity() }
-            }.map { list ->
                 ChatMessagesState(
                     sessionId = id,
-                    // 先拼接分块消息（chunk 行按 chunk_index 序合并为单条完整消息），再走既有过滤/映射。
                     messages = MessagePersistenceUseCase.mergeChunks(list).asSequence()
-                        .filterNot { it.isContextSummary }
+                        .filterNot { it.is_context_summary != 0L }
                         .filterNot {
                             it.role == MessageRole.ASSISTANT.name &&
                                 !it.content.hasVisibleContent() &&
@@ -1740,13 +1737,13 @@ class AIAgentViewModel @Inject constructor(
      * 最近一次删除的会话数据（会话 + 全部消息），用于 Snackbar「撤销」恢复。
      * 单槽覆盖：仅保留最近一次删除；进程被杀/会话切走后缓存失效（撤销窗口短，低风险）。
      */
-    private var lastDeletedSession: Pair<V2AgentSession, List<AgentMessageEntity>>? = null
+    private var lastDeletedSession: Pair<V2AgentSession, List<V2AgentMessage>>? = null
 
     fun deleteSession(id: String) = viewModelScope.launch {
         // 删除前缓存会话 + 消息，供 Snackbar「撤销」恢复（re-insert）
         val entity = sessionUseCase.getSessionById(id)
         val messages = if (entity != null) {
-            v2Agent.getMessagesBySessionOnce(id).map { it.toEntity() }
+            v2Agent.getMessagesBySessionOnce(id)
         } else emptyList()
         lastDeletedSession = entity?.let { it to messages }
 
@@ -1786,7 +1783,7 @@ class AIAgentViewModel @Inject constructor(
         lastDeletedSession = null
         sessionUseCase.upsertSession(entity)
         if (messages.isNotEmpty()) {
-            v2Agent.insertAllMessages(messages.map { it.toV2() })
+            v2Agent.insertAllMessages(messages)
         }
         _currentSessionId.value = entity.id
     }
@@ -1941,17 +1938,17 @@ class AIAgentViewModel @Inject constructor(
      */
     fun editAndResend(messageId: String, newContent: String) = viewModelScope.launch {
         try {
-            val msg = v2Agent.getMessageById(messageId)?.toEntity() ?: return@launch
+            val msg = v2Agent.getMessageById(messageId) ?: return@launch
             if (msg.role != MessageRole.USER.name) return@launch
             // 1) 保留原对话：把该消息及其之后的所有消息标记为已截断（isCompacted=1），
             //    不删除，UI 仍可见；仅不再参与新一轮上下文回放。
-            v2Agent.markMessagesCompactedInclusiveFromTimestamp(msg.sessionId, msg.timestamp)
+            v2Agent.markMessagesCompactedInclusiveFromTimestamp(msg.session_id, msg.created_at)
             // 2) 以新内容作为新一轮对话重新执行（enqueueAgentRequest 会插入新的用户消息并开启新任务分组）
             enqueueAgentRequest(
                 request = newContent,
                 modelRequest = newContent,
                 projectRoot = _currentWorkspace.value,
-                targetSessionId = msg.sessionId
+                targetSessionId = msg.session_id
             )
         } catch (e: Exception) {
             FileLogger.e(TAG, "编辑并重发失败", e)
@@ -1971,10 +1968,10 @@ class AIAgentViewModel @Inject constructor(
      */
     fun retryTool(messageId: String) = viewModelScope.launch {
         try {
-            val msg = v2Agent.getMessageById(messageId)?.toEntity() ?: return@launch
+            val msg = v2Agent.getMessageById(messageId) ?: return@launch
             if (msg.role != MessageRole.TOOL.name) return@launch
-            val toolName = msg.toolName ?: return@launch
-            val toolArgs = msg.toolArgs.orEmpty()
+            val toolName = msg.tool_name ?: return@launch
+            val toolArgs = msg.tool_args.orEmpty()
             val prompt = buildString {
                 append("请重新执行以下工具调用：\n")
                 append("工具：$toolName\n")
@@ -1986,7 +1983,7 @@ class AIAgentViewModel @Inject constructor(
                 request = prompt,
                 modelRequest = prompt,
                 projectRoot = _currentWorkspace.value,
-                targetSessionId = msg.sessionId
+                targetSessionId = msg.session_id
             )
         } catch (e: Exception) {
             FileLogger.e(TAG, "重试工具调用失败", e)
@@ -2053,55 +2050,6 @@ class AIAgentViewModel @Inject constructor(
     }
 
     // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun V2AgentMessage.toEntity() = AgentMessageEntity(
-        id = id,
-        sessionId = session_id,
-        taskId = task_id,
-        role = role,
-        content = content,
-        timestamp = seq,
-        toolCallsJson = tool_calls_json,
-        toolCallId = tool_call_id,
-        toolName = tool_name,
-        toolArgs = tool_args,
-        isError = is_error == 1L,
-        reasoning = reasoning,
-        signature = signature,
-        attachmentsJson = attachments_json,
-        isCompacted = is_compacted == 1L,
-        isContextSummary = is_context_summary == 1L,
-        isCompactionMarker = is_compaction_marker == 1L,
-        inputTokens = input_tokens.toInt(),
-        outputTokens = output_tokens.toInt(),
-        chunkGroupId = chunk_group_id,
-        chunkIndex = chunk_index.toInt(),
-    )
-
-    private fun AgentMessageEntity.toV2() = V2AgentMessage(
-        id = id,
-        session_id = sessionId,
-        role = role,
-        seq = timestamp,
-        created_at = timestamp,
-        task_id = taskId,
-        content = content,
-        tool_calls_json = toolCallsJson,
-        tool_call_id = toolCallId,
-        tool_name = toolName,
-        tool_args = toolArgs,
-        is_error = if (isError) 1L else 0L,
-        reasoning = reasoning,
-        signature = signature,
-        attachments_json = attachmentsJson,
-        is_compacted = if (isCompacted) 1L else 0L,
-        is_context_summary = if (isContextSummary) 1L else 0L,
-        is_compaction_marker = if (isCompactionMarker) 1L else 0L,
-        input_tokens = inputTokens.toLong(),
-        output_tokens = outputTokens.toLong(),
-        chunk_group_id = chunkGroupId,
-        chunk_index = chunkIndex.toLong(),
-    )
 
     private fun V2SessionWithCount.toEntity() = ChatSessionWithCount(
         id = id,

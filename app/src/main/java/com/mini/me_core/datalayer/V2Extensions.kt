@@ -1,5 +1,6 @@
 package com.mini.me_core.datalayer
 
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_message
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session
 import com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides
@@ -9,6 +10,11 @@ import com.mini.me_core.core.util.EnumSafe
 import com.mini.me_core.feature.agent.domain.core.model.AgentMode
 import com.mini.me_core.feature.agent.domain.core.model.ChatSession
 import com.mini.me_core.feature.agent.domain.core.model.ReasoningEffort
+import com.mini.me_core.feature.agent.presentation.AgentAttachment
+import com.mini.me_core.feature.agent.presentation.AgentUIMessage
+import com.mini.me_core.feature.agent.presentation.BACKGROUND_NOTIFICATION_PREFIX
+import com.mini.me_core.feature.agent.presentation.MessageRole
+import kotlinx.serialization.json.Json
 import com.mini.mecore.datalayer.sqldelight.credentials.Git_credentials
 import com.mini.mecore.datalayer.sqldelight.settings.Ai_providers
 import com.mini.mecore.datalayer.sqldelight.t2i.T2i_provider_models
@@ -85,3 +91,37 @@ fun Agent_session.toChatSession(): ChatSession = ChatSession(
     totalOutputTokens = total_output_tokens.toInt(),
     lastInputTokens = last_input_tokens.toInt(),
 )
+
+// agent_message Boolean 扩展（Long 0/1 → Boolean）
+val Agent_message.isErrorBool: Boolean get() = is_error != 0L
+val Agent_message.isCompactedBool: Boolean get() = is_compacted != 0L
+val Agent_message.isContextSummaryBool: Boolean get() = is_context_summary != 0L
+val Agent_message.isCompactionMarkerBool: Boolean get() = is_compaction_marker != 0L
+
+private val uiJson = Json { ignoreUnknownKeys = true }
+
+fun Agent_message.toUIMessage(): AgentUIMessage {
+    val roleEnum: MessageRole = runCatching {
+        EnumSafe.valueOf(role, MessageRole.USER, tag = "agent_message.role")
+    }.getOrElse { MessageRole.USER }
+    val attachments = attachments_json?.let { v ->
+        runCatching { uiJson.decodeFromString<List<AgentAttachment>>(v) }.getOrDefault(emptyList())
+    } ?: emptyList()
+    return AgentUIMessage(
+        id = id,
+        role = roleEnum,
+        content = content,
+        timestamp = created_at,
+        taskId = task_id,
+        toolName = tool_name,
+        toolArgs = tool_args,
+        isError = is_error != 0L,
+        reasoning = reasoning,
+        attachments = attachments,
+        isCompactionMarker = is_compaction_marker != 0L,
+        isBackgroundNotification = roleEnum == MessageRole.USER &&
+            content.startsWith(BACKGROUND_NOTIFICATION_PREFIX),
+        inputTokens = input_tokens.toInt(),
+        outputTokens = output_tokens.toInt()
+    )
+}
