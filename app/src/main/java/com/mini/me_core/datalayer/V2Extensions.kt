@@ -3,6 +3,7 @@ package com.mini.me_core.datalayer
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_message
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session
+import com.mini.mecore.datalayer.sqldelight.agent.SelectAllSessionsWithCount
 import com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides
 import com.mini.mecore.datalayer.sqldelight.agent.Skill_conversation_state
 import com.mini.mecore.datalayer.sqldelight.agent.Skill_state
@@ -90,6 +91,16 @@ fun Agent_session.toChatSession(): ChatSession = ChatSession(
     totalInputTokens = total_input_tokens.toInt(),
     totalOutputTokens = total_output_tokens.toInt(),
     lastInputTokens = last_input_tokens.toInt(),
+)
+
+// SelectAllSessionsWithCount → ChatSession 领域模型
+fun SelectAllSessionsWithCount.toChatSession(): ChatSession = ChatSession(
+    id = id,
+    title = title ?: "",
+    createdAt = created_at,
+    updatedAt = updated_at,
+    workspacePath = workspace_path,
+    mode = EnumSafe.valueOf(mode, AgentMode.BUILD, tag = "agent_session.mode"),
 )
 
 // agent_message Boolean 扩展（Long 0/1 → Boolean）

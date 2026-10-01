@@ -108,7 +108,8 @@ import com.mini.me_core.core.theme.LocalAnimationScale
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.data.local.dao.ChatSessionWithCount
+import com.mini.mecore.datalayer.sqldelight.agent.SelectAllSessionsWithCount as V2SessionWithCount
+import com.mini.me_core.datalayer.toChatSession
 import com.mini.me_core.feature.agent.domain.core.model.ChatSession
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.settings.data.repository.AppThemeMode
@@ -131,7 +132,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun ChatDrawerContent(
-    sessionsWithCount: List<ChatSessionWithCount>,
+    sessionsWithCount: List<V2SessionWithCount>,
     currentSessionId: String?,
     agentStates: Map<String, AgentUIState>,
     onSelect: (ChatSession) -> Unit,
@@ -208,7 +209,7 @@ fun ChatDrawerContent(
                 onSelect = onSelect,
                 onLongPress = { menuSession = it },
                 onDirectDelete = { swiped ->
-                    onDelete(swiped.toDomain())
+                    onDelete(swiped.toChatSession())
                     val deletedMsg = context.getString(R.string.chat_deleted_snackbar, swiped.title)
                     val undoLabel = context.getString(R.string.chat_undo)
                     scope.launch {
@@ -222,7 +223,7 @@ fun ChatDrawerContent(
                         }
                     }
                 },
-                onSwipeRename = { pendingRename = it.toDomain() },
+                onSwipeRename = { pendingRename = it.toChatSession() },
                 modifier = Modifier.weight(1f)
             )
             1 -> if (workspaceViewModel != null && workspaceFileViewModel != null) {
@@ -627,7 +628,7 @@ private fun DrawerTopTab(
 /** 对话列表的扁平条目：分组头 或 会话行（A3 四档吸顶分组用）。 */
 private sealed interface SessionListEntry {
     data class Header(val bucket: SessionBucket, val count: Int) : SessionListEntry
-    data class Row(val session: ChatSessionWithCount) : SessionListEntry
+    data class Row(val session: V2SessionWithCount) : SessionListEntry
 }
 
 /**
@@ -635,10 +636,10 @@ private sealed interface SessionListEntry {
  * 展平为 [SessionListEntry] 列表。组内保持输入顺序（数据源已按更新时间降序）。
  */
 private fun buildSessionEntries(
-    sessions: List<ChatSessionWithCount>,
+    sessions: List<V2SessionWithCount>,
     nowMs: Long
 ): List<SessionListEntry> {
-    val grouped = sessions.groupBy { sessionBucket(it.updatedAtMs, nowMs) }
+    val grouped = sessions.groupBy { sessionBucket(it.updated_at, nowMs) }
     val order = listOf(
         SessionBucket.TODAY,
         SessionBucket.YESTERDAY,
@@ -700,7 +701,7 @@ private enum class SwipeRevealState { Collapsed, Expanded }
  */
 @Composable
 private fun SwipeableSessionRow(
-    session: ChatSessionWithCount,
+    session: V2SessionWithCount,
     selected: Boolean,
     isExecuting: Boolean,
     expanded: Boolean,
@@ -843,13 +844,13 @@ private fun SwipeableSessionRow(
  */
 @Composable
 private fun ChatSessionListPanel(
-    sessions: List<ChatSessionWithCount>,
+    sessions: List<V2SessionWithCount>,
     currentSessionId: String?,
     agentStates: Map<String, AgentUIState>,
     onSelect: (ChatSession) -> Unit,
     onLongPress: (ChatSession) -> Unit,
-    onDirectDelete: (ChatSessionWithCount) -> Unit,
-    onSwipeRename: (ChatSessionWithCount) -> Unit,
+    onDirectDelete: (V2SessionWithCount) -> Unit,
+    onSwipeRename: (V2SessionWithCount) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -905,8 +906,8 @@ private fun ChatSessionListPanel(
                                     },
                                     onDirectDelete = { onDirectDelete(entry.session) },
                                     onSwipeRename = { onSwipeRename(entry.session) },
-                                    onClick = { onSelect(entry.session.toDomain()) },
-                                    onLongClick = { onLongPress(entry.session.toDomain()) }
+                                    onClick = { onSelect(entry.session.toChatSession()) },
+                                    onLongClick = { onLongPress(entry.session.toChatSession()) }
                                 )
                             }
                         }

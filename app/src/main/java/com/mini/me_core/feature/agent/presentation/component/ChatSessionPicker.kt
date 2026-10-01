@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.data.local.dao.ChatSessionWithCount
+import com.mini.mecore.datalayer.sqldelight.agent.SelectAllSessionsWithCount as V2SessionWithCount
 
 /**
  * 单条会话行（两行布局）：短按选中，长按弹出功能菜单（重命名/删除）。
@@ -46,23 +46,23 @@ import com.mini.me_core.feature.agent.data.local.dao.ChatSessionWithCount
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatSessionRow(
-    session: ChatSessionWithCount,
+    session: V2SessionWithCount,
     selected: Boolean,
     isExecuting: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
     val nowMs = System.currentTimeMillis()
-    val bucket = sessionBucket(session.updatedAtMs, nowMs)
+    val bucket = sessionBucket(session.updated_at, nowMs)
     val timeText = when (bucket) {
-        SessionBucket.TODAY -> formatSessionClock(session.updatedAtMs)
+        SessionBucket.TODAY -> formatSessionClock(session.updated_at)
         SessionBucket.YESTERDAY -> stringResource(R.string.chat_session_yesterday)
         SessionBucket.WITHIN_7D ->
-            stringResource(R.string.chat_session_days_ago, sessionDaysAgo(session.updatedAtMs, nowMs))
-        SessionBucket.EARLIER -> formatSessionDate(session.updatedAtMs, nowMs)
+            stringResource(R.string.chat_session_days_ago, sessionDaysAgo(session.updated_at, nowMs))
+        SessionBucket.EARLIER -> formatSessionDate(session.updated_at, nowMs)
     }
-    val countText = if (session.messageCount > 0) {
-        stringResource(R.string.chat_session_msg_count, session.messageCount)
+    val countText = if (session.message_count.toInt() > 0) {
+        stringResource(R.string.chat_session_msg_count, session.message_count.toInt())
     } else {
         stringResource(R.string.chat_session_no_msg)
     }
@@ -104,7 +104,7 @@ fun ChatSessionRow(
                 Spacer(Modifier.width(Spacing.md))
             }
             Text(
-                text = session.title,
+                text = session.title ?: "",
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,

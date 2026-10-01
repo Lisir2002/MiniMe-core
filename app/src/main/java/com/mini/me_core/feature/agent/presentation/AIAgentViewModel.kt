@@ -11,7 +11,6 @@ import com.mini.mecore.datalayer.sqldelight.agent.Agent_message as V2AgentMessag
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
 import com.mini.mecore.datalayer.sqldelight.agent.SelectAllSessionsWithCount as V2SessionWithCount
 import com.mini.me_core.feature.agent.domain.session.checkpoint.CheckpointManager
-import com.mini.me_core.feature.agent.data.local.dao.ChatSessionWithCount
 import com.mini.me_core.datalayer.toChatSession
 import com.mini.me_core.datalayer.toUIMessage
 import com.mini.me_core.feature.agent.data.CodeChangeTracker
@@ -221,11 +220,11 @@ class AIAgentViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** 对话列表专用数据源：会话 + 消息条数聚合（保留工作台过滤，逻辑同 [sessions]）。 */
-    val sessionsWithCount: StateFlow<List<ChatSessionWithCount>> = _currentWorkspace
+    val sessionsWithCount: StateFlow<List<V2SessionWithCount>> = _currentWorkspace
         .flatMapLatest { path ->
             if (path.isBlank()) flowOf(emptyList())
             else v2Agent.observeAllSessionsWithCount().map { list ->
-                list.map { it.toEntity() }.filter { it.workspacePath.isBlank() || it.workspacePath == path }
+                list.filter { it.workspace_path.isBlank() || it.workspace_path == path }
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -2048,16 +2047,4 @@ class AIAgentViewModel @Inject constructor(
             else -> "text"
         }
     }
-
-    // ── V2 映射 ──────────────────────────────────────────────────────
-
-    private fun V2SessionWithCount.toEntity() = ChatSessionWithCount(
-        id = id,
-        title = title ?: "",
-        createdAtMs = created_at,
-        updatedAtMs = updated_at,
-        workspacePath = workspace_path,
-        mode = mode,
-        messageCount = message_count.toInt(),
-    )
 }
