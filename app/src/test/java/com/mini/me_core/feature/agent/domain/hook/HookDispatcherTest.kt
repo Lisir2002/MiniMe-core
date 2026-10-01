@@ -2,7 +2,6 @@ package com.mini.me_core.feature.agent.domain.core.hook
 
 import com.mini.me_core.datalayer.repository.WakeQueueStore
 import com.mini.mecore.datalayer.sqldelight.agent.Wake_queue as V2WakeItem
-import com.mini.me_core.feature.agent.data.local.entity.WakeItemEntity
 import com.mini.me_core.feature.agent.domain.core.model.AgentMode
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
 import com.mini.me_core.feature.agent.domain.schedule.wake.WakeQueueManager
@@ -33,7 +32,7 @@ class HookDispatcherTest {
             }
         }
         override suspend fun listPendingWakeItems(): List<V2WakeItem> =
-            store.filter { it.status == WakeItemEntity.STATUS_PENDING }.sortedBy { it.created_at_ms }
+            store.filter { it.status == "PENDING" }.sortedBy { it.created_at_ms }
     }
 
     private fun commitDisciplineHook(store: WakeQueueStore = FakeWakeQueueStore()): CommitDisciplineHook =

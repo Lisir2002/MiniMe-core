@@ -2,7 +2,6 @@ package com.mini.me_core.feature.agent.domain.schedule.wake
 
 import com.mini.me_core.datalayer.repository.WakeQueueStore
 import com.mini.mecore.datalayer.sqldelight.agent.Wake_queue as V2WakeItem
-import com.mini.me_core.feature.agent.data.local.entity.WakeItemEntity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -34,7 +33,7 @@ class WakeQueueManagerTest {
         }
 
         override suspend fun listPendingWakeItems(): List<V2WakeItem> =
-            store.filter { it.status == WakeItemEntity.STATUS_PENDING }.sortedBy { it.created_at_ms }
+            store.filter { it.status == "PENDING" }.sortedBy { it.created_at_ms }
     }
 
     // ---------- 写入 ----------
@@ -48,7 +47,7 @@ class WakeQueueManagerTest {
         val pending = manager.pendingForSession("s1")
         assertEquals(1, pending.size)
         assertEquals("hook.commit-discipline", pending[0].source)
-        assertEquals(WakeItemEntity.STATUS_PENDING, pending[0].status)
+        assertEquals("PENDING", pending[0].status)
     }
 
     @Test
@@ -96,7 +95,7 @@ class WakeQueueManagerTest {
     fun markConsumed_removesFromPending() = runBlocking {
         val manager = WakeQueueManager(FakeWakeQueueStore())
         manager.enqueue("s1", "src", "type", "content")
-        val ids = manager.pendingForSession("s1").map { it.wakeId }
+        val ids = manager.pendingForSession("s1").map { it.wake_id }
 
         manager.markConsumed(ids)
 
@@ -119,7 +118,7 @@ class WakeQueueManagerTest {
         val store = FakeWakeQueueStore(failOnUpdate = true)
         val manager = WakeQueueManager(store)
         manager.enqueue("s1", "src", "type", "content")
-        val ids = manager.pendingForSession("s1").map { it.wakeId }
+        val ids = manager.pendingForSession("s1").map { it.wake_id }
 
         try {
             manager.markConsumed(ids)
@@ -131,7 +130,7 @@ class WakeQueueManagerTest {
         // 失败后仍为待注入（保留待下次，防丢失）
         val pending = manager.pendingForSession("s1")
         assertEquals(1, pending.size)
-        assertEquals(WakeItemEntity.STATUS_PENDING, pending[0].status)
+        assertEquals("PENDING", pending[0].status)
     }
 
     // ---------- 异步入队（供同步 Hook 回调） ----------

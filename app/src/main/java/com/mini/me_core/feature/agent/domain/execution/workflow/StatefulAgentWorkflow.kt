@@ -56,7 +56,7 @@ import com.mini.me_core.feature.agent.domain.execution.tool.ToolStreamEvent
 import com.mini.me_core.feature.agent.domain.execution.tool.toTransportString
 import com.mini.me_core.feature.agent.domain.execution.tool.toToolResult
 import com.mini.me_core.feature.agent.domain.session.trajectory.TrajectoryService
-import com.mini.me_core.feature.agent.data.local.entity.WakeItemEntity
+import com.mini.mecore.datalayer.sqldelight.agent.Wake_queue as V2WakeItem
 import com.mini.me_core.feature.agent.domain.core.hook.HookDispatcher
 import com.mini.me_core.feature.agent.domain.core.hook.HookOutcome
 import com.mini.me_core.feature.agent.domain.core.hook.PostToolUseContext
@@ -780,7 +780,7 @@ class StatefulAgentWorkflow @Inject constructor(
         if (pendingWakeups.isNotEmpty()) {
             userRequestContent = buildWakeReminder(pendingWakeups) + "\n\n" + userRequestContent
             try {
-                withContext(Dispatchers.IO) { wakeQueueManager.markConsumed(pendingWakeups.map { it.wakeId }) }
+                withContext(Dispatchers.IO) { wakeQueueManager.markConsumed(pendingWakeups.map { it.wake_id }) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1524,7 +1524,7 @@ class StatefulAgentWorkflow @Inject constructor(
      * 注入位置 = 系统提示词后、用户消息前；按 source 分组列出，末尾提示「处理完继续原任务」
      * （对齐 design 11.3 asyncRewake：rewakeMessage + rewakeSummary）。
      */
-    private fun buildWakeReminder(items: List<WakeItemEntity>): String {
+    private fun buildWakeReminder(items: List<V2WakeItem>): String {
         val grouped = items.groupBy { it.source }
         return buildString {
             append("【系统·补充审查发现】")
