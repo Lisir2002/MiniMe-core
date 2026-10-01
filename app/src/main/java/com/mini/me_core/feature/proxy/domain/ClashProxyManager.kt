@@ -133,6 +133,11 @@ class ClashProxyManager @Inject constructor(
         /** P0-5：control secret 在 KVStore 中的键（密文形式，与订阅 secret 同一套 CredentialEncryptor）。 */
         private const val CONTROL_SECRET_KEY = "control_secret"
 
+        /** P2-15：上次成功使用的端口持久化键。 */
+        private const val MIXED_PORT_KEY = "mixed_port"
+        private const val CONTROLLER_PORT_KEY = "controller_port"
+        private const val PORT_RETRY_MAX = 10
+
         /** 被覆盖块接管、需从源配置剥离的顶层键（避免与 fixed override 冲突或被恶意夹带）。 */
         val OVERRIDDEN_KEYS = listOf(
             "mixed-port", "port", "socks-port", "redir-port",
@@ -199,6 +204,20 @@ class ClashProxyManager @Inject constructor(
     private var crashRestartInProgress: Boolean = false
 
     /**
+     * P2-15：运行时实际使用的 mixed/controller 端口（默认 = 常量；冲突时 +1 避让并持久化）。
+     * 所有实例方法（合成配置/controllerRequest/env/routeHolder）一律读这两个字段，不再直接用常量。
+     */
+    @Volatile
+    private var runtimeMixedPort: Int = MIXED_PORT
+
+    @Volatile
+    private var runtimeControllerPort: Int = CONTROLLER_PORT
+
+    /** P2-15：是否因端口冲突避让过（供 UI 提示「7890 被占用」）。 */
+    @Volatile
+    private var mixedPortWasAdjusted: Boolean = false
+
+    /**
      * 下载 mihomo 二进制用的**直连** OkHttp：强制 Proxy.NO_PROXY 覆盖共享 client 的 ProxySelector。
      * 内核二进制属于基础设施，必须绕过代理自举（代理未起/代理本身被墙都不能成为下载失败原因）。
      */
@@ -245,21 +264,21 @@ class ClashProxyManager @Inject constructor(
                 val ok = ensureKernelRunning(restart = false)
                 enabledCache = ok
                 _state.update { it.copy(enabled = ok) }
-                routeHolder.update(ok, "127.0.0.1:$MIXED_PORT")
+                routeHolder.update(ok, "127.0.0.1:$runtimeMixedPort")
                 FileLogger.i(
                     TAG,
                     if (ok) "启动时自动恢复 mihomo 内核成功"
                     else "启动时自动恢复 mihomo 内核失败（保持代理关闭，避免把网络流量打进未监听的端口）"
                 )
             } else {
-                routeHolder.update(false, "127.0.0.1:$MIXED_PORT")
+                routeHolder.update(false, "127.0.0.1:$runtimeMixedPort")
             }
             // 之后的开关变化继续由 flow 驱动
             repository.proxyEnabledFlow.drop(1).collect { e ->
                 enabledCache = e
                 _state.update { it.copy(enabled = e) }
                 // 同步给 App 网络层的路由开关写位，让共享 OkHttp 的 ProxySelector 感知（§4.2）
-                routeHolder.update(e, "127.0.0.1:$MIXED_PORT")
+                routeHolder.update(e, "127.0.0.1:$runtimeMixedPort")
             }
         }
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
@@ -321,7 +340,59 @@ class ClashProxyManager @Inject constructor(
     }
 
     /** 控制器地址 "127.0.0.1:port"。 */
-    fun controllerAddress(): String = "$CONTROLLER_HOST:$CONTROLLER_PORT"
+    fun controllerAddress(): String = "$CONTROLLER_HOST:$runtimeControllerPort"
+
+    /** P2-15：当前实际 mixed 端口（供 UI 展示）。 */
+    fun mixedPort(): Int = runtimeMixedPort
+
+    /** P2-15：是否因冲突避让过默认端口。 */
+    fun portAdjusted(): Boolean = mixedPortWasAdjusted
+
+    /**
+     * P2-15：在启动 mihomo 前选定空闲端口。
+     *
+     * 优先用上次持久化的端口；若仍被占用则从默认 7890/9090 起 +1 试绑（最多 10 次）。
+     * 用 ServerSocket 绑定 127.0.0.1:port 成功即视为空闲（绑完立即关闭，再交还内核绑定）。
+     */
+    private fun ensurePortsSelected() {
+        // 1. 先读上次持久化
+        val savedMixed = kv.getInt(PROXY_NS, MIXED_PORT_KEY)?.toInt() ?: MIXED_PORT
+        val savedCtrl = kv.getInt(PROXY_NS, CONTROLLER_PORT_KEY)?.toInt() ?: CONTROLLER_PORT
+
+        val mixed = pickFreePort(savedMixed, MIXED_PORT)
+        val ctrl = pickFreePort(savedCtrl, CONTROLLER_PORT)
+        runtimeMixedPort = mixed
+        runtimeControllerPort = ctrl
+        mixedPortWasAdjusted = (mixed != MIXED_PORT)
+
+        kv.putInt(PROXY_NS, MIXED_PORT_KEY, mixed.toLong())
+        kv.putInt(PROXY_NS, CONTROLLER_PORT_KEY, ctrl.toLong())
+        FileLogger.i(TAG, "端口选定: mixed=$mixed ctrl=$ctrl (adjusted=$mixedPortWasAdjusted)")
+    }
+
+    /** 从 preferred 起尝试绑定，失败则 +1，最多 PORT_RETRY_MAX 次；都失败回退默认。 */
+    private fun pickFreePort(preferred: Int, fallback: Int): Int {
+        var port = preferred
+        repeat(PORT_RETRY_MAX) {
+            if (isPortFree(port)) return port
+            port++
+        }
+        // 全部被占，回到 fallback 附近再试一轮（极端情况）
+        port = fallback
+        repeat(PORT_RETRY_MAX) {
+            if (isPortFree(port)) return port
+            port++
+        }
+        return fallback
+    }
+
+    private fun isPortFree(port: Int): Boolean = runCatching {
+        java.net.ServerSocket().use { s ->
+            s.bind(java.net.InetSocketAddress("127.0.0.1", port))
+            true
+        }
+    }.getOrDefault(false)
+
 
     fun controllerSecret(): String = secret
 
@@ -418,12 +489,12 @@ class ClashProxyManager @Inject constructor(
         clean["dns"] = buildFixedDnsConfig()
         val body = Yaml().dump(clean)
         return buildString {
-            appendLine("mixed-port: $MIXED_PORT")
+            appendLine("mixed-port: $runtimeMixedPort")
             appendLine("allow-lan: false")
             appendLine("mode: rule")
             // info 而非 silent：内核启动期 FATAL/错误必须落到 mihomo.log，否则秒退原因完全不可见。
             appendLine("log-level: info")
-            appendLine("external-controller: $CONTROLLER_HOST:$CONTROLLER_PORT")
+            appendLine("external-controller: $CONTROLLER_HOST:$runtimeControllerPort")
             appendLine("secret: \"$secret\"")
             appendLine()
             append(body.trimEnd('\n'))
@@ -626,7 +697,7 @@ class ClashProxyManager @Inject constructor(
         body: String? = null,
     ): String? = withContext(Dispatchers.IO) {
         ensureSecretLoaded()
-        val url = "http://$CONTROLLER_HOST:$CONTROLLER_PORT$path"
+        val url = "http://$CONTROLLER_HOST:$runtimeControllerPort$path"
         val requestBody = body?.toRequestBody("application/json".toMediaType())
             ?: ByteArray(0).toRequestBody(null)
         val req = when (method) {
@@ -715,7 +786,7 @@ class ClashProxyManager @Inject constructor(
     fun trafficFlow(): Flow<ProxyTraffic> = callbackFlow {
         ensureSecretLoaded()
         val req = Request.Builder()
-            .url("http://$CONTROLLER_HOST:$CONTROLLER_PORT/traffic")
+            .url("http://$CONTROLLER_HOST:$runtimeControllerPort/traffic")
             .header("Authorization", "Bearer $secret")
             .build()
         val listener = object : WebSocketListener() {
@@ -1022,7 +1093,7 @@ class ClashProxyManager @Inject constructor(
                 _state.update {
                     it.copy(enabled = false, recovering = false, recoveryAttempt = 0, controllerReachable = false)
                 }
-                routeHolder.update(false, "127.0.0.1:$MIXED_PORT")
+                routeHolder.update(false, "127.0.0.1:$runtimeMixedPort")
             }
         } catch (t: Throwable) {
             FileLogger.w(TAG, "崩溃自动重启异常: ${t.message}")
@@ -1056,7 +1127,9 @@ class ClashProxyManager @Inject constructor(
         // 内核必须实际跑起来并让控制面就绪，才能把开关置为 enabled——
         // 否则 App 流量会被 routeHolder 打进无人监听的 7890（`Failed to connect to /127.0.0.1:7890`）。
         // P1-11：内核已在运行时优先热重载（不杀进程、不断连）；热重载失败才回退到 restart。
+        // P2-15：启动前检测/避让端口冲突（内核未在跑时才需要；已在跑则端口已定）。
         val wasAlive = mihomoProcess?.isAlive == true
+        if (!wasAlive) ensurePortsSelected()
         val kernelOk = if (wasAlive) {
             val reloaded = reloadConfig(config)
             if (reloaded) true else {
@@ -1077,10 +1150,10 @@ class ClashProxyManager @Inject constructor(
         enabledCache = true
         // P0-3：用户手动拉起成功视为新会话，清零崩溃退避计数并清除恢复中状态。
         crashRestartAttempts = 0
-        routeHolder.update(true, "127.0.0.1:$MIXED_PORT")
+        routeHolder.update(true, "127.0.0.1:$runtimeMixedPort")
         _state.update { it.copy(enabled = true, activeProfileId = profileId, recovering = false, recoveryAttempt = 0) }
         // P2-14：进入前台保活通知。
-        runCatching { ProxyForegroundService.start(context, MIXED_PORT) }
+        runCatching { ProxyForegroundService.start(context, runtimeMixedPort) }
         FileLogger.i(TAG, "network_proxy ON (profile=$profileId inline=${inlineYaml != null})")
         return "ok"
     }
@@ -1093,7 +1166,7 @@ class ClashProxyManager @Inject constructor(
         enabledCache = false
         // P0-3：用户主动关闭，重置崩溃退避计数与恢复中状态。
         crashRestartAttempts = 0
-        routeHolder.update(false, "127.0.0.1:$MIXED_PORT")
+        routeHolder.update(false, "127.0.0.1:$runtimeMixedPort")
         _state.update { it.copy(enabled = false, recovering = false, recoveryAttempt = 0) }
         // P2-14：退出前台保活。
         runCatching { ProxyForegroundService.stop(context) }
@@ -1106,7 +1179,7 @@ class ClashProxyManager @Inject constructor(
      */
     fun exportContainerEnv(): Map<String, String> {
         if (!enabledCache) return emptyMap()
-        val proxy = "http://$CONTROLLER_HOST:$MIXED_PORT"
+        val proxy = "http://$CONTROLLER_HOST:$runtimeMixedPort"
         return mapOf(
             "http_proxy" to proxy,
             "https_proxy" to proxy,

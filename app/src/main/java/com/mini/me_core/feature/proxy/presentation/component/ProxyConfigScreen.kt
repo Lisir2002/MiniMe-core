@@ -162,7 +162,7 @@ fun ProxyConfigScreen(
 
                 // P1-8：流量用量（今日 / 本周）。
                 item {
-                    TrafficUsageCard(today = trafficToday, week = trafficWeek)
+                    TrafficUsageCard(today = trafficToday, week = trafficWeek, port = viewModel.proxyPort)
                 }
 
                 // 网络层优化 C5：模型接口直连/代理分流开关（默认关，需先开启代理才可切换）。
@@ -456,6 +456,7 @@ private fun DiagnosticCard(
 private fun TrafficUsageCard(
     today: com.mini.me_core.datalayer.store.TrafficUsage,
     week: com.mini.me_core.datalayer.store.TrafficUsage,
+    port: Int,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -469,6 +470,10 @@ private fun TrafficUsageCard(
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("本周：↑ ${formatBytes(week.upBytes)}  ↓ ${formatBytes(week.downBytes)}",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(Spacing.xs))
+            val portNote = if (port != 7890) "代理端口：$port（7890 被占用）" else "代理端口：$port"
+            Text(portNote, style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
         }
     }
 }
