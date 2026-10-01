@@ -1,0 +1,16 @@
+-- v3 → v4 迁移（P3-19）：新建代理连接审计日志表。
+-- 新建表，不改既有表；旧库升级仅执行此 DDL。
+
+CREATE TABLE proxy_connection_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  timestamp   INTEGER NOT NULL,
+  host        TEXT,
+  ip          TEXT,
+  port        INTEGER,
+  protocol    TEXT,
+  up_bytes    INTEGER NOT NULL,
+  down_bytes  INTEGER NOT NULL,
+  duration_ms INTEGER NOT NULL,
+  status      TEXT
+);
+CREATE INDEX proxy_connection_log_ts_idx ON proxy_connection_log (timestamp);

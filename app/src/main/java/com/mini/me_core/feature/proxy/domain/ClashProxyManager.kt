@@ -375,6 +375,10 @@ class ClashProxyManager @Inject constructor(
     /** P2-15：当前实际 mixed 端口（供 UI 展示）。 */
     fun mixedPort(): Int = runtimeMixedPort
 
+    /** P3-19：公开的控制面请求包装（供连接审计日志读取 /connections）。 */
+    suspend fun controllerRequestPublic(method: String, path: String): String? =
+        controllerRequest(method, path)
+
     /** P2-15：是否因冲突避让过默认端口。 */
     fun portAdjusted(): Boolean = mixedPortWasAdjusted
 

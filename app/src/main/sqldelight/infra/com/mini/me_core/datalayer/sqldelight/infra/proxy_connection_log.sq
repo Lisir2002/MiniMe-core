@@ -1,0 +1,38 @@
+-- infra / 代理连接审计日志 v4 schema（P3-19）
+-- 生成类：InfraDb / Proxy_connection_logQueries
+-- 默认关闭；开启后每 10s 对比 /connections 快照，结束的连接批量落库。
+
+CREATE TABLE proxy_connection_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  timestamp   INTEGER NOT NULL,
+  host        TEXT,
+  ip          TEXT,
+  port        INTEGER,
+  protocol    TEXT,
+  up_bytes    INTEGER NOT NULL,
+  down_bytes  INTEGER NOT NULL,
+  duration_ms INTEGER NOT NULL,
+  status      TEXT
+);
+CREATE INDEX proxy_connection_log_ts_idx ON proxy_connection_log (timestamp);
+
+-- ── queries ──
+insertLog:
+INSERT INTO proxy_connection_log (timestamp, host, ip, port, protocol, up_bytes, down_bytes, duration_ms, status)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- 分页倒序查询（默认）。
+selectRecent:
+SELECT * FROM proxy_connection_log ORDER BY timestamp DESC LIMIT ? OFFSET ?;
+
+-- 按域名模糊搜索倒序。
+selectByHost:
+SELECT * FROM proxy_connection_log WHERE host LIKE ? ORDER BY timestamp DESC LIMIT ? OFFSET ?;
+
+-- 导出全量（CSV 用）。
+selectAll:
+SELECT * FROM proxy_connection_log ORDER BY timestamp ASC;
+
+-- 过期清理。
+deleteOlderThan:
+DELETE FROM proxy_connection_log WHERE timestamp < ?;

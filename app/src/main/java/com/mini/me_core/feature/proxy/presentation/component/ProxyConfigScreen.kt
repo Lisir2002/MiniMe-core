@@ -107,6 +107,8 @@ fun ProxyConfigScreen(
     val trafficWeek by viewModel.trafficWeek.collectAsStateWithLifecycle()
     val nodeHealth by viewModel.nodeHealth.collectAsStateWithLifecycle()
     val warmupState by viewModel.warmupState.collectAsStateWithLifecycle()
+    val connLogEnabled by viewModel.connLogEnabled.collectAsStateWithLifecycle()
+    val connLogs by viewModel.connLogs.collectAsStateWithLifecycle()
 
     var expandedId by remember { mutableStateOf<String?>(null) }
     var expandedTab by remember { mutableStateOf(0) }
@@ -168,6 +170,16 @@ fun ProxyConfigScreen(
                 // P1-8：流量用量（今日 / 本周）。
                 item {
                     TrafficUsageCard(today = trafficToday, week = trafficWeek, port = viewModel.proxyPort)
+                }
+
+                // P3-19：连接审计日志开关 + 列表。
+                item {
+                    ConnLogCard(
+                        enabled = connLogEnabled,
+                        logs = connLogs,
+                        onToggle = viewModel::setConnLogEnabled,
+                        onRefresh = { viewModel.refreshConnLogs() }
+                    )
                 }
 
                 // 网络层优化 C5：模型接口直连/代理分流开关（默认关，需先开启代理才可切换）。
@@ -409,6 +421,53 @@ private fun NodesEntryCard(
 }
 
 /** P1-9：连接诊断交通灯卡片。 */
+/** P3-19：连接审计日志卡片（开关 + 最近记录列表）。 */
+@Composable
+private fun ConnLogCard(
+    enabled: Boolean,
+    logs: List<com.mini.me_core.datalayer.store.ProxyConnectionEntry>,
+    onToggle: (Boolean) -> Unit,
+    onRefresh: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(LocalCornerRadius.current.xl),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+    ) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("连接日志", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text("审计每个连接的域名/流量/时长（默认关，隐私优先）",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                androidx.compose.material3.Switch(checked = enabled, onCheckedChange = onToggle)
+            }
+            if (enabled) {
+                Spacer(Modifier.height(Spacing.sm))
+                Row {
+                    OutlinedButton(onClick = onRefresh) { Text("刷新") }
+                }
+                Spacer(Modifier.height(Spacing.xs))
+                if (logs.isEmpty()) {
+                    Text("暂无结束连接记录", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    logs.take(20).forEach { e ->
+                        Text(
+                            "${e.host ?: e.ip ?: "?"}:${e.port ?: "?"} · ${e.protocol ?: ""} · " +
+                                "↓${formatBytes(e.downBytes)} ↑${formatBytes(e.upBytes)} · ${e.durationMs / 1000}s",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun DiagnosticCard(
     diagnostic: com.mini.me_core.feature.proxy.domain.ProxyDiagnosticResult?,

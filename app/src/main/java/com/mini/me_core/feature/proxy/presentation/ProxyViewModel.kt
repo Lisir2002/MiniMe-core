@@ -4,12 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.feature.proxy.data.ProxySettingsRepository
 import com.mini.me_core.datalayer.store.ProxyTrafficRepository
+import com.mini.me_core.datalayer.store.ProxyConnectionLogRepository
+import com.mini.me_core.datalayer.store.ProxyConnectionEntry
 import com.mini.me_core.datalayer.store.TrafficUsage
 import com.mini.me_core.feature.proxy.domain.ClashConfigSummary
 import com.mini.me_core.feature.proxy.domain.ClashProxiesSnapshot
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
 import com.mini.me_core.feature.proxy.domain.ProxyConnectivityTester
 import com.mini.me_core.feature.proxy.domain.ProxyNodeHealthMonitor
+import com.mini.me_core.feature.proxy.domain.ProxyConnectionLogger
 import com.mini.me_core.feature.proxy.domain.ProxyTrafficSampler
 import com.mini.me_core.feature.proxy.domain.ProxyDiagnosticResult
 import com.mini.me_core.feature.proxy.domain.ProxyRuntimeState
@@ -85,6 +88,8 @@ class ProxyViewModel @Inject constructor(
     private val trafficSampler: ProxyTrafficSampler,
     private val trafficRepo: ProxyTrafficRepository,
     private val nodeHealthMonitor: ProxyNodeHealthMonitor,
+    private val connectionLogger: ProxyConnectionLogger,
+    private val connLogRepo: ProxyConnectionLogRepository,
 ) : ViewModel() {
 
     /** 已播种的订阅/manual/list（脱敏，cipher 不解密返回）。 */
@@ -125,6 +130,34 @@ class ProxyViewModel @Inject constructor(
 
     /** P3-18：预热实例状态。 */
     val warmupState = manager.warmupState
+
+    // ── P3-19：连接审计日志 ──
+    val connLogEnabled = connectionLogger.enabled
+    private val _connLogs = MutableStateFlow<List<ProxyConnectionEntry>>(emptyList())
+    val connLogs: StateFlow<List<ProxyConnectionEntry>> = _connLogs.asStateFlow()
+
+    fun setConnLogEnabled(on: Boolean) {
+        connectionLogger.setEnabled(on)
+        refreshConnLogs()
+    }
+
+    fun refreshConnLogs(query: String = "") {
+        viewModelScope.launch(Dispatchers.IO) {
+            _connLogs.value = if (query.isBlank()) connLogRepo.recent() else connLogRepo.search(query)
+        }
+    }
+
+    /** 导出全部日志为 CSV 字符串。 */
+    fun exportConnLogsCsv(): String {
+        val sb = StringBuilder("timestamp,host,ip,port,protocol,up_bytes,down_bytes,duration_ms,status\n")
+        connLogRepo.all().forEach { e ->
+            sb.appendLine(listOf(
+                e.timestamp, e.host ?: "", e.ip ?: "", e.port ?: "", e.protocol ?: "",
+                e.upBytes, e.downBytes, e.durationMs, e.status ?: ""
+            ).joinToString(","))
+        }
+        return sb.toString()
+    }
 
     /** P1-8：今日/本周/累计流量用量。 */
     private val _trafficToday = MutableStateFlow(TrafficUsage(0, 0))
