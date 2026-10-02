@@ -43,12 +43,19 @@ class EncryptedDatabaseManager(
             migrator.migrate(definition, KeyRotationMigrator.PLAIN, targetPassphrase)
         }
 
-        return driverFactory.createBlocking(definition)
+        return driverFactory.create(definition)
     }
 
     /**
      * 阻塞版本的getDriver（供ConnectionPool在非协程上下文中调用）。
-     * 内部使用runBlocking切换到IO线程。
+     *
+     * 此处必须阻塞是因为 [ConnectionPool.driver] 是同步函数（@Synchronized），
+     * 被 DI Provider、启动初始化等非协程路径调用。runBlocking 切到 IO 线程执行
+     * DEK 读取与驱动创建，避免加密计算占用调用方线程。
+     *
+     * 注意：若调用方处于主线程（如 Application.onCreate 的首屏 DB 预热），
+     * 此函数会短暂阻塞主线程等待 IO 完成。正常情况下打开已有库仅需毫秒级
+     * PRAGMA 检查，可接受；首次创建或迁移时耗时较长，应确保不在主线程触发。
      */
     fun getDriverBlocking(dbId: String): SqlDriver {
         return runBlocking(Dispatchers.IO) {

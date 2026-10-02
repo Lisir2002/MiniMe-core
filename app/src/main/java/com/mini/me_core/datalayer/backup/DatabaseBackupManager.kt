@@ -452,6 +452,8 @@ class DatabaseBackupManager(
         val dek = try {
             // getDek（而非 getOrCreateDek）：校验场景绝不能"顺手"造一把新 DEK，
             // 那会让本可判定的「密钥不匹配」变成「新 DEK + 打不开」且旧数据永久不可解。
+            // 此处阻塞是因为 importBackup() 是同步函数，被 ViewModel/AutoBackupManager
+            // 在后台协程中调用；runBlocking 切 IO 线程取 DEK，不阻塞调用线程。
             runBlocking(Dispatchers.IO) { km.getDek(purpose) }
         } catch (e: Exception) {
             return IntegrityVerdict.Undecryptable("读取本机 DEK 失败: ${e.javaClass.simpleName}")
@@ -502,6 +504,8 @@ class DatabaseBackupManager(
     private fun snapshotRowCounts(dbFile: File, dbId: String): Map<String, Long>? {
         val km = keyManager ?: return null
         val dek = try {
+            // 此处阻塞是因为 exportBackup() 是同步函数，在后台线程执行；
+            // runBlocking 切 IO 线程取 DEK，避免加密计算占用调用线程。
             runBlocking(Dispatchers.IO) { km.getDek(CipherPassphrase.purpose(dbId)) }
         } catch (e: Exception) {
             FileLogger.w(TAG, "取 DEK 失败，跳过行数快照: $dbId (${e.javaClass.simpleName})")

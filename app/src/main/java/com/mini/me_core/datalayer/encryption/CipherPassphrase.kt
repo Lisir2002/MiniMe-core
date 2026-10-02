@@ -32,8 +32,8 @@ object CipherPassphrase {
     /** 按数据库定义 id 取 DEK purpose（driver 侧使用）。 */
     fun purpose(dbId: String): String = DB_PREFIX + dbId
 
-    /** 该 purpose 是否为数据库密钥（决定 [UnifiedKeyManager.rotateDek] 是否允许）。 */
-    fun isDbPurpose(purpose: String): Boolean = purpose.startsWith(DB_PREFIX)
+    /** 该 purpose 是否为数据库密钥（决定 [UnifiedKeyManager.rotateDek] 是否允许）。前缀后须有 id。 */
+    fun isDbPurpose(purpose: String): Boolean = purpose.startsWith(DB_PREFIX) && purpose.length > DB_PREFIX.length
 
     /** DEK → passphrase 字符串。调用方须在用完后 `dek.fill(0)` 擦除。 */
     fun encode(dek: ByteArray): String = Base64.encodeToString(dek, Base64.NO_WRAP)

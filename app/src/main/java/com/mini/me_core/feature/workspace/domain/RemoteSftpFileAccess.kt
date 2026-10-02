@@ -75,7 +75,13 @@ class RemoteSftpFileAccess @Inject constructor(
     /** 单引号转义：远程路径含单引号时用 `'\''` 绕过，保证 shell 命令安全。 */
     private fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
 
-    /** 同步执行远程命令并返回完整 stdout。失败时抛友好异常。 */
+    /**
+     * 同步执行远程命令并返回完整 stdout。失败时抛友好异常。
+     *
+     * 此处阻塞是因为 FileAccessProvider 接口为同步设计，被 Agent 工具层调用；
+     * 工具执行本身运行在后台协程中，runBlocking 仅桥接到 IO 线程执行 SSH 命令，
+     * 不阻塞主线程。
+     */
     private fun execSync(command: String): String = runBlocking {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val session = try {
@@ -100,7 +106,10 @@ class RemoteSftpFileAccess @Inject constructor(
         }
     }
 
-    /** 同步执行远程命令，返回退出码（不抛异常）。 */
+    /**
+     * 同步执行远程命令，返回退出码（不抛异常）。
+     * 同 [execSync]，阻塞桥接至 IO 线程，调用方为后台 Agent 工具执行上下文。
+     */
     private fun execExitCode(command: String): Int = runBlocking {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val session = try {

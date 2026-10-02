@@ -182,7 +182,12 @@ class RemoteSshConnection @Inject constructor(
         sftp
     }
 
-    /** [getSftpClient] 的阻塞版，供非 suspend 调用方（如 [RemoteSftpFileAccess]）使用。 */
+    /**
+     * [getSftpClient] 的阻塞版，供非 suspend 调用方使用。
+     *
+     * 此处阻塞是因为调用方处于非协程上下文；调用方需自行确保在后台线程执行，
+     * 否则 runBlocking 会阻塞所在线程（含主线程导致 ANR）。
+     */
     fun getSftpClientBlocking(): SFTPClient = runBlocking { getSftpClient() }
 
     /** 若已配置但未连接，立即尝试重连一次。返回是否最终连通。供 App 回到前台时主动触发。 */

@@ -43,12 +43,20 @@ class SkillStateRepository @Inject constructor(
     private suspend fun getSkillStates(): List<V2SkillState> =
         v2Agent.listSkillStates()
 
+    /**
+     * 同步版技能状态查询，供非 suspend 上下文（如 PromptSource.build 接口方法）使用。
+     * 调用方需自行确保在后台线程执行，否则 runBlocking 会阻塞所在线程。
+     */
     private fun getSkillStatesSync(): List<V2SkillState> =
         runBlocking(Dispatchers.IO) { v2Agent.listSkillStates() }
 
     private suspend fun getConvStates(sessionId: String): List<V2ConvState> =
         v2Agent.listSkillConversationStates(sessionId)
 
+    /**
+     * 同步版对话状态查询，供非 suspend 上下文使用。
+     * 调用方需自行确保在后台线程执行。
+     */
     private fun getConvStatesSync(sessionId: String): List<V2ConvState> =
         runBlocking(Dispatchers.IO) { v2Agent.listSkillConversationStates(sessionId) }
 

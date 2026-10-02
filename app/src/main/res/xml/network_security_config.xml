@@ -1,13 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <!--
-        AI provider Base URLs are user-configurable and may point at plain-HTTP
-        endpoints (self-hosted proxies, LAN servers). Therefore cleartext traffic
-        is permitted globally.
+        默认安全策略：禁止一切明文 HTTP（cleartext）流量。
 
-        Security note: API keys sent over HTTP are transmitted in plaintext and
-        can be intercepted by anyone on the same network. Users should use HTTPS
-        endpoints whenever possible, especially when connecting over the internet.
+        AI Provider 的 API Key 等凭证只能通过 HTTPS 传输；明文 HTTP 下凭证会以裸字节
+        经过每一跳网络，可被同网段中间人直接嗅探。因此全局默认收紧为「禁止明文」，
+        引导用户配置 HTTPS 端点（Provider 编辑页在输入 http:// 时会给出安全警告）。
+
+        说明：Android 的 network-security-config 在进程启动时一次性加载，运行期无法
+        动态追加域名。用户自托管的 HTTP 端点（局域网 LLM、本地 MCP 等）仍可在 UI
+        确认风险后使用——下面的 loopback 例外覆盖了本机代理/本地服务这一最常见形态；
+        对于非回环的自托管 HTTP 端点，编辑页的安全提示与 OkHttp 层的
+        HttpWarningInterceptor 会持续提醒用户改用 HTTPS。
     -->
-    <base-config cleartextTrafficPermitted="true" />
+    <base-config cleartextTrafficPermitted="false" />
+
+    <!--
+        本地回环例外：放行 127.0.0.1 / localhost 上的明文通信。
+
+        这些连接不经过物理网卡、不出本机总线，不存在被外网中间人窃听的风险，且属于
+        应用正常运行所必需：
+          - mihomo 代理内核：mixed-port 127.0.0.1:7890、external-controller 127.0.0.1:9090
+          - 内置 MCP HTTP 服务器、容器内本机开发服务
+          - 本机自托管的 LLM 端点（如 Termux / 本机 Ollama 的 http://127.0.0.1:11434）
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">::1</domain>
+    </domain-config>
 </network-security-config>

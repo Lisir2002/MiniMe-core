@@ -48,8 +48,10 @@ class ProxyHealthMonitor @Inject constructor(
         const val CHECK_INTERVAL_MS = 30_000L
         /** 单次检测超时：5 秒。 */
         const val TIMEOUT_MS = 5_000L
-        /** 探测目标：Google 的 204 端点，轻量、可靠。 */
-        const val PROBE_URL = "http://www.gstatic.com/generate_204"
+        /** 探测目标：Google 的 204 端点，轻量、可靠。
+         *  使用 https：经 HTTP 代理出口时走 CONNECT 隧道完成 TLS 握手，应用层无明文，
+         *  与默认禁止 cleartext 的网络安全策略保持一致（避免被当作明文 http 探测而拦截）。 */
+        const val PROBE_URL = "https://www.gstatic.com/generate_204"
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

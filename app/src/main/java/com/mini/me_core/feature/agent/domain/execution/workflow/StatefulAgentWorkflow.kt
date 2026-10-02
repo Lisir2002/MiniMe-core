@@ -1599,10 +1599,10 @@ class StatefulAgentWorkflow @Inject constructor(
         //    会话内未触发过。注意：不做数量截断——完整候选集交给 LLM 决策器判断，命中后再调度截断（见步骤 2），
         //    避免「截断优先」导致内置技能在排序变化时被提前过滤掉、永远进不了模型判断。
         val candidates = try {
-            skillStateRepository.listSkillsSync()
+            skillStateRepository.listSkills()
                 // MCP 包装技能已降级为别名（直接调用绑定 MCP 工具），不参与自动触发执行。
                 .filter { it.enabled && it.autoTrigger && it.type != SkillType.MCP }
-                .let { list -> skillStateRepository.filterVisibleSkillsSync(list, context.sessionId) }
+                .let { list -> skillStateRepository.filterVisibleSkills(list, context.sessionId) }
                 .filter { sessionState == null || !sessionState.hasAutoTriggeredSkill(it.id) }
         } catch (e: Exception) {
             FileLogger.w(TAG, "技能自动触发：候选读取失败，跳过", e)

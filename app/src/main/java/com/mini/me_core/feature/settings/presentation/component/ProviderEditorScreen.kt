@@ -455,6 +455,15 @@ fun ProviderEditorScreen(
                     )
                     HorizontalDivider()
                     val baseUrlError = baseUrl.isNotBlank() && !baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")
+                    // 明文 HTTP 安全提示：用户填写 http:// 端点时给出显著警告。
+                    // 回环地址（127.0.0.1 / localhost）不出本机总线、不被外网窃听，
+                    // 且已在 network_security_config 中放行，故仅做提示不做强烈警示。
+                    val effectiveBaseUrl = baseUrl.ifBlank { defaultProviderBaseUrl(type) }
+                    val isPlainHttp = effectiveBaseUrl.startsWith("http://")
+                    val isLoopbackHttp = isPlainHttp && run {
+                        val host = runCatching { java.net.URL(effectiveBaseUrl).host }.getOrNull() ?: ""
+                        host == "localhost" || host == "127.0.0.1" || host == "::1"
+                    }
                     AppTextField(
                         value = apiKey,
                         onValueChange = { apiKey = it },
@@ -496,6 +505,49 @@ fun ProviderEditorScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    // ── 明文 HTTP 安全警告：输入 http:// 端点时显著提示凭证风险 ──
+                    if (isPlainHttp) {
+                        Surface(
+                            shape = RoundedCornerShape(Spacing.sm),
+                            color = if (isLoopbackHttp)
+                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+                            else
+                                MaterialTheme.colorScheme.errorContainer,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(Spacing.sm),
+                                verticalAlignment = Alignment.Top,
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        text = if (isLoopbackHttp) "本机明文端点（可接受）" else "不安全的连接：明文 HTTP",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Text(
+                                        text = if (isLoopbackHttp)
+                                            "该地址指向本机回环，流量不出设备，无被外网窃听风险，可安全使用。"
+                                        else
+                                            "API Key 将通过明文 HTTP 传输，可能被同一网络中的中间人窃听或篡改。" +
+                                                "请确认这是受信任的内网自托管端点；对外网访问强烈建议改用 HTTPS。",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     // ── 测试连接按钮 + 内联结果（放在 Base URL 下方）──
                     Row(verticalAlignment = Alignment.CenterVertically) {

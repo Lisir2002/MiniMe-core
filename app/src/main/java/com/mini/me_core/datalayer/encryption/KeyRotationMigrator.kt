@@ -3,8 +3,6 @@ package com.mini.me_core.datalayer.encryption
 import android.content.Context
 import android.content.SharedPreferences
 import com.mini.me_core.core.util.FileLogger
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import net.sqlcipher.database.SQLiteDatabase
 import java.io.File
 
@@ -42,10 +40,10 @@ class KeyRotationMigrator(private val context: Context) {
     /**
      * 口令提供方：给定库 id，返回该库在**某一密钥形态**下的 SQLCipher 口令。
      *
-     * 实现须自行保证不阻塞主线程（取 DEK 等耗时操作请在内部 `runBlocking(Dispatchers.IO)`）。
+     * 改为 suspend：取 DEK 等耗时操作在协程上下文中直接执行，无需 runBlocking 桥接。
      */
     fun interface PassphraseProvider {
-        fun passphraseFor(dbId: String): String
+        suspend fun passphraseFor(dbId: String): String
     }
 
     companion object {
@@ -70,9 +68,7 @@ class KeyRotationMigrator(private val context: Context) {
          */
         fun dekProvider(keyManager: UnifiedKeyManager): PassphraseProvider =
             PassphraseProvider { dbId ->
-                val dek = runBlocking(Dispatchers.IO) {
-                    keyManager.getOrCreateDek(CipherPassphrase.purpose(dbId))
-                }
+                val dek = keyManager.getOrCreateDek(CipherPassphrase.purpose(dbId))
                 try {
                     CipherPassphrase.encode(dek)
                 } finally {
@@ -95,9 +91,12 @@ class KeyRotationMigrator(private val context: Context) {
     /**
      * 把库从 [from] 形态迁到 [to] 形态。
      *
+     * 改为 suspend：口令提供方（[PassphraseProvider.passphraseFor]）现在是 suspend，
+     * 取 DEK 等耗时操作在协程上下文中执行，由调用方决定线程调度。
+     *
      * @return true = 迁移成功（或本就无需迁移）；false = 跳过 / 降级失败，源库原样保留。
      */
-    fun migrate(
+    suspend fun migrate(
         definition: DatabaseDefinition,
         from: PassphraseProvider,
         to: PassphraseProvider,
