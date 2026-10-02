@@ -146,17 +146,18 @@ fun ParticleSplashCanvas(
                 // As mix→1: normal particles fade to onBackground, accents stay primary.
                 val usePrimaryGlow = accent || mix < 0.5f
 
-                // 优化：发光半径增强，HOLD时6.5倍，飞行时9倍
-                val glowMul = if (stage == SplashStage.HOLD) 6.5f else 9f
+                // 优化：发光半径适度降低，HOLD时4.5倍，飞行时6.5倍，
+                // 避免发光过强导致文字边缘模糊、颗粒感粗糙
+                val glowMul = if (stage == SplashStage.HOLD) 4.5f else 6.5f
                 val glowRadius = sz * glowMul
                 val glowBmp = if (usePrimaryGlow) primaryGlow else onBgGlow
 
-                // 优化：发光alpha增强，HOLD时0.45-0.65
+                // 优化：发光alpha适度降低，HOLD时0.35-0.5，避免过曝
                 val glowAlpha = when (stage) {
-                    SplashStage.HOLD -> (0.45f + 0.2f * kotlin.math.sin(elapsedMs * 0.005f)).coerceIn(0.4f, 0.65f)
-                    SplashStage.EXPLODE -> 0.6f
-                    SplashStage.CONVERGE -> 0.6f - 0.15f * mix
-                    else -> 0.45f
+                    SplashStage.HOLD -> (0.35f + 0.15f * kotlin.math.sin(elapsedMs * 0.005f)).coerceIn(0.3f, 0.5f)
+                    SplashStage.EXPLODE -> 0.5f
+                    SplashStage.CONVERGE -> 0.5f - 0.12f * mix
+                    else -> 0.38f
                 }
                 glowPaint.alpha = (glowAlpha * 255).toInt().coerceIn(0, 255)
                 dstRect.set(px - glowRadius, py - glowRadius, px + glowRadius, py + glowRadius)
@@ -165,8 +166,9 @@ fun ParticleSplashCanvas(
                 // 优化：核心用径向渐变替代实心圆，中心亮、边缘透明，更柔和
                 val coreColor = if (usePrimaryGlow) particleSystem.primaryTinted[i]
                                 else particleSystem.onBgTinted[i]
-                val coreAlpha = (255 * (0.8f + 0.2f * mix)).toInt().coerceIn(0, 255)
-                val coreRadius = sz * 1.2f
+                // 优化：核心半径适度减小，从sz*1.2降到sz*0.95，让粒子更精致
+                val coreAlpha = (255 * (0.85f + 0.15f * mix)).toInt().coerceIn(0, 255)
+                val coreRadius = sz * 0.95f
                 val coreGradient = RadialGradient(
                     px, py, coreRadius,
                     intArrayOf(

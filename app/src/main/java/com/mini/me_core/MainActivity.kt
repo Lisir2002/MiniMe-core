@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
@@ -237,7 +238,15 @@ class MainActivity : ComponentActivity() {
                         // 透明 Surface 不会导致视觉问题。
                         color = androidx.compose.ui.graphics.Color.Transparent
                     ) {
+                        // 启动动画状态：提前定义，供主内容 alpha 控制使用
+                        var showSplash by remember { mutableStateOf(true) }
                         androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
+                        // 启动动画期间隐藏主内容，避免首帧闪聊天页面
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .alpha(if (showSplash) 0f else 1f)
+                        ) {
                         AppNavigation(
                             browserController = browserController,
                             browserLoginPromptManager = browserLoginPromptManager,
@@ -255,6 +264,7 @@ class MainActivity : ComponentActivity() {
                         com.mini.me_core.core.ui.GlobalHttpWarningDialogHost(
                             bridge = httpWarningBridge
                         )
+                        }
 
                         // F6.4：上次异常退出提示。仅检测一次，提供查看报告入口（详情走开发者选项）。
                         var showCrashPrompt by remember {
@@ -283,7 +293,6 @@ class MainActivity : ComponentActivity() {
                         val splashStyle by themeSettings.splashStyleFlow.collectAsStateWithLifecycle(
                             initialValue = com.mini.me_core.core.splash.SplashStyle.PARTICLE
                         )
-                        var showSplash by remember { mutableStateOf(true) }
                         if (showSplash) {
                             when (splashStyle) {
                                 com.mini.me_core.core.splash.SplashStyle.PARTICLE -> {
