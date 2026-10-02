@@ -226,6 +226,48 @@ jobs:
       - name: Build Release APK
         run: ./gradlew --warning-mode=all :app:assembleRelease --stacktrace
 
+      # 【签名校验门禁】防止「签了名但不是官方签名」的包被发布：
+      #   即使密钥被换成另一把有效密钥，apksigner 仍会验证通过。此处把产出 APK 的证书
+      #   SHA-256 指纹与仓库 Secret EXPECTED_SIGNING_CERT_FINGERPRINT（官方 minime.jks 指纹）比对，
+      #   不匹配即失败、阻断后续 Release 上传。指纹通过 Secret 注入，不硬编码。
+      #   （大小写归一化为小写 hex 后比较，避免 keytool/apksigner 输出大小写差异导致误判。）
+      - name: Verify APK is Release (not Debug)
+        run: |
+          set -e
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
+          : "${APK_PATH:?}"
+          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | head -1)
+          echo "--- aapt badging debuggable 检查 ---"
+          if $AAPT dump badging "$APK_PATH" | grep -q "flags:.*DEBUGGABLE" || $AAPT dump badging "$APK_PATH" | grep -q "application-debuggable"; then
+            echo "::error::APK 是 debug 包（debuggable=true），不是 release 包！"
+            exit 1
+          fi
+          echo "✓ APK 为 release 包（非 debuggable）"
+
+      - name: Verify APK Signature (official cert fingerprint)
+        env:
+          EXPECTED_SIGNING_CERT_FINGERPRINT: ${{ secrets.EXPECTED_SIGNING_CERT_FINGERPRINT }}
+        run: |
+          set -e
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
+          : "${APK_PATH:?}"
+          : "${EXPECTED_SIGNING_CERT_FINGERPRINT:?::error::Secret EXPECTED_SIGNING_CERT_FINGERPRINT 未配置}"
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | head -1)
+          echo "--- apksigner 打印证书 ---"
+          $APKSIGNER verify --print-certs "$APK_PATH"
+          # 提取证书 SHA-256 digest（apksigner 输出形如 "Signer #1 certificate SHA-256 digest: AB:..."）
+          CERT_FINGERPRINT=$($APKSIGNER verify --print-certs "$APK_PATH" \
+            | grep -i "SHA-256 digest" | head -1 \
+            | sed -E 's/.*[Dd]igest:[[:space:]]*//' | tr -d ' \r\n' | tr 'A-F' 'a-f')
+          EXPECTED_FINGERPRINT=$(echo "$EXPECTED_SIGNING_CERT_FINGERPRINT" | tr -d ' \r\n' | tr 'A-F' 'a-f')
+          echo "实际指纹: $CERT_FINGERPRINT"
+          echo "预期指纹: $EXPECTED_FINGERPRINT"
+          if [ "$CERT_FINGERPRINT" != "$EXPECTED_FINGERPRINT" ]; then
+            echo "::error::APK 签名证书不匹配！预期: $EXPECTED_FINGERPRINT, 实际: $CERT_FINGERPRINT"
+            exit 1
+          fi
+          echo "✓ APK 签名验证通过，官方证书指纹匹配"
+
       # 重命名 APK 为「软件名-版本号-变体」格式（品牌前缀来自 branding.gradle.kts 的 APK_PREFIX）：
       #   MiniMe-v0.0.15-release.apk（正式版）
       #   MiniMe-v0.0.16-rc1.apk（预览版）
