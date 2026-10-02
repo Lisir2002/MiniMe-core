@@ -412,6 +412,14 @@ class MiniMeCore : Application() {
                 .onFailure { FileLogger.w(TAG, "DatabaseMaintenance 失败（忽略）", it) }
         }
 
+        // TextMate 引擎初始化（sora-editor 语法高亮，替代 tree-sitter）。
+        // 后台加载 ~260 grammar + 5 主题，不阻塞首帧；首次打开代码文件时应已就绪。
+        appScope.launch {
+            runCatching {
+                com.mini.me_core.feature.editor.textmate.TextMateManager.initialize(this@MiniMeCore)
+            }.onFailure { FileLogger.w(TAG, "TextMate 引擎初始化失败（忽略，查看时回退纯文本）", it) }
+        }
+
         // 定时提醒调度循环：启动即轮询扫描到点的 schedule 项（内部异常隔离，失败不影响启动）。
         scheduleScheduler.start(appScope)
     }

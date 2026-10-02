@@ -54,6 +54,10 @@ json = "20240303"
 # Debug
 leakcanary = "2.14"
 
+# sora-editor (TextMate 高亮，替代 tree-sitter)
+soraEditor = "0.24.4"
+desugarJdkLibs = "2.1.5"
+
 [libraries]
 # AndroidX
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -126,3 +130,9 @@ json = { group = "org.json", name = "json", version.ref = "json" }
 
 # Debug
 leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-android", version.ref = "leakcanary" }
+
+# sora-editor
+sora-editor-bom = { group = "io.github.rosemoe", name = "editor-bom", version.ref = "soraEditor" }
+sora-editor = { group = "io.github.rosemoe", name = "editor" }
+sora-language-textmate = { group = "io.github.rosemoe", name = "language-textmate" }
+desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }

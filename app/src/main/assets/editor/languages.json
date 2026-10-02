@@ -1,0 +1,1304 @@
+{
+  "languages": [
+    {
+      "grammar": "editor/grammars/abap.json",
+      "name": "abap",
+      "scopeName": "source.abap"
+    },
+    {
+      "grammar": "editor/grammars/actionscript-3.json",
+      "name": "actionscript-3",
+      "scopeName": "source.actionscript.3"
+    },
+    {
+      "grammar": "editor/grammars/ada.json",
+      "name": "ada",
+      "scopeName": "source.ada"
+    },
+    {
+      "grammar": "editor/grammars/ahk.json",
+      "name": "ahk",
+      "scopeName": "source.ahk"
+    },
+    {
+      "grammar": "editor/grammars/ahk2.json",
+      "name": "ahk2",
+      "scopeName": "source.ahk2"
+    },
+    {
+      "grammar": "editor/grammars/angular-expression.json",
+      "name": "angular-expression",
+      "scopeName": "expression.ng"
+    },
+    {
+      "grammar": "editor/grammars/angular-html.json",
+      "name": "angular-html",
+      "scopeName": "text.html.derivative.ng"
+    },
+    {
+      "grammar": "editor/grammars/angular-inline-style.json",
+      "name": "angular-inline-style",
+      "scopeName": "inline-styles.ng"
+    },
+    {
+      "grammar": "editor/grammars/angular-inline-template.json",
+      "name": "angular-inline-template",
+      "scopeName": "inline-template.ng"
+    },
+    {
+      "grammar": "editor/grammars/angular-let-declaration.json",
+      "name": "angular-let-declaration",
+      "scopeName": "template.let.ng"
+    },
+    {
+      "grammar": "editor/grammars/angular-template-blocks.json",
+      "name": "angular-template-blocks",
+      "scopeName": "template.blocks.ng"
+    },
+    {
+      "grammar": "editor/grammars/angular-template.json",
+      "name": "angular-template",
+      "scopeName": "template.ng"
+    },
+    {
+      "grammar": "editor/grammars/angular-ts.json",
+      "name": "angular-ts",
+      "scopeName": "source.ts.ng"
+    },
+    {
+      "grammar": "editor/grammars/apache.json",
+      "name": "apache",
+      "scopeName": "source.apacheconf"
+    },
+    {
+      "grammar": "editor/grammars/apex.json",
+      "name": "apex",
+      "scopeName": "source.apex"
+    },
+    {
+      "grammar": "editor/grammars/apl.json",
+      "name": "apl",
+      "scopeName": "source.apl"
+    },
+    {
+      "grammar": "editor/grammars/applescript.json",
+      "name": "applescript",
+      "scopeName": "source.applescript"
+    },
+    {
+      "grammar": "editor/grammars/ara.json",
+      "name": "ara",
+      "scopeName": "source.ara"
+    },
+    {
+      "grammar": "editor/grammars/asciidoc.json",
+      "name": "asciidoc",
+      "scopeName": "text.asciidoc"
+    },
+    {
+      "grammar": "editor/grammars/asm.json",
+      "name": "asm",
+      "scopeName": "source.asm.x86_64"
+    },
+    {
+      "grammar": "editor/grammars/astro.json",
+      "name": "astro",
+      "scopeName": "source.astro"
+    },
+    {
+      "grammar": "editor/grammars/awk.json",
+      "name": "awk",
+      "scopeName": "source.awk"
+    },
+    {
+      "grammar": "editor/grammars/ballerina.json",
+      "name": "ballerina",
+      "scopeName": "source.ballerina"
+    },
+    {
+      "grammar": "editor/grammars/bat.json",
+      "name": "bat",
+      "scopeName": "source.batchfile"
+    },
+    {
+      "grammar": "editor/grammars/beancount.json",
+      "name": "beancount",
+      "scopeName": "text.beancount"
+    },
+    {
+      "grammar": "editor/grammars/berry.json",
+      "name": "berry",
+      "scopeName": "source.berry"
+    },
+    {
+      "grammar": "editor/grammars/bibtex.json",
+      "name": "bibtex",
+      "scopeName": "text.bibtex"
+    },
+    {
+      "grammar": "editor/grammars/bicep.json",
+      "name": "bicep",
+      "scopeName": "source.bicep"
+    },
+    {
+      "grammar": "editor/grammars/bird2.json",
+      "name": "bird2",
+      "scopeName": "source.bird2"
+    },
+    {
+      "grammar": "editor/grammars/blade.json",
+      "name": "blade",
+      "scopeName": "text.html.php.blade"
+    },
+    {
+      "grammar": "editor/grammars/bsl.json",
+      "name": "bsl",
+      "scopeName": "source.bsl"
+    },
+    {
+      "grammar": "editor/grammars/c.json",
+      "name": "c",
+      "scopeName": "source.c"
+    },
+    {
+      "grammar": "editor/grammars/c3.json",
+      "name": "c3",
+      "scopeName": "source.c3"
+    },
+    {
+      "grammar": "editor/grammars/cadence.json",
+      "name": "cadence",
+      "scopeName": "source.cadence"
+    },
+    {
+      "grammar": "editor/grammars/cairo.json",
+      "name": "cairo",
+      "scopeName": "source.cairo0"
+    },
+    {
+      "grammar": "editor/grammars/chapel.json",
+      "name": "chapel",
+      "scopeName": "source.chapel"
+    },
+    {
+      "grammar": "editor/grammars/clarity.json",
+      "name": "clarity",
+      "scopeName": "source.clar"
+    },
+    {
+      "grammar": "editor/grammars/clojure.json",
+      "name": "clojure",
+      "scopeName": "source.clojure"
+    },
+    {
+      "grammar": "editor/grammars/cmake.json",
+      "name": "cmake",
+      "scopeName": "source.cmake"
+    },
+    {
+      "grammar": "editor/grammars/cobol.json",
+      "name": "cobol",
+      "scopeName": "source.cobol"
+    },
+    {
+      "grammar": "editor/grammars/codeowners.json",
+      "name": "codeowners",
+      "scopeName": "text.codeowners"
+    },
+    {
+      "grammar": "editor/grammars/codeql.json",
+      "name": "codeql",
+      "scopeName": "source.ql"
+    },
+    {
+      "grammar": "editor/grammars/coffee.json",
+      "name": "coffee",
+      "scopeName": "source.coffee"
+    },
+    {
+      "grammar": "editor/grammars/common-lisp.json",
+      "name": "common-lisp",
+      "scopeName": "source.commonlisp"
+    },
+    {
+      "grammar": "editor/grammars/coq.json",
+      "name": "coq",
+      "scopeName": "source.rocq"
+    },
+    {
+      "grammar": "editor/grammars/cpp-macro.json",
+      "name": "cpp-macro",
+      "scopeName": "source.cpp.embedded.macro"
+    },
+    {
+      "grammar": "editor/grammars/cpp.json",
+      "name": "cpp",
+      "scopeName": "source.cpp"
+    },
+    {
+      "grammar": "editor/grammars/crystal.json",
+      "name": "crystal",
+      "scopeName": "source.crystal"
+    },
+    {
+      "grammar": "editor/grammars/csharp.json",
+      "name": "csharp",
+      "scopeName": "source.cs"
+    },
+    {
+      "grammar": "editor/grammars/css.json",
+      "name": "css",
+      "scopeName": "source.css"
+    },
+    {
+      "grammar": "editor/grammars/csv.json",
+      "name": "csv",
+      "scopeName": "text.csv"
+    },
+    {
+      "grammar": "editor/grammars/cue.json",
+      "name": "cue",
+      "scopeName": "source.cue"
+    },
+    {
+      "grammar": "editor/grammars/cypher.json",
+      "name": "cypher",
+      "scopeName": "source.cypher"
+    },
+    {
+      "grammar": "editor/grammars/d.json",
+      "name": "d",
+      "scopeName": "source.d"
+    },
+    {
+      "grammar": "editor/grammars/dart.json",
+      "name": "dart",
+      "scopeName": "source.dart"
+    },
+    {
+      "grammar": "editor/grammars/dax.json",
+      "name": "dax",
+      "scopeName": "source.dax"
+    },
+    {
+      "grammar": "editor/grammars/desktop.json",
+      "name": "desktop",
+      "scopeName": "source.desktop"
+    },
+    {
+      "grammar": "editor/grammars/diff.json",
+      "name": "diff",
+      "scopeName": "source.diff"
+    },
+    {
+      "grammar": "editor/grammars/docker.json",
+      "name": "docker",
+      "scopeName": "source.dockerfile"
+    },
+    {
+      "grammar": "editor/grammars/dotenv.json",
+      "name": "dotenv",
+      "scopeName": "source.dotenv"
+    },
+    {
+      "grammar": "editor/grammars/dream-maker.json",
+      "name": "dream-maker",
+      "scopeName": "source.dm"
+    },
+    {
+      "grammar": "editor/grammars/edge.json",
+      "name": "edge",
+      "scopeName": "text.html.edge"
+    },
+    {
+      "grammar": "editor/grammars/elixir.json",
+      "name": "elixir",
+      "scopeName": "source.elixir"
+    },
+    {
+      "grammar": "editor/grammars/elm.json",
+      "name": "elm",
+      "scopeName": "source.elm"
+    },
+    {
+      "grammar": "editor/grammars/emacs-lisp.json",
+      "name": "emacs-lisp",
+      "scopeName": "source.emacs.lisp"
+    },
+    {
+      "grammar": "editor/grammars/erb.json",
+      "name": "erb",
+      "scopeName": "text.html.erb"
+    },
+    {
+      "grammar": "editor/grammars/erlang.json",
+      "name": "erlang",
+      "scopeName": "source.erlang"
+    },
+    {
+      "grammar": "editor/grammars/es-tag-css.json",
+      "name": "es-tag-css",
+      "scopeName": "inline.es6-css"
+    },
+    {
+      "grammar": "editor/grammars/es-tag-glsl.json",
+      "name": "es-tag-glsl",
+      "scopeName": "inline.es6-glsl"
+    },
+    {
+      "grammar": "editor/grammars/es-tag-html.json",
+      "name": "es-tag-html",
+      "scopeName": "inline.es6-html"
+    },
+    {
+      "grammar": "editor/grammars/es-tag-sql.json",
+      "name": "es-tag-sql",
+      "scopeName": "inline.tagged-template-sql"
+    },
+    {
+      "grammar": "editor/grammars/es-tag-xml.json",
+      "name": "es-tag-xml",
+      "scopeName": "inline.es6-xml"
+    },
+    {
+      "grammar": "editor/grammars/fennel.json",
+      "name": "fennel",
+      "scopeName": "source.fnl"
+    },
+    {
+      "grammar": "editor/grammars/fish.json",
+      "name": "fish",
+      "scopeName": "source.fish"
+    },
+    {
+      "grammar": "editor/grammars/fluent.json",
+      "name": "fluent",
+      "scopeName": "source.ftl"
+    },
+    {
+      "grammar": "editor/grammars/fortran-fixed-form.json",
+      "name": "fortran-fixed-form",
+      "scopeName": "source.fortran.fixed"
+    },
+    {
+      "grammar": "editor/grammars/fortran-free-form.json",
+      "name": "fortran-free-form",
+      "scopeName": "source.fortran.free"
+    },
+    {
+      "grammar": "editor/grammars/fsharp.json",
+      "name": "fsharp",
+      "scopeName": "source.fsharp"
+    },
+    {
+      "grammar": "editor/grammars/gdresource.json",
+      "name": "gdresource",
+      "scopeName": "source.gdresource"
+    },
+    {
+      "grammar": "editor/grammars/gdscript.json",
+      "name": "gdscript",
+      "scopeName": "source.gdscript"
+    },
+    {
+      "grammar": "editor/grammars/gdshader.json",
+      "name": "gdshader",
+      "scopeName": "source.gdshader"
+    },
+    {
+      "grammar": "editor/grammars/genie.json",
+      "name": "genie",
+      "scopeName": "source.genie"
+    },
+    {
+      "grammar": "editor/grammars/gherkin.json",
+      "name": "gherkin",
+      "scopeName": "text.gherkin.feature"
+    },
+    {
+      "grammar": "editor/grammars/git-commit.json",
+      "name": "git-commit",
+      "scopeName": "text.git-commit"
+    },
+    {
+      "grammar": "editor/grammars/git-rebase.json",
+      "name": "git-rebase",
+      "scopeName": "text.git-rebase"
+    },
+    {
+      "grammar": "editor/grammars/gleam.json",
+      "name": "gleam",
+      "scopeName": "source.gleam"
+    },
+    {
+      "grammar": "editor/grammars/glimmer-js.json",
+      "name": "glimmer-js",
+      "scopeName": "source.gjs"
+    },
+    {
+      "grammar": "editor/grammars/glimmer-ts.json",
+      "name": "glimmer-ts",
+      "scopeName": "source.gts"
+    },
+    {
+      "grammar": "editor/grammars/glsl.json",
+      "name": "glsl",
+      "scopeName": "source.glsl"
+    },
+    {
+      "grammar": "editor/grammars/gn.json",
+      "name": "gn",
+      "scopeName": "source.gn"
+    },
+    {
+      "grammar": "editor/grammars/gnuplot.json",
+      "name": "gnuplot",
+      "scopeName": "source.gnuplot"
+    },
+    {
+      "grammar": "editor/grammars/go.json",
+      "name": "go",
+      "scopeName": "source.go"
+    },
+    {
+      "grammar": "editor/grammars/graphql.json",
+      "name": "graphql",
+      "scopeName": "source.graphql"
+    },
+    {
+      "grammar": "editor/grammars/groovy.json",
+      "name": "groovy",
+      "scopeName": "source.groovy"
+    },
+    {
+      "grammar": "editor/grammars/hack.json",
+      "name": "hack",
+      "scopeName": "source.hack"
+    },
+    {
+      "grammar": "editor/grammars/haml.json",
+      "name": "haml",
+      "scopeName": "text.haml"
+    },
+    {
+      "grammar": "editor/grammars/handlebars.json",
+      "name": "handlebars",
+      "scopeName": "text.html.handlebars"
+    },
+    {
+      "grammar": "editor/grammars/haskell.json",
+      "name": "haskell",
+      "scopeName": "source.haskell"
+    },
+    {
+      "grammar": "editor/grammars/haxe.json",
+      "name": "haxe",
+      "scopeName": "source.hx"
+    },
+    {
+      "grammar": "editor/grammars/hcl.json",
+      "name": "hcl",
+      "scopeName": "source.hcl"
+    },
+    {
+      "grammar": "editor/grammars/hjson.json",
+      "name": "hjson",
+      "scopeName": "source.hjson"
+    },
+    {
+      "grammar": "editor/grammars/hlsl.json",
+      "name": "hlsl",
+      "scopeName": "source.hlsl"
+    },
+    {
+      "grammar": "editor/grammars/html-derivative.json",
+      "name": "html-derivative",
+      "scopeName": "text.html.derivative"
+    },
+    {
+      "grammar": "editor/grammars/html.json",
+      "name": "html",
+      "scopeName": "text.html.basic"
+    },
+    {
+      "grammar": "editor/grammars/http.json",
+      "name": "http",
+      "scopeName": "source.http"
+    },
+    {
+      "grammar": "editor/grammars/hurl.json",
+      "name": "hurl",
+      "scopeName": "source.hurl"
+    },
+    {
+      "grammar": "editor/grammars/hxml.json",
+      "name": "hxml",
+      "scopeName": "source.hxml"
+    },
+    {
+      "grammar": "editor/grammars/hy.json",
+      "name": "hy",
+      "scopeName": "source.hy"
+    },
+    {
+      "grammar": "editor/grammars/imba.json",
+      "name": "imba",
+      "scopeName": "source.imba"
+    },
+    {
+      "grammar": "editor/grammars/ini.json",
+      "name": "ini",
+      "scopeName": "source.ini"
+    },
+    {
+      "grammar": "editor/grammars/java.json",
+      "name": "java",
+      "scopeName": "source.java"
+    },
+    {
+      "grammar": "editor/grammars/javascript.json",
+      "name": "javascript",
+      "scopeName": "source.js"
+    },
+    {
+      "grammar": "editor/grammars/jinja-html.json",
+      "name": "jinja-html",
+      "scopeName": "text.html.jinja"
+    },
+    {
+      "grammar": "editor/grammars/jinja.json",
+      "name": "jinja",
+      "scopeName": "source.jinja"
+    },
+    {
+      "grammar": "editor/grammars/jison.json",
+      "name": "jison",
+      "scopeName": "source.jison"
+    },
+    {
+      "grammar": "editor/grammars/json.json",
+      "name": "json",
+      "scopeName": "source.json"
+    },
+    {
+      "grammar": "editor/grammars/json5.json",
+      "name": "json5",
+      "scopeName": "source.json5"
+    },
+    {
+      "grammar": "editor/grammars/jsonc.json",
+      "name": "jsonc",
+      "scopeName": "source.json.comments"
+    },
+    {
+      "grammar": "editor/grammars/jsonl.json",
+      "name": "jsonl",
+      "scopeName": "source.json.lines"
+    },
+    {
+      "grammar": "editor/grammars/jsonnet.json",
+      "name": "jsonnet",
+      "scopeName": "source.jsonnet"
+    },
+    {
+      "grammar": "editor/grammars/jssm.json",
+      "name": "jssm",
+      "scopeName": "source.jssm"
+    },
+    {
+      "grammar": "editor/grammars/jsx.json",
+      "name": "jsx",
+      "scopeName": "source.js.jsx"
+    },
+    {
+      "grammar": "editor/grammars/julia.json",
+      "name": "julia",
+      "scopeName": "source.julia"
+    },
+    {
+      "grammar": "editor/grammars/just.json",
+      "name": "just",
+      "scopeName": "source.just"
+    },
+    {
+      "grammar": "editor/grammars/kdl.json",
+      "name": "kdl",
+      "scopeName": "source.kdl"
+    },
+    {
+      "grammar": "editor/grammars/kotlin.json",
+      "name": "kotlin",
+      "scopeName": "source.kotlin"
+    },
+    {
+      "grammar": "editor/grammars/kusto.json",
+      "name": "kusto",
+      "scopeName": "source.kusto"
+    },
+    {
+      "grammar": "editor/grammars/latex.json",
+      "name": "latex",
+      "scopeName": "text.tex.latex"
+    },
+    {
+      "grammar": "editor/grammars/lean.json",
+      "name": "lean",
+      "scopeName": "source.lean4"
+    },
+    {
+      "grammar": "editor/grammars/less.json",
+      "name": "less",
+      "scopeName": "source.css.less"
+    },
+    {
+      "grammar": "editor/grammars/liquid.json",
+      "name": "liquid",
+      "scopeName": "text.html.liquid"
+    },
+    {
+      "grammar": "editor/grammars/llvm.json",
+      "name": "llvm",
+      "scopeName": "source.llvm"
+    },
+    {
+      "grammar": "editor/grammars/log.json",
+      "name": "log",
+      "scopeName": "text.log"
+    },
+    {
+      "grammar": "editor/grammars/logo.json",
+      "name": "logo",
+      "scopeName": "source.logo"
+    },
+    {
+      "grammar": "editor/grammars/lua.json",
+      "name": "lua",
+      "scopeName": "source.lua"
+    },
+    {
+      "grammar": "editor/grammars/luau.json",
+      "name": "luau",
+      "scopeName": "source.luau"
+    },
+    {
+      "grammar": "editor/grammars/make.json",
+      "name": "make",
+      "scopeName": "source.makefile"
+    },
+    {
+      "grammar": "editor/grammars/markdown-nix.json",
+      "name": "markdown-nix",
+      "scopeName": "markdown.nix.codeblock"
+    },
+    {
+      "grammar": "editor/grammars/markdown-vue.json",
+      "name": "markdown-vue",
+      "scopeName": "markdown.vue.codeblock"
+    },
+    {
+      "grammar": "editor/grammars/markdown.json",
+      "name": "markdown",
+      "scopeName": "text.html.markdown"
+    },
+    {
+      "grammar": "editor/grammars/marko.json",
+      "name": "marko",
+      "scopeName": "text.marko"
+    },
+    {
+      "grammar": "editor/grammars/matlab.json",
+      "name": "matlab",
+      "scopeName": "source.matlab"
+    },
+    {
+      "grammar": "editor/grammars/mdc.json",
+      "name": "mdc",
+      "scopeName": "text.markdown.mdc.standalone"
+    },
+    {
+      "grammar": "editor/grammars/mdx.json",
+      "name": "mdx",
+      "scopeName": "source.mdx"
+    },
+    {
+      "grammar": "editor/grammars/mermaid.json",
+      "name": "mermaid",
+      "scopeName": "markdown.mermaid.codeblock"
+    },
+    {
+      "grammar": "editor/grammars/mipsasm.json",
+      "name": "mipsasm",
+      "scopeName": "source.mips"
+    },
+    {
+      "grammar": "editor/grammars/mojo.json",
+      "name": "mojo",
+      "scopeName": "source.mojo"
+    },
+    {
+      "grammar": "editor/grammars/moonbit.json",
+      "name": "moonbit",
+      "scopeName": "source.moonbit"
+    },
+    {
+      "grammar": "editor/grammars/move.json",
+      "name": "move",
+      "scopeName": "source.move"
+    },
+    {
+      "grammar": "editor/grammars/narrat.json",
+      "name": "narrat",
+      "scopeName": "source.narrat"
+    },
+    {
+      "grammar": "editor/grammars/nextflow-groovy.json",
+      "name": "nextflow-groovy",
+      "scopeName": "source.nextflow-groovy"
+    },
+    {
+      "grammar": "editor/grammars/nextflow.json",
+      "name": "nextflow",
+      "scopeName": "source.nextflow"
+    },
+    {
+      "grammar": "editor/grammars/nginx.json",
+      "name": "nginx",
+      "scopeName": "source.nginx"
+    },
+    {
+      "grammar": "editor/grammars/nim.json",
+      "name": "nim",
+      "scopeName": "source.nim"
+    },
+    {
+      "grammar": "editor/grammars/nix.json",
+      "name": "nix",
+      "scopeName": "source.nix"
+    },
+    {
+      "grammar": "editor/grammars/nsis.json",
+      "name": "nsis",
+      "scopeName": "source.nsis"
+    },
+    {
+      "grammar": "editor/grammars/nushell.json",
+      "name": "nushell",
+      "scopeName": "source.nushell"
+    },
+    {
+      "grammar": "editor/grammars/objective-c.json",
+      "name": "objective-c",
+      "scopeName": "source.objc"
+    },
+    {
+      "grammar": "editor/grammars/objective-cpp.json",
+      "name": "objective-cpp",
+      "scopeName": "source.objcpp"
+    },
+    {
+      "grammar": "editor/grammars/ocaml.json",
+      "name": "ocaml",
+      "scopeName": "source.ocaml"
+    },
+    {
+      "grammar": "editor/grammars/odin.json",
+      "name": "odin",
+      "scopeName": "source.odin"
+    },
+    {
+      "grammar": "editor/grammars/openscad.json",
+      "name": "openscad",
+      "scopeName": "source.scad"
+    },
+    {
+      "grammar": "editor/grammars/org.json",
+      "name": "org",
+      "scopeName": "source.org"
+    },
+    {
+      "grammar": "editor/grammars/pascal.json",
+      "name": "pascal",
+      "scopeName": "source.pascal"
+    },
+    {
+      "grammar": "editor/grammars/perl.json",
+      "name": "perl",
+      "scopeName": "source.perl"
+    },
+    {
+      "grammar": "editor/grammars/php.json",
+      "name": "php",
+      "scopeName": "source.php"
+    },
+    {
+      "grammar": "editor/grammars/pkl.json",
+      "name": "pkl",
+      "scopeName": "source.pkl"
+    },
+    {
+      "grammar": "editor/grammars/plsql.json",
+      "name": "plsql",
+      "scopeName": "source.plsql.oracle"
+    },
+    {
+      "grammar": "editor/grammars/po.json",
+      "name": "po",
+      "scopeName": "source.po"
+    },
+    {
+      "grammar": "editor/grammars/polar.json",
+      "name": "polar",
+      "scopeName": "source.polar"
+    },
+    {
+      "grammar": "editor/grammars/postcss.json",
+      "name": "postcss",
+      "scopeName": "source.css.postcss"
+    },
+    {
+      "grammar": "editor/grammars/powerquery.json",
+      "name": "powerquery",
+      "scopeName": "source.powerquery"
+    },
+    {
+      "grammar": "editor/grammars/powershell.json",
+      "name": "powershell",
+      "scopeName": "source.powershell"
+    },
+    {
+      "grammar": "editor/grammars/prisma.json",
+      "name": "prisma",
+      "scopeName": "source.prisma"
+    },
+    {
+      "grammar": "editor/grammars/prolog.json",
+      "name": "prolog",
+      "scopeName": "source.prolog"
+    },
+    {
+      "grammar": "editor/grammars/proto.json",
+      "name": "proto",
+      "scopeName": "source.proto"
+    },
+    {
+      "grammar": "editor/grammars/pug.json",
+      "name": "pug",
+      "scopeName": "text.pug"
+    },
+    {
+      "grammar": "editor/grammars/puppet.json",
+      "name": "puppet",
+      "scopeName": "source.puppet"
+    },
+    {
+      "grammar": "editor/grammars/purescript.json",
+      "name": "purescript",
+      "scopeName": "source.purescript"
+    },
+    {
+      "grammar": "editor/grammars/python.json",
+      "name": "python",
+      "scopeName": "source.python"
+    },
+    {
+      "grammar": "editor/grammars/qml.json",
+      "name": "qml",
+      "scopeName": "source.qml"
+    },
+    {
+      "grammar": "editor/grammars/qmldir.json",
+      "name": "qmldir",
+      "scopeName": "source.qmldir"
+    },
+    {
+      "grammar": "editor/grammars/qss.json",
+      "name": "qss",
+      "scopeName": "source.qss"
+    },
+    {
+      "grammar": "editor/grammars/r.json",
+      "name": "r",
+      "scopeName": "source.r"
+    },
+    {
+      "grammar": "editor/grammars/racket.json",
+      "name": "racket",
+      "scopeName": "source.racket"
+    },
+    {
+      "grammar": "editor/grammars/raku.json",
+      "name": "raku",
+      "scopeName": "source.perl.6"
+    },
+    {
+      "grammar": "editor/grammars/razor.json",
+      "name": "razor",
+      "scopeName": "text.aspnetcorerazor"
+    },
+    {
+      "grammar": "editor/grammars/rbs.json",
+      "name": "rbs",
+      "scopeName": "source.rbs"
+    },
+    {
+      "grammar": "editor/grammars/reg.json",
+      "name": "reg",
+      "scopeName": "source.reg"
+    },
+    {
+      "grammar": "editor/grammars/regexp.json",
+      "name": "regexp",
+      "scopeName": "source.regexp.python"
+    },
+    {
+      "grammar": "editor/grammars/rel.json",
+      "name": "rel",
+      "scopeName": "source.rel"
+    },
+    {
+      "grammar": "editor/grammars/riscv.json",
+      "name": "riscv",
+      "scopeName": "source.riscv"
+    },
+    {
+      "grammar": "editor/grammars/ron.json",
+      "name": "ron",
+      "scopeName": "source.ron"
+    },
+    {
+      "grammar": "editor/grammars/rosmsg.json",
+      "name": "rosmsg",
+      "scopeName": "source.rosmsg"
+    },
+    {
+      "grammar": "editor/grammars/rst.json",
+      "name": "rst",
+      "scopeName": "source.rst"
+    },
+    {
+      "grammar": "editor/grammars/ruby.json",
+      "name": "ruby",
+      "scopeName": "source.ruby"
+    },
+    {
+      "grammar": "editor/grammars/rust.json",
+      "name": "rust",
+      "scopeName": "source.rust"
+    },
+    {
+      "grammar": "editor/grammars/sas.json",
+      "name": "sas",
+      "scopeName": "source.sas"
+    },
+    {
+      "grammar": "editor/grammars/sass.json",
+      "name": "sass",
+      "scopeName": "source.sass"
+    },
+    {
+      "grammar": "editor/grammars/scala.json",
+      "name": "scala",
+      "scopeName": "source.scala"
+    },
+    {
+      "grammar": "editor/grammars/scheme.json",
+      "name": "scheme",
+      "scopeName": "source.scheme"
+    },
+    {
+      "grammar": "editor/grammars/scss.json",
+      "name": "scss",
+      "scopeName": "source.css.scss"
+    },
+    {
+      "grammar": "editor/grammars/sdbl.json",
+      "name": "sdbl",
+      "scopeName": "source.sdbl"
+    },
+    {
+      "grammar": "editor/grammars/shaderlab.json",
+      "name": "shaderlab",
+      "scopeName": "source.shaderlab"
+    },
+    {
+      "grammar": "editor/grammars/shellscript.json",
+      "name": "shellscript",
+      "scopeName": "source.shell"
+    },
+    {
+      "grammar": "editor/grammars/shellsession.json",
+      "name": "shellsession",
+      "scopeName": "text.shell-session"
+    },
+    {
+      "grammar": "editor/grammars/smalltalk.json",
+      "name": "smalltalk",
+      "scopeName": "source.smalltalk.gnu"
+    },
+    {
+      "grammar": "editor/grammars/smithy.json",
+      "name": "smithy",
+      "scopeName": "source.smithy"
+    },
+    {
+      "grammar": "editor/grammars/solidity.json",
+      "name": "solidity",
+      "scopeName": "source.solidity"
+    },
+    {
+      "grammar": "editor/grammars/soy.json",
+      "name": "soy",
+      "scopeName": "text.html.soy"
+    },
+    {
+      "grammar": "editor/grammars/sparql.json",
+      "name": "sparql",
+      "scopeName": "source.sparql"
+    },
+    {
+      "grammar": "editor/grammars/splunk.json",
+      "name": "splunk",
+      "scopeName": "source.splunk_search"
+    },
+    {
+      "grammar": "editor/grammars/sql.json",
+      "name": "sql",
+      "scopeName": "source.sql"
+    },
+    {
+      "grammar": "editor/grammars/ssh-config.json",
+      "name": "ssh-config",
+      "scopeName": "source.ssh-config"
+    },
+    {
+      "grammar": "editor/grammars/stata.json",
+      "name": "stata",
+      "scopeName": "source.stata"
+    },
+    {
+      "grammar": "editor/grammars/stylus.json",
+      "name": "stylus",
+      "scopeName": "source.stylus"
+    },
+    {
+      "grammar": "editor/grammars/surrealql.json",
+      "name": "surrealql",
+      "scopeName": "source.surrealql"
+    },
+    {
+      "grammar": "editor/grammars/svelte.json",
+      "name": "svelte",
+      "scopeName": "source.svelte"
+    },
+    {
+      "grammar": "editor/grammars/swift.json",
+      "name": "swift",
+      "scopeName": "source.swift"
+    },
+    {
+      "grammar": "editor/grammars/system-verilog.json",
+      "name": "system-verilog",
+      "scopeName": "source.systemverilog"
+    },
+    {
+      "grammar": "editor/grammars/systemd.json",
+      "name": "systemd",
+      "scopeName": "source.systemd"
+    },
+    {
+      "grammar": "editor/grammars/talonscript.json",
+      "name": "talonscript",
+      "scopeName": "source.talon"
+    },
+    {
+      "grammar": "editor/grammars/tasl.json",
+      "name": "tasl",
+      "scopeName": "source.tasl"
+    },
+    {
+      "grammar": "editor/grammars/tcl.json",
+      "name": "tcl",
+      "scopeName": "source.tcl"
+    },
+    {
+      "grammar": "editor/grammars/templ.json",
+      "name": "templ",
+      "scopeName": "source.templ"
+    },
+    {
+      "grammar": "editor/grammars/terraform.json",
+      "name": "terraform",
+      "scopeName": "source.hcl.terraform"
+    },
+    {
+      "grammar": "editor/grammars/tex.json",
+      "name": "tex",
+      "scopeName": "text.tex"
+    },
+    {
+      "grammar": "editor/grammars/toml.json",
+      "name": "toml",
+      "scopeName": "source.toml"
+    },
+    {
+      "grammar": "editor/grammars/ts-tags.json",
+      "name": "ts-tags",
+      "scopeName": "source.ts.tags"
+    },
+    {
+      "grammar": "editor/grammars/tsv.json",
+      "name": "tsv",
+      "scopeName": "text.tsv"
+    },
+    {
+      "grammar": "editor/grammars/tsx.json",
+      "name": "tsx",
+      "scopeName": "source.tsx"
+    },
+    {
+      "grammar": "editor/grammars/turtle.json",
+      "name": "turtle",
+      "scopeName": "source.turtle"
+    },
+    {
+      "grammar": "editor/grammars/twig.json",
+      "name": "twig",
+      "scopeName": "text.html.twig"
+    },
+    {
+      "grammar": "editor/grammars/typescript.json",
+      "name": "typescript",
+      "scopeName": "source.ts"
+    },
+    {
+      "grammar": "editor/grammars/typespec.json",
+      "name": "typespec",
+      "scopeName": "source.tsp"
+    },
+    {
+      "grammar": "editor/grammars/typst.json",
+      "name": "typst",
+      "scopeName": "source.typst"
+    },
+    {
+      "grammar": "editor/grammars/v.json",
+      "name": "v",
+      "scopeName": "source.v"
+    },
+    {
+      "grammar": "editor/grammars/vala.json",
+      "name": "vala",
+      "scopeName": "source.vala"
+    },
+    {
+      "grammar": "editor/grammars/vb.json",
+      "name": "vb",
+      "scopeName": "source.asp.vb.net"
+    },
+    {
+      "grammar": "editor/grammars/verilog.json",
+      "name": "verilog",
+      "scopeName": "source.verilog"
+    },
+    {
+      "grammar": "editor/grammars/vhdl.json",
+      "name": "vhdl",
+      "scopeName": "source.vhdl"
+    },
+    {
+      "grammar": "editor/grammars/viml.json",
+      "name": "viml",
+      "scopeName": "source.viml"
+    },
+    {
+      "grammar": "editor/grammars/vue-directives.json",
+      "name": "vue-directives",
+      "scopeName": "vue.directives"
+    },
+    {
+      "grammar": "editor/grammars/vue-html.json",
+      "name": "vue-html",
+      "scopeName": "text.html.vue-html"
+    },
+    {
+      "grammar": "editor/grammars/vue-interpolations.json",
+      "name": "vue-interpolations",
+      "scopeName": "vue.interpolations"
+    },
+    {
+      "grammar": "editor/grammars/vue-sfc-style-variable-injection.json",
+      "name": "vue-sfc-style-variable-injection",
+      "scopeName": "vue.sfc.style.variable.injection"
+    },
+    {
+      "grammar": "editor/grammars/vue-vine.json",
+      "name": "vue-vine",
+      "scopeName": "source.vue-vine"
+    },
+    {
+      "grammar": "editor/grammars/vue.json",
+      "name": "vue",
+      "scopeName": "text.html.vue"
+    },
+    {
+      "grammar": "editor/grammars/vyper.json",
+      "name": "vyper",
+      "scopeName": "source.vyper"
+    },
+    {
+      "grammar": "editor/grammars/wasm.json",
+      "name": "wasm",
+      "scopeName": "source.wat"
+    },
+    {
+      "grammar": "editor/grammars/wenyan.json",
+      "name": "wenyan",
+      "scopeName": "source.wenyan"
+    },
+    {
+      "grammar": "editor/grammars/wgsl.json",
+      "name": "wgsl",
+      "scopeName": "source.wgsl"
+    },
+    {
+      "grammar": "editor/grammars/wikitext.json",
+      "name": "wikitext",
+      "scopeName": "source.wikitext"
+    },
+    {
+      "grammar": "editor/grammars/wit.json",
+      "name": "wit",
+      "scopeName": "source.wit"
+    },
+    {
+      "grammar": "editor/grammars/wolfram.json",
+      "name": "wolfram",
+      "scopeName": "source.wolfram"
+    },
+    {
+      "grammar": "editor/grammars/xml.json",
+      "name": "xml",
+      "scopeName": "text.xml"
+    },
+    {
+      "grammar": "editor/grammars/xsl.json",
+      "name": "xsl",
+      "scopeName": "text.xml.xsl"
+    },
+    {
+      "grammar": "editor/grammars/yaml.json",
+      "name": "yaml",
+      "scopeName": "source.yaml"
+    },
+    {
+      "grammar": "editor/grammars/zenscript.json",
+      "name": "zenscript",
+      "scopeName": "source.zenscript"
+    },
+    {
+      "grammar": "editor/grammars/zig.json",
+      "name": "zig",
+      "scopeName": "source.zig"
+    }
+  ]
+}

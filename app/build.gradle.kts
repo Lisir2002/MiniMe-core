@@ -182,24 +182,6 @@ android {
         ndk { abiFilters += listOf("arm64-v8a") }
 
         // ── Native viewer/editor 核心（libminimeviewer）──
-        // c++_shared STL：多个静态库（tree-sitter 核心 + 各 grammar）共享同一份 libc++_shared.so，
-        // 体积更小；AGP 会自动把 libc++_shared.so 打入 APK。符号隐藏在 CMake 侧统一处理。
-        // 不强制 -DCMAKE_BUILD_TYPE=Release：debug 保持 -O0 便于 native 调试，
-        // release 的 -Oz 体积优化在 CMakeLists.txt 内按 Release 构建类型施加。
-        externalNativeBuild {
-            cmake {
-                arguments += listOf("-DANDROID_STL=c++_shared")
-            }
-        }
-    }
-
-    // Native 构建入口：CMakeLists.txt 位于 app/src/main/cpp/。
-    // version 固定为 SDK 内安装的 cmake 3.22.1（与设计文档一致）。
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
     }
 
     // 容器资产：sourceSets.main.assets 挂 _armAssets，其内同时含 container/arm（arm64 容器 rootfs + proot）
@@ -269,6 +251,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // sora-editor language-textmate 在 API < 33 需要 coreLibrary desugaring
+        // （tm4e 内部使用 java.util.regex 新 API；Joni 正则也依赖 desugared stdlib）。
+        isCoreLibraryDesugaringEnabled = true
     }
 
     // RC92：MigrationSchemaConsistencyTest 失败详情 println 到 stdout，
@@ -459,6 +444,13 @@ dependencies {
     implementation(libs.multiplatform.markdown.renderer.m3)
     implementation(libs.multiplatform.markdown.renderer.code)
     implementation(libs.highlights.jvm)
+
+    // sora-editor + TextMate 高亮引擎（替代 tree-sitter）
+    // LGPL-2.1：在「开源许可」页注明 sora-editor。
+    implementation(platform(libs.sora.editor.bom))
+    implementation(libs.sora.editor)
+    implementation(libs.sora.language.textmate)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     // Core Android
     implementation(libs.androidx.core)

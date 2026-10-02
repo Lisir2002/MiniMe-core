@@ -242,12 +242,9 @@ internal fun AboutSection(
     val viewingPath = browserUi.openingLocalPath
     val currentDoc = docViewerDoc
 
-    // 系统返回键：优先退出搜索模式 > 关闭大纲 > 收起查看器/浏览器/文档
-    val codeViewerUi by codeViewerVM.ui.collectAsStateWithLifecycle()
+    // 系统返回键：收起查看器/浏览器/文档
     androidx.activity.compose.BackHandler(enabled = currentDoc != null || showCodeBrowser || viewingPath != null) {
         when {
-            codeViewerUi.searchMode -> codeViewerVM.toggleSearchMode()
-            codeViewerUi.showOutline -> codeViewerVM.closeOutline()
             viewingPath != null -> codeBrowserVM.consumeOpenedFile()
             currentDoc != null -> docViewerDoc = null
             showCodeBrowser -> showCodeBrowser = false
@@ -267,99 +264,15 @@ internal fun AboutSection(
         return
     }
 
-    // 查看代码：动态顶栏 = 文件名/搜索框 + 搜索/大纲/编码 actions，返回键回到浏览器目录。
+    // 查看代码：顶栏 = 文件名 + 返回。sora-editor 自带搜索（长按）。
     if (viewingPath != null) {
-        val focusRequester = remember { FocusRequester() }
-        var showEncodingMenu by remember { mutableStateOf(false) }
-        val encLabel = remember(codeViewerUi.currentEncoding) {
-            com.mini.me_core.core.viewer.code.ENCODING_LABELS
-                .firstOrNull { it.first == codeViewerUi.currentEncoding }?.second ?: "UTF-8"
-        }
         Column(modifier = Modifier.fillMaxSize()) {
-            if (codeViewerUi.searchMode) {
-                // 搜索模式：顶栏替换为搜索输入框
-                AppTopAppBar(
-                    title = "",
-                    onNavigateBack = { codeViewerVM.toggleSearchMode() },
-                    navigationIcon = Icons.Rounded.Close,
-                    navigationContentDescription = "退出搜索",
-                    titleContent = {
-                        LaunchedEffect(Unit) { focusRequester.requestFocus() }
-                        OutlinedTextField(
-                            value = codeViewerUi.searchQuery,
-                            onValueChange = { codeViewerVM.onSearchQuery(it) },
-                            singleLine = true,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(end = 8.dp)
-                                .focusRequester(focusRequester),
-                            placeholder = { Text("搜索…", style = MaterialTheme.typography.bodyMedium) },
-                            trailingIcon = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (codeViewerUi.searchResults.isNotEmpty()) {
-                                        Text(
-                                            text = "${codeViewerUi.currentMatchIndex + 1}/${codeViewerUi.searchResults.size}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(horizontal = 4.dp),
-                                        )
-                                    }
-                                    IconButton(onClick = { codeViewerVM.prevMatch() }) {
-                                        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "上一个")
-                                    }
-                                    IconButton(onClick = { codeViewerVM.nextMatch() }) {
-                                        Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "下一个")
-                                    }
-                                }
-                            },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                            ),
-                        )
-                    },
-                )
-            } else {
-                // 普通模式：文件名 + 搜索/大纲/编码 actions
-                AppTopAppBar(
-                    title = viewingPath.substringAfterLast('/'),
-                    onNavigateBack = { codeBrowserVM.consumeOpenedFile() },
-                    navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
-                    navigationContentDescription = "返回",
-                    actions = {
-                        IconButton(onClick = { codeViewerVM.toggleSearchMode() }) {
-                            Icon(Icons.Rounded.Search, contentDescription = "搜索")
-                        }
-                        IconButton(onClick = { codeViewerVM.toggleOutline() }) {
-                            Icon(Icons.AutoMirrored.Rounded.List, contentDescription = "大纲")
-                        }
-                        // 编码切换
-                        Box {
-                            IconButton(onClick = { showEncodingMenu = true }) {
-                                Text(
-                                    text = encLabel,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = showEncodingMenu,
-                                onDismissRequest = { showEncodingMenu = false },
-                            ) {
-                                com.mini.me_core.core.viewer.code.ENCODING_LABELS.forEach { (code, name) ->
-                                    DropdownMenuItem(
-                                        text = { Text(name) },
-                                        onClick = {
-                                            codeViewerVM.setEncoding(code)
-                                            showEncodingMenu = false
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    },
-                )
-            }
+            AppTopAppBar(
+                title = viewingPath.substringAfterLast('/'),
+                onNavigateBack = { codeBrowserVM.consumeOpenedFile() },
+                navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                navigationContentDescription = "返回",
+            )
             Box(modifier = Modifier.weight(1f)) {
                 com.mini.me_core.core.viewer.code.CodeViewerScreen(
                     path = viewingPath,
@@ -1272,7 +1185,7 @@ private fun OpenSourceCreditsSection(expanded: OpenSourceLib?, onExpand: (OpenSo
             OpenSourceLib(stringResource(R.string.about_credit_sqlcipher), "Zetetic", "4.x", "BSD-like", "https://www.zetetic.net/sqlcipher"),
             OpenSourceLib(stringResource(R.string.about_credit_coil), "Coil", "2.x", "Apache-2.0", "https://coil-kt.github.io/coil"),
             OpenSourceLib(stringResource(R.string.about_credit_accompanist), "Google", "0.34.x", "Apache-2.0", "https://github.com/google/accompanist"),
-            OpenSourceLib(stringResource(R.string.about_credit_treesitter), "tree-sitter", "0.24.x", "MIT", "https://tree-sitter.github.io/tree-sitter"),
+            OpenSourceLib("sora-editor", "Rosemoe", "0.24.4", "LGPL-2.1", "https://github.com/Rosemoe/sora-editor"),
             OpenSourceLib(stringResource(R.string.about_credit_ssh), "SSHJ", "0.38.0", "Apache-2.0", "https://github.com/hierynomus/sshj"),
             OpenSourceLib(stringResource(R.string.about_credit_terminal), "Termux", "JNI", "GPL-3.0", "https://github.com/termux/termux-app"),
         )
