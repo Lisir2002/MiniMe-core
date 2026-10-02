@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -161,6 +162,8 @@ private fun AssetRow(title: String, subtitle: String, meta: String, onClick: () 
 
 @Composable
 private fun AssetDetailView(title: String, meta: String, body: String, onBack: () -> Unit) {
+    // 拦截系统返回键，关闭资产详情页
+    BackHandler { onBack() }
     Scaffold(
         topBar = {
             AppTopAppBar(

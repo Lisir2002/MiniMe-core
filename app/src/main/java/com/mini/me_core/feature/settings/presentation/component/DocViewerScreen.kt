@@ -17,6 +17,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +68,9 @@ fun DocViewerScreen(
     var currentPath by remember(assetPath, alternateAssetPath) { mutableStateOf(assetPath) }
     var currentRemote by remember(remoteUrl, alternateRemoteUrl) { mutableStateOf(remoteUrl) }
     var state by remember(currentPath, currentRemote) { mutableStateOf<DocLoadState>(DocLoadState.Loading) }
+
+    // 拦截系统返回键，关闭文档查看器
+    BackHandler { onBack() }
 
     LaunchedEffect(currentPath, currentRemote) {
         state = DocLoadState.Loading

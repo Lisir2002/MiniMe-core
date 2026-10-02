@@ -61,7 +61,10 @@ fun RuleManagerScreen(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = stringResource(R.string.norm_flow_rule_empty),
+                    text = if (projectRoot.isBlank())
+                        "当前未选择工作区，仅可查看全局规则。\n全局规则文件不存在或为空。\n在对话中选择工作区后可查看项目/工作区/模块规则。"
+                    else
+                        stringResource(R.string.norm_flow_rule_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

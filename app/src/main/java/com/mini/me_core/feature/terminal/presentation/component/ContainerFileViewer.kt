@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +48,9 @@ fun ContainerFileViewer(
     val codeViewerVM: CodeViewerViewModel = viewModel()
     val ui by codeViewerVM.ui.collectAsStateWithLifecycle()
     var tempPath by remember { mutableStateOf<String?>(null) }
+
+    // 拦截系统返回键，关闭查看器而非穿透到底层页面
+    BackHandler { onDismiss() }
 
     LaunchedEffect(entry.path) {
         val path = withContext(Dispatchers.IO) {

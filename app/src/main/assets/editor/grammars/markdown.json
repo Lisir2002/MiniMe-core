@@ -40,7 +40,7 @@
   "repository": {
     "front_matter": {
       "type": "pattern",
-      "begin": "\\A---\\s*$",
+      "begin": "^---\\s*$",
       "end": "^---\\s*$",
       "name": "meta.front-matter.markdown",
       "contentName": "source.yaml.front-matter.embedded",
@@ -186,7 +186,7 @@
     },
     "table": {
       "type": "pattern",
-      "begin": "^(?=.*\\|.*\\|)",
+      "begin": "^(?=.*\\|.*\\|.*\\|)",
       "end": "$",
       "name": "meta.table.markdown",
       "patterns": [
