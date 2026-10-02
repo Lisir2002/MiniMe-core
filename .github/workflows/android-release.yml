@@ -258,8 +258,8 @@ jobs:
           # 提取证书 SHA-256 digest（apksigner 输出形如 "Signer #1 certificate SHA-256 digest: AB:..."）
           CERT_FINGERPRINT=$($APKSIGNER verify --print-certs "$APK_PATH" \
             | grep -i "SHA-256 digest" | head -1 \
-            | sed -E 's/.*[Dd]igest:[[:space:]]*//' | tr -d ' \r\n' | tr 'A-F' 'a-f')
-          EXPECTED_FINGERPRINT=$(echo "$EXPECTED_SIGNING_CERT_FINGERPRINT" | tr -d ' \r\n' | tr 'A-F' 'a-f')
+            | sed -E 's/.*[Dd]igest:[[:space:]]*//' | tr -d ' :\r\n' | tr 'A-F' 'a-f')
+          EXPECTED_FINGERPRINT=$(echo "$EXPECTED_SIGNING_CERT_FINGERPRINT" | tr -d ' :\r\n' | tr 'A-F' 'a-f')
           echo "实际指纹: $CERT_FINGERPRINT"
           echo "预期指纹: $EXPECTED_FINGERPRINT"
           if [ "$CERT_FINGERPRINT" != "$EXPECTED_FINGERPRINT" ]; then
