@@ -136,6 +136,17 @@ fun FileReaderScreen(
         }
     }
 
+    // 编辑模式下每10秒自动保存一次（有未保存修改时才保存）
+    LaunchedEffect(isEditing) {
+        if (!isEditing) return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(10_000)
+            if (hasUnsavedChanges && isEditing) {
+                saveFile()
+            }
+        }
+    }
+
     // 放弃修改并退出编辑模式
     fun discardAndExit() {
         hasUnsavedChanges = false
