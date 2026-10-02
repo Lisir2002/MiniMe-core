@@ -321,20 +321,20 @@ class RemoteServerViewModel @Inject constructor(
         viewModelScope.launch {
             kv.putString(REMOTE_MOUNT_PREFS_NS, "dir_$mountId", direction)
             _mountSyncDirections.value = _mountSyncDirections.value + (mountId to direction)
-            // TODO: 将 direction 传入 SyncEngine，按方向限制 upload/download/watch 行为
+            // TODO: 将 direction 传入 SyncEngine，按方向限制 upload/download/watch 行为。跟踪见 #2。
         }
     }
 
     /** 设置全局冲突处理策略并持久化。 */
     fun setConflictStrategy(strategy: String) {
         syncSettingsRepository.setConflictStrategy(strategy)
-        // TODO: 将 strategy 传入 SyncEngine，解决冲突时按策略执行
+        // TODO: 将 strategy 传入 SyncEngine，解决冲突时按策略执行。跟踪见 #3。
     }
 
     /** 设置自动同步开关与间隔（分钟，0 表示仅手动）并持久化。 */
     fun setAutoSync(enabled: Boolean, intervalMinutes: Int) {
         syncSettingsRepository.setAutoSync(enabled, intervalMinutes)
-        // TODO: 按 intervalMinutes 启动/取消周期同步协程
+        // TODO: 按 intervalMinutes 启动/取消周期同步协程。跟踪见 #4。
     }
 
     fun setSyncIgnoredPatterns(patterns: String) {

@@ -123,9 +123,9 @@ class T2IPermissionPolicyEngine @Inject constructor(
         //    后续 RC70 可在 T2I 仓储里加 `monthly_used_tokens` DataStore 持久化。）
         val monthlyQuota = effectiveMonthlyQuota(req)
         if (monthlyQuota > 0) {
-            // TODO(RC69+): monthlyUsedTokens = 读 DataStore `t2i_monthly_used_tokens_${yyyyMM}`
-            //   目前暂时跳过 P4（相当于月度不限），避免 RC69 第一版引入 DataStore key 后又改命名。
-            //   仓储层 saveProvider 已经预留字段，后续补一行即可。
+            // TODO: monthlyUsedTokens = 读 DataStore `t2i_monthly_used_tokens_${yyyyMM}`
+            //   目前暂时跳过 P4（相当于月度不限），避免引入 DataStore key 后又改命名。
+            //   仓储层 saveProvider 已经预留字段，后续补一行即可。跟踪见 #1。
         }
 
         // ── P5 渐进保护阈值 ──

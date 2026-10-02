@@ -58,3 +58,4 @@ app/.cxx/
 qbot-app/src/_qbotAssets/apt/
 qbot-app/src/_qbotAssets/qq/
 qbot-app/src/_qbotAssets/manifest.json
+app/local-test.jks

@@ -546,6 +546,7 @@ class BrowserController @Inject constructor(
     fun evalJs(code: String, onResult: (String) -> Unit) {
         mainHandler.post {
             val wv = activeWebView() ?: run { onResult(""); return@post }
+            BrowserUrlSecurity.logJsExecution(code)
             // 回显执行的命令到 Console
             _consoleLogs.update { (it + "> $code").takeLast(200) }
             wv.evaluateJavascript("(function(){try{return eval(${JsonPrimitive(code)});}catch(e){return 'Error: '+e.message;}})();") { raw ->
@@ -687,7 +688,7 @@ class BrowserController @Inject constructor(
 
     /** 单独取页面纯文本（R2.1 按需取文）：模型需要正文时再取，不再随快照默认返回。 */
     suspend fun pageText(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_PAGE_TEXT).take(MAX_PAGE_TEXT)
+        evalJs(JS_PAGE_TEXT).take(MAX_PAGE_TEXT)
     }
 
     /**
@@ -696,7 +697,7 @@ class BrowserController @Inject constructor(
      * @return null 表示全部解析失败；否则返回（id, 命中方式, 匹配数）。
      */
     suspend fun resolveElementId(locator: String): ResolvedElement? = mutex.withLock {
-        val raw = evalJs("($BrowserJsScripts.JS_LOCATE)(${quote(locator)})")
+        val raw = evalJs("($JS_LOCATE)(${quote(locator)})")
         val obj = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return@withLock null
         val ok = runCatching { (obj["ok"] as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
         if (!ok) return@withLock null
@@ -707,7 +708,7 @@ class BrowserController @Inject constructor(
     }
 
     /**
-     * 元素可交互性等待：最多等待 timeoutMs，每 intervalMs 重试 BrowserJsScripts.JS_ACTIONABILITY。
+     * 元素可交互性等待：最多等待 timeoutMs，每 intervalMs 重试 JS_ACTIONABILITY。
      * 元素不在视口内时先 scrollIntoView。skipOverlap=true 时跳过遮挡检查（输入框可能被键盘遮挡）。
      * @return null 表示超时仍不可交互；否则返回失败原因字符串（成功时返回 null）。
      */
@@ -715,7 +716,7 @@ class BrowserController @Inject constructor(
         val deadline = System.currentTimeMillis() + timeoutMs
         var lastReason: String? = null
         while (System.currentTimeMillis() < deadline) {
-            val raw = evalJs("($BrowserJsScripts.JS_ACTIONABILITY)(${quote(id)}, ${if (skipOverlap) "true" else "false"})")
+            val raw = evalJs("($JS_ACTIONABILITY)(${quote(id)}, ${if (skipOverlap) "true" else "false"})")
             val obj = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull()
             val ok = runCatching { (obj?.get("ok") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
             if (ok) return null
@@ -827,7 +828,7 @@ class BrowserController @Inject constructor(
             // 反检测：点击前随机延迟 100-300ms，模拟人类操作
             delay((100..300).random().toLong())
             // 鼠标移动轨迹：获取元素中心坐标，从当前鼠标位置贝塞尔曲线移动过去
-            val centerRaw = evalJs("($BrowserJsScripts.JS_GET_ELEMENT_CENTER)(${quote(resolved.id)})")
+            val centerRaw = evalJs("($JS_GET_ELEMENT_CENTER)(${quote(resolved.id)})")
             val centerObj = runCatching { json.parseToJsonElement(centerRaw).jsonObject }.getOrNull()
             val targetX = runCatching { (centerObj?.get("x") as? JsonPrimitive)?.content?.toDouble() }.getOrNull() ?: 0.0
             val targetY = runCatching { (centerObj?.get("y") as? JsonPrimitive)?.content?.toDouble() }.getOrNull() ?: 0.0
@@ -845,13 +846,13 @@ class BrowserController @Inject constructor(
                 val invT = 1.0 - t
                 val px = invT * invT * startX + 2 * invT * t * midX + t * t * targetX
                 val py = invT * invT * startY + 2 * invT * t * midY + t * t * targetY
-                evalJs("($BrowserJsScripts.JS_MOUSE_MOVE)(${px}, ${py})")
+                evalJs("($JS_MOUSE_MOVE)(${px}, ${py})")
                 delay((10..30).random().toLong())
             }
             // hover 停留 50-150ms
             delay((50..150).random().toLong())
             // 触发点击事件序列
-            evalJs("($BrowserJsScripts.JS_CLICK_AT)(${quote(resolved.id)}, ${targetX}, ${targetY})")
+            evalJs("($JS_CLICK_AT)(${quote(resolved.id)}, ${targetX}, ${targetY})")
             waitForPageSettled(10_000)
             afterWrite("click", snapshotInternal(SnapshotLevel.SUMMARY))
         } finally {
@@ -879,17 +880,17 @@ class BrowserController @Inject constructor(
             }
             if (text.isEmpty()) {
                 // 空文本：直接触发清空事件
-                evalJs("($BrowserJsScripts.JS_TYPE)(${quote(resolved.id)}, ${quote("")})")
+                evalJs("($JS_TYPE)(${quote(resolved.id)}, ${quote("")})")
             } else if (text.length == 1) {
-                // 单字符：直接用原 BrowserJsScripts.JS_TYPE
-                evalJs("($BrowserJsScripts.JS_TYPE)(${quote(resolved.id)}, ${quote(text)})")
+                // 单字符：直接用原 JS_TYPE
+                evalJs("($JS_TYPE)(${quote(resolved.id)}, ${quote(text)})")
             } else {
                 // 多字符：逐字符输入，每字符间隔 50-150ms 随机延迟，最后统一触发 input/change
                 for (ch in text) {
-                    evalJs("($BrowserJsScripts.JS_APPEND_CHAR)(${quote(resolved.id)}, ${quote(ch.toString())})")
+                    evalJs("($JS_APPEND_CHAR)(${quote(resolved.id)}, ${quote(ch.toString())})")
                     delay((50..150).random().toLong())
                 }
-                evalJs("($BrowserJsScripts.JS_FIRE_INPUT)(${quote(resolved.id)})")
+                evalJs("($JS_FIRE_INPUT)(${quote(resolved.id)})")
             }
             afterWrite("type", snapshotInternal(SnapshotLevel.SUMMARY))
         } finally {
@@ -919,15 +920,15 @@ class BrowserController @Inject constructor(
                     continue
                 }
                 if (text.isEmpty()) {
-                    evalJs("($BrowserJsScripts.JS_TYPE)(${quote(resolved.id)}, ${quote("")})")
+                    evalJs("($JS_TYPE)(${quote(resolved.id)}, ${quote("")})")
                 } else if (text.length == 1) {
-                    evalJs("($BrowserJsScripts.JS_TYPE)(${quote(resolved.id)}, ${quote(text)})")
+                    evalJs("($JS_TYPE)(${quote(resolved.id)}, ${quote(text)})")
                 } else {
                     for (ch in text) {
-                        evalJs("($BrowserJsScripts.JS_APPEND_CHAR)(${quote(resolved.id)}, ${quote(ch.toString())})")
+                        evalJs("($JS_APPEND_CHAR)(${quote(resolved.id)}, ${quote(ch.toString())})")
                         delay((50..150).random().toLong())
                     }
-                    evalJs("($BrowserJsScripts.JS_FIRE_INPUT)(${quote(resolved.id)})")
+                    evalJs("($JS_FIRE_INPUT)(${quote(resolved.id)})")
                 }
                 delay(100)
                 filled++
@@ -949,7 +950,7 @@ class BrowserController @Inject constructor(
                 recordAction("select_option", "失败：元素未找到（$elementId）")
                 return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 未找到：data-rcb-id / CSS 路径 / 语义均未命中")
             }
-            evalJs("($BrowserJsScripts.JS_SELECT)(${quote(resolved.id)}, ${quote(value)})")
+            evalJs("($JS_SELECT)(${quote(resolved.id)}, ${quote(value)})")
             afterWrite("select_option", snapshotInternal(SnapshotLevel.SUMMARY))
         } finally {
             _agentStatus.value = AgentBrowserStatus()
@@ -961,7 +962,7 @@ class BrowserController @Inject constructor(
         _agentStatus.value = AgentBrowserStatus("正在提交表单", true)
         try {
             val id = elementId?.let { resolveElementId(it)?.id }
-            evalJs("($BrowserJsScripts.JS_SUBMIT)(${if (id == null) "null" else quote(id)})")
+            evalJs("($JS_SUBMIT)(${if (id == null) "null" else quote(id)})")
             waitForPageSettled(15_000)
             afterWrite("submit", snapshotInternal(SnapshotLevel.SUMMARY))
         } finally {
@@ -973,7 +974,7 @@ class BrowserController @Inject constructor(
     suspend fun scroll(direction: String): BrowserPageSnapshot = mutex.withLock {
         _agentStatus.value = AgentBrowserStatus("正在滚动页面", true)
         try {
-            evalJs("($BrowserJsScripts.JS_SCROLL)(${quote(direction)})")
+            evalJs("($JS_SCROLL)(${quote(direction)})")
             delay(550)
             afterWrite("scroll", snapshotInternal(SnapshotLevel.SUMMARY))
         } finally {
@@ -983,7 +984,7 @@ class BrowserController @Inject constructor(
 
     /** 读取元素属性。 */
     suspend fun getAttribute(elementId: String, attribute: String): String? {
-        val out = evalJs("($BrowserJsScripts.JS_ATTRIBUTE)(${quote(elementId)}, ${quote(attribute)})")
+        val out = evalJs("($JS_ATTRIBUTE)(${quote(elementId)}, ${quote(attribute)})")
         val parsed = runCatching { json.parseToJsonElement(out).jsonObject }.getOrNull()
         return parsed?.get("value")?.let { if (it is JsonPrimitive) it.content else null }
     }
@@ -1011,12 +1012,12 @@ class BrowserController @Inject constructor(
         return@withLock try {
             if (structured) {
                 if (autoScroll) autoScrollLoad()
-                val result = evalJs(BrowserJsScripts.JS_STRUCTURED_EXTRACT)
+                val result = evalJs(JS_STRUCTURED_EXTRACT)
                 recordAction("extract", "结构化提取页面内容（自动识别页面类型）")
                 result
             } else {
                 if (autoScroll) autoScrollLoad()
-                val result = evalJs("($BrowserJsScripts.JS_EXTRACT)(${if (selector == null) "null" else quote(selector)}, ${quote(mode)})")
+                val result = evalJs("($JS_EXTRACT)(${if (selector == null) "null" else quote(selector)}, ${quote(mode)})")
                 recordAction("extract", "抽取结构化数据（mode=$mode${if (selector != null) ", selector=$selector" else ""}${if (autoScroll) ", 自动滚动" else ""}）")
                 result
             }
@@ -1032,7 +1033,7 @@ class BrowserController @Inject constructor(
             // 元素截图：先滚动元素到视口中央并取相对视口矩形
             var crop: Rect? = null
             if (elementId != null) {
-                val raw = evalJs("($BrowserJsScripts.JS_ELEMENT_RECT)(${quote(elementId)})")
+                val raw = evalJs("($JS_ELEMENT_RECT)(${quote(elementId)})")
                 val obj = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull()
                 val ok = runCatching { (obj?.get("ok") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
                 if (!ok) return@withLock null
@@ -1246,7 +1247,7 @@ class BrowserController @Inject constructor(
                 recordAction("hover", "失败：元素未找到（$elementId）")
                 return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 未找到：data-rcb-id / CSS 路径 / 语义均未命中")
             }
-            evalJs("($BrowserJsScripts.JS_HOVER)(${quote(resolved.id)})")
+            evalJs("($JS_HOVER)(${quote(resolved.id)})")
             delay(200)
             afterWrite("hover", snapshotInternal(SnapshotLevel.SUMMARY))
         } finally {
@@ -1263,7 +1264,7 @@ class BrowserController @Inject constructor(
                 recordAction("press_key", "失败：元素未找到（$elementId）")
                 return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 未找到：data-rcb-id / CSS 路径 / 语义均未命中")
             }
-            evalJs("($BrowserJsScripts.JS_PRESS_KEY)(${quote(resolved.id)}, ${quote(key)})")
+            evalJs("($JS_PRESS_KEY)(${quote(resolved.id)}, ${quote(key)})")
             afterWrite("press_key", snapshotInternal(SnapshotLevel.SUMMARY))
         } finally {
             _agentStatus.value = AgentBrowserStatus()
@@ -1280,7 +1281,7 @@ class BrowserController @Inject constructor(
                 return@withLock BrowserPageSnapshot(url = lastSnapshot.url, pageText = "元素 $elementId 未找到：data-rcb-id / CSS 路径 / 语义均未命中")
             }
             val targetResolved = targetElementId?.let { resolveElementId(it)?.id }
-            evalJs("($BrowserJsScripts.JS_DRAG)(${quote(resolved.id)}, ${if (targetResolved == null) "null" else quote(targetResolved)})")
+            evalJs("($JS_DRAG)(${quote(resolved.id)}, ${if (targetResolved == null) "null" else quote(targetResolved)})")
             afterWrite("drag", snapshotInternal(SnapshotLevel.SUMMARY))
         } finally {
             _agentStatus.value = AgentBrowserStatus()
@@ -1304,7 +1305,7 @@ class BrowserController @Inject constructor(
                 pendingUploadDone = done
             }
             try {
-                evalJs("($BrowserJsScripts.JS_UPLOAD_CLICK)(${quote(elementId)})")
+                evalJs("($JS_UPLOAD_CLICK)(${quote(elementId)})")
                 val ok = withTimeoutOrNull(3_000) { done.await() } ?: false
                 if (ok) null
                 else "未能自动上传：文件选择器未被触发（可能被页面脚本拦截）。可改用 takeover 让用户手动选择文件。"
@@ -1544,12 +1545,19 @@ class BrowserController @Inject constructor(
     private fun createWebView(tabId: String): WebView {
         val wv = WebView(context)
         wv.settings.apply {
+            // 本浏览器需要执行自动化脚本，JS 按需保持开启；其余危险能力一律关闭。
             javaScriptEnabled = true
+            javaScriptCanOpenWindowsAutomatically = false
             domStorageEnabled = true
             databaseEnabled = true
-            allowFileAccess = true
+            // 安全加固：禁止本地文件 / 内容访问，防止任意页面读取本地资源。
+            allowFileAccess = false
+            allowContentAccess = false
+            allowFileAccessFromFileURLs = false
+            allowUniversalAccessFromFileURLs = false
+            // 禁止混合内容：HTTPS 页面不加载 HTTP 子资源。
+            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             loadsImagesAutomatically = true
-            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             // F4.8 双指捏合缩放 + 双击缩放（系统默认手势）
             builtInZoomControls = true
             displayZoomControls = false
@@ -1560,7 +1568,14 @@ class BrowserController @Inject constructor(
         }
         wv.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                view.loadUrl(request.url.toString())
+                val target = request.url.toString()
+                // 敏感域名 / 危险 scheme 黑名单校验，命中则阻断导航。
+                if (BrowserUrlSecurity.isBlocked(target)) {
+                    FileLogger.w(TAG, "导航被安全策略阻断: $target")
+                    return true
+                }
+                BrowserUrlSecurity.logNavigation(target)
+                view.loadUrl(target)
                 return true
             }
             override fun shouldInterceptRequest(
@@ -1601,10 +1616,12 @@ class BrowserController @Inject constructor(
                 return true
             }
             override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
+                BrowserUrlSecurity.logJsDialog("alert", message)
                 handleDialog("alert", message ?: "", result)
                 return true
             }
             override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
+                BrowserUrlSecurity.logJsDialog("confirm", message)
                 handleDialog("confirm", message ?: "", result)
                 return true
             }
@@ -1629,24 +1646,25 @@ class BrowserController @Inject constructor(
         }
         // 下载监听：F4.2 委托给 BrowserDownloadManager（进度/暂停/续传/通知）
         wv.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
+            BrowserUrlSecurity.logDownload(url, mimetype)
             downloadManager.enqueue(url, userAgent, contentDisposition, mimetype)
         }
         // 动态数据捕获插桩：在 document-start 注入（比任何页面脚本早），抓取 fetch/XHR/WS/SSE 请求。
         try {
-            WebViewCompat.addDocumentStartJavaScript(wv, BrowserJsScripts.JS_NET_HOOK, setOf("*"))
+            WebViewCompat.addDocumentStartJavaScript(wv, JS_NET_HOOK, setOf("*"))
         } catch (e: Exception) {
             FileLogger.w(TAG, "addDocumentStartJavaScript 注入失败（旧 WebView 降级：不采集网络数据）", e)
         }
         // DOM 变化订阅（R2.4 事件驱动感知）：document-start 注入 MutationObserver，
         // 供 wait_for_change 挂起等待页面变化，替代轮询 snapshot。
         try {
-            WebViewCompat.addDocumentStartJavaScript(wv, BrowserJsScripts.JS_CHANGE_OBSERVER, setOf("*"))
+            WebViewCompat.addDocumentStartJavaScript(wv, JS_CHANGE_OBSERVER, setOf("*"))
         } catch (e: Exception) {
             FileLogger.w(TAG, "addDocumentStartJavaScript 注入失败（旧 WebView 降级：wait_for_change 不可用）", e)
         }
         // 反检测：document-start 注入，确保在任何页面脚本之前覆盖 webdriver/plugins 等特征
         try {
-            WebViewCompat.addDocumentStartJavaScript(wv, BrowserJsScripts.JS_ANTI_DETECT, setOf("*"))
+            WebViewCompat.addDocumentStartJavaScript(wv, JS_ANTI_DETECT, setOf("*"))
         } catch (e: Exception) {
             FileLogger.w(TAG, "addDocumentStartJavaScript 反检测注入失败（降级 onPageStarted 注入）", e)
         }
@@ -1733,7 +1751,7 @@ class BrowserController @Inject constructor(
      * summary/standard 不取正文，由工具侧按分级裁剪元素 JSON 后返回。
      */
     private suspend fun snapshotInternal(level: SnapshotLevel = SnapshotLevel.FULL): BrowserPageSnapshot {
-        val elJson = evalJs(BrowserJsScripts.JS_SNAPSHOT)
+        val elJson = evalJs(JS_SNAPSHOT)
         val parsed = runCatching { json.parseToJsonElement(elJson).jsonObject }.getOrNull()
         val elements = runCatching {
             parsed?.get("elements")?.let { el ->
@@ -1748,7 +1766,7 @@ class BrowserController @Inject constructor(
         val title = parsed?.get("title")?.let { if (it is JsonPrimitive) it.content else "" } ?: ""
         val url = parsed?.get("url")?.let { if (it is JsonPrimitive) it.content else "" } ?: ""
         // 分级：page_text 只在 FULL 级提取；登录表单信号基于元素（密码框）始终检测
-        val pageText = if (level == SnapshotLevel.FULL) evalJs(BrowserJsScripts.JS_PAGE_TEXT) else ""
+        val pageText = if (level == SnapshotLevel.FULL) evalJs(JS_PAGE_TEXT) else ""
         val (hasLogin, hint) = detectLoginForm(
             BrowserPageSnapshot(title = title, url = url, headings = headings, elements = elements, pageText = pageText.take(12000))
         )
@@ -1914,7 +1932,7 @@ class BrowserController @Inject constructor(
     suspend fun snapshotShadow(level: SnapshotLevel = SnapshotLevel.STANDARD): BrowserPageSnapshot = mutex.withLock {
         _agentStatus.value = AgentBrowserStatus("正在穿透 Shadow DOM 提取", true)
         try {
-            val elJson = evalJs(BrowserJsScripts.JS_SNAPSHOT_SHADOW)
+            val elJson = evalJs(JS_SNAPSHOT_SHADOW)
             val parsed = runCatching { json.parseToJsonElement(elJson).jsonObject }.getOrNull()
             val elements = runCatching {
                 parsed?.get("elements")?.let { el ->
@@ -1929,7 +1947,7 @@ class BrowserController @Inject constructor(
             val title = parsed?.get("title")?.let { if (it is JsonPrimitive) it.content else "" } ?: ""
             val url = parsed?.get("url")?.let { if (it is JsonPrimitive) it.content else "" } ?: ""
             val shadowCount = parsed?.get("shadow_roots")?.let { if (it is JsonPrimitive) it.content.toIntOrNull() ?: 0 } ?: 0
-            val pageText = if (level == SnapshotLevel.FULL) evalJs(BrowserJsScripts.JS_PAGE_TEXT) else ""
+            val pageText = if (level == SnapshotLevel.FULL) evalJs(JS_PAGE_TEXT) else ""
             val snap = BrowserPageSnapshot(
                 title = title, url = url, headings = headings, elements = elements,
                 pageText = pageText.take(12000), pendingRequests = readPendingCount()
@@ -1944,7 +1962,7 @@ class BrowserController @Inject constructor(
 
     /** 列出所有 iframe（最多 5 层递归），返回 JSON 字符串。 */
     suspend fun listIframes(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_LIST_IFRAMES)
+        evalJs(JS_LIST_IFRAMES)
     }
 
     /**
@@ -1952,7 +1970,7 @@ class BrowserController @Inject constructor(
      * @return ResolvedElement 或 null
      */
     suspend fun locateInIframe(chain: String): ResolvedElement? = mutex.withLock {
-        val raw = evalJs("(${BrowserJsScripts.JS_IFRAME_CHAIN_LOCATE})(${quote(chain)})")
+        val raw = evalJs("(${JS_IFRAME_CHAIN_LOCATE})(${quote(chain)})")
         val obj = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return@withLock null
         val ok = runCatching { (obj["ok"] as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
         if (!ok) return@withLock null
@@ -1962,7 +1980,7 @@ class BrowserController @Inject constructor(
 
     /** 在 iframe 链内执行操作（click/type/hover）。 */
     suspend fun actionInIframe(chain: String, action: String, arg1: String, arg2: String = ""): String = mutex.withLock {
-        evalJs("(${BrowserJsScripts.JS_IFRAME_ACTION})(${quote(chain)}, ${quote(action)}, ${quote(arg1)}, ${quote(arg2)})")
+        evalJs("(${JS_IFRAME_ACTION})(${quote(chain)}, ${quote(action)}, ${quote(arg1)}, ${quote(arg2)})")
     }
 
     /**
@@ -1970,7 +1988,7 @@ class BrowserController @Inject constructor(
      * 通常在导航后调用，或在页面加载时自动注入（通过 addDocumentStartJavaScript）。
      */
     suspend fun enableApiInterception() = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_NET_HOOK_V2)
+        evalJs(JS_NET_HOOK_V2)
         recordAction("intercept_api", "已启用增强版 API 拦截（全量请求/响应体捕获）")
     }
 
@@ -1982,7 +2000,7 @@ class BrowserController @Inject constructor(
 
     /** 重放指定 id 的 API 请求。 */
     suspend fun replayApi(callId: Int): String = mutex.withLock {
-        evalJs("(${BrowserJsScripts.JS_REPLAY_API})($callId)")
+        evalJs("(${JS_REPLAY_API})($callId)")
     }
 
     /**
@@ -1998,7 +2016,7 @@ class BrowserController @Inject constructor(
             var lastDomVer = -1L
             while (System.currentTimeMillis() < deadline) {
                 val check = runCatching {
-                    json.parseToJsonElement(evalJs(BrowserJsScripts.JS_RENDER_WAIT_CHECK)).jsonObject
+                    json.parseToJsonElement(evalJs(JS_RENDER_WAIT_CHECK)).jsonObject
                 }.getOrNull()
                 val domVer: Long = runCatching { (check?.get("dom_version") as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L }.getOrNull() ?: 0L
                 val netPending: Int = runCatching { (check?.get("net_pending") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0 }.getOrNull() ?: 0
@@ -2027,7 +2045,7 @@ class BrowserController @Inject constructor(
 
     /** 检测页面渲染类型（SSR/CSR/Next.js/Nuxt 等），返回 JSON 字符串。 */
     suspend fun detectRenderingType(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_DETECT_RENDERING_TYPE)
+        evalJs(JS_DETECT_RENDERING_TYPE)
     }
 
     /**
@@ -2038,9 +2056,9 @@ class BrowserController @Inject constructor(
         _agentStatus.value = AgentBrowserStatus("应用指纹伪装（$mode）", true)
         try {
             if (mode == "aggressive") {
-                evalJs(BrowserJsScripts.JS_STEALTH_AGGRESSIVE)
+                evalJs(JS_STEALTH_AGGRESSIVE)
                 // 健康检查
-                val healthRaw = evalJs(BrowserJsScripts.JS_STEALTH_HEALTH_CHECK)
+                val healthRaw = evalJs(JS_STEALTH_HEALTH_CHECK)
                 val health = runCatching { json.parseToJsonElement(healthRaw).jsonObject }.getOrNull()
                 val anomaly: Boolean = runCatching { (health?.get("anomaly") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
                 if (anomaly) {
@@ -2052,7 +2070,7 @@ class BrowserController @Inject constructor(
                 recordAction("stealth", "已应用 aggressive 指纹伪装，健康检查通过")
                 "{\"mode\":\"aggressive\",\"fallback\":false}"
             } else {
-                evalJs(BrowserJsScripts.JS_ANTI_DETECT)
+                evalJs(JS_ANTI_DETECT)
                 recordAction("stealth", "已应用 basic 指纹伪装")
                 "{\"mode\":\"basic\"}"
             }
@@ -2064,12 +2082,12 @@ class BrowserController @Inject constructor(
     /** 内容清洗：检测并清理混淆内容，返回清洗结果 JSON。 */
     suspend fun deobfuscate(text: String? = null): String = mutex.withLock {
         val arg = if (text != null) quote(text) else "null"
-        evalJs("(${BrowserJsScripts.JS_DEOBFUSCATE_TEXT})($arg)")
+        evalJs("(${JS_DEOBFUSCATE_TEXT})($arg)")
     }
 
     /** 提取清洗后的页面文本（自动移除隐藏元素、清理零宽字符）。 */
     suspend fun extractCleanText(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_EXTRACT_CLEAN_TEXT)
+        evalJs(JS_EXTRACT_CLEAN_TEXT)
     }
 
     /**
@@ -2081,7 +2099,7 @@ class BrowserController @Inject constructor(
         _agentStatus.value = AgentBrowserStatus("分页提取（最多${maxPages}页）", true)
         try {
             val selArg = if (selector != null) quote(selector) else "null"
-            evalJs("(${BrowserJsScripts.JS_PAGINATE_EXTRACT})($maxPages, $selArg)")
+            evalJs("(${JS_PAGINATE_EXTRACT})($maxPages, $selArg)")
         } finally {
             _agentStatus.value = AgentBrowserStatus()
         }
@@ -2096,7 +2114,7 @@ class BrowserController @Inject constructor(
         _agentStatus.value = AgentBrowserStatus("无限滚动提取（最多${maxScrolls}次）", true)
         try {
             val selArg = if (selector != null) quote(selector) else "null"
-            evalJs("(${BrowserJsScripts.JS_INFINITE_SCROLL_EXTRACT})($maxScrolls, $selArg)")
+            evalJs("(${JS_INFINITE_SCROLL_EXTRACT})($maxScrolls, $selArg)")
         } finally {
             _agentStatus.value = AgentBrowserStatus()
         }
@@ -2104,7 +2122,7 @@ class BrowserController @Inject constructor(
 
     /** 获取快照的 API 数据来源标注。 */
     suspend fun snapshotApiSource(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_SNAPSHOT_API_SOURCE)
+        evalJs(JS_SNAPSHOT_API_SOURCE)
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -2217,7 +2235,7 @@ class BrowserController @Inject constructor(
             ?: return@withLock SafeClickResult(ok = false, reason = "NOT_FOUND", detail = "元素未找到: $elementId")
 
         // 前置检查
-        val checkRaw = evalJs("(${BrowserJsScripts.JS_SAFE_CLICK_CHECK})(${quote(resolved.id)})")
+        val checkRaw = evalJs("(${JS_SAFE_CLICK_CHECK})(${quote(resolved.id)})")
         val check = runCatching { json.parseToJsonElement(checkRaw).jsonObject }.getOrNull()
         val checkOk: Boolean = runCatching { (check?.get("ok") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
         val reason: String = runCatching { (check?.get("reason") as? JsonPrimitive)?.content }.getOrNull() ?: ""
@@ -2226,16 +2244,16 @@ class BrowserController @Inject constructor(
         }
 
         // 捕获点击前指纹
-        val beforeFp = evalJs(BrowserJsScripts.JS_CAPTURE_BEFORE_CLICK)
+        val beforeFp = evalJs(JS_CAPTURE_BEFORE_CLICK)
 
         // 执行点击（复用已有 click 的人类行为）
         waitForActionable(resolved.id, skipOverlap = true)
         delay((80..200).random().toLong())
-        evalJs("(${BrowserJsScripts.JS_CLICK_AT})(${quote(resolved.id)}, 0, 0)")
+        evalJs("(${JS_CLICK_AT})(${quote(resolved.id)}, 0, 0)")
         delay(400)
 
         // 后置验证
-        val verifyRaw = evalJs("(${BrowserJsScripts.JS_SAFE_CLICK_VERIFY})($beforeFp)")
+        val verifyRaw = evalJs("(${JS_SAFE_CLICK_VERIFY})($beforeFp)")
         val verify = runCatching { json.parseToJsonElement(verifyRaw).jsonObject }.getOrNull()
         val changed: Boolean = runCatching { (verify?.get("changed") as? JsonPrimitive)?.content?.toBoolean() }.getOrNull() ?: false
 
@@ -2261,21 +2279,21 @@ class BrowserController @Inject constructor(
             // 偶尔打错字
             if (Math.random() < mistakeRate && ch.isLetter()) {
                 val wrongChar = ('a'..'z').random().toString()
-                evalJs("(${BrowserJsScripts.JS_HUMAN_TYPE_CHAR})(${quote(resolved.id)}, ${quote(wrongChar)})")
+                evalJs("(${JS_HUMAN_TYPE_CHAR})(${quote(resolved.id)}, ${quote(wrongChar)})")
                 delay((100..250).random().toLong())
                 // 退格修正
-                evalJs(BrowserJsScripts.JS_HUMAN_BACKSPACE + "(${quote(resolved.id)})")
+                evalJs(JS_HUMAN_BACKSPACE + "(${quote(resolved.id)})")
                 delay((80..150).random().toLong())
             }
-            evalJs("(${BrowserJsScripts.JS_HUMAN_TYPE_CHAR})(${quote(resolved.id)}, ${quote(ch.toString())})")
+            evalJs("(${JS_HUMAN_TYPE_CHAR})(${quote(resolved.id)}, ${quote(ch.toString())})")
         }
-        evalJs("(${BrowserJsScripts.JS_HUMAN_FIRE_INPUT})(${quote(resolved.id)})")
+        evalJs("(${JS_HUMAN_FIRE_INPUT})(${quote(resolved.id)})")
         afterWrite("human_type", snapshotInternal(SnapshotLevel.SUMMARY))
     }
 
     // ── 滚动位置获取 ──
     suspend fun getScrollPosition(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_GET_SCROLL_POS)
+        evalJs(JS_GET_SCROLL_POS)
     }
 
     /** 检测到限流响应（429/403）时的提示。 */
@@ -2309,7 +2327,7 @@ class BrowserController @Inject constructor(
         val cookies = withContext(Dispatchers.Main) {
             CookieManager.getInstance().getCookie(url) ?: ""
         }
-        val storageDump = evalJs(BrowserJsScripts.JS_STORAGE_DUMP)
+        val storageDump = evalJs(JS_STORAGE_DUMP)
         sessionStore[sessionId] = SavedSession(sessionId, url, cookies, storageDump)
         recordAction("save_session", "会话已保存: $sessionId ($url)")
         sessionId
@@ -2332,7 +2350,7 @@ class BrowserController @Inject constructor(
         }
         // 恢复 storage
         runCatching {
-            evalJs("(${BrowserJsScripts.JS_STORAGE_RESTORE})(${quote(session.storageDump)})")
+            evalJs("(${JS_STORAGE_RESTORE})(${quote(session.storageDump)})")
         }
         // 导航到保存的 URL
         navigate(session.url)
@@ -2409,29 +2427,29 @@ class BrowserController @Inject constructor(
     // ── 验证码辅助 + 安全审计 ──
     /** 检测页面验证码。 */
     suspend fun detectCaptcha(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_CAPTCHA_DETECT)
+        evalJs(JS_CAPTCHA_DETECT)
     }
 
     /** 权限审计。 */
     suspend fun permissionAudit(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_PERMISSION_AUDIT)
+        evalJs(JS_PERMISSION_AUDIT)
     }
 
     /** 资源拦截（减少加载）。 */
     suspend fun blockResource(types: String): String = mutex.withLock {
-        evalJs("(${BrowserJsScripts.JS_BLOCK_RESOURCE})(${quote(types)})")
+        evalJs("(${JS_BLOCK_RESOURCE})(${quote(types)})")
     }
 
     /** 获取全页截图所需信息。 */
     suspend fun getFullPageInfo(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_FULL_PAGE_INFO)
+        evalJs(JS_FULL_PAGE_INFO)
     }
 
     /** 全页截图：滚动拼接。 */
     suspend fun screenshotFullPage(): String? = mutex.withLock {
         _agentStatus.value = AgentBrowserStatus("正在截取全页（滚动拼接）", true)
         try {
-            val infoRaw = evalJs(BrowserJsScripts.JS_FULL_PAGE_INFO)
+            val infoRaw = evalJs(JS_FULL_PAGE_INFO)
             val info = runCatching { json.parseToJsonElement(infoRaw).jsonObject }.getOrNull()
             val scrollHeight = runCatching { (info?.get("scrollHeight") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0 }.getOrNull() ?: 0
             val clientHeight = runCatching { (info?.get("clientHeight") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0 }.getOrNull() ?: 0
@@ -2468,22 +2486,22 @@ class BrowserController @Inject constructor(
 
     /** 检测前端框架及版本。 */
     suspend fun detectFramework(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_DETECT_FRAMEWORK)
+        evalJs(JS_DETECT_FRAMEWORK)
     }
 
     /** 提取 SSR 注入数据（__NEXT_DATA__ / __NUXT__ / __INITIAL_STATE__ 等）。 */
     suspend fun extractSsrData(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_EXTRACT_SSR_DATA)
+        evalJs(JS_EXTRACT_SSR_DATA)
     }
 
     /** 提取框架内部状态（React Fiber / Vue 实例 / Redux / Pinia / Zustand）。 */
     suspend fun extractFrameworkState(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_EXTRACT_FRAMEWORK_STATE)
+        evalJs(JS_EXTRACT_FRAMEWORK_STATE)
     }
 
     /** 检测虚拟列表。 */
     suspend fun detectVirtualList(): String = mutex.withLock {
-        evalJs(BrowserJsScripts.JS_DETECT_VIRTUAL_LIST)
+        evalJs(JS_DETECT_VIRTUAL_LIST)
     }
 
     /**
@@ -2491,7 +2509,7 @@ class BrowserController @Inject constructor(
      * 导航后等待渲染完成。
      */
     suspend fun spaNavigate(url: String): String = mutex.withLock {
-        val result = evalJs("(${BrowserJsScripts.JS_SPA_NAVIGATE})(${quote(url)})")
+        val result = evalJs("(${JS_SPA_NAVIGATE})(${quote(url)})")
         // 等待新路由渲染完成
         runCatching { waitForRenderComplete(5000) }
         result
@@ -2502,7 +2520,7 @@ class BrowserController @Inject constructor(
      * 实际重放由 Kotlin 层通过 replay_api 控制。
      */
     suspend fun apiPaginate(maxPages: Int, urlPattern: String): String = mutex.withLock {
-        evalJs("(${BrowserJsScripts.JS_API_PAGINATE})($maxPages, ${quote(urlPattern)})")
+        evalJs("(${JS_API_PAGINATE})($maxPages, ${quote(urlPattern)})")
     }
 
     /** 解析网络缓冲 JSON（兼容 WebView evaluateJavascript 对字符串结果再包裹一层的形态）。 */

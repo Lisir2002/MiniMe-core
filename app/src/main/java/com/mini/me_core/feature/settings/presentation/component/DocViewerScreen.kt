@@ -234,6 +234,11 @@ private fun DocWebView(html: String, modifier: Modifier = Modifier) {
                 settings.javaScriptEnabled = false
                 settings.loadWithOverviewMode = true
                 settings.useWideViewPort = true
+                // 安全加固：静态文档无需任何文件 / 内容访问能力
+                settings.allowFileAccess = false
+                settings.allowContentAccess = false
+                settings.allowFileAccessFromFileURLs = false
+                settings.allowUniversalAccessFromFileURLs = false
                 webViewClient = WebViewClient()
                 setBackgroundColor(AndroidColor.TRANSPARENT)
             }
