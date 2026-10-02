@@ -129,7 +129,9 @@ A: Use the companion app [MiniMe Logs](https://github.com/Lisir2002/MiniMe-core/
 <details>
 <summary>Release signing configuration</summary>
 
-Add to `app/keystore.properties`:
+Signing keys are injected via GitHub Secrets, not committed to the repository. CI restores them to `app/minime.jks` + `app/keystore.properties` before building.
+
+**Local development**: create `app/keystore.properties` manually (obtain keys through a secure channel):
 
 ```properties
 storeFile=minime.jks
@@ -138,7 +140,13 @@ keyAlias=your_alias
 keyPassword=your_key_password
 ```
 
-`storeFile` path is customizable (filename not fixed). CI restores it from secrets to `app/minime.jks`. When signing config is not present, release build auto-falls back to the debug keystore, so `assembleRelease` always produces an APK.
+**CI release**: configure 4 secrets in `Settings → Secrets → Actions`:
+- `SIGNING_KEYSTORE_BASE64`: base64-encoded minime.jks
+- `SIGNING_STORE_PASSWORD`: keystore password
+- `SIGNING_KEY_ALIAS`: key alias
+- `SIGNING_KEY_PASSWORD`: key password
+
+Missing any secret fails the build immediately — no silent fallback to debug keystore.
 
 </details>
 
@@ -153,9 +161,9 @@ keyPassword=your_key_password
 
 ### Cloud build (GitHub Actions release automation)
 
-Releases are tag-driven: push a `v*` tag on a `main` commit (e.g. `git push origin v0.0.0.24` / `v0.0.0.24-rc1`) and [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) takes over automatically: unit tests → assembleRelease → production signing → arm64-v8a artifact validation → upload R8 mapping → create GitHub Release → attach APK → write Run Summary. RC tags (containing `-rc`) are auto-marked as prerelease.
+Releases are tag-driven: push a `v*` tag on a `main` commit (e.g. `git push origin v0.0.0.46`) and [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) takes over automatically: unit tests → assembleRelease → production signing → arm64-v8a artifact validation → upload R8 mapping → create GitHub Release → attach APK → write Run Summary. No RC releases for the main app.
 
-- **Production-signing**: the official keystore (`app/minime.jks`) and properties (`app/keystore.properties`) are committed to the repository (maintainer-authorized), so CI signs directly without extra secrets.
+- **Production-signing**: the official keystore is injected via GitHub Secrets (`SIGNING_KEYSTORE_BASE64` / `SIGNING_STORE_PASSWORD` / `SIGNING_KEY_ALIAS` / `SIGNING_KEY_PASSWORD`), not committed to the repository. CI restores them before building. Missing any secret causes build failure.
 - **Real-time monitoring & artifact verification**, full commands, and CI job details: see [docs/ci-release.md](./docs/ci-release.md) (cloud build & release operations manual).
 - **Release conventions**: APK naming, title format, and body format mandatory constraints are in [AGENTS.md Release Conventions](./AGENTS.md#发版规范最高优先级--强制约束--发版前逐条核对).
 

@@ -11,8 +11,11 @@ app/build/
 local.properties
 gradle-local.properties
 
-# 签名：唯一官方 keystore 已按维护者决定**入库**（app/minime.jks + app/keystore.properties），
-# 保证每一次 release 都使用同一把正式密钥。以下不再忽略，交由 git 跟踪。
+# 签名：唯一官方 keystore 通过 GitHub Secrets 注入，不入库。
+# CI 构建前从 Secrets 恢复为 app/minime.jks + app/keystore.properties；
+# 本地开发需自行创建该文件（从安全渠道获取密钥）。
+app/minime.jks
+app/keystore.properties
 
 # Debug / profiling
 *.hprof

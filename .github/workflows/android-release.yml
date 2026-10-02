@@ -36,12 +36,32 @@ jobs:
           java-version: '17'
 
       # 【签名策略 · 唯一官方密钥】正式 release 一律使用「唯一官方 keystore」：
-      #   app/minime.jks + app/keystore.properties（已按维护者决定**入库**，见 .gitignore / branding.gradle.kts「签名策略」），
-      #   本地与 CI 每次构建加载同一把密钥，签名指纹恒定。
-      # 故此处**不再**需要从 CI secrets 恢复 keystore / 生成 keystore.properties（旧策略，已移除）。
-      # app/ 下的 minime.jks 与 keystore.properties 随 checkout 自带，Gradle signingConfigs.release 直接读取，
-      # 缺少即构建失败（require 强制），不存在「静默回退 debug keystore 当正式签名」。
-      # debug keystore（~/.android/debug.keystore）仅由 AGP 开发期自动生成用于 debug 构建，release 与它无关。
+      #   密钥通过 GitHub Secrets 注入（SIGNING_KEYSTORE_BASE64 / SIGNING_STORE_PASSWORD /
+      #   SIGNING_KEY_PASSWORD / SIGNING_KEY_ALIAS），CI 构建前恢复为 app/minime.jks +
+      #   app/keystore.properties。密钥文件不入库，防止仓库泄露导致签名被伪造。
+      #   缺少任一 Secret 即构建失败，不存在「静默回退 debug keystore 当正式签名」。
+      #   debug keystore（~/.android/debug.keystore）仅由 AGP 开发期自动生成用于 debug 构建，release 与它无关。
+      - name: Restore signing keystore from GitHub Secrets
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+        run: |
+          set -e
+          : "${SIGNING_KEYSTORE_BASE64:?::error::Secret SIGNING_KEYSTORE_BASE64 未配置}"
+          : "${SIGNING_STORE_PASSWORD:?::error::Secret SIGNING_STORE_PASSWORD 未配置}"
+          : "${SIGNING_KEY_PASSWORD:?::error::Secret SIGNING_KEY_PASSWORD 未配置}"
+          : "${SIGNING_KEY_ALIAS:?::error::Secret SIGNING_KEY_ALIAS 未配置}"
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > app/minime.jks
+          cat > app/keystore.properties << EOF
+          storeFile=minime.jks
+          storePassword=$SIGNING_STORE_PASSWORD
+          keyAlias=$SIGNING_KEY_ALIAS
+          keyPassword=$SIGNING_KEY_PASSWORD
+          EOF
+          echo "✓ 签名密钥已从 Secrets 恢复（app/minime.jks + app/keystore.properties）"
+          ls -la app/minime.jks app/keystore.properties
       - name: Set up Android SDK (use pre-installed + manual install)
         run: |
           set -e
@@ -205,7 +225,7 @@ jobs:
           fi
           echo "✓ applicationId 校验通过: $cur_id"
 
-      # 签名：唯一官方 keystore + properties 已入库，随 checkout 自带（见上方「签名策略」注释）。
+      # 签名：唯一官方 keystore + properties 已从 GitHub Secrets 恢复（见上方「签名策略」注释）。
       # 发版质量门禁：跑 release 变体单元测试（用户策略 = 所有测试/验证都用发行版），
       # 与用户实际安装的 release classpath 一致，不再被 debug 专用代码路径掩盖。
       # （纯 JVM 单测不依赖真机 ABI，与 arm64-only 的打包策略无冲突。）

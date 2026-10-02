@@ -20,6 +20,8 @@ val brandAppName: String = extra["brandAppName"] as String
 val brandIconFamily: String = extra["brandIconFamily"] as String
 
 // 从本地 keystore.properties 读取 release 签名密钥（已 gitignore，不入库）。
+// CI 构建前从 GitHub Secrets 恢复为 app/minime.jks + app/keystore.properties；
+// 本地开发需自行创建该文件（从安全渠道获取密钥），缺少即 release 构建失败。
 // 若文件不存在（如 CI 环境）则跳过，release 产出 unsigned 包。
 val keystorePropertiesFile = file("keystore.properties")
 val keystoreProperties = Properties()
@@ -134,10 +136,10 @@ android {
         }
 
         create("release") {
-            // 唯一官方密钥：必须存在 app/keystore.properties（已入库），指向 minime.jks。
+            // 唯一官方密钥：必须存在 app/keystore.properties（CI 从 GitHub Secrets 恢复，本地需自行创建），指向 minime.jks。
             // 缺少即失败——正式版不再可能被 debug keystore 签名发出。
             require(keystorePropertiesFile.exists()) {
-                "release 正式签名密钥缺失：缺少 app/keystore.properties（唯一官方密钥，已入库）。" +
+                "release 正式签名密钥缺失：缺少 app/keystore.properties（唯一官方密钥，CI 从 Secrets 恢复）。" +
                     "正式 release 必须用同一把官方密钥（见 branding.gradle.kts 签名策略）。"
             }
             storeFile = file(keystoreProperties["storeFile"] as String)

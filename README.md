@@ -130,7 +130,9 @@ A：使用附属应用 [MiniMe Logs](https://github.com/Lisir2002/MiniMe-core/re
 <details>
 <summary>Release 签名配置</summary>
 
-在 `app/keystore.properties` 中添加：
+签名密钥通过 GitHub Secrets 注入，不入库。CI 构建前从 Secrets 恢复为 `app/minime.jks` + `app/keystore.properties`。
+
+**本地开发**：需自行创建 `app/keystore.properties`（从安全渠道获取密钥）：
 
 ```properties
 storeFile=minime.jks
@@ -139,7 +141,13 @@ keyAlias=your_alias
 keyPassword=your_key_password
 ```
 
-`storeFile` 路径可自定义（不固定文件名），CI 会从 secrets 还原到 `app/minime.jks`。未配置时 release 会自动回退到 debug keystore 签名，保证零配置下 `assembleRelease` 也能产出 APK。
+**CI 发版**：仓库 `Settings → Secrets → Actions` 必须配置 4 个 secrets：
+- `SIGNING_KEYSTORE_BASE64`：minime.jks 的 base64 编码
+- `SIGNING_STORE_PASSWORD`：密钥库密码
+- `SIGNING_KEY_ALIAS`：密钥别名
+- `SIGNING_KEY_PASSWORD`：密钥密码
+
+缺失任一 Secret 即构建失败，不会静默回退到 debug keystore。
 
 </details>
 
@@ -153,9 +161,9 @@ keyPassword=your_key_password
 
 ### 云端构建（GitHub Actions 自动发版）
 
-发版走 Tag 驱动：在 `main` 节点上打 `v*` Tag 推送（如 `git push origin v0.0.0.16` / `v0.0.0.16-rc1`），由 [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) 自动接管：单测 → assembleRelease → 正式签名 → arm64-v8a 产物校验 → 上传 R8 mapping → 创建 GitHub Release → 挂载 APK → 写入 Run Summary。RC Tag（含 `-rc`）自动标记为 prerelease。
+发版走 Tag 驱动：在 `main` 节点上打 `v*` Tag 推送（如 `git push origin v0.0.0.46`），由 [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) 自动接管：单测 → assembleRelease → 正式签名 → arm64-v8a 产物校验 → 上传 R8 mapping → 创建 GitHub Release → 挂载 APK → 写入 Run Summary。主应用不发 RC 版。
 
-- **正式签名前置条件**：仓库 `Settings → Secrets → Actions` 必须配置 4 个 secrets —— `AICODE_KEYSTORE_BASE64` / `AICODE_KEYSTORE_PASSWORD` / `AICODE_KEY_ALIAS` / `AICODE_KEY_PASSWORD`。缺失任一会静默回退到 debug keystore 签名，产物不可上架。
+- **正式签名前置条件**：仓库 `Settings → Secrets → Actions` 必须配置 4 个 secrets —— `SIGNING_KEYSTORE_BASE64` / `SIGNING_STORE_PASSWORD` / `SIGNING_KEY_ALIAS` / `SIGNING_KEY_PASSWORD`。缺失任一会构建失败，不会静默回退到 debug keystore。
 - **实时监控与产物校验**、完整命令与 CI job 详解：见 [docs/ci-release.md](./docs/ci-release.md)（云端构建发版运维手册）。
 - **发版规范**：安装包命名、标题格式、正文格式等强制约束见 [AGENTS.md 发版规范](./AGENTS.md#发版规范最高优先级--强制约束--发版前逐条核对)。
 
