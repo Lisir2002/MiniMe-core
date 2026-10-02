@@ -11,6 +11,7 @@ import com.mini.me_core.feature.proxy.data.ProxySettingsRepository
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
 import com.mini.me_core.feature.proxy.domain.ProxyConnectivityTester
 import com.mini.me_core.feature.proxy.domain.ProxyNodeHealthMonitor
+import com.mini.me_core.feature.proxy.domain.ProxySessionManager
 import com.mini.me_core.datalayer.store.ProxyTrafficRepository
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -53,29 +54,49 @@ class NetworkProxyTool @Inject constructor(
     private val connectivityTester: ProxyConnectivityTester,
     private val trafficRepo: ProxyTrafficRepository,
     private val nodeHealthMonitor: ProxyNodeHealthMonitor,
+    private val sessionManager: ProxySessionManager,
 ) : AgentTool() {
 
     private companion object {
         const val TAG = "NetworkProxyTool"
+        const val LATENCY_CACHE_TTL_MS = 60_000L  // 测速缓存 60 秒
     }
 
+    /** 预测速缓存：node -> (timestamp, delayMs) */
+    private val latencyCache = mutableMapOf<String, Pair<Long, Long?>>()
+
+    /** 目标地区 → 节点关键词映射（用于 smart 选优）。 */
+    private val regionKeywords = mapOf(
+        "github" to listOf("香港", "日本", "新加坡", "台湾", "韩国", "HK", "JP", "SG", "TW", "KR"),
+        "google" to listOf("香港", "日本", "新加坡", "台湾", "美国", "HK", "JP", "SG", "TW", "US"),
+        "youtube" to listOf("香港", "日本", "新加坡", "台湾", "美国", "HK", "JP", "SG", "TW", "US"),
+        "openai" to listOf("美国", "日本", "新加坡", "香港", "US", "JP", "SG", "HK"),
+        "anthropic" to listOf("美国", "日本", "新加坡", "香港", "US", "JP", "SG", "HK"),
+        "huggingface" to listOf("美国", "日本", "新加坡", "香港", "US", "JP", "SG", "HK"),
+        "docker" to listOf("香港", "日本", "新加坡", "美国", "HK", "JP", "SG", "US"),
+        "pypi" to listOf("香港", "日本", "新加坡", "国内", "HK", "JP", "SG"),
+        "npmjs" to listOf("香港", "日本", "新加坡", "国内", "HK", "JP", "SG"),
+        "default" to listOf("香港", "日本", "新加坡", "台湾", "韩国", "HK", "JP", "SG", "TW", "KR"),
+    )
+
     override val name = "network_proxy"
-    override val description = "管理容器内网络代理（mihomo，VPN 形态）。action ∈ {status, on, off, test, select, list_subscriptions, list_proxies, latency, diagnose, traffic, health, auto_fix}。on 用已播种 profile_id 或临时 inline_yaml；select 切 select 分组节点（node=auto 自动选最快）或 mode；latency 单节点或 group 批量；diagnose 四项连接诊断；auto_fix 自动切最快节点并复检。所有会改出口的操作都会请求用户确认。"
+    override val description = "管理容器内网络代理（mihomo，VPN 形态）。action ∈ {status, use, release, keepalive, on, off, test, select, list_subscriptions, list_proxies, latency, diagnose, traffic, health, auto_fix}。use=一键开启+测速选优+返回代理地址（推荐）；release=标记使用结束启动空闲倒计时；keepalive=重置空闲计时器续命；on/off=手动开关；select 切节点（node=auto 最快，node=smart 按目标地区智能选优）或 mode；latency 测速（结果缓存60秒）；status 返回 auto_close_in 剩余秒数。代理默认5分钟无活动自动关闭。所有会改出口的操作都会请求用户确认。"
     override val permissionPolicy = ToolPermissionPolicy.ASK
     override val capabilities = setOf(ToolCapability.MODIFY_NETWORK, ToolCapability.NETWORK_READ)
 
     override val parameters = mapOf(
         "action" to ToolParameter(
             "action", ParameterType.STRING,
-            "要执行的操作：status / on / off / test / select / list_subscriptions / list_proxies / latency / diagnose / traffic / health / auto_fix",
-            enum = listOf("status", "on", "off", "test", "select", "list_subscriptions", "list_proxies", "latency", "diagnose", "traffic", "health", "auto_fix")
+            "要执行的操作：status / use / release / keepalive / on / off / test / select / list_subscriptions / list_proxies / latency / diagnose / traffic / health / auto_fix",
+            enum = listOf("status", "use", "release", "keepalive", "on", "off", "test", "select", "list_subscriptions", "list_proxies", "latency", "diagnose", "traffic", "health", "auto_fix")
         ),
-        "profile_id" to ToolParameter("profile_id", ParameterType.STRING, "on 时引用一个已播种的 profile id（list_subscriptions 可得）", required = false),
-        "inline_yaml" to ToolParameter("inline_yaml", ParameterType.STRING, "临时代理配置 YAML（仅本次会话，不建成长期订阅）。on 时可用", required = false),
+        "profile_id" to ToolParameter("profile_id", ParameterType.STRING, "use/on 时引用一个已播种的 profile id（list_subscriptions 可得）", required = false),
+        "inline_yaml" to ToolParameter("inline_yaml", ParameterType.STRING, "临时代理配置 YAML（仅本次会话，不建成长期订阅）。use/on 时可用", required = false),
+        "target_url" to ToolParameter("target_url", ParameterType.STRING, "use/select node=smart 时的目标 URL，用于智能选择最优地区节点", required = false),
         "url" to ToolParameter("url", ParameterType.STRING, "test 单个订阅 URL", required = false),
         "yaml" to ToolParameter("yaml", ParameterType.STRING, "test 单个手动 YAML", required = false),
         "group" to ToolParameter("group", ParameterType.STRING, "select 目标分组名；latency 批量测速时为分组名", required = false),
-        "node" to ToolParameter("node", ParameterType.STRING, "select 目标节点名；传 \"auto\" 自动选分组内最快可用节点", required = false),
+        "node" to ToolParameter("node", ParameterType.STRING, "select 目标节点名；传 \"auto\" 自动选最快，传 \"smart\" 按目标地区智能选优", required = false),
         "mode" to ToolParameter("mode", ParameterType.STRING, "select 时切换运行模式：rule / global / direct", required = false),
     )
 
@@ -85,6 +106,9 @@ class NetworkProxyTool @Inject constructor(
         return try {
             when (action) {
                 "status" -> doStatus()
+                "use" -> doUse(args)
+                "release" -> doRelease()
+                "keepalive" -> doKeepAlive()
                 "on" -> doOn(args)
                 "off" -> doOff()
                 "test" -> doTest(args)
@@ -133,17 +157,93 @@ class NetworkProxyTool @Inject constructor(
                     "today_down_bytes" to JsonPrimitive(today.downBytes),
                     "active_connections" to JsonPrimitive(connCount ?: -1),
                     "unhealthy_nodes" to JsonArray(unhealthy.map { JsonPrimitive(it) }),
+                    "auto_close_in" to JsonPrimitive(sessionManager.autoCloseIn.value),
+                    "session_active" to JsonPrimitive(sessionManager.sessionActive.value),
+                    "idle_timeout_sec" to JsonPrimitive(sessionManager.getIdleTimeoutSec()),
                 )
             )
         )
     }
 
-    // ── 写：on / off ──
+    // ── 会话级：use / release / keepalive（随用随开，用完随关）──
+
+    /** use：一键开启 + 测速选优 + 返回代理地址。模型最常用入口。 */
+    private suspend fun doUse(args: Map<String, JsonElement>): ToolResult {
+        val profileId = args["profile_id"]?.jsonPrimitive?.contentOrNull
+        val inlineYaml = args["inline_yaml"]?.jsonPrimitive?.contentOrNull
+        val targetUrl = args["target_url"]?.jsonPrimitive?.contentOrNull
+
+        // 1. 开启会话（若未开启）
+        val result = sessionManager.startSession(profileId, inlineYaml)
+        if (result != "ok") return ToolResult.Error(result, "PROXY_ON_FAILED")
+
+        // 2. 找一个 select 分组，测速选优
+        val group = findFirstSelectGroup()
+        var selectedNode: String? = null
+        var selectedDelay: Long? = null
+        if (group != null) {
+            selectedNode = if (targetUrl != null) {
+                pickSmartNode(group, targetUrl)
+            } else {
+                pickFastestNode(group)
+            }
+            if (selectedNode != null) {
+                manager.controllerRequest("PUT", "/proxies/${encoded(group)}", """{"name":"$selectedNode"}""")
+                selectedDelay = testNodeDelayMs(selectedNode)
+            }
+        }
+
+        sessionManager.markActivity()
+        return ToolResult.Success(
+            JsonObject(
+                mapOf(
+                    "ok" to JsonPrimitive(true),
+                    "enabled" to JsonPrimitive(true),
+                    "proxy_addr" to JsonPrimitive("${manager.state.value.mixedHost}:${manager.state.value.mixedPort}"),
+                    "group" to (group?.let { JsonPrimitive(it) } ?: JsonPrimitive("")),
+                    "node" to (selectedNode?.let { JsonPrimitive(it) } ?: JsonPrimitive("")),
+                    "node_delay_ms" to (selectedDelay?.let { JsonPrimitive(it) } ?: JsonPrimitive(-1)),
+                    "auto_close_in" to JsonPrimitive(sessionManager.autoCloseIn.value),
+                    "note" to JsonPrimitive("代理已就绪，空闲${sessionManager.getIdleTimeoutSec()}秒后自动关闭；调用 keepalive 可续命"),
+                )
+            )
+        )
+    }
+
+    /** release：标记本次使用结束，启动空闲倒计时。 */
+    private suspend fun doRelease(): ToolResult {
+        sessionManager.endSession()
+        return ToolResult.Success(
+            JsonObject(
+                mapOf(
+                    "ok" to JsonPrimitive(true),
+                    "auto_close_in" to JsonPrimitive(sessionManager.autoCloseIn.value),
+                    "note" to JsonPrimitive("已标记使用结束，空闲${sessionManager.getIdleTimeoutSec()}秒后自动关闭"),
+                )
+            )
+        )
+    }
+
+    /** keepalive：重置空闲计时器，续命。 */
+    private suspend fun doKeepAlive(): ToolResult {
+        sessionManager.keepAlive()
+        return ToolResult.Success(
+            JsonObject(
+                mapOf(
+                    "ok" to JsonPrimitive(true),
+                    "auto_close_in" to JsonPrimitive(sessionManager.autoCloseIn.value),
+                )
+            )
+        )
+    }
+
+    // ── 写：on / off（手动模式，暂停自动关闭）──
     private suspend fun doOn(args: Map<String, JsonElement>): ToolResult {
         val profileId = args["profile_id"]?.jsonPrimitive?.contentOrNull
         val inlineYaml = args["inline_yaml"]?.jsonPrimitive?.contentOrNull
         val result = manager.on(profileId, inlineYaml)
         if (result != "ok") return ToolResult.Error(result, "PROXY_ON_FAILED")
+        sessionManager.onManualOn()  // 手动开启，暂停自动关闭
         return ToolResult.Success(
             JsonObject(
                 mapOf(
@@ -151,7 +251,8 @@ class NetworkProxyTool @Inject constructor(
                     "enabled" to JsonPrimitive(true),
                     "profile_id" to (profileId?.let { JsonPrimitive(it) } ?: JsonPrimitive("")),
                     "inline" to JsonPrimitive(inlineYaml != null),
-                    "note" to JsonPrimitive("代理已启用：新容器进程生效；inline 仅本次会话、不入订阅列表"),
+                    "auto_close" to JsonPrimitive(false),
+                    "note" to JsonPrimitive("手动开启，自动关闭已暂停；调用 use 可恢复随用随关模式"),
                 )
             )
         )
@@ -159,10 +260,9 @@ class NetworkProxyTool @Inject constructor(
 
     private suspend fun doOff(): ToolResult {
         manager.off()
+        sessionManager.onManualOff()
         return ToolResult.Success(
-            JsonObject(
-                mapOf("ok" to JsonPrimitive(true), "enabled" to JsonPrimitive(false))
-            )
+            JsonObject(mapOf("ok" to JsonPrimitive(true), "enabled" to JsonPrimitive(false)))
         )
     }
 
@@ -231,24 +331,31 @@ class NetworkProxyTool @Inject constructor(
         val mode = args["mode"]?.jsonPrimitive?.contentOrNull
         val group = args["group"]?.jsonPrimitive?.contentOrNull
         val node = args["node"]?.jsonPrimitive?.contentOrNull
+        val targetUrl = args["target_url"]?.jsonPrimitive?.contentOrNull
         if (mode != null) {
             val body = """{"mode":"$mode"}"""
             val resp = manager.controllerRequest("PATCH", "/configs", body)
             if (resp == null) return selOffline()
+            sessionManager.markActivity()
             return ToolResult.Success(
                 JsonObject(mapOf("ok" to JsonPrimitive(true), "mode" to JsonPrimitive(mode)))
             )
         }
         if (group == null || node == null) {
-            return ToolResult.Error("select 需要 group+node（切节点，node=auto 自动选最快）或 mode（切模式）", "MISSING_ARGS")
+            return ToolResult.Error("select 需要 group+node（切节点，node=auto 最快，node=smart 按目标地区智能选优）或 mode（切模式）", "MISSING_ARGS")
         }
-        // node="auto"：自动测速该分组，选最快可用节点。
-        val targetNode = if (node == "auto") {
-            pickFastestNode(group)
+        // node="auto"：自动测速该分组，选最快可用节点（带缓存）。
+        // node="smart"：按 target_url 地区智能选优。
+        val targetNode = when (node) {
+            "auto" -> pickFastestNode(group)
                 ?: return ToolResult.Error("分组内无可用节点（全部超时）", "NO_HEALTHY_NODE")
-        } else node
+            "smart" -> pickSmartNode(group, targetUrl ?: "")
+                ?: return ToolResult.Error("分组内无匹配地区的可用节点", "NO_HEALTHY_NODE")
+            else -> node
+        }
         val resp = manager.controllerRequest("PUT", "/proxies/${encoded(group)}", """{"name":"$targetNode"}""")
         if (resp == null) return selOffline()
+        sessionManager.markActivity()
         return ToolResult.Success(
             JsonObject(
                 mapOf(
@@ -256,25 +363,70 @@ class NetworkProxyTool @Inject constructor(
                     "group" to JsonPrimitive(group),
                     "node" to JsonPrimitive(targetNode),
                     "auto" to JsonPrimitive(node == "auto"),
+                    "smart" to JsonPrimitive(node == "smart"),
                 )
             )
         )
     }
 
-    /** 测分组内全部节点延迟，返回最快者（失败/超时节点跳过）。无可用返回 null。 */
-    private suspend fun pickFastestNode(group: String): String? {
+    /** 找第一个 select 类型的分组（用于 use/auto_fix 自动选优）。 */
+    private suspend fun findFirstSelectGroup(): String? {
         val proxies = manager.controllerRequest("GET", "/proxies") ?: return null
         val root = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(proxies).jsonObject }.getOrNull()
             ?: return null
-        val members = root["proxies"]?.jsonObject?.get(group)?.jsonObject?.get("all")?.jsonArray
-            ?: return null
+        val proxiesMap = root["proxies"]?.jsonObject ?: return null
+        return proxiesMap.entries.firstOrNull {
+            val type = it.value.jsonObject["type"]?.jsonPrimitive?.contentOrNull
+            type == "Selector" && it.value.jsonObject["all"] != null
+        }?.key
+    }
+
+    /** 按目标 URL 地区智能选优：先匹配地区关键词，再在匹配节点中选最快。 */
+    private suspend fun pickSmartNode(group: String, targetUrl: String): String? {
+        val members = getGroupMembers(group) ?: return null
+        val keywords = regionKeywords.entries.firstOrNull { (k, _) ->
+            k != "default" && targetUrl.contains(k, ignoreCase = true)
+        }?.value ?: regionKeywords["default"]!!
+
+        // 先在匹配地区的节点中选最快
+        val matched = members.filter { name -> keywords.any { name.contains(it, ignoreCase = true) } }
+        val candidates = matched.ifEmpty { members }
         var best: String? = null; var bestDelay = Long.MAX_VALUE
-        members.forEach { el ->
-            val name = el.jsonPrimitive.contentOrNull ?: return@forEach
-            val d = testNodeDelayMs(name) ?: return@forEach
+        candidates.forEach { name ->
+            val d = testNodeDelayMsCached(name) ?: return@forEach
             if (d in 1..<bestDelay) { bestDelay = d; best = name }
         }
         return best
+    }
+
+    /** 测分组内全部节点延迟（带缓存），返回最快者。 */
+    private suspend fun pickFastestNode(group: String): String? {
+        val members = getGroupMembers(group) ?: return null
+        var best: String? = null; var bestDelay = Long.MAX_VALUE
+        members.forEach { name ->
+            val d = testNodeDelayMsCached(name) ?: return@forEach
+            if (d in 1..<bestDelay) { bestDelay = d; best = name }
+        }
+        return best
+    }
+
+    private suspend fun getGroupMembers(group: String): List<String>? {
+        val proxies = manager.controllerRequest("GET", "/proxies") ?: return null
+        val root = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(proxies).jsonObject }.getOrNull()
+            ?: return null
+        return root["proxies"]?.jsonObject?.get(group)?.jsonObject?.get("all")?.jsonArray
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+    }
+
+    /** 单节点延迟（带 60 秒缓存），失败返回 null。 */
+    private suspend fun testNodeDelayMsCached(node: String): Long? {
+        val cached = latencyCache[node]
+        if (cached != null && System.currentTimeMillis() - cached.first < LATENCY_CACHE_TTL_MS) {
+            return cached.second
+        }
+        val delay = testNodeDelayMs(node)
+        latencyCache[node] = System.currentTimeMillis() to delay
+        return delay
     }
 
     /** 单节点延迟（ms），失败返回 null。 */
@@ -396,12 +548,7 @@ class NetworkProxyTool @Inject constructor(
                 "before" to JsonPrimitive("GREEN"), "note" to JsonPrimitive("连接正常，无需修复"))))
         }
         // 找一个 select 分组，切到最快节点。
-        val proxies = manager.controllerRequest("GET", "/proxies")
-            ?: return ToolResult.Error("控制面不可达", "PROXY_NOT_RUNNING")
-        val root = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(proxies).jsonObject }.getOrNull()
-            ?: return ToolResult.Error("解析 /proxies 失败", "PROXY_FAILED")
-        val proxiesMap = root["proxies"]?.jsonObject ?: return ToolResult.Error("无分组", "PROXY_FAILED")
-        val targetGroup = proxiesMap.entries.firstOrNull { it.value.jsonObject["all"] != null }?.key
+        val targetGroup = findFirstSelectGroup()
             ?: return ToolResult.Error("无可切换分组", "NO_HEALTHY_NODE")
         val fastest = pickFastestNode(targetGroup)
             ?: return ToolResult.Error("分组内无可用节点", "NO_HEALTHY_NODE")

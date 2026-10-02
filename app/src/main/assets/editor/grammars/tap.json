@@ -1,0 +1,52 @@
+{
+  "scopeName": "source.tap",
+  "name": "TAP",
+  "extensions": [
+    "tap"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#results"
+    },
+    {
+      "include": "#plan"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.tap",
+          "match": "^#.*$"
+        }
+      ]
+    },
+    "results": {
+      "patterns": [
+        {
+          "name": "keyword.control.ok.tap",
+          "match": "^ok\\b"
+        },
+        {
+          "name": "keyword.control.notok.tap",
+          "match": "^not ok\\b"
+        },
+        {
+          "name": "constant.numeric.tap",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "plan": {
+      "patterns": [
+        {
+          "name": "keyword.control.plan.tap",
+          "match": "^\\d+\\.\\.\\d+"
+        }
+      ]
+    }
+  }
+}

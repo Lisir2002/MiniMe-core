@@ -1,0 +1,57 @@
+{
+  "scopeName": "source.papyrus",
+  "name": "Papyrus",
+  "extensions": [
+    "psc",
+    "ppj"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.papyrus",
+          "match": ";.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.papyrus",
+          "begin": "\"",
+          "end": "\""
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.papyrus",
+          "match": "\\b(scriptName|extends|import|event|function|state|endState|if|elseIf|else|endIf|while|endWhile|return|property|endProperty|state|endState|auto|readOnly|conditional|global|native|debugOnly|betaOnly|const|new|parent|as|is|not|and|or|xor|mod|true|false|none|self|parent|game|utility|math|string|int|float|bool|object|form|reference|actor|objectReference|keyword|location|quest|race|faction|class|struct|endStruct|group|endGroup|conditional|global|native|debugOnly|betaOnly|const|new|parent|as|is|not|and|or|xor|mod|true|false|none|self|parent|game|utility|math|string|int|float|bool|object|form|reference|actor|objectReference|keyword|location|quest|race|faction|class|struct|endStruct|group|endGroup)\\b"
+        },
+        {
+          "name": "entity.name.function.papyrus",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.papyrus",
+      "match": "\\b-?\\d+\\.?\\d*\\b"
+    }
+  }
+}

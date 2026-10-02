@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.tokens.PrimitiveElevation
 
@@ -338,12 +339,12 @@ private fun rememberTaskStateVisual(state: TaskState): TaskStateVisual {
  */
 @Composable
 private fun TaskStateIcon(stateVisual: TaskStateVisual) {
-    val iconModifier = if (stateVisual.pulsing) {
+    val iconModifier = if (stateVisual.pulsing && !ScaledAnimation.isDisabled()) {
         val transition = rememberInfiniteTransition(label = "task-state")
         val alpha by transition.animateFloat(
             initialValue = 1f,
             targetValue = 0.3f,
-            animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+            animationSpec = infiniteRepeatable(ScaledAnimation.tween(700), RepeatMode.Reverse),
             label = "task-state-alpha"
         )
         Modifier.graphicsLayer { this.alpha = alpha }

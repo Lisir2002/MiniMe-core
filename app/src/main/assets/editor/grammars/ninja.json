@@ -1,0 +1,43 @@
+{
+  "name": "Ninja",
+  "scopeName": "source.ninja",
+  "fileTypes": [
+    "ninja"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.#.Ninja",
+      "match": "#.*$"
+    },
+    {
+      "name": "string.quoted.double.Ninja",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Ninja",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Ninja",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Ninja",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Ninja",
+      "match": "\\b(rule|build|default|pool|include|subninja|depfile|deps|command|description|generator|restat)\\b"
+    },
+    {
+      "name": "constant.numeric.Ninja",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

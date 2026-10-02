@@ -1,0 +1,53 @@
+{
+  "scopeName": "source.gcode",
+  "name": "G-Code",
+  "extensions": [
+    "gcode",
+    "nc",
+    "g",
+    "tap",
+    "cnc"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#codes"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.semicolon.gcode",
+          "match": ";.*$"
+        },
+        {
+          "name": "comment.block.parentheses.gcode",
+          "begin": "\\(",
+          "end": "\\)"
+        }
+      ]
+    },
+    "codes": {
+      "patterns": [
+        {
+          "name": "keyword.control.gcode",
+          "match": "\\b[GgMm]\\d+\\.?\\d*\\b"
+        },
+        {
+          "name": "variable.parameter.gcode",
+          "match": "\\b[A-FH-LN-Za-fh-ln-z]\\d*\\.?\\d*\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.gcode",
+      "match": "\\b-?\\d+\\.?\\d*\\b"
+    }
+  }
+}

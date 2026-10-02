@@ -18,6 +18,8 @@ const val PROXY_ENABLED_KEY = "proxy_enabled"
 const val ACTIVE_PROFILE_ID_KEY = "active_profile_id"
 const val PROFILES_JSON_KEY = "proxy_profiles_json"
 const val AI_HOSTS_DIRECT_KEY = "ai_hosts_direct"
+const val IDLE_TIMEOUT_SEC_KEY = "idle_timeout_sec"
+const val DEFAULT_IDLE_TIMEOUT_SEC = 300L
 
 /** 网络代理（network_proxy）的持久化：启用开关、活跃 profile、已播种的订阅列表。 */
 @Singleton
@@ -40,9 +42,12 @@ class ProxySettingsRepository @Inject constructor(
 
     val activeProfileIdFlow: Flow<String?> = kv.observeString(PROXY_NS, ACTIVE_PROFILE_ID_KEY).map { it?.takeIf { v -> v.isNotBlank() } }
 
+    val idleTimeoutSecFlow: Flow<Long> = kv.observeInt(PROXY_NS, IDLE_TIMEOUT_SEC_KEY).map { it ?: DEFAULT_IDLE_TIMEOUT_SEC }
+
     suspend fun setProxyEnabled(enabled: Boolean) { kv.putBool(PROXY_NS, PROXY_ENABLED_KEY, enabled) }
     suspend fun setAiHostsDirect(enabled: Boolean) { kv.putBool(PROXY_NS, AI_HOSTS_DIRECT_KEY, enabled) }
     suspend fun isProxyEnabled(): Boolean = proxyEnabledFlow.first()
+    suspend fun updateIdleTimeout(seconds: Long) { kv.putInt(PROXY_NS, IDLE_TIMEOUT_SEC_KEY, seconds) }
 
     suspend fun setActiveProfile(id: String?) {
         if (id == null) kv.delete(PROXY_NS, ACTIVE_PROFILE_ID_KEY) else kv.putString(PROXY_NS, ACTIVE_PROFILE_ID_KEY, id)

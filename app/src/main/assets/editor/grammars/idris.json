@@ -1,0 +1,44 @@
+{
+  "name": "Idris",
+  "scopeName": "source.idris",
+  "fileTypes": [
+    "idr",
+    "ipkg"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.--.Idris",
+      "match": "--.*$"
+    },
+    {
+      "name": "string.quoted.double.Idris",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Idris",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Idris",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Idris",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Idris",
+      "match": "\\b(module|where|data|record|type|let|in|if|then|else|case|of|do|return)\\b"
+    },
+    {
+      "name": "constant.numeric.Idris",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

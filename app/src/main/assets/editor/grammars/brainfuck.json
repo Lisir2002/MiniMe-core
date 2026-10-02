@@ -1,0 +1,44 @@
+{
+  "name": "Brainfuck",
+  "scopeName": "source.brainfuck",
+  "fileTypes": [
+    "bf",
+    "b"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.#.Brainfuck",
+      "match": "#.*$"
+    },
+    {
+      "name": "string.quoted.double.Brainfuck",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Brainfuck",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Brainfuck",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Brainfuck",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Brainfuck",
+      "match": "\\b(>|<|+|-|.|,|[|])\\b"
+    },
+    {
+      "name": "constant.numeric.Brainfuck",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

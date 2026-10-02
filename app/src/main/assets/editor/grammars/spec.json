@@ -1,0 +1,43 @@
+{
+  "name": "RPM Spec",
+  "scopeName": "source.spec",
+  "fileTypes": [
+    "spec"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.#.RPM Spec",
+      "match": "#.*$"
+    },
+    {
+      "name": "string.quoted.double.RPM Spec",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.RPM Spec",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.RPM Spec",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.RPM Spec",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.RPM Spec",
+      "match": "\\b(Name:|Version:|Release:|Summary:|License:|URL:|Source0:|Patch0:|BuildRequires:|Requires:|%description|%prep|%build|%install|%files|%changelog|%package|%define)\\b"
+    },
+    {
+      "name": "constant.numeric.RPM Spec",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

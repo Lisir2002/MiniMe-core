@@ -1,0 +1,43 @@
+{
+  "name": "WSDL",
+  "scopeName": "source.wsdl",
+  "fileTypes": [
+    "wsdl"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.<!--.WSDL",
+      "match": "<!--.*$"
+    },
+    {
+      "name": "string.quoted.double.WSDL",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.WSDL",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.WSDL",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.WSDL",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.WSDL",
+      "match": "\\b(definitions|types|message|portType|binding|service|port|operation|input|output|fault|soap|address|body)\\b"
+    },
+    {
+      "name": "constant.numeric.WSDL",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

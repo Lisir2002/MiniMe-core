@@ -236,9 +236,9 @@ private fun NodeManagerContent(
             tab = tab,
             onTabChange = onTabChange,
             testing = testing,
-            canTest = nodes.isNotEmpty(),
+            canTest = nodes.isNotEmpty() && enabled,
             onTestAll = {
-                viewModel.activeProfileId.value?.let(viewModel::testProfileLatency)
+                viewModel.activeProfileId.value?.let(viewModel::smartSelectBestNode)
             }
         )
 
@@ -290,10 +290,17 @@ private fun StatusHero(
     traffic: ProxyTraffic?,
     onEnable: () -> Unit
 ) {
+    val isRunning = enabled && reachable
+    val isStarting = enabled && !reachable
     val dotColor = when {
-        enabled && reachable -> Color(0xFF7CFC9B)
-        enabled -> Color(0xFFFFC857)
+        isRunning -> Color(0xFF7CFC9B)
+        isStarting -> Color(0xFFFFC857)
         else -> Color.White.copy(alpha = 0.55f)
+    }
+    val statusText = when {
+        isRunning -> "运行中"
+        isStarting -> "启动中…"
+        else -> "已关闭"
     }
     Box(
         modifier = Modifier
@@ -312,7 +319,7 @@ private fun StatusHero(
                 )
                 Spacer(Modifier.width(Spacing.sm))
                 Text(
-                    text = if (enabled) stringResource(R.string.ui_______4d1f56d6_2) else stringResource(R.string.ui_______b5fb1ee7_2),
+                    text = statusText,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -340,7 +347,7 @@ private fun StatusHero(
                 )
                 Spacer(Modifier.width(Spacing.xs))
                 Text(
-                    text = activeName,
+                    text = activeName.ifBlank { "未选择配置" },
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace,
                     color = Color.White,
@@ -370,9 +377,9 @@ private fun StatusHero(
             Spacer(Modifier.height(Spacing.xs))
             Text(
                 text = when {
-                    enabled && !reachable -> stringResource(R.string.ui_______950d8300)
-                    enabled -> stringResource(R.string.ui_mixed_76b25e4d)
-                    else -> stringResource(R.string.ui_______019bfe60)
+                    isStarting -> "内核启动中，控制面稍后就绪…"
+                    isRunning -> "代理运行中，流量已接管"
+                    else -> "点击下方按钮开启代理"
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.85f)
@@ -387,14 +394,14 @@ private fun StatusHero(
                     ),
                     shape = RoundedCornerShape(LocalCornerRadius.current.lg)
                 ) {
-                    Text(stringResource(R.string.ui______06fef6bd), fontWeight = FontWeight.Bold)
+                    Text("开启代理", fontWeight = FontWeight.Bold)
                 }
             }
         }
     }
 }
 
-// ─────────────────────────── 工具条：分段切换 + 全部测速 ───────────────────────────
+// ─────────────────────────── 工具条：分段切换 + 智能选优 ───────────────────────────
 
 @Composable
 private fun ToolbarRow(
@@ -426,9 +433,9 @@ private fun ToolbarRow(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
                 Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.ui_____33aac613))
+                Text("选优中")
             } else {
-                Text(stringResource(R.string.ui______98322500))
+                Text("智能选优")
             }
         }
     }

@@ -116,3 +116,19 @@
 -keep class net.sqlcipher.** { *; }
 -keep class net.sqlcipher.database.** { *; }
 -dontwarn net.sqlcipher.**
+
+# ---- sora-editor + TextMate 高亮引擎 ----
+# sora-editor 内部通过反射加载 language、scheme 等类，必须完整保留
+-keep class io.github.rosemoe.sora.** { *; }
+-keep interface io.github.rosemoe.sora.** { *; }
+-dontwarn io.github.rosemoe.sora.**
+
+# tm4e (TextMate 引擎内部实现)
+# grammar/theme 解析、正则引擎都通过反射动态加载
+-keep class org.eclipse.tm4e.** { *; }
+-keep interface org.eclipse.tm4e.** { *; }
+-dontwarn org.eclipse.tm4e.**
+
+# Joni 正则引擎（TextMate 正则后端）
+-keep class org.joni.** { *; }
+-dontwarn org.joni.**

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.AnimatedVisibility
@@ -111,22 +112,25 @@ internal fun TaskAccordion(
     val renderUnits = remember(group.taskId, group.subGroups) { buildRenderUnits(group.subGroups) }
 
     // 流式生成脉冲动画：动态调整边框高亮
-    val infiniteTransition = rememberInfiniteTransition(label = "streamingPulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.9f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
-    val borderAlpha = if (group.isStreaming) pulseAlpha else 0.6f
+    val pulseAlpha = if (group.isStreaming && !ScaledAnimation.isDisabled()) {
+        val infiniteTransition = rememberInfiniteTransition(label = "streamingPulse")
+        val a by infiniteTransition.animateFloat(
+            initialValue = 0.3f,
+            targetValue = 0.9f,
+            animationSpec = infiniteRepeatable(
+                animation = ScaledAnimation.tween(1200, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulseAlpha"
+        )
+        a
+    } else 0.6f
+    val borderAlpha = pulseAlpha
 
     // 根据状态动态调整卡片阴影
     val elevation by animateDpAsState(
         targetValue = if (group.isStreaming) 4.dp else if (group.isExpanded) 2.dp else 1.dp,
-        animationSpec = tween(300),
+        animationSpec = ScaledAnimation.tween(300),
         label = "cardElevation"
     )
 
@@ -216,13 +220,13 @@ internal fun TaskAccordion(
             AnimatedVisibility(
                 visible = group.isExpanded,
                 enter = expandVertically(
-                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+                    animationSpec = ScaledAnimation.tween(350, easing = FastOutSlowInEasing),
                     expandFrom = Alignment.Top
-                ) + fadeIn(animationSpec = tween(350)),
+                ) + fadeIn(animationSpec = ScaledAnimation.tween(350)),
                 exit = shrinkVertically(
-                    animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
+                    animationSpec = ScaledAnimation.tween(250, easing = FastOutSlowInEasing),
                     shrinkTowards = Alignment.Top
-                ) + fadeOut(animationSpec = tween(250))
+                ) + fadeOut(animationSpec = ScaledAnimation.tween(250))
             ) {
                 Column(
                     modifier = Modifier
@@ -433,13 +437,13 @@ private fun EmbeddedToolAccordion(
         AnimatedVisibility(
             visible = expanded,
             enter = expandVertically(
-                animationSpec = tween(300, easing = FastOutSlowInEasing),
+                animationSpec = ScaledAnimation.tween(300, easing = FastOutSlowInEasing),
                 expandFrom = Alignment.Top
-            ) + fadeIn(tween(200)),
+            ) + fadeIn(ScaledAnimation.tween(200)),
             exit = shrinkVertically(
-                animationSpec = tween(200),
+                animationSpec = ScaledAnimation.tween(200),
                 shrinkTowards = Alignment.Top
-            ) + fadeOut(tween(150))
+            ) + fadeOut(ScaledAnimation.tween(150))
         ) {
             Column(
                 modifier = Modifier
@@ -920,13 +924,13 @@ private fun SubAccordion(
             AnimatedVisibility(
                 visible = subGroup.isExpanded,
                 enter = expandVertically(
-                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                    animationSpec = ScaledAnimation.tween(300, easing = FastOutSlowInEasing),
                     expandFrom = Alignment.Top
-                ) + fadeIn(tween(200)),
+                ) + fadeIn(ScaledAnimation.tween(200)),
                 exit = shrinkVertically(
-                    animationSpec = tween(200),
+                    animationSpec = ScaledAnimation.tween(200),
                     shrinkTowards = Alignment.Top
-                ) + fadeOut(tween(150))
+                ) + fadeOut(ScaledAnimation.tween(150))
             ) {
                 Column(
                     modifier = Modifier

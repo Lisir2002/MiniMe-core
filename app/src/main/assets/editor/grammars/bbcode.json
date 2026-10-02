@@ -1,0 +1,44 @@
+{
+  "name": "BBCode",
+  "scopeName": "source.bbcode",
+  "fileTypes": [
+    "bb",
+    "bbcode"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line..BBCode",
+      "match": ".*$"
+    },
+    {
+      "name": "string.quoted.double.BBCode",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.BBCode",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.BBCode",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.BBCode",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.BBCode",
+      "match": "\\b(b|/b|i|/i|u|/u|url|/url|img|/img|quote|/quote|code|/code|list|/list|*)\\b"
+    },
+    {
+      "name": "constant.numeric.BBCode",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

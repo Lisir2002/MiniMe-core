@@ -44,6 +44,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.Spacing
 
 /**
@@ -75,7 +76,7 @@ fun NormFlowIndicatorBar(
         // 规范概览浮层：向上展开
         AnimatedVisibility(
             visible = showSheet,
-            enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+            enter = expandVertically(ScaledAnimation.tween(250), expandFrom = Alignment.Bottom) + fadeIn(ScaledAnimation.tween(200)),
             exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
         ) {
             NormFlowOverviewSheet(

@@ -1,0 +1,44 @@
+{
+  "name": "Device Tree",
+  "scopeName": "source.dts",
+  "fileTypes": [
+    "dts",
+    "dtsi"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.Device Tree",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.Device Tree",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Device Tree",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Device Tree",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Device Tree",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Device Tree",
+      "match": "\\b(/|compatible|model|reg|address-cells|size-cells|status|phandle|interrupts|clocks|pinctrl|#include|/dts-v1/)\\b"
+    },
+    {
+      "name": "constant.numeric.Device Tree",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

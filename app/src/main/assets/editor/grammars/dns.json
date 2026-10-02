@@ -1,0 +1,44 @@
+{
+  "name": "DNS Zone",
+  "scopeName": "source.dns",
+  "fileTypes": [
+    "zone",
+    "db"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.;.DNS Zone",
+      "match": ";.*$"
+    },
+    {
+      "name": "string.quoted.double.DNS Zone",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.DNS Zone",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.DNS Zone",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.DNS Zone",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.DNS Zone",
+      "match": "\\b($TTL|$ORIGIN|$INCLUDE|IN|SOA|NS|A|AAAA|CNAME|MX|TXT|PTR|SRV|CAA|MX|localhost)\\b"
+    },
+    {
+      "name": "constant.numeric.DNS Zone",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

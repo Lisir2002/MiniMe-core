@@ -1,0 +1,44 @@
+{
+  "name": "PlantUML",
+  "scopeName": "source.plantuml",
+  "fileTypes": [
+    "puml",
+    "plantuml"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.'.PlantUML",
+      "match": "'.*$"
+    },
+    {
+      "name": "string.quoted.double.PlantUML",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.PlantUML",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.PlantUML",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.PlantUML",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.PlantUML",
+      "match": "\\b(@startuml|@enduml|class|interface|actor|participant|->|-->|note|left|right|of|as)\\b"
+    },
+    {
+      "name": "constant.numeric.PlantUML",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

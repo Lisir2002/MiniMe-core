@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.AnimatedVisibility
@@ -142,12 +143,12 @@ private fun StepRow(step: TaskStep) {
 
     // Running 步骤脉冲背景
     val isRunning = step.status == TaskStepStatus.RUNNING
-    val bgModifier = if (isRunning) {
+    val bgModifier = if (isRunning && !ScaledAnimation.isDisabled()) {
         val transition = rememberInfiniteTransition(label = "step-pulse")
         val alpha by transition.animateFloat(
             initialValue = 0.08f,
             targetValue = 0.18f,
-            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+            animationSpec = infiniteRepeatable(ScaledAnimation.tween(900), RepeatMode.Reverse),
             label = "step-pulse-alpha"
         )
         Modifier

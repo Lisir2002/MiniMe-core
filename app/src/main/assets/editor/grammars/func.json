@@ -1,0 +1,61 @@
+{
+  "scopeName": "source.func",
+  "name": "FunC",
+  "extensions": [
+    "fc",
+    "func"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.func",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.func",
+          "begin": "\"",
+          "end": "\""
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.func",
+          "match": "\\b(global|const|forall|repeat|do|until|while|if|then|else|elseif|return|impure|inline|inline_ref|asm|method_id|operator|extends|mutates|abstract|override|private|public|builtin|extern|with|from|is|not|and|or|xor|throw|try|catch|throw_if|throw_unless|require)\\b"
+        },
+        {
+          "name": "storage.type.func",
+          "match": "\\b(int|cell|slice|builder|cont|tuple|bool|void|var|auto)\\b"
+        },
+        {
+          "name": "entity.name.function.func",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.func",
+      "match": "\\b-?\\d+\\.?\\d*\\b"
+    }
+  }
+}

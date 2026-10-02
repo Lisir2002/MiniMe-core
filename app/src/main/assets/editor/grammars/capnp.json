@@ -1,0 +1,43 @@
+{
+  "name": "CapnProto",
+  "scopeName": "source.capnp",
+  "fileTypes": [
+    "capnp"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.#.CapnProto",
+      "match": "#.*$"
+    },
+    {
+      "name": "string.quoted.double.CapnProto",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.CapnProto",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.CapnProto",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.CapnProto",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.CapnProto",
+      "match": "\\b(@0x|struct|enum|interface|using|import|const|annotation|extends|$)\\b"
+    },
+    {
+      "name": "constant.numeric.CapnProto",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

@@ -46,6 +46,15 @@ object TextMateManager {
     @Volatile
     private var initialized = false
 
+    /** 最后一次初始化失败的错误信息，供 UI 层展示诊断。 */
+    @Volatile
+    var lastInitError: String? = null
+        private set
+
+    /** 初始化失败次数，用于诊断反复失败。 */
+    var initFailCount = 0
+        private set
+
     @Volatile
     var currentThemeName: String = "dark-plus"
         private set
@@ -67,46 +76,68 @@ object TextMateManager {
 
             val t0 = System.currentTimeMillis()
             try {
+                lastInitError = null
                 // 1. 注册 AssetsFileResolver
                 FileProviderRegistry.getInstance().addFileProvider(
                     AssetsFileResolver(appContext.applicationContext.assets)
                 )
+                Log.d(TAG, "AssetsFileResolver 注册完成")
 
                 // 2. 加载主题
                 val themeRegistry = ThemeRegistry.getInstance()
+                var themeSuccess = 0
                 for (info in builtinThemes) {
                     runCatching { loadTheme(info) }
+                        .onSuccess { themeSuccess++ }
                         .onFailure { Log.w(TAG, "加载主题失败: ${info.name}", it) }
                 }
                 themeRegistry.setTheme(currentThemeName)
-                Log.i(TAG, "主题加载完成: ${builtinThemes.size} 套")
+                Log.i(TAG, "主题加载完成: $themeSuccess/${builtinThemes.size} 套")
 
                 // 3. 加载 grammar 索引
                 GrammarRegistry.getInstance().loadGrammars(GRAMMAR_INDEX)
-                Log.i(TAG, "Grammar 加载完成")
+                Log.i(TAG, "Grammar 索引加载完成")
 
                 // 4. 构建 extension → scopeName 映射
                 buildExtensionMap(appContext)
 
                 initialized = true
+                initFailCount = 0
                 val elapsed = System.currentTimeMillis() - t0
-                Log.i(TAG, "TextMate 引擎初始化完成，耗时 ${elapsed}ms，可用 scope=${availableScopes.size}")
+                Log.i(TAG, "✅ TextMate 引擎初始化完成，耗时 ${elapsed}ms，可用 scope=${availableScopes.size}，扩展名映射=${extToScope.size}")
             } catch (e: Exception) {
-                Log.e(TAG, "TextMate 引擎初始化失败", e)
+                initFailCount++
+                lastInitError = "${e.javaClass.simpleName}: ${e.message}"
+                Log.e(TAG, "❌ TextMate 引擎初始化失败 (第 $initFailCount 次): ${e.message}", e)
             }
         }
     }
 
-    /** 从 languages.json 读取所有 language 条目，构建扩展名→scopeName 映射。 */
+    /** 从 languages.json 读取所有 language 条目，构建 scope 索引和扩展名→scopeName 映射。 */
     private fun buildExtensionMap(appContext: Context) {
         runCatching {
             val json = appContext.assets.open(GRAMMAR_INDEX).bufferedReader().use { it.readText() }
             val arr = JSONObject(json).getJSONArray("languages")
+            var validCount = 0
+            var extCount = 0
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
                 val scope = obj.optString("scopeName", "")
-                if (scope.isNotEmpty()) availableScopes.add(scope)
+                if (scope.isNotEmpty()) {
+                    availableScopes.add(scope)
+                    validCount++
+                    // 从 extensions 字段构建扩展名映射
+                    val extensions = obj.optJSONArray("extensions")
+                    if (extensions != null) {
+                        for (j in 0 until extensions.length()) {
+                            val ext = extensions.getString(j).lowercase().trimStart('.')
+                            extToScope[ext] = scope
+                            extCount++
+                        }
+                    }
+                }
             }
+            Log.i(TAG, "语言注册表验证: $validCount/${arr.length()} 个有效 scopeName，$extCount 条扩展名映射")
         }.onFailure { Log.w(TAG, "构建 scope 索引失败", it) }
     }
 
@@ -139,10 +170,37 @@ object TextMateManager {
         return extToScope[key]
     }
 
+    /**
+     * 按完整文件名推断 scopeName（支持多段扩展名，如 .blade.php、.html.erb、.adoc.txt）。
+     * 先尝试完整文件名匹配，再逐段去掉前缀尝试匹配。
+     * @return scopeName，未识别返回 null
+     */
+    fun scopeForFileName(fileName: String): String? {
+        val lower = fileName.lowercase()
+        // 完整文件名匹配（如 cmakelists.txt、codeowners）
+        extToScope[lower]?.let { return it }
+        // 多段扩展名：逐段去掉前缀（如 test.blade.php -> blade.php -> php）
+        var remaining = lower
+        while (remaining.contains('.')) {
+            remaining = remaining.substringAfter('.')
+            extToScope[remaining]?.let { return it }
+        }
+        return null
+    }
+
     /** 设置当前主题（深色/浅色切换）。 */
     fun setTheme(name: String) {
         currentThemeName = name
         ThemeRegistry.getInstance().setTheme(name)
+    }
+
+    /** 根据系统深色/浅色模式自动选择主题。 */
+    fun setThemeBySystemMode(isDarkMode: Boolean) {
+        val themeName = if (isDarkMode) "dark-plus" else "light-plus"
+        if (themeName != currentThemeName) {
+            setTheme(themeName)
+            Log.i(TAG, "跟随系统模式切换主题: $themeName (dark=$isDarkMode)")
+        }
     }
 
     /** 创建与当前主题绑定的 ColorScheme，用于设置到 CodeEditor。 */

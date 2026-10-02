@@ -1,0 +1,70 @@
+{
+  "scopeName": "source.zephir",
+  "name": "Zephir",
+  "extensions": [
+    "zep"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.zephir",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.zephir",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.zephir",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.zephir",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.zephir",
+          "match": "\\b(namespace|use|as|class|interface|trait|extends|implements|function|method|return|if|else|elseif|endif|while|endwhile|for|endfor|foreach|endforeach|do|until|loop|switch|endswitch|case|default|break|continue|new|clone|isset|unset|empty|echo|print|var|const|let|in|instanceof|try|catch|throw|finally|public|protected|private|static|abstract|final|native|inline|deprecated|experimental|optimizer|inline|c-import|c-define|c-declare|c-expr|c-var|c-call|c-function|c-method|c-property|c-constant|c-macro|c-include|c-eval|c-fetch|c-store|c-let|c-set|c-get|c-isset|c-unset|c-empty|c-count|c-exists|c-type|c-cast|c-convert|c-increment|c-decrement|c-add|c-sub|c-mul|c-div|c-mod|c-and|c-or|c-xor|c-concat|c-equals|c-not-equals|c-identical|c-not-identical|c-less|c-greater|c-less-equal|c-greater-equal|c-and|c-or|c-not|c-bitwise-and|c-bitwise-or|c-bitwise-xor|c-bitwise-not|c-shift-left|c-shift-right|c-truth|c-falsy|c-bool|c-int|c-uint|c-long|c-ulong|c-char|c-uchar|c-double|c-float|c-string|c-array|c-object|c-resource|c-null|c-void|c-var|c-pointer|c-reference|c-value|c-zval|c-zend-string|c-zend-array|c-zend-object|c-zend-class-entry|c-zend-function|c-zend-method|c-zend-property|c-zend-constant|c-zend-module|c-zend-extension|c-zend-api|c-zend-execute|c-zend-compile|c-zend-parse|c-zend-error|c-zend-exception|c-zend-functions|c-zend-hash|c-zend-list|c-zend-object-store|c-zend-objects|c-zend-stack|c-zend-stream|c-zend-unicode|c-zend-utility|c-zend-variables|c-zend-builtin-functions|c-zend-builtin-extensions|c-zend-builtin-sapi|c-zend-builtin-embed|c-zend-builtin-tests|c-zend-builtin-main|c-zend-builtin-win32|c-zend-builtin-tsrm|c-zend-builtin-zend|c-zend-builtin-ctype|c-zend-builtin-date|c-zend-builtin-dom|c-zend-builtin-filter|c-zend-builtin-hash|c-zend-builtin-iconv|c-zend-builtin-json|c-zend-builtin-mbstring|c-zend-builtin-pcre|c-zend-builtin-pdo|c-zend-builtin-phar|c-zend-builtin-posix|c-zend-builtin-reflection|c-zend-builtin-session|c-zend-builtin-simplexml|c-zend-builtin-soap|c-zend-builtin-sockets|c-zend-builtin-spl|c-zend-builtin-sqlite3|c-zend-builtin-standard|c-zend-builtin-tokenizer|c-zend-builtin-xml|c-zend-builtin-xmlreader|c-zend-builtin-xmlwriter|c-zend-builtin-zip|c-zend-builtin-zlib)\\b"
+        },
+        {
+          "name": "storage.type.zephir",
+          "match": "\\b(int|uint|long|ulong|char|uchar|double|float|string|array|object|resource|bool|boolean|void|var|zval|zend_string|zend_array|zend_object|zend_class_entry|zend_function|zend_method|zend_property|zend_constant|zend_module|zend_extension)\\b"
+        },
+        {
+          "name": "entity.name.function.zephir",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.zephir",
+      "match": "\\b-?\\d+\\.?\\d*\\b"
+    }
+  }
+}

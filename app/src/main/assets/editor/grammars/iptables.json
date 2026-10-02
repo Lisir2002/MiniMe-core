@@ -1,0 +1,43 @@
+{
+  "name": "iptables",
+  "scopeName": "source.iptables",
+  "fileTypes": [
+    "iptables"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.#.iptables",
+      "match": "#.*$"
+    },
+    {
+      "name": "string.quoted.double.iptables",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.iptables",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.iptables",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.iptables",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.iptables",
+      "match": "\\b(*filter|*nat|*mangle|COMMIT|DROP|ACCEPT|REJECT|LOG|RETURN|Chain|target|prot|source|destination)\\b"
+    },
+    {
+      "name": "constant.numeric.iptables",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

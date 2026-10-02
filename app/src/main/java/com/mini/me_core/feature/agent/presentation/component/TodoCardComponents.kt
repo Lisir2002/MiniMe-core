@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.core.RepeatMode
@@ -143,16 +144,19 @@ internal fun TodoItemRow(item: ParsedTodoItem) {
                 )
             }
             isInProgress -> {
-                val transition = rememberInfiniteTransition(label = "todo-progress-dot")
-                val alpha by transition.animateFloat(
-                    initialValue = 1f,
-                    targetValue = 0.3f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(650),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "todo-progress-dot-alpha"
-                )
+                val alpha = if (!ScaledAnimation.isDisabled()) {
+                    val transition = rememberInfiniteTransition(label = "todo-progress-dot")
+                    val a by transition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 0.3f,
+                        animationSpec = infiniteRepeatable(
+                            animation = ScaledAnimation.tween(650),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "todo-progress-dot-alpha"
+                    )
+                    a
+                } else 1f
                 Box(
                     modifier = Modifier
                         .size(8.dp)

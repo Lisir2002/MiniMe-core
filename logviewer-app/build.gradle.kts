@@ -51,6 +51,8 @@ val stageReferencedSources by tasks.registering(Copy::class) {
         "com/mini/me_core/core/theme/components/AppEmptyState.kt",
         // 主题入口（含 Spacing 定义）
         "com/mini/me_core/core/theme/MiniMeTheme.kt",
+        // 动画缩放工具（AppBadge 依赖）
+        "com/mini/me_core/core/theme/ScaledAnimation.kt",
     )
     into(referencedSrcDir)
 }

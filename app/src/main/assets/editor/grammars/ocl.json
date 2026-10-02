@@ -1,0 +1,56 @@
+{
+  "scopeName": "source.ocl",
+  "name": "OCL",
+  "extensions": [
+    "ocl"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.ocl",
+          "match": "--.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.ocl",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.ocl",
+          "match": "\\b(context|inv|pre|post|body|init|derive|def|let|in|if|then|else|endif|package|endpackage|import|namespace|endnamespace|stereotype|endstereotype|for|in|do|endfor|while|endwhile|iterate|collect|select|reject|exists|forAll|isUnique|one|any|closure|collectNested|sortedBy|sum|product|size|isEmpty|notEmpty|includes|excludes|includesAll|excludesAll|count|including|excluding|union|intersection|includingAll|excludingAll|symmetricDifference|asSet|asSequence|asBag|asOrderedSet|flatten|selectByKind|selectByType|oclIsKindOf|oclIsTypeOf|oclIsNew|oclAsType|oclIsUndefined|oclIsInvalid|oclInvalid|oclUndefined|allInstances|toInteger|toReal|toString|div|mod|and|or|xor|not|implies|true|false|null|invalid|self|result|Tuple|Set|Bag|Sequence|OrderedSet|Collection|Integer|Real|String|Boolean|OclAny|OclVoid|OclInvalid|OclMessage|UnlimitedNatural)\\b"
+        },
+        {
+          "name": "entity.name.function.ocl",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.ocl",
+      "match": "\\b-?\\d+\\.?\\d*\\b"
+    }
+  }
+}

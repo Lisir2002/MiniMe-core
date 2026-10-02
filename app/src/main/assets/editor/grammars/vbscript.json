@@ -1,0 +1,44 @@
+{
+  "name": "VBScript",
+  "scopeName": "source.vbscript",
+  "fileTypes": [
+    "vbs",
+    "vbe"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.'.VBScript",
+      "match": "'.*$"
+    },
+    {
+      "name": "string.quoted.double.VBScript",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.VBScript",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.VBScript",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.VBScript",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.VBScript",
+      "match": "\\b(Sub|End Sub|Function|End Function|Dim|If|Then|Else|ElseIf|End If|For|To|Step|Next|Do|Loop|While|Wend|Call|MsgBox|InputBox|WScript|CreateObject)\\b"
+    },
+    {
+      "name": "constant.numeric.VBScript",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

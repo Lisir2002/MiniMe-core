@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.core.RepeatMode
@@ -291,12 +292,12 @@ private fun StatusMarker(state: ToolCallState) {
         ToolCallState.PENDING -> Triple(Color(0xFF9CA3AF), "等待中", false)
     }
 
-    val dotAlpha = if (pulsing) {
+    val dotAlpha = if (pulsing && !ScaledAnimation.isDisabled()) {
         val transition = rememberInfiniteTransition(label = "toolcall-status")
         transition.animateFloat(
             initialValue = 1f,
             targetValue = 0.25f,
-            animationSpec = infiniteRepeatable(tween(650), RepeatMode.Reverse),
+            animationSpec = infiniteRepeatable(ScaledAnimation.tween(650), RepeatMode.Reverse),
             label = "toolcall-status-alpha"
         ).value
     } else {

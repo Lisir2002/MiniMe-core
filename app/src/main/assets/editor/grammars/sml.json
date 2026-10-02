@@ -1,0 +1,45 @@
+{
+  "name": "Standard ML",
+  "scopeName": "source.sml",
+  "fileTypes": [
+    "sml",
+    "fun",
+    "sig"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.(*.Standard ML",
+      "match": "(*.*$"
+    },
+    {
+      "name": "string.quoted.double.Standard ML",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Standard ML",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Standard ML",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Standard ML",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Standard ML",
+      "match": "\\b(fun|fn|let|in|end|if|then|else|case|of|datatype|type|structure|signature|val|ref|andalso|orelse)\\b"
+    },
+    {
+      "name": "constant.numeric.Standard ML",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 package com.mini.me_core.feature.browser.presentation
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.theme.AnimationScaleHolder
+import com.mini.me_core.core.theme.ScaledAnimation
 
 import android.content.Context
 import android.content.Intent
@@ -1211,16 +1213,19 @@ private fun AiToolbarButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val transition = rememberInfiniteTransition(label = "aiPulse")
-    val scale by transition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "aiScale"
-    )
+    val scale = if (AnimationScaleHolder.scale > 0f) {
+        val transition = rememberInfiniteTransition(label = "aiPulse")
+        val s by transition.animateFloat(
+            initialValue = 1.0f,
+            targetValue = 1.15f,
+            animationSpec = infiniteRepeatable(
+                animation = ScaledAnimation.tweenGlobal(600, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "aiScale"
+        )
+        s
+    } else 1f
     Column(
         modifier = modifier
             .fillMaxHeight()

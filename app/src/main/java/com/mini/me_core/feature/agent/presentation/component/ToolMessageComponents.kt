@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
@@ -377,13 +378,13 @@ internal fun ToolCallGroup(
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically(
-                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                    animationSpec = ScaledAnimation.tween(300, easing = FastOutSlowInEasing),
                     expandFrom = Alignment.Top
-                ) + fadeIn(tween(200)),
+                ) + fadeIn(ScaledAnimation.tween(200)),
                 exit = shrinkVertically(
-                    animationSpec = tween(200),
+                    animationSpec = ScaledAnimation.tween(200),
                     shrinkTowards = Alignment.Top
-                ) + fadeOut(tween(150))
+                ) + fadeOut(ScaledAnimation.tween(150))
             ) {
                 Column(
                     modifier = Modifier
@@ -431,12 +432,12 @@ internal fun ToolStatusDot(running: Boolean, isError: Boolean) {
         isError -> DiffRemoveText
         else -> DiffAddText
     }
-    val dotAlpha = if (running) {
+    val dotAlpha = if (running && !ScaledAnimation.isDisabled()) {
         val transition = rememberInfiniteTransition(label = "tool-status-dot")
         transition.animateFloat(
             initialValue = 1f,
             targetValue = 0.25f,
-            animationSpec = infiniteRepeatable(animation = tween(650), repeatMode = RepeatMode.Reverse),
+            animationSpec = infiniteRepeatable(animation = ScaledAnimation.tween(650), repeatMode = RepeatMode.Reverse),
             label = "tool-status-dot-alpha"
         ).value
     } else {
@@ -917,13 +918,13 @@ internal fun EnvironmentStatusStrip(
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically(
-                    animationSpec = tween(200, easing = FastOutSlowInEasing),
+                    animationSpec = ScaledAnimation.tween(200, easing = FastOutSlowInEasing),
                     expandFrom = Alignment.Top
-                ) + fadeIn(tween(150)),
+                ) + fadeIn(ScaledAnimation.tween(150)),
                 exit = shrinkVertically(
-                    animationSpec = tween(150),
+                    animationSpec = ScaledAnimation.tween(150),
                     shrinkTowards = Alignment.Top
-                ) + fadeOut(tween(100))
+                ) + fadeOut(ScaledAnimation.tween(100))
             ) {
                 Column(
                     modifier = Modifier

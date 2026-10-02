@@ -1,0 +1,44 @@
+{
+  "name": "Arduino",
+  "scopeName": "source.arduino",
+  "fileTypes": [
+    "ino",
+    "pde"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.Arduino",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.Arduino",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Arduino",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Arduino",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Arduino",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Arduino",
+      "match": "\\b(void|int|boolean|float|if|else|for|while|setup|loop|digitalRead|digitalWrite|analogRead|analogWrite|delay|pinMode|return)\\b"
+    },
+    {
+      "name": "constant.numeric.Arduino",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

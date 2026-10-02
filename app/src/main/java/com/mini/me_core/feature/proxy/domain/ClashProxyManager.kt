@@ -646,14 +646,26 @@ class ClashProxyManager @Inject constructor(
             val proxies = root["proxies"] as? List<*> ?: emptyList<Any?>()
             val groups = root["proxy-groups"] as? List<*> ?: emptyList<Any?>()
             val providers = root["proxy-providers"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
+            val validProxyTypes = setOf(
+                "ss", "shadowsocks", "vmess", "trojan", "ssr", "shadowsocksr",
+                "http", "https", "socks5", "hysteria2", "hy2", "vless",
+                "wireguard", "wg", "tuic", "tuic5", "snell", "brook",
+                "naive", "naiveproxy", "ssh", "direct", "reject", "relay",
+                "dns", "mtproto", "anytls", "ech"
+            )
             val nodes = proxies.mapNotNull { item ->
                 if (item !is Map<*, *>) return@mapNotNull null
                 val name = item["name"]?.toString()?.takeIf { it.isNotBlank() }
                     ?: return@mapNotNull null
+                val type = item["type"]?.toString()?.lowercase() ?: "unknown"
+                // 过滤非节点条目：必须是已知代理类型，且有 server 字段
+                if (type !in validProxyTypes) return@mapNotNull null
+                val server = item["server"]?.toString()?.takeIf { it.isNotBlank() }
+                    ?: return@mapNotNull null
                 ProxyNodeInfo(
                     name = name,
-                    type = item["type"]?.toString() ?: "unknown",
-                    server = item["server"]?.toString() ?: "",
+                    type = type,
+                    server = server,
                     port = (item["port"] as? Number)?.toInt()
                         ?: item["port"]?.toString()?.toIntOrNull() ?: 0,
                 )

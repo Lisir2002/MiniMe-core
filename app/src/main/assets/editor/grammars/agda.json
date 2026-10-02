@@ -1,0 +1,43 @@
+{
+  "name": "Agda",
+  "scopeName": "source.agda",
+  "fileTypes": [
+    "agda"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.--.Agda",
+      "match": "--.*$"
+    },
+    {
+      "name": "string.quoted.double.Agda",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Agda",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Agda",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Agda",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Agda",
+      "match": "\\b(module|where|data|record|type|let|in|if|then|else|pi|sigma|lambda|\\)\\b"
+    },
+    {
+      "name": "constant.numeric.Agda",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

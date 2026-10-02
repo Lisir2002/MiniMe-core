@@ -2,7 +2,6 @@ package com.mini.me_core.feature.agent.presentation.component
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.mini.me_core.core.theme.ScaledAnimation
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -80,7 +80,7 @@ fun SwipeToConfirm(
         }
         val animatedOffsetDp: Dp by animateDpAsState(
             targetValue = with(androidx.compose.ui.platform.LocalDensity.current) { animateTarget.toDp() },
-            animationSpec = tween(durationMillis = if (confirmed) 120 else 220, delayMillis = 0),
+            animationSpec = ScaledAnimation.tween(if (confirmed) 120 else 220, delayMillis = 0),
             label = "swipe_back_or_lock"
         )
         val animatedOffsetPx = with(androidx.compose.ui.platform.LocalDensity.current) { animatedOffsetDp.toPx() }

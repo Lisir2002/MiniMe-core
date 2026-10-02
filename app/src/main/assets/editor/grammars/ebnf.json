@@ -1,0 +1,12 @@
+{
+  "scopeName": "source.ebnf",
+  "name": "EBNF",
+  "extensions": [
+    "ebnf"
+  ],
+  "patterns": [
+    {
+      "include": "source.bnf"
+    }
+  ]
+}

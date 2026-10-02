@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.agent.presentation.component.formatTokenCountShort
 
@@ -805,8 +806,8 @@ private fun ThemedCollapsibleGroup(
             // 可折叠内容
             AnimatedVisibility(
                 visible = expanded,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
+                enter = fadeIn(ScaledAnimation.tween(250)) + expandVertically(ScaledAnimation.tween(250)),
+                exit = fadeOut(ScaledAnimation.tween(200)) + shrinkVertically(ScaledAnimation.tween(200))
             ) {
                 Column { content() }
             }

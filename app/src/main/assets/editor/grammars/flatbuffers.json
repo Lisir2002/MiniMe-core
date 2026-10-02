@@ -1,0 +1,43 @@
+{
+  "name": "FlatBuffers",
+  "scopeName": "source.flatbuffers",
+  "fileTypes": [
+    "fbs"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.FlatBuffers",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.FlatBuffers",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.FlatBuffers",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.FlatBuffers",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.FlatBuffers",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.FlatBuffers",
+      "match": "\\b(namespace|table|struct|enum|union|root_type|file_identifier|file_extension|attribute|include|include)\\b"
+    },
+    {
+      "name": "constant.numeric.FlatBuffers",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

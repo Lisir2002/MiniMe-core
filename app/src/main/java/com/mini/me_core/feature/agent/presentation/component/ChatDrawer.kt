@@ -712,8 +712,8 @@ private fun SwipeableSessionRow(
     onLongClick: () -> Unit
 ) {
     val density = LocalDensity.current
-    // 两个操作按钮各 72dp 宽
-    val actionWidthPx = with(density) { 72.dp.toPx() * 2 }
+    // 两个操作按钮各 80dp 宽
+    val actionWidthPx = with(density) { 80.dp.toPx() * 2 }
     val velocityThresholdPx = with(density) { 100.dp.toPx() }
 
     val animScale = LocalAnimationScale.current
@@ -762,45 +762,88 @@ private fun SwipeableSessionRow(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+                    .padding(horizontal = 4.dp)
             ) {
-                // 重命名按钮（primary/蓝）
+                // 重命名按钮（蓝）
                 Box(
                     modifier = Modifier
-                        .width(72.dp)
+                        .width(80.dp)
                         .fillMaxHeight()
-                        .background(MaterialTheme.colorScheme.primary)
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = LocalCornerRadius.current.md,
+                                bottomStart = LocalCornerRadius.current.md,
+                                topEnd = 2.dp,
+                                bottomEnd = 2.dp
+                            )
+                        )
+                        .background(Color(0xFF3B82F6))
                         .clickable {
                             onSwipeRename()
                             onExpandedChange(false)
-                        },
+                        }
+                        .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Edit,
-                        contentDescription = stringResource(R.string.common_rename),
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Edit,
+                            contentDescription = stringResource(R.string.common_rename),
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "重命名",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
-                // 删除按钮（error/红，最右侧）
+                Spacer(Modifier.width(2.dp))
+                // 删除按钮（红，最右侧）
                 Box(
                     modifier = Modifier
-                        .width(72.dp)
+                        .width(80.dp)
                         .fillMaxHeight()
-                        .background(MaterialTheme.colorScheme.error)
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = 2.dp,
+                                bottomStart = 2.dp,
+                                topEnd = LocalCornerRadius.current.md,
+                                bottomEnd = LocalCornerRadius.current.md
+                            )
+                        )
+                        .background(Color(0xFFEF4444))
                         .clickable {
                             onDirectDelete()
                             onExpandedChange(false)
-                        },
+                        }
+                        .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Delete,
-                        contentDescription = stringResource(R.string.common_delete),
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Delete,
+                            contentDescription = stringResource(R.string.common_delete),
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "删除",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
 

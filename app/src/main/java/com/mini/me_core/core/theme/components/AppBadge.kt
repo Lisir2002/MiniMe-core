@@ -1,4 +1,5 @@
 package com.mini.me_core.core.theme.components
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 
 import androidx.compose.animation.core.RepeatMode
@@ -110,13 +111,13 @@ fun AppStatusDot(
         AppStatusDotColor.Neutral -> colors.textTertiary
     }
 
-    val alpha = if (pulse) {
+    val alpha = if (pulse && !ScaledAnimation.isDisabled()) {
         val transition = rememberInfiniteTransition(label = "status-dot")
         transition.animateFloat(
             initialValue = 1f,
             targetValue = 0.25f,
             animationSpec = infiniteRepeatable(
-                animation = tween(650),
+                animation = ScaledAnimation.tween(650),
                 repeatMode = RepeatMode.Reverse,
             ),
             label = "status-dot-alpha",

@@ -1,4 +1,6 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.AnimationScaleHolder
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
@@ -150,7 +152,7 @@ fun BundleInstallCard(
     }
     val tintAnim = remember { Animatable(0f) }
     LaunchedEffect(aggregate?.phase) {
-        tintAnim.animateTo(1f, animationSpec = tween(600, easing = FastOutSlowInEasing))
+        tintAnim.animateTo(1f, animationSpec = ScaledAnimation.tweenGlobal(600, easing = FastOutSlowInEasing))
     }
     val tintColor = lerp(baseBg, targetTint, tintAnim.value)
     Card(
@@ -299,18 +301,21 @@ private fun InstallingProgressLayout(
             val installing = aggregate?.phase?.isTerminal?.not() == true
             val chevronRot by animateFloatAsState(
                 targetValue = 0f,
-                animationSpec = tween(250, easing = FastOutSlowInEasing),
+                animationSpec = ScaledAnimation.tweenGlobal(250, easing = FastOutSlowInEasing),
                 label = "chev_${bundle.id.stableKey}",
             )
-            val infinite = rememberInfiniteTransition(label = "chev_bounce")
-            val bounceScale by infinite.animateFloat(
-                initialValue = 1f, targetValue = 1.15f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(700, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "chev_bounce_${bundle.id.stableKey}",
-            )
+            val bounceScale = if (installing && AnimationScaleHolder.scale > 0f) {
+                val infinite = rememberInfiniteTransition(label = "chev_bounce")
+                val s by infinite.animateFloat(
+                    initialValue = 1f, targetValue = 1.15f,
+                    animationSpec = infiniteRepeatable(
+                        animation = ScaledAnimation.tweenGlobal(700, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "chev_bounce_${bundle.id.stableKey}",
+                )
+                s
+            } else 1f
             Icon(
                 imageVector = Icons.Rounded.KeyboardArrowDown,
                 contentDescription = stringResource(R.string.ui______34c1ac67),
@@ -598,7 +603,7 @@ private fun SegmentedProgressBar(
     // F：进度条 animateFloatAsState 插值
     val animated by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
-        animationSpec = tween(200, easing = LinearEasing),
+        animationSpec = ScaledAnimation.tweenGlobal(200, easing = LinearEasing),
         label = "progress_anim",
     )
     val estimated = source == ProgressSource.TRAFFIC_STATS_ESTIMATED
@@ -639,15 +644,18 @@ private fun SegmentedProgressBar(
             }
         } else if (isFailed) {
             // FAILED：整段红 + ✖ 浮层 + 尾部闪烁
-            val blink = rememberInfiniteTransition(label = "fail_blink")
-            val blinkAlpha by blink.animateFloat(
-                initialValue = 0.5f, targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(500),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "fail_blink_alpha",
-            )
+            val blinkAlpha = if (AnimationScaleHolder.scale > 0f) {
+                val blink = rememberInfiniteTransition(label = "fail_blink")
+                val a by blink.animateFloat(
+                    initialValue = 0.5f, targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = ScaledAnimation.tweenGlobal(500),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "fail_blink_alpha",
+                )
+                a
+            } else 0.75f
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -846,12 +854,15 @@ private fun MicroSlotBlock(slot: DownloadSlot, size: Dp, onClick: () -> Unit) {
         val baseLook = when (slot.status) {
             SlotStatus.WAITING -> {
                 // WAITING：alpha 呼吸（0.3↔0.5）无限循环
-                val breathing = rememberInfiniteTransition(label = "wait_breath")
-                val alpha by breathing.animateFloat(
-                    initialValue = 0.3f, targetValue = 0.55f,
-                    animationSpec = infiniteRepeatable(tween(1600), RepeatMode.Reverse),
-                    label = "wait_alpha",
-                )
+                val alpha = if (AnimationScaleHolder.scale > 0f) {
+                    val breathing = rememberInfiniteTransition(label = "wait_breath")
+                    val a by breathing.animateFloat(
+                        initialValue = 0.3f, targetValue = 0.55f,
+                        animationSpec = infiniteRepeatable(ScaledAnimation.tweenGlobal(1600), RepeatMode.Reverse),
+                        label = "wait_alpha",
+                    )
+                    a
+                } else 0.425f
                 SlotBlockLook(
                     bg = Color(0xFFE0E0E0).copy(alpha = alpha),
                     border = Color(0xFF9E9E9E),
@@ -885,7 +896,7 @@ private fun MicroSlotBlock(slot: DownloadSlot, size: Dp, onClick: () -> Unit) {
                     runCatching {
                         pulseAlpha.animateTo(
                             targetValue = 0.6f,
-                            animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+                            animationSpec = ScaledAnimation.tweenGlobal( 400, easing = FastOutSlowInEasing),
                         )
                     }
                 }
@@ -963,7 +974,7 @@ private fun MicroSlotBlock(slot: DownloadSlot, size: Dp, onClick: () -> Unit) {
                 LaunchedEffect(slot.id, slot.status) {
                     runCatching {
                         anim.animateTo(
-                            1f, animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                            1f, animationSpec = ScaledAnimation.tweenGlobal( 220, easing = FastOutSlowInEasing),
                         )
                     }
                 }
@@ -1000,15 +1011,18 @@ private fun TriangleTopStart(tint: Color, size: Dp) {
 // ─────────────────────── 通用 shimmer 工具（InfiniteTransition + drawBehind 渐变平移） ───────────────────────
 
 private fun Modifier.shimmerOverlay(startColor: Color, endColor: Color): Modifier = composed {
-    val transition = rememberInfiniteTransition(label = "shimmer_transition")
-    val shift by transition.animateFloat(
-        initialValue = -1f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 800, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "shimmer_shift",
-    )
+    val shift = if (AnimationScaleHolder.scale > 0f) {
+        val transition = rememberInfiniteTransition(label = "shimmer_transition")
+        val s by transition.animateFloat(
+            initialValue = -1f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = ScaledAnimation.tweenGlobal( 800, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "shimmer_shift",
+        )
+        s
+    } else 0f
     this.then(
         Modifier.drawBehind {
             val w = this.size.width
@@ -1111,7 +1125,7 @@ private fun TokenizedStatusLine(
     // phase 切 Crossfade
     Crossfade(
         targetState = agg?.phase?.name ?: state.javaClass.simpleName,
-        animationSpec = tween(250, easing = FastOutSlowInEasing),
+        animationSpec = ScaledAnimation.tweenGlobal(250, easing = FastOutSlowInEasing),
         label = "statusline_crossfade_${bundle.id.stableKey}",
     ) { _ ->
         Row(

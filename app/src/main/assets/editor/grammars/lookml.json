@@ -1,0 +1,61 @@
+{
+  "scopeName": "source.lookml",
+  "name": "LookML",
+  "extensions": [
+    "lkml",
+    "lookml"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.lookml",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.lookml",
+          "begin": "\"",
+          "end": "\""
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.lookml",
+          "match": "\\b(explore|view|model|dashboard|look|filter|measure|dimension|dimension_group|parameter|set|join|access_filter|aggregate_table|action|alert|application|assertion|bookmark|bundle|calendar|color|constant|datagroup|derived_table|entry|extension|field|filter|foreign_key|graph|group|group_label|html|include|info|label|link|local_dependency|map_layer|milestone|named_value_format|override_constant|owner|parameter|persist_with|policy|project|query|reference_line|region|relationship|remote_dependency|required_access_grants|scenario|schedule|search|series|sets|slug|sorts|ssh_tunnel|subtotal|table|test|theme|timezone|topcount|traverse|type|ui|url|value|view|when|where|with)\\b"
+        },
+        {
+          "name": "storage.type.lookml",
+          "match": "\\b(string|number|integer|yesno|date|date_time|duration|tier|location|zipcode|sum|average|count|count_distinct|min|max|median|percentile|list|sum_distinct|running_total|average_distinct)\\b"
+        },
+        {
+          "name": "entity.name.function.lookml",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*:)"
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.lookml",
+      "match": "\\b-?\\d+\\.?\\d*\\b"
+    }
+  }
+}

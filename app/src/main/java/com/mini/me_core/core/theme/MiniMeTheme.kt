@@ -344,6 +344,9 @@ fun MiniMeTheme(
     // Phase 5：加载背景图
     val bgBitmap = rememberBitmapFromUri(backgroundImageUri)
 
+    // 同步全局动画缩放 holder（供非 Composable 上下文使用，如 NavHost 过渡动画）
+    AnimationScaleHolder.scale = animationScale
+
     androidx.compose.runtime.CompositionLocalProvider(
         LocalAppDarkMode provides darkTheme,
         com.mini.me_core.core.theme.tokens.LocalAppTheme provides appThemeState,

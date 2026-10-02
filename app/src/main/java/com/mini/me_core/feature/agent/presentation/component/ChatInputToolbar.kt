@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.agent.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.PrimitiveAlpha
 
 import androidx.compose.animation.AnimatedVisibility
@@ -90,7 +91,7 @@ internal fun ChatInputToolbar(
         // 收纳展开行：思考强度 + 技能对话入口
         AnimatedVisibility(
             visible = showMore,
-            enter = expandVertically(),
+            enter = expandVertically(ScaledAnimation.tween(250)),
             exit = shrinkVertically()
         ) {
             Row(
@@ -195,7 +196,7 @@ private fun ModePill(
     }
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "modePillScale")
+    val scale by animateFloatAsState(if (pressed) 0.92f else 1f, animationSpec = ScaledAnimation.tween(150), label = "modePillScale")
 
     // v2 混合模式：胶囊按钮（RoundedCornerShape 50），图标 16dp + 3dp 间距 + 文字 11sp 粗体
     Row(

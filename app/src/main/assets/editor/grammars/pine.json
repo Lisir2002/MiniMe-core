@@ -1,0 +1,43 @@
+{
+  "name": "Pine Script",
+  "scopeName": "source.pine",
+  "fileTypes": [
+    "pine"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.Pine Script",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.Pine Script",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Pine Script",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Pine Script",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Pine Script",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Pine Script",
+      "match": "\\b(//@version=5|indicator|strategy|plot|plotshape|plotchar|if|else|for|while|var|na|true|false)\\b"
+    },
+    {
+      "name": "constant.numeric.Pine Script",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

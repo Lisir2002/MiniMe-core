@@ -1,0 +1,43 @@
+{
+  "name": "GAMS",
+  "scopeName": "source.gams",
+  "fileTypes": [
+    "gms"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.*.GAMS",
+      "match": "*.*$"
+    },
+    {
+      "name": "string.quoted.double.GAMS",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.GAMS",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.GAMS",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.GAMS",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.GAMS",
+      "match": "\\b($ontext|$offtext|$include|sets|parameters|variables|equations|model|solve|display|if|then|else|loop)\\b"
+    },
+    {
+      "name": "constant.numeric.GAMS",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

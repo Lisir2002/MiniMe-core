@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
@@ -170,16 +171,22 @@ internal fun StreamingBubble(text: String) {
  */
 @Composable
 internal fun BlinkingCursor(color: androidx.compose.ui.graphics.Color) {
-    val transition = rememberInfiniteTransition(label = "cursor")
-    val alpha by transition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes { durationMillis = 1000 },
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "cursorAlpha"
-    )
+    val animDisabled = ScaledAnimation.isDisabled()
+    val alpha = if (animDisabled) {
+        1f
+    } else {
+        val transition = rememberInfiniteTransition(label = "cursor")
+        val a by transition.animateFloat(
+            initialValue = 1f,
+            targetValue = 0f,
+            animationSpec = infiniteRepeatable(
+                animation = keyframes { durationMillis = 1000 },
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "cursorAlpha"
+        )
+        a
+    }
     Box(
         modifier = Modifier
             .height(16.dp)
@@ -351,28 +358,32 @@ internal fun TypingDots(
     color: Color,
     dotSize: androidx.compose.ui.unit.Dp = 6.dp
 ) {
-    val transition = rememberInfiniteTransition(label = "typing-dots")
+    val animDisabled = ScaledAnimation.isDisabled()
+    val transition = if (!animDisabled) rememberInfiniteTransition(label = "typing-dots") else null
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.height(dotSize + 10.dp)
     ) {
         repeat(3) { index ->
-            val offsetY by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = 0f,
-                animationSpec = infiniteRepeatable(
-                    animation = keyframes {
-                        durationMillis = 900
-                        0f at 0
-                        -5f at 180
-                        0f at 360
-                        0f at 900
-                    },
-                    repeatMode = RepeatMode.Restart,
-                    initialStartOffset = StartOffset(index * 150)
-                ),
-                label = "dot-$index"
-            )
+            val offsetY = if (transition != null) {
+                val y by transition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = keyframes {
+                            durationMillis = 900
+                            0f at 0
+                            -5f at 180
+                            0f at 360
+                            0f at 900
+                        },
+                        repeatMode = RepeatMode.Restart,
+                        initialStartOffset = StartOffset(index * 150)
+                    ),
+                    label = "dot-$index"
+                )
+                y
+            } else 0f
             Box(
                 modifier = Modifier
                     .graphicsLayer { translationY = offsetY }

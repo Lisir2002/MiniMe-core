@@ -1,0 +1,43 @@
+{
+  "name": "Stan",
+  "scopeName": "source.stan",
+  "fileTypes": [
+    "stan"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.Stan",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.Stan",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Stan",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Stan",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Stan",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Stan",
+      "match": "\\b(data|parameters|model|generated quantities|if|else|for|while|return|int|real|vector|matrix|array)\\b"
+    },
+    {
+      "name": "constant.numeric.Stan",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

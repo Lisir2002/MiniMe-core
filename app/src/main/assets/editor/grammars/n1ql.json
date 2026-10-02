@@ -1,0 +1,12 @@
+{
+  "scopeName": "source.n1ql",
+  "name": "N1QL",
+  "extensions": [
+    "n1ql"
+  ],
+  "patterns": [
+    {
+      "include": "source.sql"
+    }
+  ]
+}

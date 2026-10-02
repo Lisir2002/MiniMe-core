@@ -1,0 +1,70 @@
+{
+  "scopeName": "source.dafny",
+  "name": "Dafny",
+  "extensions": [
+    "dfy"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.dafny",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.dafny",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.dafny",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.dafny",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.dafny",
+          "match": "\\b(abstract|assert|assume|break|calc|case|class|codatatype|const|constructor|continue|copredicate|datatype|decreases|else|ensures|exception|exists|export|extends|for|forall|free|fresh|function|ghost|if|import|include|inductive|invariant|is|iterator|label|lemma|match|method|modified|module|multiset|new|newtype|object|old|opened|predicate|private|protected|public|reads|refines|replaces|return|returns|sealed|static|then|this|trait|twostate|type|var|virtual|where|while|witness|yields|yield)\\b"
+        },
+        {
+          "name": "storage.type.dafny",
+          "match": "\\b(bool|int|nat|real|string|char|bv8|bv16|bv32|bv64|array|array2|array3|seq|set|iset|map|imap|tuple|object|handle)\\b"
+        },
+        {
+          "name": "entity.name.function.dafny",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.dafny",
+      "match": "\\b-?\\d+\\.?\\d*\\b"
+    }
+  }
+}

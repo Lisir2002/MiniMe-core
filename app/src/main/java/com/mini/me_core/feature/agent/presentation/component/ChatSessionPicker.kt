@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.animation.core.RepeatMode
@@ -87,12 +88,12 @@ fun ChatSessionRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (isExecuting) {
+            if (isExecuting && !ScaledAnimation.isDisabled()) {
                 val transition = rememberInfiniteTransition(label = "tool-status-dot")
                 val alpha by transition.animateFloat(
                     initialValue = 1f,
                     targetValue = 0.25f,
-                    animationSpec = infiniteRepeatable(animation = tween(650), repeatMode = RepeatMode.Reverse),
+                    animationSpec = infiniteRepeatable(animation = ScaledAnimation.tween(650), repeatMode = RepeatMode.Reverse),
                     label = "tool-status-dot-alpha"
                 )
                 Box(

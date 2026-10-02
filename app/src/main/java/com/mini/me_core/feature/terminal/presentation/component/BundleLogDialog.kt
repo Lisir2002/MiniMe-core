@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.terminal.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.theme.ScaledAnimation
 
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
@@ -706,7 +707,7 @@ private fun LogLineRow(
     LaunchedEffect(line.id) {
         if (isNewlyAppended) {
             flashAlpha.animateTo(
-                0f, animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
+                0f, animationSpec = ScaledAnimation.tweenGlobal( 320, easing = FastOutSlowInEasing),
             )
         }
     }
@@ -824,8 +825,8 @@ private fun ErrorRowCard(line: LogLine, fg: Color, ctx: Context, modifier: Modif
             }
             AnimatedVisibility(
                 visible = expanded,
-                enter = fadeIn(tween(120)),
-                exit = fadeOut(tween(120)),
+                enter = fadeIn(ScaledAnimation.tweenGlobal(120)),
+                exit = fadeOut(ScaledAnimation.tweenGlobal(120)),
             ) {
                 Column(modifier = Modifier.padding(top = Spacing.xs)) {
                     Text(

@@ -1,0 +1,43 @@
+{
+  "name": "Jenkinsfile",
+  "scopeName": "source.jenkinsfile",
+  "fileTypes": [
+    "Jenkinsfile"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.Jenkinsfile",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.Jenkinsfile",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Jenkinsfile",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Jenkinsfile",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Jenkinsfile",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Jenkinsfile",
+      "match": "\\b(pipeline|agent|stages|stage|steps|environment|post|when|matrix|tools|options|triggers|parameters)\\b"
+    },
+    {
+      "name": "constant.numeric.Jenkinsfile",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

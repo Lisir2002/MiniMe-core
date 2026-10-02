@@ -1,0 +1,43 @@
+{
+  "name": "Pony",
+  "scopeName": "source.pony",
+  "fileTypes": [
+    "pony"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.Pony",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.Pony",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Pony",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Pony",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Pony",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Pony",
+      "match": "\\b(actor|class|interface|trait|primitive|struct|new|fun|be|if|else|match|for|while|with|consume)\\b"
+    },
+    {
+      "name": "constant.numeric.Pony",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

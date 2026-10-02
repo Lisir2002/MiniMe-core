@@ -1,0 +1,43 @@
+{
+  "name": "Motoko",
+  "scopeName": "source.motoko",
+  "fileTypes": [
+    "mo"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.Motoko",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.Motoko",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Motoko",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Motoko",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Motoko",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Motoko",
+      "match": "\\b(actor|class|module|import|from|let|var|func|if|else|switch|case|for|while|loop|return|async|await)\\b"
+    },
+    {
+      "name": "constant.numeric.Motoko",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

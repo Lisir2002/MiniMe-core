@@ -1,0 +1,65 @@
+{
+  "scopeName": "source.mint",
+  "name": "Mint",
+  "extensions": [
+    "mint"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.mint",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.mint",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.interpolated.mint",
+          "begin": "`",
+          "end": "`"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.mint",
+          "match": "\\b(component|fun|state|property|next|if|else|for|of|case|when|try|catch|with|use|module|enum|union|record|implements|where|is|as|in|not|and|or|xor|mod|rem|shl|shr|return|break|continue|do|while|until|repeat|throw|rescue|ensure|defer|assert|expect|test|suite|specify|given|when|then|and|but|pending|focus|skip|only)\\b"
+        },
+        {
+          "name": "storage.type.mint",
+          "match": "\\b(String|Number|Bool|Time|Maybe|Result|Array|Hash|Set|Tuple|Void|Never|Any|Json|Html|Element|Component|Store|Http|WebSocket|File|Blob|FormData|LocalStorage|SessionStorage|Location|Navigator|Window|Document|Element|Node|Event|MouseEvent|KeyboardEvent|InputEvent|FocusEvent|WheelEvent|PointerEvent|DragEvent|ClipboardEvent|AnimationEvent|TransitionEvent|Promise|Error|TypeError|RangeError|SyntaxError|ReferenceError|URIError|EvalError|RegExp|Map|WeakMap|WeakSet|DataView|ArrayBuffer|TypedArray|Int8Array|Uint8Array|Uint8ClampedArray|Int16Array|Uint16Array|Int32Array|Uint32Array|Float32Array|Float64Array|BigInt64Array|BigUint64Array)\\b"
+        },
+        {
+          "name": "entity.name.function.mint",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.mint",
+      "match": "\\b-?\\d+\\.?\\d*\\b"
+    }
+  }
+}

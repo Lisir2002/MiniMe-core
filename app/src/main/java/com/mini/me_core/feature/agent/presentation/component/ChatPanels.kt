@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.agent.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.theme.ScaledAnimation
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -173,7 +174,7 @@ internal fun ToolPermissionPanel(
 internal fun StatusBanner(state: AgentUIState) {
     AnimatedVisibility(
         visible = state is AgentUIState.Error || state is AgentUIState.Applied,
-        enter = fadeIn(),
+        enter = fadeIn(ScaledAnimation.tween(200)),
         exit = fadeOut()
     ) {
         when (state) {

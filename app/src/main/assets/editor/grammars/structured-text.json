@@ -1,0 +1,43 @@
+{
+  "name": "Structured Text",
+  "scopeName": "source.st",
+  "fileTypes": [
+    "st"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.Structured Text",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.Structured Text",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Structured Text",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Structured Text",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Structured Text",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Structured Text",
+      "match": "\\b(PROGRAM|END_PROGRAM|VAR|END_VAR|VAR_INPUT|VAR_OUTPUT|VAR_GLOBAL|IF|THEN|ELSE|ELSIF|END_IF|FOR|TO|BY|DO|END_FOR|WHILE|END_WHILE|REPEAT|UNTIL|END_REPEAT)\\b"
+    },
+    {
+      "name": "constant.numeric.Structured Text",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

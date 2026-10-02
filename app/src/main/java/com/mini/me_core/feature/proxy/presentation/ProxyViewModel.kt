@@ -35,6 +35,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 
 /** 导入配置的预检结果（仅展示，不落盘）。[resolvedYaml] 供保存时作为来源。 */
@@ -426,6 +429,106 @@ class ProxyViewModel @Inject constructor(
             manager.off()
         } else if (wasActive != null && wasActive != manager.state.value.activeProfileId) {
             manager.on(wasActive, null)
+        }
+    }
+
+    /**
+     * 智能选优：对当前活跃配置的所有节点并发测速，自动切换到延迟最低的可用节点。
+     * 与 testProfileLatency 的区别：测完后自动 select 最快节点，并发送事件通知。
+     */
+    fun smartSelectBestNode(id: String) {
+        val current = _profileNodes.value ?: return
+        if (current.profileId != id || current.testing) return
+        _profileNodes.value = current.copy(testing = true, latencies = emptyMap(), error = null)
+        viewModelScope.launch {
+            val nodes = current.summary.nodes
+            if (nodes.isEmpty()) {
+                _profileNodes.update { v ->
+                    if (v == null || v.profileId != id) v
+                    else v.copy(testing = false, error = "没有可测的内联节点（节点可能全部来自 proxy-provider）")
+                }
+                return@launch
+            }
+            // 智能选优要求代理必须在运行（要切节点）
+            if (!manager.state.value.enabled) {
+                val r = manager.on(id, null)
+                if (r != "ok") {
+                    _profileNodes.update { v ->
+                        if (v == null || v.profileId != id) v
+                        else v.copy(testing = false, error = "启用代理失败：$r")
+                    }
+                    return@launch
+                }
+            }
+            // 等控制面就绪
+            val ready = withContext(Dispatchers.IO) {
+                var ok = false
+                repeat(6) {
+                    if (manager.controllerRequest("GET", "/configs") != null) { ok = true; return@withContext true }
+                    delay(500)
+                }
+                ok
+            }
+            if (!ready) {
+                _profileNodes.update { v ->
+                    if (v == null || v.profileId != id) v
+                    else v.copy(testing = false, error = "mihomo 控制面不可达")
+                }
+                return@launch
+            }
+            // 并发测速（6 并发）
+            val semaphore = Semaphore(6)
+            val latencies = mutableMapOf<String, Long?>()
+            coroutineScope {
+                nodes.forEach { node ->
+                    launch(Dispatchers.IO) {
+                        semaphore.withPermit {
+                            val d = manager.testNodeLatency(node)
+                            latencies[node.name] = d
+                            _profileNodes.update { v ->
+                                if (v == null || v.profileId != id) v
+                                else v.copy(latencies = v.latencies + (node.name to d))
+                            }
+                        }
+                    }
+                }
+            }
+            // 选最快可用节点
+            val best = latencies.entries
+                .filter { it.value != null && it.value!! > 0 }
+                .minByOrNull { it.value!! }
+            if (best != null) {
+                // 找第一个 select 分组并切换
+                val proxiesResp = manager.controllerRequest("GET", "/proxies")
+                var group: String? = null
+                if (proxiesResp != null) {
+                    val parsed = runCatching {
+                        kotlinx.serialization.json.Json.parseToJsonElement(proxiesResp)
+                    }.getOrNull()
+                    val proxiesObj = parsed?.jsonObject?.get("proxies")?.jsonObject
+                    if (proxiesObj != null) {
+                        for ((gName, gValue) in proxiesObj) {
+                            val gType = gValue.jsonObject["type"]?.jsonPrimitive?.contentOrNull
+                            if (gType == "Selector") {
+                                group = gName
+                                break
+                            }
+                        }
+                    }
+                }
+                if (group != null) {
+                    val encodedGroup = java.net.URLEncoder.encode(group, "UTF-8").replace("+", "%20")
+                    manager.controllerRequest("PUT", "/proxies/$encodedGroup", """{"name":"${best.key}"}""")
+                    _events.send("已智能选优：${best.key}（${best.value}ms）")
+                } else {
+                    _events.send("测速完成：最快节点 ${best.key}（${best.value}ms），但未找到可切换的分组")
+                }
+            } else {
+                _events.send("所有节点均超时，无法智能选优")
+            }
+            _profileNodes.update { v ->
+                if (v == null || v.profileId != id) v else v.copy(testing = false)
+            }
         }
     }
 

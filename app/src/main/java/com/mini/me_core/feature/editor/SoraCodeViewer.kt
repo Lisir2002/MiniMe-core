@@ -72,8 +72,15 @@ fun SoraCodeViewer(
     var lineCount by remember { mutableIntStateOf(0) }
     var loaded by remember { mutableStateOf(false) }
 
+    // 自适应高亮引擎
+    val highlighter = remember { com.mini.me_core.feature.editor.core.AdaptiveHighlighter(scope) }
+
     // 加载文件
     LaunchedEffect(filePath) {
+        // 先初始化 TextMate 引擎，确保 LanguageDetector 可以使用全量扩展名映射回退
+        com.mini.me_core.feature.editor.textmate.TextMateManager
+            .initialize(context.applicationContext)
+
         withContext(Dispatchers.IO) {
             val file = File(filePath)
             if (file.exists()) {
@@ -105,14 +112,18 @@ fun SoraCodeViewer(
 
         editor.setText(text)
         editor.isEditable = editable
+        // 先统一设置 colorScheme，确保所有文件（无论是否有高亮）背景色一致
+        // 即使 createLanguage 失败，背景色也不会跳变
+        editor.colorScheme = com.mini.me_core.feature.editor.textmate.TextMateManager
+            .createColorScheme()
         try {
             val lang = com.mini.me_core.feature.editor.textmate.TextMateManager
                 .createLanguage(scopeName, autoCompletion = editable)
             editor.setEditorLanguage(lang)
-            editor.colorScheme = com.mini.me_core.feature.editor.textmate.TextMateManager
-                .createColorScheme()
+            // 接入自适应高亮引擎（大文件自动降级）
+            highlighter.attach(editor, scopeName, lineCount)
         } catch (e: Exception) {
-            android.util.Log.w("SoraCodeViewer", "设置 TextMate 高亮失败: $scopeName", e)
+            android.util.Log.w("SoraCodeViewer", "设置 TextMate 高亮失败: $scopeName，回退纯文本", e)
         }
         onEditorReady?.invoke(editor)
     }
@@ -131,6 +142,7 @@ fun SoraCodeViewer(
     // 释放
     DisposableEffect(Unit) {
         onDispose {
+            highlighter.detach()
             editor.release()
         }
     }

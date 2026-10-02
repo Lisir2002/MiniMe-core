@@ -1,0 +1,70 @@
+{
+  "scopeName": "source.flix",
+  "name": "Flix",
+  "extensions": [
+    "flix"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.flix",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.flix",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.flix",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.interpolated.flix",
+          "begin": "\"\"\"",
+          "end": "\"\"\""
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.flix",
+          "match": "\\b(alias|case|catch|chan|choose|def|deref|discard|else|enum|exists|false|fix|for|forall|force|foreach|from|get|if|import|in|inject|inline|instance|into|lat|law|lawful|lazy|let|match|mod|mut|new|not|null|of|opaque|or|override|pub|query|ref|region|reify|sealed|select|solve|spawn|static|try|type|use|where|with|yield)\\b"
+        },
+        {
+          "name": "storage.type.flix",
+          "match": "\\b(Bool|Char|Float32|Float64|BigDecimal|Int8|Int16|Int32|Int64|BigInt|String|Unit|Array|Vector|List|Map|Set|Option|Result|Nil|Cons|Ok|Err|None|Some|True|False)\\b"
+        },
+        {
+          "name": "entity.name.function.flix",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.flix",
+      "match": "\\b-?\\d+\\.?\\d*\\b"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "Dhall",
+  "scopeName": "source.dhall",
+  "fileTypes": [
+    "dhall"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.--.Dhall",
+      "match": "--.*$"
+    },
+    {
+      "name": "string.quoted.double.Dhall",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Dhall",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Dhall",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Dhall",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Dhall",
+      "match": "\\b(let|in|if|then|else|forall|exists|Type|Kind|Sort|Natural|Integer|Double|Text|Bool|List|Optional|merge|fold|assert)\\b"
+    },
+    {
+      "name": "constant.numeric.Dhall",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

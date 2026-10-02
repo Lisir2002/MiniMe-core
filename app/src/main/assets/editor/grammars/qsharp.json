@@ -1,0 +1,43 @@
+{
+  "name": "Q#",
+  "scopeName": "source.qsharp",
+  "fileTypes": [
+    "qs"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.Q#",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.Q#",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Q#",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Q#",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Q#",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Q#",
+      "match": "\\b(namespace|open|operation|function|if|else|for|while|return|let|mutable|use|borrow|qubit|Pauli|Result)\\b"
+    },
+    {
+      "name": "constant.numeric.Q#",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

@@ -2,7 +2,6 @@ package com.mini.me_core.core.ui
 
 import android.os.Build
 import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
@@ -13,6 +12,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.mini.me_core.core.theme.ScaledAnimation
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
@@ -90,7 +90,7 @@ fun rememberImeBottomInset(): Dp {
     // API < 30 不额外适配：沿用 manifest 的 adjustResize 系统默认行为，旧设备保持原样。
     val animatedRestingPx by animateIntAsState(
         targetValue = restingPx,
-        animationSpec = tween(durationMillis = 220),
+        animationSpec = ScaledAnimation.tween(220),
         label = "ime-resting"
     )
     val px = when {

@@ -1,0 +1,43 @@
+{
+  "name": "MoonScript",
+  "scopeName": "source.moonscript",
+  "fileTypes": [
+    "moon"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.--.MoonScript",
+      "match": "--.*$"
+    },
+    {
+      "name": "string.quoted.double.MoonScript",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.MoonScript",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.MoonScript",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.MoonScript",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.MoonScript",
+      "match": "\\b(require|import|export|local|if|else|for|while|switch|when|unless|then|do|return|new|class|extends|function)\\b"
+    },
+    {
+      "name": "constant.numeric.MoonScript",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

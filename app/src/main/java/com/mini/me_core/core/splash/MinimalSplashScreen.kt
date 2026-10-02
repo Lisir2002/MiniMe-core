@@ -6,7 +6,6 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +17,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.mini.me_core.core.theme.LocalAnimationScale
+import com.mini.me_core.core.theme.ScaledAnimation
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
@@ -42,21 +47,27 @@ fun MinimalSplashScreen(
     val colors = MaterialTheme.colorScheme
     var elapsedMs by remember { mutableLongStateOf(0L) }
     val logoAlpha = remember { Animatable(0f) }
+    val animScale = LocalAnimationScale.current
+    val animDisabled = animScale <= 0f
 
-    val infinite = rememberInfiniteTransition(label = "minimal_splash")
-    val drift by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "gradient_drift"
-    )
+    val drift by if (!animDisabled) {
+        val infinite = rememberInfiniteTransition(label = "minimal_splash")
+        infinite.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = ScaledAnimation.tween(3000, scale = animScale, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "gradient_drift"
+        )
+    } else {
+        remember { mutableStateOf(0.5f) }
+    }
 
     LaunchedEffect(Unit) {
-        logoAlpha.animateTo(1f, tween(800))
-        delay(2500)
+        logoAlpha.animateTo(1f, ScaledAnimation.tween(800, scale = animScale))
+        delay(if (animDisabled) 800L else 2500L)
         onDismiss()
     }
 

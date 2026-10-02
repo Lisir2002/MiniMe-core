@@ -1,0 +1,43 @@
+{
+  "name": "LiveScript",
+  "scopeName": "source.livescript",
+  "fileTypes": [
+    "ls"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.#.LiveScript",
+      "match": "#.*$"
+    },
+    {
+      "name": "string.quoted.double.LiveScript",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.LiveScript",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.LiveScript",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.LiveScript",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.LiveScript",
+      "match": "\\b(require|import|export|def|var|let|const|if|else|for|while|switch|when|unless|then|do|return|new|class|extends)\\b"
+    },
+    {
+      "name": "constant.numeric.LiveScript",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

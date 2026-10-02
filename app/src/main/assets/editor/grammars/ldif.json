@@ -1,0 +1,41 @@
+{
+  "scopeName": "source.ldif",
+  "name": "LDIF",
+  "extensions": [
+    "ldif"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#entries"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.ldif",
+          "match": "^#.*$"
+        }
+      ]
+    },
+    "entries": {
+      "patterns": [
+        {
+          "name": "keyword.operator.ldif",
+          "match": "^dn:"
+        },
+        {
+          "name": "entity.attribute.ldif",
+          "match": "^[a-zA-Z][a-zA-Z0-9-]*:"
+        },
+        {
+          "name": "constant.language.ldif",
+          "match": "^(version|dn|changetype|add|delete|modify|modrdn|moddn)\\b"
+        }
+      ]
+    }
+  }
+}

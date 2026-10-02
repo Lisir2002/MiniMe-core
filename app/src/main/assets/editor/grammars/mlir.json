@@ -1,0 +1,64 @@
+{
+  "scopeName": "source.mlir",
+  "name": "MLIR",
+  "extensions": [
+    "mlir"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.mlir",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.mlir",
+          "begin": "\"",
+          "end": "\""
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.mlir",
+          "match": "\\b(func|func_native|return|br|cond_br|switch|call|call_indirect|constant|alloc|alloca|dealloc|load|store|get_global|set_global|memref_cast|tensor_cast|index_cast|signless|unsigned|signed|complex|f32|f64|f16|bf16|i1|i8|i16|i32|i64|i128|index|memref|tensor|vector|tuple|affine|sparse|dense|opaque|unit|none|symbol|visibility|public|private|nested|internal|always|inline|noinline|optnone|minsize|optsize|cold|nocallback|noduplicate|convergent|add|sub|mul|div|rem|mod|and|or|xor|shl|shrs|shru|cmpi|cmpf|select|sitofp|fptosi|uitofp|fptoui|fpext|fptrunc|trunc|zext|sext|bitcast|index_cast|memref_cast|tensor_cast|vector_transfer_read|vector_transfer_write|vector_extract|vector_insert|vector_broadcast|vector_reduction|vector_matmul|vector_outerproduct|vector_print|vector_extractelement|vector_insertelement|vector_shuffle|scf|affine|gpu|rocdl|nvvm|llvm|spv|openmp|omp|pdl|pdl_interp|transform|linalg|tosa|mhlo|chlo|gml_st|vector|memref|tensor|arith|math|cf|func|scf|affine|gpu|rocdl|nvvm|llvm|spv|openmp|omp|pdl|pdl_interp|transform|linalg|tosa|mhlo|chlo|gml_st)\\b"
+        },
+        {
+          "name": "entity.name.function.mlir",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\s*\\()"
+        },
+        {
+          "name": "variable.other.mlir",
+          "match": "%[a-zA-Z0-9_]+"
+        },
+        {
+          "name": "variable.language.mlir",
+          "match": "@[a-zA-Z0-9_]+"
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric.mlir",
+      "match": "\\b-?\\d+\\.?\\d*\\b"
+    }
+  }
+}

@@ -8,7 +8,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -23,6 +22,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.mini.me_core.core.theme.LocalAnimationScale
+import com.mini.me_core.core.theme.ScaledAnimation
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -70,6 +71,7 @@ fun ParticleSplashScreen(
     val density = LocalDensity.current.density
     val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
+    val animScale = LocalAnimationScale.current
 
     // Detect device quality level
     val quality = remember { SplashQualityLevel.detect(context) }
@@ -92,7 +94,7 @@ fun ParticleSplashScreen(
     val isPressed by interactionSource.collectIsPressedAsState()
     val skipScale by animateFloatAsState(
         targetValue = if (isPressed) 0.95f else 1f,
-        animationSpec = tween(100),
+        animationSpec = ScaledAnimation.tween(100),
         label = "skip_scale"
     )
     var skipButtonVisible by remember { mutableStateOf(true) }
@@ -134,7 +136,7 @@ fun ParticleSplashScreen(
     LaunchedEffect(isDismissing) {
         if (isDismissing) {
             skipButtonVisible = false
-            overlayAlpha.animateTo(0f, tween(500))
+            overlayAlpha.animateTo(0f, ScaledAnimation.tween(500, scale = animScale))
             onDismiss()
         }
     }

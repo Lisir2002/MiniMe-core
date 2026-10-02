@@ -1,0 +1,44 @@
+{
+  "name": "ReasonML",
+  "scopeName": "source.reason",
+  "fileTypes": [
+    "re",
+    "rei"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.ReasonML",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.ReasonML",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.ReasonML",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.ReasonML",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.ReasonML",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.ReasonML",
+      "match": "\\b(type|let|in|if|else|switch|function|module|open|include|external|pub|private|rec|and)\\b"
+    },
+    {
+      "name": "constant.numeric.ReasonML",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

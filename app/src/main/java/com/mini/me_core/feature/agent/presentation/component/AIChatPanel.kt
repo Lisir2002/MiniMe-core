@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.agent.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.theme.ScaledAnimation
 
 import android.net.Uri
 import android.widget.Toast
@@ -653,7 +654,7 @@ fun AIChatPanel(
 
             AnimatedVisibility(
                 visible = changes.isNotEmpty(),
-                enter = fadeIn(),
+                enter = fadeIn(ScaledAnimation.tween(200)),
                 exit = fadeOut()
             ) {
                 ChangePreviewPanel(
@@ -667,7 +668,7 @@ fun AIChatPanel(
 
             AnimatedVisibility(
                 visible = pendingPermission != null,
-                enter = fadeIn(),
+                enter = fadeIn(ScaledAnimation.tween(200)),
                 exit = fadeOut()
             ) {
                 pendingPermission?.let { request ->
@@ -680,7 +681,7 @@ fun AIChatPanel(
 
             AnimatedVisibility(
                 visible = pendingQuestion != null,
-                enter = fadeIn(),
+                enter = fadeIn(ScaledAnimation.tween(200)),
                 exit = fadeOut()
             ) {
                 pendingQuestion?.let { question ->
@@ -695,7 +696,7 @@ fun AIChatPanel(
             val planApproval by viewModel.pendingPlanApproval.collectAsStateWithLifecycle()
             AnimatedVisibility(
                 visible = planApproval != null,
-                enter = fadeIn(),
+                enter = fadeIn(ScaledAnimation.tween(200)),
                 exit = fadeOut()
             ) {
                 planApproval?.let { state ->

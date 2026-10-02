@@ -29,16 +29,19 @@ object LanguageDetector {
         "brewfile" to "source.ruby",
         "procfile" to "source.d",
         "justfile" to "source.just",
-        "build" to "python.bazel",
-        "workspace" to "python.bazel",
-        ".gitignore" to "source.gitignore",
-        ".gitattributes" to "source.gitignore",
-        ".gitmodules" to "source.gitmodules",
-        ".dockerignore" to "source.gitignore",
+        "build" to "source.bazel",
+        "workspace" to "source.bazel",
+        ".gitignore" to "source.ignore",
+        ".gitattributes" to "source.ignore",
+        ".gitmodules" to "source.ignore",
+        ".dockerignore" to "source.ignore",
+        ".npmignore" to "source.ignore",
+        ".eslintignore" to "source.ignore",
         ".env" to "source.dotenv",
-        ".envrc" to "source.sh",
+        ".envrc" to "source.shell",
         "docker-compose.yml" to "source.yaml",
         "docker-compose.yaml" to "source.yaml",
+        "codeowners" to "text.codeowners",
     )
 
     /** 扩展名 → scopeName（覆盖最常见 ~100 种；其余走 TextMateManager 注册表查询）。 */
@@ -53,7 +56,7 @@ object LanguageDetector {
         "sass" to "source.sass",
         "less" to "source.css.less",
         "styl" to "source.stylus",
-        "vue" to "source.vue",
+        "vue" to "text.html.vue",
         "svelte" to "source.svelte",
         "astro" to "source.astro",
         // JS/TS
@@ -121,7 +124,7 @@ object LanguageDetector {
         "jl" to "source.julia",
         // Data formats
         "json" to "source.json",
-        "jsonc" to "source.json",
+        "jsonc" to "source.json.comments",
         "json5" to "source.json5",
         "jsonl" to "source.json",
         "yaml" to "source.yaml",
@@ -144,18 +147,17 @@ object LanguageDetector {
         "mdx" to "text.html.markdown",
         "adoc" to "text.asciidoc",
         "asciidoc" to "text.asciidoc",
-        "rst" to "text.restructuredtext",
-        "tex" to "text.tex",
+        "rst" to "source.rst",
         "bib" to "text.bibtex",
-        "typ" to "text.typst",
-        "mmd" to "source.mermaid",
+        "typ" to "source.typst",
+        "mmd" to "markdown.mermaid.codeblock",
         // Build/DevOps
         "tf" to "source.hcl",
         "tfvars" to "source.hcl",
         "hcl" to "source.hcl",
         "cmake" to "source.cmake",
         "ninja" to "source.ninja",
-        "bzl" to "python.bazel",
+        "bzl" to "source.python",
         "dockerfile" to "source.dockerfile",
         "nginx" to "source.nginx",
         // Query
@@ -187,7 +189,6 @@ object LanguageDetector {
         "nim" to "source.nim",
         "cr" to "source.crystal",
         "d" to "source.d",
-        "zig" to "source.zig",
         "wasm" to "source.wat",
         "wat" to "source.wat",
         "wgsl" to "source.wgsl",
@@ -196,11 +197,11 @@ object LanguageDetector {
         "vert" to "source.glsl",
         "cu" to "source.cpp",
         "ipynb" to "source.json",
-        "diff" to "text.diff",
-        "patch" to "text.diff",
+        "diff" to "source.diff",
+        "patch" to "source.diff",
         "log" to "text.log",
         "vim" to "source.viml",
-        "el" to "source.elisp",
+        "el" to "source.emacs.lisp",
         "scm" to "source.scheme",
         "ss" to "source.scheme",
         "lisp" to "source.commonlisp",
@@ -242,9 +243,14 @@ object LanguageDetector {
     /**
      * 检测文件应使用的 TextMate scopeName。
      *
-     * @param file 文件
-     * @param firstLines 文件前 N 行文本（用于 shebang/modeline 检测；可为空）
-     * @return scopeName，未识别返回 "text.plain"
+     * 检测策略（按优先级）：
+     *  1. 文件名匹配（Dockerfile、Makefile 等无扩展名文件）
+     *  2. 硬编码扩展名映射（常见 ~150 种，快速路径）
+     *  3. TextMateManager 注册表扩展名映射（全量 ~580 种，覆盖所有内置 grammar）
+     *  4. Shebang 行（#!/usr/bin/env python3 → Python）
+     *  5. Vim modeline / Emacs file variable
+     *  6. 内容特征（首行特征匹配）
+     *  7. 兜底：Plain Text（text.plain）
      */
     fun detect(file: File, firstLines: String? = null): String {
         val name = file.name
@@ -252,13 +258,18 @@ object LanguageDetector {
         // 1. 文件名精确匹配（Dockerfile、Makefile 等）
         filenameMap[name.lowercase()]?.let { return it }
 
-        // 2. 扩展名
+        // 2. 硬编码扩展名映射（快速路径，覆盖最常见语言）
         val ext = file.extension.lowercase()
         if (ext.isNotEmpty()) {
             extensionMap[ext]?.let { return it }
         }
 
-        // 3. Shebang
+        // 3. TextMateManager 注册表扩展名映射（全量覆盖，支持多段扩展名如 .blade.php）
+        if (TextMateManager.isInitialized()) {
+            TextMateManager.scopeForFileName(name)?.let { return it }
+        }
+
+        // 4. Shebang / modeline / 内容特征
         if (!firstLines.isNullOrEmpty()) {
             detectFromShebang(firstLines)?.let { return it }
             detectFromModeline(firstLines)?.let { return it }
@@ -303,21 +314,47 @@ object LanguageDetector {
         return null
     }
 
-    /** 内容特征检测（XML/JSON/YAML 等）。 */
+    /** 内容特征检测（XML/JSON/YAML/Python/Rust/Go 等）。 */
     private fun detectFromContent(content: String): String? {
         val trimmed = content.trimStart()
+        val firstLine = trimmed.lineSequence().firstOrNull()?.trim() ?: return null
+
         // JSON
         if ((trimmed.startsWith("{") && trimmed.endsWith("}")) ||
             (trimmed.startsWith("[") && trimmed.endsWith("]"))
         ) {
-            return "source.json"
+            // 简单判断：第一行有 "key": 格式
+            if (trimmed.startsWith("{")) {
+                val hasQuotedKey = trimmed.contains(Regex("\"\\w+\"\\s*:"))
+                if (hasQuotedKey) return "source.json"
+            }
         }
         // XML
         if (trimmed.startsWith("<?xml")) return "text.xml"
         // HTML
-        if (trimmed.startsWith("<!DOCTYPE html") || trimmed.startsWith("<html")) return "text.html.basic"
+        if (trimmed.startsWith("<!DOCTYPE html", ignoreCase = true) ||
+            trimmed.startsWith("<html", ignoreCase = true)
+        ) return "text.html.basic"
         // YAML front matter
         if (trimmed.startsWith("---\n")) return "source.yaml"
+        // Python 特征：def / class / import / from
+        if (Regex("^(def|class|import|from)\\s+\\w+").containsMatchIn(firstLine)) return "source.python"
+        // Rust 特征：fn main / let mut
+        if (Regex("^(fn |pub fn |let mut |struct |impl )").containsMatchIn(firstLine)) return "source.rust"
+        // Go 特征：package / func
+        if (Regex("^(package |func )").containsMatchIn(firstLine)) return "source.go"
+        // Shell 特征：# 开头注释 + 常见命令
+        if (firstLine.startsWith("#") && !firstLine.startsWith("#!") &&
+            Regex("(echo|cd|ls|export|if|then|fi|for|done)").containsMatchIn(firstLine)
+        ) return "source.shell"
+        // C/C++ 特征：#include
+        if (firstLine.startsWith("#include")) return "source.cpp"
+        // Java/Kotlin 特征：package / import
+        if (Regex("^(package |import java)").containsMatchIn(firstLine)) return "source.java"
+        // SQL 特征：SELECT / CREATE / INSERT
+        if (Regex("^(SELECT|CREATE|INSERT|UPDATE|DELETE)\\s+", RegexOption.IGNORE_CASE).containsMatchIn(firstLine)) return "source.sql"
+        // Markdown 特征：# 标题 / - 列表 / ``` 代码块
+        if (firstLine.startsWith("# ") || firstLine.startsWith("## ") || firstLine.startsWith("```")) return "text.html.markdown"
         return null
     }
 

@@ -1,0 +1,43 @@
+{
+  "name": "Metal",
+  "scopeName": "source.metal",
+  "fileTypes": [
+    "metal"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.Metal",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.Metal",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Metal",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Metal",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Metal",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Metal",
+      "match": "\\b(\\#include|using|namespace|class|struct|kernel|vertex|fragment|device|thread|float|int|if|else|for|while|return)\\b"
+    },
+    {
+      "name": "constant.numeric.Metal",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

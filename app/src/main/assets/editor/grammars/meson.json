@@ -1,0 +1,43 @@
+{
+  "name": "Meson",
+  "scopeName": "source.meson",
+  "fileTypes": [
+    "build"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.#.Meson",
+      "match": "#.*$"
+    },
+    {
+      "name": "string.quoted.double.Meson",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Meson",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Meson",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Meson",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Meson",
+      "match": "\\b(project|executable|library|shared_library|static_library|dependency|declare_dependency|if|else|foreach|endif|endforeach|return|meson|build_target)\\b"
+    },
+    {
+      "name": "constant.numeric.Meson",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

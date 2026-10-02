@@ -1,0 +1,44 @@
+{
+  "name": "AutoIt",
+  "scopeName": "source.autoit",
+  "fileTypes": [
+    "au3",
+    "a3k"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.;.AutoIt",
+      "match": ";.*$"
+    },
+    {
+      "name": "string.quoted.double.AutoIt",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.AutoIt",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.AutoIt",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.AutoIt",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.AutoIt",
+      "match": "\\b(Func|EndFunc|If|Then|Else|ElseIf|EndIf|For|To|Step|Next|While|WEnd|Do|Until|Select|Case|Switch|Return|Dim|Local|Global|Const)\\b"
+    },
+    {
+      "name": "constant.numeric.AutoIt",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

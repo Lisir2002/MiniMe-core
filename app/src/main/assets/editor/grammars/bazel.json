@@ -1,0 +1,45 @@
+{
+  "name": "Bazel",
+  "scopeName": "source.bazel",
+  "fileTypes": [
+    "bzl",
+    "BUILD",
+    "WORKSPACE"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.#.Bazel",
+      "match": "#.*$"
+    },
+    {
+      "name": "string.quoted.double.Bazel",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Bazel",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Bazel",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Bazel",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Bazel",
+      "match": "\\b(load|package|py_library|py_binary|py_test|cc_library|cc_binary|cc_test|java_library|java_binary|java_test|glob|select|exports_files|visibility)\\b"
+    },
+    {
+      "name": "constant.numeric.Bazel",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

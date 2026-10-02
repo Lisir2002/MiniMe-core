@@ -1,0 +1,44 @@
+{
+  "name": "Maxima",
+  "scopeName": "source.maxima",
+  "fileTypes": [
+    "mac",
+    "wxm"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line./*.Maxima",
+      "match": "/*.*$"
+    },
+    {
+      "name": "string.quoted.double.Maxima",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Maxima",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Maxima",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Maxima",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Maxima",
+      "match": "\\b(:lisp|block|if|then|else|for|while|do|end|define|function|load|save|solve|integrate|diff)\\b"
+    },
+    {
+      "name": "constant.numeric.Maxima",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

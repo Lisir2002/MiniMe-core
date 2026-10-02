@@ -1,0 +1,44 @@
+{
+  "name": "DOT",
+  "scopeName": "source.dot",
+  "fileTypes": [
+    "dot",
+    "gv"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.DOT",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.DOT",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.DOT",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.DOT",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.DOT",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.DOT",
+      "match": "\\b(digraph|graph|node|edge|subgraph|strict|->|--)\\b"
+    },
+    {
+      "name": "constant.numeric.DOT",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

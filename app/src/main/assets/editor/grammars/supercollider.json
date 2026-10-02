@@ -1,0 +1,43 @@
+{
+  "name": "SuperCollider",
+  "scopeName": "source.supercollider",
+  "fileTypes": [
+    "scd"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.SuperCollider",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.SuperCollider",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.SuperCollider",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.SuperCollider",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.SuperCollider",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.SuperCollider",
+      "match": "\\b(SynthDef|play|out|SinOsc|LFO|Env|if|else|for|while|do|end|nil|true|false)\\b"
+    },
+    {
+      "name": "constant.numeric.SuperCollider",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

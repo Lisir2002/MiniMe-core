@@ -1,0 +1,43 @@
+{
+  "name": "HOCON",
+  "scopeName": "source.hocon",
+  "fileTypes": [
+    "hocon"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.HOCON",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.HOCON",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.HOCON",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.HOCON",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.HOCON",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.HOCON",
+      "match": "\\b(include|true|false|null)\\b"
+    },
+    {
+      "name": "constant.numeric.HOCON",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

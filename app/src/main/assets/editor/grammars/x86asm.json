@@ -1,0 +1,45 @@
+{
+  "name": "x86 Assembly",
+  "scopeName": "source.x86asm",
+  "fileTypes": [
+    "asm",
+    "s",
+    "nasm"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.;.x86 Assembly",
+      "match": ";.*$"
+    },
+    {
+      "name": "string.quoted.double.x86 Assembly",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.x86 Assembly",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.x86 Assembly",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.x86 Assembly",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.x86 Assembly",
+      "match": "\\b(section|global|extern|mov|add|sub|mul|div|jmp|je|jne|jg|jl|call|ret|push|pop|eax|ebx|ecx|edx|ebp|esp)\\b"
+    },
+    {
+      "name": "constant.numeric.x86 Assembly",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

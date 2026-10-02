@@ -1,0 +1,43 @@
+{
+  "name": "Smali",
+  "scopeName": "source.smali",
+  "fileTypes": [
+    "smali"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.#.Smali",
+      "match": "#.*$"
+    },
+    {
+      "name": "string.quoted.double.Smali",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Smali",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Smali",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Smali",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Smali",
+      "match": "\\b(.class|.super|.method|.end method|.field|.locals|.param|.prologue|.line|move|return|if|goto|invoke|new-instance)\\b"
+    },
+    {
+      "name": "constant.numeric.Smali",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

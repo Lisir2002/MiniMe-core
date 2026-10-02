@@ -1,0 +1,45 @@
+{
+  "name": "XQuery",
+  "scopeName": "source.xquery",
+  "fileTypes": [
+    "xqy",
+    "xquery",
+    "xql"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.(:.XQuery",
+      "match": "(:.*$"
+    },
+    {
+      "name": "string.quoted.double.XQuery",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.XQuery",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.XQuery",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.XQuery",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.XQuery",
+      "match": "\\b(xquery|version|declare|namespace|module|import|for|let|where|order by|return|if|then|else|instance of|cast as|typeswitch)\\b"
+    },
+    {
+      "name": "constant.numeric.XQuery",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.agent.presentation.component.richsegment
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.theme.ScaledAnimation
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import androidx.compose.animation.animateContentSize
@@ -408,7 +409,7 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
             .background(bg)
             // 问题21：边框加强为 borderStrong，轮廓更清晰
             .border(BorderStroke(1.dp, colors.borderStrong), RoundedCornerShape(LocalCornerRadius.current.map(10.dp)))
-            .animateContentSize(animationSpec = tween(160))
+            .animateContentSize(animationSpec = ScaledAnimation.tweenGlobal(160))
     ) {
         // Header：语言角标 + 复制 + 展开/收起（渐变跟随品牌色）
         Row(

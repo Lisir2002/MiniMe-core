@@ -1,0 +1,44 @@
+{
+  "name": "Mercury",
+  "scopeName": "source.mercury",
+  "fileTypes": [
+    "m",
+    "moo"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.%.Mercury",
+      "match": "%.*$"
+    },
+    {
+      "name": "string.quoted.double.Mercury",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Mercury",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Mercury",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Mercury",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Mercury",
+      "match": "\\b(:-|-->|module|interface|implementation|import|pred|func|type|if|then|else|forall|some)\\b"
+    },
+    {
+      "name": "constant.numeric.Mercury",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

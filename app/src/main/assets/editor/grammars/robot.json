@@ -1,0 +1,43 @@
+{
+  "name": "Robot Framework",
+  "scopeName": "source.robot",
+  "fileTypes": [
+    "robot"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.#.Robot Framework",
+      "match": "#.*$"
+    },
+    {
+      "name": "string.quoted.double.Robot Framework",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Robot Framework",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Robot Framework",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Robot Framework",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Robot Framework",
+      "match": "\\b(*** Settings ***|*** Variables ***|*** Keywords ***|*** Test Cases ***|*** Tasks ***|Library|Resource|Force Tags|Default Tags|Documentation|Suite Setup|Suite Teardown|Test Setup|Test Teardown|Run Keyword|Run Keywords)\\b"
+    },
+    {
+      "name": "constant.numeric.Robot Framework",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

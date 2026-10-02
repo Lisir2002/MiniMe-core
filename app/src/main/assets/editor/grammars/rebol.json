@@ -1,0 +1,44 @@
+{
+  "name": "Rebol",
+  "scopeName": "source.rebol",
+  "fileTypes": [
+    "rebol",
+    "r"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.;.Rebol",
+      "match": ";.*$"
+    },
+    {
+      "name": "string.quoted.double.Rebol",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Rebol",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Rebol",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Rebol",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Rebol",
+      "match": "\\b(rebol|red|script|context|object|func|function|if|else|foreach|loop|while|return|true|false|none)\\b"
+    },
+    {
+      "name": "constant.numeric.Rebol",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

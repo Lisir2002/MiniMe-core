@@ -1,0 +1,29 @@
+{
+  "scopeName": "source.aspectj",
+  "name": "AspectJ",
+  "extensions": [
+    "aj"
+  ],
+  "patterns": [
+    {
+      "include": "source.java"
+    },
+    {
+      "include": "#aspect-keywords"
+    }
+  ],
+  "repository": {
+    "aspect-keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.aspectj",
+          "match": "\\b(aspect|pointcut|before|after|around|declare|parents|warning|error|soft|precedence|thisJoinPoint|thisJoinPointStaticPart|thisEnclosingJoinPointStaticPart)\\b"
+        },
+        {
+          "name": "keyword.operator.aspectj",
+          "match": "\\b(call|execution|get|set|initialization|preinitialization|staticinitialization|handler|adviceexecution|withincode|within|target|this|args|if|cflow|cflowbelow)\\b"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "Candid",
+  "scopeName": "source.candid",
+  "fileTypes": [
+    "candid"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.Candid",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.Candid",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Candid",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Candid",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Candid",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Candid",
+      "match": "\\b(service|actor|type|variant|record|func|query|update|oneway|composite|opt|vec|principal|nat|int|text|blob)\\b"
+    },
+    {
+      "name": "constant.numeric.Candid",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

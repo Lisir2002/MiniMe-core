@@ -1,0 +1,39 @@
+{
+  "scopeName": "text.html.leaf",
+  "name": "Leaf",
+  "extensions": [
+    "leaf"
+  ],
+  "patterns": [
+    {
+      "include": "text.html.basic"
+    },
+    {
+      "include": "#leaf-tags"
+    }
+  ],
+  "repository": {
+    "leaf-tags": {
+      "patterns": [
+        {
+          "name": "meta.tag.leaf",
+          "begin": "#(?:\\w+)",
+          "end": "(?=#|$)",
+          "captures": {
+            "0": {
+              "name": "entity.name.tag.leaf"
+            }
+          }
+        },
+        {
+          "name": "variable.other.leaf",
+          "match": "#\\w+"
+        },
+        {
+          "name": "keyword.control.leaf",
+          "match": "#(if|else|elseif|endif|for|endfor|while|endwhile|switch|endswitch|case|break|continue|return|import|extends|block|endblock|set|filter|endfilter|macro|endmacro|autoescape|endautoescape|do|flush|spaceless|endspaceless|verbatim|endverbatim|comment|endcomment|include|require)\\b"
+        }
+      ]
+    }
+  }
+}

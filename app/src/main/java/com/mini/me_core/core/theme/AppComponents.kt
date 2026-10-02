@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
 
 // ──────────────────────────────────────────────
@@ -36,30 +37,30 @@ object Elevation {
 // ──────────────────────────────────────────────
 val pageEnterTransition: EnterTransition =
     slideInHorizontally(
-        animationSpec = tween(250),
+        animationSpec = ScaledAnimation.tweenGlobal(250),
         initialOffsetX = { it / 4 }
-    ) + fadeIn(animationSpec = tween(250))
+    ) + fadeIn(animationSpec = ScaledAnimation.tweenGlobal(250))
 
 val pageExitTransition: ExitTransition =
-    fadeOut(animationSpec = tween(200))
+    fadeOut(animationSpec = ScaledAnimation.tweenGlobal(200))
 
 val pagePopEnterTransition: EnterTransition =
-    fadeIn(animationSpec = tween(200))
+    fadeIn(animationSpec = ScaledAnimation.tweenGlobal(200))
 
 val pagePopExitTransition: ExitTransition =
     slideOutHorizontally(
-        animationSpec = tween(250),
+        animationSpec = ScaledAnimation.tweenGlobal(250),
         targetOffsetX = { it / 4 }
-    ) + fadeOut(animationSpec = tween(200))
+    ) + fadeOut(animationSpec = ScaledAnimation.tweenGlobal(200))
 
 val terminalEnterTransition: EnterTransition =
     slideInHorizontally(
-        animationSpec = tween(250),
+        animationSpec = ScaledAnimation.tweenGlobal(250),
         initialOffsetX = { it / 4 }
     )
 
 val terminalExitTransition: ExitTransition =
     slideOutHorizontally(
-        animationSpec = tween(250),
+        animationSpec = ScaledAnimation.tweenGlobal(250),
         targetOffsetX = { it / 4 }
     )

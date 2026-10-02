@@ -1,0 +1,45 @@
+{
+  "name": "Scilab",
+  "scopeName": "source.scilab",
+  "fileTypes": [
+    "sci",
+    "sce",
+    "tst"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.//.Scilab",
+      "match": "//.*$"
+    },
+    {
+      "name": "string.quoted.double.Scilab",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Scilab",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.Scilab",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.Scilab",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.Scilab",
+      "match": "\\b(function|endfunction|if|then|else|elseif|end|for|while|do|break|continue|return|global|clear|clc|plot|x=meshgrid)\\b"
+    },
+    {
+      "name": "constant.numeric.Scilab",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}

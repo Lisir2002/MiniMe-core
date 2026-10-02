@@ -1,0 +1,63 @@
+{
+  "scopeName": "source.bnf",
+  "name": "BNF",
+  "extensions": [
+    "bnf"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#rules"
+    },
+    {
+      "include": "#terminals"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.bnf",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.bnf",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "rules": {
+      "patterns": [
+        {
+          "name": "entity.name.rule.bnf",
+          "match": "^\\s*<[^>]+>"
+        },
+        {
+          "name": "keyword.operator.assignment.bnf",
+          "match": "::=|="
+        },
+        {
+          "name": "keyword.operator.alternation.bnf",
+          "match": "\\|"
+        }
+      ]
+    },
+    "terminals": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.bnf",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.bnf",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    }
+  }
+}

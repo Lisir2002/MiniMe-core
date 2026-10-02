@@ -1,0 +1,13 @@
+{
+  "scopeName": "source.xpp",
+  "name": "X++",
+  "extensions": [
+    "xpp",
+    "x++"
+  ],
+  "patterns": [
+    {
+      "include": "source.java"
+    }
+  ]
+}

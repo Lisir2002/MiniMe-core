@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
 
 /**
@@ -41,13 +42,13 @@ fun AppStatusDot(
         AppStatusType.Warning -> colors.warning
     }
 
-    val scale by if (animate) {
+    val scale by if (animate && !ScaledAnimation.isDisabled()) {
         val transition = rememberInfiniteTransition(label = "status_dot")
         transition.animateFloat(
             initialValue = 1f,
             targetValue = 1.3f,
             animationSpec = infiniteRepeatable(
-                animation = tween(800),
+                animation = ScaledAnimation.tween(800),
                 repeatMode = RepeatMode.Reverse,
             ),
             label = "dot_scale",

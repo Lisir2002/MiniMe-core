@@ -1,0 +1,31 @@
+{
+  "fileTypes": [
+    "gitignore",
+    "dockerignore",
+    "npmignore",
+    "eslintignore",
+    "prettierignore",
+    "gitattributes",
+    "gitmodules"
+  ],
+  "name": "Ignore",
+  "scopeName": "source.ignore",
+  "patterns": [
+    {
+      "name": "comment.line.number-sign.ignore",
+      "match": "#.*$"
+    },
+    {
+      "name": "keyword.control.ignore",
+      "match": "^(!)?(\\/)?(\\*?\\*?\\/?)+$"
+    },
+    {
+      "name": "constant.character.escape.ignore",
+      "match": "\\\\."
+    },
+    {
+      "name": "string.unquoted.ignore",
+      "match": "^[^#\\s]+$"
+    }
+  ]
+}

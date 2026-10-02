@@ -1,0 +1,45 @@
+{
+  "name": "VBA",
+  "scopeName": "source.vba",
+  "fileTypes": [
+    "vba",
+    "bas",
+    "cls"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.'.VBA",
+      "match": "'.*$"
+    },
+    {
+      "name": "string.quoted.double.VBA",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.VBA",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "string.quoted.single.VBA",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.VBA",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.VBA",
+      "match": "\\b(Sub|End Sub|Function|End Function|Dim|Const|If|Then|Else|ElseIf|End If|For|To|Step|Next|Do|Loop|While|Wend|Call|Return|Private|Public|ByVal|ByRef)\\b"
+    },
+    {
+      "name": "constant.numeric.VBA",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    }
+  ]
+}
