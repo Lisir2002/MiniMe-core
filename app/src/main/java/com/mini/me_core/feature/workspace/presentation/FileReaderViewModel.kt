@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mini.me_core.feature.workspace.domain.DelegatingFileAccess
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,5 +60,10 @@ class FileReaderViewModel @Inject constructor(
                 }
             )
         }
+    }
+
+    /** 保存编辑后的内容到原文件路径，返回是否成功。 */
+    suspend fun save(path: String, content: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { fileAccess.writeFile(path, content, overwrite = true) }
     }
 }
