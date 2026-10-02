@@ -35,14 +35,14 @@ import com.mini.me_core.core.theme.components.AppTopAppBar
 /** P3：分层规则管理页（只读列表 + 启用/禁用内存覆盖）。 */
 @Composable
 fun RuleManagerScreen(
-    projectRoot: String,
     onBack: () -> Unit,
     viewModel: RuleManagerViewModel = hiltViewModel()
 ) {
     val rules by viewModel.rules.collectAsStateWithLifecycle()
     val disabledNames by viewModel.disabledNames.collectAsStateWithLifecycle()
+    val projectRoot by viewModel.currentProjectRoot.collectAsStateWithLifecycle()
 
-    LaunchedEffect(projectRoot) { viewModel.load(projectRoot) }
+    LaunchedEffect(Unit) { viewModel.loadCurrent() }
 
     Scaffold(
         topBar = {

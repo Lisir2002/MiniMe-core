@@ -384,7 +384,7 @@ fun SettingsScreen(
         return
     }
     if (showRuleManager) {
-        RuleManagerScreen(projectRoot = "", onBack = { showRuleManager = false })
+        RuleManagerScreen(onBack = { showRuleManager = false })
         return
     }
     if (assetViewerTab != null) {
