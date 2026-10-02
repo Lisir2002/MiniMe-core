@@ -76,7 +76,8 @@ MiniMe-core 是一款在 Android 手机上运行的 AI 编程工具，将大语�
 **环境要求**
 
 - **真机（正式支持）**：Android 8.0+（API 26）arm64-v8a 设备（当前 Android 真机主流 ABI）
-- **虚拟环境（模拟器 / 虚拟机）**：x86_64 或 arm64 系统镜像均支持——同一通用包安装即用，容器按宿主架构自动选用（x86_64 走 x86_64 原生 proot，arm64 走原生执行）
+- **虚拟环境（模拟器 / 虚拟机）**：推荐使用 arm64 系统镜像（原生运行）。x86_64 镜像设备上 App native 层不兼容（仅 arm64-v8a），需使用 arm64 镜像模拟器。
+- **容器内架构**：App 内置双架构 Linux 容器——arm64 rootfs 原生执行（默认），x86_64 rootfs 经 QEMU 静态转译执行（兼容官方只发 x86_64 的 Android SDK Build-Tools 等工具链，性能有转译开销）。
 
 ## 快速上手
 
@@ -94,7 +95,7 @@ MiniMe-core 是一款在 Android 手机上运行的 AI 编程工具，将大语�
 A：为支持 PRoot 容器执行，targetSdk 锁定为 28 以绕过 Android 10+ 的 W^X 策略，与 Termux 采用相同取舍，因此不符合 Google Play 的 targetSdk 要求。
 
 **Q：APK 为什么这么大？**
-A：release 仅 arm64-v8a，内置 Alpine Linux rootfs 和功能包，确保开箱即用；debug 变体保留双 ABI 用于模拟器开发。
+A：App native 层仅 arm64-v8a（x86_64 so 已移除，APK 从 ~72MB 降至 ~51MB）；内置 Alpine Linux rootfs（arm64 + x86_64 双架构）、QEMU 转译器、tree-sitter 语法库和功能包，确保开箱即用。
 
 **Q：支持哪些 AI 提供商？**
 A：支持所有兼容 OpenAI / Anthropic / Gemini API 协议的自定义供应商，包括但不限于 OpenAI、Anthropic、Google Gemini、DeepSeek、通义千问、智谱 GLM、豆包、阶跃星辰等。
@@ -119,7 +120,7 @@ A：使用附属应用 [MiniMe Logs](https://github.com/Lisir2002/MiniMe-core/re
 
 # Release 发布包（需配置签名；不配置时自动回退到 debug keystore 签名，保证能产出 APK）
 ./gradlew assembleRelease
-# 产物路径：app/build/outputs/apk/release/app-release.apk（双 ABI 通用包：arm64-v8a + x86_64）
+# 产物路径：app/build/outputs/apk/release/app-release.apk（仅 arm64-v8a native so；容器资产含双架构 rootfs）
 
 # Release AAB
 ./gradlew bundleRelease
@@ -152,7 +153,7 @@ keyPassword=your_key_password
 
 ### 云端构建（GitHub Actions 自动发版）
 
-发版走 Tag 驱动：在 `main` 节点上打 `v*` Tag 推送（如 `git push origin v0.0.0.16` / `v0.0.0.16-rc1`），由 [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) 自动接管：单测 → assembleRelease → 正式签名 → ABI 双架构产物校验 → 上传 R8 mapping → 创建 GitHub Release → 挂载 APK → 写入 Run Summary。RC Tag（含 `-rc`）自动标记为 prerelease。
+发版走 Tag 驱动：在 `main` 节点上打 `v*` Tag 推送（如 `git push origin v0.0.0.16` / `v0.0.0.16-rc1`），由 [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) 自动接管：单测 → assembleRelease → 正式签名 → arm64-v8a 产物校验 → 上传 R8 mapping → 创建 GitHub Release → 挂载 APK → 写入 Run Summary。RC Tag（含 `-rc`）自动标记为 prerelease。
 
 - **正式签名前置条件**：仓库 `Settings → Secrets → Actions` 必须配置 4 个 secrets —— `AICODE_KEYSTORE_BASE64` / `AICODE_KEYSTORE_PASSWORD` / `AICODE_KEY_ALIAS` / `AICODE_KEY_PASSWORD`。缺失任一会静默回退到 debug keystore 签名，产物不可上架。
 - **实时监控与产物校验**、完整命令与 CI job 详解：见 [docs/ci-release.md](./docs/ci-release.md)（云端构建发版运维手册）。
@@ -170,7 +171,7 @@ keyPassword=your_key_password
 | 网络 | Retrofit 2.11.0 + OkHttp 4.12.0 + Gson |
 | 异步 | Kotlin Coroutines / Flow |
 | 终端 | Termux terminal-emulator + terminal-view（JNI libtermux.so） |
-| 容器 | PRoot + Alpine Linux 3.21 rootfs（arm64-v8a / x86_64） |
+| 容器 | PRoot + Alpine Linux 3.21 rootfs（容器内双架构：arm64 原生执行 + x86_64 QEMU 转译；App native so 仅 arm64-v8a） |
 | 远程 SSH | SSHJ 0.38.0（exec channel + shell channel） |
 | 加密 | BouncyCastle bcprov-jdk18on 1.75 + Android Keystore AES-GCM |
 | FTP | Apache Commons Net 3.10.0 |
@@ -218,9 +219,10 @@ app/src/main/java/com/mini/me_core/
 ## 已知限制
 
 - `targetSdk` 锁定为 28 以绕过 Android 10+ W^X 策略，使 PRoot 可执行；代价为无法上架 Google Play（与 Termux 同一取舍）。
-- release 仅 arm64-v8a：
+- App native 层仅 arm64-v8a：
   - 适配所有主流 Android 真机（骁龙/天玑/麒麟等 64 位 ARM 芯片）；
-  - debug 变体保留 x86_64 供模拟器开发；
+  - 模拟器请使用 arm64 系统镜像（x86_64 镜像设备上 App native 层不兼容）；
+  - 容器内支持双架构：arm64 rootfs 原生执行（默认），x86_64 rootfs 经 QEMU 静态转译执行（兼容官方 x86_64 工具链，性能有转译开销）；
   - 极端罕见的主机 ABI（非 arm64）下容器不可用，AI 核心（对话/文件/远程 SSH）仍可用，容器/终端走明确降级提示。
 
 ## 贡献
