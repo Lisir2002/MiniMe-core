@@ -208,6 +208,7 @@ app/src/main/java/com/mini/me_core/
 |---|---|
 | [PLAN.md](./PLAN.md) | 设计文档总览与引导目录（AI 协同开发首选入口） |
 | [AGENTS.md](./AGENTS.md) | AI 协同开发规范：资产同步纪律、Conventional Commits、分支工作流、发版规范（最高优先级强制约束） |
+| [docs/workflow/工作流程规范.md](./docs/workflow/工作流程规范.md) | 工作流程规范：编程验证、功能设计、Bug 修复、发版、汇报规范与质量门禁 |
 | [CHANGELOG.md](./docs/Version%20Log/CHANGELOG.md) | 用户面向版本更新日志（含各版本独立日志） |
 | [docs/ci-release.md](./docs/ci-release.md) | 云端构建发版运维手册：CI 全流程、产物校验、签名策略 |
 | [docs/ui-standards.md](./docs/ui-standards.md) | UI 设计规范：页面槽位、统一组件、颜色间距字体、禁止事项 |
