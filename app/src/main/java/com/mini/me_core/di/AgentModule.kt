@@ -28,6 +28,7 @@ import com.mini.me_core.feature.agent.domain.execution.tool.explorer.SearchCodeT
 import com.mini.me_core.feature.agent.domain.execution.tool.skill.LoadSkillTool
 import com.mini.me_core.feature.agent.domain.execution.tool.question.AskUserQuestionTool
 import com.mini.me_core.feature.agent.domain.execution.tool.browser.BrowserAgentTool
+import java.net.Proxy
 import com.mini.me_core.feature.agent.domain.core.prompt.SystemPromptProvider
 import com.mini.me_core.feature.agent.domain.execution.workflow.AgentWorkflow
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionManager
@@ -93,7 +94,7 @@ object AgentModule {
     //   代理不通时由 ProxyHealthMonitor + ProxyRouteHolder 自动降级为直连（见阶段4）。
     // ══════════════════════════════════════════════════════════
 
-    /** 直连 OkHttpClient：不挂载 proxySelector，所有请求直接出网。 */
+    /** 直连 OkHttpClient：强制 NO_PROXY，所有请求直接出网，彻底隔绝系统代理污染。 */
     @Provides
     @Singleton
     @Named("direct")
@@ -106,6 +107,10 @@ object AgentModule {
             .connectTimeout(120, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS)
             .writeTimeout(120, TimeUnit.SECONDS)
+            // 代理隔离核心：强制直连，不依赖默认 ProxySelector。
+            // 即使系统 WiFi 设置了全局代理、或应用内某处调用了 ProxySelector.setDefault，
+            // directClient 也绝对不会走代理，确保国内模型接口零污染。
+            .proxy(Proxy.NO_PROXY)
             // 安全审计 P2-7：探测非回环明文 http:// 请求并全局弹窗提示改用 HTTPS（仅上报不阻断）。
             .addInterceptor(com.mini.me_core.core.network.HttpWarningInterceptor(httpWarningBridge))
             // F6.6：仅 debug 构建加入网络监控拦截器（记录 URL/状态/耗时/大小，敏感头脱敏）；
@@ -454,6 +459,7 @@ object AgentModule {
         anthropicApi: AnthropicApi,
         geminiApi: GeminiApi,
         @Named("direct") okHttpClient: OkHttpClient,
+        @Named("proxy") proxyOkHttpClient: OkHttpClient,
         proxyHealthMonitor: com.mini.me_core.feature.proxy.domain.ProxyHealthMonitor,
         promptProvider: SystemPromptProvider,
         permissionManager: ToolPermissionManager,
@@ -493,6 +499,7 @@ object AgentModule {
             anthropicApi,
             geminiApi,
             okHttpClient,
+            proxyOkHttpClient,
             proxyHealthMonitor,
             promptProvider,
             permissionManager,

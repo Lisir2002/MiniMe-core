@@ -98,6 +98,21 @@ class OpenAIAdapter @Inject constructor(
             .create(OpenAIApi::class.java)
     }
 
+    /**
+     * 流式请求专用 API 实例：基于注入的 okHttpClient 构建（120s 超时），
+     * 确保流式请求与非流式请求走同一条网络路由（direct 或 proxy，由上层根据 needsProxy 注入）。
+     * 懒加载：baseUrl 可能在构造后被设置，首次使用时才构建。
+     */
+    private val streamingApi: OpenAIApi by lazy {
+        val base = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        Retrofit.Builder()
+            .baseUrl(base)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(OpenAIApi::class.java)
+    }
+
     override suspend fun complete(
         systemPrompt: String,
         messages: List<AgentMessage>,
@@ -260,7 +275,7 @@ class OpenAIAdapter @Inject constructor(
                     var streamInputTokens = 0
                     var streamOutputTokens = 0
 
-                    val body = api.streamResponses(
+                    val body = streamingApi.streamResponses(
                         url = url,
                         authorization = "Bearer $apiKey",
                         request = request
@@ -393,7 +408,7 @@ class OpenAIAdapter @Inject constructor(
             var streamInputTokens = 0
             var streamOutputTokens = 0
 
-            val body = api.streamChatCompletion(
+            val body = streamingApi.streamChatCompletion(
                 url = url,
                 authorization = "Bearer $apiKey",
                 request = request

@@ -28,11 +28,11 @@ import javax.inject.Inject
 import javax.inject.Named
 
 /**
- * 实时网络搜索工具。经**共享 OkHttp**（注入 ProxyRouteHolder 的 ProxySelector）请求海外
+ * 实时网络搜索工具。经**代理 OkHttp**（注入 @Named("proxy")，挂载 ProxyRouteHolder 的 ProxySelector）请求海外
  * Parallel AI MCP，代理启用时流量走 mihomo 出口，未启用时直连（可被墙阻断）。
  */
 class WebSearchTool @Inject constructor(
-    @Named("direct") private val client: OkHttpClient
+    @Named("proxy") private val client: OkHttpClient
 ) : AgentTool() {
 
     private companion object {

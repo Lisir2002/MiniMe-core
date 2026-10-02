@@ -117,6 +117,8 @@ class StatefulAgentWorkflow @Inject constructor(
     private val anthropicApi: AnthropicApi,
     private val geminiApi: GeminiApi,
     @Named("direct") private val okHttpClient: OkHttpClient,
+    // 代理隔离：模型高级参数 needsProxy=true 时使用此客户端走 mihomo 代理，false 时用上面的直连客户端。
+    @Named("proxy") private val proxyOkHttpClient: OkHttpClient,
     // 阶段5：代理健康检测器，模型请求失败时自动诊断代理状态。
     private val proxyHealthMonitor: com.mini.me_core.feature.proxy.domain.ProxyHealthMonitor,
     private val promptProvider: SystemPromptProvider,
@@ -402,12 +404,25 @@ class StatefulAgentWorkflow @Inject constructor(
     /**
      * 根据 [config] 创建一个全新的、独立的 [AIProvider] 实例。
      * 用于识图回退和上下文压缩等独立请求场景，完全不占用或修改主对话所用的 Provider 单例。
+     *
+     * 代理隔离：根据 [AIProviderConfig.needsProxy] 选择网络客户端。
+     * - needsProxy=true → proxyOkHttpClient（走 mihomo 代理，含健康降级与熔断）
+     * - needsProxy=false → okHttpClient（强制直连，不受系统代理污染）
      */
     private suspend fun createStandaloneProvider(config: AIProviderConfig, sessionId: String?): AIProvider {
+        // 代理路由选择：needsProxy 开关真正生效，决定模型请求走直连还是代理。
+        val useProxy = config.needsProxy
+        val clientForProvider = if (useProxy) proxyOkHttpClient else okHttpClient
+        // 代理路由日志：记录每个模型的网络出口，便于排查"代理污染模型接口"类问题。
+        com.mini.me_core.core.util.FileLogger.i(
+            TAG,
+            "模型网络路由: name=${config.name} model=${config.effectiveModel} " +
+                "baseUrl=${config.baseUrl} needsProxy=$useProxy → ${if (useProxy) "代理出口(mihomo)" else "直连(NO_PROXY)"}"
+        )
         val provider: AIProvider = when (config.type) {
-            ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi, okHttpClient)
-            ProviderType.GEMINI -> GeminiAdapter(geminiApi, okHttpClient)
-            else -> OpenAIAdapter(openAIApi, okHttpClient)
+            ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi, clientForProvider)
+            ProviderType.GEMINI -> GeminiAdapter(geminiApi, clientForProvider)
+            else -> OpenAIAdapter(openAIApi, clientForProvider)
         }
         provider.apiKey = config.apiKey
         provider.baseUrl = config.baseUrl

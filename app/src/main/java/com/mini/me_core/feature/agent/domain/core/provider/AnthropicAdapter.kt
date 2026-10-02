@@ -90,6 +90,20 @@ class AnthropicAdapter @Inject constructor(
             .create(AnthropicApi::class.java)
     }
 
+    /**
+     * 流式请求专用 API 实例：基于注入的 okHttpClient 构建（120s 超时），
+     * 确保流式请求与非流式请求走同一条网络路由（direct 或 proxy，由上层根据 needsProxy 注入）。
+     */
+    private val streamingApi: AnthropicApi by lazy {
+        val base = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        Retrofit.Builder()
+            .baseUrl(base)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(AnthropicApi::class.java)
+    }
+
     override suspend fun complete(
         systemPrompt: String,
         messages: List<AgentMessage>,
@@ -207,7 +221,7 @@ class AnthropicAdapter @Inject constructor(
             // thinking block 的加密签名（signature_delta 事件携带），随 Final 上抛供工具循环回传。
             var signature: String? = null
 
-            val body = api.streamMessage(url = url, apiKey = apiKey, request = request)
+            val body = streamingApi.streamMessage(url = url, apiKey = apiKey, request = request)
 
             body.use { rb ->
                 // 首字节超时 watchdog：requestTimeout 秒内未收到首个内容块则关闭流，触发可重试的 IOException。

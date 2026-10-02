@@ -25,14 +25,14 @@ import javax.inject.Named
 import javax.net.ssl.SSLException
 
 /**
- * 网页抓取工具。注意：必须走**共享 OkHttp**（[AgentModule] 注入 ProxyRouteHolder 的 ProxySelector），
+ * 网页抓取工具。必须走**代理 OkHttp**（[AgentModule] 注入 @Named("proxy")，挂载 ProxyRouteHolder 的 ProxySelector），
  * 代理启用时流量才会经 mihomo mixed-port 出口，否则直连被墙站点必然失败。
  * 旧实现用 `Jsoup.connect()`（内部 HttpURLConnection）完全绕过共享 OkHttp 与代理，
  * 导致「节点可用但谷歌打不开」；现改为 OkHttp 拉响应体 + Jsoup 解析正文，代理路由与
  * 正文提取能力两者兼得。
  */
 class WebFetchTool @Inject constructor(
-    @Named("direct") private val client: OkHttpClient
+    @Named("proxy") private val client: OkHttpClient
 ) : AgentTool() {
 
     private companion object {
