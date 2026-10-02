@@ -212,16 +212,14 @@ internal fun AboutSection(
         runCatching {
             val pm = context.packageManager
             val info = pm.getPackageInfo(context.packageName, 0)
+            // longVersionCode 自 P(28) 起可用，minSdk=26 存在 API 26-27 设备，保留双分支。
             val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 info.longVersionCode
             } else {
                 @Suppress("DEPRECATED") info.versionCode.toLong()
             }
-            val minSdk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                info.applicationInfo?.minSdkVersion ?: Build.VERSION_CODES.P
-            } else {
-                Build.VERSION_CODES.P
-            }
+            // minSdk=26 >= N(24)，minSdkVersion 字段可读，旧 else 常量兜底已作为死分支移除。
+            val minSdk = info.applicationInfo?.minSdkVersion ?: Build.VERSION_CODES.P
             AppInfo(
                 name = info.versionName ?: "unknown",
                 code = code,

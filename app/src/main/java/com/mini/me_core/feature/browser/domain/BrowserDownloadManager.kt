@@ -338,16 +338,15 @@ class BrowserDownloadManager @Inject constructor(
     private val channelId = "mini_browser_downloads"
 
     private fun ensureChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nm = context.getSystemService(NotificationManager::class.java) ?: return
-            if (nm.getNotificationChannel(channelId) == null) {
-                val ch = NotificationChannel(
-                    channelId,
-                    context.getString(R.string.browser_notif_channel_name),
-                    NotificationManager.IMPORTANCE_LOW
-                ).apply { description = context.getString(R.string.browser_notif_channel_desc) }
-                nm.createNotificationChannel(ch)
-            }
+        // minSdk=26=O，通知通道 API 恒可用，外层 SDK_INT>=O 守卫已作为死分支移除。
+        val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        if (nm.getNotificationChannel(channelId) == null) {
+            val ch = NotificationChannel(
+                channelId,
+                context.getString(R.string.browser_notif_channel_name),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply { description = context.getString(R.string.browser_notif_channel_desc) }
+            nm.createNotificationChannel(ch)
         }
     }
 

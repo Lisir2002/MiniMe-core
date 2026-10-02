@@ -328,7 +328,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestLegacyStoragePermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        // minSdk=26，恒 >= M(23)，旧版本短路守卫已作为 ObsoleteSdkInt 死分支移除。
         val permissions = arrayOf(
             Manifest.permission.READ_EXTERNAL_STORAGE,
             Manifest.permission.WRITE_EXTERNAL_STORAGE

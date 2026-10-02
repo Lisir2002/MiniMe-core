@@ -107,11 +107,10 @@ class StorageTool @Inject constructor(
     }
 
     private fun hasStoragePermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= 23) {
-            ContextCompat.checkSelfPermission(
-                context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-            ) == PackageManager.PERMISSION_GRANTED
-        } else true
+        // minSdk=26，恒 >= 23，旧版本 else 分支（直接返回 true）已作为死分支移除。
+        return ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun doList(dir: File): ToolResult {

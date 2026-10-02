@@ -522,28 +522,27 @@ class MiniMeCore : Application() {
     }
 
     private fun createNotificationChannels() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            val channel = NotificationChannel(
-                "terminal_service",
-                "Terminal Services",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Notifications for background terminal tasks"
-                setShowBadge(false)
-            }
-            notificationManager.createNotificationChannel(channel)
-            // P2-14：代理前台保活通道。
-            val proxyChannel = NotificationChannel(
-                "proxy_service",
-                "Proxy Service",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Notifications while the proxy is running"
-                setShowBadge(false)
-            }
-            notificationManager.createNotificationChannel(proxyChannel)
+        // minSdk=26=O，通知通道 API 恒可用，外层 SDK_INT>=O 守卫已作为死分支移除。
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        val channel = NotificationChannel(
+            "terminal_service",
+            "Terminal Services",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "Notifications for background terminal tasks"
+            setShowBadge(false)
         }
+        notificationManager.createNotificationChannel(channel)
+        // P2-14：代理前台保活通道。
+        val proxyChannel = NotificationChannel(
+            "proxy_service",
+            "Proxy Service",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "Notifications while the proxy is running"
+            setShowBadge(false)
+        }
+        notificationManager.createNotificationChannel(proxyChannel)
     }
 
     /**

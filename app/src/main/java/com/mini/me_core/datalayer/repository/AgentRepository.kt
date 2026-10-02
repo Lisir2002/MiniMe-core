@@ -196,27 +196,8 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
     suspend fun getPageBySessionAfter(sessionId: String, lastTimestamp: Long, lastId: String, limit: Long): List<Agent_message> =
         withContext(Dispatchers.IO) { q.selectMessagePageBySessionAfter(sessionId, lastTimestamp, lastTimestamp, lastId, limit).executeAsList() }
 
-    // ── 旧版（保留：V1toV2FullMigrator 迁移期使用；P3 后删除）───────────────
-
-    suspend fun appendMessage(id: String, sessionId: String, role: String, seq: Long, now: Long = System.currentTimeMillis()) =
-        withContext(Dispatchers.IO) {
-            q.insertMessage(id, sessionId, role, seq, now, "", "", null, null, null, null, 0L, null, null, null, 0L, 0L, 0L, 0L, 0L, "", 0L)
-        }
-
-    suspend fun appendPart(
-        id: String, messageId: String, kind: String, seq: Long,
-        text: String?, toolName: String?, toolArgs: String?, toolResult: String?, toolError: String?,
-    ) = withContext(Dispatchers.IO) {
-        q.insertMessagePart(id, messageId, kind, seq, text, toolName, toolArgs, toolResult, toolError)
-    }
-
-    suspend fun appendToolCall(
-        id: String, messageId: String, name: String, argsJson: String?, resultJson: String?, status: String,
-        now: Long = System.currentTimeMillis(),
-    ) = withContext(Dispatchers.IO) { q.insertToolCall(id, messageId, name, argsJson, resultJson, status, now) }
-
-    suspend fun saveCheckpoint(id: String, sessionId: String, snapshotJson: String, now: Long = System.currentTimeMillis()) =
-        withContext(Dispatchers.IO) { q.insertCheckpoint(id, sessionId, snapshotJson, now) }
+    // P3 已完成：原 legacy V1 写入方法块（appendMessage/appendPart/appendToolCall/saveCheckpoint）
+    // 及其唯一依赖 V1toV2FullMigrator 已全仓零调用、迁移类已不存在，按「P3 后删除」清理。
 
     suspend fun listCheckpoints(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Agent_checkpoint> =
         withContext(Dispatchers.IO) { q.selectCheckpointsBySession(sessionId).executeAsList() }
@@ -229,9 +210,6 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
 
     fun observeCheckpointsBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Agent_checkpoint>> =
         q.selectCheckpointsBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observeTodoItemsBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Todo_items>> =
-        q.selectTodoItemsBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
 
     fun observeFileEditHunksBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.File_edit_hunks>> =
         q.selectFileEditHunksBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
