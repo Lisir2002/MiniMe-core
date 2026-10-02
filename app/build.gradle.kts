@@ -170,13 +170,16 @@ android {
             useSupportLibrary = true
         }
 
-        // 通用单包（用户决策「不分包」）：双 ABI 打入同一 APK，真机与模拟器/虚拟机都安装即用。
-        //   - arm64-v8a：真机 arm64 / arm64 系统镜像模拟器（原生执行容器，默认路径）；
-        //   - x86_64：x86_64 系统镜像模拟器（x86_64 原生 proot + x86_64 rootfs，见
-        //     ContainerInstaller 双架构安装与 EnvironmentDetector 环境探测）。
-        // Android 包管理器在安装/运行期按设备 ABI 自动选用 lib/arm64-v8a 或 lib/x86_64 下的 .so
-        // （libtermux.so 由 terminal-emulator 模块为全部 ABI 提供），互不干扰、无需用户选择。
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        // 仅保留 arm64-v8a：所有变体（debug/release）都只打包 arm64 native 库。
+        //   - 真机 arm64 原生运行；
+        //   - 模拟器用 arm64 系统镜像（Android Studio AVD 已默认支持 arm64 镜像）；
+        //   - 容器内仍支持双架构：arm64 rootfs 原生执行，x86_64 rootfs 经 QEMU 转译运行
+        //     （见 assets/container/ 双架构资产与 ContainerInstaller 运行时选择逻辑）。
+        // 历史教训：曾在 defaultConfig 配双 ABI、release 块用 abiFilters.clear() 覆盖，
+        //   但 AGP 8.x 的 defaultConfig/buildType NdkOptions 是 union 合并而非替换，
+        //   clear() 只清空 buildType 自身空集合，defaultConfig 的 x86_64 仍被合并进来，
+        //   导致 release APK 始终双 ABI（72MB）。根因修复：defaultConfig 直接只配 arm64-v8a。
+        ndk { abiFilters += listOf("arm64-v8a") }
 
         // ── Native viewer/editor 核心（libminimeviewer）──
         // c++_shared STL：多个静态库（tree-sitter 核心 + 各 grammar）共享同一份 libc++_shared.so，
@@ -199,8 +202,10 @@ android {
         }
     }
 
-    // 双架构通用包：sourceSets.main.assets 挂 _armAssets，其内同时含 container/arm（arm64 容器）与
-    // container/x86_64（x86_64 rootfs + arm64 宿主 qemu 转译器 + x86_64 宿主原生 proot），一并打进 APK，
+    // 容器资产：sourceSets.main.assets 挂 _armAssets，其内同时含 container/arm（arm64 容器 rootfs + proot）
+    // 与 container/x86_64（x86_64 rootfs + arm64 宿主 qemu 转译器 + x86_64 宿主原生 proot），
+    // 一并打进 APK。注意：这是容器内的用户态二进制资产，不是 App 自身的 native so——
+    // App native 层（libminimeviewer/libsqlcipher/libtermux 等）仅 arm64-v8a（见 defaultConfig.ndk.abiFilters）。
     // 运行时由 EnvironmentDetector 按宿主架构选装/选用对应 rootfs 与 proot（见 ContainerInstaller）。
     sourceSets {
         getByName("main") {
@@ -243,13 +248,11 @@ android {
             // release 构建的体积/性能深度优化：
             //   debugSymbolLevel=none  —— 不向 APK / AAB 注入 native 调试符号表，省 ~1MB+。
             //   isPseudoLocalesEnabled=false —— 关闭伪本地化资源，省少量体积。
-            //   ndk.abiFilters 仅 arm64-v8a —— release 只打真机主流 ABI，so 体积减半；
-            //     容器功能不受影响（arm64 设备原生执行 aarch64 rootfs，x86_64 容器经 qemu 转译仍可用）；
-            //     x86_64 仅用于模拟器开发调试，debug 变体保留双 ABI。
+            //   ABI 过滤统一在 defaultConfig.ndk.abiFilters 配置（仅 arm64-v8a），
+            //     不在 release 块重复设置——AGP 8.x defaultConfig/buildType NdkOptions 是 union
+            //     合并关系，buildType 块的 abiFilters.clear() 无法清除 defaultConfig 的值。
             ndk {
                 debugSymbolLevel = "none"
-                abiFilters.clear()
-                abiFilters += listOf("arm64-v8a")
             }
             isPseudoLocalesEnabled = false
 
