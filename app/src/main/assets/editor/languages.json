@@ -1630,8 +1630,7 @@
       "name": "prolog",
       "scopeName": "source.prolog",
       "extensions": [
-        "pl",
-        "pro"
+        "pl"
       ]
     },
     {

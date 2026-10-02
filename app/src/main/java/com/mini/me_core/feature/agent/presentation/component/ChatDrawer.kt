@@ -104,6 +104,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mini.me_core.core.theme.LocalAnimationScale
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Radius
@@ -712,8 +713,8 @@ private fun SwipeableSessionRow(
     onLongClick: () -> Unit
 ) {
     val density = LocalDensity.current
-    // 两个操作按钮各 80dp 宽
-    val actionWidthPx = with(density) { 80.dp.toPx() * 2 }
+    // 两个操作按钮各 72dp 宽
+    val actionWidthPx = with(density) { 72.dp.toPx() * 2 }
     val velocityThresholdPx = with(density) { 100.dp.toPx() }
 
     val animScale = LocalAnimationScale.current
@@ -767,7 +768,7 @@ private fun SwipeableSessionRow(
                 // 重命名按钮（蓝）
                 Box(
                     modifier = Modifier
-                        .width(80.dp)
+                        .width(72.dp)
                         .fillMaxHeight()
                         .clip(
                             RoundedCornerShape(
@@ -781,11 +782,11 @@ private fun SwipeableSessionRow(
                         .clickable {
                             onSwipeRename()
                             onExpandedChange(false)
-                        }
-                        .padding(vertical = 12.dp),
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
+                        modifier = Modifier.padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
@@ -793,14 +794,15 @@ private fun SwipeableSessionRow(
                             imageVector = Icons.Rounded.Edit,
                             contentDescription = stringResource(R.string.common_rename),
                             tint = Color.White,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(2.dp))
                         Text(
                             text = "重命名",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 11.sp
                         )
                     }
                 }
@@ -808,7 +810,7 @@ private fun SwipeableSessionRow(
                 // 删除按钮（红，最右侧）
                 Box(
                     modifier = Modifier
-                        .width(80.dp)
+                        .width(72.dp)
                         .fillMaxHeight()
                         .clip(
                             RoundedCornerShape(
@@ -822,11 +824,11 @@ private fun SwipeableSessionRow(
                         .clickable {
                             onDirectDelete()
                             onExpandedChange(false)
-                        }
-                        .padding(vertical = 12.dp),
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
+                        modifier = Modifier.padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
@@ -834,14 +836,15 @@ private fun SwipeableSessionRow(
                             imageVector = Icons.Rounded.Delete,
                             contentDescription = stringResource(R.string.common_delete),
                             tint = Color.White,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(2.dp))
                         Text(
                             text = "删除",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 11.sp
                         )
                     }
                 }

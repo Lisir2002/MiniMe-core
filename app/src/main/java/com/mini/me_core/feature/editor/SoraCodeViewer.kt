@@ -5,6 +5,17 @@ import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BrokenImage
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -14,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -71,49 +83,71 @@ fun SoraCodeViewer(
     var scopeName by remember { mutableStateOf("text.plain") }
     var lineCount by remember { mutableIntStateOf(0) }
     var loaded by remember { mutableStateOf(false) }
+    var isBinary by remember { mutableStateOf(false) }
+    var loadError by remember { mutableStateOf<String?>(null) }
 
     // 自适应高亮引擎
     val highlighter = remember { com.mini.me_core.feature.editor.core.AdaptiveHighlighter(scope) }
 
-    // 加载文件
-    LaunchedEffect(filePath) {
-        // 先初始化 TextMate 引擎，确保 LanguageDetector 可以使用全量扩展名映射回退
+    // TextMate 引擎只需初始化一次（幂等，内部有已初始化判断）
+    LaunchedEffect(Unit) {
         com.mini.me_core.feature.editor.textmate.TextMateManager
             .initialize(context.applicationContext)
+    }
 
+    // 加载文件（二进制检测 + 性能优化：单次读取、行数顺便统计）
+    LaunchedEffect(filePath) {
+        loaded = false
+        isBinary = false
+        loadError = null
         withContext(Dispatchers.IO) {
             val file = File(filePath)
-            if (file.exists()) {
-                val raw = file.readBytes()
-                // 简单 UTF-8 BOM 剥离
-                val content = if (raw.size >= 3 &&
-                    raw[0] == 0xEF.toByte() && raw[1] == 0xBB.toByte() && raw[2] == 0xBF.toByte()
-                ) {
-                    raw.copyOfRange(3, raw.size).toString(Charsets.UTF_8)
-                } else {
-                    raw.toString(Charsets.UTF_8)
-                }
-                val detected = com.mini.me_core.feature.editor.detect.LanguageDetector
-                    .detect(file, content.take(4096))
-                text = content
-                scopeName = detected
-                lineCount = content.count { it == '\n' } + 1
+            if (!file.exists()) {
+                loadError = "文件不存在"
+                loaded = true
+                return@withContext
             }
+            val raw = file.readBytes()
+            // 二进制检测：前 8KB 中 NULL 字节占比 > 30% 判定为二进制
+            val sampleSize = minOf(raw.size, 8192)
+            var nullCount = 0
+            for (i in 0 until sampleSize) {
+                if (raw[i] == 0x00.toByte()) nullCount++
+            }
+            if (sampleSize > 0 && nullCount * 100 / sampleSize > 30) {
+                isBinary = true
+                loaded = true
+                return@withContext
+            }
+            // UTF-8 BOM 剥离
+            val content = if (raw.size >= 3 &&
+                raw[0] == 0xEF.toByte() && raw[1] == 0xBB.toByte() && raw[2] == 0xBF.toByte()
+            ) {
+                raw.copyOfRange(3, raw.size).toString(Charsets.UTF_8)
+            } else {
+                raw.toString(Charsets.UTF_8)
+            }
+            // 语言检测（取前 4KB 样本）
+            val detected = com.mini.me_core.feature.editor.detect.LanguageDetector
+                .detect(file, content.take(4096))
+            // 行数统计：遍历一次同时统计（比单独 count 更高效）
+            var lines = 1
+            for (c in content) {
+                if (c == '\n') lines++
+            }
+            text = content
+            scopeName = detected
+            lineCount = lines
         }
         loaded = true
     }
 
     // 文本或语言变化时设置到编辑器
-    LaunchedEffect(loaded, text, scopeName) {
-        if (!loaded) return@LaunchedEffect
-        // 确保 TextMate 引擎已初始化
-        com.mini.me_core.feature.editor.textmate.TextMateManager
-            .initialize(context.applicationContext)
-
+    LaunchedEffect(loaded, text, scopeName, isBinary, loadError) {
+        if (!loaded || isBinary || loadError != null) return@LaunchedEffect
         editor.setText(text)
         editor.isEditable = editable
         // 先统一设置 colorScheme，确保所有文件（无论是否有高亮）背景色一致
-        // 即使 createLanguage 失败，背景色也不会跳变
         editor.colorScheme = com.mini.me_core.feature.editor.textmate.TextMateManager
             .createColorScheme()
         try {
@@ -147,10 +181,51 @@ fun SoraCodeViewer(
         }
     }
 
-    AndroidView(
-        factory = { editor },
-        modifier = modifier,
-    )
+    // 二进制文件或加载错误时显示提示，否则显示编辑器
+    if (isBinary) {
+        androidx.compose.foundation.layout.Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            androidx.compose.foundation.layout.Column(
+                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+            ) {
+                androidx.compose.material3.Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Rounded.BrokenImage,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
+                androidx.compose.material3.Text(
+                    text = "二进制文件",
+                    style = androidx.compose.material3.MaterialTheme.typography.titleMedium
+                )
+                androidx.compose.foundation.layout.Spacer(Modifier.height(4.dp))
+                androidx.compose.material3.Text(
+                    text = "此文件为二进制格式，不支持文本查看",
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    } else if (loadError != null) {
+        androidx.compose.foundation.layout.Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            androidx.compose.material3.Text(
+                text = loadError ?: "加载失败",
+                style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.error
+            )
+        }
+    } else {
+        AndroidView(
+            factory = { editor },
+            modifier = modifier,
+        )
+    }
 }
 
 /** 获取编辑器当前文本（保存时调用）。 */
