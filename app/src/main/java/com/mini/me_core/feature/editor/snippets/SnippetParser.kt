@@ -83,6 +83,22 @@ object SnippetParser {
                 continue
             }
             if (c == '$') {
+                // $1, $2 等裸编号占位符（等价于 ${1}）
+                val digitMatch = Regex("\\d+").matchAt(s, i + 1)
+                if (digitMatch != null) {
+                    val index = digitMatch.value.toInt()
+                    val tStart = out.length
+                    tabStops.add(
+                        TabStop(
+                            index = index,
+                            start = tStart,
+                            end = out.length,
+                            defaultValue = "",
+                        ),
+                    )
+                    i = i + 1 + digitMatch.value.length
+                    continue
+                }
                 // $VAR_NAME 形式的变量
                 val m = VAR_NAME.matchAt(s, i + 1)
                 if (m != null) {
