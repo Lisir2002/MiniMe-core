@@ -1,0 +1,36 @@
+{
+  "name": "one-light",
+  "displayName": "One Light",
+  "type": "light",
+  "colors": {
+    "editor.background": "#FAFAFA",
+    "editor.foreground": "#383A42",
+    "editorLineNumber.foreground": "#9D9D9F",
+    "editor.lineHighlightBackground": "#F0F0F0",
+    "editor.selectionBackground": "#E5E5E6",
+    "editor.inactiveSelectionBackground": "#EAEAEB",
+    "editorCursor.foreground": "#526FFF",
+    "editorIndentGuide.background1": "#E5E5E6",
+    "editorIndentGuide.activeBackground1": "#9D9D9F"
+  },
+  "tokenColors": [
+    { "scope": ["comment", "punctuation.definition.comment"], "settings": { "foreground": "#A0A1A7", "fontStyle": "italic" } },
+    { "scope": ["string", "punctuation.definition.string"], "settings": { "foreground": "#50A14F" } },
+    { "scope": ["constant.numeric"], "settings": { "foreground": "#B76B01" } },
+    { "scope": ["keyword", "storage.type", "storage.modifier"], "settings": { "foreground": "#A626A4" } },
+    { "scope": ["entity.name.function", "support.function", "meta.function-call"], "settings": { "foreground": "#4078F2" } },
+    { "scope": ["entity.name.type", "entity.name.class", "support.type", "support.class"], "settings": { "foreground": "#C18401" } },
+    { "scope": ["variable", "variable.parameter"], "settings": { "foreground": "#383A42" } },
+    { "scope": ["entity.name.tag"], "settings": { "foreground": "#E45649" } },
+    { "scope": ["entity.other.attribute-name"], "settings": { "foreground": "#B76B01" } },
+    { "scope": ["constant.language", "support.constant"], "settings": { "foreground": "#B76B01" } },
+    { "scope": ["operator", "keyword.operator"], "settings": { "foreground": "#0184BC" } },
+    { "scope": ["variable.language", "variable.language.this"], "settings": { "foreground": "#E45649" } },
+    { "scope": ["markup.heading", "entity.name.section"], "settings": { "foreground": "#4078F2" } },
+    { "scope": ["markup.bold"], "settings": { "fontStyle": "bold" } },
+    { "scope": ["markup.italic"], "settings": { "fontStyle": "italic" } },
+    { "scope": ["markup.inserted"], "settings": { "foreground": "#50A14F" } },
+    { "scope": ["markup.deleted"], "settings": { "foreground": "#E45649" } },
+    { "scope": ["markup.changed"], "settings": { "foreground": "#C18401" } }
+  ]
+}

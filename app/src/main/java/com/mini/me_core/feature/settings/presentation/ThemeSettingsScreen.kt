@@ -97,6 +97,9 @@ import com.mini.me_core.core.theme.tokens.SemanticColors
  * 注意：背景图功能（backgroundImage / backgroundMask / cardOpacity）数据层接口已预留，
  * UI 暂不暴露，后续单独调试后再开放。
  */
+/** 编辑器主题子页面状态。 */
+private enum class EditorThemeSubScreen { NONE, LIST, EDITOR }
+
 @Composable
 fun ThemeSettingsScreen(
     onNavigateBack: () -> Unit,
@@ -110,6 +113,23 @@ fun ThemeSettingsScreen(
     // 恢复出厂确认 Dialog 状态
     var showResetConfirm by remember { mutableStateOf(false) }
 
+    // 编辑器主题子页面导航
+    var editorThemeSub by remember { mutableStateOf(EditorThemeSubScreen.NONE) }
+    var editorBaseTheme by remember { mutableStateOf<String?>(null) }
+
+    when (editorThemeSub) {
+        EditorThemeSubScreen.LIST -> com.mini.me_core.feature.editor.themes.EditorThemesScreen(
+            onNavigateBack = { editorThemeSub = EditorThemeSubScreen.NONE },
+            onOpenEditor = { base ->
+                editorBaseTheme = base
+                editorThemeSub = EditorThemeSubScreen.EDITOR
+            },
+        )
+        EditorThemeSubScreen.EDITOR -> com.mini.me_core.feature.editor.themes.editor.ThemeEditorScreen(
+            baseThemeName = editorBaseTheme,
+            onNavigateBack = { editorThemeSub = EditorThemeSubScreen.LIST },
+        )
+        EditorThemeSubScreen.NONE -> {
     val themeScrollState = rememberPersistentScrollState("settings_theme")
     // 问题4修复：去掉自带 Scaffold + AppTopAppBar，复用外层 SettingsScreen 的顶栏
     Column(
@@ -119,6 +139,14 @@ fun ThemeSettingsScreen(
             .verticalScroll(themeScrollState),
     ) {
         Spacer(Modifier.height(16.dp))
+
+            // ── 编辑器主题入口 ──
+            AppSectionHeader(title = stringResource(R.string.editor_theme_title))
+            EditorThemeEntryRow(
+                onClick = { editorThemeSub = EditorThemeSubScreen.LIST },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            Spacer(Modifier.height(24.dp))
 
             // ── Section 1: 实时预览 ──
             AppSectionHeader(title = stringResource(R.string.theme_section_preview))
@@ -196,6 +224,8 @@ fun ThemeSettingsScreen(
 
             Spacer(Modifier.height(48.dp))
     }
+        } // EditorThemeSubScreen.NONE
+    } // when (editorThemeSub)
 
     // 恢复出厂确认 Dialog
     if (showResetConfirm) {
@@ -1031,3 +1061,48 @@ private fun SliderRow(
         )
     }
 }
+
+// ──────────────────────────────────────────────
+// 编辑器主题入口行
+// ──────────────────────────────────────────────
+
+/**
+ * 设置页中「编辑器主题」入口行：点击进入编辑器主题管理器。
+ */
+@Composable
+private fun EditorThemeEntryRow(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalAppTheme.current.colors
+    AppCard(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onClick() }
+                .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.editor_theme_title),
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                    color = colors.textPrimary,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.editor_theme_subtitle),
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary,
+                )
+            }
+            Text(
+                text = stringResource(R.string.common_open),
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                color = colors.brandPrimary,
+            )
+        }
+    }
+}
+

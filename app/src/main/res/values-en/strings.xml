@@ -2801,4 +2801,62 @@
     <string name="download_confirm_size_unknown">Unknown size</string>
 
     <!-- QQ Bot Module -->
+
+    <!-- Editor Themes Module -->
+    <string name="editor_theme_title">Editor Theme</string>
+    <string name="editor_theme_subtitle">Customize the code editor color scheme</string>
+    <string name="editor_theme_category_all">All</string>
+    <string name="editor_theme_category_dark">Dark</string>
+    <string name="editor_theme_category_light">Light</string>
+    <string name="editor_theme_category_high_contrast">High Contrast</string>
+    <string name="editor_theme_category_colorblind">Colorblind Friendly</string>
+    <string name="editor_theme_category_custom">Custom</string>
+    <string name="editor_theme_search_hint">Search themes…</string>
+    <string name="editor_theme_apply">Apply</string>
+    <string name="editor_theme_applied">In use</string>
+    <string name="editor_theme_follow_system">Follow system</string>
+    <string name="editor_theme_follow_system_sub">Automatically switch editor theme by system dark/light mode</string>
+    <string name="editor_theme_dark_theme">Dark theme</string>
+    <string name="editor_theme_light_theme">Light theme</string>
+    <string name="editor_theme_import">Import theme</string>
+    <string name="editor_theme_import_success">Theme imported successfully</string>
+    <string name="editor_theme_import_failed">Failed to import theme</string>
+    <string name="editor_theme_export">Export</string>
+    <string name="editor_theme_delete">Delete</string>
+    <string name="editor_theme_delete_confirm_title">Delete theme?</string>
+    <string name="editor_theme_delete_confirm_msg">This custom theme will be deleted permanently.</string>
+    <string name="editor_theme_edit">Edit</string>
+    <string name="editor_theme_new">New theme</string>
+    <string name="editor_theme_new_hint">Create a custom color scheme from a base theme</string>
+    <string name="editor_theme_pick_base">Choose a base theme</string>
+    <string name="editor_theme_name_hint">Theme name</string>
+    <string name="editor_theme_save">Save theme</string>
+    <string name="editor_theme_reset">Reset to base</string>
+    <string name="editor_theme_preview">Live preview</string>
+    <string name="editor_theme_group_editor">Editor</string>
+    <string name="editor_theme_group_syntax">Syntax</string>
+    <string name="editor_theme_preview_language">Sample language</string>
+    <string name="editor_theme_empty_custom">No custom themes yet</string>
+    <string name="editor_theme_empty_custom_sub">Import or create a theme to get started</string>
+    <string name="editor_theme_name_required">Please enter a theme name</string>
+    <string name="editor_theme_name_exists">Theme name already exists</string>
+    <string name="editor_theme_choose_file">Choose a theme file</string>
+    <string name="editor_theme_import_hint">Supports .json (VS Code theme) or .tmTheme files</string>
+
+    <!-- Color fields -->
+    <string name="editor_color_editor_background">Background</string>
+    <string name="editor_color_editor_foreground">Foreground</string>
+    <string name="editor_color_line_number">Line number</string>
+    <string name="editor_color_line_highlight">Current line highlight</string>
+    <string name="editor_color_selection">Selection</string>
+    <string name="editor_color_cursor">Cursor</string>
+    <string name="editor_color_keyword">Keyword</string>
+    <string name="editor_color_string">String</string>
+    <string name="editor_color_comment">Comment</string>
+    <string name="editor_color_number">Number</string>
+    <string name="editor_color_function">Function</string>
+    <string name="editor_color_type">Type</string>
+    <string name="editor_color_variable">Variable</string>
+    <string name="editor_color_operator">Operator</string>
+    <string name="editor_color_constant">Constant</string>
 </resources>
