@@ -62,6 +62,15 @@ jobs:
           done
           echo "All skill scripts pass POSIX sh syntax check"
 
+      # CI 预检查：编译前自动拦截常见错误，避免等到 Lint/编译阶段才失败（耗时几秒，节省十几分钟）。
+      # 检查项：strings 文件 translatable 属性、禁止 values-en 目录、
+      #         Compose 中禁止直接 LocalContext.current.getString()、@SuppressLint import 检查、密钥安全检查。
+      # 脚本见 scripts/ci/pre-build-check.py。
+      - name: CI pre-build check (auto-catch common errors)
+        run: |
+          set -e
+          python3 scripts/ci/pre-build-check.py
+
       # 数据持久化静态检查：防止 putJson/getString 读写列不匹配、Singleton 状态硬编码等
       # 导致"设置项重启后丢失"类 bug。脚本见 scripts/dev/check-persistence.py。
       - name: Persistence static check

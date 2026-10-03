@@ -14,6 +14,9 @@ gradle-local.properties
 # 签名：唯一官方 keystore 通过 GitHub Secrets 注入，不入库。
 # CI 构建前从 Secrets 恢复为 app/minime.jks + app/keystore.properties；
 # 本地开发需自行创建该文件（从安全渠道获取密钥）。
+# 通配符规则：防止任何密钥文件意外提交到仓库
+*.jks
+*.keystore
 app/minime.jks
 app/keystore.properties
 
