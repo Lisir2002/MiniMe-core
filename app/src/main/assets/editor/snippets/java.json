@@ -1,0 +1,60 @@
+{
+  "snippets": [
+    {
+      "name": "Java 类",
+      "prefix": "class",
+      "language": "java",
+      "description": "公开类定义",
+      "body": ["public class ${1:ClassName} {", "  ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Java main 方法",
+      "prefix": "main",
+      "language": "java",
+      "description": "程序入口",
+      "body": ["public static void main(String[] args) {", "  ${0:System.out.println(\"Hello, World!\");}", "}"]
+    },
+    {
+      "name": "Java 方法",
+      "prefix": "method",
+      "language": "java",
+      "description": "公开方法",
+      "body": ["public ${1:void} ${2:methodName}(${3:String arg}) {", "  ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Java for 循环",
+      "prefix": "for",
+      "language": "java",
+      "description": "标准 for 循环",
+      "body": ["for (int ${1:i} = 0; ${1:i} < ${2:n}; ${1:i}++) {", "  ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Java for-each",
+      "prefix": "foreach",
+      "language": "java",
+      "description": "增强 for 循环",
+      "body": ["for (${1:Type} ${2:item} : ${3:collection}) {", "  ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Java try-catch",
+      "prefix": "try",
+      "language": "java",
+      "description": "异常捕获",
+      "body": ["try {", "  ${1:// TODO}", "} catch (${2:Exception} ${3:e}) {", "  ${0:${3:e}.printStackTrace();}", "}"]
+    },
+    {
+      "name": "Java println",
+      "prefix": "sout",
+      "language": "java",
+      "description": "标准输出",
+      "body": ["System.out.println(${1:\"\"});"]
+    },
+    {
+      "name": "Java if-else",
+      "prefix": "ifel",
+      "language": "java",
+      "description": "if-else 分支",
+      "body": ["if (${1:condition}) {", "  ${2:// TODO}", "} else {", "  ${0:// TODO}", "}"]
+    }
+  ]
+}

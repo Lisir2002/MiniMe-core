@@ -1,0 +1,53 @@
+{
+  "snippets": [
+    {
+      "name": "Swift 函数",
+      "prefix": "func",
+      "language": "swift",
+      "description": "函数定义",
+      "body": ["func ${1:funcName}(${2:args}) -> ${3:ReturnType} {", "    ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Swift 结构体",
+      "prefix": "struct",
+      "language": "swift",
+      "description": "结构体定义",
+      "body": ["struct ${1:Name} {", "    var ${2:field}: ${3:Type}", "    ${0:}"]
+    },
+    {
+      "name": "Swift 类",
+      "prefix": "class",
+      "language": "swift",
+      "description": "类定义",
+      "body": ["class ${1:ClassName} {", "    var ${2:prop}: ${3:Type}", "    init(${2:prop}: ${3:Type}) {", "        self.${2:prop} = ${2:prop}", "    }", "    ${0:}"]
+    },
+    {
+      "name": "Swift if",
+      "prefix": "if",
+      "language": "swift",
+      "description": "条件分支",
+      "body": ["if ${1:condition} {", "    ${2:// TODO}", "} else {", "    ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Swift for-in",
+      "prefix": "for",
+      "language": "swift",
+      "description": "遍历循环",
+      "body": ["for ${1:item} in ${2:iterable} {", "    ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Swift guard",
+      "prefix": "guard",
+      "language": "swift",
+      "description": "提前退出",
+      "body": ["guard let ${1:value} = ${2:optional} else {", "    ${0:return}", "}"]
+    },
+    {
+      "name": "Swift switch",
+      "prefix": "switch",
+      "language": "swift",
+      "description": "分支匹配",
+      "body": ["switch ${1:value} {", "case ${2:pattern}:", "    ${3:expr}", "${0:default:", "}"]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "snippets": [
+    {
+      "name": "HTML 文档结构",
+      "prefix": "html",
+      "language": "html",
+      "description": "完整 HTML5 模板",
+      "body": ["<!DOCTYPE html>", "<html lang=\"${1:zh-CN}\">", "<head>", "  <meta charset=\"UTF-8\">", "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">", "  <title>${0:Document}</title>", "</head>", "<body>", "  ", "</body>", "</html>"]
+    },
+    {
+      "name": "HTML div",
+      "prefix": "div",
+      "language": "html",
+      "description": "div 容器",
+      "body": ["<div class=\"${1:container}\">${0:content}</div>"]
+    },
+    {
+      "name": "HTML 表格",
+      "prefix": "table",
+      "language": "html",
+      "description": "表格结构",
+      "body": ["<table>", "  <thead>", "    <tr>", "      <th>${1:Header}</th>", "    </tr>", "  </thead>", "  <tbody>", "    <tr>", "      <td>${0:Data}</td>", "    </tr>", "  </tbody>", "</table>"]
+    },
+    {
+      "name": "HTML 表单",
+      "prefix": "form",
+      "language": "html",
+      "description": "表单结构",
+      "body": ["<form action=\"${1:/submit}\" method=\"${2:post}\">", "  <input type=\"${3:text}\" name=\"${4:name}\">", "  <button type=\"${5:submit}\">${0:提交}</button>", "</form>"]
+    },
+    {
+      "name": "HTML 图片",
+      "prefix": "img",
+      "language": "html",
+      "description": "图片标签",
+      "body": ["<img src=\"${1:image.png}\" alt=\"${2:description}\"${0:}>"]
+    },
+    {
+      "name": "HTML 链接",
+      "prefix": "a",
+      "language": "html",
+      "description": "超链接",
+      "body": ["<a href=\"${1:https://example.com}\">${0:link text}</a>"]
+    },
+    {
+      "name": "HTML 无序列表",
+      "prefix": "ul",
+      "language": "html",
+      "description": "无序列表",
+      "body": ["<ul>", "  <li>${1:item}</li>", "  ${0:<li></li>}", "</ul>"]
+    },
+    {
+      "name": "HTML 脚本引入",
+      "prefix": "script",
+      "language": "html",
+      "description": "script 标签",
+      "body": ["<script src=\"${1:script.js}\"></script>"]
+    }
+  ]
+}

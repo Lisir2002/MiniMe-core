@@ -156,6 +156,7 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     About(R.string.settings_about),
     Update(R.string.update_title),
     Theme(R.string.settings_theme_title),
+    Snippets(R.string.settings_snippets_title),
     DevOptions(R.string.dev_options_title),
 }
 
@@ -769,6 +770,11 @@ fun SettingsScreen(
                         onNavigateBack = { section = SettingsSection.Menu }
                     )
                 }
+                SettingsSection.Snippets -> {
+                    com.mini.me_core.feature.editor.snippets.ui.SnippetSettingsScreen(
+                        onNavigateBack = { section = SettingsSection.Menu }
+                    )
+                }
                 SettingsSection.DevOptions -> com.mini.me_core.feature.settings.presentation.DevOptionsScreen(
                     onNavigateBack = { section = SettingsSection.Menu },
                     onOpenLogViewer = { section = SettingsSection.Logs },
@@ -1154,6 +1160,17 @@ internal fun SettingsMenu(
             iconBgDark = Color(0xFF4C1D95),
             keywords = listOf("theme", "appearance", stringResource(R.string.ui____afcde261), stringResource(R.string.ui____41e8e8b9), stringResource(R.string.ui____48d0a09b), stringResource(R.string.ui____f0789e79), stringResource(R.string.ui____9970ad07)),
             action = { onOpen(SettingsSection.Theme) }
+        ),
+        MenuItem(
+            section = SettingsSection.Snippets,
+            group = groupSystem,
+            title = stringResource(R.string.settings_snippets_title),
+            subtitle = stringResource(R.string.settings_snippets_subtitle),
+            icon = Icons.Rounded.Description,
+            iconBgLight = Color(0xFF10B981),
+            iconBgDark = Color(0xFF065F46),
+            keywords = listOf("snippet", "code", stringResource(R.string.settings_snippets_title), "completion"),
+            action = { onOpen(SettingsSection.Snippets) }
         ),
         MenuItem(
             section = null,

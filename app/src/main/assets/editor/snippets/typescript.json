@@ -1,0 +1,60 @@
+{
+  "snippets": [
+    {
+      "name": "TS 接口",
+      "prefix": "interface",
+      "language": "typescript",
+      "description": "定义接口",
+      "body": ["interface ${1:Name} {", "  ${2:prop}: ${3:type};", "  ${0:}", "}"]
+    },
+    {
+      "name": "TS 类型别名",
+      "prefix": "type",
+      "language": "typescript",
+      "description": "定义类型别名",
+      "body": ["type ${1:Name} = ${2:string};"]
+    },
+    {
+      "name": "TS 泛型函数",
+      "prefix": "gfunc",
+      "language": "typescript",
+      "description": "泛型函数",
+      "body": ["function ${1:funcName}<${2:T}>(${3:arg}: ${2:T}): ${2:T} {", "  ${0:return ${3:arg};}", "}"]
+    },
+    {
+      "name": "TS 枚举",
+      "prefix": "enum",
+      "language": "typescript",
+      "description": "枚举定义",
+      "body": ["enum ${1:Direction} {", "  ${2:Up},", "  ${3:Down},", "  ${0:Left},", "}"]
+    },
+    {
+      "name": "TS 箭头函数",
+      "prefix": "=>",
+      "language": "typescript",
+      "description": "带类型注解的箭头函数",
+      "body": ["const ${1:funcName} = (${2:param}: ${3:type}): ${4:ReturnType} => {", "  ${0:// TODO}", "};"]
+    },
+    {
+      "name": "TS 类",
+      "prefix": "class",
+      "language": "typescript",
+      "description": "带类型的类",
+      "body": ["class ${1:ClassName} {", "  private ${2:prop}: ${3:string};", "  constructor(${2:prop}: ${3:string}) {", "    this.${2:prop} = ${2:prop};", "  }", "  ${0:method() {} }", "}"]
+    },
+    {
+      "name": "TS 异步函数",
+      "prefix": "async",
+      "language": "typescript",
+      "description": "async/await",
+      "body": ["async function ${1:funcName}(${2:params}): Promise<${3:Result}> {", "  const ${4:result} = await ${5:call()};", "  ${0:return ${4:result};}", "}"]
+    },
+    {
+      "name": "TS 只读数组",
+      "prefix": "ra",
+      "language": "typescript",
+      "description": "只读数组类型",
+      "body": ["ReadonlyArray<${1:T}>"]
+    }
+  ]
+}

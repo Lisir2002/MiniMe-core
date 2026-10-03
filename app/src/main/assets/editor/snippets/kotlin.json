@@ -1,0 +1,60 @@
+{
+  "snippets": [
+    {
+      "name": "Kotlin main",
+      "prefix": "main",
+      "language": "kotlin",
+      "description": "程序入口",
+      "body": ["fun main() {", "    ${0:println(\"Hello, World!\")}", "}"]
+    },
+    {
+      "name": "Kotlin 函数",
+      "prefix": "fun",
+      "language": "kotlin",
+      "description": "函数定义",
+      "body": ["fun ${1:funcName}(${2:args}): ${3:ReturnType} {", "    ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Kotlin 类",
+      "prefix": "class",
+      "language": "kotlin",
+      "description": "数据类",
+      "body": ["data class ${1:ClassName}(", "    val ${2:prop}: ${3:String}", "${0:)"]
+    },
+    {
+      "name": "Kotlin if",
+      "prefix": "if",
+      "language": "kotlin",
+      "description": "条件表达式",
+      "body": ["if (${1:condition}) {", "    ${2:// TODO}", "} else {", "    ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Kotlin for",
+      "prefix": "for",
+      "language": "kotlin",
+      "description": "for 循环",
+      "body": ["for (${1:item} in ${2:iterable}) {", "    ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Kotlin try-catch",
+      "prefix": "try",
+      "language": "kotlin",
+      "description": "异常捕获",
+      "body": ["try {", "    ${1:// TODO}", "} catch (${2:e}: Exception) {", "    ${0:${2:e}.printStackTrace()}", "} finally {", "}"]
+    },
+    {
+      "name": "Kotlin when",
+      "prefix": "when",
+      "language": "kotlin",
+      "description": "模式匹配",
+      "body": ["when (${1:value}) {", "    ${2:is Type} -> ${3:expr}", "    ${0:else -> }", "}"]
+    },
+    {
+      "name": "Kotlin object 单例",
+      "prefix": "object",
+      "language": "kotlin",
+      "description": "单例对象",
+      "body": ["object ${1:Singleton} {", "    ${0:val instance = this}", "}"]
+    }
+  ]
+}

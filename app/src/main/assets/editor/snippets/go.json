@@ -1,0 +1,60 @@
+{
+  "snippets": [
+    {
+      "name": "Go 函数",
+      "prefix": "func",
+      "language": "go",
+      "description": "函数定义",
+      "body": ["func ${1:funcName}(${2:args}) ${3:retType} {", "  ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Go main 函数",
+      "prefix": "main",
+      "language": "go",
+      "description": "程序入口",
+      "body": ["package main", "", "import \"fmt\"", "", "func main() {", "  ${0:fmt.Println(\"Hello, World!\")}", "}"]
+    },
+    {
+      "name": "Go 结构体",
+      "prefix": "struct",
+      "language": "go",
+      "description": "结构体定义",
+      "body": ["type ${1:Name} struct {", "  ${2:Field} ${3:Type}", "  ${0:}", "}"]
+    },
+    {
+      "name": "Go 方法",
+      "prefix": "method",
+      "language": "go",
+      "description": "结构体方法",
+      "body": ["func (${1:r} ${2:Receiver}) ${3:MethodName}() ${4:retType} {", "  ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Go for 循环",
+      "prefix": "for",
+      "language": "go",
+      "description": "for 循环",
+      "body": ["for ${1:i} := 0; ${1:i} < ${2:n}; ${1:i}++ {", "  ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Go if-else",
+      "prefix": "ifel",
+      "language": "go",
+      "description": "if-else 分支",
+      "body": ["if ${1:condition} {", "  ${2:// TODO}", "} else {", "  ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Go 错误处理",
+      "prefix": "err",
+      "language": "go",
+      "description": "if err != nil",
+      "body": ["if ${1:err} != nil {", "  ${0:return ${1:err}}"]
+    },
+    {
+      "name": "Go goroutine",
+      "prefix": "go",
+      "language": "go",
+      "description": "启动协程",
+      "body": ["go ${1:funcName}(${2:args})"]
+    }
+  ]
+}

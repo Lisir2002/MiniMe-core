@@ -1,0 +1,60 @@
+{
+  "snippets": [
+    {
+      "name": "Rust 函数",
+      "prefix": "fn",
+      "language": "rust",
+      "description": "函数定义",
+      "body": ["fn ${1:funcName}(${2:args}) -> ${3:ReturnType} {", "  ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Rust main",
+      "prefix": "main",
+      "language": "rust",
+      "description": "程序入口",
+      "body": ["fn main() {", "  ${0:println!(\"Hello, World!\");}", "}"]
+    },
+    {
+      "name": "Rust 结构体",
+      "prefix": "struct",
+      "language": "rust",
+      "description": "结构体定义",
+      "body": ["struct ${1:Name} {", "  ${2:field}: ${3:Type},", "  ${0:}", "}"]
+    },
+    {
+      "name": "Rust impl 块",
+      "prefix": "impl",
+      "language": "rust",
+      "description": "实现块",
+      "body": ["impl ${1:Name} {", "  ${0:fn method(&self) {}}", "}"]
+    },
+    {
+      "name": "Rust match",
+      "prefix": "match",
+      "language": "rust",
+      "description": "模式匹配",
+      "body": ["match ${1:value} {", "  ${2:pattern} => ${3:expr},", "  ${0:_ => todo!(),}", "}"]
+    },
+    {
+      "name": "Rust for 循环",
+      "prefix": "for",
+      "language": "rust",
+      "description": "for 循环",
+      "body": ["for ${1:item} in ${2:iterable} {", "  ${0:// TODO}", "}"]
+    },
+    {
+      "name": "Rust Result 处理",
+      "prefix": "res",
+      "language": "rust",
+      "description": "match Result",
+      "body": ["match ${1:result} {", "  Ok(${2:val}) => ${3:val},", "  Err(${4:err}) => return Err(${4:err}),", "  ${0:}", "}"]
+    },
+    {
+      "name": "Rust println",
+      "prefix": "p",
+      "language": "rust",
+      "description": "打印宏",
+      "body": ["println!(\"${1:var} = {}\", ${1:var});"]
+    }
+  ]
+}

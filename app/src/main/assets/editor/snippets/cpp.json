@@ -1,0 +1,60 @@
+{
+  "snippets": [
+    {
+      "name": "C++ main",
+      "prefix": "main",
+      "language": "cpp",
+      "description": "程序入口",
+      "body": ["#include <iostream>", "", "int main() {", "    ${0:std::cout << \"Hello, World\" << std::endl;}", "    return 0;", "}"]
+    },
+    {
+      "name": "C++ include",
+      "prefix": "inc",
+      "language": "cpp",
+      "description": "头文件包含",
+      "body": ["#include <${1:iostream}>"]
+    },
+    {
+      "name": "C++ 类",
+      "prefix": "class",
+      "language": "cpp",
+      "description": "类定义",
+      "body": ["class ${1:ClassName} {", "public:", "    ${1:ClassName}(${2:args});", "    ${0:~${1:ClassName}();}", "};"]
+    },
+    {
+      "name": "C++ 函数",
+      "prefix": "func",
+      "language": "cpp",
+      "description": "函数定义",
+      "body": ["${1:void} ${2:funcName}(${3:int arg}) {", "    ${0:// TODO}", "}"]
+    },
+    {
+      "name": "C++ for 循环",
+      "prefix": "for",
+      "language": "cpp",
+      "description": "范围 for 循环",
+      "body": ["for (const auto& ${1:item} : ${2:container}) {", "    ${0:// TODO}", "}"]
+    },
+    {
+      "name": "C++ if-else",
+      "prefix": "ifel",
+      "language": "cpp",
+      "description": "if-else 分支",
+      "body": ["if (${1:condition}) {", "    ${2:// TODO}", "} else {", "    ${0:// TODO}", "}"]
+    },
+    {
+      "name": "C++ try-catch",
+      "prefix": "try",
+      "language": "cpp",
+      "description": "异常捕获",
+      "body": ["try {", "    ${1:// TODO}", "} catch (const std::exception& ${2:e}) {", "    ${0:std::cerr << ${2:e}.what() << std::endl;}", "}"]
+    },
+    {
+      "name": "C++ namespace",
+      "prefix": "ns",
+      "language": "cpp",
+      "description": "命名空间",
+      "body": ["namespace ${1:name} {", "    ${0:// TODO}", "}"]
+    }
+  ]
+}

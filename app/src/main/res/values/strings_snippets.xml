@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_snippets_title">代码片段</string>
+    <string name="settings_snippets_subtitle">管理代码片段与补全触发</string>
+
+    <string name="snippet_completion_enabled">片段补全</string>
+    <string name="snippet_completion_enabled_sub">输入触发词时在补全列表中展示匹配片段</string>
+
+    <string name="snippet_nav_prev">上一个</string>
+    <string name="snippet_nav_next">下一个</string>
+
+    <string name="snippet_section_builtin">内置片段</string>
+    <string name="snippet_section_custom">自定义片段</string>
+
+    <string name="snippet_add">新增片段</string>
+    <string name="snippet_edit">编辑片段</string>
+    <string name="snippet_delete">删除</string>
+    <string name="snippet_delete_confirm">确定删除该片段吗？</string>
+    <string name="snippet_cancel">取消</string>
+    <string name="snippet_save">保存</string>
+
+    <string name="snippet_name">名称</string>
+    <string name="snippet_prefix">触发词</string>
+    <string name="snippet_language">语言</string>
+    <string name="snippet_description">描述</string>
+    <string name="snippet_body">正文</string>
+    <string name="snippet_body_hint">每行一段，支持 ${1:占位符} 语法</string>
+
+    <string name="snippet_import">导入</string>
+    <string name="snippet_export">导出</string>
+    <string name="snippet_import_success">成功导入 %1$d 个片段</string>
+    <string name="snippet_import_error">导入失败：%1$s</string>
+    <string name="snippet_export_copied">已导出到剪贴板</string>
+    <string name="snippet_empty_custom">暂无自定义片段，点击右上角添加</string>
+
+    <string name="snippet_field_required">该字段不能为空</string>
+    <string name="snippet_count_prefix">共 %1$d 个</string>
+</resources>

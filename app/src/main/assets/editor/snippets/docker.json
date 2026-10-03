@@ -1,0 +1,67 @@
+{
+  "snippets": [
+    {
+      "name": "Dockerfile 基础结构",
+      "prefix": "docker",
+      "language": "docker",
+      "description": "完整 Dockerfile",
+      "body": ["FROM ${1:ubuntu:22.04}", "", "WORKDIR ${2:/app}", "", "COPY ${3:. .}", "", "RUN ${4:apt-get update}", "", "EXPOSE ${5:8080}", "", "CMD [\"${0:./start.sh}\"]"]
+    },
+    {
+      "name": "Docker COPY",
+      "prefix": "copy",
+      "language": "docker",
+      "description": "复制文件",
+      "body": ["COPY ${1:./src} ${2:/app}"]
+    },
+    {
+      "name": "Docker RUN",
+      "prefix": "run",
+      "language": "docker",
+      "description": "执行命令",
+      "body": ["RUN ${1:apt-get update && apt-get install -y curl}"]
+    },
+    {
+      "name": "Docker EXPOSE",
+      "prefix": "expose",
+      "language": "docker",
+      "description": "声明端口",
+      "body": ["EXPOSE ${1:8080}"]
+    },
+    {
+      "name": "Docker ENTRYPOINT",
+      "prefix": "entrypoint",
+      "language": "docker",
+      "description": "容器入口",
+      "body": ["ENTRYPOINT [\"${1:/app/start.sh}\"]"]
+    },
+    {
+      "name": "Docker 多阶段构建",
+      "prefix": "multistage",
+      "language": "docker",
+      "description": "多阶段构建",
+      "body": ["FROM ${1:node:18} AS builder", "WORKDIR /app", "COPY . .", "RUN npm ci && npm run build", "", "FROM ${2:nginx:alpine}", "COPY --from=builder /app/dist /usr/share/nginx/html", "EXPOSE ${0:80}"]
+    },
+    {
+      "name": "Docker ENV",
+      "prefix": "env",
+      "language": "docker",
+      "description": "环境变量",
+      "body": ["ENV ${1:KEY}=${2:value}"]
+    },
+    {
+      "name": "Docker VOLUME",
+      "prefix": "volume",
+      "language": "docker",
+      "description": "声明数据卷",
+      "body": ["VOLUME ${1:/data}"]
+    },
+    {
+      "name": "Docker HEALTHCHECK",
+      "prefix": "healthcheck",
+      "language": "docker",
+      "description": "健康检查",
+      "body": ["HEALTHCHECK --interval=${1:30s} CMD curl -f http://localhost:${2:8080}/health || exit 1"]
+    }
+  ]
+}
