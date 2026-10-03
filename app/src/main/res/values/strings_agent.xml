@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="agent_stopped_by_user">已被用户停止</string>
     <string name="agent_tool_executing">%1$s 执行中…</string>
     <string name="agent_goal_status_active">目标进行中</string>

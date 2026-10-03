@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="norm_flow_status_card">运行状态</string>
     <string name="norm_flow_preset">预设方案</string>
     <string name="norm_flow_preset_strict">严格</string>

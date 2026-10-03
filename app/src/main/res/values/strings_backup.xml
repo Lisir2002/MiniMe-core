@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="backup_exported">备份已导出</string>
     <string name="backup_write_failed">写入失败: %1$s</string>
     <string name="backup_read_failed">读取备份文件失败</string>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="browser_title">内置浏览器</string>
     <string name="browser_address_hint">输入网址或搜索</string>
     <string name="browser_go">前往</string>

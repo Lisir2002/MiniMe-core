@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="sync_unknown_connection">未知连接</string>
     <string name="sync_ignore_list">目录/文件忽略列表</string>
     <string name="sync_ignore_desc">多个规则请用英文逗号分隔。这些名称的目录及文件将不会被同步到远程服务器（如 node_modules）。</string>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="settings_snippets_title">代码片段</string>
     <string name="settings_snippets_subtitle">管理代码片段与补全触发</string>
 

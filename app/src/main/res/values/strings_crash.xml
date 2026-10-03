@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="crash_dialog_title">上次异常退出</string>
     <string name="crash_dialog_message">检测到上次运行发生崩溃，是否查看崩溃报告？</string>
     <string name="crash_view">查看报告</string>

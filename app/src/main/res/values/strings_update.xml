@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="update_title">版本更新</string>
     <string name="update_tab_latest">最新版本</string>
     <string name="update_tab_history">历史版本</string>

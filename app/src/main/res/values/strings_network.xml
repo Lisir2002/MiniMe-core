@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="net_stats">请求 %1$d · 成功率 %2$d%% · 平均 %3$d ms</string>
     <string name="net_item">%1$s %2$s · %3$d · %4$d ms</string>
     <string name="net_slowest">最慢请求</string>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="editor_theme_title">编辑器主题</string>
     <string name="editor_theme_subtitle">自定义代码编辑器配色方案</string>
     <string name="editor_theme_category_all">全部</string>

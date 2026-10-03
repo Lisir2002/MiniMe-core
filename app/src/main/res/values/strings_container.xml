@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="container_bindings">绑定: %1$s</string>
     <string name="container_share_storage">共享设备存储</string>
     <string name="container_share_storage_desc">把设备外存绑定进容器 /root/storage/shared，方便在终端里读写本机文件。开启后生效于后续启动的容器进程，已运行的终端需重开。</string>

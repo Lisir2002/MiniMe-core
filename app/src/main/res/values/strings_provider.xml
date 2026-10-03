@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="model_management_tab_providers">服务商</string>
     <string name="model_switch_title">切换模型</string>
     <string name="model_switch_current_to_new">%1$s → %2$s</string>

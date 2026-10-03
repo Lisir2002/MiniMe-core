@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="download_confirm_title">确认下载</string>
     <string name="download_confirm_message">文件：%1$s\n大小：%2$s\n来源：%3$s</string>
     <string name="download_confirm_button">确认下载</string>

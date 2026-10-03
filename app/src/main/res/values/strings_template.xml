@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="template_open">模板</string>
     <string name="template_search_hint">搜索模板…</string>
     <string name="template_new">+ 新建模板</string>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="security_http_warning_title">检测到明文 HTTP 请求</string>
     <string name="security_http_warning_desc">应用正在通过未加密的明文 HTTP 与 %1$s 通信，数据存在被窃听或篡改风险。请优先改用 HTTPS 地址，或确认该服务位于可信的本地网络。</string>
     <string name="token_usage_title">Token 用量</string>

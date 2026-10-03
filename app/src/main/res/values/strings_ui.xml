@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="ui_1fs_960c9b8d">✨ %1$.1fs · %2$d 包</string>
     <string name="ui___3479daf9"> · 空</string>
     <string name="ui____12a64640">实时 (空)</string>

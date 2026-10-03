@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="file_diff_sheet_title">任务变更 (%1$d)</string>
     <string name="file_diff_tab_changes">文件修改 (%1$d)</string>
     <string name="file_diff_tab_logs">日志 (%1$d)</string>

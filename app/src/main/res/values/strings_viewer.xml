@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="md_code_expand">展开全部代码</string>
     <string name="md_code_collapse">收起代码</string>
     <string name="md_code_lines">共 %1$d 行</string>

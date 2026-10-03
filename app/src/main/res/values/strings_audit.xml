@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="audit_stats_total">总事件</string>
     <string name="audit_stats_failed">失败事件</string>
     <string name="audit_stats_today">今日事件</string>

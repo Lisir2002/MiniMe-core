@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="dev_options_title">开发者选项</string>
     <string name="dev_options_unlocked">开发者选项已解锁</string>
     <string name="dev_tab_performance">性能</string>

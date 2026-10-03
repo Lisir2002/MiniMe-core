@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="skill_search_hint">搜索技能…</string>
     <string name="skill_import">导入技能</string>
     <string name="skill_list_empty">暂无技能</string>

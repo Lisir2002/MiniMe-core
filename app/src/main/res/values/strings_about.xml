@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="about_version">版本</string>
     <string name="about_github_repo">GitHub 仓库</string>
     <string name="about_license">开源许可证</string>

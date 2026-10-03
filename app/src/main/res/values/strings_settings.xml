@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="settings_title">设置</string>
     <string name="settings_search_hint">搜索设置项…</string>
     <string name="settings_search_empty_title">未找到匹配的设置项</string>

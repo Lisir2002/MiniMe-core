@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="capability_center_title">能力中心</string>
     <string name="capability_center_subtitle">技能管理、MCP 工具服务等</string>
     <string name="capability_tab_tools">工具</string>
