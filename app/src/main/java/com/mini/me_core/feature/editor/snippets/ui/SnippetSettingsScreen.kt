@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import android.annotation.SuppressLint
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +59,7 @@ import com.mini.me_core.feature.editor.snippets.model.Snippet
 @SuppressLint("LocalContextGetResourceValueCall")
 @Composable
 fun SnippetSettingsScreen(onNavigateBack: () -> Unit) {
+    val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val exportCopiedText = stringResource(R.string.snippet_export_copied)
 
@@ -136,9 +138,9 @@ fun SnippetSettingsScreen(onNavigateBack: () -> Unit) {
                         runCatching {
                             val n = CustomSnippetStore.importFromJson(text)
                             refresh()
-                            snackbar = LocalContext.current.getString(R.string.snippet_import_success, n)
+                            snackbar = context.getString(R.string.snippet_import_success, n)
                         }.onFailure {
-                            snackbar = LocalContext.current.getString(R.string.snippet_import_error, it.message ?: "")
+                            snackbar = context.getString(R.string.snippet_import_error, it.message ?: "")
                         }
                     }) {
                         Text(stringResource(R.string.snippet_import))
