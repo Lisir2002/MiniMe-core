@@ -9,10 +9,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BrokenImage
+import androidx.compose.material.icons.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,12 +31,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.component.EditorAutoCompletion
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -91,8 +96,15 @@ fun SoraCodeViewer(
 
     // TextMate 引擎只需初始化一次（幂等，内部有已初始化判断）
     LaunchedEffect(Unit) {
+        val appCtx = context.applicationContext
         com.mini.me_core.feature.editor.textmate.TextMateManager
-            .initialize(context.applicationContext)
+            .initialize(appCtx)
+        // 代码片段子系统：内置片段加载 + 自定义片段 + 偏好
+        withContext(Dispatchers.IO) {
+            com.mini.me_core.feature.editor.snippets.SnippetRepository.initialize(appCtx)
+            com.mini.me_core.feature.editor.snippets.CustomSnippetStore.initialize(appCtx)
+        }
+        com.mini.me_core.feature.editor.snippets.SnippetSettings.initialize(appCtx)
     }
 
     // 加载文件（二进制检测 + 性能优化：单次读取、行数顺便统计）
@@ -151,9 +163,17 @@ fun SoraCodeViewer(
         editor.colorScheme = com.mini.me_core.feature.editor.textmate.TextMateManager
             .createColorScheme()
         try {
-            val lang = com.mini.me_core.feature.editor.textmate.TextMateManager
+            val inner = com.mini.me_core.feature.editor.textmate.TextMateManager
                 .createLanguage(scopeName, autoCompletion = editable)
+            // 编辑模式下用片段补全包装器包裹原生语言
+            val lang = if (editable) {
+                com.mini.me_core.feature.editor.snippets.SnippetLanguageWrapper(inner, scopeName)
+            } else {
+                inner
+            }
             editor.setEditorLanguage(lang)
+            // 绑定当前文件，使 $TM_FILENAME 等变量可解析
+            com.mini.me_core.feature.editor.snippets.SnippetEditorBridge.bindFile(editor, filePath)
             // 接入自适应高亮引擎（大文件自动降级）
             highlighter.attach(editor, scopeName, lineCount)
         } catch (e: Exception) {
@@ -221,10 +241,65 @@ fun SoraCodeViewer(
             )
         }
     } else {
-        AndroidView(
-            factory = { editor },
-            modifier = modifier,
-        )
+        var snippetActive by remember { mutableStateOf(false) }
+        LaunchedEffect(editor, editable) {
+            while (true) {
+                snippetActive = editable &&
+                    com.mini.me_core.feature.editor.snippets.SnippetEditorBridge.isSnippetActive(editor)
+                delay(150)
+            }
+        }
+        Column(modifier = modifier) {
+            AndroidView(
+                factory = { editor },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            )
+            if (snippetActive) {
+                SnippetNavBar(
+                    onPrev = {
+                        com.mini.me_core.feature.editor.snippets.SnippetEditorBridge.prevPlaceholder(editor)
+                    },
+                    onNext = {
+                        com.mini.me_core.feature.editor.snippets.SnippetEditorBridge.nextPlaceholder(editor)
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 片段展开会话中的占位符跳转栏（移动端无 Tab 键的替代）。
+ * 仅在 [SnippetEditorBridge.isSnippetActive] 为真时显示。
+ */
+@Composable
+private fun SnippetNavBar(onPrev: () -> Unit, onNext: () -> Unit) {
+    androidx.compose.material3.Surface(tonalElevation = 2.dp) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            androidx.compose.material3.TextButton(onClick = onPrev, modifier = Modifier.weight(1f)) {
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowLeft,
+                    contentDescription = stringResource(com.mini.me_core.R.string.snippet_nav_prev),
+                )
+                Spacer(Modifier.size(4.dp))
+                Text(stringResource(com.mini.me_core.R.string.snippet_nav_prev))
+            }
+            androidx.compose.material3.TextButton(onClick = onNext, modifier = Modifier.weight(1f)) {
+                Text(stringResource(com.mini.me_core.R.string.snippet_nav_next))
+                Spacer(Modifier.size(4.dp))
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowRight,
+                    contentDescription = stringResource(com.mini.me_core.R.string.snippet_nav_next),
+                )
+            }
+        }
     }
 }
 

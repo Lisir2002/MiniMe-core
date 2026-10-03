@@ -2801,4 +2801,34 @@
     <string name="download_confirm_size_unknown">Unknown size</string>
 
     <!-- QQ Bot Module -->
+
+    <!-- Code Snippets -->
+    <string name="settings_snippets_title">Code Snippets</string>
+    <string name="settings_snippets_subtitle">Manage code snippets and completion triggers</string>
+    <string name="snippet_completion_enabled">Snippet completion</string>
+    <string name="snippet_completion_enabled_sub">Show matching snippets in completion as you type triggers</string>
+    <string name="snippet_nav_prev">Previous</string>
+    <string name="snippet_nav_next">Next</string>
+    <string name="snippet_section_builtin">Built-in snippets</string>
+    <string name="snippet_section_custom">Custom snippets</string>
+    <string name="snippet_add">Add snippet</string>
+    <string name="snippet_edit">Edit snippet</string>
+    <string name="snippet_delete">Delete</string>
+    <string name="snippet_delete_confirm">Delete this snippet?</string>
+    <string name="snippet_cancel">Cancel</string>
+    <string name="snippet_save">Save</string>
+    <string name="snippet_name">Name</string>
+    <string name="snippet_prefix">Prefix</string>
+    <string name="snippet_language">Language</string>
+    <string name="snippet_description">Description</string>
+    <string name="snippet_body">Body</string>
+    <string name="snippet_body_hint">One line per entry, supports ${1:placeholder} syntax</string>
+    <string name="snippet_import">Import</string>
+    <string name="snippet_export">Export</string>
+    <string name="snippet_import_success">Imported %1$d snippets</string>
+    <string name="snippet_import_error">Import failed: %1$s</string>
+    <string name="snippet_export_copied">Exported to clipboard</string>
+    <string name="snippet_empty_custom">No custom snippets yet. Tap add to create one.</string>
+    <string name="snippet_field_required">This field cannot be empty</string>
+    <string name="snippet_count_prefix">%1$d total</string>
 </resources>
