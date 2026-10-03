@@ -1,0 +1,164 @@
+{
+  "themes": [
+    {
+      "name": "dark-plus",
+      "path": "editor/themes/dark-plus.json",
+      "displayName": "MiniMe Dark",
+      "category": "dark",
+      "isDark": true,
+      "author": "MiniMe"
+    },
+    {
+      "name": "light-plus",
+      "path": "editor/themes/light-plus.json",
+      "displayName": "MiniMe Light",
+      "category": "light",
+      "isDark": false,
+      "author": "MiniMe"
+    },
+    {
+      "name": "github-dark",
+      "path": "editor/themes/github-dark-default.json",
+      "displayName": "GitHub Dark",
+      "category": "dark",
+      "isDark": true,
+      "author": "GitHub"
+    },
+    {
+      "name": "github-light",
+      "path": "editor/themes/github-light-default.json",
+      "displayName": "GitHub Light",
+      "category": "light",
+      "isDark": false,
+      "author": "GitHub"
+    },
+    {
+      "name": "dracula",
+      "path": "editor/themes/dracula.json",
+      "displayName": "Dracula",
+      "category": "dark",
+      "isDark": true,
+      "author": "Dracula Theme"
+    },
+    {
+      "name": "monokai",
+      "path": "editor/themes/monokai.json",
+      "displayName": "Monokai",
+      "category": "dark",
+      "isDark": true,
+      "author": "Wimer Hazenberg"
+    },
+    {
+      "name": "solarized-dark",
+      "path": "editor/themes/solarized-dark.json",
+      "displayName": "Solarized Dark",
+      "category": "dark",
+      "isDark": true,
+      "author": "Ethan Schoonover"
+    },
+    {
+      "name": "solarized-light",
+      "path": "editor/themes/solarized-light.json",
+      "displayName": "Solarized Light",
+      "category": "light",
+      "isDark": false,
+      "author": "Ethan Schoonover"
+    },
+    {
+      "name": "one-dark",
+      "path": "editor/themes/one-dark.json",
+      "displayName": "One Dark",
+      "category": "dark",
+      "isDark": true,
+      "author": "Atom"
+    },
+    {
+      "name": "one-light",
+      "path": "editor/themes/one-light.json",
+      "displayName": "One Light",
+      "category": "light",
+      "isDark": false,
+      "author": "Atom"
+    },
+    {
+      "name": "nord",
+      "path": "editor/themes/nord.json",
+      "displayName": "Nord",
+      "category": "dark",
+      "isDark": true,
+      "author": "Arctic Ice Studio"
+    },
+    {
+      "name": "tokyo-night",
+      "path": "editor/themes/tokyo-night.json",
+      "displayName": "Tokyo Night",
+      "category": "dark",
+      "isDark": true,
+      "author": "Enka"
+    },
+    {
+      "name": "catppuccin-mocha",
+      "path": "editor/themes/catppuccin-mocha.json",
+      "displayName": "Catppuccin Mocha",
+      "category": "dark",
+      "isDark": true,
+      "author": "Catppuccin"
+    },
+    {
+      "name": "catppuccin-latte",
+      "path": "editor/themes/catppuccin-latte.json",
+      "displayName": "Catppuccin Latte",
+      "category": "light",
+      "isDark": false,
+      "author": "Catppuccin"
+    },
+    {
+      "name": "gruvbox-dark",
+      "path": "editor/themes/gruvbox-dark.json",
+      "displayName": "Gruvbox Dark",
+      "category": "dark",
+      "isDark": true,
+      "author": "Pablo Immrico"
+    },
+    {
+      "name": "gruvbox-light",
+      "path": "editor/themes/gruvbox-light.json",
+      "displayName": "Gruvbox Light",
+      "category": "light",
+      "isDark": false,
+      "author": "Pablo Immrico"
+    },
+    {
+      "name": "hc-dark",
+      "path": "editor/themes/hc-dark.json",
+      "displayName": "High Contrast Dark",
+      "category": "highContrast",
+      "isDark": true,
+      "author": "MiniMe"
+    },
+    {
+      "name": "hc-light",
+      "path": "editor/themes/hc-light.json",
+      "displayName": "High Contrast Light",
+      "category": "highContrast",
+      "isDark": false,
+      "author": "MiniMe"
+    },
+    {
+      "name": "colorblind-dark",
+      "path": "editor/themes/colorblind-dark.json",
+      "displayName": "Colorblind Friendly Dark",
+      "category": "colorblind",
+      "isDark": true,
+      "author": "MiniMe"
+    },
+    {
+      "name": "colorblind-light",
+      "path": "editor/themes/colorblind-light.json",
+      "displayName": "Colorblind Friendly Light",
+      "category": "colorblind",
+      "isDark": false,
+      "author": "MiniMe"
+    }
+  ]
+}

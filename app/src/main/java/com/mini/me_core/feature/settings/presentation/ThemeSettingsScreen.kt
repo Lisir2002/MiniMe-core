@@ -102,6 +102,9 @@ import com.mini.me_core.core.theme.tokens.SemanticColors
  * - 颜色选择器采用 HSV 调色盘 + 预设色板组合
  * - 实时预览卡片滚动时置顶，置顶期间微折叠节省空间
  */
+/** 编辑器主题子页面状态。 */
+private enum class EditorThemeSubScreen { NONE, LIST, EDITOR }
+
 @Composable
 fun ThemeSettingsScreen(
     onNavigateBack: () -> Unit,
@@ -131,6 +134,23 @@ fun ThemeSettingsScreen(
         animationTrigger++
     }
 
+    // 编辑器主题子页面导航
+    var editorThemeSub by remember { mutableStateOf(EditorThemeSubScreen.NONE) }
+    var editorBaseTheme by remember { mutableStateOf<String?>(null) }
+
+    when (editorThemeSub) {
+        EditorThemeSubScreen.LIST -> com.mini.me_core.feature.editor.themes.EditorThemesScreen(
+            onNavigateBack = { editorThemeSub = EditorThemeSubScreen.NONE },
+            onOpenEditor = { base ->
+                editorBaseTheme = base
+                editorThemeSub = EditorThemeSubScreen.EDITOR
+            },
+        )
+        EditorThemeSubScreen.EDITOR -> com.mini.me_core.feature.editor.themes.editor.ThemeEditorScreen(
+            baseThemeName = editorBaseTheme,
+            onNavigateBack = { editorThemeSub = EditorThemeSubScreen.LIST },
+        )
+        EditorThemeSubScreen.NONE -> {
     LazyColumn(
         state = listState,
         modifier = Modifier
@@ -158,9 +178,23 @@ fun ThemeSettingsScreen(
             }
         }
 
+        // ── 编辑器主题入口 ──
+        item(key = "editor_theme_entry") {
+            Column(modifier = Modifier.padding(top = 16.dp)) {
+                AppSectionHeader(
+                    title = stringResource(R.string.editor_theme_title),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                EditorThemeEntryRow(
+                    onClick = { editorThemeSub = EditorThemeSubScreen.LIST },
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+        }
+
         // ── Section 1: 实时预览（完整态）──
         item(key = "full_preview") {
-            Column(modifier = Modifier.padding(top = 16.dp)) {
+            Column(modifier = Modifier.padding(top = 24.dp)) {
                 AppSectionHeader(
                     title = stringResource(R.string.theme_section_preview),
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -254,6 +288,8 @@ fun ThemeSettingsScreen(
             }
         }
     }
+        } // EditorThemeSubScreen.NONE
+    } // when (editorThemeSub)
 
     // 恢复出厂确认 Dialog
     if (showResetConfirm) {
@@ -1285,3 +1321,48 @@ private fun SliderRow(
         )
     }
 }
+
+// ──────────────────────────────────────────────
+// 编辑器主题入口行
+// ──────────────────────────────────────────────
+
+/**
+ * 设置页中「编辑器主题」入口行：点击进入编辑器主题管理器。
+ */
+@Composable
+private fun EditorThemeEntryRow(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalAppTheme.current.colors
+    AppCard(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onClick() }
+                .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.editor_theme_title),
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                    color = colors.textPrimary,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.editor_theme_subtitle),
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary,
+                )
+            }
+            Text(
+                text = stringResource(R.string.common_open),
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                color = colors.brandPrimary,
+            )
+        }
+    }
+}
+

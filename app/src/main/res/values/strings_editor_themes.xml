@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="editor_theme_title">编辑器主题</string>
+    <string name="editor_theme_subtitle">自定义代码编辑器配色方案</string>
+    <string name="editor_theme_category_all">全部</string>
+    <string name="editor_theme_category_dark">深色</string>
+    <string name="editor_theme_category_light">浅色</string>
+    <string name="editor_theme_category_high_contrast">高对比度</string>
+    <string name="editor_theme_category_colorblind">色弱友好</string>
+    <string name="editor_theme_category_custom">自定义</string>
+    <string name="editor_theme_search_hint">搜索主题…</string>
+    <string name="editor_theme_apply">应用</string>
+    <string name="editor_theme_applied">使用中</string>
+    <string name="editor_theme_follow_system">跟随系统</string>
+    <string name="editor_theme_follow_system_sub">根据系统深浅模式自动切换编辑器主题</string>
+    <string name="editor_theme_dark_theme">深色主题</string>
+    <string name="editor_theme_light_theme">浅色主题</string>
+    <string name="editor_theme_import">导入主题</string>
+    <string name="editor_theme_import_success">主题导入成功</string>
+    <string name="editor_theme_import_failed">主题导入失败</string>
+    <string name="editor_theme_export">导出</string>
+    <string name="editor_theme_delete">删除</string>
+    <string name="editor_theme_delete_confirm_title">删除主题？</string>
+    <string name="editor_theme_delete_confirm_msg">将删除该自定义主题，此操作不可恢复。</string>
+    <string name="editor_theme_edit">编辑</string>
+    <string name="editor_theme_new">新建主题</string>
+    <string name="editor_theme_new_hint">从基础主题创建自定义配色</string>
+    <string name="editor_theme_pick_base">选择基础主题</string>
+    <string name="editor_theme_name_hint">主题名称</string>
+    <string name="editor_theme_save">保存主题</string>
+    <string name="editor_theme_reset">重置为基础色</string>
+    <string name="editor_theme_preview">实时预览</string>
+    <string name="editor_theme_group_editor">编辑器</string>
+    <string name="editor_theme_group_syntax">语法高亮</string>
+    <string name="editor_theme_preview_language">示例语言</string>
+    <string name="editor_theme_empty_custom">暂无自定义主题</string>
+    <string name="editor_theme_empty_custom_sub">导入或新建一套主题试试</string>
+    <string name="editor_theme_name_required">请输入主题名称</string>
+    <string name="editor_theme_name_exists">主题名已存在</string>
+    <string name="editor_theme_choose_file">选择主题文件</string>
+    <string name="editor_theme_import_hint">支持 .json（VS Code 主题）或 .tmTheme 文件</string>
+
+    <!-- 颜色字段 -->
+    <string name="editor_color_editor_background">背景</string>
+    <string name="editor_color_editor_foreground">前景</string>
+    <string name="editor_color_line_number">行号</string>
+    <string name="editor_color_line_highlight">当前行高亮</string>
+    <string name="editor_color_selection">选中</string>
+    <string name="editor_color_cursor">光标</string>
+    <string name="editor_color_keyword">关键字</string>
+    <string name="editor_color_string">字符串</string>
+    <string name="editor_color_comment">注释</string>
+    <string name="editor_color_number">数字</string>
+    <string name="editor_color_function">函数</string>
+    <string name="editor_color_type">类型</string>
+    <string name="editor_color_variable">变量</string>
+    <string name="editor_color_operator">操作符</string>
+    <string name="editor_color_constant">常量</string>
+</resources>
