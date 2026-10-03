@@ -97,10 +97,13 @@ jobs:
           fi
           echo "Security gate passed: EncryptedDriverFactory is fully implemented with SQLCipher SupportFactory."
 
-      # CI 跑 Ubuntu runner：自动生成 debug keystore 供 signingConfigs.release/androidDebug 回退使用。
+      # CI 跑 Ubuntu runner：自动生成 debug keystore + keystore.properties 供 signingConfigs 配置阶段通过。
       # 必须放在 Set up JDK 之后（keytool 是 JDK bin 下的工具，JAVA_HOME 未注入前调不到）。
-      # 若 ~/.android/debug.keystore 缺失，AGP 会报 Keystore file not found，本步骤零配置兜底。
-      - name: Generate debug keystore (CI fallback signing)
+      # build.gradle.kts 的 signingConfigs.release 块在配置阶段就会 require(keystore.properties 存在)，
+      # 即使只跑 compileReleaseKotlin 也会触发，因此必须在此步骤创建 app/keystore.properties。
+      # 注意：ci.yml 只跑编译/单测/Lint，不跑 assembleRelease，所以用 debug keystore 兜底是安全的——
+      # 真正的 release 打包签名由 android-release.yml 从 GitHub Secrets 恢复唯一官方密钥完成。
+      - name: Generate debug keystore + keystore.properties (CI config fallback)
         run: |
           set -e
           echo "JAVA_HOME=$JAVA_HOME"
@@ -111,10 +114,19 @@ jobs:
               -storepass android -alias androiddebugkey -keypass android \
               -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
             echo "debug keystore created at ~/.android/debug.keystore"
-            ls -lh ~/.android/debug.keystore
           else
             echo "debug keystore already exists, skip creation"
           fi
+          # 复制 debug keystore 到 app/minime.jks，创建 app/keystore.properties 供配置阶段通过
+          cp ~/.android/debug.keystore app/minime.jks
+          cat > app/keystore.properties << EOF
+          storeFile=minime.jks
+          storePassword=android
+          keyAlias=androiddebugkey
+          keyPassword=android
+          EOF
+          echo "✓ app/keystore.properties 已创建（CI 配置兜底，仅用于编译/单测/Lint，不用于正式打包）"
+          ls -la app/minime.jks app/keystore.properties
 
       - name: Set up Android SDK (use pre-installed + manual install)
         run: |

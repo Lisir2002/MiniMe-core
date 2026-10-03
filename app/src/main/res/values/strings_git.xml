@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="diff_no_changes">无差异</string>
     <string name="diff_binary_file">二进制文件，不支持文本差异对比</string>
     <string name="diff_file_too_large">文件过大，已跳过差异计算</string>
