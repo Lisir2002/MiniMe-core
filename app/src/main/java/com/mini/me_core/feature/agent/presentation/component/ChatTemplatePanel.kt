@@ -1,23 +1,30 @@
 package com.mini.me_core.feature.agent.presentation.component
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -31,107 +38,224 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.mini.me_core.R
+import kotlin.math.roundToInt
 
 /** 一个对话模板。 */
 data class ChatTemplate(
     val name: String,
     val content: String,
     val category: String,
+    val subCategory: String,
     val builtin: Boolean = true,
 )
 
+/** 模板大分类。 */
+data class TemplateCategory(
+    val key: String,
+    val label: String,
+    val subCategories: List<TemplateSubCategory>,
+)
+
+/** 模板子分类。 */
+data class TemplateSubCategory(
+    val key: String,
+    val label: String,
+)
+
 /**
- * MiniMe 对话模板面板（F2.7）。
+ * MiniMe 对话模板面板。
  *
- * BottomSheet 占屏 60% 高：顶部分类 Tab + 搜索框；网格展示内置/自定义模板；
- * 底部「+ 新建模板」。点击模板把内容填入输入框（不自动发送）。
- * 变量 {选中文字}/{剪贴板内容}/{当前时间} 由宿主在填入时替换。
+ * BottomSheet 默认占屏 7/10 高，上滑可全屏；顶部搜索框 + 横向大分类 Tab；
+ * 下方左侧垂直子分类导航，右侧模板卡片网格。点击模板把内容填入输入框。
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatTemplatePanel(
     onDismiss: () -> Unit,
     onUseTemplate: (String) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var selectedCategory by remember { mutableStateOf("all") }
     var query by remember { mutableStateOf("") }
-    // 自定义模板（会话内持久；后续可接 Room/KVStore）
+    var selectedCategory by remember { mutableStateOf("ui_component") }
+    var selectedSubCategory by remember { mutableStateOf<String?>(null) }
+    var isFullScreen by remember { mutableStateOf(false) }
     var customTemplates by remember { mutableStateOf(listOf<ChatTemplate>()) }
     var showEditor by remember { mutableStateOf(false) }
 
+    val categories = remember { templateCategories() }
     val builtin = remember { builtinTemplates() }
     val all = builtin + customTemplates
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(Modifier.padding(horizontal = 16.dp)) {
+    val currentCategory = categories.find { it.key == selectedCategory }
+    val heightFraction by animateFloatAsState(
+        targetValue = if (isFullScreen) 1f else 0.7f,
+        label = "sheetHeight",
+    )
+
+    // 上滑全屏：内容滚动到顶部后继续上滑触发
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(
+                available: androidx.compose.ui.geometry.Offset,
+                source: NestedScrollSource,
+            ): androidx.compose.ui.geometry.Offset {
+                if (available.y < -5f && !isFullScreen && source == NestedScrollSource.Drag) {
+                    isFullScreen = true
+                    return available
+                }
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            Modifier
+                .fillMaxHeight(heightFraction)
+                .nestedScroll(nestedScrollConnection),
+        ) {
+            // 拖拽指示条 + 全屏提示
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+                )
+            }
+
             // 搜索框
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 placeholder = { Text(stringResource(R.string.template_search_hint)) },
                 singleLine = true,
             )
             Spacer(Modifier.height(8.dp))
-            // 分类 Tab
-            val cats = listOf(
-                "all" to stringResource(R.string.template_open),
-                "programming" to stringResource(R.string.template_cat_programming),
-                "writing" to stringResource(R.string.template_cat_writing),
-                "analysis" to stringResource(R.string.template_cat_analysis),
-                "creative" to stringResource(R.string.template_cat_creative),
-                "custom" to stringResource(R.string.template_cat_custom),
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(cats.size) { i ->
-                    val (key, label) = cats[i]
+
+            // 横向大分类 Tab
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 16.dp),
+            ) {
+                items(categories) { cat ->
                     AssistChip(
-                        onClick = { selectedCategory = key },
-                        label = { Text(label) },
+                        onClick = {
+                            selectedCategory = cat.key
+                            selectedSubCategory = null
+                        },
+                        label = { Text(cat.label) },
                     )
                 }
             }
             Spacer(Modifier.height(8.dp))
-            // 模板网格（60% 屏高，可滚动）
-            val filtered = all.filter { t ->
-                (selectedCategory == "all" || t.category == selectedCategory) &&
-                    (query.isBlank() || t.name.contains(query, ignoreCase = true) || t.content.contains(query, ignoreCase = true))
-            }
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.height(320.dp),
+
+            // 左侧垂直子分类导航 + 右侧内容区
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
             ) {
-                items(filtered) { tpl ->
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        onClick = {
-                            onUseTemplate(tpl.content)
-                            onDismiss()
-                        }
+                // 左侧垂直导航
+                currentCategory?.let { cat ->
+                    LazyColumn(
+                        modifier = Modifier
+                            .width(96.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
                     ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(tpl.name, style = MaterialTheme.typography.bodyMedium)
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                tpl.content.take(40),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
+                        item {
+                            SubCategoryNavItem(
+                                label = "全部",
+                                selected = selectedSubCategory == null,
+                                onClick = { selectedSubCategory = null },
+                            )
+                        }
+                        items(cat.subCategories) { sub ->
+                            SubCategoryNavItem(
+                                label = sub.label,
+                                selected = selectedSubCategory == sub.key,
+                                onClick = { selectedSubCategory = sub.key },
                             )
                         }
                     }
                 }
+
+                // 右侧内容区
+                val filtered = all.filter { t ->
+                    t.category == selectedCategory &&
+                        (selectedSubCategory == null || t.subCategory == selectedSubCategory) &&
+                        (query.isBlank() ||
+                            t.name.contains(query, ignoreCase = true) ||
+                            t.content.contains(query, ignoreCase = true))
+                }
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(horizontal = 8.dp),
+                ) {
+                    items(filtered) { tpl ->
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            onClick = {
+                                onUseTemplate(tpl.content)
+                                onDismiss()
+                            },
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(tpl.name, style = MaterialTheme.typography.bodyMedium)
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    tpl.content.take(50),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 3,
+                                )
+                            }
+                        }
+                    }
+                }
             }
+
             // 底部新建按钮
-            TextButton(onClick = { showEditor = true }, modifier = Modifier.fillMaxWidth()) {
+            TextButton(
+                onClick = { showEditor = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Icon(Icons.Rounded.Add, contentDescription = null)
                 Spacer(Modifier.width(4.dp))
                 Text(stringResource(R.string.template_new))
@@ -143,15 +267,52 @@ fun ChatTemplatePanel(
         TemplateEditorSheet(
             onDismiss = { showEditor = false },
             onSave = { name, content ->
-                customTemplates = customTemplates + ChatTemplate(name, content, "custom", builtin = false)
+                customTemplates = customTemplates + ChatTemplate(
+                    name, content, "custom", "custom", builtin = false,
+                )
                 showEditor = false
-            }
+            },
+        )
+    }
+}
+
+/** 子分类导航项。 */
+@Composable
+private fun SubCategoryNavItem(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+    }
+    // 选中指示器
+    if (selected) {
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(24.dp)
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
         )
     }
 }
 
 /** 新建/编辑模板小表单。 */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TemplateEditorSheet(
     onDismiss: () -> Unit,
@@ -160,7 +321,10 @@ private fun TemplateEditorSheet(
     var name by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -172,29 +336,209 @@ private fun TemplateEditorSheet(
                 value = content,
                 onValueChange = { content = it },
                 label = { Text(stringResource(R.string.template_content_hint)) },
-                modifier = Modifier.fillMaxWidth().height(120.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
             )
             TextButton(
                 onClick = { if (name.isNotBlank() && content.isNotBlank()) onSave(name, content) },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(R.string.template_save)) }
         }
     }
 }
 
+/** 模板大分类定义。 */
+private fun templateCategories(): List<TemplateCategory> = listOf(
+    TemplateCategory(
+        key = "ui_component",
+        label = "UI组件",
+        subCategories = listOf(
+            TemplateSubCategory("button", "按钮"),
+            TemplateSubCategory("navbar", "导航栏"),
+            TemplateSubCategory("card", "卡片"),
+            TemplateSubCategory("form", "表单"),
+            TemplateSubCategory("modal", "弹窗"),
+            TemplateSubCategory("table", "表格"),
+            TemplateSubCategory("tabs", "标签页"),
+            TemplateSubCategory("dropdown", "下拉菜单"),
+            TemplateSubCategory("progress", "进度条"),
+            TemplateSubCategory("tooltip", "提示气泡"),
+        ),
+    ),
+    TemplateCategory(
+        key = "layout",
+        label = "页面布局",
+        subCategories = listOf(
+            TemplateSubCategory("dashboard", "仪表盘"),
+            TemplateSubCategory("login", "登录注册"),
+            TemplateSubCategory("detail", "商品详情"),
+            TemplateSubCategory("settings", "设置页面"),
+            TemplateSubCategory("profile", "个人中心"),
+            TemplateSubCategory("empty", "空状态"),
+            TemplateSubCategory("error", "错误页面"),
+        ),
+    ),
+    TemplateCategory(
+        key = "interaction",
+        label = "交互设计",
+        subCategories = listOf(
+            TemplateSubCategory("loading", "加载状态"),
+            TemplateSubCategory("error_handle", "错误处理"),
+            TemplateSubCategory("confirm", "确认对话框"),
+            TemplateSubCategory("pull_refresh", "下拉刷新"),
+            TemplateSubCategory("infinite_scroll", "无限滚动"),
+            TemplateSubCategory("drag_sort", "拖拽排序"),
+        ),
+    ),
+    TemplateCategory(
+        key = "visual",
+        label = "视觉设计",
+        subCategories = listOf(
+            TemplateSubCategory("color", "配色方案"),
+            TemplateSubCategory("typography", "排版系统"),
+            TemplateSubCategory("icon", "图标规范"),
+            TemplateSubCategory("shadow", "阴影系统"),
+            TemplateSubCategory("radius", "圆角系统"),
+            TemplateSubCategory("spacing", "间距系统"),
+        ),
+    ),
+    TemplateCategory(
+        key = "responsive",
+        label = "响应式",
+        subCategories = listOf(
+            TemplateSubCategory("breakpoint", "断点规范"),
+            TemplateSubCategory("mobile", "移动端适配"),
+            TemplateSubCategory("fluid", "流式布局"),
+            TemplateSubCategory("image", "图片响应式"),
+        ),
+    ),
+    TemplateCategory(
+        key = "accessibility",
+        label = "无障碍",
+        subCategories = listOf(
+            TemplateSubCategory("audit", "无障碍审计"),
+            TemplateSubCategory("aria", "ARIA规范"),
+            TemplateSubCategory("keyboard", "键盘导航"),
+            TemplateSubCategory("contrast", "对比度检查"),
+        ),
+    ),
+    TemplateCategory(
+        key = "design_system",
+        label = "设计系统",
+        subCategories = listOf(
+            TemplateSubCategory("build", "设计系统搭建"),
+            TemplateSubCategory("api", "组件API设计"),
+            TemplateSubCategory("theme", "主题切换"),
+            TemplateSubCategory("docs", "组件文档"),
+        ),
+    ),
+    TemplateCategory(
+        key = "animation",
+        label = "动效设计",
+        subCategories = listOf(
+            TemplateSubCategory("enter", "入场动画"),
+            TemplateSubCategory("micro", "微交互"),
+            TemplateSubCategory("loading_anim", "加载动画"),
+            TemplateSubCategory("transition", "页面转场"),
+            TemplateSubCategory("gesture", "手势动画"),
+        ),
+    ),
+    TemplateCategory(
+        key = "mobile",
+        label = "移动端UI",
+        subCategories = listOf(
+            TemplateSubCategory("ios", "iOS规范"),
+            TemplateSubCategory("material", "Material Design"),
+            TemplateSubCategory("bottom_nav", "底部导航"),
+            TemplateSubCategory("gesture_nav", "手势导航"),
+        ),
+    ),
+    TemplateCategory(
+        key = "code_gen",
+        label = "代码生成",
+        subCategories = listOf(
+            TemplateSubCategory("react", "React组件"),
+            TemplateSubCategory("vue", "Vue组件"),
+            TemplateSubCategory("native", "原生组件"),
+            TemplateSubCategory("restore", "页面还原"),
+        ),
+    ),
+)
+
+/** 内置前端UI设计模板。 */
 private fun builtinTemplates(): List<ChatTemplate> = listOf(
-    ChatTemplate("解释这段代码", "请解释以下代码的功能与逻辑：\n\n{选中文字}", "programming"),
-    ChatTemplate("优化性能", "请优化以下代码的性能，说明优化点：\n\n{选中文字}", "programming"),
-    ChatTemplate("添加单元测试", "为以下代码添加单元测试：\n\n{选中文字}", "programming"),
-    ChatTemplate("Code Review", "请对以下代码做 Code Review，指出问题与改进建议：\n\n{选中文字}", "programming"),
-    ChatTemplate("润色文字", "请润色以下文字，使其更通顺专业：\n\n{选中文字}", "writing"),
-    ChatTemplate("翻译为英文", "请将以下内容翻译为英文：\n\n{选中文字}", "writing"),
-    ChatTemplate("总结要点", "请总结以下内容的要点：\n\n{选中文字}", "writing"),
-    ChatTemplate("扩写", "请扩写以下内容，丰富细节：\n\n{选中文字}", "writing"),
-    ChatTemplate("SWOT 分析", "请对以下主题做 SWOT 分析：{选中文字}", "analysis"),
-    ChatTemplate("列出优缺点", "请列出以下方案的优缺点：{选中文字}", "analysis"),
-    ChatTemplate("对比方案", "请对比方案 A 与方案 B 的优劣：{选中文字}", "analysis"),
-    ChatTemplate("头脑风暴", "请围绕以下主题头脑风暴，给出多个创意：{选中文字}", "creative"),
-    ChatTemplate("写一首诗", "请以「{选中文字}」为主题写一首诗。", "creative"),
-    ChatTemplate("设计一个产品", "请设计一个解决「{选中文字}」问题的产品，给出核心功能与定位。", "creative"),
+    // ===== UI组件 =====
+    ChatTemplate("按钮组件", "用【框架】+【样式方案】实现一个按钮组件，支持四种状态：默认、悬停、按下、加载中。加载状态禁用按钮并显示旋转动画，焦点状态对键盘用户清晰可见。\n\n{选中文字}", "ui_component", "button"),
+    ChatTemplate("导航栏", "实现一个响应式悬浮导航栏，初始透明背景，滚动时变为毛玻璃效果（半透明+模糊+阴影），移动端折叠为汉堡菜单，带展开动画。\n\n{选中文字}", "ui_component", "navbar"),
+    ChatTemplate("卡片组件", "实现一个信息卡片组件，包含：封面图、标题、描述、标签、操作按钮。支持悬停上浮效果、加载骨架屏、空状态。\n\n{选中文字}", "ui_component", "card"),
+    ChatTemplate("表单组件", "实现一个表单组件，包含：输入框验证（实时+失焦）、错误提示、密码可见切换、下拉选择、日期选择、提交按钮加载态。\n\n{选中文字}", "ui_component", "form"),
+    ChatTemplate("弹窗组件", "实现一个模态弹窗，包含：进入/退出动画、遮罩层点击关闭、ESC键关闭、焦点陷阱、滚动锁定、可定制的头部/内容/底部。\n\n{选中文字}", "ui_component", "modal"),
+    ChatTemplate("表格组件", "实现一个数据表格，支持：排序、筛选、分页、行选择、列宽拖拽、固定表头、空状态、加载状态、响应式横向滚动。\n\n{选中文字}", "ui_component", "table"),
+    ChatTemplate("标签页", "实现一个标签页组件，支持：横向滚动、下划线指示器动画、懒加载、禁用状态、可关闭标签、键盘左右切换。\n\n{选中文字}", "ui_component", "tabs"),
+    ChatTemplate("下拉菜单", "实现一个下拉菜单，支持：多级嵌套、分组、图标、快捷键提示、悬停延迟、点击外部关闭、键盘导航、ARIA属性。\n\n{选中文字}", "ui_component", "dropdown"),
+    ChatTemplate("进度条", "实现一个进度条组件，支持：线性/环形两种样式、动画过渡、不确定状态、百分比文字、自定义颜色。\n\n{选中文字}", "ui_component", "progress"),
+    ChatTemplate("提示气泡", "实现一个 Tooltip 组件，支持：12个方向定位、智能翻转（防止溢出视口）、淡入淡出动画、悬停/点击两种触发、延迟显示。\n\n{选中文字}", "ui_component", "tooltip"),
+
+    // ===== 页面布局 =====
+    ChatTemplate("仪表盘布局", "设计一个数据仪表盘页面，包含：顶部导航栏、侧边菜单、数据卡片网格、图表区域、最近活动列表。响应式：移动端侧边栏折叠为抽屉。\n\n{选中文字}", "layout", "dashboard"),
+    ChatTemplate("登录注册页", "设计一个登录注册页面，左侧品牌展示区（渐变背景+插画+标语），右侧表单区。支持：表单验证、密码强度指示器、第三方登录、忘记密码流程。\n\n{选中文字}", "layout", "login"),
+    ChatTemplate("商品详情页", "设计一个电商商品详情页，包含：图片轮播、商品信息（标题/价格/库存）、规格选择、数量加减、加入购物车/立即购买按钮、商品描述Tab、评价列表。\n\n{选中文字}", "layout", "detail"),
+    ChatTemplate("设置页面", "设计一个设置页面，采用分组列表布局，每组有标题。包含：开关切换、下拉选择、滑块、颜色选择、文件上传、危险操作区（红色确认）。\n\n{选中文字}", "layout", "settings"),
+    ChatTemplate("个人中心", "设计一个个人中心页面，顶部用户信息卡片（头像/昵称/等级/积分），功能入口网格，订单/收藏/历史快捷入口，设置入口。\n\n{选中文字}", "layout", "profile"),
+    ChatTemplate("空状态页面", "设计一组空状态页面：无数据、无网络、搜索无结果、加载失败。每个包含：插画、标题、描述文字、主操作按钮、次操作链接。\n\n{选中文字}", "layout", "empty"),
+    ChatTemplate("错误页面", "设计 404/500 错误页面，包含：错误码大字、友好提示、可能原因、返回首页/重试按钮、搜索框。风格与品牌一致，不显得冷冰冰。\n\n{选中文字}", "layout", "error"),
+
+    // ===== 交互设计 =====
+    ChatTemplate("加载状态", "为以下场景设计加载状态：页面初次加载（骨架屏）、数据刷新（下拉刷新）、按钮提交（按钮内旋转）、图片加载（模糊占位→清晰）、列表加载更多（底部加载指示器）。\n\n{选中文字}", "interaction", "loading"),
+    ChatTemplate("错误处理", "设计表单提交失败的交互：错误信息在字段下方红色显示，顶部显示汇总错误条，支持点击滚动到第一个错误字段，已填数据保留不丢失。\n\n{选中文字}", "interaction", "error_handle"),
+    ChatTemplate("确认对话框", "设计危险操作的二次确认对话框：红色警告图标、操作名称、后果说明、取消按钮（默认聚焦）、确认按钮（红色，需等待3秒才可点击）。\n\n{选中文字}", "interaction", "confirm"),
+    ChatTemplate("下拉刷新", "实现一个下拉刷新组件：下拉时显示箭头+提示文字，达到阈值后变为加载动画，刷新完成显示成功提示，支持自定义颜色和文字。\n\n{选中文字}", "interaction", "pull_refresh"),
+    ChatTemplate("无限滚动", "实现列表无限滚动：滚动到底部自动加载下一页，加载中显示骨架屏，加载失败显示重试按钮，全部加载完显示没有更多了，防抖处理。\n\n{选中文字}", "interaction", "infinite_scroll"),
+    ChatTemplate("拖拽排序", "实现一个可拖拽排序的列表：拖拽时项上浮+阴影，放置位置有指示线，支持触摸和鼠标，动画平滑，排序后有震动反馈（移动端）。\n\n{选中文字}", "interaction", "drag_sort"),
+
+    // ===== 视觉设计 =====
+    ChatTemplate("配色方案", "为【产品类型】设计一套配色方案，包含：主色、辅助色、强调色、中性色（文字/背景/边框，各5档）、系统色（成功/警告/错误/信息）。给出HEX值、使用场景、对比度验证。\n\n{选中文字}", "visual", "color"),
+    ChatTemplate("排版系统", "设计一套字体排版系统，包含：标题（H1-H6，字号/字重/行高）、正文（大/中/小）、辅助文字、按钮文字、代码字体。给出具体数值和使用场景。\n\n{选中文字}", "visual", "typography"),
+    ChatTemplate("图标规范", "设计一套图标规范：尺寸（16/20/24/32px）、线条粗细（1.5px/2px）、圆角、视觉重量统一、描边vs填充使用规则、状态变化（默认/悬停/激活/禁用）。\n\n{选中文字}", "visual", "icon"),
+    ChatTemplate("阴影系统", "设计一套阴影层级：sm（轻微悬浮）、md（卡片）、lg（弹窗）、xl（模态框）。给出具体的box-shadow值，包含深色模式适配。\n\n{选中文字}", "visual", "shadow"),
+    ChatTemplate("圆角系统", "设计一套圆角规范：xs（4px，标签）、sm（8px，按钮/输入框）、md（12px，卡片）、lg（16px，弹窗）、xl（24px，大卡片）、full（圆形）。\n\n{选中文字}", "visual", "radius"),
+    ChatTemplate("间距系统", "设计一套8px基准的间距系统：0/4/8/12/16/20/24/32/40/48/64/80/96/128px。说明每个尺寸的典型使用场景。\n\n{选中文字}", "visual", "spacing"),
+
+    // ===== 响应式 =====
+    ChatTemplate("断点规范", "定义一套响应式断点：sm（640px，手机横屏）、md（768px，平板）、lg（1024px，小桌面）、xl（1280px，桌面）、2xl（1536px，大桌面）。说明每个断点的布局变化策略。\n\n{选中文字}", "responsive", "breakpoint"),
+    ChatTemplate("移动端适配", "将这个桌面端页面适配为移动端：导航栏折叠为汉堡菜单，多列布局改为单列，表格改为卡片列表，侧边栏改为底部抽屉，按钮尺寸增大到44px触控目标。\n\n{选中文字}", "responsive", "mobile"),
+    ChatTemplate("流式布局", "实现一个流式布局页面：使用CSS Grid的auto-fit+minmax，卡片数量随视口宽度自动调整，图片等比缩放，文字大小用clamp()流式变化。\n\n{选中文字}", "responsive", "fluid"),
+    ChatTemplate("图片响应式", "实现响应式图片方案：使用srcset提供多倍图，picture元素根据视口切换不同裁剪比例，loading=lazy懒加载，模糊占位渐显效果。\n\n{选中文字}", "responsive", "image"),
+
+    // ===== 无障碍 =====
+    ChatTemplate("无障碍审计", "审查以下组件的WCAG 2.2 AA合规性：检查ARIA标签、颜色对比度（至少4.5:1）、键盘导航、焦点可见性、语义化HTML、屏幕阅读器兼容性、表单标签关联。列出问题并给出修复代码。\n\n{选中文字}", "accessibility", "audit"),
+    ChatTemplate("ARIA规范", "为以下交互组件添加正确的ARIA属性：标签页（role=tablist/tab/tabpanel）、折叠面板（aria-expanded）、模态框（role=dialog+aria-modal）、菜单（role=menu/menuitem）、进度条（role=progressbar）。\n\n{选中文字}", "accessibility", "aria"),
+    ChatTemplate("键盘导航", "确保以下组件支持完整键盘导航：Tab键顺序合理、Enter/Space激活、Esc关闭弹窗、方向键在菜单/标签页间移动、焦点陷阱（模态框内）、焦点状态清晰可见、跳过导航链接。\n\n{选中文字}", "accessibility", "keyboard"),
+    ChatTemplate("对比度检查", "检查以下配色组合的对比度：文字与背景（正文至少4.5:1，大文字至少3:1）、UI组件与背景（至少3:1）、图形与背景（至少3:1）。不达标给出调整建议。\n\n{选中文字}", "accessibility", "contrast"),
+
+    // ===== 设计系统 =====
+    ChatTemplate("设计系统搭建", "为【产品类型】搭建一套完整设计系统，包含：设计令牌（颜色/字体/间距/圆角/阴影/动效）、基础组件（按钮/输入框/卡片/标签/图标）、复合组件（导航/表单/表格/弹窗）、页面模板、使用规范文档。\n\n{选中文字}", "design_system", "build"),
+    ChatTemplate("组件API设计", "为【组件名】设计一套完整的组件API：Props列表（名称/类型/默认值/说明）、事件列表、插槽/children、方法、CSS变量（可定制点）、TypeScript类型定义。附使用示例。\n\n{选中文字}", "design_system", "api"),
+    ChatTemplate("主题切换", "实现一个完整的主题切换系统：支持浅色/深色/跟随系统，CSS变量驱动，切换有平滑过渡动画，用户偏好持久化存储，首次访问根据系统设置自动选择，所有组件适配两种主题。\n\n{选中文字}", "design_system", "theme"),
+    ChatTemplate("组件文档", "为以下组件编写完整文档：组件介绍、何时使用、Props/事件/方法说明、基础用法示例、多种状态展示、自定义样式示例、无障碍说明、设计规范（尺寸/间距/颜色）。\n\n{选中文字}", "design_system", "docs"),
+
+    // ===== 动效设计 =====
+    ChatTemplate("入场动画", "设计一组页面/元素入场动画：淡入（opacity 0→1，300ms ease-out）、上滑（translateY 20px→0，400ms ease-out）、缩放（scale 0.9→1，300ms）、左滑/右滑。支持交错延迟（stagger）。\n\n{选中文字}", "animation", "enter"),
+    ChatTemplate("微交互", "为以下元素设计微交互动画：按钮按下（scale 0.97）、收藏/点赞（心形弹跳+粒子）、开关切换（滑块滑动+颜色过渡）、标签选择（下划线动画）、下拉展开（高度auto动画）。\n\n{选中文字}", "animation", "micro"),
+    ChatTemplate("加载动画", "设计一组加载动画：旋转圆环（经典）、脉冲点（三个点依次缩放）、进度条（indeterminate来回滑动）、骨架屏（微光扫过）、品牌Logo动画（粒子聚合）。\n\n{选中文字}", "animation", "loading_anim"),
+    ChatTemplate("页面转场", "设计页面切换转场动画：淡入淡出、左滑进入/右滑退出、向上覆盖、共享元素过渡（图片从列表到详情）。确保动画时长不超过300ms，不影响可访问性（尊重prefers-reduced-motion）。\n\n{选中文字}", "animation", "transition"),
+    ChatTemplate("手势动画", "实现移动端手势交互动画：左滑删除（露出删除按钮+回弹）、下拉刷新（橡皮筋效果）、双指缩放（图片缩放+边界回弹）、长按菜单（震动+弹出）。\n\n{选中文字}", "animation", "gesture"),
+
+    // ===== 移动端UI =====
+    ChatTemplate("iOS规范", "按照iOS Human Interface Guidelines设计页面：使用SF Pro字体、安全区域适配（刘海/灵动岛）、大标题导航栏、毛玻璃效果、圆角20px、手势返回、Haptic Feedback。\n\n{选中文字}", "mobile", "ios"),
+    ChatTemplate("Material Design", "按照Material Design 3设计页面：使用Roboto字体、Material You动态取色、FAB按钮、底部导航栏、波纹效果（ripple）、高程阴影、形状（大/中/小圆角）、snackbar提示。\n\n{选中文字}", "mobile", "material"),
+    ChatTemplate("底部导航", "实现一个移动端底部导航栏：3-5个图标+文字，选中状态高亮+动画，中间可放置凸起的主操作按钮，安全区域适配，切换页面有过渡动画，badge红点提示。\n\n{选中文字}", "mobile", "bottom_nav"),
+    ChatTemplate("手势导航", "实现全面屏手势导航：左边缘右滑返回、底部上滑回桌面、底部上滑停顿多任务、与页面内横向滚动冲突的处理（边缘20px判定为返回手势）。\n\n{选中文字}", "mobile", "gesture_nav"),
+
+    // ===== 代码生成 =====
+    ChatTemplate("React组件", "用React + TypeScript + Tailwind CSS实现【组件名】，要求：函数组件+hooks、完整TypeScript类型、props默认值、forwardRef支持、所有交互状态、无障碍ARIA、单元测试、使用示例。\n\n{选中文字}", "code_gen", "react"),
+    ChatTemplate("Vue组件", "用Vue 3 + TypeScript + script setup实现【组件名】，要求：defineProps/defineEmits类型、v-model支持、插槽、生命周期、过渡动画、CSS变量主题、使用示例。\n\n{选中文字}", "code_gen", "vue"),
+    ChatTemplate("原生组件", "用原生HTML + CSS + JavaScript实现【组件名】，要求：无框架依赖、ES6+语法、CSS变量可定制、事件委托、性能优化（防抖/节流）、兼容现代浏览器。\n\n{选中文字}", "code_gen", "native"),
+    ChatTemplate("页面还原", "根据以下设计图/描述，用【技术栈】1:1还原页面。要求：语义化HTML结构、CSS布局方法、所有视觉状态（默认/悬停/焦点/按下/禁用）、精确尺寸间距、动画过渡、响应式行为。\n\n{选中文字}", "code_gen", "restore"),
 )
