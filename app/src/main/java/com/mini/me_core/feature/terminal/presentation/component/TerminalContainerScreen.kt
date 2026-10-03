@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Refresh
@@ -108,6 +109,8 @@ import com.mini.me_core.feature.terminal.data.repository.ScrollbackLines
 import com.mini.me_core.feature.terminal.data.repository.SshHeartbeatSeconds
 import com.mini.me_core.feature.terminal.data.repository.TerminalFontSizes
 import com.mini.me_core.feature.terminal.data.repository.TerminalTheme
+import com.mini.me_core.feature.terminal.data.bundle.BundleInstallState
+import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId
 import com.mini.me_core.feature.terminal.domain.ContainerFileEntry
 import com.mini.me_core.feature.terminal.presentation.TerminalSettingsViewModel
 import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
@@ -159,6 +162,8 @@ fun TerminalContainerScreen(
     val sshAutoReconnect by viewModel.sshAutoReconnect.collectAsStateWithLifecycle()
     val sshHeartbeat by viewModel.sshHeartbeatSeconds.collectAsStateWithLifecycle()
     val sshKeepalive by viewModel.sshKeepalive.collectAsStateWithLifecycle()
+    val bundleStates by viewModel.bundleStates.collectAsStateWithLifecycle()
+    val aiAllInstalled by viewModel.aiRecommendedAllInstalled.collectAsStateWithLifecycle()
 
     val errorToast by viewModel.errorToast.collectAsStateWithLifecycle()
     val successToast by viewModel.successToast.collectAsStateWithLifecycle()
@@ -393,6 +398,10 @@ fun TerminalContainerScreen(
                         onHeartbeatClick = { showHeartbeatPicker = true },
                         onSshHostsClick = onNavigateToSshHosts,
                         onRestoreDefaultsClick = { showRestoreDefaultsConfirm = true },
+                        bundleStates = bundleStates,
+                        bundleCount = viewModel.bundles().size,
+                        aiAllInstalled = aiAllInstalled,
+                        onNavigateToBundleManager = onNavigateToBundleManager,
                     )
                 }
             }
@@ -844,6 +853,10 @@ private fun TerminalTabContent(
     onHeartbeatClick: () -> Unit,
     onSshHostsClick: () -> Unit,
     onRestoreDefaultsClick: () -> Unit,
+    bundleStates: Map<TerminalBundleId, BundleInstallState>,
+    bundleCount: Int,
+    aiAllInstalled: Boolean,
+    onNavigateToBundleManager: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -852,6 +865,19 @@ private fun TerminalTabContent(
             .padding(vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
+        // 功能包管理入口
+        AppSectionHeader(title = stringResource(R.string.ui_______b37d4c61))
+        AppSectionGroup {
+            val installedBundleCount = bundleStates.count { it.value is BundleInstallState.Installed }
+            AppListItem(
+                icon = Icons.Rounded.Inventory2,
+                title = stringResource(R.string.ui_______dbda4e51_2),
+                subtitle = "官方 Bundle · 共 $bundleCount 个，已安装 $installedBundleCount${if (aiAllInstalled) " · AI 组合已就绪" else ""}",
+                onViewClick = onNavigateToBundleManager,
+                showDivider = false
+            )
+        }
+
         // G1 外观
         AppSectionHeader(title = stringResource(R.string.terminal_appearance))
         AppSectionGroup {
