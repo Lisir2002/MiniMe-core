@@ -20,6 +20,8 @@ import com.mini.me_core.feature.browser.domain.BrowserTakeoverManager
 import com.mini.me_core.feature.browser.domain.SnapshotLevel
 import com.mini.me_core.feature.workspace.domain.WorkspacePathMapper
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -77,7 +79,16 @@ class BrowserAgentTool @Inject constructor(
         const val TAG = "BrowserAgentTool"
         const val MAX_ELEMENTS = 120
         const val MAX_TEXT = 8000
+        // 全局操作超时：防止 WebView 无响应时协程永久挂起（如本地服务器断开后 click 卡死）
+        const val GLOBAL_TIMEOUT_MS = 30_000L
+        // 连续失败熔断阈值：达到后拒绝继续操作，提示模型检查页面状态，避免死循环
+        const val FAILURE_CIRCUIT_THRESHOLD = 3
     }
+
+    // 连续失败计数：成功时重置，失败时递增，达到阈值后触发熔断
+    @Volatile private var consecutiveFailures = 0
+    // 熔断状态标记：熔断后所有操作直接返回错误，直到页面恢复（navigate/view 成功自动重置）
+    @Volatile private var circuitBroken = false
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -414,97 +425,181 @@ class BrowserAgentTool @Inject constructor(
 
     override suspend fun execute(args: Map<String, JsonElement>): ToolResult {
         val action = args["action"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("缺少 action 参数", "MISSING_ACTION")
+
+        // 熔断检查：连续失败达到阈值后，除 navigate/view 外的操作直接拒绝，
+        // 防止模型在页面无响应时无限重试形成死循环。
+        // navigate/view 允许通过，因为它们可能恢复页面状态。
+        if (circuitBroken && action !in setOf("navigate", "view", "snapshot", "reload", "back", "forward")) {
+            return ToolResult.Error(
+                "浏览器操作已熔断：连续 $FAILURE_CIRCUIT_THRESHOLD 次操作失败，页面可能无响应或服务器已断开。" +
+                    "请先调用 navigate 或 view 检查页面状态，确认页面恢复后再继续操作。",
+                "CIRCUIT_BROKEN"
+            )
+        }
+
         return try {
-            when (action) {
-                "navigate" -> doNavigate(args)
-                "view" -> doView(args)
-                "snapshot" -> doSnapshot(args)
-                "page_text" -> doPageText()
-                "extract" -> doExtract(args)
-                "click" -> doClick(args)
-                "type" -> doType(args)
-                "fill_form" -> doFillForm(args)
-                "select_option" -> doSelect(args)
-                "submit" -> doSubmit(args)
-                "scroll" -> doScroll(args)
-                "hover" -> doHover(args)
-                "drag" -> doDrag(args)
-                "press_key" -> doPressKey(args)
-                "upload_file" -> doUploadFile(args)
-                "back" -> doNavigation("back", browserController.back())
-                "forward" -> doNavigation("forward", browserController.forward())
-                "reload" -> doNavigation("reload", browserController.reloadPage())
-                "screenshot" -> doScreenshot(args)
-                "evaluate" -> doEvaluate(args)
-                "wait_for" -> doWaitFor(args)
-                "wait_for_change" -> doWaitForChange(args)
-                "wait_for_network_idle" -> doWaitForNetworkIdle(args)
-                "history" -> doHistory()
-                "get_attribute" -> doGetAttribute(args)
-                "handle_dialog" -> doHandleDialog(args)
-                "login" -> doLogin()
-                "takeover" -> doTakeover(args)
-                "new_tab" -> doNewTab(args)
-                "switch_tab" -> doSwitchTab(args)
-                "close_tab" -> doCloseTab(args)
-                "list_tabs" -> doListTabs()
-                "downloads" -> doListDownloads()
-                "network" -> doNetwork(args)
-                "network_get" -> doNetworkGet(args)
-                "wait_for_request" -> doWaitForRequest(args)
-                // 第一批：反爬虫核心
-                "snapshot_shadow" -> doSnapshotShadow(args)
-                "list_iframes" -> doListIframes()
-                "iframe_action" -> doIframeAction(args)
-                "intercept_api" -> doInterceptApi()
-                "list_api_calls" -> doListApiCalls(args)
-                "replay_api" -> doReplayApi(args)
-                "wait_for_render_complete" -> doWaitForRenderComplete(args)
-                "detect_rendering_type" -> doDetectRenderingType()
-                "apply_stealth" -> doApplyStealth(args)
-                "deobfuscate" -> doDeobfuscate(args)
-                "extract_clean_text" -> doExtractCleanText()
-                "paginate_extract" -> doPaginateExtract(args)
-                "infinite_scroll_extract" -> doInfiniteScrollExtract(args)
-                // 第二批：自动化与健壮性
-                "safe_click" -> doSafeClick(args)
-                "human_type" -> doHumanType(args)
-                "macro_record" -> doMacroRecord(args)
-                "macro_playback" -> doMacroPlayback(args)
-                "macro_list" -> doMacroList()
-                "macro_clear" -> doMacroClear()
-                "set_request_interval" -> doSetRequestInterval(args)
-                "set_user_agent" -> doSetUserAgent(args)
-                "list_user_agents" -> doListUserAgents()
-                "action_chain" -> doActionChain(args)
-                // 第三批：会话与闭环
-                "save_session" -> doSaveSession()
-                "restore_session" -> doRestoreSession(args)
-                "list_sessions" -> doListSessions()
-                "clear_data" -> doClearData(args)
-                "set_incognito" -> doSetIncognito(args)
-                "wait_for_download" -> doWaitForDownload(args)
-                "download_to_workspace" -> doDownloadToWorkspace(args)
-                "upload_from_url" -> doUploadFromUrl(args)
-                "detect_captcha" -> doDetectCaptcha()
-                "permission_audit" -> doPermissionAudit()
-                "block_resource" -> doBlockResource(args)
-                "operation_log" -> doOperationLog(args)
-                "screenshot_full_page" -> doScreenshotFullPage()
-                // 第四批：SPA 专项
-                "detect_framework" -> doDetectFramework()
-                "extract_ssr_data" -> doExtractSsrData()
-                "extract_framework_state" -> doExtractFrameworkState()
-                "detect_virtual_list" -> doDetectVirtualList()
-                "spa_navigate" -> doSpaNavigate(args)
-                "api_paginate" -> doApiPaginate(args)
-                else -> ToolResult.Error("未知动作: $action", "UNKNOWN_ACTION")
+            // 全局超时保护：防止 WebView 无响应时协程永久挂起
+            // （如本地服务器断开后，click/type 等操作在 WebView 层无限等待）
+            withTimeout(GLOBAL_TIMEOUT_MS) {
+                val result = when (action) {
+                    "navigate" -> doNavigate(args)
+                    "view" -> doView(args)
+                    "snapshot" -> doSnapshot(args)
+                    "page_text" -> doPageText()
+                    "extract" -> doExtract(args)
+                    "click" -> doClick(args)
+                    "type" -> doType(args)
+                    "fill_form" -> doFillForm(args)
+                    "select_option" -> doSelect(args)
+                    "submit" -> doSubmit(args)
+                    "scroll" -> doScroll(args)
+                    "hover" -> doHover(args)
+                    "drag" -> doDrag(args)
+                    "press_key" -> doPressKey(args)
+                    "upload_file" -> doUploadFile(args)
+                    "back" -> doNavigation("back", browserController.back())
+                    "forward" -> doNavigation("forward", browserController.forward())
+                    "reload" -> doNavigation("reload", browserController.reloadPage())
+                    "screenshot" -> doScreenshot(args)
+                    "evaluate" -> doEvaluate(args)
+                    "wait_for" -> doWaitFor(args)
+                    "wait_for_change" -> doWaitForChange(args)
+                    "wait_for_network_idle" -> doWaitForNetworkIdle(args)
+                    "history" -> doHistory()
+                    "get_attribute" -> doGetAttribute(args)
+                    "handle_dialog" -> doHandleDialog(args)
+                    "login" -> doLogin()
+                    "takeover" -> doTakeover(args)
+                    "new_tab" -> doNewTab(args)
+                    "switch_tab" -> doSwitchTab(args)
+                    "close_tab" -> doCloseTab(args)
+                    "list_tabs" -> doListTabs()
+                    "downloads" -> doListDownloads()
+                    "network" -> doNetwork(args)
+                    "network_get" -> doNetworkGet(args)
+                    "wait_for_request" -> doWaitForRequest(args)
+                    "snapshot_shadow" -> doSnapshotShadow(args)
+                    "list_iframes" -> doListIframes()
+                    "iframe_action" -> doIframeAction(args)
+                    "intercept_api" -> doInterceptApi()
+                    "list_api_calls" -> doListApiCalls(args)
+                    "replay_api" -> doReplayApi(args)
+                    "wait_for_render_complete" -> doWaitForRenderComplete(args)
+                    "detect_rendering_type" -> doDetectRenderingType()
+                    "apply_stealth" -> doApplyStealth(args)
+                    "deobfuscate" -> doDeobfuscate(args)
+                    "extract_clean_text" -> doExtractCleanText()
+                    "paginate_extract" -> doPaginateExtract(args)
+                    "infinite_scroll_extract" -> doInfiniteScrollExtract(args)
+                    "safe_click" -> doSafeClick(args)
+                    "human_type" -> doHumanType(args)
+                    "macro_record" -> doMacroRecord(args)
+                    "macro_playback" -> doMacroPlayback(args)
+                    "macro_list" -> doMacroList()
+                    "macro_clear" -> doMacroClear()
+                    "set_request_interval" -> doSetRequestInterval(args)
+                    "set_user_agent" -> doSetUserAgent(args)
+                    "list_user_agents" -> doListUserAgents()
+                    "action_chain" -> doActionChain(args)
+                    "save_session" -> doSaveSession()
+                    "restore_session" -> doRestoreSession(args)
+                    "list_sessions" -> doListSessions()
+                    "clear_data" -> doClearData(args)
+                    "set_incognito" -> doSetIncognito(args)
+                    "wait_for_download" -> doWaitForDownload(args)
+                    "download_to_workspace" -> doDownloadToWorkspace(args)
+                    "upload_from_url" -> doUploadFromUrl(args)
+                    "detect_captcha" -> doDetectCaptcha()
+                    "permission_audit" -> doPermissionAudit()
+                    "block_resource" -> doBlockResource(args)
+                    "operation_log" -> doOperationLog(args)
+                    "screenshot_full_page" -> doScreenshotFullPage()
+                    "detect_framework" -> doDetectFramework()
+                    "extract_ssr_data" -> doExtractSsrData()
+                    "extract_framework_state" -> doExtractFrameworkState()
+                    "detect_virtual_list" -> doDetectVirtualList()
+                    "spa_navigate" -> doSpaNavigate(args)
+                    "api_paginate" -> doApiPaginate(args)
+                    else -> ToolResult.Error("未知动作: $action", "UNKNOWN_ACTION")
+                }
+                // 操作成功：重置连续失败计数和熔断状态
+                // （navigate/view/snapshot 等读操作成功也视为页面恢复）
+                if (result is ToolResult.Success || (result is ToolResult.Error && result.code == "UNKNOWN_ACTION")) {
+                    consecutiveFailures = 0
+                    circuitBroken = false
+                } else {
+                    // 操作返回业务错误（如元素找不到），计入连续失败
+                    recordFailure(action)
+                }
+                result
             }
+        } catch (e: TimeoutCancellationException) {
+            FileLogger.e(TAG, "browser.$action 超时（${GLOBAL_TIMEOUT_MS}ms）", e)
+            recordFailure(action)
+            ToolResult.Error(
+                "浏览器操作超时（${GLOBAL_TIMEOUT_MS / 1000}秒无响应）：页面可能已卡死或服务器已断开。" +
+                    "建议调用 navigate 重新加载页面，或检查目标服务是否仍在运行。",
+                "TIMEOUT"
+            )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             FileLogger.e(TAG, "browser.$action 失败", e)
-            ToolResult.Error("浏览器操作失败: ${e.message}")
+            recordFailure(action)
+            // 错误分类：根据异常消息判断具体原因，帮助模型做出正确决策而非盲目重试
+            val classified = classifyBrowserError(e, action)
+            ToolResult.Error(classified.first, classified.second)
+        }
+    }
+
+    /**
+     * 记录一次操作失败，达到阈值后触发熔断。
+     */
+    private fun recordFailure(action: String) {
+        consecutiveFailures++
+        if (consecutiveFailures >= FAILURE_CIRCUIT_THRESHOLD) {
+            circuitBroken = true
+            FileLogger.w(TAG, "浏览器操作熔断触发：连续 $consecutiveFailures 次失败（最近动作: $action）")
+        }
+    }
+
+    /**
+     * 浏览器错误分类：根据异常类型和消息判断具体原因，
+     * 返回 (用户可读消息, 错误码)。帮助模型区分"服务器断开"和"元素找不到"，
+     * 避免盲目重试形成死循环。
+     */
+    private fun classifyBrowserError(e: Exception, action: String): Pair<String, String> {
+        val msg = e.message ?: ""
+        val lowerMsg = msg.lowercase()
+
+        return when {
+            // 连接被拒绝：本地服务器或目标服务已停止
+            lowerMsg.contains("connection refused") || lowerMsg.contains("econnrefused") ->
+                "连接被拒绝：目标服务器可能已停止运行（如本地开发服务已断开）。" +
+                    "请确认服务是否仍在运行，或调用 navigate 检查页面状态。" to "CONNECTION_REFUSED"
+
+            // DNS 解析失败
+            lowerMsg.contains("unable to resolve host") || lowerMsg.contains("nodename nor servname") ->
+                "DNS 解析失败：无法解析目标主机名。请检查 URL 是否正确，或网络连接是否正常。" to "DNS_FAILURE"
+
+            // 连接超时
+            lowerMsg.contains("connection timed out") || lowerMsg.contains("etimedout") ->
+                "连接超时：目标服务器响应过慢或不可达。建议稍后重试，或检查网络/代理设置。" to "CONNECTION_TIMEOUT"
+
+            // 页面无响应 / WebView 相关错误
+            lowerMsg.contains("webview") || lowerMsg.contains("page not responding") ||
+                lowerMsg.contains("javascript interface") || lowerMsg.contains("evaluatejavascript") ->
+                "页面无响应：WebView 可能已卡死。建议调用 navigate 或 reload 重新加载页面。" to "PAGE_UNRESPONSIVE"
+
+            // 元素找不到（业务层面的错误，通常可恢复）
+            lowerMsg.contains("not found") || lowerMsg.contains("no such element") ||
+                lowerMsg.contains("unable to locate") ->
+                "元素未找到：页面中不存在指定元素。可能是页面尚未加载完成、元素已变化，或定位描述不准确。" +
+                    "建议先调用 snapshot 查看当前页面结构，再调整元素定位。" to "ELEMENT_NOT_FOUND"
+
+            // 通用错误
+            else ->
+                "浏览器操作失败: $msg" to "UNKNOWN"
         }
     }
 
