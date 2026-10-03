@@ -229,8 +229,18 @@ fun SoraCodeViewer(
         }
     }
 
-    // 二进制文件或加载错误时显示提示，否则显示编辑器
-    if (isBinary) {
+    // 二进制文件或加载错误时显示提示，加载中显示转圈，否则显示编辑器
+    if (!loaded) {
+        androidx.compose.foundation.layout.Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            androidx.compose.material3.CircularProgressIndicator(
+                modifier = Modifier.size(32.dp),
+                strokeWidth = 2.dp
+            )
+        }
+    } else if (isBinary) {
         androidx.compose.foundation.layout.Box(
             modifier = modifier.fillMaxSize(),
             contentAlignment = androidx.compose.ui.Alignment.Center
