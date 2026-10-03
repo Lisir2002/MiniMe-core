@@ -497,6 +497,16 @@ class GitRepository @Inject constructor(
     }
 
     /**
+     * 丢弃工作区全部未提交改动：先 `git reset --hard HEAD` 把暂存区与工作区重置到 HEAD，
+     * 再 `git clean -fd` 删除未跟踪文件与目录。两步均为写命令，据退出码判成败抛
+     * [GitCommandFailureException]。不可逆——仅在用户经二次确认「放弃改动并切换」后调用。
+     */
+    suspend fun discardWorktreeChanges(): String {
+        gitChecked("reset", "--hard", "HEAD")
+        return gitChecked("clean", "-fd")
+    }
+
+    /**
      * 写入提交署名，**优先项目级**：当前工作区（~/workspace/.git/config）已有项目级署名时写 local，
      * 否则写 global（容器 `GIT_CONFIG_GLOBAL=/root/.minime/.gitconfig`，持久挂载，跨 rootfs 升级不丢）作默认。
      * 这样 UI 与终端 `git config user.name` 读到的同一份——优先项目级、无则退全局，对齐 git 自身解析顺序。

@@ -97,4 +97,43 @@
     <string name="git_remote_url">remote.origin.url</string>
     <string name="git_actual_identity_none">git 实际署名：(未配置)</string>
     <string name="git_actual_identity">git 实际署名：%1$s</string>
+
+    <!-- 超时与容器 -->
+    <string name="git_toast_timeout">操作超时，请重试</string>
+    <string name="git_toast_load_stashes_failed">加载 stash 失败: %1$s</string>
+    <string name="git_toast_go_terminal">请前往终端页初始化容器</string>
+
+    <!-- stash 写操作名（runAction 拼「成功/失败」文案用） -->
+    <string name="git_action_stash_push">新建 stash</string>
+    <string name="git_action_stash_pop">恢复 stash</string>
+    <string name="git_action_stash_apply">应用 stash</string>
+    <string name="git_action_stash_drop">删除 stash</string>
+    <string name="git_action_stash_clear">清空 stash</string>
+
+    <!-- stash 区域 -->
+    <string name="git_stash_section">Stash</string>
+    <string name="git_stash_empty">暂无 stash 记录</string>
+    <string name="git_stash_new">新建 stash</string>
+    <string name="git_stash_message_hint">Stash 说明（可选）</string>
+    <string name="git_stash_include_untracked">包含未跟踪文件</string>
+    <string name="git_stash_pop">恢复</string>
+    <string name="git_stash_apply">应用</string>
+    <string name="git_stash_drop">删除</string>
+    <string name="git_stash_clear_all">清空全部</string>
+    <string name="git_stash_index_label">stash@{%1$d}</string>
+    <string name="git_stash_on_branch">在 %1$s 上</string>
+
+    <!-- 危险操作确认对话框 -->
+    <string name="git_danger_delete_branch_title">删除分支？</string>
+    <string name="git_danger_delete_branch_message">分支 %1$s 将被永久删除</string>
+    <string name="git_danger_delete_tag_title">删除标签？</string>
+    <string name="git_danger_delete_tag_message">标签 %1$s 将被永久删除</string>
+    <string name="git_danger_delete_remote_branch_title">删除远程分支？</string>
+    <string name="git_danger_delete_remote_branch_message">远程分支 %1$s 将从远端永久删除</string>
+    <string name="git_danger_stash_drop_title">删除 stash？</string>
+    <string name="git_danger_stash_drop_message">第 %1$d 条 stash 将被永久删除</string>
+    <string name="git_danger_stash_clear_title">清空全部 stash？</string>
+    <string name="git_danger_stash_clear_message">所有 stash 条目将被永久删除且无法恢复</string>
+    <string name="git_danger_input_name_hint">输入名称以确认</string>
+    <string name="git_danger_input_clear_hint">输入 CLEAR 以确认</string>
 </resources>

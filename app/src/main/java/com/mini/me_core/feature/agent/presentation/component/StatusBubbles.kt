@@ -201,32 +201,30 @@ internal const val REASONING_COLLAPSE_LINE_LIMIT = 8
 /**
  * 思考过程可折叠气泡：左对齐、浅色弱化，与正式回复区分。点击标题栏折叠/展开。
  *
- * 折叠判定按行数阈值：超过 [REASONING_COLLAPSE_LINE_LIMIT] 行视为「过长」，自动折叠为
- * 前 N 行 + 「展开剩余 X 行」。流式实时展示时，短文本边想边看，一旦长度越过阈值即自动
- * 折叠（折叠态下新内容仍持续追加，保持折叠不刷屏，用户可随时点开看最新）；落库后的历史
- * 气泡默认折叠，避免刷屏。用户手动 toggle 后以用户选择为准，不再被自动折叠覆盖。
+ * 默认折叠：无论是流式实时思考还是历史消息，气泡默认处于折叠状态，避免刷屏。
+ * 用户点击标题栏可手动展开/折叠，用户选择优先。折叠态显示标题栏 + 内容尾部预览
+ * （超长时显示最后 N 行 +「展开剩余 X 行」）。流式思考中（live=true）时在标题栏
+ * 显示跳动点动画，明确「思考仍在继续」。
  */
 @Composable
 internal fun ReasoningBubble(
     text: String,
-    initiallyExpanded: Boolean = true,
+    initiallyExpanded: Boolean = false,
     cache: MarkdownRenderCache? = null,
-    // 问题23：是否处于「思考仍在进行」阶段（流式思考中且正文尚未开始）。
-    // 为 true 时在内容末尾显示跳动点，明确「思考仍在继续」；思考分块到达的间隙动画不消失。
+    // 是否处于「思考仍在进行」阶段（流式思考中且正文尚未开始）。
+    // 为 true 时在标题栏显示跳动点动画，明确「思考仍在继续」。
     // 一旦正文开始流式（live=false），动画移交给 StreamingBubble，此处不再重复打点。
     live: Boolean = false
 ) {
     var userToggled by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(initiallyExpanded) }
+    var expanded by remember { mutableStateOf(false) }
     val lineCount = remember(text) { text.count { it == '\n' } + 1 }
     val overThreshold = lineCount > REASONING_COLLAPSE_LINE_LIMIT
-    // 自动折叠：仅在用户尚未手动 toggle 过时生效；用户手动展开/折叠后以用户选择为准。
-    // 问题19：流式输出中（initiallyExpanded=true）始终保持展开，不因超长自动折叠；
-    // 流式结束后历史气泡（initiallyExpanded=false）默认折叠，超长时显示尾部 N 行。
+    // 默认折叠：无论流式还是历史消息，用户尚未手动 toggle 时保持折叠；
+    // 用户手动展开/折叠后以用户选择为准。
     val effectiveExpanded = when {
         userToggled -> expanded
-        initiallyExpanded -> true
-        else -> !overThreshold
+        else -> false
     }
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -268,6 +266,11 @@ internal fun ReasoningBubble(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f)
                     )
+                    // 折叠态且流式思考中：标题栏显示跳动点动画
+                    if (live && !effectiveExpanded) {
+                        TypingDots(color = MaterialTheme.colorScheme.primary, dotSize = 4.dp)
+                        Spacer(Modifier.width(Spacing.sm))
+                    }
                     Icon(
                         if (effectiveExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                         contentDescription = if (effectiveExpanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),

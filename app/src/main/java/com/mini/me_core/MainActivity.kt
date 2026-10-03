@@ -127,6 +127,14 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var browserCredentialStore: com.mini.me_core.feature.browser.domain.BrowserCredentialStore
 
+    /** 浏览器实时预览截图管理器：模型操作时截取 WebView 画面供 UI 展示。 */
+    @Inject
+    lateinit var browserPreviewManager: com.mini.me_core.feature.browser.domain.BrowserPreviewManager
+
+    /** 浏览器操作中断控制器：用户可中断当前正在执行的浏览器操作。 */
+    @Inject
+    lateinit var browserOperationController: com.mini.me_core.feature.browser.domain.BrowserOperationController
+
     /** 数据保全通知器：观察哨兵判定结果，数据疑似丢失/包名变更时弹启动级全局告警（D8b）。 */
     @Inject
     lateinit var dataSafetyNotifier: com.mini.me_core.feature.backup.data.DataSafetyNotifier
@@ -252,6 +260,8 @@ class MainActivity : ComponentActivity() {
                             browserLoginPromptManager = browserLoginPromptManager,
                             browserTakeoverManager = browserTakeoverManager,
                             browserCredentialStore = browserCredentialStore,
+                            browserPreviewManager = browserPreviewManager,
+                            browserOperationController = browserOperationController,
                             dataSafetyNotifier = dataSafetyNotifier,
                             currentThemeMode = themeMode,
                             onCycleTheme = cycleTheme
@@ -387,6 +397,8 @@ fun AppNavigation(
     browserLoginPromptManager: com.mini.me_core.feature.browser.domain.BrowserLoginPromptManager,
     browserTakeoverManager: com.mini.me_core.feature.browser.domain.BrowserTakeoverManager,
     browserCredentialStore: com.mini.me_core.feature.browser.domain.BrowserCredentialStore,
+    browserPreviewManager: com.mini.me_core.feature.browser.domain.BrowserPreviewManager,
+    browserOperationController: com.mini.me_core.feature.browser.domain.BrowserOperationController,
     dataSafetyNotifier: com.mini.me_core.feature.backup.data.DataSafetyNotifier,
     currentThemeMode: AppThemeMode,
     onCycleTheme: () -> Unit
@@ -719,6 +731,8 @@ fun AppNavigation(
                     loginPromptManager = browserLoginPromptManager,
                     takeoverManager = browserTakeoverManager,
                     credentialStore = browserCredentialStore,
+                    previewManager = browserPreviewManager,
+                    operationController = browserOperationController,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

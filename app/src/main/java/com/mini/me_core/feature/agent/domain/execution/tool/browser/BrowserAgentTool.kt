@@ -13,6 +13,7 @@ import com.mini.me_core.feature.browser.domain.BrowserDownloadInfo
 import com.mini.me_core.feature.browser.domain.BrowserElement
 import com.mini.me_core.feature.browser.domain.BrowserLoginPromptManager
 import com.mini.me_core.feature.browser.domain.BrowserNetworkRecord
+import com.mini.me_core.feature.browser.domain.BrowserOperationController
 import com.mini.me_core.feature.browser.domain.BrowserPageSnapshot
 import com.mini.me_core.feature.browser.domain.BrowserSnapshotDelta
 import com.mini.me_core.feature.browser.domain.BrowserTabInfo
@@ -80,7 +81,8 @@ class BrowserAgentTool @Inject constructor(
     private val takeoverManager: BrowserTakeoverManager,
     private val pathMapper: WorkspacePathMapper,
     private val fingerprintManager: FingerprintManager,
-    private val antidetectController: AntidetectController
+    private val antidetectController: AntidetectController,
+    private val operationController: BrowserOperationController
 ) : AgentTool() {
 
     private companion object {
@@ -553,10 +555,21 @@ class BrowserAgentTool @Inject constructor(
     override suspend fun execute(args: Map<String, JsonElement>): ToolResult {
         val action = args["action"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("缺少 action 参数", "MISSING_ACTION")
 
+        // 中断检查：如果用户已请求中断，立即返回，不执行任何操作
+        if (operationController.isInterruptRequested()) {
+            browserController.stopLoading()
+            operationController.resetInterrupt()
+            return ToolResult.Error("用户已中断操作", "INTERRUPTED")
+        }
+
+        // 标记操作开始，UI 显示中断按钮
+        operationController.operationStarted()
+
         // 熔断检查：连续失败达到阈值后，除 navigate/view 外的操作直接拒绝，
         // 防止模型在页面无响应时无限重试形成死循环。
         // navigate/view 允许通过，因为它们可能恢复页面状态。
         if (circuitBroken && action !in setOf("navigate", "view", "snapshot", "reload", "back", "forward")) {
+            operationController.operationFinished()
             return ToolResult.Error(
                 "浏览器操作已熔断：连续 $FAILURE_CIRCUIT_THRESHOLD 次操作失败，页面可能无响应或服务器已断开。" +
                     "请先调用 navigate 或 view 检查页面状态，确认页面恢复后再继续操作。",
@@ -568,6 +581,7 @@ class BrowserAgentTool @Inject constructor(
         // 指纹/反爬管理类动作不受限制（便于模型查看状态或执行恢复操作）。
         if (action in BROWSER_INTERACT_ACTIONS && antidetectController.isPaused()) {
             val remain = antidetectController.state.value.pauseRemainingSeconds
+            operationController.operationFinished()
             return ToolResult.Error(
                 "反爬保护已暂停：浏览器操作被暂停 $remain 秒。" +
                     "请等待暂停结束，或调用 antidetect_resume 提前恢复；" +
@@ -577,6 +591,16 @@ class BrowserAgentTool @Inject constructor(
         }
 
         return try {
+            // 耗时操作前再次检查中断信号
+            if (action in setOf("navigate", "click", "type", "fill_form", "submit",
+                    "wait_for", "wait_for_change", "wait_for_network_idle", "wait_for_request",
+                    "wait_for_render_complete", "paginate_extract", "infinite_scroll_extract",
+                    "macro_playback", "action_chain")
+                && operationController.isInterruptRequested()) {
+                browserController.stopLoading()
+                operationController.resetInterrupt()
+                return ToolResult.Error("用户已中断操作", "INTERRUPTED")
+            }
             // 全局超时保护：防止 WebView 无响应时协程永久挂起
             // （如本地服务器断开后，click/type 等操作在 WebView 层无限等待）
             withTimeout(GLOBAL_TIMEOUT_MS) {
@@ -720,6 +744,8 @@ class BrowserAgentTool @Inject constructor(
             // 错误分类：根据异常消息判断具体原因，帮助模型做出正确决策而非盲目重试
             val classified = classifyBrowserError(e, action)
             ToolResult.Error(classified.first, classified.second)
+        } finally {
+            operationController.operationFinished()
         }
     }
 

@@ -55,6 +55,8 @@ import com.mini.me_core.feature.credentials.presentation.component.CredentialLis
 import com.mini.me_core.feature.git.domain.model.GitStatus
 import com.mini.me_core.feature.git.domain.model.GitTab
 import com.mini.me_core.feature.git.presentation.GitViewModel
+import com.mini.me_core.feature.git.presentation.PendingDangerAction
+import com.mini.me_core.feature.git.presentation.PendingCheckout
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.Add
@@ -174,6 +176,11 @@ fun GitScreen(
                 state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
+                state.notReadyHint != null -> ContainerNotReadyCard(
+                    hint = state.notReadyHint ?: "",
+                    onRetry = viewModel::refresh,
+                    onGoToTerminal = viewModel::notifyGoToTerminal
+                )
                 state.notARepo -> NotARepoState(onInit = viewModel::initRepo)
                 else -> when (state.tab) {
                     GitTab.STATUS -> StatusTab(
@@ -181,13 +188,20 @@ fun GitScreen(
                         busy = state.busy,
                         hasRemote = state.hasRemote,
                         hasIdentity = state.hasIdentity,
+                        stashes = state.stashes,
+                        stashLoading = state.stashLoading,
                         onStage = viewModel::stage,
                         onUnstage = viewModel::unstage,
                         onStageAll = viewModel::stageAll,
                         onCommit = { showCommitDialog = true },
                         onPull = viewModel::pull,
                         onPush = viewModel::push,
-                        onFileDiff = viewModel::loadWorktreeDiff
+                        onFileDiff = viewModel::loadWorktreeDiff,
+                        onStashPush = viewModel::stashPush,
+                        onStashPop = viewModel::stashPop,
+                        onStashApply = viewModel::stashApply,
+                        onStashDrop = { viewModel.requestDangerConfirm(PendingDangerAction.StashDrop(it)) },
+                        onStashClear = { viewModel.requestDangerConfirm(PendingDangerAction.StashClear) }
                     )
                     GitTab.BRANCHES -> BranchesTab(
                         branches = state.branches,
@@ -197,11 +211,11 @@ fun GitScreen(
                         checkoutLoading = state.checkoutLoading,
                         onCheckout = viewModel::checkoutBranch,
                         onCreateBranch = viewModel::createBranch,
-                        onDeleteBranch = viewModel::deleteBranch,
-                        onDeleteRemoteBranch = viewModel::deleteRemoteBranch,
+                        onDeleteBranch = { viewModel.requestDangerConfirm(PendingDangerAction.DeleteBranch(it)) },
+                        onDeleteRemoteBranch = { viewModel.requestDangerConfirm(PendingDangerAction.DeleteRemoteBranch(it)) },
                         onRenameBranch = viewModel::renameBranch,
                         onCreateTag = viewModel::createTag,
-                        onDeleteTag = viewModel::deleteTag
+                        onDeleteTag = { viewModel.requestDangerConfirm(PendingDangerAction.DeleteTag(it)) }
                     )
                     GitTab.LOG -> LogTab(
                         graph = state.graph,
@@ -225,6 +239,75 @@ fun GitScreen(
                 showCommitDialog = false
                 viewModel.commit(msg)
             }
+        )
+    }
+
+    // 危险操作二次确认对话框：删除分支/标签/远程分支、删除 stash、清空 stash。
+    state.pendingDanger?.let { danger ->
+        val dlg = when (danger) {
+            is PendingDangerAction.DeleteBranch -> DangerDialogSpec(
+                title = stringResource(R.string.git_danger_delete_branch_title),
+                message = stringResource(R.string.git_danger_delete_branch_message, danger.name),
+                confirmText = stringResource(R.string.common_delete),
+                level = DangerLevel.DANGER,
+                requireInput = danger.name,
+                inputHint = stringResource(R.string.git_danger_input_name_hint)
+            )
+            is PendingDangerAction.DeleteTag -> DangerDialogSpec(
+                title = stringResource(R.string.git_danger_delete_tag_title),
+                message = stringResource(R.string.git_danger_delete_tag_message, danger.name),
+                confirmText = stringResource(R.string.common_delete),
+                level = DangerLevel.WARNING,
+                requireInput = danger.name,
+                inputHint = stringResource(R.string.git_danger_input_name_hint)
+            )
+            is PendingDangerAction.DeleteRemoteBranch -> DangerDialogSpec(
+                title = stringResource(R.string.git_danger_delete_remote_branch_title),
+                message = stringResource(R.string.git_danger_delete_remote_branch_message, danger.ref),
+                confirmText = stringResource(R.string.common_delete),
+                level = DangerLevel.EXTREME,
+                requireInput = danger.ref,
+                inputHint = stringResource(R.string.git_danger_input_name_hint)
+            )
+            is PendingDangerAction.StashDrop -> DangerDialogSpec(
+                title = stringResource(R.string.git_danger_stash_drop_title),
+                message = stringResource(R.string.git_danger_stash_drop_message, danger.index),
+                confirmText = stringResource(R.string.common_delete),
+                level = DangerLevel.DANGER,
+                requireInput = null,
+                inputHint = null
+            )
+            PendingDangerAction.StashClear -> DangerDialogSpec(
+                title = stringResource(R.string.git_danger_stash_clear_title),
+                message = stringResource(R.string.git_danger_stash_clear_message),
+                confirmText = stringResource(R.string.common_clear),
+                level = DangerLevel.EXTREME,
+                requireInput = "CLEAR",
+                inputHint = stringResource(R.string.git_danger_input_clear_hint)
+            )
+        }
+        DangerousActionDialog(
+            title = dlg.title,
+            message = dlg.message,
+            confirmText = dlg.confirmText,
+            dangerLevel = dlg.level,
+            requireInput = dlg.requireInput,
+            inputHint = dlg.inputHint,
+            onConfirm = viewModel::confirmDanger,
+            onDismiss = viewModel::dismissDanger
+        )
+    }
+
+    // 工作区有未提交改动时的分支切换三态确认对话框。
+    state.pendingCheckout?.let { pc: PendingCheckout ->
+        CheckoutConfirmDialog(
+            targetBranch = pc.targetBranch,
+            hasStagedChanges = pc.hasStagedChanges,
+            hasUnstagedChanges = pc.hasUnstagedChanges,
+            hasUntrackedFiles = pc.hasUntrackedFiles,
+            onStashAndSwitch = viewModel::confirmCheckoutStash,
+            onDiscardAndSwitch = viewModel::confirmCheckoutDiscard,
+            onCancel = viewModel::dismissCheckout
         )
     }
 
@@ -358,8 +441,7 @@ private fun NotARepoState(onInit: () -> Unit) {
 }
 
 @Composable
-private fun CommitDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-    var message by remember { mutableStateOf("") }
+private fun CommitDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {    var message by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.git_tab_commits)) },
@@ -381,3 +463,13 @@ private fun CommitDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     )
 }
+
+/** 危险操作确认对话框的展示参数，按待确认动作类型拼装。 */
+private data class DangerDialogSpec(
+    val title: String,
+    val message: String,
+    val confirmText: String,
+    val level: DangerLevel,
+    val requireInput: String?,
+    val inputHint: String?
+)

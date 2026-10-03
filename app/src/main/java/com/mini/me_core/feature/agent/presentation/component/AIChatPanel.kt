@@ -593,8 +593,8 @@ fun AIChatPanel(
                         val reasoningLive = showReasoning && !showStreaming
                         if (showReasoning) {
                             item(key = "__reasoning__", contentType = "tail") {
-                                // 流式实时：短文本默认展开边想边看，过长（超 REASONING_COLLAPSE_LINE_LIMIT）时由气泡内部自动折叠，不刷屏
-                                ReasoningBubble(text = reasoning.orEmpty(), initiallyExpanded = true, cache = markdownCache, live = reasoningLive)
+                                // 流式思考默认折叠，用户点击标题栏可展开查看完整思考过程
+                                ReasoningBubble(text = reasoning.orEmpty(), initiallyExpanded = false, cache = markdownCache, live = reasoningLive)
                             }
                         }
                         val showThinking = !showReasoning && !showStreaming && !isCompacting && isBusy && runningTool.isEmpty() && pendingPermission == null && pendingQuestion == null
