@@ -7,13 +7,18 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,10 +31,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -54,6 +61,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -80,6 +88,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import java.io.File
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
@@ -308,12 +317,18 @@ fun AIChatPanel(
     // 自动滚动跟随
     var positionedSession by remember { mutableStateOf<String?>(null) }
     var followBottom by remember { mutableStateOf(true) }
-    // F2.4：用户上滑后新到达的消息数（用于浮动按钮红色未读角标）
-    var scrolledUpBaseline by remember { mutableStateOf(0) }
-    val unreadCount by remember(followBottom, messages.size, scrolledUpBaseline) {
-        derivedStateOf { if (followBottom) 0 else (messages.size - scrolledUpBaseline).coerceAtLeast(0) }
+    // 用户阅读位置基线：拖拽停止或 fling 结束时记录当前最后可见项索引，
+    // 用于精确计算未读消息数（不再仅在拖拽开始时记录，避免 fling 后计数不准）
+    var readBaselineIndex by remember { mutableStateOf(0) }
+    val unreadCount by remember(followBottom, messages.size, readBaselineIndex) {
+        derivedStateOf {
+            if (followBottom) 0
+            else (messages.size - 1 - readBaselineIndex).coerceAtLeast(0)
+        }
     }
 
+    // 是否在底部：主判断用 canScrollForward（更稳定），辅以末项位置校验，
+    // 阈值 16dp 避免滚动中频繁切换状态
     val isAtBottom by remember {
         derivedStateOf {
             if (!listState.canScrollForward) return@derivedStateOf true
@@ -323,13 +338,24 @@ fun AIChatPanel(
             val lastIndex = layout.totalItemsCount - 1
             val viewportBottom = layout.viewportEndOffset
             lastVisible.index >= lastIndex &&
-                (lastVisible.offset + lastVisible.size) <= viewportBottom + 4
+                (lastVisible.offset + lastVisible.size) <= viewportBottom + 16
         }
     }
 
-    // 问题18：不在底部且有消息时显示「回到底部」浮动按钮
+    // 显示防抖：离开底部 200ms 后才显示（避免 fling 过程中闪烁），
+    // 到达底部 100ms 后再隐藏
+    var showScrollToBottomRaw by remember { mutableStateOf(false) }
     val showScrollToBottom by remember {
-        derivedStateOf { messagesReady && messages.isNotEmpty() && !isAtBottom }
+        derivedStateOf { messagesReady && messages.isNotEmpty() && showScrollToBottomRaw }
+    }
+    LaunchedEffect(isAtBottom, messagesReady) {
+        if (!isAtBottom && messagesReady && messages.isNotEmpty()) {
+            kotlinx.coroutines.delay(200)
+            if (!isAtBottom) showScrollToBottomRaw = true
+        } else {
+            kotlinx.coroutines.delay(100)
+            if (isAtBottom) showScrollToBottomRaw = false
+        }
     }
 
     val autoScrollSignal by rememberUpdatedState(
@@ -345,20 +371,38 @@ fun AIChatPanel(
         )
     )
 
-    // 用户开始拖拽：停止跟随。松手时若已到底则恢复跟随（旧逻辑）。
+    // 用户开始拖拽：停止跟随，记录当前阅读位置基线。
+    // 拖拽停止时若已到底则恢复跟随，否则更新阅读基线为当前最后可见项。
     // 额外：流式输出时内容持续增长，用户可能松手后又被「顶」离底部——
-    // 用 snapshotFlow { isAtBottom } 持续监测，只要滑到底部就恢复跟随，
-    // 满足「流式中滚到底部自动继续跟随」。
+    // 用 snapshotFlow { isAtBottom } 持续监测，只要滑到底部就恢复跟随。
     LaunchedEffect(listState) {
         listState.interactionSource.interactions.collect { interaction ->
             when (interaction) {
                 is DragInteraction.Start -> {
                     followBottom = false
-                    scrolledUpBaseline = messages.size
                 }
-                is DragInteraction.Stop, is DragInteraction.Cancel -> followBottom = isAtBottom
+                is DragInteraction.Stop, is DragInteraction.Cancel -> {
+                    // 拖拽结束后等待一帧让布局稳定，再判断是否在底部
+                    withFrameNanos { }
+                    if (isAtBottom) {
+                        followBottom = true
+                    } else {
+                        // 更新阅读基线为当前最后可见项索引，用于精确未读计数
+                        readBaselineIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    }
+                }
             }
         }
+    }
+    // 滚动停止（fling 结束）时，如果不在底部，更新阅读基线
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .distinctUntilChanged()
+            .collect { scrolling ->
+                if (!scrolling && !isAtBottom && !followBottom) {
+                    readBaselineIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                }
+            }
     }
     LaunchedEffect(listState) {
         snapshotFlow { isAtBottom }.collect { atBottom ->
@@ -607,49 +651,19 @@ fun AIChatPanel(
                     }
                 }
 
-                // F2.4：「↓ 新消息」浮动按钮——用户上滑暂停跟随时显示，48dp 圆形 primary 背景；
-                // 有新消息到达时右上角红色未读角标。
-                if (showScrollToBottom) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = Spacing.md, bottom = Spacing.sm)
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                            .clickable {
-                                followBottom = true
-                                scope.launch {
-                                    snapToBottom(listState.layoutInfo.totalItemsCount - 1)
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = stringResource(R.string.chat_scroll_to_bottom),
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        // 未读角标
-                        if (unreadCount > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .size(16.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.error),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (unreadCount > 99) "99" else unreadCount.toString(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onError,
-                                )
-                            }
+                // 「回到底部」浮动按钮：入场出场动画、药丸/圆形自适应、点击缩放反馈、无障碍增强
+                ScrollToBottomButton(
+                    visible = showScrollToBottom,
+                    unreadCount = unreadCount,
+                    onClick = {
+                        scope.launch {
+                            val targetIndex = listState.layoutInfo.totalItemsCount - 1
+                            snapToBottom(targetIndex)
+                            if (isAtBottom) followBottom = true
                         }
-                    }
-                }
+                    },
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                )
             }
 
             AnimatedVisibility(
@@ -889,6 +903,101 @@ private fun EditingMessageBanner(
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(14.dp)
                 )
+            }
+        }
+    }
+}
+
+/**
+ * 回到底部浮动按钮。
+ *
+ * 特性：
+ * - 入场：淡入 + 从底部上滑 + 缩放；出场：淡出 + 下滑 + 缩放
+ * - 有未读消息时：药丸形状，显示「↓ N条新消息」；无未读时：48dp 圆形仅箭头
+ * - 点击缩放反馈（0.92x），Surface 背景带 4dp 阴影
+ * - 无障碍描述含未读数量，触控目标 ≥48dp
+ */
+@Composable
+private fun ScrollToBottomButton(
+    visible: Boolean,
+    unreadCount: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.padding(end = Spacing.md, bottom = Spacing.sm)
+    ) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(200)) +
+                slideInVertically(tween(200)) { it / 2 } +
+                scaleIn(tween(200)),
+            exit = fadeOut(tween(150)) +
+                slideOutVertically(tween(150)) { it / 3 } +
+                scaleOut(tween(150))
+        ) {
+            var pressed by remember { mutableStateOf(false) }
+            val pressScale by animateFloatAsState(
+                targetValue = if (pressed) 0.92f else 1f,
+                animationSpec = tween(100),
+                label = "scrollButtonPress"
+            )
+            val hasUnread = unreadCount > 0
+            val unreadText = if (unreadCount > 99) "99+" else unreadCount.toString()
+            val contentDesc = if (hasUnread) {
+                "回到底部，有$unreadCount 条新消息"
+            } else {
+                stringResource(R.string.chat_scroll_to_bottom)
+            }
+
+            Surface(
+                modifier = Modifier.scale(pressScale),
+                shape = if (hasUnread) RoundedCornerShape(20.dp) else CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                tonalElevation = 4.dp,
+                shadowElevation = 4.dp
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clickable(
+                            onClick = {
+                                pressed = true
+                                onClick()
+                                kotlinx.coroutines.GlobalScope.launch {
+                                    kotlinx.coroutines.delay(150)
+                                    pressed = false
+                                }
+                            }
+                        )
+                        .then(
+                            if (hasUnread) {
+                                Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                            } else {
+                                Modifier.size(48.dp)
+                            }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = contentDesc,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        if (hasUnread) {
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "$unreadText 条新消息",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+                }
             }
         }
     }
