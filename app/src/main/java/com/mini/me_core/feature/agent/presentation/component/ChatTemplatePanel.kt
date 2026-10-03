@@ -464,6 +464,18 @@ private fun templateCategories(): List<TemplateCategory> = listOf(
             TemplateSubCategory("restore", "页面还原"),
         ),
     ),
+    TemplateCategory(
+        key = "web_style",
+        label = "Web样式",
+        subCategories = listOf(
+            TemplateSubCategory("visual_effect", "视觉特效"),
+            TemplateSubCategory("page_section", "页面区块"),
+            TemplateSubCategory("nav_footer", "导航页脚"),
+            TemplateSubCategory("data_display", "数据展示"),
+            TemplateSubCategory("feedback", "反馈状态"),
+            TemplateSubCategory("form_input", "表单输入"),
+        ),
+    ),
 )
 
 /** 内置前端UI设计模板。 */
@@ -541,4 +553,46 @@ private fun builtinTemplates(): List<ChatTemplate> = listOf(
     ChatTemplate("Vue组件", "用Vue 3 + TypeScript + script setup实现【组件名】，要求：defineProps/defineEmits类型、v-model支持、插槽、生命周期、过渡动画、CSS变量主题、使用示例。\n\n{选中文字}", "code_gen", "vue"),
     ChatTemplate("原生组件", "用原生HTML + CSS + JavaScript实现【组件名】，要求：无框架依赖、ES6+语法、CSS变量可定制、事件委托、性能优化（防抖/节流）、兼容现代浏览器。\n\n{选中文字}", "code_gen", "native"),
     ChatTemplate("页面还原", "根据以下设计图/描述，用【技术栈】1:1还原页面。要求：语义化HTML结构、CSS布局方法、所有视觉状态（默认/悬停/焦点/按下/禁用）、精确尺寸间距、动画过渡、响应式行为。\n\n{选中文字}", "code_gen", "restore"),
+
+    // ===== Web样式 - 视觉特效 =====
+    ChatTemplate("玻璃拟态卡片", "用HTML+CSS实现玻璃拟态（Glassmorphism）卡片：半透明背景rgba(255,255,255,0.1)、backdrop-filter:blur(20px)毛玻璃、1px半透明白色边框、柔和投影、悬停时轻微上浮+边框亮度提升。同时给出浅色和深色两种主题的参数。\n\n{选中文字}", "web_style", "visual_effect"),
+    ChatTemplate("新拟态按钮", "用HTML+CSS实现新拟态（Neumorphism）按钮：背景与页面同色、双向阴影（左上亮阴影+右下暗阴影）、圆角16px、按下状态阴影反转（内凹效果）、过渡动画200ms。给出浅色和深色两套参数。\n\n{选中文字}", "web_style", "visual_effect"),
+    ChatTemplate("渐变文字", "用HTML+CSS实现渐变文字效果：linear-gradient渐变背景、background-clip:text、-webkit-text-fill-color:transparent、背景尺寸200%实现流动动画、悬停时渐变方向变化。支持多色渐变和角度自定义。\n\n{选中文字}", "web_style", "visual_effect"),
+    ChatTemplate("悬停特效按钮", "用HTML+CSS实现5种按钮悬停特效：①填充滑入（背景从左滑入）②光泽扫过（高光从左扫到右）③上浮阴影（translateY+box-shadow）④缩放弹跳（scale+回弹缓动）⑤发光脉冲（box-shadow发光扩散）。每种给出完整代码。\n\n{选中文字}", "web_style", "visual_effect"),
+    ChatTemplate("暗黑模式适配", "用CSS变量实现完整的暗黑模式适配：定义:root和[data-theme=dark]两套颜色变量、文字对比度至少4.5:1、图片用filter:brightness(0.8)降低亮度、阴影改用背景色提亮而非黑色阴影、切换时有300ms过渡动画、尊重prefers-color-scheme系统偏好。\n\n{选中文字}", "web_style", "visual_effect"),
+
+    // ===== Web样式 - 页面区块 =====
+    ChatTemplate("Hero区域", "用HTML+CSS实现产品落地页Hero区域：全屏视口高度、垂直居中、大标题（渐变文字）+副标题+主按钮+次按钮、左侧文字右侧产品截图占位、背景用渐变+网格图案+浮动装饰圆球、入场动画（文字依次淡入上滑）、响应式移动端单列。\n\n{选中文字}", "web_style", "page_section"),
+    ChatTemplate("定价卡片", "用HTML+CSS实现三档定价卡片：基础版/专业版/企业版、中间专业版高亮（放大+边框高亮+最受欢迎徽章）、每卡包含价格（大字号+周期小字）、功能列表（对勾/叉号）、CTA按钮、悬停上浮效果、年度/月度切换标签。\n\n{选中文字}", "web_style", "page_section"),
+    ChatTemplate("评价卡片", "用HTML+CSS实现用户评价卡片：头像（圆形）+姓名+职位+五星评分+引用内容+引号装饰图标、卡片悬停上浮、自动轮播（3秒切换+淡入淡出）、左右箭头导航、底部指示点、响应式移动端单卡、桌面端三卡并排。\n\n{选中文字}", "web_style", "page_section"),
+    ChatTemplate("特性网格", "用HTML+CSS实现产品特性展示网格：三列布局、每格包含图标（圆形渐变背景）+标题+描述、悬停时图标缩放+卡片上浮、图标背景色与主题色一致、偶数格背景交替、移动端单列、平板双列、加入场交错动画。\n\n{选中文字}", "web_style", "page_section"),
+    ChatTemplate("联系表单区块", "用HTML+CSS实现两栏联系区块：左侧联系信息（地址/电话/邮箱/社交图标，带图标）、右侧表单（姓名/邮箱/主题/消息文本域/提交按钮）、表单验证样式（错误红色边框+提示文字、成功绿色）、输入框聚焦时边框高亮+标签上浮。\n\n{选中文字}", "web_style", "page_section"),
+
+    // ===== Web样式 - 导航页脚 =====
+    ChatTemplate("滚动渐变导航栏", "用HTML+CSS+JS实现滚动导航栏：初始透明背景、滚动超过50px后变为毛玻璃背景（backdrop-blur+半透明）+阴影+高度收缩、Logo和导航链接、悬停下划线动画、移动端汉堡菜单（点击展开全屏菜单）、当前页面高亮、平滑滚动到锚点。\n\n{选中文字}", "web_style", "nav_footer"),
+    ChatTemplate("多列页脚", "用HTML+CSS实现多列页脚：4列布局（产品/资源/公司/法律）、每列有标题+链接列表、悬停链接变色+左移、顶部品牌区（Logo+简介+社交图标）、底部版权栏（版权文字+隐私政策链接+回到顶部按钮）、Newsletter订阅框、响应式移动端折叠为手风琴。\n\n{选中文字}", "web_style", "nav_footer"),
+    ChatTemplate("侧边栏导航", "用HTML+CSS实现可折叠侧边栏：固定左侧、宽度240px可收缩到64px（只显示图标）、菜单项（图标+文字）、选中项高亮（左侧指示条+背景色）、悬停背景色、分组标题、底部用户信息卡片、收缩时悬停显示tooltip、主内容区margin自适应。\n\n{选中文字}", "web_style", "nav_footer"),
+    ChatTemplate("面包屑导航", "用HTML+CSS实现面包屑导航：层级链接用斜杠/箭头分隔、当前页加粗不可点击、悬停链接下划线、首页用图标、过长时中间层级省略为...（点击展开）、结构化数据SEO（schema.org/BreadcrumbList）、响应式移动端只显示上一级。\n\n{选中文字}", "web_style", "nav_footer"),
+    ChatTemplate("分页组件", "用HTML+CSS实现分页组件：页码按钮（圆角）、上一页/下一页箭头、当前页高亮（背景色+白色文字）、禁用状态（灰色+不可点击）、省略号...、首尾页快捷跳转、页码数量多时智能省略（始终显示首尾+当前页附近）、悬停效果、响应式移动端简化。\n\n{选中文字}", "web_style", "nav_footer"),
+
+    // ===== Web样式 - 数据展示 =====
+    ChatTemplate("垂直时间线", "用HTML+CSS实现垂直时间线：中间垂直轴线、左右交替排列的卡片、每个节点有圆点（带图标）+日期+标题+内容、卡片悬停上浮、轴线渐变颜色、当前节点高亮（脉冲动画圆点）、移动端全部左对齐（轴线在左侧）、入场动画（卡片从两侧滑入）。\n\n{选中文字}", "web_style", "data_display"),
+    ChatTemplate("步骤条组件", "用HTML+CSS实现步骤条：水平排列的步骤节点（圆形数字）、连接线、三种状态（已完成=绿色对勾+连接线绿色、进行中=主题色+脉冲动画+连接线半满、未开始=灰色）、步骤标题+描述、响应式移动端改为垂直步骤条、支持点击跳转。\n\n{选中文字}", "web_style", "data_display"),
+    ChatTemplate("环形进度条", "用HTML+CSS+SVG实现环形进度条：SVG circle描边动画（stroke-dasharray+stroke-dashoffset）、渐变色描边、中心显示百分比文字（大字号）+标签、动画从0到目标值（1.5秒缓动）、支持多种尺寸、支持多环嵌套、悬停时轻微放大、颜色可配置。\n\n{选中文字}", "web_style", "data_display"),
+    ChatTemplate("数字计数器动画", "用HTML+CSS+JS实现数字滚动计数器：页面滚动到可视区域时触发、数字从0滚动到目标值（缓动函数easeOutQuart）、支持千分位逗号分隔、支持前缀/后缀符号、支持小数位数、持续时间1.5-2秒、多个计数器同时触发、IntersectionObserver实现懒触发。\n\n{选中文字}", "web_style", "data_display"),
+    ChatTemplate("仪表盘统计卡片", "用HTML+CSS实现数据仪表盘统计卡片：四列网格、每卡包含图标（彩色渐变圆形背景）+数值（大字号）+标签+趋势（上升绿色箭头/下降红色箭头+百分比）+迷你折线图（sparkline）、悬停上浮+阴影加深、数值动画滚动、不同指标用不同主题色、响应式移动端单列。\n\n{选中文字}", "web_style", "data_display"),
+
+    // ===== Web样式 - 反馈状态 =====
+    ChatTemplate("Toast通知", "用HTML+CSS+JS实现Toast通知组件：右上角堆叠、四种类型（成功=绿色对勾/错误=红色叉号/警告=黄色感叹号/信息=蓝色i）、图标+标题+描述+关闭按钮、底部进度条（倒计时自动消失）、入场动画（从右滑入+淡入）、出场动画（滑出+淡出）、悬停暂停倒计时、最多同时显示3条。\n\n{选中文字}", "web_style", "feedback"),
+    ChatTemplate("骨架屏加载", "用HTML+CSS实现骨架屏加载动画：灰色占位块（圆角）+微光扫过动画（linear-gradient从左到右移动）、多种布局模板（文章列表/卡片网格/详情页/表格）、与真实内容布局1:1对应、动画循环1.5秒、加载完成后骨架淡出+内容淡入、prefers-reduced-motion时禁用动画。\n\n{选中文字}", "web_style", "feedback"),
+    ChatTemplate("404错误页面", "用HTML+CSS实现404错误页面：居中布局、超大404数字（渐变文字+动画）、插画/图标、友好提示文案（不要只说404）、可能原因列表、搜索框、返回首页按钮、最近文章推荐、动画（数字浮动+背景粒子）、响应式、与网站整体风格一致。\n\n{选中文字}", "web_style", "feedback"),
+    ChatTemplate("空状态页面", "用HTML+CSS实现一组空状态页面：无数据/无网络/搜索无结果/加载失败/首次使用引导。每个包含：插画（线性风格）+标题+描述文字+主操作按钮+次操作链接、插画动画（轻微浮动）、按钮悬停效果、响应式居中、颜色与主题一致、文案友好不冷冰冰。\n\n{选中文字}", "web_style", "feedback"),
+    ChatTemplate("手风琴折叠面板", "用HTML+CSS+JS实现手风琴组件：多个折叠项、每项有标题栏（标题+图标+右侧箭头）+内容区、点击标题展开/收起（高度从0到auto平滑动画）、展开时箭头旋转180度、同时只展开一项或可多项配置、内容区padding、标题悬停背景色、无障碍属性（aria-expanded/aria-controls）、键盘支持。\n\n{选中文字}", "web_style", "feedback"),
+
+    // ===== Web样式 - 表单输入 =====
+    ChatTemplate("浮动标签输入框", "用HTML+CSS实现浮动标签输入框：标签初始在输入框内（灰色）、聚焦或有内容时标签上浮到边框上方（缩小字号+变主题色）、边框聚焦时高亮、错误状态（红色边框+红色标签+下方错误提示）、成功状态（绿色边框+对勾图标）、过渡动画200ms、支持文本域/选择框。\n\n{选中文字}", "web_style", "form_input"),
+    ChatTemplate("搜索框组件", "用HTML+CSS+JS实现搜索框：左侧搜索图标、输入框、右侧清除按钮（有内容时显示，点击清空）、聚焦时边框高亮+轻微放大、输入时显示下拉建议列表（匹配文字高亮+最近搜索+热门搜索）、键盘上下键选择+回车确认、加载中显示旋转图标、响应式移动端全屏搜索。\n\n{选中文字}", "web_style", "form_input"),
+    ChatTemplate("文件上传拖拽区", "用HTML+CSS+JS实现文件上传组件：拖拽区域（虚线边框+上传图标+提示文字）、拖拽文件进入时边框高亮+背景色变化+图标动画、点击选择文件、文件列表（文件名+大小+进度条+删除按钮）、上传中进度条动画、上传成功绿色对勾、上传失败红色重试、支持多文件、限制文件类型和大小提示。\n\n{选中文字}", "web_style", "form_input"),
+    ChatTemplate("登录注册分栏页", "用HTML+CSS实现登录注册分栏页面：左侧品牌区（渐变背景+Logo+大标题+卖点列表+装饰图形）、右侧表单区（居中卡片、Tab切换登录/注册、表单输入框、记住我+忘记密码、提交按钮、第三方登录分隔线+图标按钮、底部注册/登录链接）、表单验证、响应式移动端隐藏左侧。\n\n{选中文字}", "web_style", "form_input"),
+    ChatTemplate("开关切换组件", "用HTML+CSS实现开关（Toggle）组件：轨道（圆角胶囊）+滑块（圆形）、点击切换、开状态=主题色背景+滑块在右、关状态=灰色背景+滑块在左、过渡动画200ms ease-in-out、滑块悬停时轻微放大、禁用状态（半透明+不可点击）、带文字标签、支持不同尺寸、无障碍role=switch+aria-checked。\n\n{选中文字}", "web_style", "form_input"),
 )
