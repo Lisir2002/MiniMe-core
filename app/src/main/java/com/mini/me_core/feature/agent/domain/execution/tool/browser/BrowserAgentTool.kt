@@ -18,6 +18,12 @@ import com.mini.me_core.feature.browser.domain.BrowserSnapshotDelta
 import com.mini.me_core.feature.browser.domain.BrowserTabInfo
 import com.mini.me_core.feature.browser.domain.BrowserTakeoverManager
 import com.mini.me_core.feature.browser.domain.SnapshotLevel
+import com.mini.me_core.feature.browser.domain.antidetect.AntidetectController
+import com.mini.me_core.feature.browser.domain.antidetect.SignalDetector
+import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintGenerator
+import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintManager
+import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintProfile
+import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintValidator
 import com.mini.me_core.feature.workspace.domain.WorkspacePathMapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
@@ -72,7 +78,9 @@ class BrowserAgentTool @Inject constructor(
     private val credentialStore: BrowserCredentialStore,
     private val loginPromptManager: BrowserLoginPromptManager,
     private val takeoverManager: BrowserTakeoverManager,
-    private val pathMapper: WorkspacePathMapper
+    private val pathMapper: WorkspacePathMapper,
+    private val fingerprintManager: FingerprintManager,
+    private val antidetectController: AntidetectController
 ) : AgentTool() {
 
     private companion object {
@@ -83,6 +91,18 @@ class BrowserAgentTool @Inject constructor(
         const val GLOBAL_TIMEOUT_MS = 30_000L
         // 连续失败熔断阈值：达到后拒绝继续操作，提示模型检查页面状态，避免死循环
         const val FAILURE_CIRCUIT_THRESHOLD = 3
+        // 浏览器交互动作集合：反爬暂停时这些动作被拒绝，管理类动作不受限
+        val BROWSER_INTERACT_ACTIONS = setOf(
+            "navigate", "view", "snapshot", "page_text", "extract",
+            "click", "type", "fill_form", "select_option", "submit",
+            "scroll", "hover", "drag", "press_key", "upload_file",
+            "back", "forward", "reload", "screenshot", "evaluate",
+            "wait_for", "wait_for_change", "wait_for_network_idle",
+            "get_attribute", "new_tab", "switch_tab", "close_tab",
+            "snapshot_shadow", "list_iframes", "iframe_action",
+            "safe_click", "human_type", "action_chain",
+            "spa_navigate", "wait_for_request"
+        )
     }
 
     // 连续失败计数：成功时重置，失败时递增，达到阈值后触发熔断
@@ -162,9 +182,49 @@ class BrowserAgentTool @Inject constructor(
         append("- 不要在 localhost 服务断开后继续操作，先确认服务运行状态。\n")
         append("- 不要删除/提交不可逆操作前不确认，先 takeover 让用户确认。\n")
         append("\n")
+        append("## 指纹与反爬系统\n")
+        append("浏览器内置指纹伪装和反爬检测系统，支持多套浏览器指纹配置切换、自动检测反爬信号、自适应调整策略。\n")
+        append("\n")
+        append("### 什么时候该切换指纹\n")
+        append("- 访问新地区/国家的网站时（如从美国站点切换到日本站点），切换为对应地区的指纹以降低被检测概率。\n")
+        append("- 被反爬系统检测后（返回验证码/403/拦截页），切换到新指纹继续操作，旧指纹进入冷却期。\n")
+        append("- 长时间使用同一指纹操作同一站点后，切换指纹降低关联追踪风险。\n")
+        append("- 操作：先 fingerprint_list 查看可用配置 → fingerprint_set 切换（apply_now=true 自动重载页面）。\n")
+        append("\n")
+        append("### 什么时候该调用 antidetect_adjust\n")
+        append("- 遇到验证码（captcha）、403 Forbidden、Cloudflare/Akamai 拦截页时。\n")
+        append("- 连续操作失败、页面返回 429 限流时。\n")
+        append("- 工具返回 note 中提示「检测到高风险反爬信号」时。\n")
+        append("- 策略选择：auto（自动推荐）/ switch_fingerprint（切换指纹）/ slow_down（降低频率）/ cool_down（暂停冷却）。\n")
+        append("\n")
+        append("### 指纹动作清单\n")
+        append("- fingerprint_list：列出所有配置（支持 status/region/browser 筛选）。\n")
+        append("- fingerprint_get：查看当前或指定配置详情（参数 profile_id，不传则返回当前）。\n")
+        append("- fingerprint_set：切换到指定配置（参数 profile_id, apply_now=true 自动重载页面）。\n")
+        append("- fingerprint_create：创建随机配置（参数 template=region_us/region_cn/region_jp/region_eu/high_end/mobile，name）。\n")
+        append("- fingerprint_delete：删除配置（参数 profile_id, force=true 可删除当前使用的）。\n")
+        append("- fingerprint_validate：校验配置内部一致性（UA/OS/地区/硬件是否匹配）。\n")
+        append("- fingerprint_test：测试当前指纹（返回一致性评分和脚本大小）。\n")
+        append("\n")
+        append("### 反爬动作清单\n")
+        append("- antidetect_status：查看当前反爬状态（detected/riskLevel/healthScore/consecutiveFailures/paused）。\n")
+        append("- antidetect_signals：查看活跃信号和历史记录。\n")
+        append("- antidetect_adjust：执行自适应调整（参数 strategy, reason）。\n")
+        append("- antidetect_pause：暂停浏览器操作（参数 duration_seconds，默认 300 秒）。\n")
+        append("- antidetect_resume：恢复浏览器操作。\n")
+        append("- browser_status：综合状态一览（当前指纹+反爬状态+当前URL）。\n")
+        append("\n")
+        append("### 指纹/反爬禁忌\n")
+        append("- 不要在同一指纹下频繁切换IP，指纹与IP地理不一致是反爬检测的重要信号。\n")
+        append("- 不要被检测到后继续同样操作，应先调用 antidetect_adjust 或切换指纹。\n")
+        append("- 不要在 antidetect_pause 暂停期间强行执行浏览器操作（会返回 ANTIDETECT_PAUSED 错误）。\n")
+        append("- 不要频繁创建和删除指纹配置，预置配置已足够覆盖常见场景。\n")
+        append("- 真实指纹配置（default_real）不可删除，无伪装时适合访问不敏感站点。\n")
+        append("\n")
         append("## 核心动作速查\n")
         append("navigate(打开)/view(智能查看)/snapshot(快照)/click(点击)/type(输入)/fill_form(批量填写)/submit(提交)/scroll(滚动)/wait_for(等元素)/wait_for_change(等变化)/screenshot(截图)/evaluate(执行JS)/back/forward/reload/login(自动登录)/takeover(请求用户接管)。\n")
-        append("高级动作：extract(结构化抽取)/select_option/hover/drag/press_key/upload_file/wait_for_network_idle/history/get_attribute/handle_dialog/标签页管理/网络请求分析/反爬增强(snapshot_shadow/apply_stealth/deobfuscate)/自动化增强(safe_click/human_type/macro)/SPA专项(detect_framework/extract_ssr_data/spa_navigate/api_paginate)。")
+        append("高级动作：extract(结构化抽取)/select_option/hover/drag/press_key/upload_file/wait_for_network_idle/history/get_attribute/handle_dialog/标签页管理/网络请求分析/反爬增强(snapshot_shadow/apply_stealth/deobfuscate)/自动化增强(safe_click/human_type/macro)/SPA专项(detect_framework/extract_ssr_data/spa_navigate/api_paginate)。\n")
+        append("指纹反爬：fingerprint_list/get/set/create/delete/validate/test / antidetect_status/signals/adjust/pause/resume / browser_status。")
     }
     override val capabilities = setOf(ToolCapability.NETWORK_READ, ToolCapability.NETWORK_WRITE, ToolCapability.USER_INTERACTION)
 
@@ -172,7 +232,7 @@ class BrowserAgentTool @Inject constructor(
         "action" to ToolParameter(
             name = "action",
             type = ParameterType.STRING,
-            description = "要执行的浏览器动作：核心动作 navigate/view/snapshot/click/type/fill_form/submit/scroll/wait_for/screenshot；高级动作 extract/select_option/hover/drag/press_key/upload_file/back/forward/reload/evaluate/wait_for_change/wait_for_network_idle/history/get_attribute/handle_dialog/login/takeover/new_tab/switch_tab/close_tab/list_tabs/downloads/network/network_get/wait_for_request；反爬增强 snapshot_shadow/list_iframes/iframe_action/intercept_api/list_api_calls/replay_api/wait_for_render_complete/detect_rendering_type/apply_stealth/deobfuscate/extract_clean_text/paginate_extract/infinite_scroll_extract；自动化增强 safe_click/human_type/macro_record/macro_playback/macro_list/macro_clear/set_request_interval/set_user_agent/list_user_agents/action_chain；会话闭环 save_session/restore_session/list_sessions/clear_data/set_incognito/wait_for_download/download_to_workspace/upload_from_url/detect_captcha/permission_audit/block_resource/operation_log/screenshot_full_page；SPA专项 detect_framework/extract_ssr_data/extract_framework_state/detect_virtual_list/spa_navigate/api_paginate",
+            description = "要执行的浏览器动作：核心动作 navigate/view/snapshot/click/type/fill_form/submit/scroll/wait_for/screenshot；高级动作 extract/select_option/hover/drag/press_key/upload_file/back/forward/reload/evaluate/wait_for_change/wait_for_network_idle/history/get_attribute/handle_dialog/login/takeover/new_tab/switch_tab/close_tab/list_tabs/downloads/network/network_get/wait_for_request；反爬增强 snapshot_shadow/list_iframes/iframe_action/intercept_api/list_api_calls/replay_api/wait_for_render_complete/detect_rendering_type/apply_stealth/deobfuscate/extract_clean_text/paginate_extract/infinite_scroll_extract；自动化增强 safe_click/human_type/macro_record/macro_playback/macro_list/macro_clear/set_request_interval/set_user_agent/list_user_agents/action_chain；会话闭环 save_session/restore_session/list_sessions/clear_data/set_incognito/wait_for_download/download_to_workspace/upload_from_url/detect_captcha/permission_audit/block_resource/operation_log/screenshot_full_page；SPA专项 detect_framework/extract_ssr_data/extract_framework_state/detect_virtual_list/spa_navigate/api_paginate；指纹反爬 fingerprint_list/fingerprint_get/fingerprint_set/fingerprint_create/fingerprint_delete/fingerprint_validate/fingerprint_test/antidetect_status/antidetect_signals/antidetect_adjust/antidetect_pause/antidetect_resume/browser_status",
             required = true,
             enum = listOf(
                 "navigate", "view", "snapshot", "page_text", "extract", "click", "type", "fill_form", "select_option", "submit",
@@ -198,7 +258,13 @@ class BrowserAgentTool @Inject constructor(
                 "operation_log", "screenshot_full_page",
                 // 第四批：SPA 专项
                 "detect_framework", "extract_ssr_data", "extract_framework_state",
-                "detect_virtual_list", "spa_navigate", "api_paginate"
+                "detect_virtual_list", "spa_navigate", "api_paginate",
+                // 第五批：指纹与反爬
+                "fingerprint_list", "fingerprint_get", "fingerprint_set",
+                "fingerprint_create", "fingerprint_delete", "fingerprint_validate", "fingerprint_test",
+                "antidetect_status", "antidetect_signals", "antidetect_adjust",
+                "antidetect_pause", "antidetect_resume",
+                "browser_status"
             )
         ),
         "url" to ToolParameter(
@@ -498,11 +564,23 @@ class BrowserAgentTool @Inject constructor(
             )
         }
 
+        // 反爬暂停检查：浏览器交互类动作在反爬暂停期间被拒绝，
+        // 指纹/反爬管理类动作不受限制（便于模型查看状态或执行恢复操作）。
+        if (action in BROWSER_INTERACT_ACTIONS && antidetectController.isPaused()) {
+            val remain = antidetectController.state.value.pauseRemainingSeconds
+            return ToolResult.Error(
+                "反爬保护已暂停：浏览器操作被暂停 $remain 秒。" +
+                    "请等待暂停结束，或调用 antidetect_resume 提前恢复；" +
+                    "如需调整策略可调用 antidetect_adjust。",
+                "ANTIDETECT_PAUSED"
+            )
+        }
+
         return try {
             // 全局超时保护：防止 WebView 无响应时协程永久挂起
             // （如本地服务器断开后，click/type 等操作在 WebView 层无限等待）
             withTimeout(GLOBAL_TIMEOUT_MS) {
-                val result = when (action) {
+                var result = when (action) {
                     "navigate" -> doNavigate(args)
                     "view" -> doView(args)
                     "snapshot" -> doSnapshot(args)
@@ -581,6 +659,22 @@ class BrowserAgentTool @Inject constructor(
                     "detect_virtual_list" -> doDetectVirtualList()
                     "spa_navigate" -> doSpaNavigate(args)
                     "api_paginate" -> doApiPaginate(args)
+                    // 指纹管理
+                    "fingerprint_list" -> doFingerprintList(args)
+                    "fingerprint_get" -> doFingerprintGet(args)
+                    "fingerprint_set" -> doFingerprintSet(args)
+                    "fingerprint_create" -> doFingerprintCreate(args)
+                    "fingerprint_delete" -> doFingerprintDelete(args)
+                    "fingerprint_validate" -> doFingerprintValidate(args)
+                    "fingerprint_test" -> doFingerprintTest()
+                    // 反爬控制
+                    "antidetect_status" -> doAntidetectStatus()
+                    "antidetect_signals" -> doAntidetectSignals(args)
+                    "antidetect_adjust" -> doAntidetectAdjust(args)
+                    "antidetect_pause" -> doAntidetectPause(args)
+                    "antidetect_resume" -> doAntidetectResume()
+                    // 综合状态
+                    "browser_status" -> doBrowserStatus()
                     else -> ToolResult.Error("未知动作: $action", "UNKNOWN_ACTION")
                 }
                 // 操作成功：重置连续失败计数和熔断状态
@@ -591,6 +685,22 @@ class BrowserAgentTool @Inject constructor(
                 } else {
                     // 操作返回业务错误（如元素找不到），计入连续失败
                     recordFailure(action)
+                }
+                // 反爬信号分析：对导航类动作执行后检测反爬信号
+                // （仅对加载页面的动作做检测，管理类动作不触发）
+                if (action in setOf("navigate", "view", "reload", "back", "forward", "spa_navigate")) {
+                    val success = result is ToolResult.Success
+                    val currentUrl = browserController.uiState.value.currentUrl
+                    val signals = antidetectController.analyzeResult(
+                        url = currentUrl,
+                        success = success
+                    )
+                    // 检测到高风险信号时，在返回结果中提示模型考虑调整策略
+                    if (signals.any { it.severity in listOf("high", "critical") }) {
+                        val highSignals = signals.filter { it.severity in listOf("high", "critical") }
+                        val noteSuffix = "⚠ 检测到高风险反爬信号：${highSignals.joinToString("、") { it.description }}。建议调用 antidetect_adjust 执行自适应调整。"
+                        result = appendNoteToResult(result, noteSuffix)
+                    }
                 }
                 result
             }
@@ -1879,6 +1989,340 @@ class BrowserAgentTool @Inject constructor(
         )
     }
 
+    // ─────────────────────── 指纹管理动作 ───────────────────────
+
+    /** 序列化单个指纹配置为 JSON 对象。 */
+    private fun profileToJson(p: FingerprintProfile): JsonObject = JsonObject(
+        mapOf(
+            "id" to JsonPrimitive(p.id),
+            "name" to JsonPrimitive(p.name),
+            "browser" to JsonPrimitive(p.browser),
+            "browser_version" to JsonPrimitive(p.browserVersion),
+            "os" to JsonPrimitive(p.os),
+            "os_version" to JsonPrimitive(p.osVersion),
+            "platform" to JsonPrimitive(p.platform),
+            "region" to JsonPrimitive(p.region),
+            "timezone" to JsonPrimitive(p.timezone),
+            "language" to JsonPrimitive(p.language),
+            "hardware_concurrency" to JsonPrimitive(p.hardwareConcurrency),
+            "device_memory" to JsonPrimitive(p.deviceMemory),
+            "screen" to JsonPrimitive("${p.screenWidth}x${p.screenHeight}"),
+            "score" to JsonPrimitive(p.score),
+            "status" to JsonPrimitive(p.status),
+            "is_available" to JsonPrimitive(p.isAvailable),
+            "is_cooling" to JsonPrimitive(p.isCooling),
+            "total_uses" to JsonPrimitive(p.totalUses),
+            "webrtc_protection" to JsonPrimitive(p.webrtcProtectionLevel),
+            "webgl_spoof" to JsonPrimitive(p.webglSpoofEnabled),
+            "canvas_noise" to JsonPrimitive(p.canvasNoiseEnabled)
+        )
+    )
+
+    /** fingerprint_list：列出所有指纹配置，支持 status/region/browser 筛选。 */
+    private fun doFingerprintList(args: Map<String, JsonElement>): ToolResult {
+        val statusFilter = args["status"]?.jsonPrimitive?.contentOrNull
+        val regionFilter = args["region"]?.jsonPrimitive?.contentOrNull
+        val browserFilter = args["browser"]?.jsonPrimitive?.contentOrNull
+
+        var list = fingerprintManager.getAll()
+        statusFilter?.let { f -> list = list.filter { it.status.equals(f, ignoreCase = true) } }
+        regionFilter?.let { f -> list = list.filter { it.region.equals(f, ignoreCase = true) } }
+        browserFilter?.let { f -> list = list.filter { it.browser.equals(f, ignoreCase = true) } }
+
+        val currentId = fingerprintManager.currentProfileId.value
+        val profilesJson = JsonArray(list.map { p ->
+            JsonObject(profileToJson(p) + ("is_current" to JsonPrimitive(p.id == currentId)))
+        })
+        val stats = fingerprintManager.getStats()
+
+        return envelope(
+            action = "fingerprint_list",
+            ok = true,
+            summary = "共 ${list.size} 个指纹配置（可用 ${stats["available"]}，冷却中 ${stats["cooling"]}）",
+            extra = JsonObject(mapOf(
+                "profiles" to profilesJson,
+                "stats" to JsonObject(stats.mapValues { JsonPrimitive(it.value.toString()) }),
+                "current_id" to JsonPrimitive(currentId ?: "none")
+            ))
+        )
+    }
+
+    /** fingerprint_get：获取当前或指定配置详情。 */
+    private fun doFingerprintGet(args: Map<String, JsonElement>): ToolResult {
+        val profileId = args["profile_id"]?.jsonPrimitive?.contentOrNull
+        val profile = if (profileId.isNullOrBlank()) {
+            fingerprintManager.getCurrent()
+        } else {
+            fingerprintManager.getById(profileId)
+        } ?: return envelope(
+            action = "fingerprint_get",
+            ok = false,
+            error = "指纹配置不存在：${profileId ?: "(当前无激活配置)"}",
+            errorCode = "PROFILE_NOT_FOUND",
+            recoverable = true
+        )
+
+        return envelope(
+            action = "fingerprint_get",
+            ok = true,
+            summary = profile.shortDescription,
+            extra = JsonObject(mapOf("profile" to profileToJson(profile)))
+        )
+    }
+
+    /** fingerprint_set：切换到指定配置，可选自动重载页面。 */
+    private suspend fun doFingerprintSet(args: Map<String, JsonElement>): ToolResult {
+        val profileId = args["profile_id"]?.jsonPrimitive?.contentOrNull
+            ?: return envelope(
+                action = "fingerprint_set",
+                ok = false,
+                error = "缺少 profile_id 参数",
+                errorCode = "MISSING_PROFILE_ID"
+            )
+        val applyNow = args["apply_now"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: true
+
+        val target = browserController.switchFingerprint(profileId, reload = applyNow)
+            ?: return envelope(
+                action = "fingerprint_set",
+                ok = false,
+                error = "无法切换到指纹 $profileId：配置不存在、不可用或正在冷却期",
+                errorCode = "SWITCH_FAILED",
+                recoverable = true
+            )
+
+        return envelope(
+            action = "fingerprint_set",
+            ok = true,
+            changed = true,
+            summary = "已切换到指纹：${target.name}（${target.region} · ${target.browser} ${target.browserVersion}）",
+            note = if (applyNow) "页面已重新加载，新指纹已生效" else "已切换配置，下次页面加载时生效"
+        )
+    }
+
+    /** fingerprint_create：创建随机配置。 */
+    private fun doFingerprintCreate(args: Map<String, JsonElement>): ToolResult {
+        val name = args["name"]?.jsonPrimitive?.contentOrNull
+        val templateName = args["template"]?.jsonPrimitive?.contentOrNull
+        val template = when (templateName?.lowercase()) {
+            "region_us", "us" -> FingerprintGenerator.Template.REGION_US
+            "region_cn", "cn" -> FingerprintGenerator.Template.REGION_CN
+            "region_jp", "jp" -> FingerprintGenerator.Template.REGION_JP
+            "region_eu", "eu" -> FingerprintGenerator.Template.REGION_EU
+            "high_end", "gaming" -> FingerprintGenerator.Template.HIGH_END
+            "mobile", "android" -> FingerprintGenerator.Template.MOBILE
+            else -> null
+        }
+
+        val profile = fingerprintManager.createRandom(template = template, name = name)
+        return envelope(
+            action = "fingerprint_create",
+            ok = true,
+            changed = true,
+            summary = "已创建指纹：${profile.name}（ID: ${profile.id}）",
+            note = "地区=${profile.region}，浏览器=${profile.browser} ${profile.browserVersion}，评分=${profile.score.toInt()}",
+            extra = JsonObject(mapOf("profile" to profileToJson(profile)))
+        )
+    }
+
+    /** fingerprint_delete：删除配置。 */
+    private fun doFingerprintDelete(args: Map<String, JsonElement>): ToolResult {
+        val profileId = args["profile_id"]?.jsonPrimitive?.contentOrNull
+            ?: return envelope(
+                action = "fingerprint_delete",
+                ok = false,
+                error = "缺少 profile_id 参数",
+                errorCode = "MISSING_PROFILE_ID"
+            )
+        val force = args["force"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: false
+
+        val ok = fingerprintManager.delete(profileId, force = force)
+        return if (ok) {
+            envelope(
+                action = "fingerprint_delete",
+                ok = true,
+                changed = true,
+                summary = "已删除指纹配置：$profileId"
+            )
+        } else {
+            envelope(
+                action = "fingerprint_delete",
+                ok = false,
+                error = "删除失败：配置不存在、是当前激活配置（需 force=true）、或为内置真实指纹配置",
+                errorCode = "DELETE_FAILED",
+                recoverable = true
+            )
+        }
+    }
+
+    /** fingerprint_validate：校验配置一致性。 */
+    private fun doFingerprintValidate(args: Map<String, JsonElement>): ToolResult {
+        val profileId = args["profile_id"]?.jsonPrimitive?.contentOrNull
+        val result = fingerprintManager.validate(profileId)
+            ?: return envelope(
+                action = "fingerprint_validate",
+                ok = false,
+                error = "配置不存在或无当前激活配置",
+                errorCode = "PROFILE_NOT_FOUND"
+            )
+
+        val issues = result.issues.joinToString("；") { "${it.field}: ${it.message}" }
+        return envelope(
+            action = "fingerprint_validate",
+            ok = result.valid,
+            summary = if (result.valid) "配置一致性校验通过（评分 ${result.score.toInt()}）"
+                       else "配置存在 ${result.issues.size} 个一致性问题（评分 ${result.score.toInt()}）",
+            note = if (result.valid) "所有指纹字段内部一致" else issues,
+            extra = JsonObject(mapOf(
+                "valid" to JsonPrimitive(result.valid),
+                "score" to JsonPrimitive(result.score),
+                "issue_count" to JsonPrimitive(result.issues.size)
+            ))
+        )
+    }
+
+    /** fingerprint_test：运行指纹检测（简化版：返回当前配置评分和一致性结果）。 */
+    private fun doFingerprintTest(): ToolResult {
+        val current = fingerprintManager.getCurrent()
+            ?: return envelope(
+                action = "fingerprint_test",
+                ok = false,
+                error = "无当前激活指纹配置",
+                errorCode = "NO_PROFILE"
+            )
+        val validation = fingerprintManager.validate()
+        val scriptSize = com.mini.me_core.feature.browser.domain.fingerprint.FingerprintInjector
+            .estimateScriptSize(current)
+
+        return envelope(
+            action = "fingerprint_test",
+            ok = true,
+            summary = "当前指纹：${current.shortDescription}",
+            note = "一致性评分=${validation?.score?.toInt() ?: 0}/100，" +
+                "注入脚本大小=${scriptSize}字节，" +
+                "WebRTC防护级别=${current.webrtcProtectionLevel}",
+            extra = JsonObject(mapOf(
+                "profile" to profileToJson(current),
+                "consistency_score" to JsonPrimitive(validation?.score ?: 0f),
+                "script_size_bytes" to JsonPrimitive(scriptSize)
+            ))
+        )
+    }
+
+    // ─────────────────────── 反爬控制动作 ───────────────────────
+
+    /** antidetect_status：获取当前反爬状态。 */
+    private fun doAntidetectStatus(): ToolResult {
+        val s = antidetectController.state.value
+        return envelope(
+            action = "antidetect_status",
+            ok = true,
+            summary = "反爬状态：detected=${s.detected}，风险=${s.riskLevel}，健康度=${s.healthScore.toInt()}/100",
+            extra = JsonObject(mapOf(
+                "detected" to JsonPrimitive(s.detected),
+                "risk_level" to JsonPrimitive(s.riskLevel),
+                "health_score" to JsonPrimitive(s.healthScore),
+                "consecutive_failures" to JsonPrimitive(s.consecutiveFailures),
+                "paused" to JsonPrimitive(s.paused),
+                "pause_remaining_seconds" to JsonPrimitive(s.pauseRemainingSeconds),
+                "last_detection_at" to JsonPrimitive(s.lastDetectionAt),
+                "last_strategy" to JsonPrimitive(s.lastStrategy ?: "")
+            ))
+        )
+    }
+
+    /** antidetect_signals：获取活跃信号和历史。 */
+    private fun doAntidetectSignals(args: Map<String, JsonElement>): ToolResult {
+        val limit = runCatching { args["limit"]?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull() ?: 10
+        val active = antidetectController.getActiveSignals()
+        val history = antidetectController.getSignalHistory(limit = limit)
+
+        fun signalToJson(sig: SignalDetector.Signal) = JsonObject(mapOf(
+            "type" to JsonPrimitive(sig.type),
+            "severity" to JsonPrimitive(sig.severity),
+            "url" to JsonPrimitive(sig.url),
+            "description" to JsonPrimitive(sig.description),
+            "timestamp" to JsonPrimitive(sig.timestamp)
+        ))
+
+        return envelope(
+            action = "antidetect_signals",
+            ok = true,
+            summary = "活跃信号 ${active.size} 个，历史记录 ${history.size} 条",
+            note = if (active.isEmpty()) "当前无活跃反爬信号"
+                   else active.joinToString("；") { it.description },
+            extra = JsonObject(mapOf(
+                "active_signals" to JsonArray(active.map { signalToJson(it) }),
+                "history" to JsonArray(history.map { signalToJson(it) })
+            ))
+        )
+    }
+
+    /** antidetect_adjust：执行自适应调整。 */
+    private fun doAntidetectAdjust(args: Map<String, JsonElement>): ToolResult {
+        val strategy = args["strategy"]?.jsonPrimitive?.contentOrNull ?: "auto"
+        val reason = args["reason"]?.jsonPrimitive?.contentOrNull ?: "手动触发"
+        val result = antidetectController.adjust(strategy = strategy, reason = reason)
+        return envelope(
+            action = "antidetect_adjust",
+            ok = true,
+            changed = true,
+            summary = "自适应调整完成（策略：$strategy）",
+            note = result
+        )
+    }
+
+    /** antidetect_pause：暂停浏览器操作。 */
+    private fun doAntidetectPause(args: Map<String, JsonElement>): ToolResult {
+        val duration = runCatching { args["duration_seconds"]?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull() ?: 300
+        antidetectController.pause(durationSeconds = duration)
+        return envelope(
+            action = "antidetect_pause",
+            ok = true,
+            changed = true,
+            summary = "已暂停浏览器操作 ${duration} 秒",
+            note = "暂停期间所有浏览器导航和交互操作将被拒绝，调用 antidetect_resume 可提前恢复"
+        )
+    }
+
+    /** antidetect_resume：恢复浏览器操作。 */
+    private fun doAntidetectResume(): ToolResult {
+        antidetectController.resume()
+        return envelope(
+            action = "antidetect_resume",
+            ok = true,
+            changed = true,
+            summary = "已恢复浏览器操作",
+            note = "连续失败计数已重置，活跃信号已清除"
+        )
+    }
+
+    /** browser_status：综合状态（当前指纹+反爬状态+当前URL）。 */
+    private fun doBrowserStatus(): ToolResult {
+        val fp = fingerprintManager.getCurrent()
+        val ad = antidetectController.state.value
+        val currentUrl = browserController.uiState.value.currentUrl
+
+        return envelope(
+            action = "browser_status",
+            ok = true,
+            summary = "当前页面：${currentUrl.ifBlank { "(无)" }}",
+            note = "指纹：${fp?.shortDescription ?: "无"} | " +
+                "反爬：${if (ad.detected) "已检测(${ad.riskLevel})" else "正常"} | " +
+                "健康度：${ad.healthScore.toInt()}/100 | " +
+                "${if (ad.paused) "暂停中(${ad.pauseRemainingSeconds}s)" else "运行中"}",
+            extra = JsonObject(mapOf(
+                "current_url" to JsonPrimitive(currentUrl),
+                "fingerprint" to (fp?.let { profileToJson(it) } ?: JsonObject(emptyMap())),
+                "antidetect" to JsonObject(mapOf(
+                    "detected" to JsonPrimitive(ad.detected),
+                    "risk_level" to JsonPrimitive(ad.riskLevel),
+                    "health_score" to JsonPrimitive(ad.healthScore),
+                    "paused" to JsonPrimitive(ad.paused)
+                ))
+            ))
+        )
+    }
+
     private fun downloadToJson(d: BrowserDownloadInfo): JsonObject =
         JsonObject(
             mapOf(
@@ -1928,6 +2372,20 @@ class BrowserAgentTool @Inject constructor(
      * 统一动作 envelope（R2.3 干净替换）：所有动作返回 `{ok, action, changed, summary, note|error,
      * recoverable, snapshot?, delta?}`，[extra] 用于追加结构化的动作专属数据（tabs/requests 等）。
      */
+    /**
+     * 在已有 ToolResult.Success 的 envelope 中追加 note 提示（用于反爬信号提醒等场景）。
+     * 对 Error 类型直接返回原样不修改。
+     */
+    private fun appendNoteToResult(result: ToolResult, note: String): ToolResult {
+        if (result !is ToolResult.Success) return result
+        val original = result.data as? JsonObject ?: return result
+        val existingNote = (original["note"] as? JsonPrimitive)?.content ?: ""
+        val merged = if (existingNote.isBlank()) note else "$existingNote\n$note"
+        val newFields = original.toMutableMap()
+        newFields["note"] = JsonPrimitive(merged)
+        return ToolResult.Success(JsonObject(newFields))
+    }
+
     private fun envelope(
         action: String,
         ok: Boolean = true,
