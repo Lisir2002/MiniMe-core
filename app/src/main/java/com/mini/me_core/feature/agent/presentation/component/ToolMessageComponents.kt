@@ -72,12 +72,48 @@ import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.EnvironmentSnapshot
 import com.mini.me_core.feature.agent.presentation.RunningToolOutput
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Construction
+import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.DragIndicator
+import androidx.compose.material.icons.rounded.EditNote
+import androidx.compose.material.icons.rounded.FilterList
+import androidx.compose.material.icons.rounded.HourglassEmpty
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Login
+import androidx.compose.material.icons.rounded.Mouse
+import androidx.compose.material.icons.rounded.NetworkCheck
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.rounded.Psychology
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.rounded.SwipeVertical
 import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.Tab
+import androidx.compose.material.icons.rounded.TouchApp
+import androidx.compose.material.icons.rounded.Upload
+import androidx.compose.material.icons.rounded.VerifiedUser
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -122,6 +158,17 @@ internal fun ToolMessageBody(
     if (message.toolName == "check_environment") {
         EnvironmentStatusStrip(
             message = message
+        )
+        return
+    }
+
+    // 浏览器操作工具：以「操作图标 + 动作名 + 目标 + 状态」的时间线卡片展示，
+    // 替代通用工具气泡，让用户直观看到模型在浏览器里做了什么。
+    if (message.toolName == "browser") {
+        BrowserOperationCard(
+            message = message,
+            running = running,
+            initiallyExpanded = initiallyExpanded
         )
         return
     }
@@ -939,4 +986,220 @@ internal fun EnvironmentStatusStrip(
             }
         }
     }
+}
+
+// ─────────────────────────── 浏览器操作时间线卡片 ───────────────────────────
+
+/**
+ * 浏览器操作元数据：动作名、显示图标、目标字段优先级（用于提取操作目标摘要）。
+ */
+private data class BrowserActionMeta(
+    val label: String,
+    val icon: ImageVector,
+    val targetFields: List<String> = emptyList()
+)
+
+/**
+ * 浏览器动作元数据映射表：覆盖最常用的 30+ 种操作，
+ * 未在表中的动作回退为通用浏览器图标。
+ */
+private val browserActionMeta: Map<String, BrowserActionMeta> = mapOf(
+    "navigate" to BrowserActionMeta("打开网页", Icons.Rounded.Public, listOf("url")),
+    "view" to BrowserActionMeta("查看页面", Icons.Rounded.Visibility, listOf("url")),
+    "snapshot" to BrowserActionMeta("页面快照", Icons.Rounded.ContentPaste, listOf("snapshot_level")),
+    "page_text" to BrowserActionMeta("提取正文", Icons.Rounded.Article, emptyList()),
+    "extract" to BrowserActionMeta("结构化抽取", Icons.Rounded.FilterList, listOf("selector", "mode")),
+    "click" to BrowserActionMeta("点击元素", Icons.Rounded.TouchApp, listOf("element_id", "id")),
+    "type" to BrowserActionMeta("输入文本", Icons.Rounded.Keyboard, listOf("element_id", "text")),
+    "fill_form" to BrowserActionMeta("填写表单", Icons.Rounded.EditNote, listOf("fields")),
+    "select_option" to BrowserActionMeta("下拉选择", Icons.Rounded.ArrowDropDown, listOf("element_id", "value")),
+    "submit" to BrowserActionMeta("提交表单", Icons.Rounded.Send, listOf("element_id")),
+    "scroll" to BrowserActionMeta("滚动页面", Icons.Rounded.SwipeVertical, listOf("direction")),
+    "hover" to BrowserActionMeta("悬停元素", Icons.Rounded.Mouse, listOf("element_id")),
+    "drag" to BrowserActionMeta("拖拽元素", Icons.Rounded.DragIndicator, listOf("element_id")),
+    "press_key" to BrowserActionMeta("按键", Icons.Rounded.Keyboard, listOf("element_id", "key")),
+    "upload_file" to BrowserActionMeta("上传文件", Icons.Rounded.Upload, listOf("element_id", "file_path")),
+    "back" to BrowserActionMeta("后退", Icons.Rounded.ArrowBack, emptyList()),
+    "forward" to BrowserActionMeta("前进", Icons.Rounded.ArrowForward, emptyList()),
+    "reload" to BrowserActionMeta("刷新", Icons.Rounded.Refresh, emptyList()),
+    "screenshot" to BrowserActionMeta("截图", Icons.Rounded.PhotoCamera, emptyList()),
+    "evaluate" to BrowserActionMeta("执行JS", Icons.Rounded.Code, listOf("js")),
+    "wait_for" to BrowserActionMeta("等待元素", Icons.Rounded.Schedule, listOf("selector", "timeout_ms")),
+    "wait_for_change" to BrowserActionMeta("等待变化", Icons.Rounded.HourglassEmpty, listOf("timeout_ms")),
+    "wait_for_network_idle" to BrowserActionMeta("等待网络空闲", Icons.Rounded.NetworkCheck, listOf("timeout_ms")),
+    "history" to BrowserActionMeta("操作历史", Icons.Rounded.History, emptyList()),
+    "get_attribute" to BrowserActionMeta("读取属性", Icons.Rounded.Info, listOf("element_id", "attribute")),
+    "handle_dialog" to BrowserActionMeta("处理弹窗", Icons.Rounded.Chat, listOf("accept")),
+    "login" to BrowserActionMeta("自动登录", Icons.Rounded.Login, emptyList()),
+    "takeover" to BrowserActionMeta("请求接管", Icons.Rounded.Person, emptyList()),
+    "new_tab" to BrowserActionMeta("新建标签", Icons.Rounded.Add, listOf("url")),
+    "switch_tab" to BrowserActionMeta("切换标签", Icons.Rounded.Tab, listOf("tab_id")),
+    "close_tab" to BrowserActionMeta("关闭标签", Icons.Rounded.Close, listOf("tab_id")),
+    "list_tabs" to BrowserActionMeta("标签列表", Icons.Rounded.Tab, emptyList()),
+    "safe_click" to BrowserActionMeta("安全点击", Icons.Rounded.VerifiedUser, listOf("element_id")),
+    "human_type" to BrowserActionMeta("模拟输入", Icons.Rounded.Psychology, listOf("element_id", "text")),
+    "detect_captcha" to BrowserActionMeta("检测验证码", Icons.Rounded.Security, emptyList()),
+    "screenshot_full_page" to BrowserActionMeta("全页截图", Icons.Rounded.PhotoLibrary, emptyList()),
+)
+
+/** 通用浏览器操作图标（未在映射表中的动作回退） */
+private val defaultBrowserIcon = Icons.Rounded.Language
+
+/**
+ * 浏览器操作时间线卡片：
+ * - 头部一行：状态圆点 + 操作图标 + 动作名 + 目标摘要 + 展开箭头
+ * - 运行中显示打字动画，失败显示红色
+ * - 点击展开查看完整参数和返回结果
+ */
+@Composable
+internal fun BrowserOperationCard(
+    message: AgentUIMessage,
+    running: Boolean,
+    initiallyExpanded: Boolean = false
+) {
+    val args = remember(message.toolArgs) { parseBrowserArgs(message.toolArgs) }
+    val action = args["action"] ?: "unknown"
+    val meta = browserActionMeta[action] ?: BrowserActionMeta(action, defaultBrowserIcon)
+    val target = remember(args) { extractBrowserTarget(args, meta) }
+    val resultText = if (!running) {
+        remember(message.id, message.content) { formatToolResult(message.content) }
+    } else null
+    val argsFull = remember(message.toolArgs) { formatToolArgs(message.toolArgs) }
+    val expandable = !running && (!resultText.isNullOrBlank() || !argsFull.isNullOrBlank())
+    var expanded by remember(message.id) { mutableStateOf(initiallyExpanded) }
+
+    Column(modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (expandable) Modifier.clickable { expanded = !expanded } else Modifier),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ToolStatusDot(running = running, isError = message.isError)
+            Spacer(Modifier.width(Spacing.sm))
+            // 操作图标
+            Icon(
+                imageVector = meta.icon,
+                contentDescription = null,
+                tint = when {
+                    running -> MaterialTheme.colorScheme.primary
+                    message.isError -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(Spacing.sm))
+            // 动作名
+            Text(
+                text = meta.label,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontWeight = FontWeight.Medium,
+                    fontSize = LocalComponentTokens.current.text.bodySmallFontSize
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            // 目标摘要
+            if (!target.isNullOrBlank()) {
+                Spacer(Modifier.width(Spacing.sm))
+                HorizontalScrollableText(
+                    text = target,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            if (running) {
+                TypingDots(color = MaterialTheme.colorScheme.onSurfaceVariant, dotSize = 5.dp)
+            } else if (expandable) {
+                Icon(
+                    if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = if (expanded) "收起" else "展开",
+                    tint = Brand.IconGray,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+        // 展开详情：参数 + 返回结果
+        if (expanded && !running) {
+            Spacer(Modifier.height(Spacing.xs))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 30.dp)
+            ) {
+                if (!argsFull.isNullOrBlank()) {
+                    Text(
+                        text = "参数",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = argsFull,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (!resultText.isNullOrBlank()) {
+                    if (!argsFull.isNullOrBlank()) Spacer(Modifier.height(Spacing.sm))
+                    Text(
+                        text = "结果",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (message.isError) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = resultText,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp
+                        ),
+                        color = if (message.isError) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 解析 browser 工具参数 JSON 为 Map */
+private fun parseBrowserArgs(argsJson: String?): Map<String, String> {
+    if (argsJson.isNullOrBlank()) return emptyMap()
+    return runCatching {
+        val obj = Json.parseToJsonElement(argsJson).jsonObject
+        obj.mapValues { (_, v) ->
+            (v as? JsonPrimitive)?.contentOrNull ?: v.toString()
+        }
+    }.getOrDefault(emptyMap())
+}
+
+/** 从 browser 参数中提取操作目标摘要（url / element_id / text 等） */
+private fun extractBrowserTarget(args: Map<String, String>, meta: BrowserActionMeta): String? {
+    // 优先使用元数据中指定的目标字段
+    for (field in meta.targetFields) {
+        args[field]?.let { value ->
+            if (value.isNotBlank()) {
+                // URL 过长时截断显示
+                val display = if (value.length > 60) value.take(57) + "..." else value
+                return display.replace("\n", " ")
+            }
+        }
+    }
+    // 回退：取第一个非 action 的字段值
+    return args.entries
+        .firstOrNull { it.key != "action" && it.value.isNotBlank() }
+        ?.value
+        ?.replace("\n", " ")
+        ?.take(60)
 }

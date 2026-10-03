@@ -93,18 +93,79 @@ class BrowserAgentTool @Inject constructor(
     private val json = Json { ignoreUnknownKeys = true }
 
     override val name = "browser"
-    override val description =
-        "操作内置服务浏览器。核心动作：open(navigate)/view(智能页面查看)/click/fill_form/submit/scroll/wait/screenshot。" +
-            "view 是首选的页面观察动作：自动等待页面稳定、识别页面类型（article/search_results/product/login/unknown）并按需返回对应级别快照。" +
-            "fill_form 可一次性批量填写多个表单字段（fields 为 元素标识->文本 的对象映射）。" +
-            "其他高级动作：extract（结构化/按模式抽取）、select_option、hover、drag、press_key、upload_file、back/forward/reload、evaluate、" +
-            "wait_for_change、wait_for_network_idle、history、get_attribute、handle_dialog、login、takeover、标签页管理、网络请求查询。" +
-            "与用户共享同一个浏览会话和登录态。支持外网 https/http 与容器内 http://localhost:PORT。" +
-            "典型用法：browser.navigate(url) 或 browser.view(url) → 阅读 summary/snapshot → browser.click/type/fill_form/submit 操作 → browser.wait_for_change() 等待变化 → browser.screenshot() 查看效果。" +
-            "所有动作返回统一 envelope：{ok, action, changed, summary, note|error, recoverable, snapshot?, delta?}，写操作自带 delta 增量对比，无需反复 snapshot。" +
-            "快照分级 snapshot_level：summary（默认，控件摘要，最省 token）/ standard（含完整元素）/ full（含页面正文）。" +
-            "element_id 可传 data-rcb-id / CSS 绝对路径 / 语义描述符（role=… name=… index=…）三者任一。" +
-            "遇到验证码/支付/二次认证等无法自动完成的步骤时，调用 takeover 请求用户亲自接管。"
+    override val description = buildString {
+        append("操作内置服务浏览器，与用户共享同一会话和登录态。支持外网 https/http 与容器内 http://localhost:PORT。\n")
+        append("\n")
+        append("## 核心原则\n")
+        append("1. 观察优先：用 view 而非反复 snapshot；写操作后看 changed+delta 验证，无需重新 snapshot。\n")
+        append("2. 失败换策略：同一动作连续失败 2 次必须换方法（换定位方式/换动作/先 view 确认页面状态），禁止同样参数重复重试。\n")
+        append("3. 等待用事件：用 wait_for_change 等待页面变化，而非轮询 snapshot；用 wait_for_network_idle 等待网络空闲。\n")
+        append("4. 读返回 envelope：所有动作返回 {ok, action, changed, summary, note|error, error_code, recoverable, snapshot?, delta?}，必须检查 ok 和 error_code。\n")
+        append("5. 省 token 优先：默认 summary 级快照（控件摘要），仅需完整元素时用 standard，需正文时用 full。\n")
+        append("6. 批量操作：fill_form 一次性填写多个字段，action_chain 串联多个动作，减少往返次数。\n")
+        append("7. 危险操作先确认：涉及支付、删除、提交不可撤销表单时，先 takeover 请求用户确认。\n")
+        append("\n")
+        append("## 标准流程\n")
+        append("view/navigate(url) → 读 summary 识别页面类型 → click/type/fill_form/submit 操作 → 看 changed+delta 验证结果 → wait_for_change 等后续变化 → 必要时 screenshot 确认视觉效果。\n")
+        append("\n")
+        append("## 错误处理决策表（必须按 error_code 对应处理）\n")
+        append("- CONNECTION_REFUSED：目标服务已停止（常见于 localhost 本地开发服务断开）。先 navigate 确认页面状态，检查服务是否启动，不要继续 click/type。\n")
+        append("- TIMEOUT：操作 30 秒无响应，页面可能卡死。调用 reload 或 navigate 重新加载，不要重复同样操作。\n")
+        append("- PAGE_UNRESPONSIVE：WebView 无响应。调用 reload 页面，严重时 navigate 到目标 URL 重新加载。\n")
+        append("- ELEMENT_NOT_FOUND：页面中不存在指定元素。先 view(snapshot_level=standard) 看当前页面结构，调整 element_id（换 data-rcb-id/CSS/语义描述符），不要重复同样的定位。\n")
+        append("- DNS_FAILURE：无法解析主机名。检查 URL 是否正确，网络/代理是否正常。\n")
+        append("- CONNECTION_TIMEOUT：服务器响应过慢或不可达。稍后重试，或检查网络/代理设置。\n")
+        append("- CIRCUIT_BROKEN：连续 3 次失败触发熔断。必须先调用 navigate 或 view 重置熔断状态，再继续其他操作。\n")
+        append("- 其他 error：阅读 error 字段中的具体建议，按建议处理。\n")
+        append("\n")
+        append("## 效率技巧\n")
+        append("- view 自动等待页面稳定、识别页面类型（article/search_results/product/login/unknown）并返回对应级别快照，比 navigate+snapshot 更高效。\n")
+        append("- 写操作（click/type/fill_form/submit/select_option）返回 delta 增量对比，直接看 changed 和 delta 即可验证操作效果。\n")
+        append("- page_text 单独取页面正文，比 full 级快照更省 token。\n")
+        append("- extract 支持按 selector 或模式结构化抽取，比 snapshot 后手动解析更高效。\n")
+        append("- wait_for_change 是事件驱动的，比轮询 snapshot 更省 token 且响应更快。\n")
+        append("- safe_click 内置等待元素可点击+重试，比手动 click+wait_for 更可靠。\n")
+        append("- human_type 模拟人类输入节奏，降低被反爬检测的概率。\n")
+        append("- network/list_api_calls 可查看页面发起的 API 请求，SPA 页面直接调 API 比模拟点击更高效。\n")
+        append("- detect_framework 识别前端框架（React/Vue/Angular），针对性选择操作策略。\n")
+        append("- macro_record/macro_playback 可录制和回放重复操作序列。\n")
+        append("\n")
+        append("## 场景化引导\n")
+        append("- 搜索场景：view(搜索URL) → 读 summary 识别结果列表 → click 第一个结果链接 → wait_for_change → view 读文章。\n")
+        append("- 表单填写：view 确认表单存在 → fill_form 批量填写 → submit 提交 → 看 changed+delta 验证提交结果。\n")
+        append("- 数据抓取：view 识别页面类型 → extract 结构化抽取 → paginate_extract/infinite_scroll_extract 处理分页/无限滚动。\n")
+        append("- SPA 单页应用：detect_framework 识别框架 → network 监听 API → 直接 replay_api 或用 spa_navigate，避免页面刷新。\n")
+        append("- 本地开发服务：访问 http://localhost:PORT 前确认服务正在运行；遇到 CONNECTION_REFUSED 说明服务已断开，需重启服务后再操作。\n")
+        append("- 反爬页面：apply_stealth 启用隐身模式 → human_type 模拟输入 → safe_click 安全点击 → detect_captcha 检测验证码，遇到验证码立即 takeover。\n")
+        append("\n")
+        append("## 元素定位策略（element_id 三种方式任选）\n")
+        append("- data-rcb-id：快照中元素自带的稳定 ID，最可靠，优先使用。\n")
+        append("- CSS 绝对路径：如 /html/body/div[2]/form/input[1]，页面结构变化时易失效。\n")
+        append("- 语义描述符：role=button name=提交 index=0，最灵活但可能匹配多个元素，用 index 精确指定。\n")
+        append("- 定位失败时：先 view(standard) 查看当前元素列表，换一种定位方式，不要重复同样的定位。\n")
+        append("\n")
+        append("## 页面状态判断\n")
+        append("- 页面加载完成：view 自动等待页面稳定；或 wait_for_network_idle 等待网络空闲。\n")
+        append("- 操作成功：写操作返回 changed=true 且 delta 中有变化；或 wait_for_change 检测到页面变化。\n")
+        append("- 需要等待：操作后页面未立即变化时，用 wait_for_change（事件驱动）而非轮询 snapshot。\n")
+        append("- 页面跳转：navigate 后用 view 确认新页面加载完成，不要立即操作。\n")
+        append("\n")
+        append("## 禁忌清单\n")
+        append("- 不要在同一元素上连续 click 超过 2 次，失败后先 view 确认元素状态。\n")
+        append("- 不要在 wait_for 超时后立即同样参数重试，应调整 selector 或 timeout。\n")
+        append("- 不要忽略 error_code，每种错误码对应不同的处理策略。\n")
+        append("- 不要在 CIRCUIT_BROKEN 状态下继续非 navigate/view 操作。\n")
+        append("- 不要反复 snapshot，写操作后看 delta 即可，观察用 view。\n")
+        append("- 不要在页面未加载完成时立即操作，先 view 或 wait_for_network_idle。\n")
+        append("- 不要用 full 级快照做常规观察，默认 summary 即可。\n")
+        append("- 不要在遇到验证码/支付/二次认证时强行尝试，立即 takeover 请求用户接管。\n")
+        append("- 不要在 localhost 服务断开后继续操作，先确认服务运行状态。\n")
+        append("- 不要删除/提交不可逆操作前不确认，先 takeover 让用户确认。\n")
+        append("\n")
+        append("## 核心动作速查\n")
+        append("navigate(打开)/view(智能查看)/snapshot(快照)/click(点击)/type(输入)/fill_form(批量填写)/submit(提交)/scroll(滚动)/wait_for(等元素)/wait_for_change(等变化)/screenshot(截图)/evaluate(执行JS)/back/forward/reload/login(自动登录)/takeover(请求用户接管)。\n")
+        append("高级动作：extract(结构化抽取)/select_option/hover/drag/press_key/upload_file/wait_for_network_idle/history/get_attribute/handle_dialog/标签页管理/网络请求分析/反爬增强(snapshot_shadow/apply_stealth/deobfuscate)/自动化增强(safe_click/human_type/macro)/SPA专项(detect_framework/extract_ssr_data/spa_navigate/api_paginate)。")
+    }
     override val capabilities = setOf(ToolCapability.NETWORK_READ, ToolCapability.NETWORK_WRITE, ToolCapability.USER_INTERACTION)
 
     override val parameters: Map<String, ToolParameter> = mapOf(
@@ -698,9 +759,10 @@ class BrowserAgentTool @Inject constructor(
                 action = action,
                 ok = false,
                 error = notFound,
+                errorCode = "ELEMENT_NOT_FOUND",
                 recoverable = true,
                 summary = "$action 失败：$notFound",
-                note = "元素可能因页面刷新/重渲染失效。建议：1) 重新 snapshot 获取最新元素标识；2) 调用 screenshot 查看页面实际状态后通过视觉定位；3) 尝试使用 CSS 绝对路径或语义描述符（role=… name=… index=…）替代 data-rcb-id"
+                note = "元素可能因页面刷新/重渲染失效。建议：1) 重新 view(snapshot_level=standard) 获取最新元素标识；2) 换用 CSS 绝对路径或语义描述符（role=… name=… index=…）替代 data-rcb-id；3) 不要重复同样的定位方式"
             )
         }
         val delta = browserController.lastDelta()
@@ -1873,6 +1935,7 @@ class BrowserAgentTool @Inject constructor(
         summary: String = "",
         note: String = "",
         error: String = "",
+        errorCode: String = "",
         recoverable: Boolean = false,
         snapshot: JsonObject? = null,
         delta: BrowserSnapshotDelta? = null,
@@ -1886,6 +1949,7 @@ class BrowserAgentTool @Inject constructor(
         )
         if (note.isNotBlank()) fields["note"] = JsonPrimitive(note)
         if (error.isNotBlank()) fields["error"] = JsonPrimitive(error)
+        if (errorCode.isNotBlank()) fields["error_code"] = JsonPrimitive(errorCode)
         if (recoverable) fields["recoverable"] = JsonPrimitive(true)
         snapshot?.let { fields["snapshot"] = it }
         delta?.let { fields["delta"] = deltaToJson(it) }
