@@ -88,7 +88,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import java.io.File
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 /**
@@ -317,15 +316,6 @@ fun AIChatPanel(
     // 自动滚动跟随
     var positionedSession by remember { mutableStateOf<String?>(null) }
     var followBottom by remember { mutableStateOf(true) }
-    // 用户阅读位置基线：拖拽停止或 fling 结束时记录当前最后可见项索引，
-    // 用于精确计算未读消息数（不再仅在拖拽开始时记录，避免 fling 后计数不准）
-    var readBaselineIndex by remember { mutableStateOf(0) }
-    val unreadCount by remember(followBottom, messages.size, readBaselineIndex) {
-        derivedStateOf {
-            if (followBottom) 0
-            else (messages.size - 1 - readBaselineIndex).coerceAtLeast(0)
-        }
-    }
 
     // 是否在底部：主判断用 canScrollForward（更稳定），辅以末项位置校验，
     // 阈值 16dp 避免滚动中频繁切换状态
@@ -384,25 +374,10 @@ fun AIChatPanel(
                 is DragInteraction.Stop, is DragInteraction.Cancel -> {
                     // 拖拽结束后等待一帧让布局稳定，再判断是否在底部
                     withFrameNanos { }
-                    if (isAtBottom) {
-                        followBottom = true
-                    } else {
-                        // 更新阅读基线为当前最后可见项索引，用于精确未读计数
-                        readBaselineIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                    }
+                    if (isAtBottom) followBottom = true
                 }
             }
         }
-    }
-    // 滚动停止（fling 结束）时，如果不在底部，更新阅读基线
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress }
-            .distinctUntilChanged()
-            .collect { scrolling ->
-                if (!scrolling && !isAtBottom && !followBottom) {
-                    readBaselineIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                }
-            }
     }
     LaunchedEffect(listState) {
         snapshotFlow { isAtBottom }.collect { atBottom ->
@@ -651,10 +626,9 @@ fun AIChatPanel(
                     }
                 }
 
-                // 「回到底部」浮动按钮：入场出场动画、药丸/圆形自适应、点击缩放反馈、无障碍增强
+                // 「回到底部」浮动按钮：入场出场动画、点击缩放反馈、无障碍增强
                 ScrollToBottomButton(
                     visible = showScrollToBottom,
-                    unreadCount = unreadCount,
                     onClick = {
                         scope.launch {
                             val targetIndex = listState.layoutInfo.totalItemsCount - 1
@@ -913,14 +887,13 @@ private fun EditingMessageBanner(
  *
  * 特性：
  * - 入场：淡入 + 从底部上滑 + 缩放；出场：淡出 + 下滑 + 缩放
- * - 有未读消息时：药丸形状，显示「↓ N条新消息」；无未读时：48dp 圆形仅箭头
- * - 点击缩放反馈（0.92x），Surface 背景带 4dp 阴影
- * - 无障碍描述含未读数量，触控目标 ≥48dp
+ * - 48dp 圆形，primary 背景带 4dp 阴影
+ * - 点击缩放反馈（0.92x）
+ * - 无障碍描述，触控目标 48dp
  */
 @Composable
 private fun ScrollToBottomButton(
     visible: Boolean,
-    unreadCount: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -942,17 +915,10 @@ private fun ScrollToBottomButton(
                 animationSpec = tween(100),
                 label = "scrollButtonPress"
             )
-            val hasUnread = unreadCount > 0
-            val unreadText = if (unreadCount > 99) "99+" else unreadCount.toString()
-            val contentDesc = if (hasUnread) {
-                "回到底部，有$unreadCount 条新消息"
-            } else {
-                stringResource(R.string.chat_scroll_to_bottom)
-            }
 
             Surface(
                 modifier = Modifier.scale(pressScale),
-                shape = if (hasUnread) RoundedCornerShape(20.dp) else CircleShape,
+                shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary,
                 tonalElevation = 4.dp,
                 shadowElevation = 4.dp
@@ -969,34 +935,15 @@ private fun ScrollToBottomButton(
                                 }
                             }
                         )
-                        .then(
-                            if (hasUnread) {
-                                Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                            } else {
-                                Modifier.size(48.dp)
-                            }
-                        ),
+                        .size(48.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = contentDesc,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        if (hasUnread) {
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = "$unreadText 条新消息",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        }
-                    }
+                    Icon(
+                        Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = stringResource(R.string.chat_scroll_to_bottom),
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
         }
