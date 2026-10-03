@@ -89,6 +89,9 @@ fun SoraCodeViewer(
     // 自适应高亮引擎
     val highlighter = remember { com.mini.me_core.feature.editor.core.AdaptiveHighlighter(scope) }
 
+    // Markdown 高亮引擎门面（行内代码着色 + 共享 LRU 缓存）
+    val markdownHighlighter = remember { com.mini.me_core.feature.markdown.MarkdownHighlighter() }
+
     // TextMate 引擎只需初始化一次（幂等，内部有已初始化判断）
     LaunchedEffect(Unit) {
         com.mini.me_core.feature.editor.textmate.TextMateManager
@@ -151,15 +154,38 @@ fun SoraCodeViewer(
         editor.colorScheme = com.mini.me_core.feature.editor.textmate.TextMateManager
             .createColorScheme()
         try {
-            val lang = com.mini.me_core.feature.editor.textmate.TextMateManager
-                .createLanguage(scopeName, autoCompletion = editable)
-            editor.setEditorLanguage(lang)
-            // 接入自适应高亮引擎（大文件自动降级）
-            highlighter.attach(editor, scopeName, lineCount)
+            if (scopeName == "text.html.markdown" || scopeName == "text.html.markdown.enhanced") {
+                // Markdown 文件：使用带行内代码着色的 MarkdownLanguage。
+                // 不调用 highlighter.attach()——其内部会重新创建并 setEditorLanguage，
+                // 覆盖掉 MarkdownLanguage；sora-editor 本身已有按需渲染，滚动降级非必须。
+                val mdLang = markdownHighlighter.createLanguage()
+                editor.setEditorLanguage(mdLang)
+            } else {
+                // 普通文件：TextMateLanguage + 自适应高亮引擎（大文件自动降级）
+                val lang = com.mini.me_core.feature.editor.textmate.TextMateManager
+                    .createLanguage(scopeName, autoCompletion = editable)
+                editor.setEditorLanguage(lang)
+                highlighter.attach(editor, scopeName, lineCount)
+            }
         } catch (e: Exception) {
             android.util.Log.w("SoraCodeViewer", "设置 TextMate 高亮失败: $scopeName，回退纯文本", e)
         }
         onEditorReady?.invoke(editor)
+    }
+
+    // Markdown 文件：监听 TextMate 主题名变化，变化时清空行内代码颜色缓存
+    LaunchedEffect(scopeName) {
+        val isMarkdown = scopeName == "text.html.markdown" || scopeName == "text.html.markdown.enhanced"
+        if (!isMarkdown) return@LaunchedEffect
+        var lastTheme = com.mini.me_core.feature.editor.textmate.TextMateManager.currentThemeName
+        while (true) {
+            kotlinx.coroutines.delay(500)
+            val current = com.mini.me_core.feature.editor.textmate.TextMateManager.currentThemeName
+            if (current != lastTheme) {
+                lastTheme = current
+                markdownHighlighter.onThemeChanged()
+            }
+        }
     }
 
     // 编辑模式切换
@@ -177,6 +203,7 @@ fun SoraCodeViewer(
     DisposableEffect(Unit) {
         onDispose {
             highlighter.detach()
+            markdownHighlighter.onDestroy()
             editor.release()
         }
     }

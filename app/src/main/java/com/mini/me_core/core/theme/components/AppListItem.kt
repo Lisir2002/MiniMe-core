@@ -53,6 +53,7 @@ import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
  * @param checked 非空时 trailing 显示 Switch，与 trailing/onViewClick 互斥
  * @param onCheckedChange Switch 状态变化回调
  * @param onViewClick 查看入口（显示箭头），与 checked 互斥
+ * @param enabled 是否启用（false 时 Switch 显示禁用态，整行降低透明度）
  */
 @Composable
 fun AppListItem(
@@ -68,6 +69,7 @@ fun AppListItem(
     checked: Boolean? = null,
     onCheckedChange: ((Boolean) -> Unit)? = null,
     onViewClick: (() -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     val colors = LocalAppTheme.current.colors
 
@@ -83,6 +85,7 @@ fun AppListItem(
                 Switch(
                     checked = checked,
                     onCheckedChange = onCheckedChange,
+                    enabled = enabled,
                 )
             }
         }

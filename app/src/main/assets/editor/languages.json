@@ -1311,6 +1311,12 @@
       ]
     },
     {
+      "grammar": "editor/grammars/markdown-enhanced.json",
+      "name": "markdown-enhanced",
+      "scopeName": "text.html.markdown.enhanced",
+      "extensions": []
+    },
+    {
       "grammar": "editor/grammars/marko.json",
       "name": "marko",
       "scopeName": "text.marko",

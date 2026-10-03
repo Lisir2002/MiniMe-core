@@ -632,6 +632,121 @@
       "settings": {
         "foreground": "#0a3069"
       }
+    },
+    {
+      "name": "Markdown heading content",
+      "scope": "entity.name.section.markdown",
+      "settings": {
+        "foreground": "#0000FF"
+      }
+    },
+    {
+      "name": "Markdown bold content",
+      "scope": "markup.bold.markdown",
+      "settings": {
+        "foreground": "#795E26",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Markdown italic content",
+      "scope": "markup.italic.markdown",
+      "settings": {
+        "foreground": "#AF00DB",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "name": "Markdown strikethrough content",
+      "scope": "markup.strikethrough.markdown",
+      "settings": {
+        "foreground": "#808080",
+        "fontStyle": "strikethrough"
+      }
+    },
+    {
+      "name": "Markdown quote content",
+      "scope": "markup.quote.markdown",
+      "settings": {
+        "foreground": "#008000"
+      }
+    },
+    {
+      "name": "Markdown link URL",
+      "scope": "markup.underline.link.markdown",
+      "settings": {
+        "foreground": "#A31515",
+        "fontStyle": "underline"
+      }
+    },
+    {
+      "name": "Markdown image URL",
+      "scope": "markup.underline.link.image.markdown",
+      "settings": {
+        "foreground": "#A31515",
+        "fontStyle": "underline"
+      }
+    },
+    {
+      "name": "Markdown link title text",
+      "scope": "string.other.link.title.markdown",
+      "settings": {
+        "foreground": "#098658"
+      }
+    },
+    {
+      "name": "Markdown fenced code language id",
+      "scope": "entity.name.type.fenced.markdown",
+      "settings": {
+        "foreground": "#008000",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "name": "Markdown table content",
+      "scope": "meta.table.content.markdown",
+      "settings": {
+        "foreground": "#267F99"
+      }
+    },
+    {
+      "name": "Markdown task checked",
+      "scope": "markup.list.task.checked.markdown",
+      "settings": {
+        "foreground": "#A31515",
+        "fontStyle": "strikethrough"
+      }
+    },
+    {
+      "name": "Markdown task unchecked",
+      "scope": "markup.list.task.unchecked.markdown",
+      "settings": {
+        "foreground": "#001080"
+      }
+    },
+    {
+      "name": "Markdown punctuation markers (faded)",
+      "scope": [
+        "punctuation.definition.heading.markdown",
+        "punctuation.definition.bold.markdown",
+        "punctuation.definition.italic.markdown",
+        "punctuation.definition.strikethrough.markdown",
+        "punctuation.definition.quote.markdown",
+        "punctuation.definition.raw.markdown",
+        "punctuation.definition.fenced.markdown",
+        "punctuation.definition.list.begin.markdown",
+        "punctuation.definition.list.task.begin.markdown",
+        "punctuation.definition.list.task.end.markdown",
+        "punctuation.definition.table.markdown",
+        "punctuation.definition.string.begin.markdown",
+        "punctuation.definition.string.end.markdown",
+        "punctuation.definition.image.begin.markdown",
+        "punctuation.definition.image.end.markdown",
+        "meta.separator.markdown"
+      ],
+      "settings": {
+        "foreground": "#808080"
+      }
     }
   ],
   "type": "light"

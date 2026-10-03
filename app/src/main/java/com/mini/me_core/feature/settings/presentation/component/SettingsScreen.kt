@@ -1560,6 +1560,7 @@ internal fun GroupSwitchRow(
         showDivider = true,
         checked = checked,
         onCheckedChange = onCheckedChange,
+        enabled = enabled,
         trailing = when {
             valueSummary != null || onViewClick != null -> {
                 {
