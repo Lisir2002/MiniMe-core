@@ -69,7 +69,16 @@ class EncryptedDriverFactory(
             // M3：SupportFactory **持有传入数组且不拷贝**，必须给它独立副本。
             // 过去把同一个数组交给它、又在 finally 里 fill(0)，等于把"SQLCipher 正在用的口令"抹成全零；
             // 当前只因「构造即 eager open」侥幸可用，一旦延迟/重开连接就是用全零口令打开。
-            val cipherFactory = SupportFactory(open.bytes.copyOf())
+            //
+            // clearPassphrase=false：禁止 SQLCipher 在首次打开后自动清除明文密码。
+            // AndroidSqliteDriver 内部使用 SQLiteOpenHelper，在 schema 迁移/版本变化/连接重开时
+            // 会复用同一个 SupportHelper 多次调用 getWritableDatabase()；若默认清除密码，
+            // 重开时就会抛 "The passphrase appears to be cleared"，底层用空密码打开加密库报
+            // "file is not a database"，导致 Application.onCreate 时启动崩溃。
+            // 这是 SQLCipher 官方针对 Room/SQLDelight 等框架的推荐配置：
+            // "If something else (e.g., Room) closed the database, and you cannot control that,
+            //  use SupportFactory boolean constructor option to opt out of the automatic password clearing step."
+            val cipherFactory = SupportFactory(open.bytes.copyOf(), null, false)
             val driver = AndroidSqliteDriver(
                 schema = definition.schema,
                 context = context,
