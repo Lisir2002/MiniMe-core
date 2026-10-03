@@ -55,10 +55,11 @@ import com.mini.me_core.feature.editor.snippets.model.Snippet
  *  - 内置片段按语言分组（只读展示）
  */
 @OptIn(ExperimentalMaterial3Api::class)
+@SuppressLint("LocalContextGetResourceValueCall")
 @Composable
 fun SnippetSettingsScreen(onNavigateBack: () -> Unit) {
-    val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+    val exportCopiedText = stringResource(R.string.snippet_export_copied)
 
     var completionEnabled by remember { mutableStateOf(SnippetSettings.completionEnabled) }
     var customList by remember { mutableStateOf(CustomSnippetStore.all()) }
@@ -125,7 +126,7 @@ fun SnippetSettingsScreen(onNavigateBack: () -> Unit) {
                         runCatching {
                             val exported = CustomSnippetStore.exportToJson()
                             clipboard.setText(androidx.compose.ui.text.AnnotatedString(exported))
-                            snackbar = context.getString(R.string.snippet_export_copied)
+                            snackbar = exportCopiedText
                         }
                     }) {
                         Text(stringResource(R.string.snippet_export))
@@ -135,9 +136,9 @@ fun SnippetSettingsScreen(onNavigateBack: () -> Unit) {
                         runCatching {
                             val n = CustomSnippetStore.importFromJson(text)
                             refresh()
-                            snackbar = context.getString(R.string.snippet_import_success, n)
+                            snackbar = LocalContext.current.getString(R.string.snippet_import_success, n)
                         }.onFailure {
-                            snackbar = context.getString(R.string.snippet_import_error, it.message ?: "")
+                            snackbar = LocalContext.current.getString(R.string.snippet_import_error, it.message ?: "")
                         }
                     }) {
                         Text(stringResource(R.string.snippet_import))
