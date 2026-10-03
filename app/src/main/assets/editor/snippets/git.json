@@ -1,0 +1,46 @@
+{
+  "snippets": [
+    {
+      "name": "Git commit",
+      "prefix": "commit",
+      "language": "git",
+      "description": "提交命令",
+      "body": ["git add ${1:.}", "git commit -m \"${2:feat: 描述}\"", "git push ${0:origin main}"]
+    },
+    {
+      "name": "Git 新建分支",
+      "prefix": "branch",
+      "language": "git",
+      "description": "创建并切换分支",
+      "body": ["git checkout -b ${1:feature/branch}"]
+    },
+    {
+      "name": "Git rebase",
+      "prefix": "rebase",
+      "language": "git",
+      "description": "变基到主分支",
+      "body": ["git fetch origin", "git rebase ${1:origin/main}"]
+    },
+    {
+      "name": "Git 暂存",
+      "prefix": "stash",
+      "language": "git",
+      "description": "临时保存修改",
+      "body": ["git stash ${1:push -m \"临时保存\"}"]
+    },
+    {
+      "name": "Git 查看状态",
+      "prefix": "status",
+      "language": "git",
+      "description": "工作区状态",
+      "body": ["git status"]
+    },
+    {
+      "name": "Git 日志",
+      "prefix": "log",
+      "language": "git",
+      "description": "简洁提交日志",
+      "body": ["git log --oneline -${1:10} --graph"]
+    }
+  ]
+}

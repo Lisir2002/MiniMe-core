@@ -1,0 +1,53 @@
+{
+  "snippets": [
+    {
+      "name": "Ruby 方法",
+      "prefix": "def",
+      "language": "ruby",
+      "description": "方法定义",
+      "body": ["def ${1:method_name}(${2:args})", "  ${0:# TODO}", "end"]
+    },
+    {
+      "name": "Ruby 类",
+      "prefix": "class",
+      "language": "ruby",
+      "description": "类定义",
+      "body": ["class ${1:ClassName}", "  def initialize(${2:args})", "    ${0:# TODO}", "  end", "end"]
+    },
+    {
+      "name": "Ruby each",
+      "prefix": "each",
+      "language": "ruby",
+      "description": "遍历集合",
+      "body": ["${1:collection}.each do |${2:item}|", "  ${0:# TODO}", "end"]
+    },
+    {
+      "name": "Ruby if",
+      "prefix": "if",
+      "language": "ruby",
+      "description": "条件分支",
+      "body": ["if ${1:condition}", "  ${2:# TODO}", "else", "  ${0:# TODO}", "end"]
+    },
+    {
+      "name": "Ruby 模块",
+      "prefix": "module",
+      "language": "ruby",
+      "description": "模块定义",
+      "body": ["module ${1:Name}", "  ${0:# TODO}", "end"]
+    },
+    {
+      "name": "Ruby puts",
+      "prefix": "puts",
+      "language": "ruby",
+      "description": "输出",
+      "body": ["puts ${1:object}"]
+    },
+    {
+      "name": "Ruby begin-rescue",
+      "prefix": "begin",
+      "language": "ruby",
+      "description": "异常处理",
+      "body": ["begin", "  ${1:# TODO}", "rescue ${2:=> e}", "  ${0:puts e.message}", "end"]
+    }
+  ]
+}

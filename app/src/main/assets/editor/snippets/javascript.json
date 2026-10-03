@@ -1,0 +1,74 @@
+{
+  "snippets": [
+    {
+      "name": "JS for 循环",
+      "prefix": "for",
+      "language": "javascript",
+      "description": "标准 for 循环",
+      "body": ["for (let ${1:i} = 0; ${1:i} < ${2:array}.length; ${1:i}++) {", "  ${0:console.log(${2:array}[${1:i}]);}", "}"]
+    },
+    {
+      "name": "JS forEach",
+      "prefix": "foreach",
+      "language": "javascript",
+      "description": "数组 forEach 遍历",
+      "body": ["${1:array}.forEach((${2:item}) => {", "  ${0:console.log(${2:item});}", "});"]
+    },
+    {
+      "name": "JS 函数",
+      "prefix": "func",
+      "language": "javascript",
+      "description": "普通函数声明",
+      "body": ["function ${1:funcName}(${2:params}) {", "  ${0:// TODO}", "}"]
+    },
+    {
+      "name": "JS 箭头函数",
+      "prefix": "=>",
+      "language": "javascript",
+      "description": "箭头函数",
+      "body": ["const ${1:funcName} = (${2:params}) => {", "  ${0:// TODO}", "};"]
+    },
+    {
+      "name": "JS 类",
+      "prefix": "class",
+      "language": "javascript",
+      "description": "ES6 类",
+      "body": ["class ${1:ClassName} {", "  constructor(${2:args}) {", "    ${3:this.prop = arg;}", "  }", "  ${0:method()} {}", "}"]
+    },
+    {
+      "name": "JS if-else",
+      "prefix": "ifel",
+      "language": "javascript",
+      "description": "if-else 分支",
+      "body": ["if (${1:condition}) {", "  ${2:// TODO}", "} else {", "  ${0:// TODO}", "}"]
+    },
+    {
+      "name": "JS try-catch",
+      "prefix": "try",
+      "language": "javascript",
+      "description": "异常捕获",
+      "body": ["try {", "  ${1:// TODO}", "} catch (${2:error}) {", "  ${0:console.error(${2:error});}", "}"]
+    },
+    {
+      "name": "JS Promise",
+      "prefix": "promise",
+      "language": "javascript",
+      "description": "Promise 构造",
+      "body": ["new Promise((resolve, reject) => {", "  ${0:// TODO}", "  resolve(${1:result});", "});"]
+    },
+    {
+      "name": "JS async/await",
+      "prefix": "async",
+      "language": "javascript",
+      "description": "异步函数",
+      "body": ["async function ${1:funcName}(${2:params}) {", "  const ${3:result} = await ${4:asyncCall()};", "  ${0:return ${3:result};}", "}"]
+    },
+    {
+      "name": "JS console.log",
+      "prefix": "cl",
+      "language": "javascript",
+      "description": "控制台打印",
+      "body": ["console.log(${1:object});"]
+    }
+  ]
+}

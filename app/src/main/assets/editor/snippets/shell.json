@@ -1,0 +1,53 @@
+{
+  "snippets": [
+    {
+      "name": "Shell for 循环",
+      "prefix": "for",
+      "language": "shell",
+      "description": "遍历列表",
+      "body": ["for ${1:item} in ${2:list}; do", "  ${0:echo ${1:item}}", "done"]
+    },
+    {
+      "name": "Shell if-else",
+      "prefix": "if",
+      "language": "shell",
+      "description": "条件分支",
+      "body": ["if [ ${1:condition} ]; then", "  ${2:# TODO}", "else", "  ${0:# TODO}", "fi"]
+    },
+    {
+      "name": "Shell 函数",
+      "prefix": "func",
+      "language": "shell",
+      "description": "函数定义",
+      "body": ["${1:function_name}() {", "  ${0:# TODO}", "}"]
+    },
+    {
+      "name": "Shell case",
+      "prefix": "case",
+      "language": "shell",
+      "description": "分支选择",
+      "body": ["case ${1:$var} in", "  ${2:pattern}) ${3:cmd} ;;", "  ${0:*) ;;}", "esac"]
+    },
+    {
+      "name": "Shell shebang",
+      "prefix": "shebang",
+      "language": "shell",
+      "description": "脚本解释器声明",
+      "body": ["#!/usr/bin/env bash", "set -euo pipefail", "", "${0:}"]
+    },
+    {
+      "name": "Shell 读取输入",
+      "prefix": "read",
+      "language": "shell",
+      "description": "读取用户输入",
+      "body": ["read -p \"${1:提示: }\" ${2:var}", "${0:echo ${2:var}}"]
+    },
+    {
+      "name": "Shell 错误退出",
+      "prefix": "die",
+      "language": "shell",
+      "description": "错误处理函数",
+      "body": ["die() {", "  echo \"$@\" >&2", "  exit 1", "}", ""]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "snippets": [
+    {
+      "name": "Markdown 标题",
+      "prefix": "h1",
+      "language": "markdown",
+      "description": "一级标题",
+      "body": ["# ${1:标题}", "", "${0:正文}"]
+    },
+    {
+      "name": "Markdown 表格",
+      "prefix": "table",
+      "language": "markdown",
+      "description": "表格结构",
+      "body": ["| ${1:列1} | ${2:列2} |", "| --- | --- |", "| ${3:内容} | ${0:内容} |"]
+    },
+    {
+      "name": "Markdown 代码块",
+      "prefix": "code",
+      "language": "markdown",
+      "description": "围栏代码块",
+      "body": ["```${1:language}", "${0:code}", "```"]
+    },
+    {
+      "name": "Markdown 无序列表",
+      "prefix": "ul",
+      "language": "markdown",
+      "description": "无序列表",
+      "body": ["- ${1:item}", "- ${0:item}"]
+    },
+    {
+      "name": "Markdown 有序列表",
+      "prefix": "ol",
+      "language": "markdown",
+      "description": "有序列表",
+      "body": ["1. ${1:first}", "2. ${0:second}"]
+    },
+    {
+      "name": "Markdown 链接",
+      "prefix": "link",
+      "language": "markdown",
+      "description": "内联链接",
+      "body": ["[${1:text}](${2:https://example.com})"]
+    },
+    {
+      "name": "Markdown 图片",
+      "prefix": "img",
+      "language": "markdown",
+      "description": "图片引用",
+      "body": ["![${1:alt}](${2:image.png})"]
+    },
+    {
+      "name": "Markdown 引用",
+      "prefix": "quote",
+      "language": "markdown",
+      "description": "引用块",
+      "body": ["> ${0:引用内容}"]
+    }
+  ]
+}

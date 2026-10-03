@@ -1,0 +1,53 @@
+{
+  "snippets": [
+    {
+      "name": "C main 函数",
+      "prefix": "main",
+      "language": "c",
+      "description": "程序入口",
+      "body": ["#include <stdio.h>", "", "int main(int argc, char *argv[]) {", "    ${0:printf(\"Hello, World\\\\n\");}", "    return 0;", "}"]
+    },
+    {
+      "name": "C include",
+      "prefix": "inc",
+      "language": "c",
+      "description": "头文件包含",
+      "body": ["#include <${1:stdio.h}>"]
+    },
+    {
+      "name": "C 函数",
+      "prefix": "func",
+      "language": "c",
+      "description": "函数定义",
+      "body": ["${1:void} ${2:funcName}(${3:int arg}) {", "    ${0:// TODO}", "}"]
+    },
+    {
+      "name": "C for 循环",
+      "prefix": "for",
+      "language": "c",
+      "description": "for 循环",
+      "body": ["for (int ${1:i} = 0; ${1:i} < ${2:n}; ${1:i}++) {", "    ${0:// TODO}", "}"]
+    },
+    {
+      "name": "C if-else",
+      "prefix": "ifel",
+      "language": "c",
+      "description": "if-else 分支",
+      "body": ["if (${1:condition}) {", "    ${2:// TODO}", "} else {", "    ${0:// TODO}", "}"]
+    },
+    {
+      "name": "C 头文件保护",
+      "prefix": "guard",
+      "language": "c",
+      "description": "头文件宏保护",
+      "body": ["#ifndef ${1:HEADER_H}", "#define ${1:HEADER_H}", "", "${0:#endif // ${1:HEADER_H}}"]
+    },
+    {
+      "name": "C printf",
+      "prefix": "printf",
+      "language": "c",
+      "description": "格式化输出",
+      "body": ["printf(\"${1:%s\\\\n}\", ${2:arg});"]
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "snippets": [
+    {
+      "name": "SQL SELECT",
+      "prefix": "select",
+      "language": "sql",
+      "description": "查询语句",
+      "body": ["SELECT ${1:*}", "FROM ${2:table}", "WHERE ${3:condition};", "${0:}"]
+    },
+    {
+      "name": "SQL INSERT",
+      "prefix": "insert",
+      "language": "sql",
+      "description": "插入语句",
+      "body": ["INSERT INTO ${1:table} (${2:column1, column2})", "VALUES (${3:value1, value2});"]
+    },
+    {
+      "name": "SQL UPDATE",
+      "prefix": "update",
+      "language": "sql",
+      "description": "更新语句",
+      "body": ["UPDATE ${1:table}", "SET ${2:column = value}", "WHERE ${3:condition};"]
+    },
+    {
+      "name": "SQL DELETE",
+      "prefix": "delete",
+      "language": "sql",
+      "description": "删除语句",
+      "body": ["DELETE FROM ${1:table}", "WHERE ${2:condition};"]
+    },
+    {
+      "name": "SQL JOIN",
+      "prefix": "join",
+      "language": "sql",
+      "description": "内连接",
+      "body": ["SELECT ${1:columns}", "FROM ${2:table1}", "INNER JOIN ${3:table2} ON ${4:table1.id = table2.id};"]
+    },
+    {
+      "name": "SQL CREATE TABLE",
+      "prefix": "create",
+      "language": "sql",
+      "description": "建表语句",
+      "body": ["CREATE TABLE ${1:table_name} (", "  ${2:id} INTEGER PRIMARY KEY,", "  ${3:created_at} TIMESTAMP DEFAULT CURRENT_TIMESTAMP", "${0:});"]
+    }
+  ]
+}

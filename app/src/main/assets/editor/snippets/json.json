@@ -1,0 +1,46 @@
+{
+  "snippets": [
+    {
+      "name": "JSON 对象",
+      "prefix": "obj",
+      "language": "json",
+      "description": "基本对象结构",
+      "body": ["{", "  \"${1:key}\": \"${2:value}\",", "  ${0:}"]
+    },
+    {
+      "name": "JSON 数组",
+      "prefix": "arr",
+      "language": "json",
+      "description": "数组结构",
+      "body": ["[", "  \"${1:item}\",", "  ${0:}", "]"]
+    },
+    {
+      "name": "JSON 嵌套对象",
+      "prefix": "nested",
+      "language": "json",
+      "description": "对象内嵌数组",
+      "body": ["{", "  \"${1:items}\": [", "    {", "      \"${2:id}\": 1,", "      \"${3:name}\": \"${4:}\"", "    }", "  ],", "  ${0:}"]
+    },
+    {
+      "name": "JSON 字符串属性",
+      "prefix": "str",
+      "language": "json",
+      "description": "字符串键值对",
+      "body": ["\"${1:key}\": \"${2:value}\""]
+    },
+    {
+      "name": "JSON 数字属性",
+      "prefix": "num",
+      "language": "json",
+      "description": "数字键值对",
+      "body": ["\"${1:key}\": ${2:0}"]
+    },
+    {
+      "name": "JSON 布尔属性",
+      "prefix": "bool",
+      "language": "json",
+      "description": "布尔键值对",
+      "body": ["\"${1:key}\": ${2:true}"]
+    }
+  ]
+}
