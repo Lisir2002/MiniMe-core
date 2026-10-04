@@ -3,11 +3,12 @@ import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.ui.rememberPersistentScrollState
 
-import androidx.compose.foundation.background
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,23 +18,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.shape.RoundedCornerShape as RCS
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.BrightnessAuto
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.AlertDialog
 import com.mini.me_core.core.theme.components.AppDialog
@@ -50,19 +52,28 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.launch
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.components.AppButton
 import com.mini.me_core.core.theme.components.AppButtonVariant
@@ -82,21 +93,16 @@ import com.mini.me_core.core.theme.tokens.CornerStyle
 import com.mini.me_core.core.theme.tokens.SemanticColors
 
 /**
- * 主题设置页（Phase 4 + Phase 5）。
+ * 主题设置页（优化版）。
  *
- * Phase 4：
- * - 外观模式选择（跟随系统 / 浅色 / 深色）
- * - 6 套主题预设横向卡片选择
- * - 实时预览区
- *
- * Phase 5 新增：
- * - 颜色自定义（9 项可自定义颜色 + 对比度警告）
- * - 显示偏好（圆角风格 + 字体大小 + 动效强度）
- * - 恢复出厂主题（底部红色按钮 + 确认弹窗）
- *
- * 注意：背景图功能（backgroundImage / backgroundMask / cardOpacity）数据层接口已预留，
- * UI 暂不暴露，后续单独调试后再开放。
+ * 优化内容：
+ * - 移除直角预设，只保留圆角模式
+ * - 重新排列布局：预览→外观模式→主题预设→显示偏好→颜色自定义→恢复出厂
+ * - 动效演示返回页面时自动播放一次
+ * - 颜色选择器采用 HSV 调色盘 + 预设色板组合
+ * - 实时预览卡片滚动时置顶，置顶期间微折叠节省空间
  */
+
 @Composable
 fun ThemeSettingsScreen(
     onNavigateBack: () -> Unit,
@@ -107,94 +113,147 @@ fun ThemeSettingsScreen(
     val settings by viewModel.settings.collectAsState()
     val currentPreset = ThemePresets.byId(settings.presetId)
 
-    // 恢复出厂确认 Dialog 状态
     var showResetConfirm by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
-    val themeScrollState = rememberPersistentScrollState("settings_theme")
-    // 问题4修复：去掉自带 Scaffold + AppTopAppBar，复用外层 SettingsScreen 的顶栏
-    Column(
+    // 预览卡片是否已滚出可视区域（用于触发置顶折叠态）
+    val previewCollapsed by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 100
+        }
+    }
+
+    // 动效返回播放触发计数
+    var animationTrigger by remember { mutableStateOf(0) }
+
+    // 页面可见时触发一次动效播放
+    LaunchedEffect(Unit) {
+        animationTrigger++
+    }
+
+    LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.surfacePage)
-            .verticalScroll(themeScrollState),
+            .background(colors.surfacePage),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        Spacer(Modifier.height(16.dp))
+        // ── 置顶折叠态预览（仅在滚动后显示）──
+        item(key = "sticky_preview") {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = previewCollapsed,
+                enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+            ) {
+                CollapsedPreviewBar(
+                    preset = currentPreset,
+                    isDark = isDark,
+                    onClick = {
+                        scope.launch {
+                            listState.animateScrollToItem(0)
+                        }
+                    },
+                )
+            }
+        }
 
-            // ── Section 1: 实时预览 ──
-            AppSectionHeader(title = stringResource(R.string.theme_section_preview))
-            ThemePreviewCard(
-                preset = currentPreset,
-                isDark = isDark,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
+        // ── Section 1: 实时预览（完整态）──
+        item(key = "full_preview") {
+            Column(modifier = Modifier.padding(top = 24.dp)) {
+                AppSectionHeader(
+                    title = stringResource(R.string.theme_section_preview),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                ThemePreviewCard(
+                    preset = currentPreset,
+                    isDark = isDark,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+        }
 
-            Spacer(Modifier.height(24.dp))
+        // ── Section 2: 外观模式 ──
+        item(key = "appearance_mode") {
+            Column(modifier = Modifier.padding(top = 24.dp)) {
+                AppSectionHeader(
+                    title = stringResource(R.string.theme_section_appearance),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                AppearanceModeSelector(
+                    selectedMode = ThemeMode.fromPersisted(settings.mode),
+                    onModeSelected = { viewModel.setMode(it) },
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+        }
 
-            // ── Section 2: 外观模式 ──
-            AppSectionHeader(title = stringResource(R.string.theme_section_appearance))
-            AppearanceModeSelector(
-                selectedMode = ThemeMode.fromPersisted(settings.mode),
-                onModeSelected = { viewModel.setMode(it) },
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
+        // ── Section 3: 主题预设 ──
+        item(key = "presets") {
+            Column(modifier = Modifier.padding(top = 24.dp)) {
+                AppSectionHeader(
+                    title = stringResource(R.string.theme_section_presets),
+                    subtitle = stringResource(R.string.theme_section_presets_sub),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                PresetCarousel(
+                    presets = ThemePresets.All,
+                    selectedPresetId = settings.presetId,
+                    onPresetSelected = { viewModel.setPreset(it) },
+                )
+            }
+        }
 
-            Spacer(Modifier.height(24.dp))
+        // ── Section 4: 显示偏好（圆角/字体/动效）──
+        item(key = "display_prefs") {
+            Column(modifier = Modifier.padding(top = 24.dp)) {
+                AppSectionHeader(
+                    title = stringResource(R.string.theme_section_display),
+                    subtitle = stringResource(R.string.theme_section_display_sub),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                DisplayPreferencesSection(
+                    cornerRadius = settings.cornerRadius,
+                    fontScale = settings.fontScale,
+                    animationScale = settings.animationScale,
+                    animationTrigger = animationTrigger,
+                    onCornerRadiusChange = { viewModel.setCornerRadius(it) },
+                    onFontScaleChange = { viewModel.setFontScale(it) },
+                    onAnimationScaleChange = { viewModel.setAnimationScale(it) },
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+        }
 
-            // ── Section 3: 主题预设 ──
-            AppSectionHeader(
-                title = stringResource(R.string.theme_section_presets),
-                subtitle = stringResource(R.string.theme_section_presets_sub),
-            )
-            PresetCarousel(
-                presets = ThemePresets.All,
-                selectedPresetId = settings.presetId,
-                onPresetSelected = { viewModel.setPreset(it) },
-            )
+        // ── Section 5: 颜色自定义 ──
+        item(key = "custom_colors") {
+            Column(modifier = Modifier.padding(top = 24.dp)) {
+                AppSectionHeader(
+                    title = stringResource(R.string.theme_section_custom_colors),
+                    subtitle = stringResource(R.string.theme_section_custom_colors_sub),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                ColorCustomizationSection(
+                    settings = settings,
+                    currentColors = colors,
+                    onColorPick = { field, color -> viewModel.updateCustomColor(field, color) },
+                    onResetColor = { field -> viewModel.updateCustomColor(field, null) },
+                    calculateContrast = { c1, c2 -> viewModel.calculateContrastRatio(c1, c2) },
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+        }
 
-            Spacer(Modifier.height(24.dp))
-
-            // ── Section 4: 颜色自定义（Phase 5）──
-            AppSectionHeader(
-                title = stringResource(R.string.theme_section_custom_colors),
-                subtitle = stringResource(R.string.theme_section_custom_colors_sub),
-            )
-            ColorCustomizationSection(
-                settings = settings,
-                currentColors = colors,
-                onColorPick = { field, color -> viewModel.updateCustomColor(field, color) },
-                onResetColor = { field -> viewModel.updateCustomColor(field, null) },
-                calculateContrast = { c1, c2 -> viewModel.calculateContrastRatio(c1, c2) },
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            // ── Section 5: 显示偏好（Phase 5）──
-            AppSectionHeader(
-                title = stringResource(R.string.theme_section_display),
-                subtitle = stringResource(R.string.theme_section_display_sub),
-            )
-            DisplayPreferencesSection(
-                cornerStyle = settings.cornerStyleEnum(),
-                cornerRadius = settings.cornerRadius,
-                fontScale = settings.fontScale,
-                animationScale = settings.animationScale,
-                onCornerStyleChange = { viewModel.setCornerStyle(it) },
-                onCornerRadiusChange = { viewModel.setCornerRadius(it) },
-                onFontScaleChange = { viewModel.setFontScale(it) },
-                onAnimationScaleChange = { viewModel.setAnimationScale(it) },
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-
-            Spacer(Modifier.height(32.dp))
-
-            // ── Section 7: 恢复出厂主题（Phase 5）──
-            FactoryResetButton(
-                onClick = { showResetConfirm = true },
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-
-            Spacer(Modifier.height(48.dp))
+        // ── Section 6: 恢复出厂主题 ──
+        item(key = "factory_reset") {
+            Column(modifier = Modifier.padding(top = 32.dp, bottom = 48.dp)) {
+                FactoryResetButton(
+                    onClick = { showResetConfirm = true },
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+        }
     }
 
     // 恢复出厂确认 Dialog
@@ -211,12 +270,76 @@ fun ThemeSettingsScreen(
 }
 
 // ──────────────────────────────────────────────
-// 实时预览卡片（Phase 4 保留）
+// 折叠态预览栏（置顶时显示）
 // ──────────────────────────────────────────────
 
-/**
- * 实时预览区：模拟聊天界面缩略图。
- */
+@Composable
+private fun CollapsedPreviewBar(
+    preset: ThemePreset,
+    isDark: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = LocalAppTheme.current.colors
+    val previewColors = if (isDark) preset.darkColors else preset.lightColors
+
+    AppCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clickable { onClick() },
+        variant = AppCardVariant.Default,
+    ) {
+        Row(
+            modifier = Modifier
+                .background(previewColors.surfaceCard)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // 迷你品牌标识
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
+                    .background(previewColors.brandPrimary),
+            )
+            Text(
+                text = "MiniMe",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = previewColors.textPrimary,
+                modifier = Modifier.weight(1f),
+            )
+            // 迷你用户气泡
+            Box(
+                modifier = Modifier
+                    .width(40.dp)
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
+                    .background(previewColors.brandPrimary),
+            )
+            // 迷你助手气泡
+            Box(
+                modifier = Modifier
+                    .width(50.dp)
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
+                    .background(previewColors.surfaceSunken),
+            )
+            Icon(
+                imageVector = Icons.Rounded.ExpandMore,
+                contentDescription = stringResource(R.string.theme_preview_expand),
+                tint = previewColors.textSecondary,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+// ──────────────────────────────────────────────
+// 实时预览卡片（完整态）
+// ──────────────────────────────────────────────
+
 @Composable
 private fun ThemePreviewCard(
     preset: ThemePreset,
@@ -317,7 +440,6 @@ private fun ThemePreviewCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // 左侧附件按钮占位
                 Box(
                     modifier = Modifier
                         .size(24.dp)
@@ -333,14 +455,12 @@ private fun ThemePreviewCard(
                         fontWeight = FontWeight.Bold,
                     )
                 }
-                // 占位文字
                 Text(
                     text = stringResource(R.string.theme_preview_input_hint),
                     fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                     color = previewColors.textTertiary,
                     modifier = Modifier.weight(1f),
                 )
-                // 发送按钮
                 Box(
                     modifier = Modifier
                         .size(28.dp)
@@ -361,7 +481,7 @@ private fun ThemePreviewCard(
 }
 
 // ──────────────────────────────────────────────
-// 外观模式选择器（Phase 4 保留）
+// 外观模式选择器
 // ──────────────────────────────────────────────
 
 @Composable
@@ -424,7 +544,7 @@ private fun AppearanceModeSelector(
 }
 
 // ──────────────────────────────────────────────
-// 预设卡片横向滚动（Phase 4 保留）
+// 预设卡片横向滚动
 // ──────────────────────────────────────────────
 
 @Composable
@@ -465,7 +585,6 @@ private fun PresetCarousel(
                             .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                             .background(preset.previewBackground),
                     ) {
-                        // 模拟卡片色块
                         Box(
                             modifier = Modifier
                                 .padding(6.dp)
@@ -474,7 +593,6 @@ private fun PresetCarousel(
                                 .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
                                 .background(preset.previewSurface),
                         )
-                        // 模拟主色气泡
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
@@ -499,7 +617,6 @@ private fun PresetCarousel(
                     )
                 }
 
-                // "使用中" 角标：右上角叠加，不改变卡片高度
                 if (isSelected) {
                     Box(
                         modifier = Modifier
@@ -523,13 +640,9 @@ private fun PresetCarousel(
 }
 
 // ──────────────────────────────────────────────
-// Phase 5: 颜色自定义区域
+// 颜色自定义区域
 // ──────────────────────────────────────────────
 
-/**
- * 颜色自定义区域：9 项可自定义颜色列表。
- * 每项显示颜色名 + 预览圆点 + 自定义/恢复按钮 + 对比度警告。
- */
 @Composable
 private fun ColorCustomizationSection(
     settings: com.mini.me_core.core.theme.tokens.ThemeSettings,
@@ -568,7 +681,6 @@ private fun ColorCustomizationSection(
         }
     }
 
-    // 颜色选择器 Dialog
     pendingColorField?.let { field ->
         ColorPickerDialog(
             title = CustomColorFields.DISPLAY_NAMES[field] ?: field,
@@ -582,9 +694,6 @@ private fun ColorCustomizationSection(
     }
 }
 
-/**
- * 单个颜色行：名称 + 圆点 + 对比度警告 + 自定义/恢复按钮。
- */
 @Composable
 private fun ColorRow(
     name: String,
@@ -612,7 +721,6 @@ private fun ColorRow(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.weight(1f),
             ) {
-                // 颜色预览圆点（点击弹出选择器）
                 Box(
                     modifier = Modifier
                         .size(28.dp)
@@ -635,7 +743,6 @@ private fun ColorRow(
             }
         }
 
-        // 对比度警告（WCAG AA: 4.5:1）：浅 warning 背景圆角容器包裹，保证 warning 文字在卡片上对比度
         if (lowContrast) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -662,9 +769,10 @@ private fun ColorRow(
     }
 }
 
-/**
- * 颜色选择器 Dialog：预设色板 + 常用色快速选择。
- */
+// ──────────────────────────────────────────────
+// 颜色选择器 Dialog：HSV 调色盘 + 预设色板
+// ──────────────────────────────────────────────
+
 @Composable
 private fun ColorPickerDialog(
     title: String,
@@ -675,45 +783,61 @@ private fun ColorPickerDialog(
     val colors = LocalAppTheme.current.colors
     var selectedColor by remember { mutableStateOf(initialColor) }
 
-    // 预设色板（每行 5 个，共 4 行 = 20 色）
+    // 预设色板
     val presetSwatches = listOf(
-        // 红色系
-        Color(0xFFEF4444), Color(0xFFDC2626), Color(0xFFB91C1C), Color(0xFFF87171), Color(0xFFFECACA),
-        // 橙色系
-        Color(0xFFF97316), Color(0xFFEA580C), Color(0xFFD97706), Color(0xFFFB923C), Color(0xFFFED7AA),
-        // 黄色系
-        Color(0xFFEAB308), Color(0xFFCA8A04), Color(0xFFFACC15), Color(0xFFFEF08A), Color(0xFFFDE68A),
-        // 绿色系
-        Color(0xFF22C55E), Color(0xFF16A34A), Color(0xFF15803D), Color(0xFF4ADE80), Color(0xFFBBF7D0),
-        // 青色系
-        Color(0xFF06B6D4), Color(0xFF0891B2), Color(0xFF0E7490), Color(0xFF22D3EE), Color(0xFFA5F3FC),
-        // 蓝色系
-        Color(0xFF3B82F6), Color(0xFF2563EB), Color(0xFF1D4ED8), Color(0xFF60A5FA), Color(0xFFBFDBFE),
-        // 紫色系
-        Color(0xFF8B5CF6), Color(0xFF7C3AED), Color(0xFF6D28D9), Color(0xFFA78BFA), Color(0xFFDDD6FE),
-        // 粉色系
-        Color(0xFFEC4899), Color(0xFFDB2777), Color(0xFFBE185D), Color(0xFFF472B6), Color(0xFFFBCFE8),
-        // 灰阶
-        Color(0xFFFFFFFF), Color(0xFFE2E8F0), Color(0xFF94A3B8), Color(0xFF475569), Color(0xFF0F172A),
+        Color(0xFFEF4444), Color(0xFFDC2626), Color(0xFFF97316), Color(0xFFEAB308),
+        Color(0xFF22C55E), Color(0xFF06B6D4), Color(0xFF3B82F6), Color(0xFF8B5CF6),
+        Color(0xFFEC4899), Color(0xFF64748B), Color(0xFF1E293B), Color(0xFFFFFFFF),
     )
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.theme_color_picker_title, title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // 当前选中色预览
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(LocalCornerRadius.current.md))
-                        .background(selectedColor)
-                        .border(1.dp, colors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.md)),
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // 当前选中色预览 + Hex
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+                            .background(selectedColor)
+                            .border(1.dp, colors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.md)),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "HEX",
+                            fontSize = 11.sp,
+                            color = colors.textSecondary,
+                        )
+                        Text(
+                            text = selectedColor.toHexString(),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textPrimary,
+                        )
+                    }
+                }
+
+                // HSV 调色盘
+                HsvColorPicker(
+                    initialColor = selectedColor,
+                    onColorChanged = { selectedColor = it },
                 )
 
-                // 色板网格（5列）
-                presetSwatches.chunked(5).forEach { rowColors ->
+                // 预设色板标题
+                Text(
+                    text = stringResource(R.string.theme_color_presets),
+                    fontSize = 12.sp,
+                    color = colors.textSecondary,
+                )
+
+                // 预设色板网格（4列3行）
+                presetSwatches.chunked(4).forEach { rowColors ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -751,6 +875,168 @@ private fun ColorPickerDialog(
     )
 }
 
+// ──────────────────────────────────────────────
+// HSV 调色盘组件
+// ──────────────────────────────────────────────
+
+private fun Color.toAndroidArgb(): Int = android.graphics.Color.argb(
+    (alpha * 255).toInt(),
+    (red * 255).toInt(),
+    (green * 255).toInt(),
+    (blue * 255).toInt()
+)
+
+@Composable
+private fun HsvColorPicker(
+    initialColor: Color,
+    onColorChanged: (Color) -> Unit,
+) {
+    val colors = LocalAppTheme.current.colors
+
+    // 初始 HSV 值
+    val initialHsv = remember(initialColor) {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(initialColor.toAndroidArgb(), hsv)
+        hsv
+    }
+
+    var hue by remember { mutableStateOf(initialHsv[0]) }
+    var saturation by remember { mutableStateOf(initialHsv[1]) }
+    var value by remember { mutableStateOf(initialHsv[2]) }
+
+    // 当外部 initialColor 变化时同步
+    LaunchedEffect(initialColor) {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(initialColor.toAndroidArgb(), hsv)
+        hue = hsv[0]
+        saturation = hsv[1]
+        value = hsv[2]
+    }
+
+    // HSV 变化时回调
+    LaunchedEffect(hue, saturation, value) {
+        val argb = android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, value))
+        onColorChanged(Color(argb))
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // 饱和度/亮度面板
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+                .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+                .border(1.dp, colors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.md))
+                .pointerInput(Unit) {
+                    detectDragGestures { change, _ ->
+                        change.consume()
+                        val pos = change.position
+                        val width = size.width
+                        val height = size.height
+                        saturation = (pos.x / width).coerceIn(0f, 1f)
+                        value = (1f - pos.y / height).coerceIn(0f, 1f)
+                    }
+                },
+        ) {
+            // 用 Canvas 绘制饱和度/亮度渐变
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                val width = size.width
+                val height = size.height
+
+                // 底色：当前色相的纯色
+                val hueColor = android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f))
+
+                // 横向：白色到透明（饱和度从低到高）
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(Color.White, Color(hueColor)),
+                        startX = 0f,
+                        endX = width,
+                    ),
+                    size = size,
+                )
+
+                // 纵向：透明到黑色（亮度从高到低）
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black),
+                        startY = 0f,
+                        endY = height,
+                    ),
+                    size = size,
+                )
+            }
+
+            // 选择器指示器
+            Box(
+                modifier = Modifier
+                    .offset(
+                        x = (saturation * 180.dp.value - 10).dp,
+                        y = ((1f - value) * 180.dp.value - 10).dp,
+                    )
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, Color.White, CircleShape)
+                    .background(Color.Transparent),
+            )
+        }
+
+        // 色相条
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(24.dp)
+                .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
+                .border(1.dp, colors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.sm))
+                .pointerInput(Unit) {
+                    detectDragGestures { change, _ ->
+                        change.consume()
+                        val pos = change.position
+                        val width = size.width
+                        hue = (pos.x / width * 360f).coerceIn(0f, 360f)
+                    }
+                },
+        ) {
+            // 彩虹渐变
+            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                val hueColors = (0..360 step 30).map { h ->
+                    Color(android.graphics.Color.HSVToColor(floatArrayOf(h.toFloat(), 1f, 1f)))
+                }
+                drawRect(
+                    brush = Brush.horizontalGradient(colors = hueColors),
+                    size = size,
+                )
+            }
+
+            // 色相选择器
+            Box(
+                modifier = Modifier
+                    .offset(
+                        x = (hue / 360f * 300.dp.value - 8).dp,
+                        y = (-2).dp,
+                    )
+                    .width(16.dp)
+                    .height(28.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .border(2.dp, Color.White, RoundedCornerShape(4.dp))
+                    .background(
+                        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f)))
+                    ),
+            )
+        }
+    }
+}
+
+/** 颜色转 hex 字符串（带 #） */
+private fun Color.toHexString(): String =
+    "#%02X%02X%02X".format(
+        (red * 255).toInt(),
+        (green * 255).toInt(),
+        (blue * 255).toInt(),
+    )
+
 /** 颜色转短 hex（用于比较是否选中），忽略 alpha 差异。 */
 private fun Color.toHexShort(): String =
     "#%02X%02X%02X".format(
@@ -760,104 +1046,77 @@ private fun Color.toHexShort(): String =
     )
 
 // ──────────────────────────────────────────────
-// Phase 5: 显示偏好区域
+// 显示偏好区域（移除直角预设，只保留圆角）
 // ──────────────────────────────────────────────
 
-/**
- * 显示偏好区域：圆角风格选择（圆角/直角）+ 自定义圆角半径滑块 + 字体大小滑块 + 动效强度滑块。
- */
 @Composable
 private fun DisplayPreferencesSection(
-    cornerStyle: CornerStyle,
     cornerRadius: Float,
     fontScale: Float,
     animationScale: Float,
-    onCornerStyleChange: (CornerStyle) -> Unit,
+    animationTrigger: Int,
     onCornerRadiusChange: (Float) -> Unit,
     onFontScaleChange: (Float) -> Unit,
     onAnimationScaleChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalAppTheme.current.colors
-    val isRounded = cornerStyle == CornerStyle.ROUNDED
 
     AppCard(modifier = modifier) {
         Column(
             modifier = Modifier.padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Lg),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // 圆角风格二选一（预览形状跟随实际 cornerRadius，选中态走品牌主色）
+            // 圆角预览 + 半径滑块
             Text(
-                text = stringResource(R.string.theme_corner_style),
+                text = stringResource(R.string.theme_corner_radius),
                 fontSize = LocalComponentTokens.current.text.titleSmallFontSize,
                 color = colors.textPrimary,
                 fontWeight = FontWeight.Medium,
             )
+
+            // 圆角预览（跟随实际半径）
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 圆角预览使用当前实际半径；直角预览 0dp
-                val roundedShape: androidx.compose.ui.graphics.Shape =
-                    RoundedCornerShape(cornerRadius.dp)
-                val sharpShape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(0.dp)
-                val styles = listOf(
-                    Triple(CornerStyle.ROUNDED, stringResource(R.string.theme_corner_rounded), roundedShape),
-                    Triple(CornerStyle.Sharp, stringResource(R.string.theme_corner_sharp), sharpShape),
+                // 小预览
+                Box(
+                    modifier = Modifier
+                        .size(width = 64.dp, height = 32.dp)
+                        .clip(RoundedCornerShape(cornerRadius.dp))
+                        .background(colors.brandPrimary.copy(alpha = 0.2f))
+                        .border(1.dp, colors.brandPrimary, RoundedCornerShape(cornerRadius.dp)),
                 )
-                styles.forEach { (style, label, shape) ->
-                    val isSelected = style == cornerStyle
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
-                            .background(colors.surfaceSunken)
-                            .border(
-                                width = if (isSelected) 2.dp else 1.dp,
-                                color = if (isSelected) colors.brandPrimary else colors.borderDefault,
-                                shape = RoundedCornerShape(LocalCornerRadius.current.lg),
-                            )
-                            .clickable { onCornerStyleChange(style) }
-                            .padding(vertical = 10.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        // 预览形状（跟随实际圆角半径）
-                        Box(
-                            modifier = Modifier
-                                .size(width = 56.dp, height = 28.dp)
-                                .clip(shape)
-                                .background(colors.textSecondary),
-                        )
-                        Text(
-                            text = label,
-                            fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) colors.brandPrimary else colors.textSecondary,
-                        )
-                        // 圆角模式下显示当前半径数值
-                        if (style == CornerStyle.ROUNDED) {
-                            Text(
-                                text = "%.0fdp".format(cornerRadius),
-                                fontSize = LocalComponentTokens.current.text.labelSmallFontSize,
-                                color = colors.textTertiary,
-                            )
-                        }
-                    }
-                }
+                // 中预览
+                Box(
+                    modifier = Modifier
+                        .size(width = 64.dp, height = 32.dp)
+                        .clip(RoundedCornerShape(cornerRadius.dp))
+                        .background(colors.surfaceSunken)
+                        .border(1.dp, colors.borderDefault, RoundedCornerShape(cornerRadius.dp)),
+                )
+                // 当前半径数值
+                Text(
+                    text = "%.0fdp".format(cornerRadius),
+                    fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.brandPrimary,
+                    modifier = Modifier.weight(1f),
+                )
             }
 
-            Spacer(Modifier.height(4.dp))
-
-            // 圆角半径滑块（仅圆角模式可用，直角模式禁用置灰）
+            // 圆角半径滑块
             SliderRow(
                 label = stringResource(R.string.theme_corner_radius),
                 value = cornerRadius,
                 valueRange = 0f..24f,
                 onValueChange = onCornerRadiusChange,
                 valueLabel = "%.0fdp".format(cornerRadius),
-                enabled = isRounded,
             )
+
+            Spacer(Modifier.height(4.dp))
 
             // 字体大小滑块
             SliderRow(
@@ -877,29 +1136,33 @@ private fun DisplayPreferencesSection(
                 valueLabel = if (animationScale == 0f) stringResource(R.string.common_close) else "%.0f%%".format(animationScale * 100),
             )
 
-            // 动效预览：点击播放动画，时长跟随 animationScale
-            AnimationPreviewBox()
+            // 动效预览（返回页面时自动播放）
+            AnimationPreviewBox(trigger = animationTrigger)
         }
     }
 }
 
 // ──────────────────────────────────────────────
-// Phase 5: 动效强度预览
+// 动效强度预览（支持触发计数）
 // ──────────────────────────────────────────────
 
-/**
- * 动效强度预览：点击后播放一次"圆点左→右移动 + 缩放(1.0→1.5→1.0) + 透明度变化"动画，
- * 播完自动回到初始位置（不 toggle）。动画时长跟随 LocalAnimationScale。
- * 0% 时直接跳变（无动画），100% 时最慢最丝滑。
- */
 @Composable
-private fun AnimationPreviewBox() {
+private fun AnimationPreviewBox(
+    trigger: Int = 0,
+) {
     val colors = LocalAppTheme.current.colors
     val animScale = com.mini.me_core.core.theme.LocalAnimationScale.current
 
     var playCount by remember { mutableStateOf(0) }
     val progress = remember { androidx.compose.animation.core.Animatable(0f) }
     val animDuration = (900L * animScale).toInt().coerceAtLeast(0)
+
+    // 外部触发时播放
+    LaunchedEffect(trigger) {
+        if (trigger > 0) {
+            playCount++
+        }
+    }
 
     LaunchedEffect(playCount) {
         if (playCount == 0) return@LaunchedEffect
@@ -912,9 +1175,7 @@ private fun AnimationPreviewBox() {
     }
 
     val p = progress.value
-    // 横向位移：从左侧 8dp 出发，向右移动 200dp
     val offsetX = 8f + p * 200f
-    // 缩放 1.0 -> 1.5 -> 1.0（中点峰值），透明度同步起伏
     val wave = kotlin.math.sin((p * Math.PI).toDouble()).toFloat()
     val dotScale = 1f + 0.5f * wave
     val dotAlpha = 1f - 0.4f * wave
@@ -950,12 +1211,9 @@ private fun AnimationPreviewBox() {
 }
 
 // ──────────────────────────────────────────────
-// Phase 5: 恢复出厂主题按钮
+// 恢复出厂主题按钮
 // ──────────────────────────────────────────────
 
-/**
- * 页面底部"恢复出厂主题"按钮：描边样式（透明底 + 1dp error 描边 + error 文字）。
- */
 @Composable
 private fun FactoryResetButton(
     onClick: () -> Unit,
@@ -985,9 +1243,6 @@ private fun FactoryResetButton(
 // 通用：滑块行
 // ──────────────────────────────────────────────
 
-/**
- * 通用滑块行：标签 + 当前值 + Slider。
- */
 @Composable
 private fun SliderRow(
     label: String,

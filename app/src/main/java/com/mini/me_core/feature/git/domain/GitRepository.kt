@@ -7,14 +7,12 @@ import com.mini.me_core.feature.git.domain.model.GitCommit
 import com.mini.me_core.feature.git.domain.model.GitFileChange
 import com.mini.me_core.feature.git.domain.model.GitGraph
 import com.mini.me_core.feature.git.domain.model.GitGraphRef
-import com.mini.me_core.feature.git.domain.model.GitStash
 import com.mini.me_core.feature.git.domain.model.GraphCommit
 import com.mini.me_core.feature.git.domain.model.GitStatus
 import com.mini.me_core.feature.git.domain.model.GitTag
 import com.mini.me_core.feature.workspace.data.repository.WorkspaceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,72 +35,42 @@ class GitRepository @Inject constructor(
     private companion object {
         /** 提交拓扑图每页加载条数。首批与每次「加载更多」都取这么多条，超过的需滚到底再拉。 */
         const val GRAPH_PAGE_SIZE = 100
-
-        /** 短命令超时（status/branches/tags/config/rev-parse/init/add/commit/branch/checkout/stash 等本地快命令）。 */
-        const val TIMEOUT_QUICK_MS = 15_000L
-
-        /** 日志与拓扑图加载超时（首页 100 条及「加载更多」追加页）。 */
-        const val TIMEOUT_LOG_MS = 30_000L
-
-        /** 单文件内容读取与 diff 解析超时（show/commitFiles）。 */
-        const val TIMEOUT_FILE_MS = 10_000L
-
-        /** 网络操作超时（pull/push/clone/删除远程分支）。 */
-        const val TIMEOUT_NETWORK_MS = 120_000L
     }
     /**
      * 执行一条 `git` 子命令，返回合并后的 stdout+stderr 文本。仅用于只读命令（status/branches/log/remote 等）：
      * 这些靠输出解析、容错，git 非零退出码不会让 UI 误判（解析得空罢了）。凭据由 `credential.helper=store`
      * 经落盘文件自动注入（见 [GitCredentialsFileSync]），不在此按命令塞 `http.extraHeader`。
      * 每条参数经 [shellQuote] 单引号转义，含空格/特殊字符的值（提交消息、含空格路径等）安全传递。
-     *
-     * [timeoutMs] 为该命令的超时上限，默认 [TIMEOUT_QUICK_MS]；日志/图加载传 [TIMEOUT_LOG_MS]，
-     * 文件读取/diff 传 [TIMEOUT_FILE_MS]。超时由 [gitRaw] 抛 [GitTimeoutException]，与普通失败区分。
      */
     private suspend fun git(
-        vararg args: String,
-        timeoutMs: Long = TIMEOUT_QUICK_MS
-    ): String = gitRaw(args, timeoutMs)
+        vararg args: String
+    ): String = gitRaw(args)
 
     /**
      * 执行一条 `git` **写**子命令，据退出码判成败：非零（真实失败）抛 [GitCommandFailureException]
      * 携带 git 输出文本，上层 [com.mini.me_core.feature.git.presentation.GitViewModel.runAction] 据此如实显示
-     * 「失败 + 原因」而非误报成功。代表场景：未配置署名提交、未授权推送、合并冲突。空退出码（异常崩溃）
+     * 「失败 + 原因」而非误报成功。代表场景：未配置署名提交、未授权推送、合并冲突。空退出码（超时/异常）
      * 同样按失败抛，避免静默成功。
-     *
-     * [timeoutMs] 为该命令的超时上限，默认 [TIMEOUT_QUICK_MS]；网络操作（pull/push/删除远程分支）
-     * 传 [TIMEOUT_NETWORK_MS]。超时（[com.mini.me_core.feature.agent.domain.container.CommandResult.timedOut]
-     * 为 true）抛 [GitTimeoutException]，不混入 [GitCommandFailureException]。
      */
     private suspend fun gitChecked(
-        vararg args: String,
-        timeoutMs: Long = TIMEOUT_QUICK_MS
+        vararg args: String
     ): String {
         val cmd = buildString {
             append("git")
             args.forEach { append(' '); append(shellQuote(it)) }
         }
-        val result = engine.runCommandSyncWithExit(cmd, workspaceRepository.currentPath(), timeoutMs)
-        if (result.timedOut) throw GitTimeoutException(args.firstOrNull() ?: "git", timeoutMs)
+        val result = engine.runCommandSyncWithExit(cmd, workspaceRepository.currentPath())
         if (result.exitCode == 0) return result.output
         throw GitCommandFailureException(result.output.ifBlank { "git 退出码 ${result.exitCode}" })
     }
 
-    /**
-     * 拼命令并跑（不判退出码），[git] 与 [gitChecked] 复用。
-     *
-     * 走 [CommandEngine.runCommandSyncWithExit]（而非只返文本的 runCommandSync）以便拿到
-     * [com.mini.me_core.feature.agent.domain.container.CommandResult.timedOut]：超时即抛
-     * [GitTimeoutException]。其 output 与 runCommandSync 完全一致（同一 execCaptured 产出）。
-     */
-    private suspend fun gitRaw(args: Array<out String>, timeoutMs: Long = TIMEOUT_QUICK_MS): String {
+    /** 拼命令并跑（不判退出码），[git] 与 [gitChecked] 复用。 */
+    private suspend fun gitRaw(args: Array<out String>): String {
         val cmd = buildString {
             append("git")
             args.forEach { append(' '); append(shellQuote(it)) }
         }
-        val result = engine.runCommandSyncWithExit(cmd, workspaceRepository.currentPath(), timeoutMs)
-        if (result.timedOut) throw GitTimeoutException(args.firstOrNull() ?: "git", timeoutMs)
-        return result.output
+        return engine.runCommandSync(cmd, workspaceRepository.currentPath())
     }
 
     /** 当前工作区是否处于一个 git 工作树内。SSH 未连接等异常时返回 false 而非抛出，避免 UI 崩溃。 */
@@ -171,31 +139,6 @@ class GitRepository @Inject constructor(
         return GitStatus(branch, ahead, behind, staged, unstaged, untracked)
     }
 
-    /**
-     * 工作区是否干净的聚合视图：暂存区/工作区/未跟踪文件三类改动各自有无，以及是否整体干净。
-     * 基于 [status] 的 porcelain 结果派生，不额外跑命令，供 UI 据此门控提交/切换分支等操作。
-     */
-    data class WorkingTreeState(
-        val hasStagedChanges: Boolean,
-        val hasUnstagedChanges: Boolean,
-        val hasUntrackedFiles: Boolean,
-        val isClean: Boolean
-    )
-
-    /** 计算当前工作区状态（暂存/未暂存/未跟踪/是否干净）。 */
-    suspend fun workingTreeState(): WorkingTreeState {
-        val s = status()
-        val hasStaged = s.staged.isNotEmpty()
-        val hasUnstaged = s.unstaged.isNotEmpty()
-        val hasUntracked = s.untracked.isNotEmpty()
-        return WorkingTreeState(
-            hasStagedChanges = hasStaged,
-            hasUnstagedChanges = hasUnstaged,
-            hasUntrackedFiles = hasUntracked,
-            isClean = !hasStaged && !hasUnstaged && !hasUntracked
-        )
-    }
-
     /** 本地 + 远程分支列表，当前分支高亮。 */
     suspend fun branches(): List<GitBranch> = loadAllRefs().branches
 
@@ -221,12 +164,9 @@ class GitRepository @Inject constructor(
         result
     }
 
-    /** 最近 [limit] 条提交。日志读取走 [TIMEOUT_LOG_MS] 超时。 */
+    /** 最近 [limit] 条提交。 */
     suspend fun log(limit: Int = 50): List<GitCommit> {
-        val raw = git(
-            "log", "--pretty=format:%H|%h|%an|%ar|%s", "-n", limit.toString(),
-            timeoutMs = TIMEOUT_LOG_MS
-        )
+        val raw = git("log", "--pretty=format:%H|%h|%an|%ar|%s", "-n", limit.toString())
         if (raw.isBlank() || raw.startsWith("fatal:")) return emptyList()
         return raw.split('\n').mapNotNull { line ->
             val parts = line.removeSuffix("\r").split('|', limit = 5)
@@ -272,12 +212,8 @@ class GitRepository @Inject constructor(
         limit: Int = GRAPH_PAGE_SIZE
     ): GitGraph = withContext(Dispatchers.Default) {
         val skip = existingCommits.size
-        val logRaw = runCatching {
-            git(
-                "log", "--pretty=format:%H|%h|%an|%ar|%s|%P", "--skip", skip.toString(), "-n", limit.toString(),
-                timeoutMs = TIMEOUT_LOG_MS
-            )
-        }.getOrDefault("")
+        val logRaw = runCatching { git("log", "--pretty=format:%H|%h|%an|%ar|%s|%P", "--skip", skip.toString(), "-n", limit.toString()) }
+            .getOrDefault("")
         if (logRaw.isBlank() || logRaw.startsWith("fatal:")) {
             return@withContext if (existingCommits.isEmpty()) GitGraph.EMPTY
             else GitGraphBuilder.buildGraph(existingCommits, refs, hasMore = false)
@@ -348,16 +284,9 @@ class GitRepository @Inject constructor(
      * 某次提交改动的文件清单。用 `diff-tree --root` 以兼容无父的根提交；`--no-renames` 让重命名
      * 退化为「删除旧 + 新增新」，状态码取首字符即可复用 [com.mini.me_core.feature.git.domain.model.GitFileChange]。
      * 返回空列表表示该提交无文件改动（如空提交）。
-     *
-     * [hash] 须为 40 位十六进制对象名，先经 [GitRefValidator.requireValidHash] 校验；文件清单读取
-     * 走 [TIMEOUT_FILE_MS] 超时。
      */
     suspend fun commitFiles(hash: String): List<GitFileChange> {
-        GitRefValidator.requireValidHash(hash)
-        val raw = git(
-            "diff-tree", "--no-commit-id", "-r", "--root", "--name-status", "--no-renames", hash,
-            timeoutMs = TIMEOUT_FILE_MS
-        )
+        val raw = git("diff-tree", "--no-commit-id", "-r", "--root", "--name-status", "--no-renames", hash)
         return withContext(Dispatchers.Default) {
             raw.lineSequence().mapNotNull { line ->
                 val l = line.removeSuffix("\r").trim()
@@ -384,27 +313,25 @@ class GitRepository @Inject constructor(
      * 故不再在此预查 host 凭据：三端（UI/终端/AI）共用同一 helper 兜底，逻辑单一来源。remote 不存在
      * 或真实失败由 [gitChecked] 据退出码抛 [GitCommandFailureException]，上层 toast。
      */
-    suspend fun pull(): String = gitChecked("pull", timeoutMs = TIMEOUT_NETWORK_MS)
+    suspend fun pull(): String = gitChecked("pull")
 
     /**
      * 推送：有上游则 `git push`；当前分支无上游时自动 `git push --set-upstream <remote> <branch>` 首推建关联，
      * 仿 Win/Mac git 客户端「首次推送自动建上游」体验，避免用户撞到 `fatal: has no upstream branch` 原始报错。
      * remote 取 `git remote` 首个（多 remote 默认第一；无 remote 已被上层 hasRemote 门控挡掉）；
      * 分支取 `git rev-parse --abbrev-ref HEAD`。凭据仍由容器 credential.helper 链兜底注入。
-     *
-     * 推送本身走 [TIMEOUT_NETWORK_MS] 超时；其间探上游/列 remote 的本地短命令仍用默认短超时。
      */
     suspend fun push(): String {
         val hasUpstream = runCatching { git("rev-parse", "--abbrev-ref", "@{upstream}").trim() }
             .getOrDefault("")
             .takeIf { it.isNotBlank() && it != "HEAD" && !it.startsWith("fatal") } != null
-        if (hasUpstream) return gitChecked("push", timeoutMs = TIMEOUT_NETWORK_MS)
+        if (hasUpstream) return gitChecked("push")
         val remote = git("remote").split('\n').firstOrNull { it.removeSuffix("\r").isNotBlank() }?.removeSuffix("\r")?.trim()
             ?: throw GitCommandFailureException("未配置远程仓库")
         val branch = git("rev-parse", "--abbrev-ref", "HEAD").removeSuffix("\r").trim()
             .takeIf { it.isNotBlank() && it != "HEAD" }
             ?: throw GitCommandFailureException("无法确定当前分支（处于 detached HEAD）")
-        return gitChecked("push", "--set-upstream", remote, branch, timeoutMs = TIMEOUT_NETWORK_MS)
+        return gitChecked("push", "--set-upstream", remote, branch)
     }
 
     /** 本地标签列表，按创建时间倒序（最新在前）。 */
@@ -413,12 +340,9 @@ class GitRepository @Inject constructor(
     /**
      * 创建新分支。name 为新分支名；startPoint 为基准分支名（null/空 → 从当前 HEAD）；
      * checkout=true 则创建并切换（`git checkout -b`），否则仅创建不切换（`git branch`）。
-     * 分支名与起点先经 [GitRefValidator.requireValidRef] 做白名单校验；起点不存在或分支名非法时
-     * 由 [gitChecked] 据退出码抛 [GitCommandFailureException]，上层 toast。
+     * 起点不存在或分支名非法时由 [gitChecked] 据退出码抛 [GitCommandFailureException]，上层 toast。
      */
     suspend fun createBranch(name: String, startPoint: String?, checkout: Boolean): String {
-        GitRefValidator.requireValidRef(name)
-        if (!startPoint.isNullOrBlank()) GitRefValidator.requireValidRef(startPoint)
         return if (checkout) {
             if (startPoint.isNullOrBlank()) gitChecked("checkout", "-b", name)
             else gitChecked("checkout", "-b", name, startPoint)
@@ -431,79 +355,49 @@ class GitRepository @Inject constructor(
     /**
      * 安全删除本地分支（`git branch -d`）：仅删除已合并到上游的分支，未合并时 git 报错
      * 由 [gitChecked] 据退出码抛 [GitCommandFailureException]，上层 toast。当前分支不可删（git 自身拦截）。
-     * 分支名先经 [GitRefValidator.requireValidRef] 白名单校验。
      */
-    suspend fun deleteBranch(name: String): String {
-        GitRefValidator.requireValidRef(name)
-        return gitChecked("branch", "-d", name)
-    }
+    suspend fun deleteBranch(name: String): String = gitChecked("branch", "-d", name)
 
     /**
      * 重命名本地分支（`git branch -m <old> <new>`）。当前分支也可重命名：传单参数 `git branch -m <new>`
-     * 重命名当前分支；这里统一用双参数形式，由上层保证 oldName 非空。两个分支名先经
-     * [GitRefValidator.requireValidRef] 白名单校验；名字非法或已存在时由 [gitChecked]
+     * 重命名当前分支；这里统一用双参数形式，由上层保证 oldName 非空。名字非法或已存在时由 [gitChecked]
      * 据退出码抛 [GitCommandFailureException]，上层 toast。
      */
-    suspend fun renameBranch(oldName: String, newName: String): String {
-        GitRefValidator.requireValidRef(oldName)
-        GitRefValidator.requireValidRef(newName)
-        return gitChecked("branch", "-m", oldName, newName)
-    }
+    suspend fun renameBranch(oldName: String, newName: String): String =
+        gitChecked("branch", "-m", oldName, newName)
 
     /**
      * 创建轻量标签（`git tag <name>`），指向当前 HEAD。附注标签需消息且交互复杂，暂只做轻量标签；
-     * 标签名先经 [GitRefValidator.requireValidRef] 白名单校验；名字非法或已存在时由 [gitChecked]
-     * 据退出码抛 [GitCommandFailureException]，上层 toast。
+     * 名字非法或已存在时由 [gitChecked] 据退出码抛 [GitCommandFailureException]，上层 toast。
      */
-    suspend fun createTag(name: String): String {
-        GitRefValidator.requireValidRef(name)
-        return gitChecked("tag", name)
-    }
+    suspend fun createTag(name: String): String = gitChecked("tag", name)
 
     /**
-     * 删除本地标签（`git tag -d <name>`）。标签名先经 [GitRefValidator.requireValidRef] 白名单校验；
-     * 不存在时由 [gitChecked] 据退出码抛 [GitCommandFailureException]，上层 toast。
+     * 删除本地标签（`git tag -d <name>`）。不存在时由 [gitChecked] 据退出码抛 [GitCommandFailureException]，上层 toast。
      */
-    suspend fun deleteTag(name: String): String {
-        GitRefValidator.requireValidRef(name)
-        return gitChecked("tag", "-d", name)
-    }
+    suspend fun deleteTag(name: String): String = gitChecked("tag", "-d", name)
 
     /**
      * 删除远程分支（`git push <remote> --delete <branch>`）。ref 形如 `origin/feature`，拆出 remote 与分支名；
-     * 无 remote 前缀时按 `origin` 兜底。会改远端，推送走 [TIMEOUT_NETWORK_MS] 超时，失败由 [gitChecked]
-     * 抛 [GitCommandFailureException]。ref 先经 [GitRefValidator.requireValidRef] 白名单校验。
+     * 无 remote 前缀时按 `origin` 兜底。会改远端，失败由 [gitChecked] 抛 [GitCommandFailureException]。
      */
     suspend fun deleteRemoteBranch(ref: String): String {
-        GitRefValidator.requireValidRef(ref)
         val remote = ref.substringBefore('/', "origin")
         val branch = ref.substringAfter('/', ref)
-        return gitChecked("push", remote, "--delete", branch, timeoutMs = TIMEOUT_NETWORK_MS)
+        return gitChecked("push", remote, "--delete", branch)
     }
 
     /**
      * 切换到指定分支或标签。branch 可以是本地分支名、远程分支名或 tag 名。
      * 远程分支用 `git checkout -b <local> <remote>` 创建本地跟踪分支，去掉远程前缀（如 origin/）。
-     * 目标 ref 先经 [GitRefValidator.requireValidRef] 白名单校验。
      */
     suspend fun checkout(branch: String, isRemote: Boolean): String {
-        GitRefValidator.requireValidRef(branch)
         return if (isRemote) {
             val localName = branch.substringAfter('/', branch)
             gitChecked("checkout", "-b", localName, "--track", branch)
         } else {
             gitChecked("checkout", branch)
         }
-    }
-
-    /**
-     * 丢弃工作区全部未提交改动：先 `git reset --hard HEAD` 把暂存区与工作区重置到 HEAD，
-     * 再 `git clean -fd` 删除未跟踪文件与目录。两步均为写命令，据退出码判成败抛
-     * [GitCommandFailureException]。不可逆——仅在用户经二次确认「放弃改动并切换」后调用。
-     */
-    suspend fun discardWorktreeChanges(): String {
-        gitChecked("reset", "--hard", "HEAD")
-        return gitChecked("clean", "-fd")
     }
 
     /**
@@ -553,104 +447,14 @@ class GitRepository @Inject constructor(
     suspend fun getRepoUrl(): String =
         runCatching { git("config", "--get", "remote.origin.url").trim() }.getOrDefault("").removeSuffix("\r")
 
-    // ── stash ──
-
-    /** 匹配一行 `git stash list` 输出：`stash@{N}: <tail>`。 */
-    private val STASH_LINE_REGEX = Regex("^stash@\\{(\\d+)}:\\s*(.*)$")
-
-    /** 尾部里「基线哈希 + 主题」的前导哈希 token（7-40 位十六进制）。 */
-    private val STASH_HASH_PREFIX_REGEX = Regex("^([0-9a-fA-F]{7,40})(?:\\s+(.*))?$")
-
-    /**
-     * 列出全部 stash（`git stash list`），最新在前（index 0）。解析默认 reflog 文案：
-     * - `stash@{0}: WIP on <branch>: <hash> <主题>` → branch=分支，commitHash=基线哈希，message=主题；
-     * - `stash@{1}: On <branch>: <自定义消息>` → branch=分支，commitHash 为空，message=自定义消息。
-     * 解析失败的行跳过；无 stash 时返回空列表。
-     */
-    suspend fun stashList(): List<GitStash> {
-        val raw = runCatching { git("stash", "list") }.getOrDefault("")
-        if (raw.isBlank()) return emptyList()
-        val result = mutableListOf<GitStash>()
-        for (line in raw.split('\n')) {
-            val l = line.removeSuffix("\r").trim()
-            val m = STASH_LINE_REGEX.find(l) ?: continue
-            val index = m.groupValues[1].toIntOrNull() ?: continue
-            val tail = m.groupValues[2].trim()
-            // 拆出分支名与剩余说明。
-            val branch: String
-            val rest: String
-            when {
-                tail.startsWith("WIP on ") -> {
-                    val after = tail.removePrefix("WIP on ")
-                    branch = after.substringBefore(":").trim()
-                    rest = after.substringAfter(":", "").trim()
-                }
-                tail.startsWith("On ") -> {
-                    val after = tail.removePrefix("On ")
-                    branch = after.substringBefore(":").trim()
-                    rest = after.substringAfter(":", "").trim()
-                }
-                else -> {
-                    branch = ""
-                    rest = tail
-                }
-            }
-            // 剩余说明里若以哈希开头，拆出基线哈希，message 取其后的主题；否则整段即 message。
-            val hm = STASH_HASH_PREFIX_REGEX.find(rest)
-            val commitHash: String
-            val message: String
-            if (hm != null && hm.groupValues[2].isNotBlank()) {
-                commitHash = hm.groupValues[1]
-                message = hm.groupValues[2].trim()
-            } else {
-                commitHash = ""
-                message = rest
-            }
-            result.add(GitStash(index, branch, message, commitHash))
-        }
-        return result
-    }
-
-    /**
-     * 新建 stash（`git stash push`）。[message] 为自定义说明（null → 自动 WIP 文案）；
-     * [includeUntracked] 为 true 时连未跟踪文件一起 stash（`-u`）。返回 git 输出。
-     */
-    suspend fun stashPush(message: String?, includeUntracked: Boolean): String {
-        val args = mutableListOf("stash", "push")
-        if (includeUntracked) args += "-u"
-        if (!message.isNullOrBlank()) {
-            args += "-m"
-            args += message
-        }
-        return gitChecked(*args.toTypedArray())
-    }
-
-    /** 恢复并删除第 [index] 条 stash（`git stash pop stash@{index}`）。返回 git 输出。 */
-    suspend fun stashPop(index: Int): String = gitChecked("stash", "pop", "stash@{$index}")
-
-    /** 恢复但保留第 [index] 条 stash（`git stash apply stash@{index}`）。返回 git 输出。 */
-    suspend fun stashApply(index: Int): String = gitChecked("stash", "apply", "stash@{$index}")
-
-    /** 删除第 [index] 条 stash（`git stash drop stash@{index}`）。返回 git 输出。 */
-    suspend fun stashDrop(index: Int): String = gitChecked("stash", "drop", "stash@{$index}")
-
-    /** 清空全部 stash（`git stash clear`）。返回 git 输出。 */
-    suspend fun stashClear(): String = gitChecked("stash", "clear")
-
     /**
      * 读取指定 ref（提交/分支/标签）下某文件的完整内容（`git show <ref>:<path>`）。
  * 用于提交文件 diff：取 `<hash>^:<path>`（改动前）与 `<hash>:<path>`（改动后）对比。
  * 文件在指定 ref 不存在时（如新增文件的首个提交）git 报错输出 `fatal:`，此处检测到即返回空串，
  * 上层据空串判定为「新增/删除」，整个文件按全增或全删呈现。
- *
- * 安全：[ref] 先经 [GitRefValidator.requireValidRef] 白名单校验，[path] 先经
- * [GitPathValidator.requireWithinWorkspace] 确认不逃逸工作区（含符号链接），再拼进命令。
- * 文件读取走 [TIMEOUT_FILE_MS] 超时。
  */
     suspend fun showFileContent(ref: String, path: String): String {
-        GitRefValidator.requireValidRef(ref)
-        GitPathValidator.requireWithinWorkspace(File(workspaceRepository.currentPath()), path)
-        val out = git("show", "$ref:$path", timeoutMs = TIMEOUT_FILE_MS)
+        val out = git("show", "$ref:$path")
         // git show 对不存在的路径输出 fatal 到 stderr，runCommandSync 合并了 stdout+stderr。
         // 检测到 fatal 前缀视为该版本无此文件，返回空串让 diff 按全增/全删处理。
         return if (out.startsWith("fatal:") || out.startsWith("error:")) "" else out
@@ -659,20 +463,11 @@ class GitRepository @Inject constructor(
     /**
      * 读取工作区当前文件内容。用于工作区改动 diff：与 `HEAD:<path>` 对比看出未暂存的改动。
  * 文件不存在或读取失败返回空串。经容器内直接读文件而非 git show，因为工作区文件即当前内容。
- *
- * 安全：[path] 先经 [GitPathValidator.requireWithinWorkspace] 规范化并确认落在工作区内（挡住
- * `../` 上溯与指向外部的符号链接）；校验失败记一条警告日志并返回空串，不读取工作区外文件。
  */
     suspend fun worktreeFileContent(path: String): String =
         withContext(Dispatchers.IO) {
             runCatching {
-                val safeFile = try {
-                    GitPathValidator.requireWithinWorkspace(File(workspaceRepository.currentPath()), path)
-                } catch (e: IllegalArgumentException) {
-                    FileLogger.w(TAG, "拒绝工作区外路径读取: $path", e)
-                    return@runCatching ""
-                }
-                safeFile.takeIf { it.isFile }?.readText() ?: ""
+                java.io.File(workspaceRepository.currentPath(), path).takeIf { it.isFile }?.readText() ?: ""
             }.getOrDefault("")
         }
 

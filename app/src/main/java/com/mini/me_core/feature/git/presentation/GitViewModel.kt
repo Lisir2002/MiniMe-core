@@ -10,12 +10,10 @@ import com.mini.me_core.core.util.LineDiff
 import com.mini.me_core.feature.git.domain.GitCommandFailureException
 import com.mini.me_core.feature.git.domain.GitErrorMessage
 import com.mini.me_core.feature.git.domain.GitRepository
-import com.mini.me_core.feature.git.domain.GitTimeoutException
 import com.mini.me_core.feature.git.domain.model.GitBranch
 import com.mini.me_core.feature.git.domain.model.GitCommit
 import com.mini.me_core.feature.git.domain.model.GitFileChange
 import com.mini.me_core.feature.git.domain.model.GitGraph
-import com.mini.me_core.feature.git.domain.model.GitStash
 import com.mini.me_core.feature.git.domain.model.GitStatus
 import com.mini.me_core.feature.git.domain.model.GitTab
 import com.mini.me_core.feature.git.domain.model.GitTag
@@ -86,17 +84,7 @@ class GitViewModel @Inject constructor(
         /** diff 视图数据；非 null 时 UI 全屏渲染 diff 页。 */
         val diffData: DiffData? = null,
         /** 正在加载 diff。 */
-        val diffLoading: Boolean = false,
-        /** 容器未就绪引导文案；非 null 时 Git 页显示 [com.mini.me_core.feature.git.presentation.component.ContainerNotReadyCard]。 */
-        val notReadyHint: String? = null,
-        /** stash 列表（最新在前，index 0）。 */
-        val stashes: List<GitStash> = emptyList(),
-        /** 正在加载 stash 列表（只读，不阻塞写操作）。 */
-        val stashLoading: Boolean = false,
-        /** 待用户确认的危险操作；非 null 时显示危险操作确认对话框。 */
-        val pendingDanger: PendingDangerAction? = null,
-        /** 待用户选择处理方式的分支切换；工作区有改动时非 null，显示三态切换确认对话框。 */
-        val pendingCheckout: PendingCheckout? = null
+        val diffLoading: Boolean = false
     )
 
     private val _state = MutableStateFlow(GitUiState())
@@ -152,9 +140,7 @@ class GitViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 FileLogger.e(TAG, "加载分支列表失败", e)
-                val msg = if (e is GitTimeoutException) context.getString(R.string.git_toast_timeout)
-                else context.getString(R.string.git_toast_load_branches_failed, e.message)
-                _state.update { it.copy(branchesLoading = false, toast = msg) }
+                _state.update { it.copy(branchesLoading = false, toast = context.getString(R.string.git_toast_load_branches_failed, e.message)) }
             }
         }
     }
@@ -177,12 +163,12 @@ class GitViewModel @Inject constructor(
 
     fun refresh() {
         if (_state.value.busy) return
-        // 容器未就绪时不执行 git 命令，直接把引导文案写入 state 让 Git 页展示容器未就绪卡片，避免误显示"非 Git 仓库"。
+        // 容器未就绪时不执行 git 命令，直接提示用户去终端页完成初始化，避免误显示"非 Git 仓库"。
         repository.notReadyHint()?.let { hint ->
-            _state.update { it.copy(loading = false, notReadyHint = hint) }
+            _state.update { it.copy(loading = false, toast = hint) }
             return
         }
-        _state.update { it.copy(loading = true, toast = null, notReadyHint = null) }
+        _state.update { it.copy(loading = true, toast = null) }
         viewModelScope.launch {
             try {
                 if (!repository.isRepo()) {
@@ -192,28 +178,22 @@ class GitViewModel @Inject constructor(
                 val snap = loadSnapshot(includeIdentity = true)
                 val commits = snap.graph.commits.map { GitCommit(it.hash, it.shortHash, it.author, it.date, it.message) }
                 _state.update {
-                    it.copy(loading = false, notARepo = false, notReadyHint = null, status = snap.status, commits = commits, graph = snap.graph, hasRemote = snap.hasRemote, hasIdentity = snap.hasIdentity, branchesLoaded = false, branchesLoading = false, branches = emptyList(), tags = emptyList())
+                    it.copy(loading = false, notARepo = false, status = snap.status, commits = commits, graph = snap.graph, hasRemote = snap.hasRemote, hasIdentity = snap.hasIdentity, branchesLoaded = false, branchesLoading = false, branches = emptyList(), tags = emptyList())
                 }
                 // 页面已打开：后台拉取全量分支/标签，用户切到 BRANCHES tab 时无需再等。
                 loadBranches()
-                // stash 列表只读不阻塞首屏，后台拉取。
-                loadStashes()
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 FileLogger.e(TAG, "刷新失败", e)
-                val msg = if (e is GitTimeoutException) context.getString(R.string.git_toast_timeout)
-                else context.getString(R.string.git_toast_refresh_failed, e.message)
-                _state.update { it.copy(loading = false, toast = msg) }
+                _state.update { it.copy(loading = false, toast = context.getString(R.string.git_toast_refresh_failed, e.message)) }
             }
         }
     }
 
-    /** 执行一个写操作：置 busy → 跑命令 → 刷新 → 反馈。操作间互斥。
-     * [postRefresh] 在快照刷新完成后顺序执行（如 stash 写操作后刷新 stash 列表）。 */
+    /** 执行一个写操作：置 busy → 跑命令 → 刷新 → 反馈。操作间互斥。 */
     private fun runAction(
         @StringRes nameRes: Int,
-        action: suspend () -> String,
-        postRefresh: (suspend () -> Unit)? = null
+        action: suspend () -> String
     ) {
         if (_state.value.busy) return
         _state.update { it.copy(busy = true, toast = null) }
@@ -225,12 +205,8 @@ class GitViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 FileLogger.e(TAG, "${name}失败", e)
-                if (e is GitTimeoutException) {
-                    context.getString(R.string.git_toast_timeout)
-                } else {
-                    val reason = (e as? GitCommandFailureException)?.output ?: e.message
-                    context.getString(R.string.git_toast_action_failed, name, GitErrorMessage.friendly(reason ?: ""))
-                }
+                val reason = (e as? GitCommandFailureException)?.output ?: e.message
+                context.getString(R.string.git_toast_action_failed, name, GitErrorMessage.friendly(reason ?: ""))
             }
             // 刷新以反映新状态；失败也刷新，让 UI 与仓库一致。
             try {
@@ -239,7 +215,6 @@ class GitViewModel @Inject constructor(
                     val commits = snap.graph.commits.map { GitCommit(it.hash, it.shortHash, it.author, it.date, it.message) }
                     _state.update { it.copy(busy = false, status = snap.status, commits = commits, graph = snap.graph, hasRemote = snap.hasRemote, notARepo = false, toast = msg) }
                     refreshBranchesIfLoaded()
-                    postRefresh?.invoke()
                 } else {
                     _state.update { it.copy(busy = false, notARepo = true, toast = msg) }
                 }
@@ -318,137 +293,41 @@ class GitViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 FileLogger.e(TAG, "加载更多提交失败", e)
-                val msg = if (e is GitTimeoutException) context.getString(R.string.git_toast_timeout)
-                else context.getString(R.string.git_toast_load_more_failed, e.message)
-                _state.update { it.copy(graphLoadingMore = false, toast = msg) }
+                _state.update { it.copy(graphLoadingMore = false, toast = context.getString(R.string.git_toast_load_more_failed, e.message)) }
             }
         }
     }
 
     /**
-     * 切换到指定分支或标签。
-     *
-     * 先查工作区状态：若存在未提交改动（暂存/未暂存/未跟踪任一），不直接切换，而是把目标 ref
-     * 与改动摘要写入 [GitUiState.pendingCheckout]，让 UI 弹出三态确认对话框——用户选择「暂存并切换」
-     * （[confirmCheckoutStash]）、「放弃改动并切换」（[confirmCheckoutDiscard]）或取消。工作区干净时直接切换。
+     * 切换到指定分支或标签。成功后刷新全量状态。
      */
     fun checkoutBranch(ref: String, isRemote: Boolean = false) {
         if (_state.value.busy || _state.value.checkoutLoading != null) return
         _state.update { it.copy(checkoutLoading = ref, toast = null) }
         viewModelScope.launch {
-            val wts = try { repository.workingTreeState() } catch (e: Exception) {
+            val msg = try {
+                repository.checkout(ref, isRemote)
+                context.getString(R.string.git_toast_checkout_success, ref)
+            } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                null
+                FileLogger.e(TAG, "切换分支失败", e)
+                val reason = (e as? GitCommandFailureException)?.output ?: e.message
+                context.getString(R.string.git_toast_checkout_failed, GitErrorMessage.friendly(reason ?: ""))
             }
-            if (wts != null && !wts.isClean) {
-                // 有未提交改动：挂起切换，交给三态确认对话框。
-                _state.update {
-                    it.copy(
-                        checkoutLoading = null,
-                        pendingCheckout = PendingCheckout(
-                            targetBranch = ref,
-                            isRemote = isRemote,
-                            hasStagedChanges = wts.hasStagedChanges,
-                            hasUnstagedChanges = wts.hasUnstagedChanges,
-                            hasUntrackedFiles = wts.hasUntrackedFiles
-                        )
-                    )
+            try {
+                if (repository.isRepo()) {
+                    val snap = loadSnapshot(includeIdentity = false)
+                    val commits = snap.graph.commits.map { GitCommit(it.hash, it.shortHash, it.author, it.date, it.message) }
+                    _state.update { it.copy(checkoutLoading = null, status = snap.status, commits = commits, graph = snap.graph, hasRemote = snap.hasRemote, notARepo = false, toast = msg) }
+                    // 切换分支后分支列表可能变化，若已加载过则刷新。
+                    refreshBranchesIfLoaded()
+                } else {
+                    _state.update { it.copy(checkoutLoading = null, notARepo = true, toast = msg) }
                 }
-                return@launch
-            }
-            runCheckoutFlow(ref, isRemote)
-        }
-    }
-
-    /** 实际执行 checkout 命令并刷新快照。 */
-    private suspend fun runCheckoutFlow(ref: String, isRemote: Boolean) {
-        val msg = try {
-            repository.checkout(ref, isRemote)
-            context.getString(R.string.git_toast_checkout_success, ref)
-        } catch (e: Exception) {
-            if (e is CancellationException) throw e
-            FileLogger.e(TAG, "切换分支失败", e)
-            checkoutErrorMessage(e)
-        }
-        refreshAfterCheckout(msg)
-    }
-
-    /** 三态确认对话框「暂存并切换」：先 stash（含未跟踪文件）再 checkout。 */
-    fun confirmCheckoutStash() {
-        val pc = _state.value.pendingCheckout ?: return
-        dismissCheckout()
-        checkoutWithStash(pc.targetBranch, pc.isRemote)
-    }
-
-    /** 三态确认对话框「放弃改动并切换」：先 reset --hard + clean 再 checkout。 */
-    fun confirmCheckoutDiscard() {
-        val pc = _state.value.pendingCheckout ?: return
-        dismissCheckout()
-        checkoutDiscardAndSwitch(pc.targetBranch, pc.isRemote)
-    }
-
-    /** 取消分支切换，清空待确认状态。 */
-    fun dismissCheckout() = _state.update { it.copy(pendingCheckout = null) }
-
-    /** 先 stash（含未跟踪文件）再切换分支。stash 失败则中止切换并提示。 */
-    private fun checkoutWithStash(ref: String, isRemote: Boolean) {
-        if (_state.value.busy || _state.value.checkoutLoading != null) return
-        _state.update { it.copy(checkoutLoading = ref, toast = null) }
-        viewModelScope.launch {
-            val msg = try {
-                repository.stashPush(null, includeUntracked = true)
-                repository.checkout(ref, isRemote)
-                context.getString(R.string.git_toast_checkout_success, ref)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                FileLogger.e(TAG, "暂存并切换分支失败", e)
-                checkoutErrorMessage(e)
+                _state.update { it.copy(checkoutLoading = null, toast = context.getString(R.string.git_toast_action_refresh_failed, msg)) }
             }
-            refreshAfterCheckout(msg)
-            refreshStashes()
-        }
-    }
-
-    /** 先丢弃全部工作区改动（reset --hard + clean -fd）再切换分支。 */
-    private fun checkoutDiscardAndSwitch(ref: String, isRemote: Boolean) {
-        if (_state.value.busy || _state.value.checkoutLoading != null) return
-        _state.update { it.copy(checkoutLoading = ref, toast = null) }
-        viewModelScope.launch {
-            val msg = try {
-                repository.discardWorktreeChanges()
-                repository.checkout(ref, isRemote)
-                context.getString(R.string.git_toast_checkout_success, ref)
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                FileLogger.e(TAG, "放弃改动并切换分支失败", e)
-                checkoutErrorMessage(e)
-            }
-            refreshAfterCheckout(msg)
-        }
-    }
-
-    /** 把 checkout 类异常映射成提示文案：超时单独提示，其余按 git 输出友好化。 */
-    private fun checkoutErrorMessage(e: Exception): String {
-        if (e is GitTimeoutException) return context.getString(R.string.git_toast_timeout)
-        val reason = (e as? GitCommandFailureException)?.output ?: e.message
-        return context.getString(R.string.git_toast_checkout_failed, GitErrorMessage.friendly(reason ?: ""))
-    }
-
-    /** checkout 完成后刷新全量快照并回报 toast；失败时退化为仅提示。 */
-    private suspend fun refreshAfterCheckout(msg: String) {
-        try {
-            if (repository.isRepo()) {
-                val snap = loadSnapshot(includeIdentity = false)
-                val commits = snap.graph.commits.map { GitCommit(it.hash, it.shortHash, it.author, it.date, it.message) }
-                _state.update { it.copy(checkoutLoading = null, status = snap.status, commits = commits, graph = snap.graph, hasRemote = snap.hasRemote, notARepo = false, toast = msg) }
-                // 切换分支后分支列表可能变化，若已加载过则刷新。
-                refreshBranchesIfLoaded()
-            } else {
-                _state.update { it.copy(checkoutLoading = null, notARepo = true, toast = msg) }
-            }
-        } catch (e: Exception) {
-            if (e is CancellationException) throw e
-            _state.update { it.copy(checkoutLoading = null, toast = context.getString(R.string.git_toast_action_refresh_failed, msg)) }
         }
     }
 
@@ -500,82 +379,6 @@ class GitViewModel @Inject constructor(
         if (name.isBlank()) return
         runAction(R.string.git_action_delete_tag, { repository.deleteTag(name) })
     }
-
-    // ── stash ──
-
-    /** 加载 stash 列表（只读，不置 busy）。失败 toast 提示。 */
-    fun loadStashes() {
-        if (_state.value.stashLoading) return
-        _state.update { it.copy(stashLoading = true) }
-        viewModelScope.launch {
-            try {
-                val list = repository.stashList()
-                _state.update { it.copy(stashes = list, stashLoading = false) }
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                FileLogger.e(TAG, "加载 stash 列表失败", e)
-                val msg = if (e is GitTimeoutException) context.getString(R.string.git_toast_timeout)
-                else context.getString(R.string.git_toast_load_stashes_failed, e.message)
-                _state.update { it.copy(stashLoading = false, toast = msg) }
-            }
-        }
-    }
-
-    /** 静默刷新 stash 列表（写操作后调用，不置 stashLoading、失败仅记日志）。 */
-    private suspend fun refreshStashes() {
-        try {
-            val list = repository.stashList()
-            _state.update { it.copy(stashes = list) }
-        } catch (e: Exception) {
-            if (e is CancellationException) throw e
-            FileLogger.e(TAG, "刷新 stash 列表失败", e)
-        }
-    }
-
-    /** 新建 stash。[message] 为空时由 git 自动生成 WIP 文案；[includeUntracked] 为 true 连未跟踪文件一起 stash。 */
-    fun stashPush(message: String?, includeUntracked: Boolean) =
-        runAction(R.string.git_action_stash_push, { repository.stashPush(message, includeUntracked) }, postRefresh = { refreshStashes() })
-
-    /** 恢复并删除第 [index] 条 stash。 */
-    fun stashPop(index: Int) =
-        runAction(R.string.git_action_stash_pop, { repository.stashPop(index) }, postRefresh = { refreshStashes() })
-
-    /** 恢复但保留第 [index] 条 stash。 */
-    fun stashApply(index: Int) =
-        runAction(R.string.git_action_stash_apply, { repository.stashApply(index) }, postRefresh = { refreshStashes() })
-
-    /** 删除第 [index] 条 stash（危险操作，须经确认对话框）。 */
-    fun stashDrop(index: Int) =
-        runAction(R.string.git_action_stash_drop, { repository.stashDrop(index) }, postRefresh = { refreshStashes() })
-
-    /** 清空全部 stash（危险操作，须经确认对话框）。 */
-    fun stashClear() =
-        runAction(R.string.git_action_stash_clear, { repository.stashClear() }, postRefresh = { refreshStashes() })
-
-    // ── 危险操作确认 ──
-
-    /** UI 触发危险操作时调用：把待确认动作写入 state，弹出确认对话框。 */
-    fun requestDangerConfirm(action: PendingDangerAction) =
-        _state.update { it.copy(pendingDanger = action) }
-
-    /** 用户确认危险操作：取出待执行动作并分发到实际的删除方法。 */
-    fun confirmDanger() {
-        val action = _state.value.pendingDanger ?: return
-        dismissDanger()
-        when (action) {
-            is PendingDangerAction.DeleteBranch -> deleteBranch(action.name)
-            is PendingDangerAction.DeleteTag -> deleteTag(action.name)
-            is PendingDangerAction.DeleteRemoteBranch -> deleteRemoteBranch(action.ref)
-            is PendingDangerAction.StashDrop -> stashDrop(action.index)
-            PendingDangerAction.StashClear -> stashClear()
-        }
-    }
-
-    /** 取消危险操作，清空待确认状态。 */
-    fun dismissDanger() = _state.update { it.copy(pendingDanger = null) }
-
-    /** 容器未就绪卡片「前往终端」按钮：Git 页无终端导航回调，用 toast 引导用户。 */
-    fun notifyGoToTerminal() = _state.update { it.copy(toast = context.getString(R.string.git_toast_go_terminal)) }
 
     /**
      * 退出 diff 视图，清空 diff 状态。
@@ -707,38 +510,3 @@ class GitViewModel @Inject constructor(
         return offsets
     }
 }
-
-/**
- * 待用户在危险操作确认对话框中确认的不可逆动作。
- *
- * UI 层不直接执行删除类操作，而是先把动作类型塞进 [GitUiState.pendingDanger] 弹出确认对话框；
- * 用户确认后由 [GitViewModel.confirmDanger] 按本类型分发到对应的实际删除方法。
- */
-sealed class PendingDangerAction {
-    /** 删除本地分支。 */
-    data class DeleteBranch(val name: String) : PendingDangerAction()
-
-    /** 删除本地标签。 */
-    data class DeleteTag(val name: String) : PendingDangerAction()
-
-    /** 删除远程分支（形如 origin/feature）。 */
-    data class DeleteRemoteBranch(val ref: String) : PendingDangerAction()
-
-    /** 删除第 [index] 条 stash。 */
-    data class StashDrop(val index: Int) : PendingDangerAction()
-
-    /** 清空全部 stash。 */
-    data object StashClear : PendingDangerAction()
-}
-
-/**
- * 待用户选择处理方式的分支切换请求：目标 ref + 当前工作区的改动摘要。
- * 工作区有未提交改动时由 [GitViewModel.checkoutBranch] 写入，UI 据此弹出三态确认对话框。
- */
-data class PendingCheckout(
-    val targetBranch: String,
-    val isRemote: Boolean,
-    val hasStagedChanges: Boolean,
-    val hasUnstagedChanges: Boolean,
-    val hasUntrackedFiles: Boolean
-)

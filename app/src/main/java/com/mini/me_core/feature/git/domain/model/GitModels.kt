@@ -32,20 +32,6 @@ data class GitTag(
     val shortHash: String
 )
 
-/**
- * 一条 stash 条目，由 `git stash list` 解析得到。
- *
- * [index] 即 `stash@{N}` 中的 N（0 为最新），后续 pop/apply/drop 都用它定位；[branch] 是 stash
- * 创建时所在分支；[message] 为 stash 说明（`-m` 指定的自定义消息，或 WIP 时取基线提交的主题）；
- * [commitHash] 为基线提交哈希（自定义消息的 stash 无独立基线哈希时为空串）。
- */
-data class GitStash(
-    val index: Int,
-    val branch: String,
-    val message: String,
-    val commitHash: String
-)
-
 /** `git status` 的聚合视图：分支跟踪信息 + 分组后的文件改动。 */
 data class GitStatus(
     val branch: String,

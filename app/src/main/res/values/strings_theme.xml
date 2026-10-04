@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources translatable="false">
     <string name="theme_auto">自动</string>
     <string name="theme_dark">深色</string>
     <string name="theme_light">浅色</string>
@@ -22,6 +22,7 @@
     <string name="theme_preview_msg_assistant">好的，我来分析项目结构。</string>
     <string name="theme_preview_tool_call">读取文件列表</string>
     <string name="theme_preview_input_hint">输入消息...</string>
+    <string name="theme_preview_expand">点击展开预览</string>
     <string name="theme_mode_auto">跟随系统</string>
     <string name="theme_mode_light">浅色</string>
     <string name="theme_mode_dark">深色</string>
@@ -29,6 +30,7 @@
     <string name="theme_color_reset">恢复</string>
     <string name="theme_color_low_contrast">对比度不足（%1$.1f:1），可能影响可读性</string>
     <string name="theme_color_picker_title">选择%1$s</string>
+    <string name="theme_color_presets">预设颜色</string>
     <string name="theme_corner_radius">圆角半径</string>
     <string name="theme_font_size">字体大小</string>
     <string name="theme_animation_scale">动效强度</string>
