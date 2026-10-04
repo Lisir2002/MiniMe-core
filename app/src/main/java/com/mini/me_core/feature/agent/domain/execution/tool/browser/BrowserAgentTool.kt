@@ -704,11 +704,15 @@ class BrowserAgentTool @Inject constructor(
                 // 操作成功：重置连续失败计数和熔断状态
                 // （navigate/view/snapshot 等读操作成功也视为页面恢复）
                 if (result is ToolResult.Success || (result is ToolResult.Error && result.code == "UNKNOWN_ACTION")) {
-                    consecutiveFailures = 0
-                    circuitBroken = false
+                    recordSuccess(action)
+                    // 导航类操作成功后重置页面健康状态
+                    if (action in setOf("navigate", "view", "reload", "back", "forward", "spa_navigate")) {
+                        operationController.resetHealth()
+                    }
                 } else {
                     // 操作返回业务错误（如元素找不到），计入连续失败
-                    recordFailure(action)
+                    val errorCode = (result as? ToolResult.Error)?.code
+                    recordFailure(action, errorCode)
                 }
                 // 反爬信号分析：对导航类动作执行后检测反爬信号
                 // （仅对加载页面的动作做检测，管理类动作不触发）
@@ -730,20 +734,30 @@ class BrowserAgentTool @Inject constructor(
             }
         } catch (e: TimeoutCancellationException) {
             FileLogger.e(TAG, "browser.$action 超时（${GLOBAL_TIMEOUT_MS}ms）", e)
-            recordFailure(action)
+            recordFailure(action, "TIMEOUT")
+            val recovery = operationController.getRecoverySuggestion()
             ToolResult.Error(
                 "浏览器操作超时（${GLOBAL_TIMEOUT_MS / 1000}秒无响应）：页面可能已卡死或服务器已断开。" +
-                    "建议调用 navigate 重新加载页面，或检查目标服务是否仍在运行。",
+                    "建议调用 navigate 重新加载页面，或检查目标服务是否仍在运行。" +
+                    if (recovery != "页面状态正常") "\n健康建议：$recovery" else "",
                 "TIMEOUT"
             )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             FileLogger.e(TAG, "browser.$action 失败", e)
-            recordFailure(action)
             // 错误分类：根据异常消息判断具体原因，帮助模型做出正确决策而非盲目重试
             val classified = classifyBrowserError(e, action)
-            ToolResult.Error(classified.first, classified.second)
+            recordFailure(action, classified.second)
+            val recovery = operationController.getRecoverySuggestion()
+            val takeoverHint = if (operationController.shouldSuggestTakeover())
+                "\n注意：连续失败次数较多，建议请求用户接管（takeover）排查问题。" else ""
+            ToolResult.Error(
+                classified.first +
+                    if (recovery != "页面状态正常") "\n健康建议：$recovery" else "" +
+                    takeoverHint,
+                classified.second
+            )
         } finally {
             operationController.operationFinished()
         }
@@ -752,12 +766,20 @@ class BrowserAgentTool @Inject constructor(
     /**
      * 记录一次操作失败，达到阈值后触发熔断。
      */
-    private fun recordFailure(action: String) {
+    private fun recordFailure(action: String, errorCode: String? = null) {
         consecutiveFailures++
+        operationController.recordOperation(action = action, success = false, errorCode = errorCode)
         if (consecutiveFailures >= FAILURE_CIRCUIT_THRESHOLD) {
             circuitBroken = true
             FileLogger.w(TAG, "浏览器操作熔断触发：连续 $consecutiveFailures 次失败（最近动作: $action）")
         }
+    }
+
+    /** 记录操作成功，重置连续失败计数和健康状态。 */
+    private fun recordSuccess(action: String) {
+        consecutiveFailures = 0
+        circuitBroken = false
+        operationController.recordOperation(action = action, success = true)
     }
 
     /**
