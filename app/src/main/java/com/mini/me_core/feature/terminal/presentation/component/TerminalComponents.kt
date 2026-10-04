@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.terminal.presentation.component
+import com.mini.me_core.core.theme.components.AppDropdownMenu
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
@@ -749,7 +750,7 @@ fun ReconnectDropdown(
     onReconnectAll: () -> Unit,
     onRestartContainer: () -> Unit
 ) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+    AppDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(
             text = { Text(stringResource(R.string.terminal_reconnect_tab)) },
             onClick = onReconnectActive,
@@ -797,7 +798,7 @@ fun TerminalOperationsMenu(
     allowSendToAI: Boolean
 ) {
     val expanded = anchor != null
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+    AppDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(text = { Text(stringResource(R.string.ui____79d3abe9)) }, onClick = onCopy,
             leadingIcon = { Icon(Icons.Rounded.ContentCopy, null, Modifier.size(18.dp)) })
         DropdownMenuItem(text = { Text(stringResource(R.string.ui____eafbece1)) }, onClick = onPaste,

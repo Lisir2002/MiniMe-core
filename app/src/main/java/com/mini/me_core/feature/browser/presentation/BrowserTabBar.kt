@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.browser.presentation
+import com.mini.me_core.core.theme.components.AppDropdownMenu
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.AnimationScaleHolder
 import com.mini.me_core.core.theme.ScaledAnimation
@@ -321,7 +322,7 @@ internal fun TabChip(
                     )
             )
         }
-        DropdownMenu(expanded = menuExpanded, onDismissRequest = onMenuDismiss) {
+        AppDropdownMenu(expanded = menuExpanded, onDismissRequest = onMenuDismiss) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.browser_close_tab)) },
                 onClick = onClose

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.components.AppDropdownMenu
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,7 +76,7 @@ fun LogBottomStatusBar(
                         Text(stringResource(R.string.log_jump), style = MaterialTheme.typography.bodySmall)
                         Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null)
                     }
-                    DropdownMenu(expanded = jumpMenuExpanded, onDismissRequest = { jumpMenuExpanded = false }) {
+                    AppDropdownMenu(expanded = jumpMenuExpanded, onDismissRequest = { jumpMenuExpanded = false }) {
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.log_jump_next_error)) },
                             onClick = { jumpMenuExpanded = false; onNextError() },

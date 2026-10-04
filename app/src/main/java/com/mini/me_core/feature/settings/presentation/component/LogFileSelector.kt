@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.components.AppDropdownMenu
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -53,7 +54,7 @@ fun LogFileSelector(
             Text(text = label, style = MaterialTheme.typography.bodyMedium)
             Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null)
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        AppDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             // 快捷范围
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.log_quick_section_range), style = MaterialTheme.typography.labelMedium) },

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.browser.presentation
+import com.mini.me_core.core.theme.components.AppDropdownMenu
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.AnimationScaleHolder
 import com.mini.me_core.core.theme.ScaledAnimation
@@ -353,7 +354,7 @@ internal fun BrowserMoreMenu(
     onZoom: () -> Unit,
     onInspect: () -> Unit
 ) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+    AppDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(
             text = { Text(stringResource(R.string.browser_find)) },
             onClick = onFind,

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.components.AppDropdownMenu
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
@@ -527,7 +528,7 @@ fun SettingsScreen(
                                         IconButton(onClick = { auditMenuExpanded = true }, modifier = Modifier.size(40.dp)) {
                                             Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.audit_more_cd), modifier = Modifier.size(20.dp))
                                         }
-                                        DropdownMenu(
+                                        AppDropdownMenu(
                                             expanded = auditMenuExpanded,
                                             onDismissRequest = { auditMenuExpanded = false },
                                             modifier = Modifier

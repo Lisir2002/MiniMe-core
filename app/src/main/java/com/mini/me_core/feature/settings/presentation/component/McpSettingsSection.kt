@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.components.AppDropdownMenu
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
@@ -512,7 +513,7 @@ internal fun McpServerRow(
 
         // 长按弹出的编辑/删除菜单
         Box {
-            DropdownMenu(
+            AppDropdownMenu(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false }
             ) {

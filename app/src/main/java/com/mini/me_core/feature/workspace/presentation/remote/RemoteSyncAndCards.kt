@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.workspace.presentation.remote
+import com.mini.me_core.core.theme.components.AppDropdownMenu
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 
@@ -721,7 +722,7 @@ fun RemoteMountCard(
                         variant = AppChipVariant.Outlined,
                         modifier = Modifier.clickable { directionMenuExpanded = true }
                     )
-                    DropdownMenu(
+                    AppDropdownMenu(
                         expanded = directionMenuExpanded,
                         onDismissRequest = { directionMenuExpanded = false },
                         modifier = Modifier.background(MaterialTheme.colorScheme.surface)

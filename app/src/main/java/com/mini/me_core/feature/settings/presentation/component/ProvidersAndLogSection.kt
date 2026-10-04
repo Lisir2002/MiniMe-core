@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.components.AppDropdownMenu
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
 
@@ -262,7 +263,7 @@ fun ProviderItem(
                                 modifier = Modifier.size(18.dp)
                             )
                         }
-                        DropdownMenu(
+                        AppDropdownMenu(
                             expanded = menuExpanded,
                             onDismissRequest = { menuExpanded = false }
                         ) {

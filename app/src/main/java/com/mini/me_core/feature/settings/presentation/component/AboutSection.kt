@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.settings.presentation.component
+import com.mini.me_core.core.theme.components.AppDropdownMenu
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -710,7 +711,7 @@ private fun UsageStatsSection(
                     )
                 }
             }
-            DropdownMenu(expanded = showResetMenu, onDismissRequest = onDismissResetMenu) {
+            AppDropdownMenu(expanded = showResetMenu, onDismissRequest = onDismissResetMenu) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.about_reset_stats)) },
                     onClick = onRequestReset,
