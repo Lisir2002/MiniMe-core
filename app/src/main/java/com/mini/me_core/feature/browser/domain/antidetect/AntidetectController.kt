@@ -24,6 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class AntidetectController @Inject constructor(
     private val fingerprintManager: FingerprintManager,
+    private val strategyEngine: AdaptiveStrategyEngine,
 ) {
 
     // ===== 状态 =====
@@ -185,11 +186,16 @@ class AntidetectController @Inject constructor(
     fun adjust(strategy: String = "auto", reason: String = ""): String {
         val actualStrategy = if (strategy == "auto") selectAutoStrategy() else strategy
 
+        // 识别当前反爬模式（用于策略效果统计）
+        val pattern = detectCurrentPattern().pattern
+
         val result = when (actualStrategy) {
             "switch_fingerprint" -> doSwitchFingerprint()
             "slow_down" -> doSlowDown()
             "cool_down" -> doCoolDown()
             "clear_cookies" -> doClearCookies()
+            "switch_and_slow" -> doSwitchAndSlow()
+            "humanize_behavior" -> doHumanizeBehavior()
             "keep_current" -> "保持当前配置，继续观察"
             else -> "未知策略：$actualStrategy"
         }
@@ -197,6 +203,14 @@ class AntidetectController @Inject constructor(
         // 记录调整历史
         adjustmentHistory.add(AdjustmentRecord(actualStrategy, reason))
         while (adjustmentHistory.size > 50) adjustmentHistory.removeAt(0)
+
+        // 记录策略执行效果（暂时标记为成功，后续操作结果会更新）
+        strategyEngine.recordResult(
+            strategy = actualStrategy,
+            pattern = pattern,
+            success = true, // 策略执行成功（不代表反爬已解决，后续会验证）
+            partial = false,
+        )
 
         _state.update {
             it.copy(
@@ -209,34 +223,46 @@ class AntidetectController @Inject constructor(
     }
 
     /**
-     * 自动选择最优策略（规则驱动）。
+     * 自动选择最优策略（AI 驱动：上下文老虎机算法）。
      *
-     * 后续版本将升级为 AI 驱动（上下文老虎机/强化学习）。
+     * 基于 AdaptiveStrategyEngine 的 ε-贪婪算法：
+     * - 识别当前反爬模式（Cloudflare/验证码/IP封禁等）
+     * - 根据模式匹配度和历史成功率选择最优策略
+     * - 以 ε 概率探索新策略，避免陷入局部最优
+     * - 策略执行后通过 recordResult 反馈效果，持续学习
      */
     private fun selectAutoStrategy(): String {
         val currentState = _state.value
-        val hasHighSignal = activeSignals.any { it.severity in listOf("high", "critical") }
-        val hasCaptcha = activeSignals.any { it.type == "captcha_detected" }
-        val hasBlockPage = activeSignals.any { it.type == "block_page" }
-        val hasIpBanned = activeSignals.any { it.type == "ip_banned" }
-        val has429 = activeSignals.any { it.type == "http_429" }
+        val currentFingerprint = fingerprintManager.getCurrent()
 
-        return when {
-            // IP 被封禁：需要冷却 + 切换指纹
-            hasIpBanned -> "cool_down"
-            // 拦截页 + 高风险：切换指纹
-            hasBlockPage && hasHighSignal -> "switch_fingerprint"
-            // 验证码频繁：切换指纹
-            hasCaptcha && currentState.consecutiveFailures >= 2 -> "switch_fingerprint"
-            // 429 限流：降低频率
-            has429 -> "slow_down"
-            // 连续失败多：冷却
-            currentState.consecutiveFailures >= 4 -> "cool_down"
-            // 轻度问题：降低频率观察
-            currentState.consecutiveFailures >= 2 -> "slow_down"
-            // 无明显问题：保持
-            else -> "keep_current"
-        }
+        // 识别当前反爬模式
+        val patternResult = strategyEngine.detectPattern(
+            signals = activeSignals.toList(),
+        )
+
+        // 使用引擎选择最优策略
+        return strategyEngine.selectStrategy(
+            pattern = patternResult.pattern,
+            consecutiveFailures = currentState.consecutiveFailures,
+            currentFingerprintId = currentFingerprint?.id,
+        )
+    }
+
+    /**
+     * 获取当前反爬模式识别结果。
+     */
+    fun detectCurrentPattern(): AdaptiveStrategyEngine.PatternDetectionResult =
+        strategyEngine.detectPattern(signals = activeSignals.toList())
+
+    /**
+     * 获取策略推荐（含解释）。
+     */
+    fun getStrategyRecommendation(): AdaptiveStrategyEngine.StrategyRecommendation {
+        val pattern = detectCurrentPattern().pattern
+        return strategyEngine.getRecommendation(
+            pattern = pattern,
+            consecutiveFailures = _state.value.consecutiveFailures,
+        )
     }
 
     /** 切换指纹 */
@@ -280,6 +306,24 @@ class AntidetectController @Inject constructor(
     /** 清理 Cookie（返回建议，实际由 BrowserController 执行） */
     private fun doClearCookies(): String {
         return "建议清理当前站点 Cookie 和 localStorage（可通过 browser_storage 工具执行），然后重新加载页面"
+    }
+
+    /** 切换指纹并降低频率（组合策略，适用于 Cloudflare 等强防护） */
+    private fun doSwitchAndSlow(): String {
+        val switchResult = doSwitchFingerprint()
+        return "$switchResult。同时建议降低操作频率：每次操作间隔 5-10 秒，使用 human_type 模拟人类输入节奏"
+    }
+
+    /** 人类化操作行为（返回建议，实际由模型执行） */
+    private fun doHumanizeBehavior(): String {
+        return buildString {
+            append("建议采用人类化操作行为：")
+            append("1. 使用 human_type 替代 type，模拟人类输入节奏（随机延迟、退格修正）；")
+            append("2. 使用 safe_click 替代 click，内置等待元素可点击和随机延迟；")
+            append("3. 操作间加入随机等待（2-5秒），避免机械性快速操作；")
+            append("4. 滚动页面时模拟人类阅读行为（不规则滚动、偶尔回滚）；")
+            append("5. 避免在完全相同的坐标点击，加入微小随机偏移。")
+        }
     }
 
     // ===== 暂停/恢复 =====
@@ -394,6 +438,7 @@ class AntidetectController @Inject constructor(
         activeSignals.clear()
         signalHistory.clear()
         adjustmentHistory.clear()
+        strategyEngine.reset()
     }
 
     // ===== 辅助函数 =====
