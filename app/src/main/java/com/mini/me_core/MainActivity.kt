@@ -542,6 +542,24 @@ fun AppNavigation(
             }
         }
     ) {
+        androidx.compose.material3.Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            bottomBar = {
+                com.mini.me_core.core.theme.components.AppBottomBar(
+                    currentRoute = currentRoute,
+                    onNavigate = { route ->
+                        if (route != currentRoute) {
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    },
+                )
+            },
+        ) { innerPadding ->
         NavHost(
             navController = navController,
             startDestination = "chat",
@@ -745,5 +763,6 @@ fun AppNavigation(
                 )
             }
         }
+        } // Scaffold content 闭合
     }
 }
