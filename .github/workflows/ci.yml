@@ -97,10 +97,13 @@ jobs:
           fi
           echo "Security gate passed: EncryptedDriverFactory is fully implemented with SQLCipher SupportFactory."
 
-      # CI 跑 Ubuntu runner：自动生成 debug keystore 供 signingConfigs.release/androidDebug 回退使用。
+      # CI 跑 Ubuntu runner：自动生成 debug keystore + keystore.properties 供 signingConfigs 配置阶段通过。
       # 必须放在 Set up JDK 之后（keytool 是 JDK bin 下的工具，JAVA_HOME 未注入前调不到）。
-      # 若 ~/.android/debug.keystore 缺失，AGP 会报 Keystore file not found，本步骤零配置兜底。
-      - name: Generate debug keystore (CI fallback signing)
+      # build.gradle.kts 的 signingConfigs.release 块在配置阶段就会 require(keystore.properties 存在)，
+      # 即使只跑 compileReleaseKotlin 也会触发，因此必须在此步骤创建 app/keystore.properties。
+      # 注意：ci.yml 只跑编译/单测/Lint，不跑 assembleRelease，所以用 debug keystore 兜底是安全的——
+      # 真正的 release 打包签名由 android-release.yml 从 GitHub Secrets 恢复唯一官方密钥完成。
+      - name: Generate debug keystore + keystore.properties (CI config fallback)
         run: |
           set -e
           echo "JAVA_HOME=$JAVA_HOME"
@@ -111,10 +114,19 @@ jobs:
               -storepass android -alias androiddebugkey -keypass android \
               -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
             echo "debug keystore created at ~/.android/debug.keystore"
-            ls -lh ~/.android/debug.keystore
           else
             echo "debug keystore already exists, skip creation"
           fi
+          # 复制 debug keystore 到 app/minime.jks，创建 app/keystore.properties 供配置阶段通过
+          cp ~/.android/debug.keystore app/minime.jks
+          cat > app/keystore.properties << EOF
+          storeFile=minime.jks
+          storePassword=android
+          keyAlias=androiddebugkey
+          keyPassword=android
+          EOF
+          echo "✓ app/keystore.properties 已创建（CI 配置兜底，仅用于编译/单测/Lint，不用于正式打包）"
+          ls -la app/minime.jks app/keystore.properties
 
       - name: Set up Android SDK (use pre-installed + manual install)
         run: |
@@ -167,16 +179,24 @@ jobs:
           echo "--- gradle properties (without sensitive values) ---"
           grep -vE '^(systemProp\.)' gradle.properties || true
 
-      # 构建收敛为单一 release 变体：真机 arm64-v8a 单架构（已开 R8 fullMode + shrinkResources
-      # + useLegacyPackaging=false），验证"用户真正会下载安装的发布包"能否完整编出来。
-      # 签名配置缺失时也会用 debug keystore 兜底（见 Generate debug keystore 步骤），
-      # 因为 signingConfigs.release 永远绑定了 signingConfig，不会产出 unsigned 包。
+      # CI 门禁（main push / PR）：只编译 + 单测 + Lint，不跑 assembleRelease。
+      # 原因：release 打包必须使用唯一官方签名密钥（keystore.properties），该密钥仅在 tag 触发的
+      # android-release.yml 中从 GitHub Secrets 恢复；main push 无密钥，assembleRelease 必失败。
+      # compileReleaseKotlin 只编译不打包，能验证 release 变体代码可编译，无需签名。
+      # testReleaseUnitTest 在 release classpath 下跑单测，与用户最终安装的 release 运行时一致。
+      # lintRelease 提前发现 Lint 错误，避免等到发版时才在 android-release.yml 中失败。
       # --warning-mode=all 把所有弃用告警打到日志，便于提前发现 R8/AGP 升级时的破坏性变更；
       # --stacktrace 失败时打印完整异常栈，便于在 CI 一眼定位根因。
-      - name: Build release (smoke)
-        run: ./gradlew --warning-mode=all :app:assembleRelease --stacktrace
+      - name: Compile release (code smoke, no signing)
+        run: ./gradlew --warning-mode=all :app:compileReleaseKotlin --stacktrace
 
       # 单元测试（app/src/test 下的 Kotlin 单测），在 release 变体 classpath 下执行：
       # 与用户拿到的最终发布包运行时一致，避免 debug-only 代码掩盖问题。
       - name: Run unit tests (release)
         run: ./gradlew --warning-mode=all :app:testReleaseUnitTest --stacktrace
+
+      # Lint 门禁（baseline 渐进式）：app/lint-baseline.xml 收录存量 error 视为已知，
+      # abortOnError=true 下任何「新增 error」都会让本步骤失败、阻断合并；warning 不阻断。
+      # 与 android-release.yml 的 Lint 步骤保持一致，提前在 CI 阶段发现问题。
+      - name: Lint (release, baseline gate)
+        run: ./gradlew --warning-mode=all :app:lintRelease --stacktrace
