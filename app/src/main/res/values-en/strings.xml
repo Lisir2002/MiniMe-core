@@ -175,13 +175,6 @@
     <string name="fingerprint_validate_fail">Validation failed</string>
     <string name="fingerprint_default_protected">Default real fingerprint cannot be deleted</string>
     <string name="fingerprint_empty">No fingerprint profiles</string>
-    <string name="theme_auto">Auto</string>
-    <string name="theme_dark">Dark</string>
-    <string name="theme_light">Light</string>
-    <string name="theme_corner_style">Corner Style</string>
-    <string name="theme_corner_rounded">Rounded</string>
-    <string name="theme_corner_sharp">Sharp</string>
-    <string name="theme_corner_pill">Pill</string>
     <string name="settings_keepalive_title">Background Keep-alive</string>
     <string name="settings_keepalive_subtitle">Show a foreground notification to prevent the system from killing the process in background</string>
     <!-- Norm flow (D1-7, aligned with norm-chain-design.md §3.5) -->
