@@ -98,7 +98,11 @@ class EncryptedDriverFactory(
      */
     private fun createDriverWithRecovery(definition: DatabaseDefinition, passphraseBytes: ByteArray): SqlDriver {
         return try {
-            val cipherFactory = SupportFactory(passphraseBytes)
+            // clearPassphrase=false：禁止 SQLCipher 首次打开后清除内存中的口令。
+            // 默认行为会在首次打开后把口令置空，一旦连接被关闭重开（Room/SQLDelight 内部重试、
+            // 迁移流程重入等），就会抛「passphrase appears to be cleared」直接崩溃。
+            // 口令在驱动整个生命周期内保留，换取连接可安全重入；驱动关闭后由调用方擦除。
+            val cipherFactory = SupportFactory(passphraseBytes, null, false)
             val driver = AndroidSqliteDriver(
                 schema = definition.schema,
                 context = context,
@@ -143,8 +147,8 @@ class EncryptedDriverFactory(
             backupCorruptedFile(dbFile, definition.id)
             // 删除原文件及 WAL/SHM
             deleteDatabaseFiles(dbFile)
-            // 重新打开（SQLCipher 会创建全新空库）
-            val cipherFactory = SupportFactory(passphraseBytes.copyOf())
+            // 重新打开（SQLCipher 会创建全新空库），同样禁止清除口令
+            val cipherFactory = SupportFactory(passphraseBytes.copyOf(), null, false)
             val driver = AndroidSqliteDriver(
                 schema = definition.schema,
                 context = context,
