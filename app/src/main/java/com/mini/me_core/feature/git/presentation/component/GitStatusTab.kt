@@ -18,16 +18,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,13 +50,19 @@ import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.git.domain.model.GitFileChange
+import com.mini.me_core.feature.git.domain.model.GitStash
 import com.mini.me_core.feature.git.domain.model.GitStatus
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Commit
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Upload
 
 @Composable
@@ -56,13 +71,20 @@ internal fun StatusTab(
     busy: Boolean,
     hasRemote: Boolean,
     hasIdentity: Boolean,
+    stashes: List<GitStash>,
+    stashLoading: Boolean,
     onStage: (String) -> Unit,
     onUnstage: (String) -> Unit,
     onStageAll: () -> Unit,
     onCommit: () -> Unit,
     onPull: () -> Unit,
     onPush: () -> Unit,
-    onFileDiff: (String) -> Unit
+    onFileDiff: (String) -> Unit,
+    onStashPush: (String?, Boolean) -> Unit,
+    onStashPop: (Int) -> Unit,
+    onStashApply: (Int) -> Unit,
+    onStashDrop: (Int) -> Unit,
+    onStashClear: () -> Unit
 ) {
     val s = status
     val clean = s == null || (s.staged.isEmpty() && s.unstaged.isEmpty() && s.untracked.isEmpty())
@@ -78,6 +100,19 @@ internal fun StatusTab(
             onCommit = onCommit,
             onPull = onPull,
             onPush = onPush
+        )
+
+        HorizontalDivider()
+
+        StashSection(
+            stashes = stashes,
+            stashLoading = stashLoading,
+            busy = busy,
+            onStashPush = onStashPush,
+            onStashPop = onStashPop,
+            onStashApply = onStashApply,
+            onStashDrop = onStashDrop,
+            onStashClear = onStashClear
         )
 
         HorizontalDivider()
@@ -119,6 +154,200 @@ internal fun StatusTab(
             }
         }
     }
+}
+
+/**
+ * stash 管理区域：可折叠，默认展开。展示 stash 列表（index/分支/说明/基线哈希），
+ * 每条提供恢复(pop)/应用(apply)/删除(drop)；顶部提供「新建 stash」与「清空全部」入口。
+ * 删除与清空属于危险操作，由上层（GitScreen 的 DangerousActionDialog）二次确认。
+ */
+@Composable
+private fun StashSection(
+    stashes: List<GitStash>,
+    stashLoading: Boolean,
+    busy: Boolean,
+    onStashPush: (String?, Boolean) -> Unit,
+    onStashPop: (Int) -> Unit,
+    onStashApply: (Int) -> Unit,
+    onStashDrop: (Int) -> Unit,
+    onStashClear: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(true) }
+    var showNewDialog by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = Spacing.lg, top = Spacing.sm, end = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(28.dp)) {
+            Icon(
+                imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                contentDescription = if (expanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.width(Spacing.xs))
+        Text(
+            text = buildString {
+                append(stringResource(R.string.git_stash_section))
+                if (stashes.isNotEmpty()) append(" (").append(stashes.size).append(")")
+            },
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(onClick = { showNewDialog = true }, enabled = !busy) {
+            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(Spacing.xs))
+            Text(stringResource(R.string.git_stash_new))
+        }
+        if (stashes.isNotEmpty()) {
+            TextButton(onClick = onStashClear, enabled = !busy) {
+                Text(stringResource(R.string.git_stash_clear_all), color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+
+    if (expanded) {
+        when {
+            stashLoading -> Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(Spacing.md))
+                Text(stringResource(R.string.common_loading), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            stashes.isEmpty() -> Text(
+                text = stringResource(R.string.git_stash_empty),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+            )
+            else -> Column {
+                stashes.forEach { stash ->
+                    StashRow(
+                        stash = stash,
+                        enabled = !busy,
+                        onPop = { onStashPop(stash.index) },
+                        onApply = { onStashApply(stash.index) },
+                        onDrop = { onStashDrop(stash.index) }
+                    )
+                }
+            }
+        }
+    }
+
+    if (showNewDialog) {
+        NewStashDialog(
+            onDismiss = { showNewDialog = false },
+            onConfirm = { msg, untracked ->
+                showNewDialog = false
+                onStashPush(msg, untracked)
+            }
+        )
+    }
+}
+
+@Composable
+private fun StashRow(
+    stash: GitStash,
+    enabled: Boolean,
+    onPop: () -> Unit,
+    onApply: () -> Unit,
+    onDrop: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                shape = RoundedCornerShape(LocalCornerRadius.current.xs)
+            ) {
+                Text(
+                    text = stringResource(R.string.git_stash_index_label, stash.index),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 2.dp)
+                )
+            }
+            Spacer(Modifier.width(Spacing.md))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stash.message.ifBlank { stash.commitHash.ifBlank { "—" } },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (stash.branch.isNotBlank()) {
+                    Text(
+                        text = stringResource(R.string.git_stash_on_branch, stash.branch),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+            }
+            IconButton(onClick = onPop, enabled = enabled, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Rounded.Restore, contentDescription = stringResource(R.string.git_stash_pop), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+            TextButton(onClick = onApply, enabled = enabled, contentPadding = PaddingValues(horizontal = Spacing.xs)) {
+                Text(stringResource(R.string.git_stash_apply), style = MaterialTheme.typography.labelSmall)
+            }
+            IconButton(onClick = onDrop, enabled = enabled, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.git_stash_drop), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(start = Spacing.lg))
+    }
+}
+
+@Composable
+private fun NewStashDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String?, Boolean) -> Unit
+) {
+    var message by remember { mutableStateOf("") }
+    var includeUntracked by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Rounded.Archive, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary) },
+        title = { Text(stringResource(R.string.git_stash_new)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = { message = it },
+                    label = { Text(stringResource(R.string.git_stash_message_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(stringResource(R.string.git_stash_include_untracked), style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = includeUntracked, onCheckedChange = { includeUntracked = it })
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(message.trim().ifBlank { null }, includeUntracked) }) {
+                Text(stringResource(R.string.git_stash_new))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        }
+    )
 }
 
 @Composable

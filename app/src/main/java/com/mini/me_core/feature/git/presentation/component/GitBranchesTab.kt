@@ -117,10 +117,8 @@ internal fun BranchesTab(
 
     var pendingCheckout by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
-    var pendingDelete by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
     var pendingRename by remember { mutableStateOf<String?>(null) }
     var showCreateTagDialog by remember { mutableStateOf(false) }
-    var pendingDeleteTag by remember { mutableStateOf<String?>(null) }
 
     pendingCheckout?.let { (ref, isRemote) ->
         val isTag = tags.any { it.name == ref }
@@ -231,28 +229,6 @@ internal fun BranchesTab(
         }
     }
 
-    pendingDelete?.let { (name, isRemote) ->
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text(if (isRemote) stringResource(R.string.git_delete_remote_branch) else stringResource(R.string.git_delete_branch)) },
-            text = {
-                Text(
-                    if (isRemote) stringResource(R.string.git_delete_remote_branch_confirm, name)
-                    else stringResource(R.string.git_delete_local_branch_confirm, name)
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    pendingDelete = null
-                    if (isRemote) onDeleteRemoteBranch(name) else onDeleteBranch(name)
-                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.common_cancel)) }
-            }
-        )
-    }
-
     pendingRename?.let { oldName ->
         var newName by remember(oldName) { mutableStateOf(oldName) }
         AlertDialog(
@@ -342,23 +318,6 @@ internal fun BranchesTab(
         }
     }
 
-    pendingDeleteTag?.let { name ->
-        AlertDialog(
-            onDismissRequest = { pendingDeleteTag = null },
-            title = { Text(stringResource(R.string.git_delete_tag)) },
-            text = { Text(stringResource(R.string.git_delete_tag_confirm, name)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    pendingDeleteTag = null
-                    onDeleteTag(name)
-                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDeleteTag = null }) { Text(stringResource(R.string.common_cancel)) }
-            }
-        )
-    }
-
     val localTree = remember(localBranches) { buildBranchTree(localBranches) }
     val remoteTree = remember(remoteBranches) { buildBranchTree(remoteBranches) }
 
@@ -404,7 +363,7 @@ internal fun BranchesTab(
                     checkoutLoading = checkoutLoading,
                     onCheckout = { ref, remote -> pendingCheckout = ref to remote },
                     onRenameBranch = { pendingRename = it },
-                    onDeleteBranch = { pendingDelete = it to false },
+                    onDeleteBranch = onDeleteBranch,
                     onDeleteRemoteBranch = {}
                 )
             }
@@ -427,7 +386,7 @@ internal fun BranchesTab(
                     onCheckout = { ref, remote -> pendingCheckout = ref to remote },
                     onRenameBranch = {},
                     onDeleteBranch = {},
-                    onDeleteRemoteBranch = { pendingDelete = it to true }
+                    onDeleteRemoteBranch = onDeleteRemoteBranch
                 )
             }
         }
@@ -451,7 +410,7 @@ internal fun BranchesTab(
                             isLoading = checkoutLoading == t.name,
                             actions = listOf(
                                 RefAction.Switch(onClick = { pendingCheckout = t.name to false }),
-                                RefAction.Delete(onClick = { pendingDeleteTag = t.name })
+                                RefAction.Delete(onClick = { onDeleteTag(t.name) })
                             )
                         )
                     }
