@@ -204,6 +204,8 @@ fun ServiceBrowserScreen(
     loginPromptManager: BrowserLoginPromptManager,
     takeoverManager: BrowserTakeoverManager,
     credentialStore: BrowserCredentialStore,
+    previewManager: com.mini.me_core.feature.browser.domain.BrowserPreviewManager,
+    operationController: com.mini.me_core.feature.browser.domain.BrowserOperationController,
     initialUrl: String? = null,
     onNavigateBack: () -> Unit
 ) {
@@ -227,6 +229,13 @@ fun ServiceBrowserScreen(
     val blockedCount by browserController.blockedCount.collectAsStateWithLifecycle()
     val consoleLogs by browserController.consoleLogs.collectAsStateWithLifecycle()
     val gestureSettings by browserController.gestureSettings.collectAsStateWithLifecycle()
+
+    // 实时预览面板状态
+    val previewFrame by previewManager.previewState.collectAsStateWithLifecycle()
+    val operationActive by operationController.operationActive.collectAsStateWithLifecycle()
+    val interruptRequested by operationController.interruptRequested.collectAsStateWithLifecycle()
+    var previewVisible by remember { mutableStateOf(true) }
+    var showInterruptedToast by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -280,7 +289,29 @@ fun ServiceBrowserScreen(
 
     // 卸载时解除绑定（保留 WebView 与登录态）
     DisposableEffect(Unit) {
-        onDispose { browserController.unbind() }
+        onDispose {
+            browserController.unbind()
+            previewManager.stopCapturing()
+        }
+    }
+
+    // 模型操作浏览器时启动实时预览捕获，空闲时停止
+    LaunchedEffect(agentStatus.active, uiState.activeTabId) {
+        if (agentStatus.active && uiState.activeTabId.isNotBlank()) {
+            val webView = browserController.getActiveWebView() ?: return@LaunchedEffect
+            previewManager.startCapturing(webView)
+        } else {
+            previewManager.stopCapturing()
+        }
+    }
+
+    // 中断后显示「已中断」提示 2 秒
+    LaunchedEffect(interruptRequested) {
+        if (interruptRequested) {
+            showInterruptedToast = true
+            kotlinx.coroutines.delay(2000)
+            showInterruptedToast = false
+        }
     }
 
     fun navigate() {
@@ -475,12 +506,34 @@ fun ServiceBrowserScreen(
                                 strokeWidth = 2.dp
                             )
                             Text(
-                                text = agentStatus.text.ifBlank { stringResource(R.string.browser_agent_working) },
+                                text = if (showInterruptedToast) "已中断"
+                                else agentStatus.text.ifBlank { stringResource(R.string.browser_agent_working) },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
                             )
+                            // 中断按钮：操作进行中时显示红色圆形停止按钮
+                            if (operationActive) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    IconButton(
+                                        onClick = { operationController.requestInterrupt() },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Close,
+                                            contentDescription = "中断操作",
+                                            tint = MaterialTheme.colorScheme.onError,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -639,6 +692,16 @@ fun ServiceBrowserScreen(
                             bookmarks = remember { browserController.bookmarks() },
                             recentVisits = remember { browserController.history().take(6) },
                             onOpen = { openUrl(it) }
+                        )
+                    }
+                    // 实时浏览器预览面板：模型操作时右下角悬浮显示当前页面截图
+                    if (agentStatus.active && previewVisible) {
+                        BrowserPreviewPanel(
+                            previewFrame = previewFrame,
+                            onDismiss = { previewVisible = false },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(Spacing.sm)
                         )
                     }
                 }

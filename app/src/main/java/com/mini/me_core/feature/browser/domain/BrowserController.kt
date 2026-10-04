@@ -26,6 +26,11 @@ import androidx.webkit.ProxyController
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.feature.browser.domain.antidetect.AntidetectController
+import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintInjector
+import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintManager
+import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintProfile
+import com.mini.me_core.feature.browser.domain.fingerprint.WebViewFingerprintApplier
 import com.mini.me_core.feature.proxy.domain.ClashProxyManager
 import com.mini.me_core.feature.workspace.domain.WorkspacePathMapper
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -53,6 +58,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.URI
@@ -86,7 +93,9 @@ class BrowserController @Inject constructor(
     private val bookmarkStore: BrowserBookmarkStore,
     private val downloadManager: BrowserDownloadManager,
     private val adBlocker: AdBlocker,
-    private val webTranslator: WebTranslator
+    private val webTranslator: WebTranslator,
+    private val fingerprintManager: FingerprintManager,
+    private val antidetectController: AntidetectController
 ) {
     private companion object {
         const val TAG = "BrowserController"
@@ -138,6 +147,13 @@ class BrowserController @Inject constructor(
                 .map { it.enabled }
                 .distinctUntilChanged()
                 .collect { applyWebViewProxy(null) }
+        }
+        // 监听当前指纹配置变化，切换后自动应用到激活的 WebView（不自动 reload，由调用方决定是否重载）
+        scope.launch {
+            fingerprintManager.currentProfileId.collect { id ->
+                val profile = id?.let { fingerprintManager.getById(it) }
+                mainHandler.post { applyFingerprintToActiveWebView(profile) }
+            }
         }
     }
 
@@ -1496,6 +1512,9 @@ class BrowserController @Inject constructor(
 
     private fun activeWebView(): WebView? = activeTab()?.webView
 
+    /** 公开接口：获取当前激活标签的 WebView（供预览截图管理器使用）。 */
+    fun getActiveWebView(): WebView? = activeWebView()
+
     private fun findTab(id: String): BrowserTab? = tabs.firstOrNull { it.id == id }
 
     /** 切换到指定标签（主线程）。 */
@@ -1583,14 +1602,27 @@ class BrowserController @Inject constructor(
                 request: WebResourceRequest?
             ): android.webkit.WebResourceResponse? {
                 val url = request?.url?.toString() ?: return null
-                return if (adBlocker.shouldBlock(url)) {
-                    // 返回空响应以阻断广告/跟踪器请求
-                    android.webkit.WebResourceResponse("text/plain", "utf-8", null)
-                } else null
+                // 广告/跟踪器拦截优先处理
+                if (adBlocker.shouldBlock(url)) {
+                    return android.webkit.WebResourceResponse("text/plain", "utf-8", null)
+                }
+                // 指纹注入：仅拦截主框架 HTML GET 请求，在 <head> 首行注入指纹伪装脚本
+                if (request.isForMainFrame && request.method.equals("GET", ignoreCase = true) &&
+                    (url.startsWith("http://") || url.startsWith("https://"))
+                ) {
+                    try {
+                        return injectFingerprintIntoHtml(url, request)
+                    } catch (e: Exception) {
+                        FileLogger.w(TAG, "指纹注入失败，降级为正常加载: $url", e)
+                    }
+                }
+                return null
             }
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 adBlocker.reset()
                 onTabLoading(tabId, true)
+                // document-start 拦截失败时的兜底：页面开始加载即注入指纹 JS，尽量早于页面脚本执行
+                if (view != null) injectFingerprintScript(view)
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 onTabFinished(tabId, view, url)
@@ -1670,6 +1702,8 @@ class BrowserController @Inject constructor(
         }
         // 新 WebView 创建即按当前代理开关接管网络出口（WebView 不认 Java ProxySelector）。
         applyWebViewProxy(wv)
+        // 新建标签即应用当前指纹配置（UA / WebSettings / JS 伪装脚本）
+        applyFingerprintToActiveWebView(fingerprintManager.getCurrent(), target = wv)
         return wv
     }
 
@@ -1719,6 +1753,136 @@ class BrowserController @Inject constructor(
             _uiState.value = _uiState.value.copy(title = title)
         }
     }
+
+    // ─────────────────────── 指纹注入 ───────────────────────
+
+    /**
+     * 拦截主框架 HTML 请求，在 <head> 首行注入指纹伪装脚本。
+     *
+     * 通过 OkHttp 拉取原始 HTML，注入 `<script>` 标签后返回修改后的响应。
+     * 注入位置在 `<head>` 标签之后（若无 head 则在 `<html>` 之后），
+     * 确保伪装脚本在页面自身任何脚本之前执行。
+     *
+     * 注入失败时返回 null，WebView 正常加载原页面（不影响浏览）。
+     */
+    private fun injectFingerprintIntoHtml(
+        url: String,
+        request: WebResourceRequest
+    ): android.webkit.WebResourceResponse? {
+        val profile = fingerprintManager.getCurrent() ?: return null
+        // 真实指纹（无伪装配置）不注入脚本
+        if (profile.id == FingerprintProfile.DEFAULT_ID && !profile.webglSpoofEnabled) return null
+
+        // 用 OkHttp 拉取原始 HTML（复用 WebView 的请求头，保持 Cookie/Session 一致）
+        val builder = Request.Builder().url(url).get()
+        request.requestHeaders?.forEach { (key, value) ->
+            if (key !in setOf("host", "content-length", "accept-encoding")) {
+                builder.addHeader(key, value)
+            }
+        }
+        val response: Response = okHttp.newCall(builder.build()).execute()
+        val body = response.body ?: return null
+        val contentType = response.header("Content-Type", "") ?: ""
+        // 仅处理 HTML 响应
+        if (!contentType.contains("text/html", ignoreCase = true)) {
+            body.close()
+            response.close()
+            return null
+        }
+
+        val originalHtml = body.string()
+        val script = FingerprintInjector.generateScript(profile)
+        val injectTag = "<script>$script</script>"
+
+        // 在 <head> 首行注入；若无 <head> 则在 <html> 后注入；都没有则在开头注入
+        val modifiedHtml = when {
+            originalHtml.contains("<head>", ignoreCase = true) ->
+                originalHtml.replaceFirst(Regex("<head[^>]*>", RegexOption.IGNORE_CASE), "$0$injectTag")
+            originalHtml.contains("<html>", ignoreCase = true) ->
+                originalHtml.replaceFirst(Regex("<html[^>]*>", RegexOption.IGNORE_CASE), "$0$injectTag")
+            else -> injectTag + originalHtml
+        }
+
+        // 构建修改后的响应
+        val newResponse = android.webkit.WebResourceResponse(
+            "text/html",
+            response.header("Content-Encoding", "utf-8"),
+            ByteArrayInputStream(modifiedHtml.toByteArray())
+        )
+        // 复制响应头
+        val responseHeaders = mutableMapOf<String, String>()
+        response.headers.names().forEach { name ->
+            response.header(name)?.let { responseHeaders[name] = it }
+        }
+        newResponse.responseHeaders = responseHeaders
+        response.close()
+        return newResponse
+    }
+
+    /**
+     * 切换指纹配置，可选自动重新加载当前页面使新指纹生效。
+     *
+     * @param profileId 目标配置 ID
+     * @param reload 是否自动重新加载当前页面（默认 true）
+     * @return 切换成功返回新配置，失败返回 null
+     */
+    suspend fun switchFingerprint(profileId: String, reload: Boolean = true): FingerprintProfile? {
+        val target = fingerprintManager.switchTo(profileId) ?: return null
+        if (reload) {
+            reloadPage()
+        }
+        return target
+    }
+
+    /** 获取当前指纹管理器（供工具层调用）。 */
+    fun getFingerprintManager(): FingerprintManager = fingerprintManager
+
+    /**
+     * 切换并立即应用指定指纹配置到当前 WebView。
+     *
+     * 会先切换 [FingerprintManager.currentProfileId]，再把 UA / WebSettings / JS 伪装脚本
+     * 下发到激活 WebView。注意：已注入页面上下文的 JS 需要 reload 才能完全生效，
+     * 需要立即生效的场景请在调用后配合 [reload]。
+     *
+     * @param profileId 目标配置 ID
+     * @return 成功应用返回配置，找不到或不可用返回 null
+     */
+    fun applyFingerprint(profileId: String): FingerprintProfile? {
+        val target = fingerprintManager.switchTo(profileId) ?: fingerprintManager.getById(profileId) ?: return null
+        mainHandler.post {
+            activeWebView()?.let { applyFingerprintToActiveWebView(target, target = it) }
+        }
+        return target
+    }
+
+    /**
+     * 把指纹配置应用到指定 WebView（主线程）。
+     *
+     * 真实指纹（无伪装）配置与桌面版 UA 模式下不覆盖 UA，避免与现有桌面版切换冲突；
+     * 仅对启用了伪装的配置下发 WebSettings 与 JS 脚本。
+     */
+    private fun applyFingerprintToActiveWebView(
+        profile: FingerprintProfile?,
+        target: WebView? = activeWebView()
+    ) {
+        val wv = target ?: return
+        if (profile == null) return
+        // 真实指纹（无伪装）保持浏览器默认行为，不覆盖 UA、不注入脚本
+        if (profile.id == FingerprintProfile.DEFAULT_ID) return
+        // 桌面版 UA 由 toggleDesktopMode 接管，指纹 UA 不覆盖它
+        if (_uiState.value.desktopMode) return
+        WebViewFingerprintApplier.apply(wv, profile)
+    }
+
+    /** 通过 evaluateJavascript 注入指纹伪装脚本（onPageStarted 兜底用）。 */
+    private fun injectFingerprintScript(webView: WebView) {
+        val profile = fingerprintManager.getCurrent() ?: return
+        if (profile.id == FingerprintProfile.DEFAULT_ID) return
+        WebViewFingerprintApplier.injectScript(webView, profile)
+    }
+
+    /** 获取当前反爬控制器（供工具层调用）。 */
+    fun getAntidetectController(): AntidetectController = antidetectController
 
     /** 将 WebView 从当前父容器摘除（不销毁），供复用前的重新挂载与页面卸载时调用。 */
     private fun detachFromParent(wv: WebView) {
