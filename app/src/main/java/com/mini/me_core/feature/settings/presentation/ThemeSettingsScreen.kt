@@ -8,7 +8,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,8 +72,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
@@ -893,7 +898,6 @@ private fun HsvColorPicker(
 ) {
     val colors = LocalAppTheme.current.colors
 
-    // 初始 HSV 值
     val initialHsv = remember(initialColor) {
         val hsv = FloatArray(3)
         android.graphics.Color.colorToHSV(initialColor.toAndroidArgb(), hsv)
@@ -904,7 +908,6 @@ private fun HsvColorPicker(
     var saturation by remember { mutableStateOf(initialHsv[1]) }
     var value by remember { mutableStateOf(initialHsv[2]) }
 
-    // 当外部 initialColor 变化时同步
     LaunchedEffect(initialColor) {
         val hsv = FloatArray(3)
         android.graphics.Color.colorToHSV(initialColor.toAndroidArgb(), hsv)
@@ -913,93 +916,106 @@ private fun HsvColorPicker(
         value = hsv[2]
     }
 
-    // HSV 变化时回调
     LaunchedEffect(hue, saturation, value) {
         val argb = android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, value))
         onColorChanged(Color(argb))
     }
 
+    // 动态尺寸，避免硬编码导致光标偏移
+    var panelWidth by remember { mutableStateOf(0) }
+    var panelHeight by remember { mutableStateOf(0) }
+    var hueBarWidth by remember { mutableStateOf(0) }
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // 饱和度/亮度面板
+        // 饱和度/亮度面板：按下即响应，拖动跟手
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(180.dp)
+                .onSizeChanged { panelWidth = it.width; panelHeight = it.height }
                 .clip(RoundedCornerShape(LocalCornerRadius.current.md))
                 .border(1.dp, colors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.md))
                 .pointerInput(Unit) {
-                    detectDragGestures { change, _ ->
-                        change.consume()
-                        val pos = change.position
-                        val width = size.width
-                        val height = size.height
-                        saturation = (pos.x / width).coerceIn(0f, 1f)
-                        value = (1f - pos.y / height).coerceIn(0f, 1f)
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+                        // 按下立即更新
+                        saturation = (down.position.x / panelWidth).coerceIn(0f, 1f)
+                        value = (1f - down.position.y / panelHeight).coerceIn(0f, 1f)
+                        // 拖动持续更新
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            if (change.pressed) {
+                                change.consume()
+                                saturation = (change.position.x / panelWidth).coerceIn(0f, 1f)
+                                value = (1f - change.position.y / panelHeight).coerceIn(0f, 1f)
+                            }
+                            if (event.changes.all { !it.pressed }) break
+                        }
                     }
                 },
         ) {
-            // 用 Canvas 绘制饱和度/亮度渐变
-            androidx.compose.foundation.Canvas(
-                modifier = Modifier.fillMaxSize(),
-            ) {
+            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
                 val width = size.width
                 val height = size.height
-
-                // 底色：当前色相的纯色
                 val hueColor = android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f))
-
-                // 横向：白色到透明（饱和度从低到高）
                 drawRect(
                     brush = Brush.horizontalGradient(
                         colors = listOf(Color.White, Color(hueColor)),
-                        startX = 0f,
-                        endX = width,
+                        startX = 0f, endX = width,
                     ),
                     size = size,
                 )
-
-                // 纵向：透明到黑色（亮度从高到低）
                 drawRect(
                     brush = Brush.verticalGradient(
                         colors = listOf(Color.Transparent, Color.Black),
-                        startY = 0f,
-                        endY = height,
+                        startY = 0f, endY = height,
                     ),
                     size = size,
                 )
             }
-
-            // 选择器指示器
+            // 指示器：用动态尺寸像素计算，光标精确跟手
+            val indicatorSizePx = with(LocalDensity.current) { 20.dp.toPx() }
             Box(
                 modifier = Modifier
-                    .offset(
-                        x = (saturation * 180.dp.value - 10).dp,
-                        y = ((1f - value) * 180.dp.value - 10).dp,
-                    )
+                    .offset {
+                        IntOffset(
+                            x = (saturation * panelWidth - indicatorSizePx / 2).toInt(),
+                            y = ((1f - value) * panelHeight - indicatorSizePx / 2).toInt(),
+                        )
+                    }
                     .size(20.dp)
                     .clip(CircleShape)
-                    .border(2.dp, Color.White, CircleShape)
-                    .background(Color.Transparent),
+                    .border(2.dp, Color.White, CircleShape),
             )
         }
 
-        // 色相条
+        // 色相条：按下即响应，拖动跟手
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(24.dp)
+                .onSizeChanged { hueBarWidth = it.width }
                 .clip(RoundedCornerShape(LocalCornerRadius.current.sm))
                 .border(1.dp, colors.borderDefault, RoundedCornerShape(LocalCornerRadius.current.sm))
                 .pointerInput(Unit) {
-                    detectDragGestures { change, _ ->
-                        change.consume()
-                        val pos = change.position
-                        val width = size.width
-                        hue = (pos.x / width * 360f).coerceIn(0f, 360f)
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+                        hue = (down.position.x / hueBarWidth * 360f).coerceIn(0f, 360f)
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            if (change.pressed) {
+                                change.consume()
+                                hue = (change.position.x / hueBarWidth * 360f).coerceIn(0f, 360f)
+                            }
+                            if (event.changes.all { !it.pressed }) break
+                        }
                     }
                 },
         ) {
-            // 彩虹渐变
             androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
                 val hueColors = (0..360 step 30).map { h ->
                     Color(android.graphics.Color.HSVToColor(floatArrayOf(h.toFloat(), 1f, 1f)))
@@ -1009,14 +1025,18 @@ private fun HsvColorPicker(
                     size = size,
                 )
             }
-
-            // 色相选择器
+            // 色相指示器：用动态尺寸像素计算，光标精确跟手
+            val thumbWidthPx = with(LocalDensity.current) { 16.dp.toPx() }
+            val thumbHeightPx = with(LocalDensity.current) { 28.dp.toPx() }
+            val barHeightPx = with(LocalDensity.current) { 24.dp.toPx() }
             Box(
                 modifier = Modifier
-                    .offset(
-                        x = (hue / 360f * 300.dp.value - 8).dp,
-                        y = (-2).dp,
-                    )
+                    .offset {
+                        IntOffset(
+                            x = (hue / 360f * hueBarWidth - thumbWidthPx / 2).toInt(),
+                            y = (-(thumbHeightPx - barHeightPx) / 2).toInt(),
+                        )
+                    }
                     .width(16.dp)
                     .height(28.dp)
                     .clip(RoundedCornerShape(4.dp))
