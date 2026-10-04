@@ -76,19 +76,20 @@ class DataSafetyNotifier @Inject constructor(
         val v = runCatching { dataSentinel.check() }
             .onFailure { FileLogger.w(TAG, "数据保全检查失败，静默（不影响启动）", it) }
             .getOrNull() ?: return
-        if (v == SentinelVerdict.PACKAGE_CHANGED) {
-            // 无感自动迁移：包名变更 = 全新安装，私有数据隔离；从外部安全网自动找回。
-            // 成功 → 重置哨兵记忆（lastRun = 当前包/版本），避免下次启动重复自动恢复；
-            // 失败（无外部备份 / 密钥派生失败 / 解密失败）→ 回退告警，保留手动恢复入口。
+        if (v == SentinelVerdict.PACKAGE_CHANGED || v == SentinelVerdict.DATA_LOST) {
+            // 无感自动恢复：包名变更或数据疑似丢失时，自动从外部加密备份全量恢复。
+            // 成功 → 重置哨兵记忆，本轮不告警；
+            // 失败（无外部备份 / 恢复失败）→ 静默记录，仅在备份与还原页显示非阻塞提示卡片，
+            //   不再弹出启动级全局模态框，避免打扰用户。
             val restored = runCatching { autoBackupManager.restoreFromLatestExternal() }.getOrNull()
             if (restored != null && restored.isSuccess) {
                 runCatching { appRunMeta.updateLastRun(currentVersionCode(), context.packageName) }
-                    .onFailure { FileLogger.w(TAG, "自动迁移后重置哨兵记忆失败（不影响恢复结果）", it) }
-                FileLogger.i(TAG, "包名变更自动迁移成功：已从外部加密备份全量恢复数据，本轮不弹窗")
+                    .onFailure { FileLogger.w(TAG, "自动恢复后重置哨兵记忆失败（不影响恢复结果）", it) }
+                FileLogger.i(TAG, "$v 自动恢复成功：已从外部加密备份全量恢复数据，本轮不告警")
                 _verdict.value = null
                 return
             }
-            FileLogger.w(TAG, "包名变更自动迁移未生效（无可用外部备份或恢复失败），回退告警弹窗")
+            FileLogger.w(TAG, "$v 自动恢复未生效（无可用外部备份或恢复失败），静默处理，仅备份页提示")
         }
         if (v == SentinelVerdict.UPGRADED) {
             runCatching {
