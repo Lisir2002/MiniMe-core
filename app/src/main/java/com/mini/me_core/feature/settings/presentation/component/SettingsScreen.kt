@@ -35,6 +35,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -520,48 +522,57 @@ fun SettingsScreen(
                                     IconButton(onClick = { auditSearchActive = true }, modifier = Modifier.size(40.dp)) {
                                         Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.audit_search_cd), modifier = Modifier.size(20.dp))
                                     }
-                                    IconButton(onClick = { auditMenuExpanded = true }, modifier = Modifier.size(40.dp)) {
-                                        Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.audit_more_cd), modifier = Modifier.size(20.dp))
-                                    }
-                                    DropdownMenu(
-                                        expanded = auditMenuExpanded,
-                                        onDismissRequest = { auditMenuExpanded = false },
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.audit_export)) },
-                                            leadingIcon = { Icon(Icons.Rounded.Download, contentDescription = null) },
-                                            onClick = {
-                                                auditMenuExpanded = false
-                                                auditViewModel.exportCsv()
-                                            },
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.ui______9b49362a)) },
-                                            leadingIcon = { Icon(Icons.Rounded.DeleteSweep, contentDescription = null) },
-                                            onClick = {
-                                                auditMenuExpanded = false
-                                                auditViewModel.purgeExpired()
-                                            },
-                                        )
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    stringResource(R.string.audit_clear_all),
-                                                    color = MaterialTheme.colorScheme.error,
-                                                )
-                                            },
-                                            leadingIcon = {
-                                                Icon(
-                                                    Icons.Rounded.DeleteForever,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.error,
-                                                )
-                                            },
-                                            onClick = {
-                                                auditMenuExpanded = false
-                                                auditClearDialog = true
-                                            },
-                                        )
+                                    // 用Box包裹，让DropdownMenu锚定到三点按钮位置
+                                    Box {
+                                        IconButton(onClick = { auditMenuExpanded = true }, modifier = Modifier.size(40.dp)) {
+                                            Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.audit_more_cd), modifier = Modifier.size(20.dp))
+                                        }
+                                        DropdownMenu(
+                                            expanded = auditMenuExpanded,
+                                            onDismissRequest = { auditMenuExpanded = false },
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+                                                .background(MaterialTheme.colorScheme.surface)
+                                                .shadow(elevation = 4.dp, shape = RoundedCornerShape(LocalCornerRadius.current.md)),
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(R.string.audit_export), style = MaterialTheme.typography.bodyMedium) },
+                                                leadingIcon = { Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                                onClick = {
+                                                    auditMenuExpanded = false
+                                                    auditViewModel.exportCsv()
+                                                },
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(R.string.ui______9b49362a), style = MaterialTheme.typography.bodyMedium) },
+                                                leadingIcon = { Icon(Icons.Rounded.DeleteSweep, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                                onClick = {
+                                                    auditMenuExpanded = false
+                                                    auditViewModel.purgeExpired()
+                                                },
+                                            )
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        stringResource(R.string.audit_clear_all),
+                                                        color = MaterialTheme.colorScheme.error,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                    )
+                                                },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        Icons.Rounded.DeleteForever,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.error,
+                                                        modifier = Modifier.size(20.dp),
+                                                    )
+                                                },
+                                                onClick = {
+                                                    auditMenuExpanded = false
+                                                    auditClearDialog = true
+                                                },
+                                            )
+                                        }
                                     }
                                 }
                             }
