@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
@@ -217,9 +218,6 @@ class MiniMeCore : Application() {
 
         // AGENT 库预热：同步触发 ensureSchema + 结构自愈，确保先于任何 UI 查询。
         // 正常库只是两次 PRAGMA 幂等检查（毫秒级），缺失才重建。
-        // 此处必须在主线程同步完成：UI 首帧可能立即查询数据库，若延迟初始化会导致
-        // 首次查询时才打开库反而阻塞 UI。打开已有库耗时极短，可接受；
-        // 首次创建或迁移由 EncryptedDatabaseManager.getDriverBlocking 内部切 IO 执行。
         val agentDriver = connectionPool.driver(LibName.AGENT)
         agentPreheatCompleted.set(true)
         com.mini.me_core.core.performance.StartupTracer.mark("db_ready", "数据库初始化完成")

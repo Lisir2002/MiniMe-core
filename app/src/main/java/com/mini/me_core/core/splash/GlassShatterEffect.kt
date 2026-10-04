@@ -283,11 +283,8 @@ class GlassShatterEffect(
             canvas.restore()
 
             // ── 2. High-transparency glass fill ──
-            // 玻璃填充改为带冷色调的半透明色，模拟真实玻璃的光线折射，
-            // 而非纯白色——纯白在浅色背景上会显得突兀且缺乏质感。
             fillPaint.alpha = (shard.baseAlpha * 255 * alpha * faceDim).toInt().coerceIn(0, 255)
-            // 冷色调玻璃：淡蓝白色，RGB(220, 235, 255)，比纯白更有玻璃质感
-            fillPaint.color = Color.rgb(220, 235, 255)
+            fillPaint.color = Color.WHITE
             canvas.drawPath(path, fillPaint)
 
             // ── 3. Beveled edge stroke: LinearGradient top bright → bottom dark ──
@@ -304,12 +301,11 @@ class GlassShatterEffect(
                 if (vx < polyLeft) polyLeft = vx
                 if (vx > polyRight) polyRight = vx
             }
-            // Edge gradient: bright white-blue top (0.95 alpha) → dark blue-gray bottom (0.35 alpha)
-            // 增强边缘高光对比度，顶部更亮（接近纯白），底部带深蓝色调，模拟玻璃厚度的光线折射
+            // Edge gradient: bright white top (0.9 alpha) → dark gray bottom (0.3 alpha)
             val edgeGradient = LinearGradient(
                 scx, polyTop, scx, polyBottom,
-                Color.argb((242 * faceDim).toInt().coerceIn(0, 255), 245, 250, 255),
-                Color.argb((89 * faceDim).toInt().coerceIn(0, 255), 40, 60, 90),
+                Color.argb((230 * faceDim).toInt().coerceIn(0, 255), 255, 255, 255),
+                Color.argb((76 * faceDim).toInt().coerceIn(0, 255), 60, 60, 60),
                 Shader.TileMode.CLAMP
             )
             edgePaint.shader = edgeGradient
@@ -319,15 +315,14 @@ class GlassShatterEffect(
 
             // ── 4. Diagonal specular highlight band ──
             // From one corner (based on specularX/Y) to opposite corner.
-            // 镜面反射改为淡蓝白色，模拟玻璃表面的光线反射，而非纯白
             val sx = polyLeft + (polyRight - polyLeft) * shard.specularX
             val sy = polyTop + (polyBottom - polyTop) * shard.specularY
             val ex = polyLeft + (polyRight - polyLeft) * (1f - shard.specularX)
             val ey = polyTop + (polyBottom - polyTop) * (1f - shard.specularY)
             val specGradient = LinearGradient(
                 sx, sy, ex, ey,
-                Color.argb((165 * faceDim).toInt().coerceIn(0, 255), 235, 245, 255),
-                Color.argb(0, 235, 245, 255),
+                Color.argb((150 * faceDim).toInt().coerceIn(0, 255), 255, 255, 255),
+                Color.argb(0, 255, 255, 255),
                 Shader.TileMode.CLAMP
             )
             specPaint.shader = specGradient

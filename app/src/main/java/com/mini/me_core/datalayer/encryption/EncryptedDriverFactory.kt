@@ -7,7 +7,7 @@ import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import android.util.Base64
 import com.mini.me_core.core.util.FileLogger
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runBlocking
 import net.sqlcipher.database.SupportFactory
 
 /**
@@ -49,16 +49,14 @@ class EncryptedDriverFactory(
     }
 
     /**
-     * 创建加密驱动（suspend 版本）。
-     *
-     * 在协程上下文中调用，DEK 读取与驱动创建均切到 IO 线程，不阻塞调用方线程。
+     * 创建加密驱动（同步阻塞版本，供ConnectionPool在非协程上下文中调用）。
      *
      * @param definition 数据库定义
      * @return SQLCipher加密的SqlDriver
      * @throws DatabaseEncryptionException 驱动创建失败时
      */
-    suspend fun create(definition: DatabaseDefinition): SqlDriver {
-        val dek = withContext(Dispatchers.IO) {
+    fun createBlocking(definition: DatabaseDefinition): SqlDriver {
+        val dek = runBlocking(Dispatchers.IO) {
             keyManager.getOrCreateDek(CipherPassphrase.purpose(definition.id))
         }
         // DEK 编码为 Base64 字符串，再派生「字符串 + UTF-8 字节」两态（L2：两态同源，杜绝漂移）。

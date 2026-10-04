@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-        冷启动窗口背景：与应用浅色背景色 #F8FAFC 一致，避免纯白与浅蓝背景之间的跳变。
+        冷启动窗口背景：纯色填充，与粒子动画背景一致，避免白屏闪烁。
         不再使用 SplashScreen 主题/图标——粒子动画直接在 Compose 中作为覆盖层显示。
     -->
     <style name="Theme.MiniMeCore" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#F8FAFC</item>
+        <item name="android:windowBackground">@android:color/white</item>
     </style>
 </resources>

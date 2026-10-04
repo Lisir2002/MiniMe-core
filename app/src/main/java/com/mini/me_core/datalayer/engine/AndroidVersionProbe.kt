@@ -105,9 +105,6 @@ class AndroidVersionProbe(
         return try {
             // purpose 与 passphrase 必须与 EncryptedDriverFactory 完全一致（共用 CipherPassphrase），
             // 否则会出现「driver 能开、probe 打不开」的假损坏。
-            // 此处阻塞是因为 readVersion() 是同步接口（VersionProbe），被 ConnectionPool
-            // 的 preOpen 链路同步调用；runBlocking 切到 IO 线程执行 DEK 读取与 SQLCipher 打开，
-            // 避免加密计算占用调用方线程。
             val dek = runBlocking(Dispatchers.IO) { km.getOrCreateDek(CipherPassphrase.purpose(lib)) }
             // L2：从同一来源派生「字符串 + 字节」两态，保证与 driver 侧的口令完全一致。
             val open = CipherPassphrase.openParams(CipherPassphrase.encode(dek))

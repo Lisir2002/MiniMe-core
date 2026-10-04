@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 深色模式冷启动窗口背景：与应用深色背景色 #0F172A 一致，避免纯黑与深蓝灰背景之间的跳变 -->
+    <!-- 深色模式冷启动窗口背景：纯深色填充，与粒子动画背景一致 -->
     <style name="Theme.MiniMeCore" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#0F172A</item>
+        <item name="android:windowBackground">@android:color/black</item>
     </style>
 </resources>
