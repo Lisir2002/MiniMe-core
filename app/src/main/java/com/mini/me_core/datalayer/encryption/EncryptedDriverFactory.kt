@@ -9,6 +9,10 @@ import com.mini.me_core.core.util.FileLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import net.sqlcipher.database.SupportFactory
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * 加密驱动工厂。
@@ -64,18 +68,7 @@ class EncryptedDriverFactory(
         val open = CipherPassphrase.openParams(CipherPassphrase.encode(dek))
         dek.fill(0)
         try {
-            // M3：SupportFactory **持有传入数组且不拷贝**，必须给它独立副本。
-            // 过去把同一个数组交给它、又在 finally 里 fill(0)，等于把"SQLCipher 正在用的口令"抹成全零；
-            // 当前只因「构造即 eager open」侥幸可用，一旦延迟/重开连接就是用全零口令打开。
-            val cipherFactory = SupportFactory(open.bytes.copyOf())
-            val driver = AndroidSqliteDriver(
-                schema = definition.schema,
-                context = context,
-                name = definition.fileName,
-                factory = cipherFactory,
-            )
-            applyPragmas(driver, definition.id)
-            return driver
+            return createDriverWithRecovery(definition, open.bytes.copyOf())
         } catch (e: UnsatisfiedLinkError) {
             FileLogger.e(TAG, "SQLCipher原生库加载失败: ${definition.id}（不回退明文）", e)
             throw DatabaseEncryptionException(
@@ -90,6 +83,116 @@ class EncryptedDriverFactory(
             )
         } finally {
             open.bytes.fill(0)
+        }
+    }
+
+    /**
+     * 创建加密驱动，内含数据库损坏自动恢复。
+     *
+     * 恢复策略：首次打开若因数据库文件损坏失败（file is not a database / malformed /
+     * encryption error 等），将损坏文件备份到 databases/corrupted_backup/ 后删除原文件
+     * 及 WAL/SHM，再用同一密钥重新打开（SQLCipher 会创建全新空库）。二次失败才向上抛出。
+     *
+     * 这样即使数据库文件因强杀、掉电、存储空间不足等原因损坏，应用也不会启动崩溃，
+     * 而是自动恢复到可用状态（损坏文件保留备份，不丢原始证据）。
+     */
+    private fun createDriverWithRecovery(definition: DatabaseDefinition, passphraseBytes: ByteArray): SqlDriver {
+        return try {
+            val cipherFactory = SupportFactory(passphraseBytes)
+            val driver = AndroidSqliteDriver(
+                schema = definition.schema,
+                context = context,
+                name = definition.fileName,
+                factory = cipherFactory,
+            )
+            applyPragmas(driver, definition.id)
+            driver
+        } catch (e: Exception) {
+            if (isCorruptionError(e)) {
+                FileLogger.w(TAG, "检测到数据库损坏: ${definition.id}（${e.javaClass.simpleName}: ${e.message}），启动自动恢复")
+                val recovered = tryRecoverAndReopen(definition, passphraseBytes)
+                if (recovered != null) {
+                    FileLogger.i(TAG, "数据库损坏自动恢复成功: ${definition.id}")
+                    return recovered
+                }
+                FileLogger.e(TAG, "数据库损坏自动恢复失败（二次打开仍异常）: ${definition.id}")
+            }
+            throw e
+        }
+    }
+
+    /** 判断异常是否为数据库文件损坏类型。 */
+    private fun isCorruptionError(e: Exception): Boolean {
+        val msg = (e.message ?: "").lowercase(Locale.ROOT)
+        val causeMsg = (e.cause?.message ?: "").lowercase(Locale.ROOT)
+        val combined = "$msg $causeMsg"
+        return combined.contains("file is not a database") ||
+            combined.contains("malformed database") ||
+            combined.contains("database disk image is malformed") ||
+            combined.contains("encryption error") ||
+            combined.contains("passphrase appears to be cleared") ||
+            combined.contains("not an error") ||
+            (e.cause is android.database.sqlite.SQLiteException)
+    }
+
+    /** 备份损坏文件、删除原文件及 WAL/SHM，然后重新打开。成功返回驱动，失败返回 null。 */
+    private fun tryRecoverAndReopen(definition: DatabaseDefinition, passphraseBytes: ByteArray): SqlDriver? {
+        val dbFile = context.getDatabasePath(definition.fileName)
+        return try {
+            // 备份损坏文件
+            backupCorruptedFile(dbFile, definition.id)
+            // 删除原文件及 WAL/SHM
+            deleteDatabaseFiles(dbFile)
+            // 重新打开（SQLCipher 会创建全新空库）
+            val cipherFactory = SupportFactory(passphraseBytes.copyOf())
+            val driver = AndroidSqliteDriver(
+                schema = definition.schema,
+                context = context,
+                name = definition.fileName,
+                factory = cipherFactory,
+            )
+            applyPragmas(driver, definition.id)
+            driver
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "恢复后重新打开失败: ${definition.id}", e)
+            null
+        }
+    }
+
+    /** 将损坏的数据库文件备份到 databases/corrupted_backup/ 目录，文件名带时间戳。 */
+    private fun backupCorruptedFile(dbFile: File, dbId: String) {
+        if (!dbFile.exists()) return
+        try {
+            val backupDir = File(dbFile.parentFile, "corrupted_backup")
+            if (!backupDir.exists()) backupDir.mkdirs()
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val backupFile = File(backupDir, "${dbFile.name}_corrupted_$timestamp")
+            dbFile.copyTo(backupFile, overwrite = true)
+            FileLogger.i(TAG, "损坏数据库已备份: $dbId -> ${backupFile.absolutePath} (${dbFile.length()} bytes)")
+            // 同时备份 WAL 和 SHM（如果存在）
+            listOf("${dbFile.absolutePath}-wal", "${dbFile.absolutePath}-shm").forEach { path ->
+                val f = File(path)
+                if (f.exists()) {
+                    val walBackup = File(backupDir, "${f.name}_corrupted_$timestamp")
+                    f.copyTo(walBackup, overwrite = true)
+                }
+            }
+        } catch (e: Exception) {
+            FileLogger.w(TAG, "损坏数据库备份失败（不影响恢复）: $dbId", e)
+        }
+    }
+
+    /** 删除数据库文件及关联的 WAL/SHM 文件。 */
+    private fun deleteDatabaseFiles(dbFile: File) {
+        try {
+            if (dbFile.exists()) dbFile.delete()
+            listOf("${dbFile.absolutePath}-wal", "${dbFile.absolutePath}-shm", "${dbFile.absolutePath}-journal").forEach { path ->
+                val f = File(path)
+                if (f.exists()) f.delete()
+            }
+            FileLogger.i(TAG, "已删除损坏数据库文件: ${dbFile.absolutePath}")
+        } catch (e: Exception) {
+            FileLogger.w(TAG, "删除损坏数据库文件失败: ${dbFile.absolutePath}", e)
         }
     }
 
