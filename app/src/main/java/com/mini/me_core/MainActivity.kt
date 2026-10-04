@@ -21,6 +21,7 @@ import com.mini.me_core.core.theme.terminalEnterTransition
 import com.mini.me_core.core.theme.terminalExitTransition
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
@@ -563,6 +564,7 @@ fun AppNavigation(
         NavHost(
             navController = navController,
             startDestination = "chat",
+            modifier = Modifier.padding(innerPadding),
             enterTransition = {
                 when (targetState.destination.route) {
                     "terminal" -> terminalEnterTransition
