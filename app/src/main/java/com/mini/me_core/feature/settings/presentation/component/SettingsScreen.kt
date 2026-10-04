@@ -156,6 +156,7 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     About(R.string.settings_about),
     Update(R.string.update_title),
     Theme(R.string.settings_theme_title),
+    Browser(R.string.settings_browser_title),
     DevOptions(R.string.dev_options_title),
 }
 
@@ -769,6 +770,11 @@ fun SettingsScreen(
                         onNavigateBack = { section = SettingsSection.Menu }
                     )
                 }
+                SettingsSection.Browser -> {
+                    com.mini.me_core.feature.browser.presentation.FingerprintManagerScreen(
+                        onBack = { section = SettingsSection.Menu }
+                    )
+                }
                 SettingsSection.DevOptions -> com.mini.me_core.feature.settings.presentation.DevOptionsScreen(
                     onNavigateBack = { section = SettingsSection.Menu },
                     onOpenLogViewer = { section = SettingsSection.Logs },
@@ -1154,6 +1160,17 @@ internal fun SettingsMenu(
             iconBgDark = Color(0xFF4C1D95),
             keywords = listOf("theme", "appearance", stringResource(R.string.ui____afcde261), stringResource(R.string.ui____41e8e8b9), stringResource(R.string.ui____48d0a09b), stringResource(R.string.ui____f0789e79), stringResource(R.string.ui____9970ad07)),
             action = { onOpen(SettingsSection.Theme) }
+        ),
+        MenuItem(
+            section = SettingsSection.Browser,
+            group = groupSystem,
+            title = stringResource(R.string.settings_browser_title),
+            subtitle = stringResource(R.string.settings_browser_subtitle),
+            icon = Icons.Rounded.Public,
+            iconBgLight = Color(0xFF0EA5E9),
+            iconBgDark = Color(0xFF0C4A6E),
+            keywords = listOf("browser", "fingerprint", "webview", stringResource(R.string.ui____afcde261), "anti-detect", "proxy"),
+            action = { onOpen(SettingsSection.Browser) }
         ),
         MenuItem(
             section = null,
