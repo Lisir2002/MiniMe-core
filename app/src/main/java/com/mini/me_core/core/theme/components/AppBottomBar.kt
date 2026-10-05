@@ -47,11 +47,9 @@ import kotlinx.coroutines.delay
  * 浮动偏移：组件不占据父容器布局空间，但视觉上放置在指定偏移位置，触摸区域同步偏移。
  * 用于扇形菜单等悬浮层，避免展开时撑高底栏导致底部空白。
  */
-@Composable
-private fun Modifier.floatingOffset(y: Dp): Modifier {
-    val yPx = with(LocalDensity.current) { y.roundToPx() }
+private fun Modifier.floatingOffset(yPx: Int): Modifier {
     return this.then(
-        layout { measurable, constraints ->
+        Modifier.layout { measurable, constraints ->
             val placeable = measurable.measure(constraints)
             layout(0, 0) {
                 placeable.placeRelative(0, -yPx)
@@ -101,6 +99,7 @@ fun AppBottomBar(
     val isToolSelected = currentRoute in listOf("git", "browser", "terminal")
     val activeColor = MaterialTheme.colorScheme.primary
     val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val fanMenuOffsetPx = with(LocalDensity.current) { 220.dp.roundToPx() }
 
     Box {
         NavigationBar(
@@ -169,7 +168,7 @@ fun AppBottomBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(220.dp)
-                    .floatingOffset(220.dp),
+                    .floatingOffset(fanMenuOffsetPx),
                 contentAlignment = Alignment.BottomCenter,
             ) {
                 // 半透明背景，点击收起
