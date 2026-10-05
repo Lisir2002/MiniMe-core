@@ -546,6 +546,7 @@ fun AppNavigation(
         androidx.compose.material3.Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
             bottomBar = {
                 com.mini.me_core.core.theme.components.AppBottomBar(
                     currentRoute = currentRoute,

@@ -404,7 +404,13 @@ fun ServiceBrowserScreen(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            Column(modifier = Modifier.statusBarsPadding()) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding(),
+            ) {
+                Column {
                 // 第1层：标签栏（40dp），始终在顶部
                 BrowserTabBar(
                     tabs = tabs,
@@ -530,6 +536,7 @@ fun ServiceBrowserScreen(
                             }
                         }
                     }
+                }
                 }
             }
         },

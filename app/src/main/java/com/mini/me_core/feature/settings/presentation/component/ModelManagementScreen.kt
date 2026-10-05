@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.settings.presentation.component
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -64,70 +65,47 @@ internal fun ModelManagementScreen(
     // 添加供应商弹窗状态（本页面内部管理）
     var showAddProviderSheet by remember { mutableStateOf(false) }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentColor = MaterialTheme.colorScheme.onBackground,
-        topBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-            ) {
-                // ── 顶栏行：返回按钮 + 标题 + 操作按钮 ──
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.xs, vertical = Spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        // ── 顶栏 Tab：服务商 / 默认模型 + 添加按钮 ──
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            AppSegmentedControl(
+                tabs = listOf(
+                    stringResource(R.string.model_management_tab_providers),
+                    stringResource(R.string.settings_default_models)
+                ),
+                selectedIndex = selectedTab,
+                onSelect = { selectedTab = it },
+                modifier = Modifier.weight(1f),
+            )
+            // 仅在服务商 Tab 显示添加按钮
+            if (selectedTab == 0) {
+                IconButton(
+                    onClick = { showAddProviderSheet = true },
+                    modifier = Modifier.size(40.dp),
                 ) {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text(
-                        text = "模型管理",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.weight(1f)
+                    Icon(
+                        Icons.Rounded.Add,
+                        contentDescription = stringResource(R.string.settings_add_provider),
+                        modifier = Modifier.size(20.dp),
                     )
-                    // 仅在服务商 Tab 显示添加按钮
-                    if (selectedTab == 0) {
-                        IconButton(
-                            onClick = { showAddProviderSheet = true },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                Icons.Rounded.Add,
-                                contentDescription = stringResource(R.string.settings_add_provider),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
                 }
-
-                // ── 顶栏 Tab：服务商 / 默认模型 ──
-                AppSegmentedControl(
-                    tabs = listOf(
-                        stringResource(R.string.model_management_tab_providers),
-                        stringResource(R.string.settings_default_models)
-                    ),
-                    selectedIndex = selectedTab,
-                    onSelect = { selectedTab = it }
-                )
             }
         }
-    ) { padding ->
+
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+                .weight(1f)
+                .fillMaxWidth(),
         ) {
             when (selectedTab) {
                 // Tab 0：服务商列表
