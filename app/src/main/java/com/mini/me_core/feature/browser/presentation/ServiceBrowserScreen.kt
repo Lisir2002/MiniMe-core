@@ -584,15 +584,6 @@ fun ServiceBrowserScreen(
                         onInspect = { showMore = false; showDevTools = true }
                     )
                 }
-                BrowserBottomToolbar(
-                    agentActive = agentStatus.active,
-                    activeDownloadCount = activeDownloadCount,
-                    onHome = { newTab() },
-                    onBookmarks = { showBookmarks = true },
-                    onHistory = { showHistory = true },
-                    onDownloads = { showDownloads = true },
-                    onAi = { showAiPanel = true }
-                )
             }
         }
     ) { padding ->
