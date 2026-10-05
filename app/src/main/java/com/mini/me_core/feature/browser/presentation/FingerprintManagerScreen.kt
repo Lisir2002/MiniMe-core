@@ -163,41 +163,21 @@ fun FingerprintManagerScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("指纹配置管理") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.Check, contentDescription = null) // 用返回图标
-                    }
-                },
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showCreateDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (profiles.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Default.Add, contentDescription = "新建配置", tint = Color.White)
+                Text("暂无指纹配置", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        },
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            if (profiles.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("暂无指纹配置", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(profiles, key = { it.id }) { profile ->
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(profiles, key = { it.id }) { profile ->
                         FingerprintCard(
                             profile = profile,
                             isCurrent = profile.id == currentId,
@@ -222,8 +202,18 @@ fun FingerprintManagerScreen(
                     Text(msg, color = Color.White, fontSize = 14.sp)
                 }
             }
+
+            // 新建配置浮动按钮
+            FloatingActionButton(
+                onClick = { showCreateDialog = true },
+                containerColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "新建配置", tint = Color.White)
+            }
         }
-    }
 
     // 新建配置对话框
     if (showCreateDialog) {
@@ -336,7 +326,7 @@ private fun FingerprintCard(
             ) {
                 InfoChip("${profile.browser.replaceFirstChar { it.uppercase() }} ${profile.browserVersion.substringBefore(".")}")
                 InfoChip(profile.region)
-                InfoChip("评分 ${profile.score.toInt()}")
+                InfoChip(if (profile.score > 0) "评分 ${profile.score.toInt()}" else "未校验")
                 Box(
                     modifier = Modifier
                         .clip(CircleShape)

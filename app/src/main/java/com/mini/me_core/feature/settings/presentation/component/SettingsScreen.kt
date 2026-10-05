@@ -437,9 +437,8 @@ fun SettingsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // 模型管理页（Providers section）自带 Scaffold 顶栏，外层不显示顶栏以避免双重顶栏；
             // 关于页（About）由 AboutSection 内部根据「关于/浏览源码/查看代码」模式自绘唯一顶栏。
-            if (section != SettingsSection.Providers && section != SettingsSection.About) {
+            if (section != SettingsSection.About) {
             // 问题6：Menu 主页且搜索模式开启时，顶栏显示搜索输入框；带 Crossfade 平滑切换
             val animScale = com.mini.me_core.core.theme.LocalAnimationScale.current
             val barAnimDuration = (220L * animScale).toInt().coerceAtLeast(0)

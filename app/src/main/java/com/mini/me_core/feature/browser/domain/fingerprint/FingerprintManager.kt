@@ -53,6 +53,7 @@ class FingerprintManager @Inject constructor() {
         val presets = listOf(
             FingerprintGenerator.generate(
                 template = FingerprintGenerator.Template.REGION_US,
+                browser = "chrome",
                 name = "美国 Chrome 主流",
             ),
             FingerprintGenerator.generate(
