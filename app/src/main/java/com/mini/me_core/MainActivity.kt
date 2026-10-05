@@ -20,6 +20,7 @@ import com.mini.me_core.core.theme.pagePopExitTransition
 import com.mini.me_core.core.theme.terminalEnterTransition
 import com.mini.me_core.core.theme.terminalExitTransition
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -384,6 +385,7 @@ private val SENSITIVE_SECURE_ROUTES = setOf(
  * ViewModel 提升到这一层创建，以便 Drawer 内容和 AIChatPanel 共享同一实例。
  */
 @Composable
+@Suppress("UnusedMaterial3ScaffoldPaddingParameter")
 fun AppNavigation(
     browserController: com.mini.me_core.feature.browser.domain.BrowserController,
     browserLoginPromptManager: com.mini.me_core.feature.browser.domain.BrowserLoginPromptManager,
@@ -543,29 +545,16 @@ fun AppNavigation(
             }
         }
     ) {
+        Box(modifier = Modifier.fillMaxSize()) {
         androidx.compose.material3.Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
             contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
-            bottomBar = {
-                com.mini.me_core.core.theme.components.AppBottomBar(
-                    currentRoute = currentRoute,
-                    onNavigate = { route ->
-                        if (route != currentRoute) {
-                            navController.navigate(route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    },
-                )
-            },
-        ) { innerPadding ->
+        ) {
         NavHost(
             navController = navController,
             startDestination = "chat",
-            modifier = Modifier.padding(innerPadding),
+            modifier = Modifier.fillMaxSize(),
             enterTransition = {
                 when (targetState.destination.route) {
                     "terminal" -> terminalEnterTransition
@@ -766,6 +755,21 @@ fun AppNavigation(
                 )
             }
         }
-        } // Scaffold content 闭合
+        } // Scaffold content lambda 闭合
+
+        // 浮动药丸底栏（悬浮于内容上方）
+        com.mini.me_core.core.theme.components.AppBottomBar(
+            currentRoute = currentRoute,
+            onNavigate = { route ->
+                if (route != currentRoute) {
+                    navController.navigate(route) {
+                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            },
+        )
+        } // Box 闭合
     }
 }
