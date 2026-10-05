@@ -556,7 +556,7 @@ fun AppNavigation(
             startDestination = "chat",
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 92.dp),
+                .padding(bottom = 56.dp),
             enterTransition = {
                 when (targetState.destination.route) {
                     "terminal" -> terminalEnterTransition
