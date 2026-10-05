@@ -128,7 +128,7 @@ fun AppBottomBar(
     val barHeight = 64.dp
     val fabSize = 56.dp
     val fabRadiusPx = with(density) { fabSize.toPx() / 2f }
-    val notchRadiusPx = fabRadiusPx + 8f // 凹口半径比FAB大8dp间距
+    val notchRadiusPx = fabRadiusPx + 4f // 凹口半径比FAB大4dp间距
 
     // 凹口底栏背景形状
     val notchedShape: Shape = remember(notchRadiusPx) {
@@ -137,21 +137,22 @@ fun AppBottomBar(
             val height = size.height
             val centerX = width / 2
             val nr = notchRadiusPx
+            val cornerR = 8f
 
             moveTo(0f, 0f)
-            // 到凹口左侧
-            lineTo(centerX - nr - 4f, 0f)
-            // 平滑凹口左半
+            // 到凹口左侧起点
+            lineTo(centerX - nr - cornerR, 0f)
+            // 左圆角过渡 + 凹口左半（控制点2在nr高度，确保最低点切线水平）
             cubicTo(
-                centerX - nr + 2f, 0f,
-                centerX - nr * 0.55f, nr * 0.85f,
+                centerX - nr + cornerR * 0.5f, 0f,
+                centerX - nr * 0.5f, nr,
                 centerX, nr
             )
-            // 平滑凹口右半
+            // 凹口右半 + 右圆角过渡（控制点1在nr高度，与左半切线共线）
             cubicTo(
-                centerX + nr * 0.55f, nr * 0.85f,
-                centerX + nr - 2f, 0f,
-                centerX + nr + 4f, 0f
+                centerX + nr * 0.5f, nr,
+                centerX + nr - cornerR * 0.5f, 0f,
+                centerX + nr + cornerR, 0f
             )
             // 到右上角
             lineTo(width, 0f)

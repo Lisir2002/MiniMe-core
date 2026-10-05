@@ -554,7 +554,9 @@ fun AppNavigation(
         NavHost(
             navController = navController,
             startDestination = "chat",
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 92.dp),
             enterTransition = {
                 when (targetState.destination.route) {
                     "terminal" -> terminalEnterTransition
