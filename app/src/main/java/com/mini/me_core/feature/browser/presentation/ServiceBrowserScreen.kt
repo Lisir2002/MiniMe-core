@@ -479,11 +479,6 @@ fun ServiceBrowserScreen(
                         }
                     )
                 }
-            }
-        },
-        // ===== 底部工具栏（56dp） + 可选底部地址栏 =====
-        bottomBar = {
-            Column(modifier = Modifier.navigationBarsPadding()) {
                 // 模型操作状态条（AI 操作中时顶部细条提示）
                 AnimatedVisibility(
                     visible = agentStatus.active,
@@ -514,7 +509,6 @@ fun ServiceBrowserScreen(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
-                            // 中断按钮：操作进行中时显示红色圆形停止按钮
                             if (operationActive) {
                                 Surface(
                                     shape = CircleShape,
@@ -537,55 +531,8 @@ fun ServiceBrowserScreen(
                         }
                     }
                 }
-                // 地址栏：底部模式时显示在工具栏上方
-                AnimatedVisibility(
-                    visible = addressBarAtBottom,
-                    enter = slideInVertically { it } + fadeIn(),
-                    exit = slideOutVertically { it } + fadeOut()
-                ) {
-                    BrowserAddressBar(
-                        canGoBack = uiState.canGoBack,
-                        canGoForward = uiState.canGoForward,
-                        currentUrl = uiState.currentUrl,
-                        isLoading = uiState.isLoading,
-                        progress = uiState.progress,
-                        addressText = addressText,
-                        onAddressTextChange = { addressText = it },
-                        onNavigate = { navigate() },
-                        onGoBack = { browserController.goBack() },
-                        onNavigateBack = { onNavigateBack() },
-                        onGoForward = { browserController.goForward() },
-                        onStopLoading = { browserController.stopLoading() },
-                        onReload = { browserController.reload() },
-                        showMore = showMore,
-                        onShowMoreChange = { showMore = it },
-                        bookmarked = uiState.currentUrl.isNotBlank() && browserController.isBookmarked(uiState.currentUrl),
-                        incognito = uiState.incognito,
-                        desktopMode = uiState.desktopMode,
-                        addressBarAtBottom = addressBarAtBottom,
-                        onToggleAddressBar = { toggleAddressBarPosition() },
-                        onFind = { showMore = false; findVisible = true; findText = "" },
-                        onToggleBookmark = {
-                            showMore = false
-                            if (uiState.currentUrl.isNotBlank()) {
-                                if (browserController.isBookmarked(uiState.currentUrl)) {
-                                    browserController.removeBookmark(uiState.currentUrl)
-                                } else {
-                                    browserController.addBookmark()
-                                }
-                            }
-                        },
-                        onCredentials = { showMore = false; showCredentials = true },
-                        onShare = { showMore = false; shareCurrent() },
-                        onCopyLink = { showMore = false; copyCurrentLink() },
-                        onIncognito = { browserController.setIncognito(!uiState.incognito) },
-                        onDesktopMode = { browserController.toggleDesktopMode() },
-                        onZoom = { showMore = false; showZoom = true },
-                        onInspect = { showMore = false; showDevTools = true }
-                    )
-                }
             }
-        }
+        },
     ) { padding ->
         Column(
             modifier = Modifier
