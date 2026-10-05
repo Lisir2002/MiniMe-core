@@ -25,12 +25,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Terminal
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.Icon
@@ -46,10 +49,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -71,34 +77,38 @@ private val TOOLS = listOf(
     ToolDef("terminal", "终端", "命令行与包管理", Icons.Rounded.Terminal),
 )
 
-/** 主导航项定义。 */
+/** 底栏导航项定义。 */
 @Stable
-private data class NavDef(
+private data class NavItem(
     val key: String,
     val label: String,
     val icon: ImageVector,
 )
 
-private val NAV_ITEMS = listOf(
-    NavDef("chat", "对话", Icons.Rounded.Chat),
-    NavDef("more", "更多", Icons.Rounded.Apps),
-    NavDef("settings", "设置", Icons.Rounded.Settings),
+// 左右各两个导航项，中间是凸起FAB
+private val LEFT_ITEMS = listOf(
+    NavItem("chat", "对话", Icons.Rounded.Chat),
+    NavItem("files", "文件", Icons.Rounded.Folder),
+)
+private val RIGHT_ITEMS = listOf(
+    NavItem("terminal", "终端", Icons.Rounded.Terminal),
+    NavItem("settings", "设置", Icons.Rounded.Settings),
 )
 
 /**
- * 浮动毛玻璃药丸底栏（全新设计）。
+ * 底部凹口导航栏 + 中央凸起圆形FAB。
  *
  * 设计要点：
- * - 浮动药丸容器，不贴满宽度，悬浮于内容上方
- * - 毛玻璃半透明背景，柔和阴影
- * - 水滴形选中指示器，弹簧平滑滑动
- * - 中央「更多」按钮点击展开底部面板，展示工具卡片
- * - 底部面板毛玻璃风格，工具卡片带图标+名称+描述
+ * - 白色底栏背景，顶部中央有平滑凹口（notch）
+ * - 中央圆形FAB凸起于底栏上方，主题色填充，带阴影
+ * - 左右各两个导航按钮（图标+文字），选中态主题色
+ * - 点击中央FAB展开底部工具面板（Git/浏览器/终端）
+ * - 面板毛玻璃风格，工具卡片带图标+名称+描述
  * - 所有操作带触觉反馈
  *
  * @param currentRoute 当前路由
  * @param onNavigate 导航回调
- * @param visible 是否可见（滚动感知隐藏预留）
+ * @param visible 是否可见
  */
 @Composable
 fun AppBottomBar(
@@ -108,35 +118,56 @@ fun AppBottomBar(
 ) {
     val haptic = LocalHapticFeedback.current
     val cornerRadius = LocalCornerRadius.current
+    val density = LocalDensity.current
     var panelExpanded by remember { mutableStateOf(false) }
 
     val isToolPage = currentRoute in TOOLS.map { it.route }
     val currentTool = TOOLS.firstOrNull { it.route == currentRoute }
 
-    val selectedIndex = when {
-        currentRoute == "chat" -> 0
-        isToolPage -> 1
-        currentRoute == "settings" -> 2
-        else -> 0
-    }
+    // 尺寸
+    val barHeight = 64.dp
+    val fabSize = 56.dp
+    val fabRadiusPx = with(density) { fabSize.toPx() / 2f }
+    val notchRadiusPx = fabRadiusPx + 8f // 凹口半径比FAB大8dp间距
 
-    val indicatorX by animateFloatAsState(
-        targetValue = selectedIndex.toFloat(),
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
-        label = "pill_indicator_x",
-    )
+    // 凹口底栏背景形状
+    val notchedShape: Shape = remember(notchRadiusPx) {
+        GenericShape { size, _ ->
+            val width = size.width
+            val height = size.height
+            val centerX = width / 2
+            val nr = notchRadiusPx
+
+            moveTo(0f, 0f)
+            // 到凹口左侧
+            lineTo(centerX - nr - 4f, 0f)
+            // 平滑凹口左半
+            cubicTo(
+                centerX - nr + 2f, 0f,
+                centerX - nr * 0.55f, nr * 0.85f,
+                centerX, nr
+            )
+            // 平滑凹口右半
+            cubicTo(
+                centerX + nr * 0.55f, nr * 0.85f,
+                centerX + nr - 2f, 0f,
+                centerX + nr + 4f, 0f
+            )
+            // 到右上角
+            lineTo(width, 0f)
+            // 右边
+            lineTo(width, height)
+            // 底边
+            lineTo(0f, height)
+            close()
+        }
+    }
 
     val barAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
         animationSpec = tween(durationMillis = 220),
         label = "bar_alpha",
     )
-
-    val pillWidth = 232.dp
-    val pillHeight = 60.dp
-    val itemWidth = pillWidth / 3
-    val indicatorWidth = 68.dp
-    val indicatorHeight = 44.dp
 
     Box(
         modifier = Modifier
@@ -182,7 +213,7 @@ fun AppBottomBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .padding(bottom = 84.dp)
+                    .padding(bottom = 100.dp)
                     .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomStart = 20.dp, bottomEnd = 20.dp))
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
                     .padding(vertical = 20.dp, horizontal = 16.dp),
@@ -195,7 +226,7 @@ fun AppBottomBar(
                     modifier = Modifier.padding(start = 8.dp, bottom = 16.dp),
                 )
 
-                TOOLS.forEachIndexed { index, tool ->
+                TOOLS.forEach { tool ->
                     val isActive = currentRoute == tool.route
                     val cardScale by animateFloatAsState(
                         targetValue = if (isActive) 1.0f else 0.98f,
@@ -272,107 +303,159 @@ fun AppBottomBar(
             }
         }
 
-        // 浮动药丸底栏
+        // 底栏整体容器（含FAB凸起空间）
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(bottom = 12.dp),
+                .height(barHeight + fabSize / 2),
         ) {
+            // 凹口底栏背景
             Box(
                 modifier = Modifier
-                    .width(pillWidth)
-                    .height(pillHeight)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(barHeight)
+                    .clip(notchedShape)
+                    .background(MaterialTheme.colorScheme.surface)
                     .graphicsLayer {
-                        shadowElevation = 12f
-                        shape = RoundedCornerShape(28.dp)
+                        shadowElevation = 8f
+                        shape = notchedShape
                         clip = true
                     },
             ) {
-                // 水滴形选中指示器
-                Box(
-                    modifier = Modifier
-                        .width(indicatorWidth)
-                        .height(indicatorHeight)
-                        .offset(
-                            x = (indicatorX * itemWidth.value + (itemWidth.value - indicatorWidth.value) / 2f).dp,
-                            y = ((pillHeight.value - indicatorHeight.value) / 2f).dp,
-                        )
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
-                )
-
+                // 左右导航按钮
                 Row(
                     modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    NAV_ITEMS.forEachIndexed { index, item ->
-                        val isSelected = selectedIndex == index
-                        val iconScale by animateFloatAsState(
-                            targetValue = if (isSelected) 1.15f else 1.0f,
-                            animationSpec = spring(dampingRatio = 0.55f),
-                            label = "nav_icon_scale_${item.key}",
-                        )
-                        val labelAlpha by animateFloatAsState(
-                            targetValue = if (isSelected) 1f else 0.6f,
-                            animationSpec = tween(durationMillis = 200),
-                            label = "nav_label_alpha_${item.key}",
-                        )
-
-                        val displayIcon = if (item.key == "more" && currentTool != null) {
-                            currentTool.icon
-                        } else {
-                            item.icon
-                        }
-                        val displayLabel = if (item.key == "more" && currentTool != null) {
-                            currentTool.label
-                        } else {
-                            item.label
-                        }
-
-                        Column(
-                            modifier = Modifier
-                                .width(itemWidth)
-                                .height(pillHeight)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        if (item.key == "more") {
-                                            panelExpanded = true
-                                        } else {
-                                            onNavigate(item.key)
-                                        }
-                                    },
-                                ),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Icon(
-                                imageVector = displayIcon,
-                                contentDescription = displayLabel,
-                                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .size(22.dp)
-                                    .scale(iconScale),
+                    // 左侧两个按钮
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        LEFT_ITEMS.forEach { item ->
+                            NavButton(
+                                item = item,
+                                isSelected = currentRoute == item.key,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onNavigate(item.key)
+                                },
                             )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = displayLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.graphicsLayer { alpha = labelAlpha },
-                                maxLines = 1,
+                        }
+                    }
+                    // 中间占位（FAB凹口区域）
+                    Spacer(modifier = Modifier.width(fabSize + 24.dp))
+                    // 右侧两个按钮
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RIGHT_ITEMS.forEach { item ->
+                            NavButton(
+                                item = item,
+                                isSelected = currentRoute == item.key,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onNavigate(item.key)
+                                },
                             )
                         }
                     }
                 }
             }
+
+            // 中央凸起FAB
+            val fabScale by animateFloatAsState(
+                targetValue = if (panelExpanded) 0.92f else 1f,
+                animationSpec = spring(dampingRatio = 0.55f),
+                label = "fab_scale",
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = (-4).dp)
+                    .size(fabSize)
+                    .scale(fabScale)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .graphicsLayer {
+                        shadowElevation = 12f
+                        shape = CircleShape
+                        clip = true
+                    }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            panelExpanded = true
+                        },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Apps,
+                    contentDescription = "更多",
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
         }
+    }
+}
+
+/** 单个导航按钮。 */
+@Composable
+private fun NavButton(
+    item: NavItem,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    val iconScale by animateFloatAsState(
+        targetValue = if (isSelected) 1.12f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.55f),
+        label = "nav_icon_${item.key}",
+    )
+    val labelAlpha by animateFloatAsState(
+        targetValue = if (isSelected) 1f else 0.55f,
+        animationSpec = tween(durationMillis = 200),
+        label = "nav_label_${item.key}",
+    )
+
+    Column(
+        modifier = Modifier
+            .width(64.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = item.icon,
+            contentDescription = item.label,
+            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .size(24.dp)
+                .scale(iconScale),
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            text = item.label,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 10.sp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.graphicsLayer { alpha = labelAlpha },
+            maxLines = 1,
+        )
     }
 }
