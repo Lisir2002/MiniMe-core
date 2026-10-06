@@ -537,6 +537,24 @@ python3 scripts/check-persistence.py
 | **容器初始化状态重启后丢失** | **Singleton 的 MutableStateFlow 初始值硬编码（如 Idle），未从磁盘标记恢复** | **init 块中必须根据磁盘状态（文件标记/DB/KV）初始化 StateFlow，不能硬编码默认值** |
 | **配置导出内容为空** | **exportConfig 中用 getString 读取实际用 putBool/putInt 写入的键** | **导出时必须用与写入时一致的类型读取方法** |
 
+## app-template 模块开发约束
+
+app-template 是「前端应用转安卓应用」的模版壳模块，内置默认欢迎页面用于功能演示和测试。
+
+### 默认欢迎页面同步约束（强制）
+
+1. **功能展示必须与实现状态一致**：`app-template/src/main/assets/www/index.html` 中展示的所有 Bridge 功能必须是已实现的方法，禁止展示标记为 `NOT_IMPLEMENTED` 的预留功能（Media/Location/Sensor 等模块的预留方法不得出现在测试按钮中）。
+2. **随功能变更同步更新**：每次新增、修改或删除 Bridge 模块方法时，必须同步更新欢迎页面的测试按钮和功能展示，确保页面不落伍、不超前。
+3. **版本号动态获取**：欢迎页面底部的版本号必须通过 `BuildConfig.VERSION_NAME` 动态注入（由 MainActivity 在 `onPageFinished` 中更新 `#app-version` 元素），禁止硬编码版本号。
+4. **日志可复制**：测试结果输出框必须支持文本长按选择，并提供「复制日志」按钮。
+5. **审计清单**：发版前必须审计欢迎页面，确认所有展示的功能在对应 Bridge 模块的 `getMethods()` 中存在且非 `NOT_IMPLEMENTED`。
+
+### Bridge 开发约束
+
+1. **@JavascriptInterface 线程安全**：`@JavascriptInterface` 注解的方法在后台线程执行，禁止直接调用 `webView.url`、`webView.evaluateJavascript` 等必须在主线程调用的方法。URL 校验使用 `AppBridge.updateUrl()` 缓存的 `currentUrl`。
+2. **异常必须捕获**：Bridge 方法执行必须包裹 try-catch，通过 `BridgeResult.failure()` 返回错误信息，禁止抛出未捕获异常导致 WebView 返回 "Java exception was raised during method invocation"。
+3. **来源校验**：所有 Bridge 调用必须经过 `isSourceAllowed()` 校验，仅允许本地虚拟域名 `https://appassets.androidplatform.net/` 的顶层页面调用。
+
 ## 关键文件
 
 | 路径 | 作用 |

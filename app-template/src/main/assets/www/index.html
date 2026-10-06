@@ -15,16 +15,24 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background-size: 200% 200%;
+            animation: gradientShift 15s ease infinite;
             min-height: 100vh;
             color: #333;
             overflow-x: hidden;
         }
 
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
         .container {
             max-width: 480px;
             margin: 0 auto;
-            padding: 40px 24px;
+            padding: 48px 20px 32px;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -32,130 +40,131 @@
 
         .header {
             text-align: center;
-            margin-bottom: 32px;
+            margin-bottom: 28px;
             animation: fadeInDown 0.6s ease-out;
         }
 
         .logo {
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 24px;
+            width: 72px;
+            height: 72px;
+            background: rgba(255, 255, 255, 0.25);
+            border-radius: 22px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 16px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            margin: 0 auto 14px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
         }
 
         .logo svg {
-            width: 48px;
-            height: 48px;
+            width: 40px;
+            height: 40px;
             fill: white;
         }
 
         h1 {
             color: white;
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 700;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             letter-spacing: -0.5px;
         }
 
         .subtitle {
             color: rgba(255, 255, 255, 0.85);
-            font-size: 15px;
+            font-size: 14px;
             line-height: 1.6;
         }
 
         .card {
-            background: white;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             border-radius: 20px;
-            padding: 24px;
-            margin-bottom: 16px;
+            padding: 20px;
+            margin-bottom: 14px;
             box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-            animation: fadeInUp 0.6s ease-out;
+            animation: fadeInUp 0.5s ease-out both;
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
 
-        .card:nth-child(2) { animation-delay: 0.1s; }
-        .card:nth-child(3) { animation-delay: 0.2s; }
+        .card:nth-of-type(1) { animation-delay: 0.05s; }
+        .card:nth-of-type(2) { animation-delay: 0.12s; }
+        .card:nth-of-type(3) { animation-delay: 0.19s; }
 
         .card-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             color: #1a1a2e;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
         .card-title .icon {
-            width: 28px;
-            height: 28px;
+            width: 26px;
+            height: 26px;
             background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 8px;
+            border-radius: 7px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-size: 14px;
-        }
-
-        .feature-list {
-            list-style: none;
-        }
-
-        .feature-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 10px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .feature-item:last-child {
-            border-bottom: none;
-        }
-
-        .feature-dot {
-            width: 8px;
-            height: 8px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 50%;
-            margin-top: 6px;
             flex-shrink: 0;
         }
 
-        .feature-text {
-            font-size: 14px;
-            color: #555;
-            line-height: 1.5;
+        .card-title .icon svg {
+            width: 15px;
+            height: 15px;
+            fill: white;
         }
 
-        .feature-text strong {
-            color: #1a1a2e;
-        }
-
-        .btn-group {
+        .feature-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
+            gap: 10px;
         }
 
         .btn {
-            padding: 14px 16px;
             border: none;
-            border-radius: 12px;
+            border-radius: 14px;
+            padding: 14px 12px;
             font-size: 14px;
-            font-weight: 600;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 6px;
+        }
+
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.4s, height 0.4s;
+        }
+
+        .btn:active::after {
+            width: 200px;
+            height: 200px;
         }
 
         .btn:active {
@@ -165,7 +174,7 @@
         .btn-primary {
             background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
         }
 
         .btn-secondary {
@@ -173,44 +182,73 @@
             color: #333;
         }
 
+        .btn-secondary:active {
+            background: #e8e8ed;
+        }
+
         .btn-full {
             grid-column: 1 / -1;
+            padding: 16px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .feature-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            background: #f8f8fa;
+            border-radius: 12px;
+            transition: background 0.2s;
+        }
+
+        .feature-item:active {
+            background: #f0f0f3;
+        }
+
+        .feature-item .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            margin-top: 6px;
+            flex-shrink: 0;
+        }
+
+        .feature-item .text {
+            font-size: 13px;
+            color: #444;
+            line-height: 1.5;
+        }
+
+        .feature-item .text strong {
+            color: #1a1a2e;
+            font-weight: 600;
         }
 
         .result-box {
             background: #1a1a2e;
             color: #00ff88;
-            border-radius: 12px;
-            padding: 16px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.6;
-            max-height: 200px;
+            border-radius: 16px;
+            padding: 14px;
+            font-family: 'SF Mono', 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.7;
+            max-height: 180px;
             overflow-y: auto;
-            margin-top: 16px;
+            margin-top: 14px;
             display: none;
             user-select: text;
             -webkit-user-select: text;
             position: relative;
-        }
-
-        .result-box .copy-btn {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: rgba(255,255,255,0.1);
-            color: #888;
-            border: none;
-            border-radius: 6px;
-            padding: 4px 10px;
-            font-size: 11px;
-            cursor: pointer;
-            z-index: 10;
-        }
-
-        .result-box .copy-btn:hover {
-            background: rgba(255,255,255,0.2);
-            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .result-box.show {
@@ -230,12 +268,37 @@
             color: #888;
         }
 
+        .result-box .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #aaa;
+            border: none;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 10px;
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.2s;
+        }
+
+        .result-box .copy-btn:active {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+        }
+
         .footer {
             text-align: center;
-            margin-top: auto;
-            padding-top: 24px;
             color: rgba(255, 255, 255, 0.7);
             font-size: 12px;
+            margin-top: auto;
+            padding-top: 24px;
+        }
+
+        .footer #app-version {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
         }
 
         @keyframes fadeInDown {
@@ -252,53 +315,51 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .status-badge.ready {
+            background: rgba(0, 255, 136, 0.15);
+            color: #00cc6a;
+        }
+
+        .status-badge.ready::before {
+            content: '';
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #00cc6a;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <div class="logo">
-                <svg viewBox="0 0 24 24">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
+                <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
             </div>
             <h1>欢迎使用应用模版</h1>
-            <p class="subtitle">HTML / Vue → 离线 APK 构建引擎<br>全量原生 Bridge · 安全加固 · 秒级打包</p>
+            <p class="subtitle">WebView + 全量 JS Bridge，前端应用一键打包安卓</p>
         </div>
 
         <div class="card">
             <div class="card-title">
-                <span class="icon">✦</span>
-                核心特性
-            </div>
-            <ul class="feature-list">
-                <li class="feature-item">
-                    <span class="feature-dot"></span>
-                    <span class="feature-text"><strong>WebViewAssetLoader</strong> 虚拟 HTTPS 域名加载，替代 file://，安全无跨域</span>
-                </li>
-                <li class="feature-item">
-                    <span class="feature-dot"></span>
-                    <span class="feature-text"><strong>全量 JS Bridge</strong> 9 大模块，来源校验 + 能力分级，异步 Promise 调用</span>
-                </li>
-                <li class="feature-item">
-                    <span class="feature-dot"></span>
-                    <span class="feature-text"><strong>安全加固</strong> 禁用 file:// 访问、移除危险接口、安全浏览、默认禁止明文HTTP</span>
-                </li>
-                <li class="feature-item">
-                    <span class="feature-dot"></span>
-                    <span class="feature-text"><strong>SPA 路由支持</strong> history 模式自动 fallback，Vue/React 项目开箱即用</span>
-                </li>
-            </ul>
-        </div>
-
-        <div class="card">
-            <div class="card-title">
-                <span class="icon">⚡</span>
+                <div class="icon"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
                 Bridge 功能测试
+                <span class="status-badge ready">8项可用</span>
             </div>
-            <div class="btn-group">
+            <div class="feature-grid">
                 <button class="btn btn-primary" onclick="testToast()">显示 Toast</button>
-                <button class="btn btn-primary" onclick="testDeviceInfo()">设备信息</button>
+                <button class="btn btn-primary" onclick="testDevice()">设备信息</button>
                 <button class="btn btn-secondary" onclick="testVibrate()">震动测试</button>
                 <button class="btn btn-secondary" onclick="testNetwork()">网络状态</button>
                 <button class="btn btn-secondary" onclick="testClipboard()">读取剪贴板</button>
@@ -309,6 +370,31 @@
             </div>
             <div class="result-box" id="resultBox">
                 <button class="copy-btn" onclick="copyLog()">复制日志</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+                核心能力
+            </div>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <div class="dot"></div>
+                    <div class="text"><strong>虚拟 HTTPS 域名</strong>：WebViewAssetLoader 加载本地 assets，替代 file:// 协议</div>
+                </div>
+                <div class="feature-item">
+                    <div class="dot"></div>
+                    <div class="text"><strong>全量 JS Bridge</strong>：UI/设备/文件/网络/数据 5 大模块，来源校验加异步 Promise</div>
+                </div>
+                <div class="feature-item">
+                    <div class="dot"></div>
+                    <div class="text"><strong>SPA 路由支持</strong>：history 模式自动 fallback，Vue/React 项目开箱即用</div>
+                </div>
+                <div class="feature-item">
+                    <div class="dot"></div>
+                    <div class="text"><strong>安全加固</strong>：禁用 file 访问、移除危险接口、安全浏览、禁止明文 HTTP</div>
+                </div>
             </div>
         </div>
 
@@ -357,37 +443,37 @@
         }
 
         function testToast() {
-            AppBridge.ui.toast({ message: 'Hello from Bridge!', long: false })
+            AppBridge.ui.toast({ message: 'Hello from Bridge!' })
                 .then(function () { log('ui.toast', {}); })
                 .catch(function (e) { log('ui.toast', e.message, true); });
         }
 
-        function testDeviceInfo() {
-            AppBridge.device.getInfo()
+        function testDevice() {
+            AppBridge.device.getInfo({})
                 .then(function (data) { log('device.getInfo', data); })
                 .catch(function (e) { log('device.getInfo', e.message, true); });
         }
 
         function testVibrate() {
-            AppBridge.ui.vibrate({ milliseconds: 200 })
+            AppBridge.ui.vibrate({ duration: 200 })
                 .then(function () { log('ui.vibrate', {}); })
                 .catch(function (e) { log('ui.vibrate', e.message, true); });
         }
 
         function testNetwork() {
-            AppBridge.connect.getNetworkStatus()
+            AppBridge.connect.getNetworkStatus({})
                 .then(function (data) { log('connect.getNetworkStatus', data); })
                 .catch(function (e) { log('connect.getNetworkStatus', e.message, true); });
         }
 
         function testClipboard() {
-            AppBridge.data.getClipboard()
+            AppBridge.data.getClipboard({})
                 .then(function (data) { log('data.getClipboard', data); })
                 .catch(function (e) { log('data.getClipboard', e.message, true); });
         }
 
         function testFileWrite() {
-            AppBridge.file.write({ path: 'test.txt', content: 'Hello from AppBridge! ' + new Date().toISOString() })
+            AppBridge.file.write({ path: 'test.txt', content: 'Hello from Bridge!' })
                 .then(function (data) { log('file.write', data); })
                 .catch(function (e) { log('file.write', e.message, true); });
         }
@@ -399,31 +485,21 @@
         }
 
         function testFileList() {
-            AppBridge.file.list({ path: '.' })
+            AppBridge.file.list({ path: '' })
                 .then(function (data) { log('file.list', data); })
                 .catch(function (e) { log('file.list', e.message, true); });
         }
 
         function testAll() {
             testToast();
-            setTimeout(testDeviceInfo, 200);
+            setTimeout(testDevice, 200);
             setTimeout(testVibrate, 400);
             setTimeout(testNetwork, 600);
-            setTimeout(testFileWrite, 800);
-            setTimeout(testFileRead, 1000);
-            setTimeout(testFileList, 1200);
+            setTimeout(testClipboard, 800);
+            setTimeout(testFileWrite, 1000);
+            setTimeout(testFileRead, 1200);
+            setTimeout(testFileList, 1400);
         }
-
-        // 监听生命周期事件
-        AppBridge.on('app:pause', function () {
-            console.log('[Event] app:pause');
-        });
-        AppBridge.on('app:resume', function () {
-            console.log('[Event] app:resume');
-        });
-        AppBridge.on('app:backPressed', function () {
-            console.log('[Event] app:backPressed');
-        });
     </script>
 </body>
 </html>
