@@ -436,6 +436,242 @@
             color: #888;
             margin-top: 2px;
         }
+
+        /* ========== 测试区域增强 ========== */
+        .test-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+            background: #f0f0f3;
+            border-radius: 10px;
+            padding: 4px;
+        }
+
+        .test-tab {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.25s;
+        }
+
+        .test-tab.active {
+            background: white;
+            color: #1a1a2e;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .test-tab-pane {
+            display: none;
+        }
+
+        .test-tab-pane.active {
+            display: block;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* 按钮状态 */
+        .btn.testing {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .btn.testing::before {
+            content: '';
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 6px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .btn.success-flash {
+            background: linear-gradient(135deg, #00b894, #00a850) !important;
+        }
+
+        .btn.error-flash {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a) !important;
+        }
+
+        /* 测试进度条 */
+        .test-progress {
+            display: none;
+            margin: 12px 0;
+            height: 6px;
+            background: #e8e8ed;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .test-progress.show {
+            display: block;
+        }
+
+        .test-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        /* 增强日志区域 */
+        .log-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .log-stats {
+            display: flex;
+            gap: 12px;
+            font-size: 11px;
+        }
+
+        .log-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .log-stat .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .log-stat .dot.total { background: #888; }
+        .log-stat .dot.success { background: #00ff88; }
+        .log-stat .dot.error { background: #ff6b6b; }
+
+        .log-filters {
+            display: flex;
+            gap: 4px;
+        }
+
+        .log-filter-btn {
+            padding: 3px 8px;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: #aaa;
+            border-radius: 5px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .log-filter-btn.active {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+
+        .log-actions {
+            display: flex;
+            gap: 4px;
+            margin-left: 8px;
+        }
+
+        .log-action-btn {
+            padding: 3px 8px;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: #aaa;
+            border-radius: 5px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .log-action-btn:active {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+
+        /* 日志条目 */
+        .log-entry {
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .log-entry-time {
+            color: #666;
+            font-size: 10px;
+            flex-shrink: 0;
+        }
+
+        .log-entry-status {
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .log-entry-status.success { color: #00ff88; }
+        .log-entry-status.error { color: #ff6b6b; }
+
+        .log-entry-method {
+            color: #88ccff;
+            font-size: 11px;
+            font-weight: 600;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .log-entry-duration {
+            color: #888;
+            font-size: 10px;
+            flex-shrink: 0;
+        }
+
+        .log-entry-detail {
+            display: none;
+            margin-top: 6px;
+            padding: 8px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 6px;
+            font-size: 10px;
+            line-height: 1.6;
+            color: #aaa;
+            word-break: break-all;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        .log-entry.expanded .log-entry-detail {
+            display: block;
+        }
+
+        .log-empty {
+            text-align: center;
+            color: #555;
+            font-size: 11px;
+            padding: 20px 0;
+        }
     </style>
 </head>
 <body>
@@ -451,56 +687,87 @@
         <div class="card">
             <div class="card-title">
                 <div class="icon"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
-                Bridge 功能测试
-                <span class="status-badge ready">8项可用</span>
+                功能测试中心
+                <span class="status-badge ready">14项可用</span>
             </div>
-            <div class="feature-grid">
-                <button class="btn btn-primary" onclick="testToast()">显示 Toast</button>
-                <button class="btn btn-primary" onclick="testDevice()">设备信息</button>
-                <button class="btn btn-secondary" onclick="testVibrate()">震动测试</button>
-                <button class="btn btn-secondary" onclick="testNetwork()">网络状态</button>
-                <button class="btn btn-secondary" onclick="testClipboard()">读取剪贴板</button>
-                <button class="btn btn-secondary" onclick="testFileWrite()">写入文件</button>
-                <button class="btn btn-secondary" onclick="testFileRead()">读取文件</button>
-                <button class="btn btn-secondary" onclick="testFileList()">列出目录</button>
-                <button class="btn btn-full btn-primary" onclick="testAll()">全部测试</button>
-            </div>
-            <div class="result-box" id="resultBox">
-                <button class="copy-btn" onclick="copyLog()">复制日志</button>
-            </div>
-        </div>
 
-        <div class="card">
-            <div class="card-title">
-                <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div>
-                权限管理测试
-                <span class="status-badge ready">实时状态</span>
+            <!-- Tab 切换 -->
+            <div class="test-tabs">
+                <button class="test-tab active" onclick="switchTestTab('basic')">基础功能</button>
+                <button class="test-tab" onclick="switchTestTab('permission')">权限管理</button>
             </div>
-            <div class="feature-grid">
-                <button class="btn btn-primary" onclick="refreshPermStatus()">刷新状态</button>
-                <button class="btn btn-primary" onclick="testAllPermissions()">权限总览</button>
-                <button class="btn btn-secondary" onclick="testRequestCamera()">申请相机</button>
-                <button class="btn btn-secondary" onclick="testRequestLocation()">申请位置</button>
-                <button class="btn btn-secondary" onclick="testRequestStorage()">申请存储</button>
-                <button class="btn btn-secondary" onclick="testRequestNotification()">申请通知</button>
-            </div>
-            <div class="perm-summary" id="permSummary">
-                <div class="summary-item">
-                    <div class="summary-num" id="permTotal">-</div>
-                    <div class="summary-label">总权限</div>
+
+            <!-- 基础功能 Tab -->
+            <div class="test-tab-pane active" id="tab-basic">
+                <div class="feature-grid">
+                    <button class="btn btn-primary" data-test="toast" onclick="runTest('toast', testToast)">显示 Toast</button>
+                    <button class="btn btn-primary" data-test="device" onclick="runTest('device', testDevice)">设备信息</button>
+                    <button class="btn btn-secondary" data-test="vibrate" onclick="runTest('vibrate', testVibrate)">震动测试</button>
+                    <button class="btn btn-secondary" data-test="network" onclick="runTest('network', testNetwork)">网络状态</button>
+                    <button class="btn btn-secondary" data-test="clipboard" onclick="runTest('clipboard', testClipboard)">读取剪贴板</button>
+                    <button class="btn btn-secondary" data-test="fileWrite" onclick="runTest('fileWrite', testFileWrite)">写入文件</button>
+                    <button class="btn btn-secondary" data-test="fileRead" onclick="runTest('fileRead', testFileRead)">读取文件</button>
+                    <button class="btn btn-secondary" data-test="fileList" onclick="runTest('fileList', testFileList)">列出目录</button>
+                    <button class="btn btn-full btn-primary" onclick="runAllTests()">一键全部测试</button>
                 </div>
-                <div class="summary-item">
-                    <div class="summary-num" id="permGranted">-</div>
-                    <div class="summary-label">已授予</div>
-                </div>
-                <div class="summary-item">
-                    <div class="summary-num" id="permDenied">-</div>
-                    <div class="summary-label">待申请</div>
+                <div class="test-progress" id="testProgress">
+                    <div class="test-progress-bar" id="testProgressBar"></div>
                 </div>
             </div>
-            <div class="perm-list" id="permList">
-                <div class="perm-item">
-                    <span class="perm-name">点击「刷新状态」加载权限列表</span>
+
+            <!-- 权限管理 Tab -->
+            <div class="test-tab-pane" id="tab-permission">
+                <div class="feature-grid">
+                    <button class="btn btn-primary" onclick="refreshPermStatus()">刷新状态</button>
+                    <button class="btn btn-primary" onclick="testAllPermissions()">权限总览</button>
+                    <button class="btn btn-secondary" onclick="testRequestCamera()">申请相机</button>
+                    <button class="btn btn-secondary" onclick="testRequestLocation()">申请位置</button>
+                    <button class="btn btn-secondary" onclick="testRequestStorage()">申请存储</button>
+                    <button class="btn btn-secondary" onclick="testRequestNotification()">申请通知</button>
+                </div>
+                <div class="perm-summary" id="permSummary">
+                    <div class="summary-item">
+                        <div class="summary-num" id="permTotal">-</div>
+                        <div class="summary-label">总权限</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-num" id="permGranted">-</div>
+                        <div class="summary-label">已授予</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-num" id="permDenied">-</div>
+                        <div class="summary-label">待申请</div>
+                    </div>
+                </div>
+                <div class="perm-list" id="permList">
+                    <div class="perm-item">
+                        <span class="perm-name">点击「刷新状态」加载权限列表</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 增强日志区域 -->
+            <div class="result-box show" id="resultBox" style="margin-top: 14px;">
+                <div class="log-header">
+                    <div class="log-stats">
+                        <div class="log-stat"><span class="dot total"></span><span id="logTotal">0</span></div>
+                        <div class="log-stat"><span class="dot success"></span><span id="logSuccess">0</span></div>
+                        <div class="log-stat"><span class="dot error"></span><span id="logError">0</span></div>
+                    </div>
+                    <div style="display: flex; align-items: center;">
+                        <div class="log-filters">
+                            <button class="log-filter-btn active" onclick="filterLog('all')">全部</button>
+                            <button class="log-filter-btn" onclick="filterLog('success')">成功</button>
+                            <button class="log-filter-btn" onclick="filterLog('error')">失败</button>
+                        </div>
+                        <div class="log-actions">
+                            <button class="log-action-btn" onclick="clearLog()">清空</button>
+                            <button class="log-action-btn" onclick="copyLog()">复制</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="logListContainer">
+                    <div class="log-empty">暂无测试记录，点击上方按钮开始测试</div>
                 </div>
             </div>
         </div>
@@ -536,17 +803,101 @@
     </div>
 
     <script>
-        var resultBox = document.getElementById('resultBox');
+        // ========== 增强日志系统 ==========
+        var logEntries = [];
+        var logFilter = 'all';
+        var logIdCounter = 0;
+
+        function addLog(method, success, data, duration) {
+            var entry = {
+                id: ++logIdCounter,
+                time: new Date().toLocaleTimeString(),
+                method: method,
+                success: success,
+                data: data,
+                duration: duration ? duration + 'ms' : '-'
+            };
+            logEntries.unshift(entry);
+            renderLogs();
+            updateLogStats();
+        }
+
+        function renderLogs() {
+            var container = document.getElementById('logListContainer');
+            var filtered = logEntries.filter(function (e) {
+                if (logFilter === 'all') return true;
+                if (logFilter === 'success') return e.success;
+                if (logFilter === 'error') return !e.success;
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="log-empty">暂无测试记录</div>';
+                return;
+            }
+
+            var html = '';
+            filtered.forEach(function (e) {
+                var statusClass = e.success ? 'success' : 'error';
+                var statusText = e.success ? '✓ 成功' : '✗ 失败';
+                var detailText = typeof e.data === 'string' ? e.data : JSON.stringify(e.data, null, 2);
+                html += '<div class="log-entry" onclick="toggleLogDetail(' + e.id + ')" id="log-' + e.id + '">' +
+                    '<div class="log-entry-header">' +
+                    '<span class="log-entry-time">' + e.time + '</span>' +
+                    '<span class="log-entry-status ' + statusClass + '">' + statusText + '</span>' +
+                    '<span class="log-entry-method">' + e.method + '</span>' +
+                    '<span class="log-entry-duration">' + e.duration + '</span>' +
+                    '</div>' +
+                    '<div class="log-entry-detail">' + escapeHtml(detailText) + '</div>' +
+                    '</div>';
+            });
+            container.innerHTML = html;
+        }
+
+        function toggleLogDetail(id) {
+            var el = document.getElementById('log-' + id);
+            if (el) el.classList.toggle('expanded');
+        }
+
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateLogStats() {
+            var total = logEntries.length;
+            var success = logEntries.filter(function (e) { return e.success; }).length;
+            var error = total - success;
+            document.getElementById('logTotal').textContent = total;
+            document.getElementById('logSuccess').textContent = success;
+            document.getElementById('logError').textContent = error;
+        }
+
+        function filterLog(type) {
+            logFilter = type;
+            document.querySelectorAll('.log-filter-btn').forEach(function (btn) {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            renderLogs();
+        }
+
+        function clearLog() {
+            logEntries = [];
+            renderLogs();
+            updateLogStats();
+        }
 
         function copyLog() {
-            var text = resultBox.innerText || resultBox.textContent;
+            var text = logEntries.map(function (e) {
+                var status = e.success ? '[成功]' : '[失败]';
+                var detail = typeof e.data === 'string' ? e.data : JSON.stringify(e.data);
+                return e.time + ' ' + status + ' ' + e.method + ' (' + e.duration + ')\n' + detail;
+            }).join('\n\n');
+
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(function() {
-                    var btn = document.querySelector('.copy-btn');
-                    var oldText = btn.textContent;
-                    btn.textContent = '已复制';
-                    setTimeout(function() { btn.textContent = oldText; }, 1500);
-                });
+                navigator.clipboard.writeText(text).then(showCopyFeedback);
             } else {
                 var textarea = document.createElement('textarea');
                 textarea.value = text;
@@ -554,86 +905,130 @@
                 textarea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textarea);
-                var btn = document.querySelector('.copy-btn');
-                var oldText = btn.textContent;
-                btn.textContent = '已复制';
-                setTimeout(function() { btn.textContent = oldText; }, 1500);
+                showCopyFeedback();
             }
         }
 
-        function log(label, data, isError) {
-            resultBox.classList.add('show');
-            var time = new Date().toLocaleTimeString();
-            var content = '';
-            if (isError) {
-                content = '<span class="label">[' + time + ']</span> <span class="error">✗ ' + label + ': ' + data + '</span>';
-            } else {
-                content = '<span class="label">[' + time + ']</span> <span class="success">✓ ' + label + '</span><br>' +
-                          '<span class="label">' + JSON.stringify(data, null, 2) + '</span>';
-            }
-            resultBox.innerHTML = content + '<br>' + resultBox.innerHTML;
+        function showCopyFeedback() {
+            var btns = document.querySelectorAll('.log-action-btn');
+            btns.forEach(function (btn) {
+                if (btn.textContent === '复制') {
+                    var old = btn.textContent;
+                    btn.textContent = '已复制';
+                    setTimeout(function () { btn.textContent = old; }, 1500);
+                }
+            });
         }
 
+        // ========== Tab 切换 ==========
+        function switchTestTab(tab) {
+            document.querySelectorAll('.test-tab').forEach(function (t) { t.classList.remove('active'); });
+            document.querySelectorAll('.test-tab-pane').forEach(function (p) { p.classList.remove('active'); });
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tab).classList.add('active');
+        }
+
+        // ========== 按钮状态与测试封装 ==========
+        function runTest(name, testFn) {
+            var btn = document.querySelector('[data-test="' + name + '"]');
+            if (btn) {
+                btn.classList.add('testing');
+                btn.classList.remove('success-flash', 'error-flash');
+            }
+            var startTime = Date.now();
+            testFn().then(function (data) {
+                var duration = Date.now() - startTime;
+                addLog(getMethodLabel(name), true, data, duration);
+                if (btn) {
+                    btn.classList.remove('testing');
+                    btn.classList.add('success-flash');
+                    setTimeout(function () { btn.classList.remove('success-flash'); }, 800);
+                }
+            }).catch(function (e) {
+                var duration = Date.now() - startTime;
+                addLog(getMethodLabel(name), false, e.message, duration);
+                if (btn) {
+                    btn.classList.remove('testing');
+                    btn.classList.add('error-flash');
+                    setTimeout(function () { btn.classList.remove('error-flash'); }, 800);
+                }
+            });
+        }
+
+        function getMethodLabel(name) {
+            var labels = {
+                toast: 'ui.toast',
+                device: 'device.getInfo',
+                vibrate: 'ui.vibrate',
+                network: 'connect.getNetworkStatus',
+                clipboard: 'data.getClipboard',
+                fileWrite: 'file.write',
+                fileRead: 'file.read',
+                fileList: 'file.list'
+            };
+            return labels[name] || name;
+        }
+
+        // ========== 一键全部测试 ==========
+        var allTests = [
+            { name: 'toast', fn: testToast },
+            { name: 'device', fn: testDevice },
+            { name: 'vibrate', fn: testVibrate },
+            { name: 'network', fn: testNetwork },
+            { name: 'clipboard', fn: testClipboard },
+            { name: 'fileWrite', fn: testFileWrite },
+            { name: 'fileRead', fn: testFileRead },
+            { name: 'fileList', fn: testFileList }
+        ];
+
+        function runAllTests() {
+            var progress = document.getElementById('testProgress');
+            var progressBar = document.getElementById('testProgressBar');
+            progress.classList.add('show');
+            var index = 0;
+
+            function runNext() {
+                if (index >= allTests.length) {
+                    setTimeout(function () { progress.classList.remove('show'); }, 500);
+                    return;
+                }
+                var test = allTests[index];
+                var percent = ((index) / allTests.length * 100).toFixed(0);
+                progressBar.style.width = percent + '%';
+                runTest(test.name, test.fn);
+                index++;
+                setTimeout(runNext, 250);
+            }
+            runNext();
+        }
+
+        // ========== 基础功能测试函数 ==========
         function testToast() {
-            AppBridge.ui.toast({ message: 'Hello from Bridge!' })
-                .then(function () { log('ui.toast', {}); })
-                .catch(function (e) { log('ui.toast', e.message, true); });
+            return AppBridge.ui.toast({ message: 'Hello from Bridge!' });
         }
-
         function testDevice() {
-            AppBridge.device.getInfo({})
-                .then(function (data) { log('device.getInfo', data); })
-                .catch(function (e) { log('device.getInfo', e.message, true); });
+            return AppBridge.device.getInfo({});
         }
-
         function testVibrate() {
-            AppBridge.ui.vibrate({ duration: 200 })
-                .then(function () { log('ui.vibrate', {}); })
-                .catch(function (e) { log('ui.vibrate', e.message, true); });
+            return AppBridge.ui.vibrate({ duration: 200 });
         }
-
         function testNetwork() {
-            AppBridge.connect.getNetworkStatus({})
-                .then(function (data) { log('connect.getNetworkStatus', data); })
-                .catch(function (e) { log('connect.getNetworkStatus', e.message, true); });
+            return AppBridge.connect.getNetworkStatus({});
         }
-
         function testClipboard() {
-            AppBridge.data.getClipboard({})
-                .then(function (data) { log('data.getClipboard', data); })
-                .catch(function (e) { log('data.getClipboard', e.message, true); });
+            return AppBridge.data.getClipboard({});
         }
-
         function testFileWrite() {
-            AppBridge.file.write({ path: 'test.txt', content: 'Hello from Bridge!' })
-                .then(function (data) { log('file.write', data); })
-                .catch(function (e) { log('file.write', e.message, true); });
+            return AppBridge.file.write({ path: 'test.txt', content: 'Hello from Bridge!' });
         }
-
         function testFileRead() {
-            AppBridge.file.read({ path: 'test.txt' })
-                .then(function (data) { log('file.read', data); })
-                .catch(function (e) { log('file.read', e.message, true); });
+            return AppBridge.file.read({ path: 'test.txt' });
         }
-
         function testFileList() {
-            AppBridge.file.list({ path: '' })
-                .then(function (data) { log('file.list', data); })
-                .catch(function (e) { log('file.list', e.message, true); });
+            return AppBridge.file.list({ path: '' });
         }
 
-        function testAll() {
-            testToast();
-            setTimeout(testDevice, 200);
-            setTimeout(testVibrate, 400);
-            setTimeout(testNetwork, 600);
-            setTimeout(testClipboard, 800);
-            setTimeout(testFileWrite, 1000);
-            setTimeout(testFileRead, 1200);
-            setTimeout(testFileList, 1400);
-        }
-
-        // ========== 权限测试 ==========
+        // ========== 权限管理 ==========
         var PERM_LABELS = {
             'android.permission.CAMERA': '相机',
             'android.permission.ACCESS_FINE_LOCATION': '精确定位',
@@ -671,13 +1066,16 @@
         }
 
         function refreshPermStatus() {
+            var startTime = Date.now();
             AppBridge.ui.getAllPermissions({})
                 .then(function (data) {
                     renderPermSummary(data);
                     renderPermList(data);
-                    log('ui.getAllPermissions', { total: data.total, granted: data.granted, denied: data.denied });
+                    addLog('ui.getAllPermissions', true, { total: data.total, granted: data.granted, denied: data.denied }, Date.now() - startTime);
                 })
-                .catch(function (e) { log('ui.getAllPermissions', e.message, true); });
+                .catch(function (e) {
+                    addLog('ui.getAllPermissions', false, e.message, Date.now() - startTime);
+                });
         }
 
         function renderPermSummary(data) {
@@ -697,8 +1095,6 @@
             }
 
             var html = '';
-
-            // 待申请的危险权限（显示申请按钮）
             denied.forEach(function (perm) {
                 html += '<div class="perm-item">' +
                     '<span class="perm-name">' + getPermLabel(perm) + '</span>' +
@@ -707,7 +1103,6 @@
                     '</div>';
             });
 
-            // 已授予的权限（只显示前10个，避免列表过长）
             var showGranted = granted.slice(0, 10);
             showGranted.forEach(function (perm) {
                 html += '<div class="perm-item">' +
@@ -724,15 +1119,14 @@
         }
 
         function requestPermByName(permission) {
+            var startTime = Date.now();
             AppBridge.ui.requestPermission({ permission: permission })
                 .then(function (data) {
                     var granted = data[permission];
-                    log('ui.requestPermission(' + getPermLabel(permission) + ')', { granted: granted });
+                    addLog('ui.requestPermission(' + getPermLabel(permission) + ')', granted, { granted: granted }, Date.now() - startTime);
                     if (granted) {
-                        // 申请成功，刷新状态
                         setTimeout(refreshPermStatus, 300);
                     } else {
-                        // 申请被拒绝，提示去设置
                         var list = document.getElementById('permList');
                         var item = document.createElement('div');
                         item.className = 'perm-item';
@@ -743,41 +1137,36 @@
                         list.insertBefore(item, list.firstChild);
                     }
                 })
-                .catch(function (e) { log('ui.requestPermission', e.message, true); });
+                .catch(function (e) {
+                    addLog('ui.requestPermission', false, e.message, Date.now() - startTime);
+                });
         }
 
-        function testAllPermissions() {
-            refreshPermStatus();
-        }
-
-        function testRequestCamera() {
-            requestPermByName('android.permission.CAMERA');
-        }
-
-        function testRequestLocation() {
-            requestPermByName('android.permission.ACCESS_FINE_LOCATION');
-        }
+        function testAllPermissions() { refreshPermStatus(); }
+        function testRequestCamera() { requestPermByName('android.permission.CAMERA'); }
+        function testRequestLocation() { requestPermByName('android.permission.ACCESS_FINE_LOCATION'); }
+        function testRequestNotification() { requestPermByName('android.permission.POST_NOTIFICATIONS'); }
 
         function testRequestStorage() {
+            var startTime = Date.now();
             AppBridge.ui.requestPermissions({ permissions: [
                 'android.permission.READ_EXTERNAL_STORAGE',
                 'android.permission.READ_MEDIA_IMAGES'
             ]})
                 .then(function (data) {
-                    log('ui.requestPermissions(STORAGE)', data);
+                    addLog('ui.requestPermissions(STORAGE)', true, data, Date.now() - startTime);
                     setTimeout(refreshPermStatus, 300);
                 })
-                .catch(function (e) { log('ui.requestPermissions(STORAGE)', e.message, true); });
-        }
-
-        function testRequestNotification() {
-            requestPermByName('android.permission.POST_NOTIFICATIONS');
+                .catch(function (e) {
+                    addLog('ui.requestPermissions(STORAGE)', false, e.message, Date.now() - startTime);
+                });
         }
 
         function testOpenSettings() {
+            var startTime = Date.now();
             AppBridge.ui.openAppSettings({})
-                .then(function (data) { log('ui.openAppSettings', data); })
-                .catch(function (e) { log('ui.openAppSettings', e.message, true); });
+                .then(function (data) { addLog('ui.openAppSettings', true, data, Date.now() - startTime); })
+                .catch(function (e) { addLog('ui.openAppSettings', false, e.message, Date.now() - startTime); });
         }
     </script>
 </body>
