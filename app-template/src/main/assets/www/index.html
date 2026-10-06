@@ -339,6 +339,103 @@
             border-radius: 50%;
             background: #00cc6a;
         }
+
+        /* 权限状态列表 */
+        .perm-list {
+            margin-top: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .perm-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: #f8f8fa;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .perm-item .perm-name {
+            color: #333;
+            font-weight: 500;
+            flex: 1;
+        }
+
+        .perm-item .perm-status {
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .perm-item .perm-status.granted {
+            background: rgba(0, 200, 100, 0.15);
+            color: #00a850;
+        }
+
+        .perm-item .perm-status.denied {
+            background: rgba(255, 80, 80, 0.12);
+            color: #d04040;
+        }
+
+        .perm-item .perm-status.normal {
+            background: rgba(100, 100, 200, 0.12);
+            color: #5050a0;
+        }
+
+        .perm-item .perm-action {
+            margin-left: 8px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .perm-item .perm-action:active {
+            transform: scale(0.95);
+        }
+
+        .perm-item .perm-action.request {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .perm-item .perm-action.settings {
+            background: #ff9500;
+            color: white;
+        }
+
+        .perm-summary {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+            padding: 10px 12px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
+            border-radius: 10px;
+        }
+
+        .perm-summary .summary-item {
+            flex: 1;
+            text-align: center;
+        }
+
+        .perm-summary .summary-num {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a2e;
+        }
+
+        .perm-summary .summary-label {
+            font-size: 10px;
+            color: #888;
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body>
@@ -377,15 +474,34 @@
             <div class="card-title">
                 <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div>
                 权限管理测试
-                <span class="status-badge ready">6项可用</span>
+                <span class="status-badge ready">实时状态</span>
             </div>
             <div class="feature-grid">
+                <button class="btn btn-primary" onclick="refreshPermStatus()">刷新状态</button>
                 <button class="btn btn-primary" onclick="testAllPermissions()">权限总览</button>
-                <button class="btn btn-primary" onclick="testRequestCamera()">申请相机</button>
+                <button class="btn btn-secondary" onclick="testRequestCamera()">申请相机</button>
                 <button class="btn btn-secondary" onclick="testRequestLocation()">申请位置</button>
                 <button class="btn btn-secondary" onclick="testRequestStorage()">申请存储</button>
                 <button class="btn btn-secondary" onclick="testRequestNotification()">申请通知</button>
-                <button class="btn btn-secondary" onclick="testOpenSettings()">打开设置</button>
+            </div>
+            <div class="perm-summary" id="permSummary">
+                <div class="summary-item">
+                    <div class="summary-num" id="permTotal">-</div>
+                    <div class="summary-label">总权限</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-num" id="permGranted">-</div>
+                    <div class="summary-label">已授予</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-num" id="permDenied">-</div>
+                    <div class="summary-label">待申请</div>
+                </div>
+            </div>
+            <div class="perm-list" id="permList">
+                <div class="perm-item">
+                    <span class="perm-name">点击「刷新状态」加载权限列表</span>
+                </div>
             </div>
         </div>
 
@@ -518,22 +634,128 @@
         }
 
         // ========== 权限测试 ==========
-        function testAllPermissions() {
+        var PERM_LABELS = {
+            'android.permission.CAMERA': '相机',
+            'android.permission.ACCESS_FINE_LOCATION': '精确定位',
+            'android.permission.ACCESS_COARSE_LOCATION': '粗略定位',
+            'android.permission.ACCESS_BACKGROUND_LOCATION': '后台定位',
+            'android.permission.READ_EXTERNAL_STORAGE': '读取存储',
+            'android.permission.WRITE_EXTERNAL_STORAGE': '写入存储',
+            'android.permission.READ_MEDIA_IMAGES': '读取图片',
+            'android.permission.READ_MEDIA_VIDEO': '读取视频',
+            'android.permission.READ_MEDIA_AUDIO': '读取音频',
+            'android.permission.MANAGE_EXTERNAL_STORAGE': '管理存储',
+            'android.permission.RECORD_AUDIO': '录音',
+            'android.permission.READ_CONTACTS': '读取联系人',
+            'android.permission.WRITE_CONTACTS': '写入联系人',
+            'android.permission.READ_CALENDAR': '读取日历',
+            'android.permission.WRITE_CALENDAR': '写入日历',
+            'android.permission.SEND_SMS': '发送短信',
+            'android.permission.RECEIVE_SMS': '接收短信',
+            'android.permission.READ_SMS': '读取短信',
+            'android.permission.READ_PHONE_STATE': '读取电话状态',
+            'android.permission.CALL_PHONE': '拨打电话',
+            'android.permission.READ_CALL_LOG': '读取通话记录',
+            'android.permission.BODY_SENSORS': '身体传感器',
+            'android.permission.ACTIVITY_RECOGNITION': '活动识别',
+            'android.permission.POST_NOTIFICATIONS': '发送通知',
+            'android.permission.BLUETOOTH_SCAN': '蓝牙扫描',
+            'android.permission.BLUETOOTH_CONNECT': '蓝牙连接',
+            'android.permission.BLUETOOTH_ADVERTISE': '蓝牙广播',
+            'android.permission.NEARBY_WIFI_DEVICES': '附近WiFi设备',
+            'android.permission.READ_PHONE_NUMBERS': '读取电话号码'
+        };
+
+        function getPermLabel(permission) {
+            return PERM_LABELS[permission] || permission.split('.').pop();
+        }
+
+        function refreshPermStatus() {
             AppBridge.ui.getAllPermissions({})
-                .then(function (data) { log('ui.getAllPermissions', data); })
+                .then(function (data) {
+                    renderPermSummary(data);
+                    renderPermList(data);
+                    log('ui.getAllPermissions', { total: data.total, granted: data.granted, denied: data.denied });
+                })
                 .catch(function (e) { log('ui.getAllPermissions', e.message, true); });
         }
 
+        function renderPermSummary(data) {
+            document.getElementById('permTotal').textContent = data.total || 0;
+            document.getElementById('permGranted').textContent = data.granted || 0;
+            document.getElementById('permDenied').textContent = data.denied || 0;
+        }
+
+        function renderPermList(data) {
+            var list = document.getElementById('permList');
+            var denied = data.deniedList || [];
+            var granted = data.grantedList || [];
+
+            if (denied.length === 0 && granted.length === 0) {
+                list.innerHTML = '<div class="perm-item"><span class="perm-name">暂无权限数据</span></div>';
+                return;
+            }
+
+            var html = '';
+
+            // 待申请的危险权限（显示申请按钮）
+            denied.forEach(function (perm) {
+                html += '<div class="perm-item">' +
+                    '<span class="perm-name">' + getPermLabel(perm) + '</span>' +
+                    '<span class="perm-status denied">待申请</span>' +
+                    '<button class="perm-action request" onclick="requestPermByName(\'' + perm + '\')">申请</button>' +
+                    '</div>';
+            });
+
+            // 已授予的权限（只显示前10个，避免列表过长）
+            var showGranted = granted.slice(0, 10);
+            showGranted.forEach(function (perm) {
+                html += '<div class="perm-item">' +
+                    '<span class="perm-name">' + getPermLabel(perm) + '</span>' +
+                    '<span class="perm-status granted">已授予</span>' +
+                    '</div>';
+            });
+
+            if (granted.length > 10) {
+                html += '<div class="perm-item"><span class="perm-name" style="color:#999;text-align:center;">... 还有 ' + (granted.length - 10) + ' 项已授予权限</span></div>';
+            }
+
+            list.innerHTML = html;
+        }
+
+        function requestPermByName(permission) {
+            AppBridge.ui.requestPermission({ permission: permission })
+                .then(function (data) {
+                    var granted = data[permission];
+                    log('ui.requestPermission(' + getPermLabel(permission) + ')', { granted: granted });
+                    if (granted) {
+                        // 申请成功，刷新状态
+                        setTimeout(refreshPermStatus, 300);
+                    } else {
+                        // 申请被拒绝，提示去设置
+                        var list = document.getElementById('permList');
+                        var item = document.createElement('div');
+                        item.className = 'perm-item';
+                        item.style.background = 'rgba(255, 80, 80, 0.06)';
+                        item.innerHTML = '<span class="perm-name" style="color:#d04040;">' +
+                            getPermLabel(permission) + ' 被拒绝，可去设置手动开启</span>' +
+                            '<button class="perm-action settings" onclick="testOpenSettings()">去设置</button>';
+                        list.insertBefore(item, list.firstChild);
+                    }
+                })
+                .catch(function (e) { log('ui.requestPermission', e.message, true); });
+        }
+
+        function testAllPermissions() {
+            refreshPermStatus();
+        }
+
         function testRequestCamera() {
-            AppBridge.ui.requestPermission({ permission: 'android.permission.CAMERA' })
-                .then(function (data) { log('ui.requestPermission(CAMERA)', data); })
-                .catch(function (e) { log('ui.requestPermission(CAMERA)', e.message, true); });
+            requestPermByName('android.permission.CAMERA');
         }
 
         function testRequestLocation() {
-            AppBridge.ui.requestPermission({ permission: 'android.permission.ACCESS_FINE_LOCATION' })
-                .then(function (data) { log('ui.requestPermission(LOCATION)', data); })
-                .catch(function (e) { log('ui.requestPermission(LOCATION)', e.message, true); });
+            requestPermByName('android.permission.ACCESS_FINE_LOCATION');
         }
 
         function testRequestStorage() {
@@ -541,14 +763,15 @@
                 'android.permission.READ_EXTERNAL_STORAGE',
                 'android.permission.READ_MEDIA_IMAGES'
             ]})
-                .then(function (data) { log('ui.requestPermissions(STORAGE)', data); })
+                .then(function (data) {
+                    log('ui.requestPermissions(STORAGE)', data);
+                    setTimeout(refreshPermStatus, 300);
+                })
                 .catch(function (e) { log('ui.requestPermissions(STORAGE)', e.message, true); });
         }
 
         function testRequestNotification() {
-            AppBridge.ui.requestPermission({ permission: 'android.permission.POST_NOTIFICATIONS' })
-                .then(function (data) { log('ui.requestPermission(NOTIFICATION)', data); })
-                .catch(function (e) { log('ui.requestPermission(NOTIFICATION)', e.message, true); });
+            requestPermByName('android.permission.POST_NOTIFICATIONS');
         }
 
         function testOpenSettings() {
