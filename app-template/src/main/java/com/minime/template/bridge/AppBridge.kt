@@ -41,16 +41,18 @@ class AppBridge(
     }
 
     private val modules: MutableMap<String, BridgeModule> by lazy {
+        // 注意：lazy 初始化中禁止调用 registerModule()，
+        // 因为 registerModule() 访问 modules 属性会触发 lazy 再次初始化，导致 StackOverflowError
         mutableMapOf<String, BridgeModule>().apply {
-            registerModule(UiBridge(context, "ui"))
-            registerModule(DeviceBridge(context, "device"))
-            registerModule(FileBridge(context, "file"))
-            registerModule(MediaBridge(context, "media"))
-            registerModule(LocationBridge(context, "location"))
-            registerModule(SensorBridge(context, "sensor"))
-            registerModule(ConnectBridge(context, "connect"))
-            registerModule(DataBridge(context, "data"))
-            registerModule(EventBridge(context, "event"))
+            put("ui", UiBridge(context, "ui"))
+            put("device", DeviceBridge(context, "device"))
+            put("file", FileBridge(context, "file"))
+            put("media", MediaBridge(context, "media"))
+            put("location", LocationBridge(context, "location"))
+            put("sensor", SensorBridge(context, "sensor"))
+            put("connect", ConnectBridge(context, "connect"))
+            put("data", DataBridge(context, "data"))
+            put("event", EventBridge(context, "event"))
         }
     }
 
@@ -64,9 +66,29 @@ class AppBridge(
      */
     @JavascriptInterface
     fun call(requestJson: String) {
+        try {
+            callInternal(requestJson)
+        } catch (e: Throwable) {
+            // 最外层兜底：任何未捕获异常都通过回调返回具体错误信息，
+            // 避免 WebView 返回通用的 "Java exception was raised during method invocation"
+            val callbackId = try {
+                val req = json.parseToJsonElement(requestJson).jsonObject
+                req["callbackId"]?.toString()?.trim('"')
+            } catch (_: Exception) {
+                null
+            }
+            if (callbackId != null) {
+                val stackTrace = e.stackTraceToString().take(500)
+                invokeCallback(callbackId, BridgeResult.failure(
+                    "Bridge调用异常: ${e.message}\n$stackTrace", "BRIDGE_INTERNAL_ERROR"
+                ))
+            }
+        }
+    }
+
+    private fun callInternal(requestJson: String) {
         // 来源校验：仅允许本地虚拟域名
         if (!isSourceAllowed()) {
-            val result = BridgeResult.sourceNotAllowed()
             // 来源不允许时不回调（防止泄露信息给不可信来源）
             return
         }

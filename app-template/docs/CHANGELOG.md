@@ -1,5 +1,16 @@
 # MiniMe Template 更新日志
 
+## v0.0.0.6
+
+**修复**
+
+- **Bridge栈溢出**：修复 modules 的 by lazy 初始化中调用 registerModule 导致无限递归 StackOverflowError，全部 Bridge 方法无法调用。
+- **异常透传**：call 方法最外层添加 try-catch，异常时返回具体堆栈信息，不再是通用错误提示。
+
+**安全**
+
+- **混淆加固**：加强 proguard 规则，保留 AppBridge、BridgeModule 子类、JavascriptInterface 注解、kotlinx.serialization，防止 R8 移除 Bridge 调用链。
+
 ## v0.0.0.5
 
 **改进**
