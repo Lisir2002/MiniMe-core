@@ -520,6 +520,10 @@ fun AppNavigation(
                         scope.launch { drawerState.close() }
                         navController.navigate("settings")
                     },
+                    onNavigateToPackager = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate("packager")
+                    },
                     currentThemeMode = currentThemeMode,
                     onCycleTheme = onCycleTheme,
                     // 侧边栏「工作目录」tab：复用工作区 ViewModel，切换时若有运行会话则确认
@@ -622,6 +626,53 @@ fun AppNavigation(
                     onNavigateToNetProxy = { navController.navigate("proxy_config") },
                     // 能力中心入口（自侧边栏移入设置）：设置页点击直接跳转能力中心。
                     onNavigateToCapabilityCenter = { navController.navigate("capability_center") }
+                )
+            }
+            // 应用打包器 - 项目列表
+            composable("packager") {
+                val packagerViewModel: com.mini.me_core.feature.packager.presentation.PackagerViewModel = hiltViewModel()
+                com.mini.me_core.feature.packager.presentation.component.PackagerListScreen(
+                    viewModel = packagerViewModel,
+                    onNavigateBack = {
+                        navController.popBackStack()
+                        scope.launch { drawerState.open() }
+                    },
+                    onNewProject = { navController.navigate("packager_new") },
+                    onOpenProject = { project -> navController.navigate("packager_detail/${project.id}") }
+                )
+            }
+            // 应用打包器 - 新建项目向导
+            composable("packager_new") {
+                val packagerViewModel: com.mini.me_core.feature.packager.presentation.PackagerViewModel = hiltViewModel()
+                com.mini.me_core.feature.packager.presentation.component.NewProjectWizard(
+                    viewModel = packagerViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onProjectCreated = { projectId ->
+                        navController.popBackStack()
+                        navController.navigate("packager_detail/$projectId")
+                    }
+                )
+            }
+            // 应用打包器 - 项目详情
+            composable("packager_detail/{projectId}") { entry ->
+                val projectId = entry.arguments?.getString("projectId") ?: ""
+                val packagerViewModel: com.mini.me_core.feature.packager.presentation.PackagerViewModel = hiltViewModel()
+                com.mini.me_core.feature.packager.presentation.component.ProjectDetailScreen(
+                    projectId = projectId,
+                    viewModel = packagerViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onStartBuild = { project ->
+                        packagerViewModel.startBuild(project)
+                        navController.navigate("packager_build")
+                    }
+                )
+            }
+            // 应用打包器 - 构建过程
+            composable("packager_build") {
+                val packagerViewModel: com.mini.me_core.feature.packager.presentation.PackagerViewModel = hiltViewModel()
+                com.mini.me_core.feature.packager.presentation.component.BuildProgressScreen(
+                    viewModel = packagerViewModel,
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
             composable("capability_center") {

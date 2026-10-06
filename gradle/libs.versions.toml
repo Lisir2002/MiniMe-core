@@ -117,6 +117,7 @@ highlights-jvm = { group = "dev.snipme", name = "highlights-jvm", version.ref = 
 # SSH/FTP
 sshj = { group = "com.hierynomus", name = "sshj", version.ref = "sshj" }
 bouncycastle = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
+bouncycastle-pkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncycastle" }
 commons-net = { group = "commons-net", name = "commons-net", version.ref = "commonsNet" }
 ftpserver-core = { group = "org.apache.ftpserver", name = "ftpserver-core", version.ref = "ftpserver" }
 

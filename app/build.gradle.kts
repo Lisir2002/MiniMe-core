@@ -423,6 +423,7 @@ dependencies {
     // 远程同步 (SFTP/FTP) 与内置 FTP 服务端
     implementation(libs.sshj)
     implementation(libs.bouncycastle)
+    implementation(libs.bouncycastle.pkix)
     implementation(libs.commons.net)
     implementation(libs.ftpserver.core)
     implementation(libs.slf4j.simple)

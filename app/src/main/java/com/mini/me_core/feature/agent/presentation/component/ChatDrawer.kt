@@ -143,6 +143,7 @@ fun ChatDrawerContent(
     onExport: (ChatSession) -> Unit,
     onUndoDelete: () -> Unit = {},
     onNavigateToSettings: () -> Unit,
+    onNavigateToPackager: () -> Unit = {},
     currentThemeMode: AppThemeMode,
     onCycleTheme: () -> Unit,
     workspaceViewModel: WorkspaceViewModel? = null,
@@ -262,10 +263,16 @@ fun ChatDrawerContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            DrawerSettingsButton(
-                contentDescription = stringResource(R.string.chat_settings),
-                onClick = onNavigateToSettings
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                DrawerSettingsButton(
+                    contentDescription = stringResource(R.string.chat_settings),
+                    onClick = onNavigateToSettings
+                )
+                Spacer(Modifier.width(Spacing.md))
+                DrawerPackagerButton(
+                    onClick = onNavigateToPackager
+                )
+            }
             DrawerBottomIconButton(
                 icon = when (currentThemeMode) {
                     AppThemeMode.DARK -> Icons.Rounded.DarkMode
@@ -468,6 +475,35 @@ private fun DrawerSettingsButton(
         Spacer(Modifier.width(Spacing.md))
         Text(
             text = stringResource(R.string.chat_settings),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+/**
+ * 侧边栏底部「应用打包器」按钮：图标 + 文字 的整块可点击区域。
+ */
+@Composable
+private fun DrawerPackagerButton(
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
+            .clickable(onClick = onClick)
+            .padding(vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        DrawerNavIcon(
+            icon = Icons.Rounded.Code,
+            iconBgLight = Color(0xFF8B5CF6),
+            iconBgDark = Color(0xFF6D28D9)
+        )
+        Spacer(Modifier.width(Spacing.md))
+        Text(
+            text = "应用打包器",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Medium
