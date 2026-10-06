@@ -23,10 +23,10 @@ android {
         applicationId = "com.minime.template"
         minSdk = 26
         targetSdk = 34
-        // 版本号四段格式（与主应用规范一致）：0.0.0.9
+        // 版本号四段格式（与主应用规范一致）：0.0.0.10
         // versionCode = 10_000_000 + A*1_000_000_000 + B*10_000_000 + C*10_000 + D*10
-        versionCode = 10_000_090
-        versionName = "0.0.0.9"
+        versionCode = 10_000_100
+        versionName = "0.0.0.10"
 
         vectorDrawables {
             useSupportLibrary = true

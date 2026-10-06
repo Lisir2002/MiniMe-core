@@ -1,5 +1,11 @@
 # MiniMe Template 更新日志
 
+## v0.0.0.10
+
+**修复**
+
+- **权限状态误判**：getAllPermissions 中使用 requestedPermissionsFlags 与 PERMISSION_GRANTED(值为0) 按位与判断，导致所有权限永远显示待申请。改用 checkSelfPermission 准确判断，同时修复 protectionLevel 未掩码导致危险权限识别错误。
+
 ## v0.0.0.9
 
 **改进**

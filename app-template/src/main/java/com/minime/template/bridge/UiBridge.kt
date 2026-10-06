@@ -294,21 +294,22 @@ class UiBridge(
             context.packageName, PackageManager.GET_PERMISSIONS
         )
         val requestedPermissions = packageInfo.requestedPermissions ?: emptyArray()
-        val grantResults = packageInfo.requestedPermissionsFlags ?: IntArray(0)
 
         val normalPermissions = mutableListOf<String>()
         val grantedPermissions = mutableListOf<String>()
         val deniedPermissions = mutableListOf<String>()
 
-        requestedPermissions.forEachIndexed { index, permission ->
-            val flag = grantResults.getOrNull(index) ?: 0
-            val granted = (flag and PackageManager.PERMISSION_GRANTED) != 0
+        requestedPermissions.forEach { permission ->
+            // 使用 checkSelfPermission 准确判断权限授予状态（最可靠方式）
+            val granted = context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
             if (granted) {
                 grantedPermissions.add(permission)
             } else {
                 // 判断是否是危险权限（需要运行时申请）
+                // protectionLevel 可能包含额外标志位，需用 PROTECTION_MASK_BASE 掩码
                 val isDangerous = try {
-                    context.packageManager.getPermissionInfo(permission, 0).protectionLevel ==
+                    val permInfo = context.packageManager.getPermissionInfo(permission, 0)
+                    (permInfo.protectionLevel and android.content.pm.PermissionInfo.PROTECTION_MASK_BASE) ==
                         android.content.pm.PermissionInfo.PROTECTION_DANGEROUS
                 } catch (_: Exception) {
                     false
