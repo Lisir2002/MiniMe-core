@@ -63,6 +63,8 @@ class MainActivity : Activity() {
 
         // 初始化 AppBridge
         appBridge = AppBridge(this, webView)
+        // 绑定 UiBridge（状态栏/导航栏/沉浸模式/权限申请等需要 Activity 和 Window）
+        appBridge.uiBridge.attach(webView, window)
 
         // 配置 WebView 设置
         configureWebViewSettings(config.webview.debuggable)
@@ -214,6 +216,16 @@ class MainActivity : Activity() {
         appBridge.emitEvent(EventBridge.EVENT_ON_DESTROY)
         webView.destroy()
         super.onDestroy()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        // 将权限申请结果传递给 UiBridge
+        appBridge.onPermissionResult(permissions, grantResults)
     }
 
     @Deprecated("Deprecated in Java")

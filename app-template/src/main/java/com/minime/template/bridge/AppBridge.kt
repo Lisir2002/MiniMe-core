@@ -40,6 +40,18 @@ class AppBridge(
         currentUrl = url
     }
 
+    /**
+     * 获取 UiBridge 实例（用于 attach 和权限回调）
+     */
+    val uiBridge: UiBridge by lazy { modules["ui"] as UiBridge }
+
+    /**
+     * 由 MainActivity 的 onRequestPermissionsResult 调用，通知权限申请结果
+     */
+    fun onPermissionResult(permissions: Array<out String>, grantResults: IntArray) {
+        uiBridge.onPermissionResult(permissions, grantResults)
+    }
+
     private val modules: MutableMap<String, BridgeModule> by lazy {
         // 注意：lazy 初始化中禁止调用 registerModule()，
         // 因为 registerModule() 访问 modules 属性会触发 lazy 再次初始化，导致 StackOverflowError

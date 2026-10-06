@@ -1,5 +1,21 @@
 # MiniMe Template 更新日志
 
+## v0.0.0.7
+
+**新功能**
+
+- **权限管理**：新增权限检查、运行时申请、批量申请、打开应用设置、获取所有权限状态等 6 个 Bridge 方法，支持 JS 侧异步申请危险权限。
+- **全量权限声明**：AndroidManifest 声明网络、硬件、蓝牙、NFC、位置、存储、联系人、日历、短信、电话、传感器、通知、系统等全量权限，覆盖已知可获取的所有权限。
+
+**改进**
+
+- **UiBridge绑定**：MainActivity 初始化时调用 uiBridge.attach(webView, window)，状态栏/导航栏/沉浸模式/权限申请等功能正式可用。
+
+**修复**
+
+- **Toast显示**：修复 ui.toast 在 IO 线程调用导致的 `Can't toast on a thread that has not called Looper.prepare()`，切换主线程显示。
+- **震动权限**：AndroidManifest 缺少 VIBRATE 权限导致 ui.vibrate 调用失败，已补全权限声明。
+
 ## v0.0.0.6
 
 **修复**

@@ -375,6 +375,22 @@
 
         <div class="card">
             <div class="card-title">
+                <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div>
+                权限管理测试
+                <span class="status-badge ready">6项可用</span>
+            </div>
+            <div class="feature-grid">
+                <button class="btn btn-primary" onclick="testAllPermissions()">权限总览</button>
+                <button class="btn btn-primary" onclick="testRequestCamera()">申请相机</button>
+                <button class="btn btn-secondary" onclick="testRequestLocation()">申请位置</button>
+                <button class="btn btn-secondary" onclick="testRequestStorage()">申请存储</button>
+                <button class="btn btn-secondary" onclick="testRequestNotification()">申请通知</button>
+                <button class="btn btn-secondary" onclick="testOpenSettings()">打开设置</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
                 <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
                 核心能力
             </div>
@@ -499,6 +515,46 @@
             setTimeout(testFileWrite, 1000);
             setTimeout(testFileRead, 1200);
             setTimeout(testFileList, 1400);
+        }
+
+        // ========== 权限测试 ==========
+        function testAllPermissions() {
+            AppBridge.ui.getAllPermissions({})
+                .then(function (data) { log('ui.getAllPermissions', data); })
+                .catch(function (e) { log('ui.getAllPermissions', e.message, true); });
+        }
+
+        function testRequestCamera() {
+            AppBridge.ui.requestPermission({ permission: 'android.permission.CAMERA' })
+                .then(function (data) { log('ui.requestPermission(CAMERA)', data); })
+                .catch(function (e) { log('ui.requestPermission(CAMERA)', e.message, true); });
+        }
+
+        function testRequestLocation() {
+            AppBridge.ui.requestPermission({ permission: 'android.permission.ACCESS_FINE_LOCATION' })
+                .then(function (data) { log('ui.requestPermission(LOCATION)', data); })
+                .catch(function (e) { log('ui.requestPermission(LOCATION)', e.message, true); });
+        }
+
+        function testRequestStorage() {
+            AppBridge.ui.requestPermissions({ permissions: [
+                'android.permission.READ_EXTERNAL_STORAGE',
+                'android.permission.READ_MEDIA_IMAGES'
+            ]})
+                .then(function (data) { log('ui.requestPermissions(STORAGE)', data); })
+                .catch(function (e) { log('ui.requestPermissions(STORAGE)', e.message, true); });
+        }
+
+        function testRequestNotification() {
+            AppBridge.ui.requestPermission({ permission: 'android.permission.POST_NOTIFICATIONS' })
+                .then(function (data) { log('ui.requestPermission(NOTIFICATION)', data); })
+                .catch(function (e) { log('ui.requestPermission(NOTIFICATION)', e.message, true); });
+        }
+
+        function testOpenSettings() {
+            AppBridge.ui.openAppSettings({})
+                .then(function (data) { log('ui.openAppSettings', data); })
+                .catch(function (e) { log('ui.openAppSettings', e.message, true); });
         }
     </script>
 </body>
