@@ -6,6 +6,7 @@ import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.zip.CRC32
+import java.util.zip.Deflater
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 
@@ -36,7 +37,20 @@ class ZipAligner {
                 var entry: ZipEntry?
                 while (zis.nextEntry.also { entry = it } != null) {
                     val data = zis.readBytes()
-                    entries.add(EntryData(entry!!.name, entry!!.method, data))
+                    val method = entry!!.method
+                    // 对于 DEFLATED 条目，预先压缩数据
+                    val compressedData = if (method == ZipEntry.DEFLATED) {
+                        val deflater = Deflater(Deflater.DEFAULT_COMPRESSION)
+                        deflater.setInput(data)
+                        deflater.finish()
+                        val buffer = ByteArray(data.size + 1024)
+                        val compressedLength = deflater.deflate(buffer)
+                        deflater.end()
+                        buffer.copyOf(compressedLength)
+                    } else {
+                        data
+                    }
+                    entries.add(EntryData(entry!!.name, method, data, compressedData))
                     zis.closeEntry()
                 }
             }
@@ -49,7 +63,9 @@ class ZipAligner {
                 for (entryData in entries) {
                     val nameBytes = entryData.name.toByteArray(Charsets.UTF_8)
                     val crc = CRC32().apply { update(entryData.data) }.value
-                    val size = entryData.data.size
+                    val uncompressedSize = entryData.data.size
+                    val compressedData = entryData.compressedData
+                    val compressedSize = compressedData.size
 
                     // 计算基础 header 大小
                     val baseHeaderSize = 30 + nameBytes.size
@@ -75,8 +91,8 @@ class ZipAligner {
                     header.putShort(0)                        // mod time (简化)
                     header.putShort(0)                        // mod date (简化)
                     header.putInt(crc.toInt())
-                    header.putInt(size)                       // compressed size
-                    header.putInt(size)                       // uncompressed size
+                    header.putInt(compressedSize)             // compressed size
+                    header.putInt(uncompressedSize)           // uncompressed size
                     header.putShort(nameBytes.size.toShort())
                     header.putShort(padding.toShort())        // extra field length
                     header.put(nameBytes)
@@ -84,9 +100,9 @@ class ZipAligner {
                     fos.write(header.array())
                     currentOffset += header.array().size
 
-                    // 写入数据
-                    fos.write(entryData.data)
-                    currentOffset += size
+                    // 写入数据（压缩后的数据）
+                    fos.write(compressedData)
+                    currentOffset += compressedSize
                 }
 
                 // 写入 Central Directory
@@ -94,7 +110,8 @@ class ZipAligner {
                 for ((index, entryData) in entries.withIndex()) {
                     val nameBytes = entryData.name.toByteArray(Charsets.UTF_8)
                     val crc = CRC32().apply { update(entryData.data) }.value
-                    val size = entryData.data.size
+                    val uncompressedSize = entryData.data.size
+                    val compressedSize = entryData.compressedData.size
 
                     val cd = ByteBuffer.allocate(46 + nameBytes.size).order(ByteOrder.LITTLE_ENDIAN)
                     cd.putInt(CD_MAGIC)
@@ -105,8 +122,8 @@ class ZipAligner {
                     cd.putShort(0)                         // mod time
                     cd.putShort(0)                         // mod date
                     cd.putInt(crc.toInt())
-                    cd.putInt(size)                        // compressed size
-                    cd.putInt(size)                        // uncompressed size
+                    cd.putInt(compressedSize)              // compressed size
+                    cd.putInt(uncompressedSize)            // uncompressed size
                     cd.putShort(nameBytes.size.toShort())
                     cd.putShort(0)                         // extra length
                     cd.putShort(0)                         // comment length
@@ -137,7 +154,8 @@ class ZipAligner {
         private data class EntryData(
             val name: String,
             val method: Int,
-            val data: ByteArray
+            val data: ByteArray,
+            val compressedData: ByteArray
         )
     }
 }

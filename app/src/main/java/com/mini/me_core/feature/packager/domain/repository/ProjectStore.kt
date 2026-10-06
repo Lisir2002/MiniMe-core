@@ -109,11 +109,10 @@ class ProjectStore(
         val configFile = File(projectDir, "config.json")
         configFile.writeText(json.encodeToString(StoredProject.fromProject(project)))
 
-        // 保存 HTML 内容
-        if (htmlContent.isNotEmpty()) {
-            val wwwDir = File(projectDir, "www").apply { mkdirs() }
-            File(wwwDir, "index.html").writeText(htmlContent)
-        }
+        // 保存 HTML 内容（为空时使用默认模板）
+        val wwwDir = File(projectDir, "www").apply { mkdirs() }
+        val htmlToSave = if (htmlContent.isNotEmpty()) htmlContent else DEFAULT_HTML
+        File(wwwDir, "index.html").writeText(htmlToSave)
 
         // 更新内存缓存
         _projects.value = listOf(project) + _projects.value
@@ -258,4 +257,18 @@ class ProjectStore(
             )
         }
     }
+
+    /** 默认 HTML 模板 */
+    private val DEFAULT_HTML = """<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的应用</title>
+</head>
+<body>
+    <h1>Hello World</h1>
+    <p>在这里开始编写你的 HTML 应用</p>
+</body>
+</html>"""
 }
