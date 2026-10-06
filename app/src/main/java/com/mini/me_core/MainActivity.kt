@@ -545,7 +545,6 @@ fun AppNavigation(
             }
         }
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
         androidx.compose.material3.Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -554,9 +553,7 @@ fun AppNavigation(
         NavHost(
             navController = navController,
             startDestination = "chat",
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 56.dp),
+            modifier = Modifier.fillMaxSize(),
             enterTransition = {
                 when (targetState.destination.route) {
                     "terminal" -> terminalEnterTransition
@@ -758,20 +755,5 @@ fun AppNavigation(
             }
         }
         } // Scaffold content lambda 闭合
-
-        // 浮动药丸底栏（悬浮于内容上方）
-        com.mini.me_core.core.theme.components.AppBottomBar(
-            currentRoute = currentRoute,
-            onNavigate = { route ->
-                if (route != currentRoute) {
-                    navController.navigate(route) {
-                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
-            },
-        )
-        } // Box 闭合
     }
 }
