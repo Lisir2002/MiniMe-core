@@ -1,5 +1,7 @@
 package com.mini.me_core.feature.packager.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * 项目类型
  */
@@ -32,6 +34,55 @@ enum class BuildStatus {
 }
 
 /**
+ * JS Bridge 能力模块开关
+ */
+@Serializable
+data class BridgeCapabilities(
+    val ui: Boolean = true,           // UI 模块（Toast、对话框等）
+    val device: Boolean = true,       // 设备信息模块
+    val file: Boolean = true,         // 文件操作模块
+    val network: Boolean = true,      // 网络状态模块
+    val data: Boolean = true          // 数据模块（剪贴板等）
+)
+
+/**
+ * WebView 设置
+ */
+@Serializable
+data class WebViewSettings(
+    val hardwareAcceleration: Boolean = true,  // 硬件加速
+    val supportZoom: Boolean = false,           // 支持缩放
+    val domStorageEnabled: Boolean = true,      // DOM 存储
+    val allowFileAccess: Boolean = true,        // 文件访问
+    val allowContentAccess: Boolean = true,     // Content 访问
+    val mixedContentMode: Int = 0,              // 混合内容模式（0=允许，1=拒绝，2=兼容）
+    val cacheMode: Int = -1                     // 缓存模式（-1=默认，0=不缓存，1=缓存，2=网络优先，3=缓存优先）
+)
+
+/**
+ * 显示设置
+ */
+@Serializable
+data class DisplaySettings(
+    val immersiveMode: Boolean = false,         // 沉浸模式（状态栏/导航栏透明）
+    val statusBarColor: String = "#000000",    // 状态栏颜色
+    val navigationBarColor: String = "#000000", // 导航栏颜色
+    val statusBarLight: Boolean = false,        // 状态栏文字浅色
+    val screenOrientation: String = "unspecified" // 屏幕方向（unspecified/portrait/landscape）
+)
+
+/**
+ * 启动页设置
+ */
+@Serializable
+data class SplashSettings(
+    val enabled: Boolean = true,                // 启用启动页
+    val customImagePath: String? = null,        // 自定义启动页图片路径
+    val delayMs: Int = 1000,                    // 启动延迟（毫秒）
+    val fullscreen: Boolean = true              // 全屏启动页
+)
+
+/**
  * 项目配置
  *
  * @param id 项目唯一ID（UUID）
@@ -42,7 +93,11 @@ enum class BuildStatus {
  * @param type 项目类型
  * @param iconPath 自定义图标路径（可选，null 表示使用模版默认图标）
  * @param bridgeEnabled Bridge 能力总开关
+ * @param bridgeCapabilities Bridge 各模块开关
  * @param permissions 声明的权限列表
+ * @param webViewSettings WebView 设置
+ * @param displaySettings 显示设置
+ * @param splashSettings 启动页设置
  * @param createdAt 创建时间戳
  * @param updatedAt 最后更新时间戳
  * @param lastBuildAt 最后构建时间戳（可选）
@@ -57,7 +112,11 @@ data class Project(
     val type: ProjectType,
     val iconPath: String? = null,
     val bridgeEnabled: Boolean = true,
+    val bridgeCapabilities: BridgeCapabilities = BridgeCapabilities(),
     val permissions: List<String> = emptyList(),
+    val webViewSettings: WebViewSettings = WebViewSettings(),
+    val displaySettings: DisplaySettings = DisplaySettings(),
+    val splashSettings: SplashSettings = SplashSettings(),
     val createdAt: Long,
     val updatedAt: Long,
     val lastBuildAt: Long? = null,

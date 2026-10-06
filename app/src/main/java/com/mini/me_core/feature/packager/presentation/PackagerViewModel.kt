@@ -38,15 +38,14 @@ class PackagerViewModel @Inject constructor(
     private val _currentProject = MutableStateFlow<Project?>(null)
     val currentProject: StateFlow<Project?> = _currentProject.asStateFlow()
 
-    // ========== 新建项目向导状态 ==========
+    // ========== 新建项目状态 ==========
     data class NewProjectState(
-        val step: Int = 0,
         val projectType: ProjectType = ProjectType.HTML,
         val appName: String = "",
         val packageName: String = "",
         val versionName: String = Project.DEFAULT_VERSION_NAME,
-        val htmlContent: String = "",
-        val packageNameError: String? = null
+        val packageNameError: String? = null,
+        val isCreating: Boolean = false
     )
 
     private val _newProjectState = MutableStateFlow(NewProjectState())
@@ -92,6 +91,61 @@ class PackagerViewModel @Inject constructor(
         _currentProject.value = project
         loadBuildRecords(project.id)
     }
+
+    /**
+     * 更新项目配置
+     */
+    fun updateProject(project: Project) {
+        viewModelScope.launch {
+            val updated = projectStore.updateProject(project.copy(updatedAt = System.currentTimeMillis()))
+            if (_currentProject.value?.id == updated.id) {
+                _currentProject.value = updated
+            }
+        }
+    }
+
+    /**
+     * 切换权限
+     */
+    fun togglePermission(projectId: String, permission: String, enabled: Boolean) {
+        val project = getProjectById(projectId) ?: return
+        val newPermissions = if (enabled) {
+            project.permissions + permission
+        } else {
+            project.permissions - permission
+        }
+        updateProject(project.copy(permissions = newPermissions))
+    }
+
+    /**
+     * 更新 Bridge 能力模块
+     */
+    fun updateBridgeCapability(projectId: String, module: String, enabled: Boolean) {
+        val project = getProjectById(projectId) ?: return
+        val caps = project.bridgeCapabilities.let {
+            when (module) {
+                "ui" -> it.copy(ui = enabled)
+                "device" -> it.copy(device = enabled)
+                "file" -> it.copy(file = enabled)
+                "network" -> it.copy(network = enabled)
+                "data" -> it.copy(data = enabled)
+                else -> it
+            }
+        }
+        updateProject(project.copy(bridgeCapabilities = caps))
+    }
+
+    /**
+     * 根据 ID 获取项目
+     */
+    fun getProjectById(projectId: String): Project? =
+        projectStore.getProjectById(projectId)
+
+    /**
+     * 获取项目的 www 目录
+     */
+    fun getWwwDir(projectId: String): File =
+        projectStore.getWwwDir(projectId)
 
     /**
      * 删除项目
@@ -161,33 +215,6 @@ class PackagerViewModel @Inject constructor(
     }
 
     /**
-     * 更新 HTML 内容
-     */
-    fun updateHtmlContent(content: String) {
-        _newProjectState.value = _newProjectState.value.copy(htmlContent = content)
-    }
-
-    /**
-     * 向导下一步
-     */
-    fun nextStep() {
-        val state = _newProjectState.value
-        if (state.step < 4) {
-            _newProjectState.value = state.copy(step = state.step + 1)
-        }
-    }
-
-    /**
-     * 向导上一步
-     */
-    fun prevStep() {
-        val state = _newProjectState.value
-        if (state.step > 0) {
-            _newProjectState.value = state.copy(step = state.step - 1)
-        }
-    }
-
-    /**
      * 创建项目
      */
     suspend fun createProject(): Project? {
@@ -195,13 +222,18 @@ class PackagerViewModel @Inject constructor(
         if (state.appName.isBlank() || state.packageName.isBlank()) return null
         if (state.packageNameError != null) return null
 
-        return projectStore.createProject(
-            name = state.appName,
-            packageName = state.packageName,
-            type = state.projectType,
-            versionName = state.versionName,
-            htmlContent = state.htmlContent
-        )
+        _newProjectState.value = state.copy(isCreating = true)
+        return try {
+            projectStore.createProject(
+                name = state.appName,
+                packageName = state.packageName,
+                type = state.projectType,
+                versionName = state.versionName,
+                htmlContent = ""
+            )
+        } finally {
+            _newProjectState.value = _newProjectState.value.copy(isCreating = false)
+        }
     }
 
     // ========== 构建 ==========
