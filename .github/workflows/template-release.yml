@@ -1,0 +1,153 @@
+name: Template Release
+
+# 打 template-v* tag 时触发：构建 :app-template:assembleRelease 并上传 APK 到 Release。
+# 与主应用 android-release.yml、logviewer-release.yml 并行，互不影响。
+#   tag 例：template-v0.0.0.1
+#   产物：minime-template-v0.0.0.1.apk
+on:
+  push:
+    tags:
+      - 'template-v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Release Template APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '14742923'
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Template Release APK
+        run: ./gradlew :app-template:assembleRelease --stacktrace
+
+      - name: Rename APK
+        id: rename
+        run: |
+          set -e
+          ver="${GITHUB_REF_NAME#template-v}"
+          src="app-template/build/outputs/apk/release/app-template-release.apk"
+          out="dist/minime-template-v${ver}.apk"
+          mkdir -p dist
+          cp "$src" "$out"
+          echo "apk=$out" >> "$GITHUB_OUTPUT"
+          echo "TEMPLATE_VER=$ver" >> "$GITHUB_ENV"
+          ls -lh "$out"
+
+      - name: Verify signature
+        run: |
+          set -e
+          APK="${{ steps.rename.outputs.apk }}"
+          echo "--- apksigner verify ---"
+          $ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs "$APK" | head -3
+          echo "--- APK size ---"
+          ls -lh "$APK"
+
+      - name: Generate release notes
+        id: changelog
+        run: |
+          set -e
+          cur_tag="${GITHUB_REF_NAME}"
+          prev_tag=$(git tag --sort=-creatordate | grep '^template-v' | grep -v "^${cur_tag}$" | head -1)
+          version="${cur_tag#template-v}"
+          delimiter="EOF_$(date +%s)"
+          {
+            echo "body<<${delimiter}"
+            python3 scripts/gitops/release-log.py \
+              --prev "$prev_tag" \
+              --cur "$cur_tag" \
+              --version "$version" \
+              --date "$(date +%Y-%m-%d)"
+            echo ""
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Preserve existing release content
+        id: preserve
+        env:
+          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          cur_tag="${GITHUB_REF_NAME}"
+          delimiter="EOF_$(date +%s)"
+
+          existing=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${cur_tag}" || echo "")
+
+          final_body="${{ steps.changelog.outputs.body }}"
+          final_name="MiniMe Template v${TEMPLATE_VER}"
+
+          if echo "$existing" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('id') else 1)" 2>/dev/null; then
+            existing_body=$(echo "$existing" | python3 -c "import json,sys; print(json.load(sys.stdin).get('body',''))")
+            existing_name=$(echo "$existing" | python3 -c "import json,sys; print(json.load(sys.stdin).get('name',''))")
+
+            if ! echo "$existing_body" | grep -qE "请补充|请提炼|_（"; then
+              final_body="$existing_body"
+            fi
+            if echo "$existing_name" | grep -q "—"; then
+              final_name="$existing_name"
+            fi
+          fi
+
+          {
+            echo "body<<${delimiter}"
+            echo "$final_body"
+            echo "${delimiter}"
+            echo "name<<${delimiter}"
+            echo "$final_name"
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Validate release notes (hard checks)
+        run: |
+          set -e
+          body="${{ steps.preserve.outputs.body }}"
+          echo "--- 硬校验：emoji ---"
+          if echo "$body" | grep -qP '[\x{1F300}-\x{1F9FF}]|[\x{2600}-\x{27BF}]'; then
+            echo "::error::Release 正文包含 emoji，违反发版规范"
+            exit 1
+          fi
+          echo "  PASS: 无 emoji"
+          echo "--- 硬校验完成 ---"
+
+      - name: Determine prerelease flag
+        id: prerelease
+        run: |
+          tag="${{ github.ref_name }}"
+          if [[ "$tag" =~ -(rc|dev|beta|alpha)([.0-9]*)?$ ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "检测到预发布后缀，标记为 pre-release"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "正式版，不标记 pre-release"
+          fi
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ steps.preserve.outputs.name }}
+          body: ${{ steps.preserve.outputs.body }}
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+          files: |
+            ${{ steps.rename.outputs.apk }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}

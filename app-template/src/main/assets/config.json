@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "应用模版",
+    "packageName": "com.minime.template",
+    "versionName": "1.0.0",
+    "versionCode": 1,
+    "icon": "ic_launcher"
+  },
+  "webview": {
+    "entry": "index.html",
+    "themeColor": "#6750A4",
+    "orientation": "portrait",
+    "immersive": false,
+    "statusBarColor": "#4F378B",
+    "navigationBarColor": "#000000",
+    "hardwareAccelerated": true,
+    "cacheMode": "default",
+    "debuggable": true,
+    "spaFallback": true
+  },
+  "permissions": {
+    "internet": true,
+    "storage": false,
+    "camera": false,
+    "microphone": false,
+    "location": false,
+    "bluetooth": false,
+    "nfc": false,
+    "contacts": false,
+    "calendar": false,
+    "notification": false
+  },
+  "bridge": {
+    "enabled": true,
+    "modules": ["ui", "device", "file", "media", "location", "sensor", "connect", "data", "event"]
+  },
+  "splash": {
+    "enabled": true,
+    "duration": 1500,
+    "autoHide": true,
+    "backgroundColor": "#6750A4"
+  }
+}
