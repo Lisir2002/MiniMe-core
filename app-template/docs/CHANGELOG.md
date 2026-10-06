@@ -1,5 +1,11 @@
 # MiniMe Template 更新日志
 
+## v0.0.0.4
+
+**修复**
+
+- **启动崩溃**：修复启动屏 View 被重复添加导致的 `The specified child already has a parent` 闪退。
+
 ## v0.0.0.3
 
 **改进**

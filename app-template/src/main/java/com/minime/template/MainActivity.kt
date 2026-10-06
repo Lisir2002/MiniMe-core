@@ -51,7 +51,6 @@ class MainActivity : Activity() {
         splashView = View(this).apply {
             setBackgroundColor(Color.parseColor(config.splash.backgroundColor))
         }
-        setContentView(splashView)
 
         // 创建 WebView
         webView = WebView(this)
