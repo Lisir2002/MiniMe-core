@@ -13,15 +13,25 @@ import java.util.Locale
 /**
  * 崩溃日志捕获器
  *
- * 捕获未处理异常，将崩溃堆栈写入应用私有目录，便于后续排查。
- * 日志文件：/data/data/com.minime.template/crash/crash_yyyyMMdd_HHmmss.log
+ * 捕获未处理异常，将崩溃堆栈写入外部存储公共目录，用户可直接通过文件管理器查看。
+ * 主路径：/sdcard/Android/data/com.minime.template/files/crash/crash_yyyyMMdd_HHmmss.log
+ * 备选路径（外部存储不可用时）：/data/data/com.minime.template/crash/
  */
 class CrashHandler private constructor(
     private val context: Context
 ) : Thread.UncaughtExceptionHandler {
 
     private val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
-    private val crashDir: File = File(context.filesDir.parentFile, "crash").apply { mkdirs() }
+
+    // 优先使用外部存储公共目录（用户可直接访问），不可用时回退到内部私有目录
+    private val crashDir: File by lazy {
+        val externalDir = context.getExternalFilesDir("crash")
+        if (externalDir != null && (externalDir.exists() || externalDir.mkdirs())) {
+            externalDir
+        } else {
+            File(context.filesDir.parentFile, "crash").apply { mkdirs() }
+        }
+    }
 
     override fun uncaughtException(thread: Thread, throwable: Throwable) {
         try {
@@ -81,11 +91,16 @@ class CrashHandler private constructor(
 
         /**
          * 获取所有崩溃日志文件（供调试或上报使用）
+         * 优先读取外部存储公共目录，其次读取内部私有目录
          */
         fun getCrashLogs(context: Context): List<File> {
-            val crashDir = File(context.filesDir.parentFile, "crash")
-            return crashDir.listFiles { _, name -> name.startsWith("crash_") && name.endsWith(".log") }
-                ?.sortedByDescending { it.lastModified() } ?: emptyList()
+            val dirs = mutableListOf<File>()
+            context.getExternalFilesDir("crash")?.let { dirs.add(it) }
+            dirs.add(File(context.filesDir.parentFile, "crash"))
+
+            return dirs.flatMap { dir ->
+                dir.listFiles { _, name -> name.startsWith("crash_") && name.endsWith(".log") }?.toList() ?: emptyList()
+            }.sortedByDescending { it.lastModified() }
         }
     }
 }
