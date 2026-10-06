@@ -88,17 +88,27 @@ jobs:
         id: changelog
         run: |
           set -e
-          cur_tag="${GITHUB_REF_NAME}"
-          prev_tag=$(git tag --sort=-creatordate | grep '^template-v' | grep -v "^${cur_tag}$" | head -1)
-          version="${cur_tag#template-v}"
+          version="${GITHUB_REF_NAME#template-v}"
+          changelog_file="app-template/docs/CHANGELOG.md"
           delimiter="EOF_$(date +%s)"
-          {
-            echo "body<<${delimiter}"
-            python3 scripts/gitops/release-log.py \
+
+          # 从 CHANGELOG.md 中提取当前版本的内容（从 ## v{version} 到下一个 ## 或文件末尾）
+          body=$(awk -v ver="## v${version}" '$0 ~ "^"ver {found=1; next} found && /^## / {exit} found {print}' "$changelog_file")
+
+          # 如果 CHANGELOG 中没有找到对应版本，回退到 release-log.py
+          if [ -z "$body" ]; then
+            cur_tag="${GITHUB_REF_NAME}"
+            prev_tag=$(git tag --sort=-creatordate | grep '^template-v' | grep -v "^${cur_tag}$" | head -1)
+            body=$(python3 scripts/gitops/release-log.py \
               --prev "$prev_tag" \
               --cur "$cur_tag" \
               --version "$version" \
-              --date "$(date +%Y-%m-%d)"
+              --date "$(date +%Y-%m-%d)")
+          fi
+
+          {
+            echo "body<<${delimiter}"
+            echo "$body"
             echo ""
             echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
