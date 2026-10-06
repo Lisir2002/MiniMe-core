@@ -69,7 +69,7 @@ class AppBridge(
         val moduleName = request["module"]?.toString()?.trim('"') ?: return
         val method = request["method"]?.toString()?.trim('"') ?: return
         val callbackId = request["callbackId"]?.toString()?.trim('"') ?: return
-        val args = request["args"]?.jsonObject ?: JsonObject(emptyMap())
+        val args = (request["args"] as? JsonObject) ?: JsonObject(emptyMap())
 
         // 模块开关检查
         if (!configManager.isBridgeModuleEnabled(moduleName)) {

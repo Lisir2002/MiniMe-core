@@ -1,6 +1,7 @@
 package com.minime.template
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -10,7 +11,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.appcompat.app.AppCompatActivity
+import android.widget.FrameLayout
 import androidx.webkit.WebViewAssetLoader
 import com.minime.template.bridge.AppBridge
 import com.minime.template.bridge.EventBridge
@@ -27,7 +28,7 @@ import com.minime.template.bridge.UiBridge
  * 4. 启动屏：WebView 加载完成前显示启动屏，加载完成后淡出
  * 5. 全量 JS Bridge：来源校验 + 能力分级 + 异步回调
  */
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private lateinit var webView: WebView
     private lateinit var assetLoader: WebViewAssetLoader

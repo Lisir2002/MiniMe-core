@@ -1,5 +1,20 @@
 # MiniMe Template 更新日志
 
+## v0.0.0.2
+
+**修复**
+
+- **启动崩溃**：修复 Activity 继承 AppCompatActivity 但主题非 AppCompat 导致的启动闪退
+- **参数解析**：修复 Bridge 调用时 args 非对象类型导致的解析崩溃
+
+**新功能**
+
+- **崩溃日志**：新增 CrashHandler 全局捕获未处理异常，写入应用私有目录便于排查
+
+**改进**
+
+- **依赖精简**：移除 AppCompat 依赖，Activity 改用平台原生基类，APK 体积进一步缩小
+
 ## v0.0.0.1
 
 **新功能**

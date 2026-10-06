@@ -23,10 +23,10 @@ android {
         applicationId = "com.minime.template"
         minSdk = 26
         targetSdk = 34
-        // 版本号四段格式（与主应用规范一致）：0.0.0.1
+        // 版本号四段格式（与主应用规范一致）：0.0.0.2
         // versionCode = 10_000_000 + A*1_000_000_000 + B*10_000_000 + C*10_000 + D*10
-        versionCode = 10_000_010
-        versionName = "0.0.0.1"
+        versionCode = 10_000_020
+        versionName = "0.0.0.2"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -60,6 +60,10 @@ android {
         }
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -83,7 +87,6 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.webkit:webkit:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 }
