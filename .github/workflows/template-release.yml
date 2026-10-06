@@ -117,6 +117,7 @@ jobs:
         id: preserve
         env:
           GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          CHANGELOG_BODY: ${{ steps.changelog.outputs.body }}
         run: |
           set -e
           cur_tag="${GITHUB_REF_NAME}"
@@ -125,7 +126,7 @@ jobs:
           existing=$(curl -s -H "Authorization: token $GH_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/${cur_tag}" || echo "")
 
-          final_body="${{ steps.changelog.outputs.body }}"
+          final_body="$CHANGELOG_BODY"
           final_name="MiniMe Template v${TEMPLATE_VER}"
 
           if echo "$existing" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get('id') else 1)" 2>/dev/null; then
@@ -150,9 +151,11 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Validate release notes (hard checks)
+        env:
+          RELEASE_BODY: ${{ steps.preserve.outputs.body }}
         run: |
           set -e
-          body="${{ steps.preserve.outputs.body }}"
+          body="$RELEASE_BODY"
           echo "--- 硬校验：emoji ---"
           if echo "$body" | grep -qP '[\x{1F300}-\x{1F9FF}]|[\x{2600}-\x{27BF}]'; then
             echo "::error::Release 正文包含 emoji，违反发版规范"
