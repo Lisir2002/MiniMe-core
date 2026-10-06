@@ -36,6 +36,29 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # 统一签名策略：从 GitHub Secrets 恢复唯一官方密钥（app/minime.jks + app/keystore.properties）
+      - name: Restore signing keystore from GitHub Secrets
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+        run: |
+          set -e
+          : "${SIGNING_KEYSTORE_BASE64:?::error::Secret SIGNING_KEYSTORE_BASE64 未配置}"
+          : "${SIGNING_STORE_PASSWORD:?::error::Secret SIGNING_STORE_PASSWORD 未配置}"
+          : "${SIGNING_KEY_PASSWORD:?::error::Secret SIGNING_KEY_PASSWORD 未配置}"
+          : "${SIGNING_KEY_ALIAS:?::error::Secret SIGNING_KEY_ALIAS 未配置}"
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > app/minime.jks
+          cat > app/keystore.properties << EOF
+          storeFile=minime.jks
+          storePassword=$SIGNING_STORE_PASSWORD
+          keyAlias=$SIGNING_KEY_ALIAS
+          keyPassword=$SIGNING_KEY_PASSWORD
+          EOF
+          echo "签名密钥已从 Secrets 恢复（app/minime.jks + app/keystore.properties）"
+          ls -la app/minime.jks app/keystore.properties
+
       - name: Build Template Release APK
         run: ./gradlew :app-template:assembleRelease --stacktrace
 

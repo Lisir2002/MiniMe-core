@@ -4,6 +4,13 @@ plugins {
     kotlin("plugin.serialization") version "2.2.21"
 }
 
+// 从主应用 app/keystore.properties 读取 release 签名密钥（统一签名策略，CI 从 Secrets 恢复）
+val keystorePropertiesFile = rootProject.file("app/keystore.properties")
+val keystoreProperties = java.util.Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.minime.template"
     compileSdk = 36
@@ -23,13 +30,16 @@ android {
         }
     }
 
-    // 复用主应用官方签名密钥（app/minime.jks）
+    // 统一签名策略：复用主应用唯一官方密钥（app/minime.jks + keystore.properties）
     signingConfigs {
         create("release") {
-            storeFile = rootProject.file("app/minime.jks")
-            storePassword = "9d4d4f44c1eaf5bcd57c68c5c4dab893"
-            keyAlias = "minime"
-            keyPassword = "9d4d4f44c1eaf5bcd57c68c5c4dab893"
+            require(keystorePropertiesFile.exists()) {
+                "release 正式签名密钥缺失：缺少 app/keystore.properties（唯一官方密钥，CI 从 Secrets 恢复）。"
+            }
+            storeFile = rootProject.file("app/" + (keystoreProperties["storeFile"] as String))
+            storePassword = keystoreProperties["storePassword"] as String
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
             enableV1Signing = true
             enableV2Signing = true
         }
