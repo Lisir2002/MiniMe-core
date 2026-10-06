@@ -189,6 +189,28 @@
             overflow-y: auto;
             margin-top: 16px;
             display: none;
+            user-select: text;
+            -webkit-user-select: text;
+            position: relative;
+        }
+
+        .result-box .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(255,255,255,0.1);
+            color: #888;
+            border: none;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 11px;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .result-box .copy-btn:hover {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
         }
 
         .result-box.show {
@@ -285,16 +307,41 @@
                 <button class="btn btn-secondary" onclick="testFileList()">列出目录</button>
                 <button class="btn btn-full btn-primary" onclick="testAll()">全部测试</button>
             </div>
-            <div class="result-box" id="resultBox"></div>
+            <div class="result-box" id="resultBox">
+                <button class="copy-btn" onclick="copyLog()">复制日志</button>
+            </div>
         </div>
 
         <div class="footer">
-            应用模版 v1.0.0 · 构建引擎 Powered by MiniMe-core
+            应用模版 <span id="app-version">v1.0.0</span> · 构建引擎 Powered by MiniMe-core
         </div>
     </div>
 
     <script>
         var resultBox = document.getElementById('resultBox');
+
+        function copyLog() {
+            var text = resultBox.innerText || resultBox.textContent;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    var btn = document.querySelector('.copy-btn');
+                    var oldText = btn.textContent;
+                    btn.textContent = '已复制';
+                    setTimeout(function() { btn.textContent = oldText; }, 1500);
+                });
+            } else {
+                var textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                var btn = document.querySelector('.copy-btn');
+                var oldText = btn.textContent;
+                btn.textContent = '已复制';
+                setTimeout(function() { btn.textContent = oldText; }, 1500);
+            }
+        }
 
         function log(label, data, isError) {
             resultBox.classList.add('show');

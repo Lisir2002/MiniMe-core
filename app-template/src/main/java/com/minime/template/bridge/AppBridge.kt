@@ -29,6 +29,17 @@ class AppBridge(
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val configManager = ConfigManager.getInstance(context)
 
+    // 缓存当前 URL（@JavascriptInterface 在后台线程执行，不能直接调用 webView.url）
+    @Volatile
+    private var currentUrl: String = ""
+
+    /**
+     * 更新当前 URL（由 WebViewClient 在主线程调用）
+     */
+    fun updateUrl(url: String) {
+        currentUrl = url
+    }
+
     private val modules: MutableMap<String, BridgeModule> by lazy {
         mutableMapOf<String, BridgeModule>().apply {
             registerModule(UiBridge(context, "ui"))
@@ -101,10 +112,10 @@ class AppBridge(
 
     /**
      * 来源校验：检查当前 WebView 加载的是否为本地虚拟域名
+     * 注意：使用缓存的 currentUrl，避免后台线程调用 webView.url
      */
     private fun isSourceAllowed(): Boolean {
-        val url = webView.url ?: return false
-        return url.startsWith(LOCAL_VIRTUAL_DOMAIN)
+        return currentUrl.startsWith(LOCAL_VIRTUAL_DOMAIN)
     }
 
     /**

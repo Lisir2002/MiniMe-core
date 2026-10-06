@@ -102,8 +102,18 @@ class MainActivity : Activity() {
                 return null
             }
 
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                // 更新 Bridge 的 URL 缓存（用于来源校验）
+                url?.let { appBridge.updateUrl(it) }
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                // 更新 Bridge 的 URL 缓存
+                url?.let { appBridge.updateUrl(it) }
+                // 注入应用版本号到 JS 全局变量
+                webView.evaluateJavascript("window.APP_VERSION='${BuildConfig.VERSION_NAME}';if(document.getElementById('app-version')){document.getElementById('app-version').textContent='v${BuildConfig.VERSION_NAME}';}", null)
                 // 页面加载完成后隐藏启动屏
                 hideSplash()
                 // 发送 app:resume 事件
