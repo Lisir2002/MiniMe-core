@@ -275,12 +275,57 @@ class ApkBuilder(
                 // 检查关键文件
                 val hasManifest = entries.any { it.name == "AndroidManifest.xml" }
                 if (!hasManifest) return "APK 中缺少 AndroidManifest.xml"
-                val hasSignature = entries.any { it.name.startsWith("META-INF/") && it.name.endsWith(".RSA") }
-                if (!hasSignature) return "APK 中缺少签名文件"
                 null
             }
+            // 检查 V2/V3 签名块（APK Signing Block）
+            // V2 签名存储在 ZIP 内容和中央目录之间的签名块中，不在 META-INF 目录
+            if (!hasV2SignatureBlock(apkFile)) {
+                return "APK 中缺少 V2 签名块"
+            }
+            null
         } catch (e: Exception) {
             "APK 格式验证失败: ${e.message}"
+        }
+    }
+
+    /**
+     * 检查 APK 中是否存在 V2/V3 签名块（APK Signing Block）
+     *
+     * 通过查找签名块末尾的魔数 "APK Sig Block 42" 来判断。
+     * 签名块结构：... + 大小(8字节) + 魔数(8字节)，位于中央目录之前。
+     */
+    private fun hasV2SignatureBlock(apkFile: File): Boolean {
+        return try {
+            val magic = "APK Sig Block 42".toByteArray(Charsets.UTF_8)
+            val fileSize = apkFile.length()
+            // 签名块通常不会太大，读取文件末尾的 1MB 进行搜索
+            val searchSize = minOf(fileSize, 1024 * 1024).toInt()
+            val buffer = ByteArray(searchSize)
+
+            java.io.RandomAccessFile(apkFile, "r").use { raf ->
+                raf.seek(fileSize - searchSize)
+                raf.readFully(buffer)
+            }
+
+            // 在缓冲区中搜索魔数
+            var found = false
+            for (i in 0 until buffer.size - magic.size) {
+                var match = true
+                for (j in magic.indices) {
+                    if (buffer[i + j] != magic[j]) {
+                        match = false
+                        break
+                    }
+                }
+                if (match) {
+                    found = true
+                    break
+                }
+            }
+            found
+        } catch (e: Exception) {
+            FileLogger.w("ApkBuilder", "检查 V2 签名块失败: ${e.message}")
+            false
         }
     }
 

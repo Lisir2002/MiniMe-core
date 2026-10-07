@@ -394,37 +394,74 @@ class ApkAnalyzer {
 
         /**
          * 解析 APK 签名信息
+         * 支持 V1（JAR 签名）和 V2/V3（APK Signing Block）
          */
         private fun parseSignature(apkFile: File): SignatureInfo {
             return try {
-                JarFile(apkFile).use { jarFile ->
-                    // 查找签名文件
-                    val certEntry = jarFile.getEntry("META-INF/CERT.RSA")
-                        ?: jarFile.getEntry("META-INF/CERT.DSA")
-                        ?: jarFile.getEntry("META-INF/CERT.EC")
-
-                    if (certEntry != null) {
-                        jarFile.getInputStream(certEntry).use { input ->
-                            // 读取证书
-                            val certificateFactory = java.security.cert.CertificateFactory.getInstance("X.509")
-                            val cert = certificateFactory.generateCertificate(input) as X509Certificate
-
-                            SignatureInfo(
-                                isSigned = true,
-                                algorithm = cert.sigAlgName,
-                                subject = cert.subjectX500Principal.name,
-                                issuer = cert.issuerX500Principal.name,
-                                validFrom = cert.notBefore.toString(),
-                                validTo = cert.notAfter.toString()
-                            )
+                if (hasV2SignatureBlock(apkFile)) {
+                    SignatureInfo(
+                        isSigned = true,
+                        algorithm = "V2/V3 (APK Signing Block)",
+                        subject = "V2/V3 签名",
+                        issuer = "V2/V3 签名",
+                        validFrom = "-",
+                        validTo = "-"
+                    )
+                } else {
+                    JarFile(apkFile).use { jarFile ->
+                        val certEntry = jarFile.getEntry("META-INF/CERT.RSA")
+                            ?: jarFile.getEntry("META-INF/CERT.DSA")
+                            ?: jarFile.getEntry("META-INF/CERT.EC")
+                        if (certEntry != null) {
+                            jarFile.getInputStream(certEntry).use { input ->
+                                val certificateFactory = java.security.cert.CertificateFactory.getInstance("X.509")
+                                val cert = certificateFactory.generateCertificate(input) as X509Certificate
+                                SignatureInfo(
+                                    isSigned = true,
+                                    algorithm = cert.sigAlgName,
+                                    subject = cert.subjectX500Principal.name,
+                                    issuer = cert.issuerX500Principal.name,
+                                    validFrom = cert.notBefore.toString(),
+                                    validTo = cert.notAfter.toString()
+                                )
+                            }
+                        } else {
+                            SignatureInfo(isSigned = false)
                         }
-                    } else {
-                        SignatureInfo(isSigned = false)
                     }
                 }
             } catch (e: Exception) {
                 FileLogger.w(TAG, "解析签名信息失败: ${e.message}")
                 SignatureInfo(isSigned = false)
+            }
+        }
+
+        /**
+         * 检查 APK 中是否存在 V2/V3 签名块
+         */
+        private fun hasV2SignatureBlock(apkFile: File): Boolean {
+            return try {
+                val magic = "APK Sig Block 42".toByteArray(Charsets.UTF_8)
+                val fileSize = apkFile.length()
+                val searchSize = minOf(fileSize, 1024 * 1024).toInt()
+                val buffer = ByteArray(searchSize)
+                java.io.RandomAccessFile(apkFile, "r").use { raf ->
+                    raf.seek(fileSize - searchSize)
+                    raf.readFully(buffer)
+                }
+                for (i in 0 until buffer.size - magic.size) {
+                    var match = true
+                    for (j in magic.indices) {
+                        if (buffer[i + j] != magic[j]) {
+                            match = false
+                            break
+                        }
+                    }
+                    if (match) return true
+                }
+                false
+            } catch (e: Exception) {
+                false
             }
         }
     }
