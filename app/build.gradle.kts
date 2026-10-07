@@ -424,7 +424,6 @@ dependencies {
     implementation(libs.sshj)
     implementation(libs.bouncycastle)
     implementation(libs.bouncycastle.pkix)
-    implementation(libs.apksig)
     implementation(libs.commons.net)
     implementation(libs.ftpserver.core)
     implementation(libs.slf4j.simple)
