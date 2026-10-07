@@ -182,6 +182,13 @@ class ApkBuilder(
             finalApk.copyTo(downloadApk, overwrite = true)
             log("已复制到下载目录: ${downloadApk.absolutePath}", callback, logWriter)
 
+            // 同时复制到外部存储 apk 目录（与日志同目录，方便用户获取分析）
+            val externalApkDir = File(android.os.Environment.getExternalStorageDirectory(), "Android/data/com.mini.me_core/files/apk")
+            externalApkDir.mkdirs()
+            val externalApk = File(externalApkDir, finalApkName)
+            finalApk.copyTo(externalApk, overwrite = true)
+            log("已复制到外部APK目录: ${externalApk.absolutePath}", callback, logWriter)
+
             // 清理临时目录
             tempDir.deleteRecursively()
             log("临时文件已清理", callback, logWriter)
