@@ -184,59 +184,93 @@ class ManifestEditor {
 
         /**
          * 修改 manifest 标签中的 versionCode 属性值
+         * 健壮版本：完整边界检查，正确处理 Resource Map chunk
          */
         private fun modifyVersionCode(data: ByteArray, newVersionCode: Int): ByteArray {
             val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
             val newData = data.copyOf()
             val newBuffer = ByteBuffer.wrap(newData).order(ByteOrder.LITTLE_ENDIAN)
 
-            // 跳过文件头
-            buffer.int // magic
-            buffer.int // fileSize
+            // 跳过文件头 (magic + fileSize = 8 bytes)
+            if (data.size < 16) {
+                FileLogger.w(TAG, "Manifest 文件过小，无法修改 versionCode")
+                return newData
+            }
+            buffer.position(8)
 
-            // 跳过 String Pool
+            // 跳过 String Pool chunk
+            val spStart = buffer.position()
             val spType = buffer.short.toInt() and 0xFFFF
             val spHeader = buffer.short.toInt() and 0xFFFF
             val spSize = buffer.int
-            buffer.position(buffer.position() + spSize - 8)
+            if (spType != CHUNK_STRING_POOL || spSize <= 0 || spStart + spSize > data.size) {
+                FileLogger.w(TAG, "String Pool 解析异常，跳过 versionCode 修改")
+                return newData
+            }
+            // 移动到 String Pool 之后
+            buffer.position(spStart + spSize)
 
-            // 遍历 XML chunks，找到 manifest 标签
-            while (buffer.position() < data.size - 8) {
-                val chunkType = buffer.short.toInt() and 0xFFFF
-                val chunkHeader = buffer.short.toInt() and 0xFFFF
-                val chunkSize = buffer.int
-                if (chunkSize <= 0) break
+            // 遍历后续 chunks，找到第一个 START_ELEMENT（即 manifest 标签）
+            var pos = buffer.position()
+            var manifestFound = false
+            while (pos + 8 <= data.size && !manifestFound) {
+                val chunkStart = pos
+                val chunkType = buffer.getShort(chunkStart).toInt() and 0xFFFF
+                val chunkHeader = buffer.getShort(chunkStart + 2).toInt() and 0xFFFF
+                val chunkSize = buffer.getInt(chunkStart + 4)
+
+                if (chunkSize <= 0 || chunkStart + chunkSize > data.size) {
+                    FileLogger.w(TAG, "Chunk 大小异常，终止遍历: type=0x${chunkType.toString(16)}, size=$chunkSize")
+                    break
+                }
 
                 if (chunkType == 0x0102) { // START_ELEMENT
-                    val ep = buffer.position() - 8 + chunkHeader
-                    val nameIndex = buffer.getInt(ep + 12)
-                    // 字符串池中 "manifest" 的索引需要动态查找
-                    // 简化：直接查找 versionCode 属性并修改
-                    val attrCount = buffer.getShort(ep + 20).toInt() and 0xFFFF
-                    var ap = ep + 24
-                    for (i in 0 until attrCount) {
-                        val attrNameIdx = buffer.getInt(ap + 4)
-                        val attrValueType = buffer.getInt(ap + 12)
-                        // versionCode 的属性名索引需要匹配
-                        // 这里我们通过属性类型判断：versionCode 是 TYPE_INT_DEC (0x10)
-                        if (attrValueType == 0x10000000 || attrValueType == 0x00000010) {
-                            // 可能是 versionCode，检查属性名
-                            // 由于无法直接获取字符串，我们假设第一个 INT_DEC 类型的属性就是 versionCode
-                            // 实际上 manifest 标签的属性顺序：versionCode, versionName, package
-                            if (i == 0) { // 第一个属性通常是 versionCode
-                                newBuffer.putInt(ap + 16, newVersionCode)
-                                FileLogger.d(TAG, "修改 versionCode = $newVersionCode (属性索引=$i)")
-                                return newData
+                    // 检查 chunk header 大小是否足够
+                    if (chunkHeader < 28 || chunkStart + chunkHeader + 28 > data.size) {
+                        pos = chunkStart + chunkSize
+                        continue
+                    }
+
+                    // 读取属性信息
+                    val attrStartOffset = buffer.getShort(chunkStart + chunkHeader + 16).toInt() and 0xFFFF
+                    val attrCount = buffer.getShort(chunkStart + chunkHeader + 20).toInt() and 0xFFFF
+
+                    if (attrCount > 0) {
+                        val attrBase = chunkStart + attrStartOffset
+                        // 检查属性区域是否在文件范围内
+                        if (attrBase + attrCount * 20 <= data.size) {
+                            // manifest 标签的第一个属性通常是 versionCode（TYPE_INT_DEC）
+                            // 属性结构：ns(4) + name(4) + rawValue(4) + type(4) + data(4) = 20 bytes
+                            val firstAttrType = buffer.getInt(attrBase + 12)
+                            // TYPE_INT_DEC = 0x10, 存储在高8位，所以值为 0x10000000
+                            if (firstAttrType == 0x10000000.toInt()) {
+                                newBuffer.putInt(attrBase + 16, newVersionCode)
+                                FileLogger.d(TAG, "修改 versionCode = $newVersionCode (manifest标签第一个属性)")
+                                manifestFound = true
+                            } else {
+                                // 如果第一个属性不是 INT_DEC，遍历所有属性查找
+                                var ap = attrBase
+                                for (i in 0 until attrCount) {
+                                    val attrType = buffer.getInt(ap + 12)
+                                    if (attrType == 0x10000000.toInt()) {
+                                        newBuffer.putInt(ap + 16, newVersionCode)
+                                        FileLogger.d(TAG, "修改 versionCode = $newVersionCode (属性索引=$i)")
+                                        manifestFound = true
+                                        break
+                                    }
+                                    ap += 20
+                                }
                             }
                         }
-                        ap += 20
                     }
                 }
 
-                buffer.position(buffer.position() - 8 + chunkSize)
+                pos = chunkStart + chunkSize
             }
 
-            FileLogger.w(TAG, "未找到 versionCode 属性")
+            if (!manifestFound) {
+                FileLogger.w(TAG, "未找到 versionCode 属性")
+            }
             return newData
         }
 
