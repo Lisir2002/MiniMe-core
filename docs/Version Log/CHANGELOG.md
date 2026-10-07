@@ -11,6 +11,16 @@
 - **破坏性变更用「注意」显著标注并说明用户需要做什么。**
 - **禁止使用 emoji**：分类标题和正文保持纯文字，简洁专业。
 
+## [0.0.0.83] - 2026-10-07
+
+应用打包器V2签名块结构根本性修复：修正APK Signing Block格式，移除开头错误写入的魔数，修复size计算和ID-value pairs提取。
+
+### 修复
+
+- **签名块结构错误**：buildSigningBlock和combineSigningBlocks在开头size后错误写入magic，正确结构应为[size(8)]+[ID-value pairs]+[size(8)]+[magic(16)]。
+- **size计算错误**：blockSize计算中magic按8字节计算，实际为16字节，导致签名块大小不一致。
+- **ID提取错误**：combineSigningBlocks提取ID-value pairs时跳过前16字节，实际应跳过前8字节（仅size字段）。
+
 ## [0.0.0.82] - 2026-10-07
 
 应用打包器APK导出路径修正：统一导出到公共存储 Download/MiniMe-core/apk/，与日志目录同级。

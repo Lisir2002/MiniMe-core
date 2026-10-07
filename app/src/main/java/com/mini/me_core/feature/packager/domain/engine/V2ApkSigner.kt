@@ -317,19 +317,17 @@ class V2ApkSigner {
             val idValuePairBytes = idValuePair.toByteArray()
 
             // 构建完整的 APK Signing Block
+            // 正确结构: [size(8)] [ID-value pairs] [size(8)] [magic(16)]
             val signingBlock = ByteArrayOutputStream()
             val magicBytes = APK_SIG_BLOCK_MAGIC.toByteArray(Charsets.UTF_8)
 
-            // 签名块大小（不包括前8字节）= ID-value pairs + 8字节大小 + 8字节魔数
-            val blockSize = idValuePairBytes.size + 8 + 8
+            // 签名块大小（不包括前8字节）= ID-value pairs + 末尾size(8) + magic(16)
+            val blockSize = idValuePairBytes.size + 8 + 16
 
             // 写入签名块大小（uint64）
             buffer8.clear()
             buffer8.putLong(blockSize.toLong())
             signingBlock.write(buffer8.array())
-
-            // 写入魔数
-            signingBlock.write(magicBytes)
 
             // 写入 ID-value pairs
             signingBlock.write(idValuePairBytes)
@@ -339,7 +337,7 @@ class V2ApkSigner {
             buffer8.putLong(blockSize.toLong())
             signingBlock.write(buffer8.array())
 
-            // 写入魔数（重复）
+            // 写入魔数
             signingBlock.write(magicBytes)
 
             return signingBlock.toByteArray()
@@ -426,35 +424,34 @@ class V2ApkSigner {
         /**
          * 合并多个签名方案的 ID-value pairs 到一个 APK Signing Block 中
          *
-         * 输入的每个 block 都是完整的 APK Signing Block，需要提取其中的 ID-value pair，
-         * 然后重新构建一个包含所有 ID-value pairs 的 APK Signing Block。
+         * 输入的每个 block 都是完整的 APK Signing Block，结构为:
+         * [size(8)] [ID-value pairs] [size(8)] [magic(16)]
+         * 需要提取其中的 ID-value pair，然后重新构建一个包含所有 ID-value pairs 的 APK Signing Block。
          */
         private fun combineSigningBlocks(vararg blocks: ByteArray): ByteArray {
             val allIdValuePairs = ByteArrayOutputStream()
 
             for (block in blocks) {
-                // 每个 block 的结构：大小(8) + 魔数(8) + ID-value pairs + 大小(8) + 魔数(8)
-                // 提取 ID-value pairs（跳过前 16 字节，减去后 16 字节）
-                val idValuePairs = block.copyOfRange(16, block.size - 16)
+                // 每个 block 的结构：大小(8) + ID-value pairs + 大小(8) + 魔数(16)
+                // 提取 ID-value pairs（跳过前 8 字节 size，减去后 24 字节 size(8)+magic(16)）
+                val idValuePairs = block.copyOfRange(8, block.size - 24)
                 allIdValuePairs.write(idValuePairs)
             }
 
             val idValuePairsBytes = allIdValuePairs.toByteArray()
 
             // 构建新的 APK Signing Block
+            // 正确结构: [size(8)] [ID-value pairs] [size(8)] [magic(16)]
             val signingBlock = ByteArrayOutputStream()
             val buffer8 = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
             val magicBytes = APK_SIG_BLOCK_MAGIC.toByteArray(Charsets.UTF_8)
 
-            // 签名块大小（不包括前8字节）= ID-value pairs + 8字节大小 + 8字节魔数
-            val blockSize = idValuePairsBytes.size + 8 + 8
+            // 签名块大小（不包括前8字节）= ID-value pairs + 末尾size(8) + magic(16)
+            val blockSize = idValuePairsBytes.size + 8 + 16
 
             // 写入签名块大小
             buffer8.putLong(blockSize.toLong())
             signingBlock.write(buffer8.array())
-
-            // 写入魔数
-            signingBlock.write(magicBytes)
 
             // 写入所有 ID-value pairs
             signingBlock.write(idValuePairsBytes)
@@ -464,7 +461,7 @@ class V2ApkSigner {
             buffer8.putLong(blockSize.toLong())
             signingBlock.write(buffer8.array())
 
-            // 写入魔数（重复）
+            // 写入魔数
             signingBlock.write(magicBytes)
 
             return signingBlock.toByteArray()
