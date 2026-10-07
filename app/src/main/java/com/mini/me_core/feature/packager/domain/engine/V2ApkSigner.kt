@@ -204,19 +204,17 @@ class V2ApkSigner {
         /**
          * 构建签名数据（长度 + 签名算法ID + 摘要长度 + 摘要）
          *
-         * 注意：长度字段包含自身（4字节），即总长度 = 4 + 4 + 4 + 摘要长度
+         * 注意：长度字段表示长度字段之后的数据长度，即 4(算法ID) + 4(摘要长度) + 摘要数据长度
          */
         private fun buildSignatureData(contentDigest: ByteArray): ByteArray {
             val out = ByteArrayOutputStream()
             val buffer = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
 
-            // 数据部分长度：签名算法ID(4) + 摘要长度(4) + 摘要数据
+            // 长度字段之后的数据长度：签名算法ID(4) + 摘要长度(4) + 摘要数据
             val dataLength = 4 + 4 + contentDigest.size
-            // 总长度（包括长度字段本身）
-            val totalLength = 4 + dataLength
 
-            // 写入总长度（uint32）
-            buffer.putInt(totalLength)
+            // 写入长度（uint32）- 表示长度字段之后的数据长度
+            buffer.putInt(dataLength)
             out.write(buffer.array())
 
             // 写入签名算法ID（uint32）
