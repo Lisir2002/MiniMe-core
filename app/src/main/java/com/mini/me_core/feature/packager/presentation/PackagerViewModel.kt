@@ -3,6 +3,7 @@ package com.mini.me_core.feature.packager.presentation
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.packager.domain.engine.ApkBuilder
 import com.mini.me_core.feature.packager.domain.model.BuildRecord
 import com.mini.me_core.feature.packager.domain.model.BuildStatus
@@ -30,6 +31,10 @@ class PackagerViewModel @Inject constructor(
     private val projectStore: ProjectStore,
     private val buildStore: BuildStore
 ) : AndroidViewModel(application) {
+
+    companion object {
+        private const val TAG = "PackagerViewModel"
+    }
 
     // ========== 项目列表 ==========
     val projects: StateFlow<List<Project>> = projectStore.projects
@@ -151,6 +156,7 @@ class PackagerViewModel @Inject constructor(
      * 删除项目
      */
     fun deleteProject(projectId: String) {
+        FileLogger.i(TAG, "删除项目: $projectId")
         viewModelScope.launch {
             projectStore.deleteProject(projectId)
             if (_currentProject.value?.id == projectId) {
@@ -222,6 +228,7 @@ class PackagerViewModel @Inject constructor(
         if (state.appName.isBlank() || state.packageName.isBlank()) return null
         if (state.packageNameError != null) return null
 
+        FileLogger.i(TAG, "创建项目: ${state.appName} (${state.packageName}), 类型=${state.projectType}")
         _newProjectState.value = state.copy(isCreating = true)
         return try {
             projectStore.createProject(
@@ -244,6 +251,7 @@ class PackagerViewModel @Inject constructor(
     fun startBuild(project: Project) {
         if (_buildState.value.isBuilding) return
 
+        FileLogger.i(TAG, "开始构建: ${project.name} (${project.packageName}) v${project.versionName}")
         _buildState.value = BuildState(isBuilding = true)
 
         viewModelScope.launch {

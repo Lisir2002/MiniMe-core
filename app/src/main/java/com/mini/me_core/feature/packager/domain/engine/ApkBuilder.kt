@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.packager.domain.engine
 
 import android.content.Context
+import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.packager.domain.model.Project
 import com.mini.me_core.feature.packager.domain.repository.ProjectStore
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +64,10 @@ class ApkBuilder(
     }
 
     private val steps = BuildStep.entries.toTypedArray()
+
+    companion object {
+        private const val TAG = "ApkBuilder"
+    }
 
     /**
      * 执行构建
@@ -198,6 +203,7 @@ class ApkBuilder(
 
         } catch (e: Exception) {
             val errorMsg = "构建失败: ${e.javaClass.simpleName}: ${e.message}"
+            FileLogger.e(TAG, errorMsg, e)
             log("", callback, logWriter)
             log("========== 构建失败 ==========", callback, logWriter)
             log(errorMsg, callback, logWriter)
@@ -298,11 +304,12 @@ class ApkBuilder(
     }
 
     /**
-     * 记录日志（同时输出到回调和日志文件）
+     * 记录日志（同时输出到回调、日志文件和 FileLogger）
      */
     private fun log(message: String, callback: BuildProgressCallback, logWriter: PrintWriter) {
         callback.onLog(message)
         logWriter.println(message)
+        FileLogger.i(TAG, message)
     }
 
     /**

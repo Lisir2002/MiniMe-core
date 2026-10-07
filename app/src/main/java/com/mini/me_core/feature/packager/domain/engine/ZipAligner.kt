@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.packager.domain.engine
 
+import com.mini.me_core.core.util.FileLogger
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -20,6 +21,7 @@ import java.util.zip.ZipInputStream
 class ZipAligner {
 
     companion object {
+        private const val TAG = "ZipAligner"
         private const val ALIGNMENT = 4
         private const val LFH_MAGIC = 0x04034b50
         private const val CD_MAGIC = 0x02014b50
@@ -29,16 +31,20 @@ class ZipAligner {
          * 对 APK 进行 4 字节对齐
          */
         fun align(inputApk: File, outputApk: File) {
+            FileLogger.d(TAG, "开始 ZIP 对齐: ${inputApk.name} (${inputApk.length()} bytes)")
             outputApk.parentFile?.mkdirs()
             if (outputApk.exists()) outputApk.delete()
 
             // 读取所有条目
             val entries = mutableListOf<EntryData>()
+            var storedCount = 0
+            var deflatedCount = 0
             ZipInputStream(FileInputStream(inputApk)).use { zis ->
                 var entry: ZipEntry?
                 while (zis.nextEntry.also { entry = it } != null) {
                     val data = zis.readBytes()
                     val method = entry!!.method
+                    if (method == ZipEntry.STORED) storedCount++ else deflatedCount++
                     // 对于 DEFLATED 条目，预先压缩数据
                     val compressedData = if (method == ZipEntry.DEFLATED) {
                         val deflater = Deflater(Deflater.DEFAULT_COMPRESSION)
@@ -154,6 +160,7 @@ class ZipAligner {
                 eocd.putShort(0)                         // comment length
                 fos.write(eocd.array())
             }
+            FileLogger.d(TAG, "ZIP 对齐完成: ${outputApk.name} (${outputApk.length()} bytes), STORED=$storedCount, DEFLATED=$deflatedCount")
         }
 
         private data class EntryData(

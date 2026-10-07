@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.packager.domain.engine
 
+import com.mini.me_core.core.util.FileLogger
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -25,6 +26,8 @@ import java.nio.ByteOrder
 class ManifestEditor {
 
     companion object {
+        private const val TAG = "ManifestEditor"
+
         /** AXML 文件魔数 */
         private const val AXML_MAGIC = 0x00080003
 
@@ -47,6 +50,7 @@ class ManifestEditor {
             newPackageName: String,
             newAppName: String
         ): Boolean {
+            FileLogger.d(TAG, "修改 AndroidManifest.xml: 包名=$newPackageName, 应用名=$newAppName")
             val data = manifestFile.readBytes()
             val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
 
@@ -105,8 +109,11 @@ class ManifestEditor {
 
             if (packageIndex < 0 && appNameIndex < 0) {
                 // 没有找到目标字符串，可能模版已被修改过
+                FileLogger.w(TAG, "未找到目标字符串（com.minime.template / MiniMe Template），模版可能已被修改")
                 return false
             }
+
+            FileLogger.d(TAG, "找到目标字符串: 包名索引=$packageIndex, 应用名索引=$appNameIndex")
 
             // 判断是否需要重建 String Pool
             var needRebuild = false
@@ -120,6 +127,7 @@ class ManifestEditor {
             }
 
             val resultData = if (needRebuild) {
+                FileLogger.d(TAG, "新字符串更长，需要重建 String Pool")
                 rebuildStringPool(
                     data, buffer, stringPoolStart, spHeaderSize, spChunkSize,
                     stringCount, styleCount, flags, stringsStart, stylesStart,
@@ -128,6 +136,7 @@ class ManifestEditor {
                     appNameIndex, newAppName
                 )
             } else {
+                FileLogger.d(TAG, "新字符串长度足够，原地替换")
                 // 原地替换
                 val newData = data.copyOf()
                 val newBuffer = ByteBuffer.wrap(newData).order(ByteOrder.LITTLE_ENDIAN)
@@ -144,6 +153,7 @@ class ManifestEditor {
             }
 
             manifestFile.writeBytes(resultData)
+            FileLogger.d(TAG, "AndroidManifest.xml 修改完成")
             return true
         }
 

@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.packager.domain.repository
 
 import android.content.Context
+import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.packager.domain.model.BuildRecord
 import com.mini.me_core.feature.packager.domain.model.BuildStatus
 import com.mini.me_core.feature.packager.domain.model.Project
@@ -24,6 +25,10 @@ import java.io.File
 class ProjectStore(
     private val context: Context
 ) {
+    companion object {
+        private const val TAG = "ProjectStore"
+    }
+
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
@@ -54,6 +59,7 @@ class ProjectStore(
      */
     private fun loadAll() {
         val list = mutableListOf<Project>()
+        var failed = 0
         projectsDir.listFiles()?.forEach { dir ->
             if (dir.isDirectory) {
                 val configFile = File(dir, "config.json")
@@ -61,6 +67,9 @@ class ProjectStore(
                     runCatching {
                         val stored = json.decodeFromString<StoredProject>(configFile.readText())
                         list.add(stored.toProject())
+                    }.onFailure {
+                        failed++
+                        FileLogger.w(TAG, "加载项目配置失败: ${configFile.absolutePath}", it)
                     }
                 }
             }
@@ -68,6 +77,7 @@ class ProjectStore(
         // 按更新时间降序排列
         list.sortByDescending { it.updatedAt }
         _projects.value = list
+        FileLogger.d(TAG, "加载完成，共 ${list.size} 个项目" + if (failed > 0) "，$failed 个加载失败" else "")
     }
 
     /**
@@ -117,6 +127,7 @@ class ProjectStore(
         // 更新内存缓存
         _projects.value = listOf(project) + _projects.value
 
+        FileLogger.i(TAG, "创建项目: ${project.name} (${project.packageName}), 类型=${project.type}")
         project
     }
 
@@ -138,11 +149,13 @@ class ProjectStore(
      * 删除项目
      */
     suspend fun deleteProject(projectId: String) = withContext(Dispatchers.IO) {
+        val project = _projects.value.find { it.id == projectId }
         val projectDir = File(projectsDir, projectId)
         if (projectDir.exists()) {
             projectDir.deleteRecursively()
         }
         _projects.value = _projects.value.filter { it.id != projectId }
+        FileLogger.i(TAG, "删除项目: ${project?.name ?: projectId}")
     }
 
     /**

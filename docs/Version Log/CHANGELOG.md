@@ -11,6 +11,20 @@
 - **破坏性变更用「注意」显著标注并说明用户需要做什么。**
 - **禁止使用 emoji**：分类标题和正文保持纯文字，简洁专业。
 
+## [0.0.0.72] - 2026-10-07
+
+应用打包器模块完整接入主应用 FileLogger 日志层，构建全过程可追溯，参考 WebToApp 项目经验优化日志粒度。
+
+### 新功能
+
+- **日志层接入**：应用打包器全部模块接入 FileLogger，构建过程可在主应用日志中追溯。
+
+### 改进
+
+- **构建日志细化**：ApkBuilder/ApkModifier/ManifestEditor/ApkSigner/ZipAligner 各步骤详细日志记录。
+- **存储日志完善**：ProjectStore/BuildStore 加载、创建、删除操作均有日志记录。
+- **ViewModel日志**：PackagerViewModel 关键操作（创建项目、删除项目、开始构建）日志记录。
+
 ## [0.0.0.71] - 2026-10-07
 
 修复应用打包器 ZIP 对齐时 DEFLATED 条目压缩数据不完整的问题，解决 "invalid stored block lengths" 构建错误。

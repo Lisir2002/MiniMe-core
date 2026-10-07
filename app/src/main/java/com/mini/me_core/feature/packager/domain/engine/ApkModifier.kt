@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.packager.domain.engine
 
+import com.mini.me_core.core.util.FileLogger
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -17,6 +18,8 @@ import java.util.zip.ZipOutputStream
 class ApkModifier {
 
     companion object {
+        private const val TAG = "ApkModifier"
+
         /** 网页资源在 APK 中的路径前缀 */
         private const val WWW_ASSETS_PREFIX = "assets/www/"
 
@@ -30,11 +33,13 @@ class ApkModifier {
          * @param outputDir 输出目录
          */
         fun extractApk(apkFile: File, outputDir: File) {
+            FileLogger.d(TAG, "解压 APK: ${apkFile.name} (${apkFile.length()} bytes) -> ${outputDir.name}")
             if (outputDir.exists()) {
                 outputDir.deleteRecursively()
             }
             outputDir.mkdirs()
 
+            var fileCount = 0
             ZipInputStream(FileInputStream(apkFile)).use { zis ->
                 var entry: ZipEntry?
                 while (zis.nextEntry.also { entry = it } != null) {
@@ -49,10 +54,12 @@ class ApkModifier {
                         }
                         // 保留文件时间
                         entry!!.time?.let { entryFile.setLastModified(it) }
+                        fileCount++
                     }
                     zis.closeEntry()
                 }
             }
+            FileLogger.d(TAG, "解压完成，共 $fileCount 个文件")
         }
 
         /**
@@ -63,6 +70,7 @@ class ApkModifier {
          */
         fun replaceWwwAssets(extractedDir: File, wwwSourceDir: File) {
             val targetWwwDir = File(extractedDir, WWW_ASSETS_PREFIX)
+            FileLogger.d(TAG, "替换网页资源: ${wwwSourceDir.absolutePath} -> $WWW_ASSETS_PREFIX")
 
             // 删除旧的 www 目录
             if (targetWwwDir.exists()) {
@@ -72,7 +80,10 @@ class ApkModifier {
 
             // 复制新的 www 目录
             if (wwwSourceDir.exists()) {
-                copyDirectory(wwwSourceDir, targetWwwDir)
+                val fileCount = copyDirectory(wwwSourceDir, targetWwwDir)
+                FileLogger.d(TAG, "网页资源替换完成，共 $fileCount 个文件")
+            } else {
+                FileLogger.w(TAG, "源 www 目录不存在: ${wwwSourceDir.absolutePath}")
             }
         }
 
@@ -88,14 +99,17 @@ class ApkModifier {
             outputApk: File,
             noCompressExtensions: Set<String> = setOf("png", "jpg", "jpeg", "gif", "webp", "mp3", "mp4", "wav", "ogg", "arsc")
         ) {
+            FileLogger.d(TAG, "重新打包 APK: ${extractedDir.name} -> ${outputApk.name}")
             outputApk.parentFile?.mkdirs()
             if (outputApk.exists()) outputApk.delete()
 
+            var entryCount = 0
             ZipOutputStream(BufferedOutputStream(FileOutputStream(outputApk))).use { zos ->
                 // 收集所有文件，按路径排序（保证确定性）
                 val files = mutableListOf<File>()
                 collectFiles(extractedDir, files)
                 files.sortBy { it.relativeTo(extractedDir).path.replace('\\', '/') }
+                FileLogger.d(TAG, "收集到 ${files.size} 个文件待打包")
 
                 for (file in files) {
                     val relativePath = file.relativeTo(extractedDir).path.replace('\\', '/')
@@ -121,8 +135,10 @@ class ApkModifier {
                         fis.copyTo(zos)
                     }
                     zos.closeEntry()
+                    entryCount++
                 }
             }
+            FileLogger.d(TAG, "重新打包完成，共 $entryCount 个条目，输出大小: ${outputApk.length()} bytes")
         }
 
         /**
@@ -139,18 +155,21 @@ class ApkModifier {
         }
 
         /**
-         * 复制目录（递归）
+         * 复制目录（递归），返回复制的文件数
          */
-        private fun copyDirectory(src: File, dest: File) {
+        private fun copyDirectory(src: File, dest: File): Int {
             dest.mkdirs()
+            var count = 0
             src.listFiles()?.forEach { file ->
                 val destFile = File(dest, file.name)
                 if (file.isDirectory) {
-                    copyDirectory(file, destFile)
+                    count += copyDirectory(file, destFile)
                 } else {
                     file.copyTo(destFile, overwrite = true)
+                    count++
                 }
             }
+            return count
         }
 
         /**

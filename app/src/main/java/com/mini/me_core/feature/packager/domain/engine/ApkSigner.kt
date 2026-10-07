@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.packager.domain.engine
 
+import com.mini.me_core.core.util.FileLogger
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.cert.X509v3CertificateBuilder
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
@@ -38,6 +39,8 @@ import java.util.zip.ZipOutputStream
 class ApkSigner {
 
     companion object {
+        private const val TAG = "ApkSigner"
+
         init {
             // 确保 BouncyCastle 提供者已注册
             if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
@@ -68,6 +71,7 @@ class ApkSigner {
             signedApk: File,
             keystoreFile: File
         ) {
+            FileLogger.d(TAG, "开始 APK 签名: ${unsignedApk.name} (${unsignedApk.length()} bytes)")
             // 加载或生成签名密钥
             val (privateKey, certificate) = loadOrGenerateKeystore(keystoreFile)
 
@@ -84,15 +88,19 @@ class ApkSigner {
                     zis.closeEntry()
                 }
             }
+            FileLogger.d(TAG, "读取到 ${files.size} 个文件待签名")
 
             // 生成 MANIFEST.MF
             val manifestContent = generateManifest(files)
+            FileLogger.d(TAG, "生成 MANIFEST.MF 完成")
 
             // 生成 CERT.SF
             val sfContent = generateSignatureFile(manifestContent)
+            FileLogger.d(TAG, "生成 CERT.SF 完成")
 
             // 生成 CERT.RSA（签名 + 证书）
             val rsaContent = generateSignatureBlock(sfContent, privateKey, certificate)
+            FileLogger.d(TAG, "生成 CERT.RSA 完成")
 
             // 写入签名后的 APK
             signedApk.parentFile?.mkdirs()
@@ -113,6 +121,7 @@ class ApkSigner {
                     }
                 }
             }
+            FileLogger.d(TAG, "APK 签名完成: ${signedApk.name} (${signedApk.length()} bytes)")
         }
 
         /**
@@ -123,6 +132,7 @@ class ApkSigner {
 
             return if (keystoreFile.exists()) {
                 // 加载已有密钥库
+                FileLogger.d(TAG, "加载已有签名密钥库: ${keystoreFile.name}")
                 val keystore = KeyStore.getInstance("PKCS12")
                 FileInputStream(keystoreFile).use { fis ->
                     keystore.load(fis, password)
@@ -132,6 +142,7 @@ class ApkSigner {
                 Pair(privateKey, certificate)
             } else {
                 // 生成新的密钥对和证书
+                FileLogger.d(TAG, "生成新的签名密钥库: ${keystoreFile.name}")
                 val keyPair = generateKeyPair()
                 val certificate = generateSelfSignedCertificate(keyPair)
 

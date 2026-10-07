@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.packager.domain.repository
 
 import android.content.Context
+import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.packager.domain.model.BuildRecord
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +23,10 @@ class BuildStore(
     private val context: Context,
     private val projectStore: ProjectStore
 ) {
+    companion object {
+        private const val TAG = "BuildStore"
+    }
+
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
@@ -42,6 +47,7 @@ class BuildStore(
     suspend fun loadBuilds(projectId: String): List<BuildRecord> = withContext(Dispatchers.IO) {
         val buildsDir = projectStore.getBuildsDir(projectId)
         val list = mutableListOf<BuildRecord>()
+        var failed = 0
 
         buildsDir.listFiles()?.forEach { dir ->
             if (dir.isDirectory) {
@@ -50,6 +56,9 @@ class BuildStore(
                     runCatching {
                         val stored = json.decodeFromString<StoredBuildRecord>(recordFile.readText())
                         list.add(stored.toBuildRecord())
+                    }.onFailure {
+                        failed++
+                        FileLogger.w(TAG, "加载构建记录失败: ${recordFile.absolutePath}", it)
                     }
                 }
             }
@@ -58,6 +67,7 @@ class BuildStore(
         // 按开始时间降序排列
         list.sortByDescending { it.startTime }
         _buildRecords.value = _buildRecords.value + (projectId to list)
+        FileLogger.d(TAG, "加载构建记录完成，项目=$projectId，共 ${list.size} 条" + if (failed > 0) "，$failed 条加载失败" else "")
         list
     }
 
@@ -77,6 +87,7 @@ class BuildStore(
             .sortedByDescending { it.startTime }
         _buildRecords.value = _buildRecords.value + (record.projectId to updatedList)
 
+        FileLogger.d(TAG, "保存构建记录: 项目=${record.projectId}, 状态=${record.status}, 版本=${record.versionName}")
         record
     }
 
