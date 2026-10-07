@@ -1,7 +1,12 @@
 package com.mini.me_core.feature.packager.presentation.component
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,31 +20,38 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mini.me_core.core.theme.components.AppCard
+import com.mini.me_core.core.theme.components.AppTopAppBar
+import com.mini.me_core.core.theme.tokens.LocalAppTheme
+import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 import com.mini.me_core.feature.packager.domain.model.BuildStatus
 import com.mini.me_core.feature.packager.domain.model.Project
 import com.mini.me_core.feature.packager.presentation.PackagerViewModel
@@ -49,8 +61,10 @@ import java.util.Locale
 
 /**
  * 应用打包器 - 项目列表页
+ *
+ * 使用统一顶栏 AppTopAppBar 和统一卡片 AppCard，
+ * 遵循项目设计规范。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PackagerListScreen(
     viewModel: PackagerViewModel = hiltViewModel(),
@@ -59,23 +73,29 @@ fun PackagerListScreen(
     onOpenProject: (Project) -> Unit
 ) {
     val projects: List<Project> by viewModel.projects.collectAsState()
+    val colors = LocalAppTheme.current.colors
+    val cornerRadius = LocalCornerRadius.current
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("应用打包器") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.Add, contentDescription = "返回")
-                    }
-                }
+            AppTopAppBar(
+                title = "应用打包器",
+                onNavigateBack = onNavigateBack,
+                navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                navigationContentDescription = "返回"
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onNewProject) {
-                Icon(Icons.Default.Add, contentDescription = "新建项目")
+            FloatingActionButton(
+                onClick = onNewProject,
+                containerColor = colors.brandPrimary,
+                contentColor = colors.onBrandPrimary,
+                shape = RoundedCornerShape(cornerRadius.lg)
+            ) {
+                Icon(Icons.Rounded.Add, contentDescription = "新建项目")
             }
-        }
+        },
+        containerColor = colors.surfacePage
     ) { padding ->
         if (projects.isEmpty()) {
             EmptyState(modifier = Modifier.padding(padding))
@@ -84,8 +104,11 @@ fun PackagerListScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    horizontal = PrimitiveSpacing.Md,
+                    vertical = PrimitiveSpacing.Md
+                ),
+                verticalArrangement = Arrangement.spacedBy(PrimitiveSpacing.Md)
             ) {
                 items(projects, key = { it.id }) { project ->
                     ProjectCard(
@@ -105,35 +128,45 @@ fun PackagerListScreen(
  */
 @Composable
 private fun EmptyState(modifier: Modifier = Modifier) {
+    val colors = LocalAppTheme.current.colors
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-            )
-            Spacer(Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(colors.surfaceCard),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = colors.textTertiary
+                )
+            }
+            Spacer(Modifier.height(PrimitiveSpacing.Lg))
             Text(
                 text = "暂无项目",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                fontWeight = FontWeight.SemiBold,
+                color = colors.textPrimary
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(PrimitiveSpacing.Xs))
             Text(
                 text = "点击右下角按钮创建第一个项目",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                color = colors.textTertiary
             )
         }
     }
 }
 
 /**
- * 项目卡片
+ * 项目卡片（使用统一 AppCard 组件）
  */
 @Composable
 private fun ProjectCard(
@@ -142,20 +175,26 @@ private fun ProjectCard(
     onBuild: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    val colors = LocalAppTheme.current.colors
+    val cornerRadius = LocalCornerRadius.current
+    val haptic = LocalHapticFeedback.current
+
+    AppCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onClick()
+                }
+            )
     ) {
         Column(
-            modifier = Modifier
-                .clickable(onClick = onClick)
-                .padding(16.dp)
+            modifier = Modifier.padding(PrimitiveSpacing.Md)
         ) {
-            // 项目名称和类型
+            // 第一行：项目名称 + 状态徽章
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -163,77 +202,148 @@ private fun ProjectCard(
                 Text(
                     text = project.name,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
+                Spacer(Modifier.width(PrimitiveSpacing.Sm))
                 BuildStatusBadge(status = project.lastBuildStatus)
             }
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(PrimitiveSpacing.Xs))
 
-            // 包名和版本
+            // 第二行：包名
             Text(
                 text = project.packageName,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(PrimitiveSpacing.Sm))
 
-            // 类型和最后构建时间
+            // 第三行：类型 + 版本 + 构建时间
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = project.type.displayName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.width(8.dp))
+                // 类型标签
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(cornerRadius.sm))
+                        .background(colors.brandPrimary.copy(alpha = 0.1f))
+                        .padding(horizontal = PrimitiveSpacing.Sm, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = project.type.displayName,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.brandPrimary
+                    )
+                }
+                Spacer(Modifier.width(PrimitiveSpacing.Sm))
                 Text(
                     text = "v${project.versionName}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = colors.textSecondary
                 )
                 project.lastBuildAt?.let {
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(PrimitiveSpacing.Sm))
                     Text(
                         text = "构建: ${formatTime(it)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = colors.textTertiary
                     )
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(PrimitiveSpacing.Md))
 
-            // 操作按钮
+            // 第四行：操作按钮
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(PrimitiveSpacing.Sm)
             ) {
-                ActionButton(
-                    text = "构建",
-                    icon = Icons.Default.PlayArrow,
-                    onClick = onBuild,
-                    modifier = Modifier.weight(1f)
-                )
-                ActionButton(
-                    text = "配置",
-                    icon = Icons.Default.Settings,
-                    onClick = onClick,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(40.dp)
+                // 构建按钮（主按钮样式）
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(cornerRadius.md))
+                        .background(colors.brandPrimary)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onBuild()
+                            }
+                        )
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        Icons.Default.Delete,
+                        Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        tint = colors.onBrandPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "构建",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.onBrandPrimary
+                    )
+                }
+
+                // 配置按钮（次按钮样式）
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(cornerRadius.md))
+                        .background(colors.surfaceSunken)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onClick()
+                            }
+                        )
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Rounded.Settings,
+                        contentDescription = null,
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "配置",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.textSecondary
+                    )
+                }
+
+                // 删除按钮（图标按钮）
+                IconButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onDelete()
+                    },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(cornerRadius.md))
+                ) {
+                    Icon(
+                        Icons.Rounded.Delete,
                         contentDescription = "删除",
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = colors.error,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -248,55 +358,26 @@ private fun ProjectCard(
 @Composable
 private fun BuildStatusBadge(status: BuildStatus?) {
     if (status == null) return
+    val colors = LocalAppTheme.current.colors
+    val cornerRadius = LocalCornerRadius.current
+
     val (text, color) = when (status) {
-        BuildStatus.SUCCESS -> "成功" to androidx.compose.ui.graphics.Color(0xFF4CAF50)
-        BuildStatus.FAILED -> "失败" to androidx.compose.ui.graphics.Color(0xFFF44336)
-        BuildStatus.BUILDING -> "构建中" to MaterialTheme.colorScheme.primary
+        BuildStatus.SUCCESS -> "成功" to colors.success
+        BuildStatus.FAILED -> "失败" to colors.error
+        BuildStatus.BUILDING -> "构建中" to colors.brandPrimary
     }
+
     Box(
         modifier = Modifier
-            .background(color.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(cornerRadius.sm))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = PrimitiveSpacing.Sm, vertical = 3.dp)
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
             color = color,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-/**
- * 操作按钮
- */
-@Composable
-private fun ActionButton(
-    text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(Modifier.width(4.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.SemiBold
         )
     }
 }

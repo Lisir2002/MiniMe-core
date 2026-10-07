@@ -20,13 +20,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.Analytics
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -40,7 +40,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -56,6 +55,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.feature.packager.domain.engine.ApkAnalyzer
 import com.mini.me_core.feature.packager.domain.model.BuildRecord
 import com.mini.me_core.feature.packager.domain.model.BuildStatus
@@ -99,16 +99,14 @@ fun ProjectDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(currentProject.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
-                    }
-                },
+            AppTopAppBar(
+                title = currentProject.name,
+                onNavigateBack = onNavigateBack,
+                navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
+                navigationContentDescription = "返回",
                 actions = {
                     IconButton(onClick = { onStartBuild(currentProject) }) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "构建")
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = "构建", modifier = Modifier.size(20.dp))
                     }
                 }
             )
@@ -211,7 +209,7 @@ private fun OverviewTab(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ActionButtonFull(
                     text = "立即构建",
-                    icon = Icons.Default.PlayArrow,
+                    icon = Icons.Rounded.PlayArrow,
                     onClick = onStartBuild,
                     modifier = Modifier.weight(1f)
                 )
@@ -648,7 +646,7 @@ private fun BuildRecordRow(
     val (icon, color) = when (record.status) {
         com.mini.me_core.feature.packager.domain.model.BuildStatus.SUCCESS -> Icons.Default.CheckCircle to androidx.compose.ui.graphics.Color(0xFF4CAF50)
         com.mini.me_core.feature.packager.domain.model.BuildStatus.FAILED -> Icons.Default.Error to androidx.compose.ui.graphics.Color(0xFFF44336)
-        com.mini.me_core.feature.packager.domain.model.BuildStatus.BUILDING -> Icons.Default.PlayArrow to MaterialTheme.colorScheme.primary
+        com.mini.me_core.feature.packager.domain.model.BuildStatus.BUILDING -> Icons.Rounded.PlayArrow to MaterialTheme.colorScheme.primary
     }
 
     Row(
