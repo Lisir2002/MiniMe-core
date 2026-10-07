@@ -1,5 +1,6 @@
 package com.mini.me_core.feature.packager.domain.engine
 
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -43,10 +44,14 @@ class ZipAligner {
                         val deflater = Deflater(Deflater.DEFAULT_COMPRESSION)
                         deflater.setInput(data)
                         deflater.finish()
-                        val buffer = ByteArray(data.size + 1024)
-                        val compressedLength = deflater.deflate(buffer)
+                        val baos = ByteArrayOutputStream(data.size)
+                        val buffer = ByteArray(8192)
+                        while (!deflater.finished()) {
+                            val count = deflater.deflate(buffer)
+                            baos.write(buffer, 0, count)
+                        }
                         deflater.end()
-                        buffer.copyOf(compressedLength)
+                        baos.toByteArray()
                     } else {
                         data
                     }

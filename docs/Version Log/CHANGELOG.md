@@ -11,6 +11,14 @@
 - **破坏性变更用「注意」显著标注并说明用户需要做什么。**
 - **禁止使用 emoji**：分类标题和正文保持纯文字，简洁专业。
 
+## [0.0.0.71] - 2026-10-07
+
+修复应用打包器 ZIP 对齐时 DEFLATED 条目压缩数据不完整的问题，解决 "invalid stored block lengths" 构建错误。
+
+### 修复
+
+- **ZIP压缩修复**：修复 ZipAligner 中 DEFLATED 条目压缩数据被截断导致的 "invalid stored block lengths" 错误，使用 ByteArrayOutputStream 确保压缩数据完整。
+
 ## [0.0.0.70] - 2026-10-07
 
 修复应用打包器两个关键构建问题：新建项目后 index.html 自动创建，ZIP 对齐时 DEFLATED 条目正确重新压缩，解决构建失败问题。
