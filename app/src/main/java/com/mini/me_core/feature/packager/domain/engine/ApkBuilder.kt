@@ -175,19 +175,12 @@ class ApkBuilder(
             log("最终 APK: ${finalApk.absolutePath}", callback, logWriter)
             log("APK 大小: ${finalApk.length()} bytes (${formatSize(finalApk.length())})", callback, logWriter)
 
-            // 同时复制到 Download 目录
-            val downloadDir = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "MiniMePackager")
-            downloadDir.mkdirs()
-            val downloadApk = File(downloadDir, finalApkName)
-            finalApk.copyTo(downloadApk, overwrite = true)
-            log("已复制到下载目录: ${downloadApk.absolutePath}", callback, logWriter)
-
-            // 同时复制到外部存储 apk 目录（与日志同目录，方便用户获取分析）
-            val externalApkDir = File(android.os.Environment.getExternalStorageDirectory(), "Android/data/com.mini.me_core/files/apk")
-            externalApkDir.mkdirs()
-            val externalApk = File(externalApkDir, finalApkName)
-            finalApk.copyTo(externalApk, overwrite = true)
-            log("已复制到外部APK目录: ${externalApk.absolutePath}", callback, logWriter)
+            // 同时复制到公共存储目录（与日志同目录 Download/MiniMe-core/apk/，方便用户获取分析）
+            val publicApkDir = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "MiniMe-core/apk")
+            publicApkDir.mkdirs()
+            val publicApk = File(publicApkDir, finalApkName)
+            finalApk.copyTo(publicApk, overwrite = true)
+            log("已复制到公共APK目录: ${publicApk.absolutePath}", callback, logWriter)
 
             // 清理临时目录
             tempDir.deleteRecursively()
