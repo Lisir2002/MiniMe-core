@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.feature.packager.domain.engine.ApkAnalyzer
 import com.mini.me_core.feature.packager.domain.engine.ApkBuilder
 import com.mini.me_core.feature.packager.domain.model.BuildRecord
 import com.mini.me_core.feature.packager.domain.model.BuildStatus
@@ -13,10 +14,12 @@ import com.mini.me_core.feature.packager.domain.repository.BuildStore
 import com.mini.me_core.feature.packager.domain.repository.ProjectStore
 import com.mini.me_core.feature.packager.util.PinyinUtil
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 
@@ -74,6 +77,12 @@ class PackagerViewModel @Inject constructor(
     // ========== 构建记录 ==========
     private val _buildRecords = MutableStateFlow<List<BuildRecord>>(emptyList())
     val buildRecords: StateFlow<List<BuildRecord>> = _buildRecords.asStateFlow()
+
+    // ========== APK 分析结果 ==========
+    private val _apkAnalysis = MutableStateFlow<ApkAnalyzer.ApkAnalysis?>(null)
+    val apkAnalysis: StateFlow<ApkAnalyzer.ApkAnalysis?> = _apkAnalysis.asStateFlow()
+    private val _isAnalyzing = MutableStateFlow(false)
+    val isAnalyzing: StateFlow<Boolean> = _isAnalyzing.asStateFlow()
 
     private val apkBuilder = ApkBuilder(getApplication(), projectStore)
 
@@ -326,22 +335,59 @@ class PackagerViewModel @Inject constructor(
     }
 
     /**
+     * 分析 APK 文件
+     */
+    fun analyzeApk(apkFile: File) {
+        viewModelScope.launch {
+            _isAnalyzing.value = true
+            _apkAnalysis.value = null
+            try {
+                val analysis = withContext(Dispatchers.IO) {
+                    ApkAnalyzer.analyze(apkFile)
+                }
+                _apkAnalysis.value = analysis
+                FileLogger.d(TAG, "APK 分析完成: 包名=${analysis.packageName}")
+            } catch (e: Exception) {
+                FileLogger.e(TAG, "APK 分析失败: ${e.message}", e)
+            } finally {
+                _isAnalyzing.value = false
+            }
+        }
+    }
+
+    /**
+     * 清除 APK 分析结果
+     */
+    fun clearApkAnalysis() {
+        _apkAnalysis.value = null
+    }
+
+    /**
      * 安装 APK（通过 Intent）
      */
     fun installApk(apkFile: File) {
         val context = getApplication<Application>()
-        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-            setDataAndType(
-                androidx.core.content.FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    apkFile
-                ),
-                "application/vnd.android.package-archive"
+        try {
+            if (!apkFile.exists()) {
+                FileLogger.e(TAG, "APK 文件不存在: ${apkFile.absolutePath}")
+                android.widget.Toast.makeText(context, "APK 文件不存在，请重新构建", android.widget.Toast.LENGTH_LONG).show()
+                return
+            }
+            FileLogger.d(TAG, "安装 APK: ${apkFile.name} (${apkFile.length()} bytes)")
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                apkFile
             )
-            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "安装 APK 失败: ${e.message}", e)
+            android.widget.Toast.makeText(context, "安装失败: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
         }
-        context.startActivity(intent)
     }
 }

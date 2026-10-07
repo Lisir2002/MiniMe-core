@@ -20,13 +20,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,8 +39,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,7 +56,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mini.me_core.feature.packager.domain.engine.ApkAnalyzer
 import com.mini.me_core.feature.packager.domain.model.BuildRecord
+import com.mini.me_core.feature.packager.domain.model.BuildStatus
 import com.mini.me_core.feature.packager.domain.model.Project
 import com.mini.me_core.feature.packager.presentation.PackagerViewModel
 import java.io.File
@@ -85,6 +92,11 @@ fun ProjectDetailScreen(
     }
     val currentProject = project
 
+    // 进入页面时自动加载构建记录
+    LaunchedEffect(projectId) {
+        viewModel.loadBuildRecords(projectId)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -114,7 +126,7 @@ fun ProjectDetailScreen(
             }
 
             when (selectedTab) {
-                0 -> OverviewTab(project = currentProject, buildRecords = buildRecords, onStartBuild = { onStartBuild(currentProject) })
+                0 -> OverviewTab(project = currentProject, buildRecords = buildRecords, viewModel = viewModel, onStartBuild = { onStartBuild(currentProject) })
                 1 -> SourceTab(project = currentProject, viewModel = viewModel)
                 2 -> ConfigTab(project = currentProject, viewModel = viewModel)
                 3 -> BuildsTab(buildRecords = buildRecords, onInstall = { record ->
@@ -132,8 +144,13 @@ fun ProjectDetailScreen(
 private fun OverviewTab(
     project: Project,
     buildRecords: List<BuildRecord>,
+    viewModel: PackagerViewModel,
     onStartBuild: () -> Unit
 ) {
+    val apkAnalysis: ApkAnalyzer.ApkAnalysis? by viewModel.apkAnalysis.collectAsState()
+    val isAnalyzing by viewModel.isAnalyzing.collectAsState()
+    val latestSuccessBuild = buildRecords.firstOrNull { it.status == BuildStatus.SUCCESS && it.apkPath != null }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
@@ -161,6 +178,35 @@ private fun OverviewTab(
             }
         }
 
+        // APK 分析结果
+        if (latestSuccessBuild != null) {
+            item {
+                CardSection(title = "APK 分析") {
+                    if (isAnalyzing) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text("分析中...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    } else if (apkAnalysis != null) {
+                        ApkAnalysisContent(analysis = apkAnalysis!!)
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("点击按钮分析 APK 详情", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.weight(1f))
+                            TextButton(onClick = {
+                                latestSuccessBuild.apkPath?.let { viewModel.analyzeApk(File(it)) }
+                            }) {
+                                Icon(Icons.Default.Analytics, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("分析APK")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ActionButtonFull(
@@ -171,6 +217,73 @@ private fun OverviewTab(
                 )
             }
         }
+    }
+}
+
+/**
+ * APK 分析结果内容
+ */
+@Composable
+private fun ApkAnalysisContent(analysis: ApkAnalyzer.ApkAnalysis) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // 基本信息
+        InfoRow("文件大小", formatSize(analysis.fileSize))
+        if (analysis.minSdkVersion > 0) InfoRow("最低 SDK", "API ${analysis.minSdkVersion}")
+        if (analysis.targetSdkVersion > 0) InfoRow("目标 SDK", "API ${analysis.targetSdkVersion}")
+
+        // 组件统计
+        HorizontalDivider()
+        Text("组件统计", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            StatChip("Activity", analysis.activityCount)
+            StatChip("Service", analysis.serviceCount)
+            StatChip("Receiver", analysis.receiverCount)
+            StatChip("Provider", analysis.providerCount)
+        }
+
+        // 文件统计
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            StatChip("Dex", analysis.dexCount)
+            StatChip("Native库", analysis.nativeLibCount)
+            StatChip("资源", analysis.assetCount)
+        }
+
+        // 权限列表
+        if (analysis.permissions.isNotEmpty()) {
+            HorizontalDivider()
+            Text("权限列表 (${analysis.permissions.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            analysis.permissions.take(5).forEach { perm ->
+                Text(
+                    perm.removePrefix("android.permission."),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (analysis.permissions.size > 5) {
+                Text("等 ${analysis.permissions.size} 项权限", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        // 签名信息
+        if (analysis.isSigned) {
+            HorizontalDivider()
+            Text("签名信息", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            InfoRow("签名算法", analysis.signatureAlgorithm)
+            InfoRow("证书主体", analysis.certificateSubject.take(40) + if (analysis.certificateSubject.length > 40) "..." else "")
+            InfoRow("有效期至", analysis.certificateValidTo)
+        }
+    }
+}
+
+/**
+ * 统计芯片
+ */
+@Composable
+private fun StatChip(label: String, count: Int) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("$count", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -570,6 +683,16 @@ private fun BuildRecordRow(
 
 private fun formatDateTime(timestamp: Long): String =
     SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))
+
+private fun formatSize(bytes: Long): String {
+    val kb = bytes / 1024.0
+    val mb = kb / 1024.0
+    return when {
+        mb >= 1 -> String.format("%.2f MB", mb)
+        kb >= 1 -> String.format("%.1f KB", kb)
+        else -> "$bytes B"
+    }
+}
 
 // ========== HTML 模板 ==========
 
