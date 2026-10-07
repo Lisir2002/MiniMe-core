@@ -186,8 +186,19 @@ class V2ApkSigner {
             }
 
             // 对摘要序列计算 SHA256
-            return MessageDigest.getInstance("SHA-256")
+            val finalDigest = MessageDigest.getInstance("SHA-256")
                 .digest(digestStream.toByteArray())
+
+            // 根据 AOSP 规范，最终内容摘要需要加上摘要标记和长度前缀
+            // 格式: [摘要标记(1, 0x5a)] [摘要长度(4)] [SHA256摘要(32)]
+            val result = ByteArrayOutputStream()
+            result.write(DIGEST_ID_SHA256.toInt())
+            val lenBuffer = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
+            lenBuffer.putInt(finalDigest.size)
+            result.write(lenBuffer.array())
+            result.write(finalDigest)
+
+            return result.toByteArray()
         }
 
         /**
