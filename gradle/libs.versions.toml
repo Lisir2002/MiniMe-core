@@ -58,6 +58,9 @@ leakcanary = "2.14"
 soraEditor = "0.24.4"
 desugarJdkLibs = "2.1.5"
 
+# APK 签名
+apksig = "8.7.0"
+
 [libraries]
 # AndroidX
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -137,3 +140,6 @@ sora-editor-bom = { group = "io.github.rosemoe", name = "editor-bom", version.re
 sora-editor = { group = "io.github.rosemoe", name = "editor" }
 sora-language-textmate = { group = "io.github.rosemoe", name = "language-textmate" }
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
+
+# APK 签名
+apksig = { group = "com.android.tools.build", name = "apksig", version.ref = "apksig" }

@@ -132,10 +132,12 @@ class ApkBuilder(
                 val modified = ManifestEditor.modifyManifest(
                     manifestFile = manifestFile,
                     newPackageName = project.packageName,
-                    newAppName = project.name
+                    newAppName = project.name,
+                    newVersionName = project.versionName,
+                    newVersionCode = project.versionCode
                 )
                 if (modified) {
-                    log("AndroidManifest.xml 修改完成: 包名=${project.packageName}, 应用名=${project.name}", callback, logWriter)
+                    log("AndroidManifest.xml 修改完成: 包名=${project.packageName}, 应用名=${project.name}, 版本=${project.versionName}(${project.versionCode})", callback, logWriter)
                 } else {
                     log("警告: 未在 AndroidManifest.xml 中找到目标字符串，可能模版已被修改", callback, logWriter)
                 }

@@ -1,5 +1,7 @@
 package com.mini.me_core.feature.packager.domain.engine
 
+import com.android.apksig.ApkSigner
+import com.android.apksig.util.DataSources
 import com.mini.me_core.core.util.FileLogger
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.cert.X509v3CertificateBuilder
@@ -11,30 +13,22 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.RandomAccessFile
 import java.math.BigInteger
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.KeyStore
-import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.Security
 import java.security.cert.X509Certificate
-import java.util.Base64
 import java.util.Date
-import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 
 /**
- * APK 签名器（V1 方案 / JAR 签名）
+ * APK 签名器（V1 + V2 方案）
  *
- * 使用 BouncyCastle 实现 APK 的 V1 签名。
- * V1 签名基于 JAR 签名机制，在 META-INF/ 目录下生成：
- * - MANIFEST.MF：所有文件的 digest
- * - CERT.SF：MANIFEST.MF 各条目的 digest
- * - CERT.RSA：签名 + 证书
- *
- * P0 阶段使用 V1 签名，兼容性最好。P1 阶段可扩展 V2/V3 签名。
+ * 使用 Android apksig 库实现 APK 的 V1（JAR 签名）和 V2（APK Signature Scheme v2）签名。
+ * V2 签名从 Android 7.0（API 24）开始支持，Android 11（API 30）起强制要求。
+ * 同时启用 V1 签名以兼容 Android 6.0 及以下设备。
  */
 class ApkSigner {
 
@@ -48,11 +42,6 @@ class ApkSigner {
             }
         }
 
-        private const val META_INF = "META-INF/"
-        private const val MANIFEST_MF = "$META_INF/MANIFEST.MF"
-        private const val CERT_SF = "$META_INF/CERT.SF"
-        private const val CERT_RSA = "$META_INF/CERT.RSA"
-
         /** 默认签名别名 */
         private const val DEFAULT_ALIAS = "minime_packager"
 
@@ -60,7 +49,7 @@ class ApkSigner {
         private const val DEFAULT_PASSWORD = "minime_packager_2026"
 
         /**
-         * 对 APK 进行签名
+         * 对 APK 进行 V1 + V2 签名
          *
          * @param unsignedApk 未签名的 APK
          * @param signedApk 签名后的 APK
@@ -71,57 +60,58 @@ class ApkSigner {
             signedApk: File,
             keystoreFile: File
         ) {
-            FileLogger.d(TAG, "开始 APK 签名: ${unsignedApk.name} (${unsignedApk.length()} bytes)")
+            FileLogger.d(TAG, "开始 APK V1+V2 签名: ${unsignedApk.name} (${unsignedApk.length()} bytes)")
+
             // 加载或生成签名密钥
             val (privateKey, certificate) = loadOrGenerateKeystore(keystoreFile)
+            FileLogger.d(TAG, "签名密钥加载完成: alias=$DEFAULT_ALIAS")
 
-            // 读取未签名 APK 的所有文件
-            val files = mutableMapOf<String, ByteArray>()
-            ZipInputStream(FileInputStream(unsignedApk)).use { zis ->
-                var entry: ZipEntry?
-                while (zis.nextEntry.also { entry = it } != null) {
-                    val name = entry!!.name
-                    // 跳过已有的签名文件
-                    if (!name.startsWith(META_INF) || name == MANIFEST_MF) {
-                        files[name] = zis.readBytes()
-                    }
-                    zis.closeEntry()
-                }
-            }
-            FileLogger.d(TAG, "读取到 ${files.size} 个文件待签名")
+            // 构建签名配置
+            val signerConfig = ApkSigner.SignerConfig.Builder(
+                DEFAULT_ALIAS,
+                privateKey,
+                listOf(certificate)
+            ).build()
 
-            // 生成 MANIFEST.MF
-            val manifestContent = generateManifest(files)
-            FileLogger.d(TAG, "生成 MANIFEST.MF 完成")
-
-            // 生成 CERT.SF
-            val sfContent = generateSignatureFile(manifestContent)
-            FileLogger.d(TAG, "生成 CERT.SF 完成")
-
-            // 生成 CERT.RSA（签名 + 证书）
-            val rsaContent = generateSignatureBlock(sfContent, privateKey, certificate)
-            FileLogger.d(TAG, "生成 CERT.RSA 完成")
-
-            // 写入签名后的 APK
+            // 确保输出目录存在
             signedApk.parentFile?.mkdirs()
             if (signedApk.exists()) signedApk.delete()
 
-            ZipOutputStream(FileOutputStream(signedApk)).use { zos ->
-                // 写入 MANIFEST.MF（必须第一个）
-                writeEntry(zos, MANIFEST_MF, manifestContent.toByteArray(Charsets.UTF_8))
-                // 写入 CERT.SF
-                writeEntry(zos, CERT_SF, sfContent.toByteArray(Charsets.UTF_8))
-                // 写入 CERT.RSA
-                writeEntry(zos, CERT_RSA, rsaContent)
+            // 使用 apksig 进行 V1+V2 签名
+            val inputDataSource = DataSources.asDataSource(RandomAccessFile(unsignedApk, "r"))
+            val apkSigner = ApkSigner.Builder(listOf(signerConfig))
+                .setInputApk(inputDataSource)
+                .setOutputApk(signedApk)
+                .setV1SigningEnabled(true)  // 兼容 Android 6.0 及以下
+                .setV2SigningEnabled(true)  // Android 7.0+，Android 11+ 强制
+                .setV3SigningEnabled(false) // V3 签名暂不启用
+                .build()
 
-                // 写入原始文件（排除 META-INF 下的签名相关文件）
-                for ((name, data) in files) {
-                    if (name != MANIFEST_MF && !name.startsWith(META_INF)) {
-                        writeEntry(zos, name, data)
-                    }
+            apkSigner.sign()
+
+            FileLogger.d(TAG, "APK V1+V2 签名完成: ${signedApk.name} (${signedApk.length()} bytes)")
+
+            // 验证签名
+            verifySignature(signedApk)
+        }
+
+        /**
+         * 验证 APK 签名
+         */
+        private fun verifySignature(apkFile: File) {
+            try {
+                val result = com.android.apksig.ApkVerifier.Builder(apkFile)
+                    .build()
+                    .verify()
+
+                if (result.isVerified) {
+                    FileLogger.d(TAG, "签名验证通过: V1=${result.isVerifiedUsingV1Scheme}, V2=${result.isVerifiedUsingV2Scheme}")
+                } else {
+                    FileLogger.w(TAG, "签名验证失败: ${result.errors}")
                 }
+            } catch (e: Exception) {
+                FileLogger.w(TAG, "签名验证异常: ${e.message}")
             }
-            FileLogger.d(TAG, "APK 签名完成: ${signedApk.name} (${signedApk.length()} bytes)")
         }
 
         /**
@@ -198,110 +188,6 @@ class ApkSigner {
             return JcaX509CertificateConverter()
                 .setProvider(BouncyCastleProvider.PROVIDER_NAME)
                 .getCertificate(builder.build(signer))
-        }
-
-        /**
-         * 生成 MANIFEST.MF 内容
-         */
-        private fun generateManifest(files: Map<String, ByteArray>): String {
-            val sb = StringBuilder()
-            sb.append("Manifest-Version: 1.0\r\n")
-            sb.append("Created-By: MiniMe Packager 1.0\r\n")
-            sb.append("\r\n")
-
-            // 按文件名排序，保证确定性
-            val sortedNames = files.keys.filter {
-                it != MANIFEST_MF && !it.startsWith(META_INF)
-            }.sorted()
-
-            for (name in sortedNames) {
-                val data = files[name] ?: continue
-                val digest = sha256Base64(data)
-                sb.append("Name: $name\r\n")
-                sb.append("SHA-256-Digest: $digest\r\n")
-                sb.append("\r\n")
-            }
-
-            return sb.toString()
-        }
-
-        /**
-         * 生成 CERT.SF 内容（签名文件）
-         */
-        private fun generateSignatureFile(manifestContent: String): String {
-            val sb = StringBuilder()
-            sb.append("Signature-Version: 1.0\r\n")
-            sb.append("Created-By: MiniMe Packager 1.0\r\n")
-            sb.append("SHA-256-Digest-Manifest: ${sha256Base64(manifestContent.toByteArray(Charsets.UTF_8))}\r\n")
-            sb.append("\r\n")
-
-            // 对 MANIFEST.MF 中的每个条目计算 digest
-            val sections = manifestContent.split("\r\n\r\n").filter { it.isNotBlank() }
-            for (section in sections) {
-                if (section.startsWith("Manifest-Version")) continue
-                val sectionWithNewline = "$section\r\n\r\n"
-                val nameLine = section.lines().firstOrNull { it.startsWith("Name:") }
-                val name = nameLine?.substringAfter("Name: ")?.trim() ?: continue
-                val digest = sha256Base64(sectionWithNewline.toByteArray(Charsets.UTF_8))
-                sb.append("Name: $name\r\n")
-                sb.append("SHA-256-Digest: $digest\r\n")
-                sb.append("\r\n")
-            }
-
-            return sb.toString()
-        }
-
-        /**
-         * 生成 CERT.RSA 内容（PKCS7 签名块）
-         */
-        private fun generateSignatureBlock(
-            sfContent: String,
-            privateKey: PrivateKey,
-            certificate: X509Certificate
-        ): ByteArray {
-            // 使用 BouncyCastle 的 CMSSignedData 生成 PKCS7 签名
-            val cmsBuilder = org.bouncycastle.cms.CMSSignedDataGenerator()
-            val signerInfoGenerator = org.bouncycastle.cms.jcajce.JcaSignerInfoGeneratorBuilder(
-                org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder()
-                    .setProvider(BouncyCastleProvider.PROVIDER_NAME)
-                    .build()
-            )
-                .build(
-                    JcaContentSignerBuilder("SHA256WithRSA")
-                        .setProvider(BouncyCastleProvider.PROVIDER_NAME)
-                        .build(privateKey),
-                    certificate
-                )
-
-            cmsBuilder.addSignerInfoGenerator(signerInfoGenerator)
-            cmsBuilder.addCertificate(org.bouncycastle.cert.jcajce.JcaX509CertificateHolder(certificate))
-
-            val processable = org.bouncycastle.cms.CMSProcessableByteArray(
-                sfContent.toByteArray(Charsets.UTF_8)
-            )
-
-            val signedData = cmsBuilder.generate(processable, true)
-            return signedData.encoded
-        }
-
-        /**
-         * 计算 SHA-256 并返回 Base64 编码
-         */
-        private fun sha256Base64(data: ByteArray): String {
-            val digest = MessageDigest.getInstance("SHA-256")
-            val hash = digest.digest(data)
-            return Base64.getEncoder().encodeToString(hash)
-        }
-
-        /**
-         * 写入 ZIP 条目
-         */
-        private fun writeEntry(zos: ZipOutputStream, name: String, data: ByteArray) {
-            val entry = ZipEntry(name)
-            entry.time = System.currentTimeMillis()
-            zos.putNextEntry(entry)
-            zos.write(data)
-            zos.closeEntry()
         }
     }
 }

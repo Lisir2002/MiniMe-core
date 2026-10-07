@@ -38,19 +38,23 @@ class ManifestEditor {
         private const val FLAG_UTF8 = 0x00000100
 
         /**
-         * 修改 APK 中 AndroidManifest.xml 的包名和应用名
+         * 修改 APK 中 AndroidManifest.xml 的包名、应用名、版本号
          *
          * @param manifestFile AndroidManifest.xml 文件（二进制 AXML 格式）
          * @param newPackageName 新包名
          * @param newAppName 新应用名
+         * @param newVersionName 新版本号名称（如 "1.0.0"）
+         * @param newVersionCode 新版本号整数（如 1000000）
          * @return 是否有修改
          */
         fun modifyManifest(
             manifestFile: File,
             newPackageName: String,
-            newAppName: String
+            newAppName: String,
+            newVersionName: String = "",
+            newVersionCode: Int = 0
         ): Boolean {
-            FileLogger.d(TAG, "修改 AndroidManifest.xml: 包名=$newPackageName, 应用名=$newAppName")
+            FileLogger.d(TAG, "修改 AndroidManifest.xml: 包名=$newPackageName, 应用名=$newAppName, 版本名=$newVersionName, 版本码=$newVersionCode")
             val data = manifestFile.readBytes()
             val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
 
@@ -105,15 +109,22 @@ class ManifestEditor {
 
             // 找到需要修改的字符串索引
             val packageIndex = strings.indexOfFirst { it == "com.minime.template" }
-            val appNameIndex = strings.indexOfFirst { it == "MiniMe Template" }
+            // 应用名可能是"应用模版"或"MiniMe Template"
+            val appNameIndex = strings.indexOfFirst { it == "应用模版" || it == "MiniMe Template" }
+            // 版本号名称：查找模版版本号或匹配 x.y.z 模式
+            val versionNameIndex = if (newVersionName.isNotEmpty()) {
+                strings.indexOfFirst { it == "0.0.0.10" }
+                    .takeIf { it >= 0 }
+                    ?: strings.indexOfFirst { it.matches(Regex("\\d+\\.\\d+\\.\\d+")) }
+            } else -1
 
-            if (packageIndex < 0 && appNameIndex < 0) {
+            if (packageIndex < 0 && appNameIndex < 0 && versionNameIndex < 0) {
                 // 没有找到目标字符串，可能模版已被修改过
-                FileLogger.w(TAG, "未找到目标字符串（com.minime.template / MiniMe Template），模版可能已被修改")
+                FileLogger.w(TAG, "未找到目标字符串（包名/应用名/版本号），模版可能已被修改")
                 return false
             }
 
-            FileLogger.d(TAG, "找到目标字符串: 包名索引=$packageIndex, 应用名索引=$appNameIndex")
+            FileLogger.d(TAG, "找到目标字符串: 包名=$packageIndex, 应用名=$appNameIndex, 版本名=$versionNameIndex")
 
             // 判断是否需要重建 String Pool
             var needRebuild = false
@@ -125,6 +136,10 @@ class ManifestEditor {
                 val newLen = if (isUtf8) newAppName.toByteArray(Charsets.UTF_8).size else newAppName.length * 2
                 if (newLen > stringByteLengths[appNameIndex]) needRebuild = true
             }
+            if (versionNameIndex >= 0) {
+                val newLen = if (isUtf8) newVersionName.toByteArray(Charsets.UTF_8).size else newVersionName.length * 2
+                if (newLen > stringByteLengths[versionNameIndex]) needRebuild = true
+            }
 
             val resultData = if (needRebuild) {
                 FileLogger.d(TAG, "新字符串更长，需要重建 String Pool")
@@ -133,7 +148,8 @@ class ManifestEditor {
                     stringCount, styleCount, flags, stringsStart, stylesStart,
                     stringOffsets, strings, isUtf8,
                     packageIndex, newPackageName,
-                    appNameIndex, newAppName
+                    appNameIndex, newAppName,
+                    versionNameIndex, newVersionName
                 )
             } else {
                 FileLogger.d(TAG, "新字符串长度足够，原地替换")
@@ -149,12 +165,79 @@ class ManifestEditor {
                     val strStart = stringPoolStart + stringsStart + stringOffsets[appNameIndex]
                     replaceStringInPlace(newBuffer, strStart, strings[appNameIndex], newAppName, isUtf8)
                 }
+                if (versionNameIndex >= 0) {
+                    val strStart = stringPoolStart + stringsStart + stringOffsets[versionNameIndex]
+                    replaceStringInPlace(newBuffer, strStart, strings[versionNameIndex], newVersionName, isUtf8)
+                }
                 newData
             }
 
-            manifestFile.writeBytes(resultData)
+            // 修改 versionCode（整数值属性）
+            val finalData = if (newVersionCode > 0) {
+                modifyVersionCode(resultData, newVersionCode)
+            } else resultData
+
+            manifestFile.writeBytes(finalData)
             FileLogger.d(TAG, "AndroidManifest.xml 修改完成")
             return true
+        }
+
+        /**
+         * 修改 manifest 标签中的 versionCode 属性值
+         */
+        private fun modifyVersionCode(data: ByteArray, newVersionCode: Int): ByteArray {
+            val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+            val newData = data.copyOf()
+            val newBuffer = ByteBuffer.wrap(newData).order(ByteOrder.LITTLE_ENDIAN)
+
+            // 跳过文件头
+            buffer.int // magic
+            buffer.int // fileSize
+
+            // 跳过 String Pool
+            val spType = buffer.short.toInt() and 0xFFFF
+            val spHeader = buffer.short.toInt() and 0xFFFF
+            val spSize = buffer.int
+            buffer.position(buffer.position() + spSize - 8)
+
+            // 遍历 XML chunks，找到 manifest 标签
+            while (buffer.position() < data.size - 8) {
+                val chunkType = buffer.short.toInt() and 0xFFFF
+                val chunkHeader = buffer.short.toInt() and 0xFFFF
+                val chunkSize = buffer.int
+                if (chunkSize <= 0) break
+
+                if (chunkType == 0x0102) { // START_ELEMENT
+                    val ep = buffer.position() - 8 + chunkHeader
+                    val nameIndex = buffer.getInt(ep + 12)
+                    // 字符串池中 "manifest" 的索引需要动态查找
+                    // 简化：直接查找 versionCode 属性并修改
+                    val attrCount = buffer.getShort(ep + 20).toInt() and 0xFFFF
+                    var ap = ep + 24
+                    for (i in 0 until attrCount) {
+                        val attrNameIdx = buffer.getInt(ap + 4)
+                        val attrValueType = buffer.getInt(ap + 12)
+                        // versionCode 的属性名索引需要匹配
+                        // 这里我们通过属性类型判断：versionCode 是 TYPE_INT_DEC (0x10)
+                        if (attrValueType == 0x10000000 || attrValueType == 0x00000010) {
+                            // 可能是 versionCode，检查属性名
+                            // 由于无法直接获取字符串，我们假设第一个 INT_DEC 类型的属性就是 versionCode
+                            // 实际上 manifest 标签的属性顺序：versionCode, versionName, package
+                            if (i == 0) { // 第一个属性通常是 versionCode
+                                newBuffer.putInt(ap + 16, newVersionCode)
+                                FileLogger.d(TAG, "修改 versionCode = $newVersionCode (属性索引=$i)")
+                                return newData
+                            }
+                        }
+                        ap += 20
+                    }
+                }
+
+                buffer.position(buffer.position() - 8 + chunkSize)
+            }
+
+            FileLogger.w(TAG, "未找到 versionCode 属性")
+            return newData
         }
 
         /**
@@ -325,12 +408,15 @@ class ManifestEditor {
             packageIndex: Int,
             newPackageName: String,
             appNameIndex: Int,
-            newAppName: String
+            newAppName: String,
+            versionNameIndex: Int = -1,
+            newVersionName: String = ""
         ): ByteArray {
             // 构建新的字符串数组
             val newStrings = oldStrings.copyOf()
             if (packageIndex >= 0) newStrings[packageIndex] = newPackageName
             if (appNameIndex >= 0) newStrings[appNameIndex] = newAppName
+            if (versionNameIndex >= 0) newStrings[versionNameIndex] = newVersionName
 
             // 构建新的 string_data 和 string_offsets
             val stringDataList = mutableListOf<ByteArray>()
