@@ -10,6 +10,7 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.ContentSigner
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -20,6 +21,7 @@ import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.Security
+import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.Date
 
@@ -87,7 +89,22 @@ class ApkSigner {
                 .setV3SigningEnabled(false) // V3 签名暂不启用
                 .build()
 
-            apkSigner.sign()
+            // 临时移除 BouncyCastle 提供者，避免与 apksig 库的签名编码冲突
+            val bcProvider = Security.getProvider(BouncyCastleProvider.PROVIDER_NAME)
+            if (bcProvider != null) {
+                Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME)
+                FileLogger.d(TAG, "临时移除 BouncyCastle 提供者以进行签名")
+            }
+
+            try {
+                apkSigner.sign()
+            } finally {
+                // 恢复 BouncyCastle 提供者
+                if (bcProvider != null) {
+                    Security.addProvider(bcProvider)
+                    FileLogger.d(TAG, "恢复 BouncyCastle 提供者")
+                }
+            }
 
             FileLogger.d(TAG, "APK V1+V2 签名完成: ${signedApk.name} (${signedApk.length()} bytes)")
 
@@ -120,7 +137,7 @@ class ApkSigner {
         private fun loadOrGenerateKeystore(keystoreFile: File): Pair<PrivateKey, X509Certificate> {
             val password = DEFAULT_PASSWORD.toCharArray()
 
-            return if (keystoreFile.exists()) {
+            val (privateKey, certificate) = if (keystoreFile.exists()) {
                 // 加载已有密钥库
                 FileLogger.d(TAG, "加载已有签名密钥库: ${keystoreFile.name}")
                 val keystore = KeyStore.getInstance("PKCS12")
@@ -151,6 +168,27 @@ class ApkSigner {
                 }
 
                 Pair(keyPair.private, certificate)
+            }
+
+            // 将证书标准化为系统可识别的 X.509 格式（修复 BouncyCastle 证书编码问题）
+            val standardCert = normalizeCertificate(certificate)
+            return Pair(privateKey, standardCert)
+        }
+
+        /**
+         * 将证书转换为标准 X.509 格式
+         * 修复 BouncyCastle 生成的证书在 apksig 库中编码失败的问题
+         */
+        private fun normalizeCertificate(cert: X509Certificate): X509Certificate {
+            return try {
+                val certBytes = cert.encoded
+                val factory = CertificateFactory.getInstance("X.509")
+                val standard = factory.generateCertificate(ByteArrayInputStream(certBytes)) as X509Certificate
+                FileLogger.d(TAG, "证书标准化成功: subject=${standard.subjectX500Principal.name}")
+                standard
+            } catch (e: Exception) {
+                FileLogger.w(TAG, "证书标准化失败，使用原证书: ${e.message}")
+                cert
             }
         }
 
