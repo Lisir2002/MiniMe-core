@@ -301,8 +301,8 @@ class V2ApkSigner {
             val idValuePair = ByteArrayOutputStream()
             val buffer8 = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
 
-            // 值长度（uint64）= ID(4) + 签名者序列
-            val valueLength = 4L + signersSequence.size()
+            // 值长度（uint64）= 签名者序列大小（不包括 value_len 和 ID 字段）
+            val valueLength = signersSequence.size().toLong()
             buffer8.putLong(valueLength)
             idValuePair.write(buffer8.array())
 
