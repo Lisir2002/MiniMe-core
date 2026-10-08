@@ -146,6 +146,34 @@ class ApkBuilder(
             }
             callback.onStepComplete(BuildStep.MODIFY_MANIFEST, 3, steps.size)
 
+            // Step 4.5: 修改 resources.arsc 中的应用名称
+            // 应用名称实际存储在 resources.arsc 全局字符串池，仅改 AXML 不生效
+            val arscFile = File(extractedDir, "resources.arsc")
+            if (arscFile.exists()) {
+                val arscModified = ArscEditor.modifyAppName(
+                    arscFile = arscFile,
+                    oldName = "应用模版",
+                    newName = project.name
+                )
+                if (arscModified) {
+                    log("resources.arsc 应用名称修改完成: ${project.name}", callback, logWriter)
+                } else {
+                    // 尝试备用旧名称
+                    val fallback = ArscEditor.modifyAppName(
+                        arscFile = arscFile,
+                        oldName = "MiniMe Template",
+                        newName = project.name
+                    )
+                    log(
+                        if (fallback) "resources.arsc 应用名称修改完成(备用匹配): ${project.name}"
+                        else "警告: resources.arsc 应用名称修改失败",
+                        callback, logWriter
+                    )
+                }
+            } else {
+                log("警告: resources.arsc 不存在", callback, logWriter)
+            }
+
             // Step 5: 重新打包
             callback.onStepStart(BuildStep.REPACK, 4, steps.size)
             val unsignedApk = File(tempDir, "unsigned.apk")
