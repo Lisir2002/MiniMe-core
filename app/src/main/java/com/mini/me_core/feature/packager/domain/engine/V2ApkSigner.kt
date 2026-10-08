@@ -92,7 +92,7 @@ class V2ApkSigner {
             // 6. 构建 V2 签名块
             val v2SigningBlock = buildSigningBlock(
                 signatureId = V2_SIGNATURE_ID,
-                signatureData = signatureData,
+                contentDigest = contentDigest,
                 signatureBytes = signatureBytes,
                 certBytes = certBytes
             )
@@ -101,7 +101,7 @@ class V2ApkSigner {
             // 7. 构建 V3 签名块（与 V2 格式相同，ID 不同）
             val v3SigningBlock = buildSigningBlock(
                 signatureId = V3_SIGNATURE_ID,
-                signatureData = signatureData,
+                contentDigest = contentDigest,
                 signatureBytes = signatureBytes,
                 certBytes = certBytes
             )
@@ -267,12 +267,12 @@ class V2ApkSigner {
          */
         private fun buildSigningBlock(
             signatureId: Int,
-            signatureData: ByteArray,
+            contentDigest: ByteArray,
             signatureBytes: ByteArray,
             certBytes: ByteArray
         ): ByteArray {
             // 构建签名者数据（签名算法序列 + 证书序列 + 额外属性序列）
-            val signerData = buildSignerData(signatureData, certBytes)
+            val signerData = buildSignerData(contentDigest, certBytes)
 
             // 构建签名序列（算法ID + 签名长度 + 签名数据）
             val signatures = buildSignatures(signatureBytes)
@@ -356,21 +356,18 @@ class V2ApkSigner {
          * 构建签名者数据（签名算法序列 + 证书序列 + 额外属性序列）
          *
          * 签名算法序列：每个算法包含 ID(4) + 摘要长度(4) + 摘要数据
-         * 注意：这里的摘要是内容摘要，不是签名数据
+         * 注意：这里的摘要是内容摘要（已带0x5a标记和长度前缀），不是签名数据
          */
         private fun buildSignerData(
-            signatureData: ByteArray,
+            contentDigest: ByteArray,
             certBytes: ByteArray
         ): ByteArray {
             val out = ByteArrayOutputStream()
             val buffer = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
 
-            // 从签名数据中提取内容摘要
-            // 签名数据结构：长度(4) + 算法ID(4) + 摘要长度(4) + 摘要
-            val digestOffset = 12
-            val digestLength = ByteBuffer.wrap(signatureData, 8, 4)
-                .order(ByteOrder.LITTLE_ENDIAN).int
-            val digest = signatureData.copyOfRange(digestOffset, digestOffset + digestLength)
+            // 直接使用内容摘要（已带0x5a标记和长度前缀，共37字节）
+            val digest = contentDigest
+            FileLogger.d(TAG, "签名者数据使用内容摘要: ${digest.size} bytes")
 
             // 签名算法序列（算法ID + 摘要长度 + 摘要）
             val digestAlgorithm = ByteArrayOutputStream()
