@@ -142,23 +142,21 @@ class V2ApkSigner {
         }
 
         /**
-         * 计算 APK 内容的摘要（分块 SHA256）
+         * 计算 APK 内容的摘要（根据 AOSP 规范）
          *
-         * V2 签名的摘要计算：
-         * 1. 将内容分为 1MB 块
-         * 2. 对每个块计算 SHA256
-         * 3. 构建摘要序列（块大小 + 每个块的摘要标记+长度+摘要）
-         * 4. 对摘要序列计算 SHA256
+         * 正确的计算方式：
+         * 1. 将 APK 内容按照 1MB 分块
+         * 2. 每个小块的摘要 = SHA256(0xa5 + 块字节长度(uint32) + 块内容)
+         * 3. 整体摘要 = SHA256(0x5a + 小块数量(uint32) + 所有小块摘要)
+         *
+         * 返回 32 字节的 SHA256 摘要
          */
         private fun computeContentDigest(apkFile: File, centralDirOffset: Long): ByteArray {
-            val digestStream = ByteArrayOutputStream()
+            val chunkDigests = ByteArrayOutputStream()
             val buffer = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
+            var chunkCount = 0
 
-            // 写入块大小（uint32）
-            buffer.putInt(CHUNK_SIZE)
-            digestStream.write(buffer.array())
-
-            // 分块读取内容并计算 SHA256
+            // 分块读取内容并计算每个块的摘要
             FileInputStream(apkFile).use { fis ->
                 var remaining = centralDirOffset
                 val chunkBuffer = ByteArray(CHUNK_SIZE)
@@ -168,37 +166,42 @@ class V2ApkSigner {
                     val bytesRead = fis.read(chunkBuffer, 0, toRead)
                     if (bytesRead <= 0) break
 
-                    // 计算这个块的 SHA256
-                    val chunkDigest = MessageDigest.getInstance("SHA-256")
-                        .digest(chunkBuffer.copyOf(bytesRead))
-
-                    // 写入摘要标记（0x5a 表示 SHA256）
-                    digestStream.write(DIGEST_ID_SHA256.toInt())
-                    // 写入摘要长度（uint32）
+                    // 构建块数据：0xa5 + 块字节长度(uint32) + 块内容
+                    val chunkData = ByteArrayOutputStream()
+                    chunkData.write(0xa5)
                     buffer.clear()
-                    buffer.putInt(chunkDigest.size)
-                    digestStream.write(buffer.array())
-                    // 写入摘要数据
-                    digestStream.write(chunkDigest)
+                    buffer.putInt(bytesRead)
+                    chunkData.write(buffer.array())
+                    chunkData.write(chunkBuffer, 0, bytesRead)
+
+                    // 计算这个块的 SHA256 摘要
+                    val chunkDigest = MessageDigest.getInstance("SHA-256")
+                        .digest(chunkData.toByteArray())
+
+                    // 写入块摘要
+                    chunkDigests.write(chunkDigest)
 
                     remaining -= bytesRead
+                    chunkCount++
                 }
             }
 
-            // 对摘要序列计算 SHA256
+            FileLogger.d(TAG, "内容摘要分块数量: $chunkCount")
+
+            // 构建整体数据：0x5a + 小块数量(uint32) + 所有小块摘要
+            val overallData = ByteArrayOutputStream()
+            overallData.write(0x5a)
+            buffer.clear()
+            buffer.putInt(chunkCount)
+            overallData.write(buffer.array())
+            overallData.write(chunkDigests.toByteArray())
+
+            // 对整体数据计算 SHA256，得到最终的 32 字节内容摘要
             val finalDigest = MessageDigest.getInstance("SHA-256")
-                .digest(digestStream.toByteArray())
+                .digest(overallData.toByteArray())
 
-            // 根据 AOSP 规范，最终内容摘要需要加上摘要标记和长度前缀
-            // 格式: [摘要标记(1, 0x5a)] [摘要长度(4)] [SHA256摘要(32)]
-            val result = ByteArrayOutputStream()
-            result.write(DIGEST_ID_SHA256.toInt())
-            val lenBuffer = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
-            lenBuffer.putInt(finalDigest.size)
-            result.write(lenBuffer.array())
-            result.write(finalDigest)
-
-            return result.toByteArray()
+            FileLogger.d(TAG, "内容摘要计算完成: ${finalDigest.size} bytes")
+            return finalDigest
         }
 
         /**
