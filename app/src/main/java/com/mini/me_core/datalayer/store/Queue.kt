@@ -23,7 +23,7 @@ class Queue(private val db: InfraDb) {
 
     /**
      * 入队。
-     * P1 修复：原 INSERT + SELECT last_insert_rowid() 分两步无事务包裹，
+     * 原 INSERT + SELECT last_insert_rowid() 分两步无事务包裹，
      * 并发场景下两条 INSERT 之间可能插入其他记录导致返回错误的 rowid。
      * 改为单事务保证原子性。
      */

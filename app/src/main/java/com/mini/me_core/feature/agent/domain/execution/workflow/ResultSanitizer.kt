@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
 /**
- * 结果脱敏/整形（P1-09 从 StatefulAgentWorkflow 整体搬迁的叶子协作者）。
+ * 结果脱敏/整形（ 从 StatefulAgentWorkflow 整体搬迁的叶子协作者）。
  *
  * 职责：从工具结果提取/剥离内联图片与文件卡片附件、发送前按模型视觉能力净化消息图片、
  * 非多模态模型下用识图专用模型把图片翻成文本。纯整形叶子——不改业务判定与阈值，

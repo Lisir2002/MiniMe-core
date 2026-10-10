@@ -95,7 +95,7 @@ sealed class RuntimeProbeExpr {
 }
 
 /**
- * 解析后的单个 Skill 模型（RC74 元数据升级）。
+ * 解析后的单个 Skill 模型（元数据升级）。
  *
  * 相比旧版（仅 name/description/requiredTools/dir/instructions），新增了版本、作者、标签、
  * 适用模式、执行类型、依赖、来源、入口脚本、MCP 工具等字段，为技能中心 UI、生命周期管理

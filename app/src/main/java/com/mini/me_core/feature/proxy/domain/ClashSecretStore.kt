@@ -8,9 +8,9 @@ import kotlinx.coroutines.CompletableDeferred
 import java.io.File
 
 /**
- * P2-16 拆分产物：control secret 的生成 / 加密 / 存取。
+ * 拆分产物：control secret 的生成 / 加密 / 存取。
  *
- * 逻辑原样搬迁自 [ClashProxyManager]（P0-5 安全加固一字不动）：
+ * 逻辑原样搬迁自 [ClashProxyManager]（ 安全加固一字不动）：
  *  - KVStore 密文优先 → 解密返回；
  *  - 否则旧版明文文件 `filesDir/minime/proxy/secret` 仍在 → 读明文、加密写 KV、删明文文件；
  *  - 都没有 → 生成新随机 secret，加密写 KV。
@@ -32,13 +32,13 @@ internal class ClashSecretStore(
     /** secret 异步加载完成信号（加密存储需在协程中解密；suspend 调用方据此等待）。 */
     val ready = CompletableDeferred<Unit>()
 
-    /** P0-5：等待加密 secret 加载完成（所有用到 secret 的 suspend 入口先调用）。 */
+    /** 等待加密 secret 加载完成（所有用到 secret 的 suspend 入口先调用）。 */
     suspend fun ensureLoaded() {
         if (secret.isEmpty()) ready.await()
     }
 
     /**
-     * P0-5：加载或创建 control secret，加密存储在 KVStore（与订阅 secret 同一套 CredentialEncryptor）。
+     * 加载或创建 control secret，加密存储在 KVStore（与订阅 secret 同一套 CredentialEncryptor）。
      * 迁移路径见类注释。
      */
     suspend fun loadOrCreate(): String {

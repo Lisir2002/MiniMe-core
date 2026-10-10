@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * P2-17 行为保持搬迁：容器域（内置/自定义 profile、共享设备存储、本地 PRoot ↔ 远程 SSH 执行模式切换）。
+ *  行为保持搬迁：容器域（内置/自定义 profile、共享设备存储、本地 PRoot ↔ 远程 SSH 执行模式切换）。
  * 逻辑原属 SettingsViewModel，逐字搬迁；协程仍由同一 viewModelScope 驱动。
  */
 internal class ContainerSection(

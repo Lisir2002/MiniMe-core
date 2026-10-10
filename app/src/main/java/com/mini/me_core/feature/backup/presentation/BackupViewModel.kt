@@ -175,7 +175,7 @@ class BackupViewModel @Inject constructor(
         val s = _state.value as? BackupState.PreviewReady ?: return
         _state.value = BackupState.Working(label = context.getString(R.string.backup_restoring))
         workingJob = viewModelScope.launch {
-            // P0：恢复前安全点。
+            // 恢复前安全点。
             lastSafetyPoint = autoBackupManager.createSafetyPoint()
             val result = when (val src = s.source) {
                 is RestoreSource.SafUri -> {

@@ -21,7 +21,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 
 /**
- * P2-16 拆分产物：mihomo external-controller 控制端口 API 调用。
+ * 拆分产物：mihomo external-controller 控制端口 API 调用。
  *
  * 逻辑原样搬迁自 [ClashProxyManager]：secret Bearer 鉴权、127.0.0.1 回环、能拿到任意 HTTP
  * 响应即把 [ProxyRuntimeState.controllerReachable] 翻 true、连接失败翻 false。
@@ -66,7 +66,7 @@ internal class ClashControlClient(
     private fun urlEncode(s: String): String =
         java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 
-    /** P1-9：经内核真实出口测 generate_204 延迟（ms）；控制器不可达/超时返回 null。 */
+    /** 经内核真实出口测 generate_204 延迟（ms）；控制器不可达/超时返回 null。 */
     suspend fun testOutboundLatency(): Long? {
         ensureSecretLoaded()
         val resp = controllerRequest(
@@ -79,7 +79,7 @@ internal class ClashControlClient(
     }
 
     /**
-     * P1-8：读 mihomo 累计流量计数 [uploadTotal, downloadTotal]（/connections 顶层字段，自内核启动起累计）。
+     * 读 mihomo 累计流量计数 [uploadTotal, downloadTotal]（/connections 顶层字段，自内核启动起累计）。
      * 控制器不可达返回 null。差值由调用方（采样器）计算。
      */
     suspend fun readTrafficCounters(): Pair<Long, Long>? {
@@ -128,7 +128,7 @@ internal class ClashControlClient(
     }
 
     /**
-     * P1-11：热重载配置（不杀进程、不断连）。
+     * 热重载配置（不杀进程、不断连）。
      *
      * mihomo external-controller `PUT /configs?force=true` 接受 JSON：
      *   - `path`：从文件加载（这里传空，走 payload）；

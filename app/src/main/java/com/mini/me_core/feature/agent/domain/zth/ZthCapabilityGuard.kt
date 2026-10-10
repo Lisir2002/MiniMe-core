@@ -116,7 +116,7 @@ class ZthCapabilityGuard @Inject constructor() {
             it.capabilities.contains(ToolCapability.LOAD_SKILL_BUNDLE)
                     && !it.argsPreviewText.contains(Regex("""\.(skill|md|markdown|json)\b"""))
         },
-        // E7：MCP 第三方 schema 中未声明 endpoint 但 capabilities 有 NETWORK_WRITE（C.4.4 不合规，Phase 3 McpManager 再核）
+        // E7：MCP 第三方 schema 中未声明 endpoint 但 capabilities 有 NETWORK_WRITE（C.4.4 不合规，后续 McpManager 再核）
         "mcp_network_write_without_endpoint" to {
             it.mcpServerName != null
                     && it.capabilities.contains(ToolCapability.NETWORK_WRITE)
@@ -158,7 +158,7 @@ class ZthCapabilityGuard @Inject constructor() {
     )
 
     private val SAFE_MCP_SERVER_WHITELIST = setOf<String>(
-        // C.4.4 Phase 4 设置页手工维护白名单（v1.0 默认空，用户不添加即「严格」符合 ZTH-1 零幻觉假设）
+        // C.4.4  设置页手工维护白名单（v1.0 默认空，用户不添加即「严格」符合 ZTH-1 零幻觉假设）
     )
 
     // ── 对外入口 ──────────────────────────────────────────────────────────────────
@@ -169,7 +169,7 @@ class ZthCapabilityGuard @Inject constructor() {
      * @param items 工具调用计划（BATCH 建议 ≤20；超过会被自动分片为 BATCH=20 组）
      * @param tier 当前档位（DISALBED 时直接返回全 PASS_ZERO_RISK_HEURISTIC 不走 LLM）
      * @param perf 性能级（LOW_END_SKIP_LLM 时跳过 LLM 终检）
-     * @param llmReviewer 终检回调（Phase 5 接入真实实现；低端机传 null 也行）
+     * @param llmReviewer 终检回调（ 接入真实实现；低端机传 null 也行）
      */
     suspend fun auditBatch(
         items: List<ZthToolCallPlanItem>,

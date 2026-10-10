@@ -64,7 +64,7 @@ class ParallelPrefetchManager(
     val events: Flow<PrefetchEvent> = _events.asSharedFlow()
 
     // ═══════════════════════════════════════════════════════════════════════
-    // RC61f fix：内部辅助函数/属性必须「先声明后使用」（避免 Kotlin cascade 语法误报）
+    // 内部辅助函数/属性必须「先声明后使用」（避免 Kotlin cascade 语法误报）
     // 之前把 emptySlot 写在 L410，而 _slots 初始化在 L64 → 编译报 emptySlot Unresolved，
     // 触发 Kotlin cascade：L89 假 Missing }、L636 假 Unclosed comment 、下游所有
     // LinuxContainerEngine 对 ParallelPrefetchManager.xxx 引用全 Cannot infer type。
@@ -88,7 +88,7 @@ class ParallelPrefetchManager(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val semaphore = Semaphore(slotsCount)
 
-    // ─────────────────────────── RC61c S3+S4 Fix ────────────────────────────
+    // ────────────────────────── 并发预取资源生命周期 ──────────────────────────
     /** 所有已经 fire 的 async jobs。失败时 shutdown 能 cancel 所有正在 curl/wget 的包。 */
     private val inflightJobs = mutableListOf<kotlinx.coroutines.Deferred<*>>()
     /** shutdown 调用后置 true，prefetch 的循环/single download 会立刻抛 Cancellation 退出。 */
@@ -108,13 +108,13 @@ class ParallelPrefetchManager(
     private fun resetFetchIoErrors() { consecutiveFetchIoErrors = 0 }
 
     /**
-     * RC61c S3 Fix：外部（通常是 installBundle 的 catch/finally/exitCode≠0 分支）调用
+     * 外部（通常是 installBundle 的 catch/finally/exitCode≠0 分支）调用
      * 本方法，立刻释放所有并发资源：
      *   - cancel 所有 inflight jobs（curl/wget streamShell 会收 CancellationException 停掉 Socket）
      *   - cancel scope（所有 downloadSingle 子协程立刻停，不再占线程）
      *   - 把所有 slot 立刻置 FAILED（释放 Permit 语义等价：sem.withPermit 退出后自动释放 permit）
      *   - 发一次 Finished 事件，让 Aggregator 立刻结束，避免 UI 永远显示「X 槽并行 · Y KB/s」。
-     *   - RC61f：最后 cleanupPartialCache 清理 .part 半截下载垃圾，
+     *   - 最后 cleanupPartialCache 清理 .part 半截下载垃圾，
      *     防止 rootfs 里越积越多占用户手机存储。
      *
      * 幂等：多次调用安全。
@@ -149,13 +149,13 @@ class ParallelPrefetchManager(
             )
             scope.launch { _events.emit(fin) }
         }
-        // RC61f：.part 半截下载垃圾清理在 LinuxContainerEngine.installBundle 的 finally 里调
+        // .part 半截下载垃圾清理在 LinuxContainerEngine.installBundle 的 finally 里调
         //   cleanupPartialCache（suspend 函数，必须在挂起上下文才能调；这里 shutdown 是非 suspend，
         //   再加上 L130 已经 scope.cancel()，这里 scope.launch 也不会执行，所以不在这里清理）。
         FileLogger.i(TAG, "shutdown(reason=$reason) 执行完成，inflight 已释放（垃圾清理由 finally 兜底）")
     }
 
-    // ─── RC61f：下载垃圾清理 / 续传 / 中间文件（原子 mv）管理 ───
+    // ─── 下载垃圾清理 / 续传 / 中间文件（原子 mv）管理 ───
 
     /**
      * 清理 /var/cache/apk 下的 .part 半截下载 + 可选清已安装的 apk 实体（成功后释放空间）。
@@ -240,7 +240,7 @@ class ParallelPrefetchManager(
             FileLogger.w(TAG, "resolve deps apk update may have failed exit=$updateCode")
         }
         val lines = updateOut.lineSequence().map { it.trim() }.filterNot(String::isEmpty).toList()
-        // ───────────── RC61c S4 Fix: APKINDEX fetch IO ERROR 连续 2 次熔断 ─────────────
+        // ───────────── APKINDEX fetch IO ERROR 连续 2 次熔断 ─────────────
         // 截图里 WARNING fetching community: IO ERROR → 镜像挂/本地网络差，继续 resolve/prefetch
         // 只会浪费更多 Socket/线程；立刻返回空 deps，让下游 prefetch 不启动、apk add 直接走 apk 自带 fetch。
         val lowerAll = updateOut.lowercase()
@@ -356,7 +356,7 @@ class ParallelPrefetchManager(
             return finish
         }
 
-        // RC61c S3：预取前确保没被 cancel；如果失败分支已经触发 shutdown → 立刻短路返回空
+        // 预取前确保没被 cancel；如果失败分支已经触发 shutdown → 立刻短路返回空
         if (shutdownRequested) {
             val reason = "prefetch 启动前已 shutdown，跳过"
             packages.forEach { failed[it] = reason }
@@ -368,7 +368,7 @@ class ParallelPrefetchManager(
         val jobs = packages.map { pkg ->
             scope.async {
                 sem.withPermit {
-                    // RC61c S3：permit 拿到后再查一次 shutdownRequested，shutdown 发生在
+                    // permit 拿到后再查一次 shutdownRequested，shutdown 发生在
                     // sem.withPermit 进入后也能立刻释放 Permit 不占 semaphore。
                     if (shutdownRequested) {
                         throw CancellationException("prefetch cancelled (shutdown in sem.withPermit)")
@@ -393,7 +393,7 @@ class ParallelPrefetchManager(
                     } catch (t: Throwable) {
                         failed[pkg] = (t.message ?: t.javaClass.simpleName)
                         markSlotFailed(slotIdx, pkg, (t.message ?: t.javaClass.simpleName))
-                        // RC61c S4：fail-open，单包失败不再每条打 FileLogger.w 刷屏（最多打 3 条聚合）；
+                        // fail-open，单包失败不再每条打 FileLogger.w 刷屏（最多打 3 条聚合）；
                         // Aggregator 的 flushPrefetchFailures 统一输出。
                         if (failed.size <= 3) {
                             FileLogger.w(TAG, "prefetch single fail pkg=$pkg (${failed.size}/3 聚合上限)", t)
@@ -401,7 +401,7 @@ class ParallelPrefetchManager(
                     }
                 }
             }.also { job ->
-                // RC61c S3：把 job 注册进 inflightJobs，shutdown() 能逐个 cancel
+                // 把 job 注册进 inflightJobs，shutdown() 能逐个 cancel
                 synchronized(inflightJobs) { inflightJobs += job }
                 // 跑完后从 inflightJobs 移除（正常结束的包不需要 cancel）
                 job.invokeOnCompletion {
@@ -459,7 +459,7 @@ class ParallelPrefetchManager(
     }
 
     /**
-     * 单个包下载（RC61f 大改：中间文件 + 失败即删 + 断点续传）：
+     * 单个包下载（大改：中间文件 + 失败即删 + 断点续传）：
      *  0. cache hit：/var/cache/apk/$pkg.apk 已存在且非空 → 直接 DONE。
      *  1. 否则先准备临时文件 /var/cache/apk/$pkg.apk.part：
      *     - 若 .part 已存在且非空（上次下载到一半）→ 作为续传起点，curl -C - / wget -c 断点续传。
@@ -510,7 +510,7 @@ class ParallelPrefetchManager(
             error("容器内没有 curl/wget，跳过预取（apk add 会自己 fetch）")
         }
 
-        // RC61f：.part 如果上次写到一半且有字节数，算「已有字节」，传给 curl/wget 做续传
+        // .part 如果上次写到一半且有字节数，算「已有字节」，传给 curl/wget 做续传
         val alreadyBytes: Long = runSync(
             "if [ -s $partPath ]; then stat -c%s $partPath 2>/dev/null || wc -c < $partPath; fi",
             3000,
@@ -547,7 +547,7 @@ class ParallelPrefetchManager(
             lastErr = "repo $repo 4xx/5xx or too small"
         }
 
-        // RC61f：分支善后（原子 mv / 失败 rm）
+        // 分支善后（原子 mv / 失败 rm）
         if (success) {
             // 成功：原子 mv → finalPath（apk --cache-dir 能识别）
             val (mvO, mvC) = runSync(
@@ -575,7 +575,7 @@ class ParallelPrefetchManager(
     }
 
     /**
-     * curl（RC61f：改写到 .part + -C - 续传 + -w 解析）
+     * curl（改写到 .part + -C - 续传 + -w 解析）
      *
      * - -f：http!=2xx 算失败；-sSL：静默跟随重定向；
      * - -C -：自动按 outPart 的当前大小续传；alreadyBytes=0 时 -C - 等价全新下载
@@ -625,7 +625,7 @@ class ParallelPrefetchManager(
     }
 
     /**
-     * busybox wget（RC61f：改写到 .part + -c 续传）
+     * busybox wget（改写到 .part + -c 续传）
      * - -O 固定写 part；-c 表示 continue 从已存在的 part 追加。
      */
     private suspend fun runWget(

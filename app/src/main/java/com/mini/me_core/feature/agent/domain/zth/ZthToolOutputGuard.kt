@@ -12,7 +12,7 @@ import javax.inject.Singleton
 /**
  * C.4.12 ToolOutput 幻觉审查两阶段：
  *   - 阶段 1（chunk 增量）：每 64KB 切片 * 最多 10 个 chunk，用启发扫 URL/IP/邮箱/路径/凭证正则（PII 类幻觉 = 输出里出现不该出现的敏感内容 C.4.8）
- *   - 阶段 2（聚合终检）：阶段 1 完成后，把所有通过 chunk 的聚合摘要 ≤ 4_000 chars 送 LLM 终检（由 ZthToolOutputLlmReviewer 接口，Phase 5 接真实实现）
+ *   - 阶段 2（聚合终检）：阶段 1 完成后，把所有通过 chunk 的聚合摘要 ≤ 4_000 chars 送 LLM 终检（由 ZthToolOutputLlmReviewer 接口， 接真实实现）
  *
  * 逻辑严谨：
  * 1) 任何时候阶段 1 命中 ≥ 1 条「高风险规则」→ 立即 FAIL_HEURISTIC_HALLUCINATION，不再走阶段 2（C.4.12 时间优化）
@@ -135,7 +135,7 @@ class ZthToolOutputGuard @Inject constructor() {
         var weighted = 0f
         var highHit = false
 
-        // Phase 1：启发扫（chunk 10+1）
+        // 启发扫（chunk 10+1）
         for (text in chunks) {
             for (r in rules) {
                 if (r.pattern.containsMatchIn(text)) {
@@ -157,7 +157,7 @@ class ZthToolOutputGuard @Inject constructor() {
                 confidence, hitRuleIds
             )
         }
-        // Phase 2：LLM 终检（C.4.7 低端机直接跳过）
+        // LLM 终检（C.4.7 低端机直接跳过）
         if (perf == ZthPerformanceClass.LOW_END_SKIP_LLM || tier.tier <= 1 || llmReviewer == null) {
             return ZthToolOutputAudit(
                 toolName, callId,

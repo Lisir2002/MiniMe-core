@@ -93,7 +93,7 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var themeSettings: ThemeSettingsRepository
 
-    /** Phase 4：主题预设管理器（6 套配色）。 */
+    /** 主题预设管理器（6 套配色）。 */
     @Inject
     lateinit var themeSettingsManager: com.mini.me_core.core.theme.ThemeSettingsManager
 
@@ -160,7 +160,7 @@ class MainActivity : ComponentActivity() {
 
     @Suppress("DEPRECATION") // 全局更新 application resources locale，createConfigurationContext 无法替代
     override fun onCreate(savedInstanceState: Bundle?) {
-        // RC61b：enableEdgeToEdge() 必须在 super.onCreate() 之后调用（ComponentActivity 基类要求）。
+        // enableEdgeToEdge() 必须在 super.onCreate() 之后调用（ComponentActivity 基类要求）。
         // 早于 super 调用时，基类内部的 mSavedStateRegistry / mConfigChangeTracker 尚未初始化，
         // 会在低版本 AndroidX Activity 上触发 NPE 或警告，导致冷启动偶发 1-2s 秒退。
         super.onCreate(savedInstanceState)
@@ -182,7 +182,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val themeMode by themeSettings.themeModeFlow.collectAsStateWithLifecycle(initialValue = AppThemeMode.AUTO)
-            // Phase 4：收集主题预设设置，用于计算自定义 SemanticColors
+            // 收集主题预设设置，用于计算自定义 SemanticColors
             val themeSettingsState by themeSettingsManager.settings.collectAsStateWithLifecycle()
             val uiScope = rememberCoroutineScope()
             // 侧边栏主题按钮：三态顺序切换（AUTO → DARK → LIGHT → AUTO），无需弹出选择弹窗。
@@ -207,10 +207,10 @@ class MainActivity : ComponentActivity() {
                 controller.isAppearanceLightNavigationBars = !darkTheme
             }
 
-            // Phase 4：根据预设计算自定义语义色
+            // 根据预设计算自定义语义色
             val customColors = themeSettingsManager.resolveColors(darkTheme)
 
-            // Phase 5：背景图和显示偏好参数
+            // 背景图和显示偏好参数
             val bgImageUri = themeSettingsState.backgroundImage
             val bgScrim = themeSettingsState.backgroundMask
             val cardAlpha = themeSettingsState.cardOpacity
@@ -612,7 +612,7 @@ fun AppNavigation(
                         scope.launch { drawerState.open() }
                     },
                     onNavigateToTerminalSettings = { navController.navigate("terminal_settings") },
-                    // RC62：用户点「管理 SSH 主机配置」不再是占位。
+                    // 用户点「管理 SSH 主机配置」不再是占位。
                     // 从 SettingsScreen（本路由内部）点 → 直接让 SettingsScreen 的 section 切换 RemoteServers。
                     // 实现方式：利用 SettingsScreen 内部已经消费的 SettingsViewModel.openSection() 机制，
                     //   它内部 section 是 remember mutableState，但 LaunchedEffect(pendingTick) 会在 next frame
@@ -742,7 +742,7 @@ fun AppNavigation(
                 TerminalContainerScreen(
                     viewModel = terminalSettingsVM,
                     onNavigateBack = { navController.popBackStack() },
-                    // RC62：TerminalSettings 里点「管理 SSH 主机配置」→ 跨路由栈切到 Settings 的 RemoteServers 分区。
+                    // TerminalSettings 里点「管理 SSH 主机配置」→ 跨路由栈切到 Settings 的 RemoteServers 分区。
                     // 顺序必须是「先发 openSection（写入 SettingsViewModel 单例，CONFLATED Channel 只保留最新）
                     // 再 pop 回 settings 路由」，因为 SettingsScreen 在 composable 首帧就会 consume pendingTick：
                     //   tick(1) > consumed(-1) → 读 lastRequestedSection=RemoteServers → section=RemoteServers。

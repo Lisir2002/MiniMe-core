@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * 主题设置页 ViewModel（Phase 4 + Phase 5）。
+ * 主题设置页 ViewModel。
  *
  * 桥接 UI 层和 [ThemeSettingsManager]，提供 StateFlow 供 Composable 订阅。
  * 不修改任何现有 ViewModel，仅作为新增文件。
@@ -26,7 +26,7 @@ class ThemeSettingsViewModel @Inject constructor(
     /** 当前主题设置（模式 + 预设 ID + 自定义颜色 + 背景图 + 显示偏好）。 */
     val settings: StateFlow<ThemeSettings> = themeManager.settings
 
-    // ── Phase 4 已有方法 ──
+    // ──  已有方法 ──
 
     /** 切换外观模式。 */
     fun setMode(mode: ThemeMode) {
@@ -38,12 +38,12 @@ class ThemeSettingsViewModel @Inject constructor(
         viewModelScope.launch { themeManager.setPreset(presetId) }
     }
 
-    /** 恢复默认（Phase 5：清除所有自定义）。 */
+    /** 恢复默认（清除所有自定义）。 */
     fun resetToDefaults() {
         viewModelScope.launch { themeManager.resetToDefaults() }
     }
 
-    // ── Phase 5 新增方法 ──
+    // ── 新增方法 ──
 
     /**
      * 更新或清除单个自定义颜色。

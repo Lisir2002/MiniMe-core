@@ -3,7 +3,7 @@ package com.mini.me_core.feature.settings.presentation
 import com.mini.me_core.core.util.LogLevel
 
 /**
- * P2-17 行为保持搬迁：以下状态类型原定义于 SettingsViewModel.kt 顶部，
+ *  行为保持搬迁：以下状态类型原定义于 SettingsViewModel.kt 顶部，
  * 包名保持 com.mini.me_core.feature.settings.presentation 不变，
  * 故 component 子包既有 import 全部无需改动。
  */

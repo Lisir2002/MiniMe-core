@@ -13,7 +13,7 @@ import com.mini.me_core.feature.agent.domain.execution.tool.classifyError
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * 事件落库/索引/时间线记录（P1-09 从 StatefulAgentWorkflow 整体搬迁的叶子协作者）。
+ * 事件落库/索引/时间线记录（ 从 StatefulAgentWorkflow 整体搬迁的叶子协作者）。
  *
  * 职责：L6 增量索引（动作摘要/轮次快照）、L2 会话共享产物记录（callId 索引，供后续工具直引）、
  * L7 工具成功后的事件总线发布（驱动缓存失效/增量刷新联动）。均为只读副作用叶子，

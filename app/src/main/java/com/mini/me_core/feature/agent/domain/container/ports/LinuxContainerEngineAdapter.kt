@@ -13,7 +13,7 @@ import javax.inject.Inject
  * [ContainerEnginePort] 的薄适配器：纯委托到 @Singleton 的 [LinuxContainerEngine]，
  * 方法体一行转发，不改任何线程 / 调度 / Flow 初值 / 时序。
  *
- * 仅服务于 terminal / workspace 域的解耦（P3-12）；agent 域内部仍直接使用具体类。
+ * 仅服务于 terminal / workspace 域的解耦；agent 域内部仍直接使用具体类。
  */
 class LinuxContainerEngineAdapter @Inject constructor(
     private val delegate: LinuxContainerEngine,

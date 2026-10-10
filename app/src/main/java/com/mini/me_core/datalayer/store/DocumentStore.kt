@@ -74,7 +74,7 @@ class DocumentStore(private val db: InfraDb, private val driver: SqlDriver) {
 
     /**
      * FTS5 全文检索：跨 collection 匹配标题/正文（collection/key 作为 title）。
-     * P1 修复：原查询无 LIMIT，FTS 匹配大量文档时一次性加载全部到内存导致 OOM。
+     * 原查询无 LIMIT，FTS 匹配大量文档时一次性加载全部到内存导致 OOM。
      * 加 LIMIT 100 限制单次返回条数。
      *
      * M8 安全加固：用户输入直接喂给 `doc_fts MATCH` 会触发 FTS5 语法错误

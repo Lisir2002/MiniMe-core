@@ -20,7 +20,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * P3-19：代理连接审计日志采集器。
+ * 代理连接审计日志采集器。
  *
  * 默认关闭。开启后每 10s 调 mihomo `/connections` 取活跃连接快照：
  * 上次在、这次不在的连接视为「已结束」，批量落库（host/ip/port/protocol/上下行/时长）。

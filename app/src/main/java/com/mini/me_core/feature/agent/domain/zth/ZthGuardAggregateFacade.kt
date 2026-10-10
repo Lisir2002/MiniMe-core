@@ -144,7 +144,7 @@ class ZthGuardAggregateFacade @Inject constructor(
         }
         // 1) PlanApproval 挂起（tier 决定模型审查；用户必须点按钮）
         val llmPlanRisk: ZthPlanApprovalResult? = if (tier.tier >= 2 && onlineValidated) {
-            // 真实 LLM Plan 审查未接入（Phase 5+ 接口占位）→ 默认 APPROVE_NEED_CARD 以保底严格
+            // 真实 LLM Plan 审查未接入（+ 接口占位）→ 默认 APPROVE_NEED_CARD 以保底严格
             ZthPlanApprovalResult(ZthPlanApprovalVerdict.APPROVE_NEED_CARD,
                 reason = "PlanApproval LLM Reviewer：Phase 5 占位实现（按默认严格路径 APPROVE_NEED_CARD）",
                 offlineModelSkipped = false)
@@ -189,7 +189,7 @@ class ZthGuardAggregateFacade @Inject constructor(
     // ────────────────────────────────────────────────────────────────────────
 
     /**
-     * preTool：调用 RunCommandTool / 任何 Write 工具前批量审查（Phase 5 调）。
+     * preTool：调用 RunCommandTool / 任何 Write 工具前批量审查（ 调）。
      *   (1) CircuitBreaker 放行
      *   (2) ZthCapabilityGuard.auditBatch(items) → 启发式 21 规则 + 8s 超时
      *   (3) 若 anyNeedUserConfirm → 挂 ConfirmationCard
@@ -272,7 +272,7 @@ class ZthGuardAggregateFacade @Inject constructor(
         mode: AgentMode, executionMode: ExecutionMode, onlineValidated: Boolean
     ): ZthPostToolAuditBundle {
         val (tier, ctx) = prepareEnv(sessionId, mode, executionMode, onlineValidated)
-        // 1) ToolOutputGuard 启发式（Phase 5 简化版：3 条正则）
+        // 1) ToolOutputGuard 启发式（ 简化版：3 条正则）
         val audit = runToolOutputHeuristic(toolName, callId, outputText, tier, perf = ZthPerformanceClass.HIGH_END)
         val hallucinationFlag = audit.hallucinationConfidence >= tierHallucinationThreshold(tier)
         var cls: FailureClassification? = null
@@ -301,7 +301,7 @@ class ZthGuardAggregateFacade @Inject constructor(
         }
         // 5) Checkpoint 补快照（若有 modifiedFilesHint + checkpoint 存在）
         modifiedFilesHint.takeIf { it.isNotEmpty() }?.let { files ->
-            val ckptId = "CKPT:$sessionId" // 简化：假设 sessionId=chainId（后续 Phase 5 真接入时由 structuredPlan 传入）
+            val ckptId = "CKPT:$sessionId" // 简化：假设 sessionId=chainId（后续真接入时由 structuredPlan 传入）
             files.forEachIndexed { idx, fp ->
                 checkpointRepo.attachFileSnapshot(
                     snapshotId = "SNAP:$ckptId:$idx:${fp.hashCode()}",
@@ -364,7 +364,7 @@ class ZthGuardAggregateFacade @Inject constructor(
     /**
      * 3 步第 2 步：Preflight（写代码前强制扫描真实代码，避免 AI 幻觉假设）。
      * 简化实现：校验 (1) 目标文件是否存在 (2) package 路径和目录一致。
-     * 详细扫描由 Phase 5 真实接入时再补充 AST 层。
+     * 详细扫描由  真实接入时再补充 AST 层。
      */
     suspend fun preflightVerify(
         expectedFilePaths: List<String>,
@@ -406,7 +406,7 @@ class ZthGuardAggregateFacade @Inject constructor(
      * 内部挂 ConfirmationCard：VM.triggerCard → 等待 commitUserDecision 完成。
      * 目前简化：triggerCard 后 sleep 短时间 + 检查 uiState.pendingCard==null
      * 真实交互由用户在 UI 上滑动后 ZthConfirmationCardViewModel.doCommit 清空 pendingCard。
-     * （Phase 5 真接入时用 CompletableDeferred<String> 包装 choice）
+     * （ 真接入时用 CompletableDeferred<String> 包装 choice）
      */
     private suspend fun triggerCardSuspend(
         vm: com.mini.me_core.feature.agent.presentation.ZthConfirmationCardViewModel,
@@ -422,7 +422,7 @@ class ZthGuardAggregateFacade @Inject constructor(
             explanation = explanation
         )
         vm.triggerCard(payload)
-        // Phase 5 真接入：此处用 SharedFlow/CompletableDeferred 等用户决策。
+        //  真接入：此处用 SharedFlow/CompletableDeferred 等用户决策。
         // 目前简化返回（UI 会显示卡，真实 commit 由用户滑动后 VM 完成 LINK-INV 4 写）。
         FileLogger.i(TAG, "挂 ConfirmationCard：template=$cardTemplateId subClass=$subClass confidence=$confidence")
     }
@@ -434,7 +434,7 @@ class ZthGuardAggregateFacade @Inject constructor(
         ZthPresetTier.STRICT -> 0.5f
     }
 
-    /** ToolOutputGuard 简化启发扫（3 条正则）；真实实现 Phase 5 独立成类。 */
+    /** ToolOutputGuard 简化启发扫（3 条正则）；真实实现  独立成类。 */
     private fun runToolOutputHeuristic(
         toolName: String, callId: String, text: String,
         tier: ZthPresetTier, perf: ZthPerformanceClass
@@ -480,7 +480,7 @@ sealed interface PostflightResult {
 
 /**
  * 简化单例：PkgMgr 检测。真实实现由 ZthPkgMgrDetector（C.4.14）在 Application.onCreate 写。
- * Phase 5 占位：默认 UNKNOWN（FailureClassifier 的默认兜底不阻塞）。
+ *  占位：默认 UNKNOWN（FailureClassifier 的默认兜底不阻塞）。
  */
 object ZthPkgMgrDetectedHolder {
     @Volatile var current: PkgMgrDetected = PkgMgrDetected.UNKNOWN

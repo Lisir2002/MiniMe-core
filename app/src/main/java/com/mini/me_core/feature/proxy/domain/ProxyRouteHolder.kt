@@ -40,7 +40,7 @@ class ProxyRouteHolder @Inject constructor() {
     }
 
     /**
-     * 网络层优化 C5：AI 接口直连/代理分流开关（可配置策略，默认关 = 保持全走代理）。
+     * AI 接口直连/代理分流开关（可配置策略，默认关 = 保持全走代理）。
      * 由 [ClashProxyManager] 收集 DataStore 设置写入；开启后已知 AI host 跳过代理直连，
      * 去掉代理一跳延迟；若所在网络直连不通（依赖代理才能访问模型接口），关闭即可回退代理。
      */
@@ -52,12 +52,12 @@ class ProxyRouteHolder @Inject constructor() {
         this.aiHostsDirect = value
     }
 
-    // ── 阶段4：代理健康自动降级（ProxyHealthMonitor 反向写入） ──
+    // ── 代理健康自动降级（ProxyHealthMonitor 反向写入） ──
 
     /**
      * 代理出口是否健康（由 [ProxyHealthMonitor] 主动探测后写入）。
      * true = 代理链路通，正常走代理；false = 代理不通，自动降级直连。
-     * 与 P0-4 熔断不同：熔断是被动的（OkHttp 连接失败触发），这个是主动探测（30s 轮询）。
+     * 与  熔断不同：熔断是被动的（OkHttp 连接失败触发），这个是主动探测（30s 轮询）。
      */
     @Volatile
     var healthDegraded: Boolean = false
@@ -75,7 +75,7 @@ class ProxyRouteHolder @Inject constructor() {
         }
     }
 
-    // ───────────────── P0-4：代理连接熔断（circuit breaker） ─────────────────
+    // ───────────────── 代理连接熔断（circuit breaker） ─────────────────
 
     /** 连续连接到本机代理地址失败的次数；达到 [FAIL_TRIP_THRESHOLD] 次触发临时直连。 */
     @Volatile
@@ -101,9 +101,9 @@ class ProxyRouteHolder @Inject constructor() {
         override fun select(uri: URI): List<Proxy> {
             if (!this@ProxyRouteHolder.enabled) return listOf(Proxy.NO_PROXY)
             val now = System.currentTimeMillis()
-            // 阶段4：健康检测降级 —— 代理出口探测不通时，自动直连，避免所有请求打进死路。
+            // 健康检测降级 —— 代理出口探测不通时，自动直连，避免所有请求打进死路。
             if (healthDegraded) return listOf(Proxy.NO_PROXY)
-            // P0-4：熔断窗口内一律直连，避免代理挂掉后所有请求继续打进无人监听的端口。
+            // 熔断窗口内一律直连，避免代理挂掉后所有请求继续打进无人监听的端口。
             if (now < bypassUntilMs) return listOf(Proxy.NO_PROXY)
             // 超过失败窗口的旧计数清零：只统计「近期连续」失败。
             if (lastProxyFailMs != 0L && now - lastProxyFailMs > FAIL_WINDOW_MS) {
@@ -124,7 +124,7 @@ class ProxyRouteHolder @Inject constructor() {
         }
 
         override fun connectFailed(uri: URI?, sa: SocketAddress?, ioe: IOException?) {
-            // P0-4：仅统计「连接到本机代理地址」失败；直连目标本身失败不算代理的锅。
+            // 仅统计「连接到本机代理地址」失败；直连目标本身失败不算代理的锅。
             if (!this@ProxyRouteHolder.enabled) return
             val now = System.currentTimeMillis()
             if (now < bypassUntilMs) return // 已在熔断窗口，忽略
@@ -200,13 +200,13 @@ class ProxyRouteHolder @Inject constructor() {
     companion object {
         private const val TAG = "ProxyRouteHolder"
 
-        /** P0-4：连续失败多少次触发熔断。 */
+        /** 连续失败多少次触发熔断。 */
         private const val FAIL_TRIP_THRESHOLD = 3
 
-        /** P0-4：熔断后临时直连的时长。 */
+        /** 熔断后临时直连的时长。 */
         private const val BYPASS_DURATION_MS = 30_000L
 
-        /** P0-4：失败计数的时间窗口：超过此间隔的旧失败不计入连续失败。 */
+        /** 失败计数的时间窗口：超过此间隔的旧失败不计入连续失败。 */
         private const val FAIL_WINDOW_MS = 30_000L
 
         /**

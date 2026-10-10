@@ -50,7 +50,7 @@ class RuleRegistry @Inject constructor(
         listModuleDirs = { projectRoot -> listModuleDirs(projectRoot) }
     )
 
-    /** P3：内存禁用覆盖集合（rule name）。 */
+    /** 内存禁用覆盖集合（rule name）。 */
     private val disabledRuleNames = mutableSetOf<String>()
 
     fun disableRule(name: String) { disabledRuleNames.add(name) }

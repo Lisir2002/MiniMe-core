@@ -11,7 +11,7 @@ import com.mini.me_core.feature.agent.domain.execution.permission.FailureSubClas
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 
 /**
- * Phase 2 纯域模型层：7 子系统之间的入参/出参统一在这里。
+ * 纯域模型层：7 子系统之间的入参/出参统一在这里。
  * 禁止 7 子系统互相持有对方具体实现（只能通过接口 + 本层数据类通信），方便 JUnit 隔离单测。
  */
 
@@ -59,7 +59,7 @@ data class ZthCapabilityAuditResult(
     val timedOut: Boolean = false
 )
 
-/** CapabilityGuard 的 LLM 终检请求（Phase 2.2 里定义为 interface，Phase 5 接入真实 StatefulAgentWorkflow 调用）。 */
+/** CapabilityGuard 的 LLM 终检请求（定义为 interface，待接入真实 StatefulAgentWorkflow 调用）。 */
 fun interface ZthCapabilityLlmReviewer {
     suspend fun reviewBatch(items: List<ZthToolCallPlanItem>): Map<String, ZthCapabilityVerdict> // key=toolName
 }
@@ -133,7 +133,7 @@ data class ZthToolOutputAudit(
             || verdict == ZthToolOutputVerdict.FAIL_HEURISTIC_HALLUCINATION
 )
 
-/** ToolOutputGuard 的 LLM 终检接口（Phase 5 接真实实现）。 */
+/** ToolOutputGuard 的 LLM 终检接口（ 接真实实现）。 */
 fun interface ZthToolOutputLlmReviewer {
     suspend fun reviewAggregated(toolName: String, aggregatedText: String): ZthToolOutputVerdict
 }
@@ -199,7 +199,7 @@ enum class BundleMirror(val stableKey: String, val humanName: String) {
     USTC("ustc", "中科大镜像");
 }
 
-/** Phase 2.8 门面对外暴露的 4 方法返回聚合体（让 Phase 5 StatefulAgentWorkflow 无需拆判断）。 */
+/** 门面对外暴露的 4 方法返回聚合体（让  StatefulAgentWorkflow 无需拆判断）。 */
 data class ZthPreToolAuditBundle(
     val perItemResults: List<ZthCapabilityAuditResult>,
     val anyNeedUserConfirm: Boolean,
@@ -217,7 +217,7 @@ data class ZthThrowableClassifyBundle(
 
 data class ZthPostToolAuditBundle(
     val outputAudit: ZthToolOutputAudit,
-    /** 若 hallucinationConfidence ≥ 阈值，Phase 5 必须二次调用 FailureClassifier(E7)。 */
+    /** 若 hallucinationConfidence ≥ 阈值， 必须二次调用 FailureClassifier(E7)。 */
     val hallucinationFlag: Boolean,
     val classificationIfFailure: FailureClassification?
 )

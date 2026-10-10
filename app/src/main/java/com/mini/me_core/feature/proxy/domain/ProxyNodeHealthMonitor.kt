@@ -14,7 +14,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * P2-13：节点健康监控。
+ * 节点健康监控。
  *
  * 代理启用后每 10 分钟对当前 select 分组内所有节点测一次延迟：
  *  - 单次 >5000ms 或失败记一次超时，**连续 2 次**超时标记为不可用（内存态，不持久化）；

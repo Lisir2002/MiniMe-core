@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
 /**
  * C.4.18 Firestore 双向同步 Manager（接口 + Placeholder 实现）。
  *
- * ### Phase 4 设计约束（Preflight P12 纠正）
+ * ### 设计约束
  * 项目目前未引入：
  *  - Firebase/Firestore BOM SDK
  *  - Argon2id KDF 库
@@ -26,7 +26,7 @@ import kotlinx.coroutines.withContext
  *    - LWW 冲突合并算法作为**纯函数**单独暴露（无 SDK 依赖，可 JUnit 100% 覆盖）
  *    - Envelope（ct/hmac/updatedAtMs/deviceId）结构在此文件中定义为数据类
  *
- * ### 真实实现时（Phase 4 加完依赖后）只需要：
+ * ### 真实实现（加完依赖后）只需要：
  *  1. 在 build.gradle.kts 加 firebase-bom + argon2 + bip39 依赖
  *  2. 写 RealZthSharedSyncKeyStore（Argon2id + BIP-39 8 词）
  *  3. 写 RealZthFirestoreSyncManager（FirebaseFirestore.getInstance() + 6 个 collection）
@@ -66,7 +66,7 @@ class ZthFirestoreSyncManager @Inject constructor(
     sealed interface SyncResult {
         data class Success(val pushed: Int, val pulled: Int, val conflictsResolved: Int) : SyncResult
         data class PartialFailure(val reason: String, val pushed: Int, val pulled: Int) : SyncResult
-        /** 依赖未就绪（Firestore SDK / BIP-39 / Argon2id 未引入）→ UI 显示「Phase 4 激活」。 */
+        /** 依赖未就绪（Firestore SDK / BIP-39 / Argon2id 未引入）→ UI 显示「待激活」。 */
         object DependencyNotReady : SyncResult
         /** 用户还未 generateSharedKey / importFromMnemonic → 需先去设置页。 */
         object SharedKeyNotReady : SyncResult
@@ -79,13 +79,13 @@ class ZthFirestoreSyncManager @Inject constructor(
      */
     suspend fun syncNow(deviceId: String): SyncResult = withContext(Dispatchers.IO) {
         if (!keyStore.isReady()) return@withContext SyncResult.SharedKeyNotReady
-        // Phase 4：此处加真实 Firestore SDK 调用（目前占位）
+        // 此处加真实 Firestore SDK 调用（目前占位）
         FileLogger.i(TAG, "syncNow：Firestore SDK 未引入（Phase 4 后激活），deviceId=$deviceId")
         SyncResult.DependencyNotReady
     }
 
     // ────────────────────────────────────────────────────────────────────────
-    // LWW 冲突合并算法（纯函数，可 JUnit 单测；Phase 4 真实 Syncer 内部调用）
+    // LWW 冲突合并算法（纯函数，可 JUnit 单测； 真实 Syncer 内部调用）
     // ────────────────────────────────────────────────────────────────────────
 
     /**

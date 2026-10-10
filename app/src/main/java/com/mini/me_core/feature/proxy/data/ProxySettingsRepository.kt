@@ -73,7 +73,7 @@ class ProxySettingsRepository @Inject constructor(
         return credentialEncryptor.decrypt(profile.secretCipher)
     }
 
-    /** P1-7：拉取到新订阅内容后刷新该 profile 的密文与 updatedAt（保留 name/kind/createdAt/autoUpdate）。 */
+    /** 拉取到新订阅内容后刷新该 profile 的密文与 updatedAt（保留 name/kind/createdAt/autoUpdate）。 */
     suspend fun refreshSubscription(id: String, newPlainSecret: String) {
         val raw = kv.getString(PROXY_NS, PROFILES_JSON_KEY)
         val current = raw?.let { runCatching { json.decodeFromString(profileSerializer, it) }.getOrNull() } ?: emptyList()
@@ -84,7 +84,7 @@ class ProxySettingsRepository @Inject constructor(
         kv.putString(PROXY_NS, PROFILES_JSON_KEY, json.encodeToString(profileSerializer, merged))
     }
 
-    /** P1-7：更新某 profile 的自动更新开关与间隔。 */
+    /** 更新某 profile 的自动更新开关与间隔。 */
     suspend fun setAutoUpdate(id: String, enabled: Boolean, intervalHours: Int) {
         val raw = kv.getString(PROXY_NS, PROFILES_JSON_KEY)
         val current = raw?.let { runCatching { json.decodeFromString(profileSerializer, it) }.getOrNull() } ?: emptyList()

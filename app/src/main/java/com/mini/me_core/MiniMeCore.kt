@@ -141,7 +141,7 @@ class MiniMeCore : Application() {
     @Inject
     lateinit var modelMetadataService: ModelMetadataService
 
-    /** 网络层优化 C1：三家 AI host 连接预热（启动后台预建 DNS+TCP+TLS+HTTP2，降低首字延迟）。 */
+    /** 三家 AI host 连接预热（启动后台预建 DNS+TCP+TLS+HTTP2，降低首字延迟）。 */
     @Inject
     lateinit var connectionPrewarmer: com.mini.me_core.core.network.ConnectionPrewarmer
 
@@ -188,7 +188,7 @@ class MiniMeCore : Application() {
     lateinit var batteryOptimizer: com.mini.me_core.core.performance.BatteryOptimizer
 
     /** 长驻作用域：持续把持久化的日志等级同步到 FileLogger。
-     * RC61b：附加 [CoroutineExceptionHandler]，任何子协程未捕获的异常都兜底记日志，
+     * 附加 [CoroutineExceptionHandler]，任何子协程未捕获的异常都兜底记日志，
      * 避免 scope 内一个子协程崩把 scope.job 整个 cancel。 */
     private val appScope: CoroutineScope = run {
         val eh = CoroutineExceptionHandler { _, throwable ->
@@ -235,7 +235,7 @@ class MiniMeCore : Application() {
         FileLogger.d(TAG, "核心服务：凭据桥接 + MCP 已启动")
 
         // 启动画面门闩：数据层 + 核心服务就绪，放行 Splash Screen 退出。
-        // 异步预热（阶段3）不阻塞首帧。
+        // 异步预热不阻塞首帧。
         com.mini.me_core.core.performance.StartupTracer.mark("core_services_ready", "核心服务/主题就绪")
         com.mini.me_core.core.splash.AppInitState.markReady()
 
@@ -303,7 +303,7 @@ class MiniMeCore : Application() {
         appScope.launch {
             logSettings.levelFlow.collectLatest { com.mini.me_core.core.util.LogLevelController.apply(it) }
         }
-        // ============== RC61b 修正：首帧优先，延后重活 + 严格异常/超时隔离 ==============
+        // ============== 首帧优先，延后重活 + 严格异常/超时隔离 ==============
         // 冷启动时把「加载执行模式 → 建立 SSH 连接」延后 500ms，
         // 确保 MainActivity 先把首帧画出来。
         // 设计要点：
@@ -459,7 +459,7 @@ class MiniMeCore : Application() {
 
     /** 捕获未处理异常并落盘，随后交回系统默认处理器（保留原有崩溃弹窗/上报行为）。
      *
-     *  RC61b hotfix3 关键修正：此前 FileLogger 把 CRASH 行通过 ioExecutor 异步落盘，
+     *  此前 FileLogger 把 CRASH 行通过 ioExecutor 异步落盘，
      *  但「调用 previous?.uncaughtException → 系统立即杀进程」之后排队任务根本没机会执行，
      *  结果就是**用户看到 1-2 秒闪退、日志里找不到任何 CRASH 记录**。此处改为两步：
      *    ① 先 e() 到 logcat（立即生效、不丢）；
@@ -533,7 +533,7 @@ class MiniMeCore : Application() {
             setShowBadge(false)
         }
         notificationManager.createNotificationChannel(channel)
-        // P2-14：代理前台保活通道。
+        // 代理前台保活通道。
         val proxyChannel = NotificationChannel(
             "proxy_service",
             "Proxy Service",

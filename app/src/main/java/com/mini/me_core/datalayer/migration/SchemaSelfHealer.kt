@@ -17,7 +17,7 @@ import com.mini.me_core.core.util.FileLogger
  * （改名旧表 → 建新表 → 按列交集迁移数据 → 重建索引 → 删旧表）。全程不改 schema 版本、
  * 不丢数据、幂等（已修复则直接跳过）。新建库因 schema 本身就含全列，也会直接跳过。
  *
- * v2-full-takeover P3 诊断加固：healAgentSession / healAgentMessage / healTable 全节点
+ * healAgentSession / healAgentMessage / healTable 全节点
  * 加 FileLogger，让崩溃快照里能看到「existing 列是什么、missing 列是什么、RENAME 是否成功」，
  * 彻底消除「自愈没生效到底是没执行还是执行了但跑失败」的盲区。
  */
@@ -76,7 +76,7 @@ object SchemaSelfHealer {
         "CREATE INDEX agent_session_updated_idx ON agent_session (updated_at);"
 
     // ── agent_session 目标结构（与 sqldelight/agent/agent.sq 保持一致）──────────
-    // agent_session 与 agent_message 同属 P2-3「对齐全表」的演进表，结构漂移风险同类，一并自愈。
+    // agent_session 与 agent_message 同属 「对齐全表」的演进表，结构漂移风险同类，一并自愈。
 
     private val AGENT_SESSION_COLUMNS = listOf(
         "id", "title", "mode", "model", "status", "created_at", "updated_at",
@@ -214,7 +214,7 @@ object SchemaSelfHealer {
      *  ② 临时关闭 `foreign_keys`（重建期间强制 FK 没有意义，且 `legacy_alter_table` 不可用时用它兜底）；
      *  ③ 结束后恢复。两个 PRAGMA 都包 `runCatching`——设备 SQLite 版本不支持时降级，不阻断自愈。
      *
-     * v2-full-takeover P3 诊断加固：全节点输出 FileLogger，让崩溃快照里能看到 existing / missing /
+     * 全节点输出 FileLogger，让崩溃快照里能看到 existing / missing /
      *  RENAME / CREATE / INSERT / DROP 的每一步状态。
      */
     fun healTable(

@@ -1,4 +1,4 @@
-@file:Suppress("FunctionNaming", "LongMethod", "LongParameterList") // Compose 命名/长组件约定；P3-12 仅容器类型移包改引用，UI 行为保持
+@file:Suppress("FunctionNaming", "LongMethod", "LongParameterList") // Compose 命名/长组件约定；仅容器类型移包改引用，UI 行为保持
 
 package com.mini.me_core.feature.terminal.presentation.component
 

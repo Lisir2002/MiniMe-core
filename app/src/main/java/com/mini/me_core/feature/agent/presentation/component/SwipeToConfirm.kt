@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
  * 实现：pointerInput + detectDragGestures + Canvas 画圆角进度条 + 圆形滑块。
  * 不依赖 Swipeable/AnchoredDraggable（防止 Gradle 需加 foundation 影响 CI）。
  *
- * @param enabled true=可滑动；false=整体置灰（tier 1 允许 false，但 Phase 5 默认 true）
+ * @param enabled true=可滑动；false=整体置灰（tier 1 允许 false，但  默认 true）
  * @param onProgressChange 0~1 实时进度（给 ConfirmationCardStateMachine 发 SWIPE_PROGRESS / SWIPE_THRESHOLD_HIT）
  * @param onConfirmed 进度 ≥ 0.92 且松手时回调一次（STATE-INV-1 必须在这个回调后才能 USER_CLICK_CONFIRM 生效）
  */

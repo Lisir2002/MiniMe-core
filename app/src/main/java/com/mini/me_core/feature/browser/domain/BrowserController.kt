@@ -130,14 +130,14 @@ class BrowserController @Inject constructor(
     private var originalUserAgent: String? = null
 
     /**
-     * P0-6：记录当前已下发给 WebView 进程的代理状态，避免重复 set/clear 造成竞态。
+     * 记录当前已下发给 WebView 进程的代理状态，避免重复 set/clear 造成竞态。
      * null = 尚未下发 / WebView 不支持 PROXY_OVERRIDE。
      */
     @Volatile
     private var webViewProxyApplied: Boolean? = null
 
     // 代理开关变化时，让已存在的 WebView 也跟上 mihomo 代理（新标签/导航天然生效）。
-    // P0-6：只对 enabled 边沿触发（distinctUntilChanged），避免 controllerReachable / recovering /
+    // 只对 enabled 边沿触发（distinctUntilChanged），避免 controllerReachable / recovering /
     // activeProfileId 等字段的每次刷新都重复下发 setProxyOverride/clearProxyOverride——
     // 这些异步操作若被连续多次调用，后发的 clear 可能晚于先发的 set 完成，导致代理状态错乱。
     init {
@@ -164,7 +164,7 @@ class BrowserController @Inject constructor(
      * 代理开启时指向 mihomo mixed-port 并放行 loopback/内网（容器开发服务直连），
      * 关闭时清除覆盖回退系统默认网络。内部统一 post 到主线程执行。
      *
-     * P0-6：[webViewProxyApplied] 去重——期望状态与已下发状态一致时直接跳过，杜绝重复下发
+     * [webViewProxyApplied] 去重——期望状态与已下发状态一致时直接跳过，杜绝重复下发
      * 与异步回调交错导致的竞态。
      */
     private fun applyWebViewProxy(webView: WebView?) {
@@ -192,7 +192,7 @@ class BrowserController @Inject constructor(
                     ProxyController.getInstance().clearProxyOverride(syncExecutor, Runnable {})
                 }
             }.onSuccess {
-                // P0-6：记录已下发状态，后续相同状态直接跳过（去重防竞态）。
+                // 记录已下发状态，后续相同状态直接跳过（去重防竞态）。
                 webViewProxyApplied = desired
             }.onFailure {
                 FileLogger.w(TAG, "设置 WebView 代理失败: ${it.message}")

@@ -46,7 +46,7 @@ import java.io.InputStream
  * 元数据小表 upsert 主键替换、口令错误与损坏文件的异常分类文案均保持原样。
  * 所有依赖由 [BackupManagerImpl] 装配时传入；解密到临时文件/打开 tar 流复用 [BackupSnapshotStore]。
  */
-@Suppress("LongParameterList", "TooManyFunctions") // P3-17：构造签名逐参保持；恢复各域内聚为私有方法，行为保持提取
+@Suppress("LongParameterList", "TooManyFunctions") // 构造签名逐参保持；恢复各域内聚为私有方法，行为保持提取
 internal class BackupRestorer(
     private val store: BackupSnapshotStore,
     private val v2Agent: V2AgentRepository,

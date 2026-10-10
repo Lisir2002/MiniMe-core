@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * 权限/审批中继枢纽（P1-08 从 AIAgentViewModel 提取，行为保持搬迁）。
+ * 权限/审批中继枢纽（ 从 AIAgentViewModel 提取，行为保持搬迁）。
  *
  * 仅做「请求流编排 + 审批回调转发」：
  * - 把引擎层 [ToolPermissionManager] / [AskUserQuestionManager] / [PlanApprovalManager]

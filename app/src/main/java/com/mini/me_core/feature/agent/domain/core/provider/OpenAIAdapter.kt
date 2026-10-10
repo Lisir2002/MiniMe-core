@@ -35,7 +35,7 @@ import com.mini.me_core.feature.agent.data.remote.openai.OpenAIToolDefinition
 import com.mini.me_core.feature.agent.data.remote.openai.OpenAIFunctionDefinition
 import com.mini.me_core.feature.agent.data.remote.openai.StreamOptions
 
-/** P1 定点字段抽取：OpenAI Chat Completions 流式所需标量字段（点连接 = 嵌套路径，数组下标为路径段）。 */
+/** 定点字段抽取：OpenAI Chat Completions 流式所需标量字段（点连接 = 嵌套路径，数组下标为路径段）。 */
 private const val OPENAI_TOOL_CALL_SUBSCRIPT_COUNT = 2
 private val OPENAI_CHAT_STREAM_PATHS: List<List<String>> = buildList {
     add(listOf("error", "code"))
@@ -54,7 +54,7 @@ private val OPENAI_CHAT_STREAM_PATHS: List<List<String>> = buildList {
     }
 }
 
-/** P1 定点字段抽取：OpenAI Responses API 流式热路径（output_text.delta）所需标量字段。 */
+/** 定点字段抽取：OpenAI Responses API 流式热路径（output_text.delta）所需标量字段。 */
 private val OPENAI_RESPONSES_STREAM_PATHS: List<List<String>> = listOf(
     listOf("error", "code"),
     listOf("error", "message"),
@@ -299,7 +299,7 @@ class OpenAIAdapter @Inject constructor(
                                 if (data.isEmpty()) continue
                                 rawSse.append(line).append('\n')
                                 if (data == "[DONE]") break
-                                // P1 定点字段抽取：热路径（response.output_text.delta）只取 type/delta 两个标量，不建整树。
+                                // 定点字段抽取：热路径（response.output_text.delta）只取 type/delta 两个标量，不建整树。
                                 val m = runCatching { SseFieldExtractor.extract(data, OPENAI_RESPONSES_STREAM_PATHS) }.getOrElse { emptyMap() }
                                 // 错误：error 对象至少带 message，命中任一字段即抛出。
                                 m["error.message"]?.let { msg ->
@@ -437,7 +437,7 @@ class OpenAIAdapter @Inject constructor(
                         if (data.isEmpty()) continue
                         rawSse.append(line).append('\n')
                         if (data == "[DONE]") break
-                        // P1 定点字段抽取：JsonReader 流式逐 token 只取目标标量，不建整棵 JSON 树。
+                        // 定点字段抽取：JsonReader 流式逐 token 只取目标标量，不建整棵 JSON 树。
                         val m = runCatching { SseFieldExtractor.extract(data, OPENAI_CHAT_STREAM_PATHS) }.getOrElse { emptyMap() }
                         // 错误：OpenAI 的 error 对象至少带 message，命中任一字段即抛出。
                         m["error.message"]?.let { msg ->

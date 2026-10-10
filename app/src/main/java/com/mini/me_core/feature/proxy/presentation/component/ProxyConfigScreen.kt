@@ -411,7 +411,7 @@ private fun MasterToggle(
     }
 }
 
-/** 网络层优化 C5：模型接口直连/代理分流开关。需代理启用态才可切换（直连仅在代理链路下有意义）。 */
+/** 模型接口直连/代理分流开关。需代理启用态才可切换（直连仅在代理链路下有意义）。 */
 @Composable
 private fun AiHostsDirectToggle(
     checked: Boolean,
@@ -513,8 +513,8 @@ private fun NodesEntryCard(
     }
 }
 
-/** P1-9：连接诊断交通灯卡片。 */
-/** P3-19：连接审计日志卡片（开关 + 最近记录列表）。 */
+/** 连接诊断交通灯卡片。 */
+/** 连接审计日志卡片（开关 + 最近记录列表）。 */
 @Composable
 private fun ConnLogCard(
     enabled: Boolean,
@@ -594,7 +594,7 @@ private fun DiagnosticCard(
                     com.mini.me_core.feature.proxy.domain.TrafficLight.RED -> "连接不通"
                     null -> "未诊断"
                 }
-                // P2-16：状态行合一：状态 · 延迟 · 今日用量。
+                // 状态行合一：状态 · 延迟 · 今日用量。
                 val lat = diagnostic?.outboundLatencyMs
                 val summary = buildString {
                     append(title)
@@ -616,7 +616,7 @@ private fun DiagnosticCard(
     }
 }
 
-/** P1-8：流量用量卡片（今日 / 本周）。 */
+/** 流量用量卡片（今日 / 本周）。 */
 @Composable
 private fun TrafficUsageCard(
     today: com.mini.me_core.datalayer.store.TrafficUsage,
@@ -652,7 +652,7 @@ private fun ImportEditor(
     var nameField by remember { mutableStateOf("") }
     var urlField by remember { mutableStateOf("") }
     var yamlField by remember { mutableStateOf("") }
-    // P2-12：直接代理表单字段。
+    // ：直接代理表单字段。
     var dpProtocol by remember { mutableStateOf("socks5") }
     var dpHost by remember { mutableStateOf("") }
     var dpPort by remember { mutableStateOf("") }
@@ -797,7 +797,7 @@ private fun ImportEditor(
 
             preview?.takeIf { it.ok }?.let { p ->
                 Spacer(Modifier.height(Spacing.md))
-                // P2-12：按当前导入模式决定 kind/secret；direct 存合成后的最小 YAML。
+                // ：按当前导入模式决定 kind/secret；direct 存合成后的最小 YAML。
                 val kind = when (mode) {
                     ImportMode.SUBSCRIPTION -> ProxySubscription.KIND_SUBSCRIPTION
                     ImportMode.DIRECT -> ProxySubscription.KIND_DIRECT
@@ -1103,7 +1103,7 @@ private fun ProfileRow(
     }
 }
 
-/** P1-7：把时间戳格式化为「x分钟前/x小时前/x天前」。 */
+/** 把时间戳格式化为「x分钟前/x小时前/x天前」。 */
 private fun relativeAgo(ts: Long): String {    val diff = System.currentTimeMillis() - ts
     if (diff < 60_000L) return "刚刚"
     val minutes = diff / 60_000L
@@ -1114,7 +1114,7 @@ private fun relativeAgo(ts: Long): String {    val diff = System.currentTimeMill
     return "${days}天前"
 }
 
-/** P1-8：字节格式化为人类可读。 */
+/** 字节格式化为人类可读。 */
 private fun formatBytes(bytes: Long): String {
     val b = bytes.toDouble()
     return when {
@@ -1125,7 +1125,7 @@ private fun formatBytes(bytes: Long): String {
     }
 }
 
-/** P2-12：由 socks5/http 单跳参数合成最小 Clash YAML。 */
+/** 由 socks5/http 单跳参数合成最小 Clash YAML。 */
 private fun buildDirectYaml(protocol: String, host: String, port: String, user: String, pass: String): String {
     val sb = StringBuilder()
     sb.appendLine("proxies:")

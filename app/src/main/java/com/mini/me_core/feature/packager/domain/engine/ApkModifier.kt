@@ -173,7 +173,7 @@ class ApkModifier {
         }
 
         /**
-         * 计算文件的 CRC32 校验值（用于 STORED 方式的 ZIP 条目）
+         * 计算文件的 C校验值（用于 STORED 方式的 ZIP 条目）
          */
         private fun computeCrc32(file: File): Long {
             val crc = java.util.zip.CRC32()

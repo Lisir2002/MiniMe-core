@@ -35,7 +35,7 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
-/** P1 定点字段抽取路径：Anthropic 流式各事件所需的标量字段（点连接 = 嵌套路径，数组下标为路径段）。 */
+/** 定点字段抽取路径：Anthropic 流式各事件所需的标量字段（点连接 = 嵌套路径，数组下标为路径段）。 */
 private val ANTHROPIC_STREAM_PATHS: List<List<String>> = listOf(
     listOf("type"),
     listOf("error", "type"),
@@ -245,7 +245,7 @@ class AnthropicAdapter @Inject constructor(
                         val data = line.removePrefix("data:").trim()
                         if (data.isEmpty()) continue
                         rawSse.append(line).append('\n')
-                        // P1 定点字段抽取：JsonReader 流式逐 token 只取目标标量，不建整棵 JSON 树，
+                        // 定点字段抽取：JsonReader 流式逐 token 只取目标标量，不建整棵 JSON 树，
                         // 显著降低流式主路径的解析 CPU 与 GC（旧实现每行 parseString 建整树）。
                         val m = runCatching { SseFieldExtractor.extract(data, ANTHROPIC_STREAM_PATHS) }.getOrElse { emptyMap() }
                         // 单行 SSE 解析：不同上游/模型的字段类型偶有出入，宽松解析——

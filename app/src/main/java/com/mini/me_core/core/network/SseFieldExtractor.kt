@@ -5,7 +5,7 @@ import com.google.gson.stream.JsonToken
 import java.io.StringReader
 
 /**
- * SSE 行定点字段抽取（网络层优化设计 P1）。
+ * SSE 行定点字段抽取（网络层优化设计）。
  *
  * 原实现 `JsonParser.parseString(data).asJsonObject` 会对每个 SSE 行构建一整棵 Gson JSON tree
  * （大量小对象/数组/字符串分配，是流式主路径的 CPU 与 GC 大头）。本工具改用 Gson 的流式

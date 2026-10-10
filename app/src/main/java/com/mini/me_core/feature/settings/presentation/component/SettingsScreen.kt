@@ -225,11 +225,11 @@ fun SettingsScreen(
     val stepInjectLayeredRulesEnabled by viewModel.stepInjectLayeredRulesEnabled.collectAsStateWithLifecycle()
     val stepInjectProjectAgentsEnabled by viewModel.stepInjectProjectAgentsEnabled.collectAsStateWithLifecycle()
     val fileObservationEnabled by viewModel.fileObservationEnabled.collectAsStateWithLifecycle()
-    // P1：推理强度 / 空转阈值 / 预设方案
+    // 推理强度 / 空转阈值 / 预设方案
     val reasoningBudgetLevel by viewModel.reasoningBudgetLevel.collectAsStateWithLifecycle()
     val idleConvergeRounds by viewModel.idleConvergeRounds.collectAsStateWithLifecycle()
     val activePreset by viewModel.activePreset.collectAsStateWithLifecycle()
-    // P2：新增护栏 + 用量卡片项
+    // 新增护栏 + 用量卡片项
     val dangerousCommandEnabled by viewModel.guardDangerousCommandEnabled.collectAsStateWithLifecycle()
     val largeFileEnabled by viewModel.guardLargeFileEnabled.collectAsStateWithLifecycle()
     val pathBoundaryEnabled by viewModel.guardPathBoundaryEnabled.collectAsStateWithLifecycle()
@@ -245,12 +245,12 @@ fun SettingsScreen(
     var showMcpDialog by remember { mutableStateOf(false) }
     var editingMcp by remember { mutableStateOf<McpServerConfig?>(null) }
     var showThemeSheet by remember { mutableStateOf(false) }
-    // P1：规范查看器导航（0=静态规则, 1=SOP, null=关闭）
+    // 规范查看器导航（0=静态规则, 1=SOP, null=关闭）
     var assetViewerTab by remember { mutableStateOf<Int?>(null) }
-    // P2：注入诊断面板 / 护栏日志导航
+    // 注入诊断面板 / 护栏日志导航
     var showDiagnosis by remember { mutableStateOf(false) }
     var showGuardLogs by remember { mutableStateOf(false) }
-    // P3：规则管理 / 导入导出
+    // 规则管理 / 导入导出
     var showRuleManager by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
@@ -275,7 +275,7 @@ fun SettingsScreen(
     // 搜索历史（KVStore 持久化，由 ViewModel 暴露）
     val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
 
-    // RC62：跨屏跳转（terminal_settings → settings → RemoteServers）：接收来自 SettingsViewModel
+    // 跨屏跳转（terminal_settings → settings → RemoteServers）：接收来自 SettingsViewModel
     //   的 openSection 请求，切到 SettingsScreen 内部的 section。
     // 注意：这段必须写在 `var section` remember 之后，否则会引用 section 报 Unresolved。
     val pendingTick by viewModel.pendingOpenSectionTick.collectAsStateWithLifecycle()
@@ -795,7 +795,7 @@ fun SettingsScreen(
         }
     }
 
-    // P3：导入配置对话框
+    // 导入配置对话框
     if (showImportDialog) {
         val importSuccessStr = stringResource(R.string.norm_flow_import_success)
         val importFailedStr = stringResource(R.string.norm_flow_import_failed)

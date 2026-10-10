@@ -8,7 +8,7 @@ import javax.inject.Singleton
 /**
  * C.4.13 Terminal Bundle 下载镜像自动切换 + 失败细分 8 SubClass。
  *
- * 严格镜像顺序（Phase 4 替换为真 OkHttp 下载）：
+ * 严格镜像顺序（ 替换为真 OkHttp 下载）：
  *   OFFICIAL → ALIYUN → TSINGHUA → USTC（BundleMirror 枚举 ordinal 顺序锁死）。
  *   每个镜像最多下载 1 次；合计最多切 4 次。
  *   单次下载超时 = 90s（可通过构造参数 override，单测短点）。
@@ -23,8 +23,8 @@ import javax.inject.Singleton
  *   磁盘满(ENOSPC) → INFRA_PACKAGE_DISK_FULL
  *   其他网络错误 → INFRA_HTTP_SERVER_OR_NETWORK
  *
- * 接口 + 占位实现：Phase 1.5 Preflight P12（项目当前无 OkHttp wrapper 直接注入），
- * 故把「下载」抽成 Downloader 接口，Phase 4 AgentModule.kt @Provides 才写 RealOkHttpDownloader。
+ * 接口 + 占位实现：（项目当前无 OkHttp wrapper 直接注入），
+ * 故把「下载」抽成 Downloader 接口， AgentModule.kt @Provides 才写 RealOkHttpDownloader。
  */
 @Singleton
 class TerminalBundleMirrorRotator @Inject constructor(
@@ -34,11 +34,11 @@ class TerminalBundleMirrorRotator @Inject constructor(
     private val maxAttempts: Int = BundleMirror.entries.size,
     /** 默认镜像顺序 = OFFICIAL→ALIYUN→TSINGHUA→USTC，测试可传子集。 */
     private val mirrorOrder: List<BundleMirror> = BundleMirror.entries,
-    /** 默认占位实现；Phase 4 替换为真。 */
+    /** 默认占位实现； 替换为真。 */
     private val downloader: Downloader = PlaceholderDownloader
 ) {
 
-    /** 下载器：Phase 4 注入真 OkHttp；单测提供 FakeDownloader。 */
+    /** 下载器： 注入真 OkHttp；单测提供 FakeDownloader。 */
     fun interface Downloader {
         suspend fun download(bundleKey: String, mirror: BundleMirror, timeoutMs: Long): DownloadAttempt
     }
@@ -119,7 +119,7 @@ class TerminalBundleMirrorRotator @Inject constructor(
         else -> FailureSubClass.INFRA_HTTP_SERVER_OR_NETWORK
     }
 
-    /** Phase 1~3 默认下载实现（占位，永远失败；Phase 4 AgentModule 注入 RealOkHttpDownloader）。 */
+    /** 默认下载实现（占位，永远失败； AgentModule 注入 RealOkHttpDownloader）。 */
     object PlaceholderDownloader : Downloader {
         override suspend fun download(bundleKey: String, mirror: BundleMirror, timeoutMs: Long): DownloadAttempt =
             DownloadAttempt(

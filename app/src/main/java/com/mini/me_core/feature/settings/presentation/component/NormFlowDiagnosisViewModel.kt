@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
-/** P2：注入诊断面板 ViewModel，从 SystemPromptProvider 读取最近一次 step 注入诊断。 */
+/** 注入诊断面板 ViewModel，从 SystemPromptProvider 读取最近一次 step 注入诊断。 */
 @HiltViewModel
 class NormFlowDiagnosisViewModel @Inject constructor(
     private val systemPromptProvider: SystemPromptProvider

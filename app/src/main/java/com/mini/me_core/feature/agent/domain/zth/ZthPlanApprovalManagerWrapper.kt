@@ -9,14 +9,14 @@ import javax.inject.Singleton
 /**
  * C.4.2 / C.4.9 PlanApprovalManager 桥接。
  *
- * 逻辑严谨（Preflight P13：**真实 PlanApprovalChoice 只有 {APPROVE, REFINE} 两个值**，
+ * 逻辑严谨（**真实 PlanApprovalChoice 只有 {APPROVE, REFINE} 两个值**，
  * 没有我们设计的 MODIFY / REJECT / CANCEL），因此本 Wrapper 提供两条桥接铁律：
  *
  * 桥接映射 BRIDGE-1：
  *   ZTH Verdict              → 真实 PlanApprovalChoice
  *   ───────────────────────────────────────────────────
  *   APPROVE_DIRECT           → APPROVE
- *   APPROVE_NEED_CARD        → APPROVE（但 Phase 5 会在 ZthGuardAggregateFacade
+ *   APPROVE_NEED_CARD        → APPROVE（但  会在 ZthGuardAggregateFacade
  *                              接收到该值后**再挂一层 ConfirmationCard 挂起**，不通过底层 PlanApprovalManager）
  *   REFUSE                   → REFINE（reason=「ZTH 拒绝：+ $reason」自动写 refineReason 注入到 PlanApprovalRequest.reason）
  *   MODIFY_AND_REQUIRE_REFINE → REFINE（refineSuggestion 追加到 PlanApprovalRequest.reason）
@@ -40,7 +40,7 @@ class ZthPlanApprovalManagerWrapper @Inject constructor(
      * @param sessionId 会话 id（传给真实 PlanApprovalManager）
      * @param tier 当前档位
      * @param onlineValidated C.4.9 离线标志
-     * @param llmPlanRisk 可选：Phase 5 跑模型审查后（档位 ≥2 且在线时），把 ZthPlanApprovalResult 传进来
+     * @param llmPlanRisk 可选： 跑模型审查后（档位 ≥2 且在线时），把 ZthPlanApprovalResult 传进来
      *   若为 null → 表示跳过模型审批（档位 0/1 或离线）。
      * @return 桥接后的真实选择 + 最终给 UI 显示的 reason（已含 ZTH 注入信息）
      */
@@ -70,7 +70,7 @@ class ZthPlanApprovalManagerWrapper @Inject constructor(
         }
 
         // (4) 其余情况（APPROVE_DIRECT / APPROVE_NEED_CARD / 跳过模型）→ 走真实 PlanApprovalManager
-        //     若需要 ConfirmationCard（APPROVE_NEED_CARD）→ Phase 5 ZthGuardAggregateFacade 收到 Pair(APPROVE, reason)
+        //     若需要 ConfirmationCard（APPROVE_NEED_CARD）→  ZthGuardAggregateFacade 收到 Pair(APPROVE, reason)
         //     后再跑 CapabilityGuard 卡（不会跳过 ZTH）。
         val choice = realManager.awaitApproval(finalReason, sessionId)
         return choice to finalReason

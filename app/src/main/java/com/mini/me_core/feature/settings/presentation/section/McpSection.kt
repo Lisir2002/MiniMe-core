@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
- * P2-17 行为保持搬迁：MCP 服务器域（外部 MCP server 列表管理与重载 / 内置 MCP server 开关）。
+ *  行为保持搬迁：MCP 服务器域（外部 MCP server 列表管理与重载 / 内置 MCP server 开关）。
  * 逻辑原属 SettingsViewModel，逐字搬迁；协程仍由同一 viewModelScope 驱动。
  */
 internal class McpSection(

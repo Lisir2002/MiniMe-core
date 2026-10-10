@@ -20,7 +20,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 代理出口健康检测器（阶段3新增）。
+ * 代理出口健康检测器。
  *
  * 职责：主动探测整个代理链路（mihomo → 节点 → 外网）是否可用，而非被动等待模型请求失败。
  *
@@ -82,7 +82,7 @@ class ProxyHealthMonitor @Inject constructor(
     init {
         // 启动后台轮询。
         startMonitoring()
-        // 阶段4：健康状态变化时反向写入 ProxyRouteHolder，触发自动降级/恢复。
+        // 健康状态变化时反向写入 ProxyRouteHolder，触发自动降级/恢复。
         scope.launch {
             proxyHealthy.collect { healthy ->
                 routeHolder.setHealthDegraded(!healthy)

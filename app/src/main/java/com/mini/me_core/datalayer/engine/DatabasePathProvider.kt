@@ -12,7 +12,7 @@ import java.io.File
  * ⚠️ 严禁解析到外部/共享存储（getExternalFilesDir / scoped storage / SD 卡）。
  *    任何新库路径必须经本 Provider，杜绝误指到用户可访问空间。
  *
- * v2-full-takeover P0-3：抽为接口，平台实现见 [AndroidDatabasePathProvider]，
+ * 抽为接口，平台实现见 [AndroidDatabasePathProvider]，
  * 使 [com.mini.me_core.datalayer.migration.MigrationEngine] 的快照/回滚可在 JVM 单测覆盖。
  */
 /**

@@ -13,7 +13,7 @@ import javax.inject.Singleton
  *
  * 业务逻辑（计数 / 冷却 / CAS 迁移 / kill-switch）在 [ZthCircuitBreakerManager]，
  * 这里只提供：
- *   - 供 Phase 4.2 SyncManager 拉/推的 getAllOnce / upsertAll
+ *   - 供 .2 SyncManager 拉/推的 getAllOnce / upsertAll
  *   - 供 UI Red Banner observe 用的 observeGlobalAndSession
  *   - Firestore Entity↔Dto 映射
  *
@@ -31,11 +31,11 @@ class ZthCircuitBreakerRepository @Inject constructor(
     fun observeGlobalAndSession(sessionId: String): Flow<List<V2Fuse>> =
         v2Agent.observeAllFuses()
 
-    /** Phase 4.2 Sync：全量拉取本地（push 到 Firestore）。 */
+    /** .2 Sync：全量拉取本地（push 到 Firestore）。 */
     suspend fun getAll(): List<V2Fuse> =
         v2Agent.listAllFuses()
 
-    /** Phase 4.2 Sync：Firestore pull → 本地合并（按 KILL-1 不变性过滤 killSwitch1=true）。 */
+    /** .2 Sync：Firestore pull → 本地合并（按 KILL-1 不变性过滤 killSwitch1=true）。 */
     suspend fun mergeFromRemote(remoteList: List<V2Fuse>) {
         val locals = getAll().associateBy { it.scope to it.scope_id }
         val toUpsert = mutableListOf<V2Fuse>()
@@ -65,7 +65,7 @@ class ZthCircuitBreakerRepository @Inject constructor(
         }
     }
 
-    // ── Phase 4.2 Firestore：Entity ↔ Dto 映射 ─────────────────────────
+    // ── .2 Firestore：Entity ↔ Dto 映射 ─────────────────────────
 
     fun toDto(e: V2Fuse): Map<String, Any?> = mapOf(
         "id" to e.id, "scope" to e.scope, "scopeId" to e.scope_id,

@@ -157,7 +157,7 @@ fun ProviderEditorScreen(
     var fetchDialogKey by remember { mutableIntStateOf(0) }
     var selectedTab by remember { mutableIntStateOf(0) }
     val editorScrollState = rememberPersistentScrollState("settings_provider_editor")
-    // RC63 ④：当前「能力覆盖」面板正在编辑哪一个模型；null=关闭。
+    // 当前「能力覆盖」面板正在编辑哪一个模型；null=关闭。
     var capabilityOverrideModel by remember { mutableStateOf<String?>(null) }
 
     // ── 新增高级参数状态（采样 / API Path / 超时重试 / 备用供应商） ──
@@ -190,9 +190,9 @@ fun ProviderEditorScreen(
     val testResults by viewModel.testResults.collectAsStateWithLifecycle()
     val testing by viewModel.testing.collectAsStateWithLifecycle()
     val modelMetadata by viewModel.modelMetadata.collectAsStateWithLifecycle()
-    /** RC72：保存失败提示（不闪退，弹 Toast）。 */
+    /** 保存失败提示（不闪退，弹 Toast）。 */
     val saveError by viewModel.saveError.collectAsStateWithLifecycle()
-    /** RC63 ③ 兼容端点全局策略（下拉 + 两个 Switch）。 */
+    /** 兼容端点全局策略（下拉 + 两个 Switch）。 */
     val defaultPolicy by viewModel.compatibilityDefaultPolicyFlow.collectAsStateWithLifecycle()
     val autoDowngrade by viewModel.autoDowngradeOnSendFailureFlow.collectAsStateWithLifecycle()
     val viewImageGuard by viewModel.viewImageUnknownGuardPolicyFlow.collectAsStateWithLifecycle()
@@ -202,7 +202,7 @@ fun ProviderEditorScreen(
     val allProviders by viewModel.providers.collectAsStateWithLifecycle()
     val modelSnapshot = models.toList()
 
-    /** RC63 ④ 单模型覆盖：ProviderModelRow 每个模型 hasOverride 的即时快照（Flow -> State）。 */
+    /** 单模型覆盖：ProviderModelRow 每个模型 hasOverride 的即时快照（Flow -> State）。 */
     val overridesMap: Map<String, V2ModelCapabilityOverride> by remember(type, models) {
         // 注意 1：下面每一步都显式标注类型，原因是 CI（Kotlin 2.1.20 + AGP 8.9.3）对
         // "combine(List<Flow<Pair<A,B?>>>)" 这种嵌套泛型 + lambda 的推断会失败，
@@ -245,7 +245,7 @@ fun ProviderEditorScreen(
         }
     }
 
-    // RC72：保存失败时弹 Toast（不闪退），消费后不再重复弹。
+    // 保存失败时弹 Toast（不闪退），消费后不再重复弹。
     LaunchedEffect(saveError) {
         val err = saveError
         if (err != null) {
@@ -688,7 +688,7 @@ fun ProviderEditorScreen(
                                 }
                             }
 
-                            // ── 需要代理出口（阶段2新增）──
+                            // ── 需要代理出口──
                             // 开启后该 Provider 的 API 请求走 proxyClient（挂载 proxySelector）；
                             // 关闭后走 directClient 直连。海外官方模型默认开启，国内兼容端点可手动关闭。
                             Row(
@@ -1247,7 +1247,7 @@ internal fun String.semanticConnectionError(): String {
 }
 
 // ————————————————————————————————————————————————————————————
-// RC63 ③：兼容端点策略 & viewImage 守卫 两个下拉选择器
+// 兼容端点策略 & viewImage 守卫 两个下拉选择器
 // ————————————————————————————————————————————————————————————
 
 private fun policyDisplayName(p: DefaultPolicy): String = when (p) {

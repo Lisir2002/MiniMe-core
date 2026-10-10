@@ -39,9 +39,9 @@ class T2IPermissionPolicyEngine @Inject constructor(
         const val TAG = "T2IPolicy"
 
         // ══ 默认额度（免费用户；ZTH Tier 为 PRO/ENTERPRISE 时按 tierQuotas 覆盖）══
-        /** P2：免费用户日额度（token 数，对应“生成 50 张 1024×1024 标准图”）。 */
+        /** 免费用户日额度（token 数，对应“生成 50 张 1024×1024 标准图”）。 */
         const val DEFAULT_DAILY_QUOTA_TOKENS = 5000
-        /** P3：单会话额度（避免模型幻觉在一条会话里打爆额度）。 */
+        /** 单会话额度（避免模型幻觉在一条会话里打爆额度）。 */
         const val DEFAULT_SESSION_QUOTA_TOKENS = 1500
         /** P5：渐进阈值——免费用户当日成功 20 张后升级为“每次都要确认”。 */
         const val DEFAULT_PROGRESSIVE_THRESHOLD_IMAGES = 20
@@ -70,7 +70,7 @@ class T2IPermissionPolicyEngine @Inject constructor(
         val costPerImageTokens: Int,
         /** 预期本次请求的图片数量（未来支持 batch 时用；目前固定 1）。 */
         val imageCount: Int = 1,
-        /** P1 强制确认开关（从 DataStore `t2i_force_confirm` 读，默认 false）。 */
+        /**  强制确认开关（从 DataStore `t2i_force_confirm` 读，默认 false）。 */
         val forceConfirm: Boolean = false,
         /** P5 渐进阈值开关（从 DataStore 读；默认 true）。 */
         val progressiveProtection: Boolean = true,
@@ -119,8 +119,8 @@ class T2IPermissionPolicyEngine @Inject constructor(
         }
 
         // ── P4 月度供应商额度（简化实现：从 zthTierRepo 获取 tier 月度额度；
-        //    因 T2I 是 RC69 新增模块，配额月度计数器 DataStore 未存在时走 no-op（= 不限制），
-        //    后续 RC70 可在 T2I 仓储里加 `monthly_used_tokens` DataStore 持久化。）
+        //    因 T2I 是 新增模块，配额月度计数器 DataStore 未存在时走 no-op（= 不限制），
+        //    后续 可在 T2I 仓储里加 `monthly_used_tokens` DataStore 持久化。）
         val monthlyQuota = effectiveMonthlyQuota(req)
         if (monthlyQuota > 0) {
             // TODO: monthlyUsedTokens = 读 DataStore `t2i_monthly_used_tokens_${yyyyMM}`
@@ -194,8 +194,8 @@ class T2IPermissionPolicyEngine @Inject constructor(
      *   PRO → 更高额度（覆盖免费的 2×~5×）
      *   ENTERPRISE → 不限（daily/session/monthly 都返回 0 = 跳过）
      *
-     * RC69 第一版：为避免 T2I 改动反向侵入 ZTH Tier（ZTH 是 agent 安全模块，与 T2I 职责隔离），
-     * 这里先全部返回 null（即 FREE 档），等 RC70 UI 添加 Tier 切换后再改。
+     * 第一版：为避免 T2I 改动反向侵入 ZTH Tier（ZTH 是 agent 安全模块，与 T2I 职责隔离），
+     * 这里先全部返回 null（即 FREE 档），等 UI 添加 Tier 切换后再改。
      */
     private suspend fun tierQuotas(): TierQuotas {
         // val tier = zthTierRepo.getTier().first()

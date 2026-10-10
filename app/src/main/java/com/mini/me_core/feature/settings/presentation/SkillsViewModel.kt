@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * 技能中心 ViewModel（RC74 新增；本期扩展：导入/导出/作用域覆盖）。
+ * 技能中心 ViewModel（；本期扩展：导入/导出/作用域覆盖）。
  *
  * 承载技能列表、启用/卸载、统一导入管线状态机（prepare → confirm）、导出与分享。
  */

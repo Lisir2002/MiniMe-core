@@ -91,6 +91,9 @@ fun NewProjectWizard(
             ) {
                 Button(
                     onClick = {
+                        // 既有阻塞边界（行为保持，本轮不改）：onClick 为非 suspend 回调；createProject 仅在
+                        // app 私有目录写本地纯 HTML 项目骨架（毫秒级磁盘 IO）。运行在主线程是既有设计，
+                        // 勿在此引入 StrictMode ThreadPolicy 探测——会把既有设计直接升级为崩溃。
                         runBlocking {
                             val project = viewModel.createProject()
                             if (project != null) {

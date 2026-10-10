@@ -120,7 +120,7 @@ class AIAgentViewModel @Inject constructor(
     /** 已向调度循环注册过到点投递回调的会话 id 集合（去重 + onCleared 注销用）。 */
     private val registeredScheduleSessions = mutableSetOf<String>()
 
-    /** 输入框草稿状态协作者（P1-08 行为保持搬迁）。 */
+    /** 输入框草稿状态协作者（ 行为保持搬迁）。 */
     private val composer = ComposerState()
 
     /**
@@ -153,7 +153,7 @@ class AIAgentViewModel @Inject constructor(
     private val currentAgentIds = mutableMapOf<String, String?>()
 
     /**
-     * AI 忙碌期间到达的后台任务完成事件缓冲区已迁至 [agentLoopRunner]（P1-08 行为保持搬迁）。
+     * AI 忙碌期间到达的后台任务完成事件缓冲区已迁至 [agentLoopRunner]（ 行为保持搬迁）。
      */
 
     private val _currentSessionId = MutableStateFlow<String?>(null)
@@ -202,7 +202,7 @@ class AIAgentViewModel @Inject constructor(
         _currentWorkspace.value = path
     }
 
-    // ───────────────────────── P1-08 协作者装配（行为保持搬迁）─────────────────────────
+    // ───────────────────────── 协作者装配（行为保持搬迁）─────────────────────────
     // 所有协作者复用本 ViewModel 的 viewModelScope，不新建独立 scope，生命周期不超过本 ViewModel。
     // currentSessionId/currentWorkspace 的 MutableStateFlow 仍由本门面持有并原样传入。
 

@@ -103,7 +103,7 @@ class ProxyViewModel @Inject constructor(
     val enabled: StateFlow<Boolean> = repository.proxyEnabledFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    /** 网络层优化 C5：AI 接口直连分流开关（默认关）。 */
+    /** AI 接口直连分流开关（默认关）。 */
     val aiHostsDirect: StateFlow<Boolean> = repository.aiHostsDirectFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
@@ -114,13 +114,13 @@ class ProxyViewModel @Inject constructor(
     /** 运行态（含 mode / controller 可达性）。 */
     val runtime: StateFlow<ProxyRuntimeState> = manager.state
 
-    /** P1-9：最近一次连接诊断结果（交通灯数据源）。 */
+    /** 最近一次连接诊断结果（交通灯数据源）。 */
     val diagnostic: StateFlow<ProxyDiagnosticResult?> = connectivityTester.result
 
-    /** P2-13：节点健康状态（nodeName -> 是否健康）。 */
+    /** 节点健康状态（nodeName -> 是否健康）。 */
     val nodeHealth: StateFlow<Map<String, Boolean>> = nodeHealthMonitor.health
 
-    /** P2-13：自动切换到最快节点开关（默认关）。 */
+    /** 自动切换到最快节点开关（默认关）。 */
     private val _autoSwitchFastest = MutableStateFlow(false)
     val autoSwitchFastest: StateFlow<Boolean> = _autoSwitchFastest
     fun setAutoSwitchFastest(enabled: Boolean) {
@@ -128,13 +128,13 @@ class ProxyViewModel @Inject constructor(
         nodeHealthMonitor.autoSwitchFastest = enabled
     }
 
-    /** P2-15：实际代理端口（冲突避让后）。 */
+    /** 实际代理端口（冲突避让后）。 */
     val proxyPort: Int get() = manager.mixedPort()
 
-    /** P3-18：预热实例状态。 */
+    /** 预热实例状态。 */
     val warmupState = manager.warmupState
 
-    // ── P3-19：连接审计日志 ──
+    // ── 连接审计日志 ──
     val connLogEnabled = connectionLogger.enabled
     private val _connLogs = MutableStateFlow<List<ProxyConnectionEntry>>(emptyList())
     val connLogs: StateFlow<List<ProxyConnectionEntry>> = _connLogs.asStateFlow()
@@ -162,7 +162,7 @@ class ProxyViewModel @Inject constructor(
         return sb.toString()
     }
 
-    /** P1-8：今日/本周/累计流量用量。 */
+    /** 今日/本周/累计流量用量。 */
     private val _trafficToday = MutableStateFlow(TrafficUsage(0, 0))
     val trafficToday: StateFlow<TrafficUsage> = _trafficToday
     private val _trafficWeek = MutableStateFlow(TrafficUsage(0, 0))
@@ -170,7 +170,7 @@ class ProxyViewModel @Inject constructor(
     private val _trafficTotal = MutableStateFlow(TrafficUsage(0, 0))
     val trafficTotal: StateFlow<TrafficUsage> = _trafficTotal
 
-    /** P1-8：刷新流量用量展示（进入页面 / 手动刷新时调）。 */
+    /** 刷新流量用量展示（进入页面 / 手动刷新时调）。 */
     fun refreshTrafficUsage() {
         viewModelScope.launch(Dispatchers.IO) {
             _trafficToday.value = trafficRepo.todayUsage()
@@ -220,7 +220,7 @@ class ProxyViewModel @Inject constructor(
         }
     }
 
-    /** 网络层优化 C5：切换 AI 接口直连分流（持久化，ClashProxyManager 同步到网络路由）。 */
+    /** 切换 AI 接口直连分流（持久化，ClashProxyManager 同步到网络路由）。 */
     fun toggleAiHostsDirect(desired: Boolean) {
         viewModelScope.launch {
             repository.setAiHostsDirect(desired)
@@ -246,12 +246,12 @@ class ProxyViewModel @Inject constructor(
         }
     }
 
-    /** P1-9：手动重跑连接诊断。 */
+    /** 手动重跑连接诊断。 */
     fun retestConnectivity() {
         viewModelScope.launch { connectivityTester.runDiagnostics() }
     }
 
-    /** P1-7：手动刷新某订阅型 profile（拉最新 YAML，活跃则热重载）。 */
+    /** 手动刷新某订阅型 profile（拉最新 YAML，活跃则热重载）。 */
     fun refreshSubscription(id: String) {
         viewModelScope.launch {
             val ok = manager.refreshSubscriptionNow(id)
@@ -601,7 +601,7 @@ class ProxyViewModel @Inject constructor(
 
     /** 危险/覆盖键扫描：提示哪些字段将从配置中剥离（与 synthesizeConfig 实际剥离的键集保持一致）。 */
     private fun dangerScan(yaml: String): List<String> {
-        // P0-2：dns/script/profile/geodata-mode 已并入 OVERRIDDEN_KEYS，直接复用，
+        // dns/script/profile/geodata-mode 已并入 OVERRIDDEN_KEYS，直接复用，
         // 避免「提示要剥离但实际没剥」与「实际剥离但没提示」的不一致。
         val danger = ClashProxyManager.OVERRIDDEN_KEYS
         return yaml.lines().map { it.trimStart() }

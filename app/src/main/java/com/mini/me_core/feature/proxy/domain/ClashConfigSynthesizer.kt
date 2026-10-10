@@ -7,7 +7,7 @@ import org.yaml.snakeyaml.Yaml
 import java.io.File
 
 /**
- * P2-16 拆分产物：Clash 配置合成 / 危险键剥离 / 回环绑定。
+ * 拆分产物：Clash 配置合成 / 危险键剥离 / 回环绑定。
  *
  * 逻辑原样搬迁自 [ClashProxyManager]，安全加固一字不动：
  *  - 远程订阅 / 任何外部 YAML 均不可信，必须走 [ClashProxyManager.newSafeYaml]（SafeConstructor，
@@ -49,7 +49,7 @@ internal class ClashConfigSynthesizer(
             FileLogger.w(tag, "订阅源 YAML 解析失败（${e.message}），仅生成 DIRECT 兜底配置")
         }
         if (clean["rules"] == null) clean["rules"] = listOf("MATCH,DIRECT")
-        // DNS 防泄露（P0-1）：无论订阅自带什么 dns 配置，一律覆盖为 fake-ip + 国内 DoH 主 / 海外 DoH
+        // DNS 防泄露（）：无论订阅自带什么 dns 配置，一律覆盖为 fake-ip + 国内 DoH 主 / 海外 DoH
         // fallback。fake-ip 模式下命中代理规则的域名由远端代理解析，本机不再发出明文 DNS 查询；
         // fallback-filter 按 geoip=CN 分流：国内域名走国内 DoH，海外域名走 Cloudflare DoH，
         // 避免「订阅商 DNS 被劫持 / 本机 DNS 泄露真实访问目标」。
@@ -70,7 +70,7 @@ internal class ClashConfigSynthesizer(
     }
 
     /**
-     * 固定 DNS 配置（P0-1 防泄露）。
+     * 固定 DNS 配置（ 防泄露）。
      *
      * - enhanced-mode=fake-ip：命中代理规则的域名直接返回 198.18.0.0/16 假地址，真实域名由远端代理
      *   出口解析，本机不发明文 DNS；

@@ -12,7 +12,7 @@ import com.mini.me_core.core.util.FileLogger
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
- * P2-14：代理前台保活服务。
+ * 代理前台保活服务。
  *
  * 代理启用时 startForeground 常驻通知「代理运行中 · 127.0.0.1:7890」，降低 mihomo 子进程被系统
  * 回收概率；点击通知回 MainActivity（用户可再进代理设置页）。关闭代理时 stopForeground + stopSelf。

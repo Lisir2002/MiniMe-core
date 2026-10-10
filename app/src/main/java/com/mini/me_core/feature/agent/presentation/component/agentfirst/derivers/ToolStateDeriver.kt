@@ -48,7 +48,7 @@ enum class ToolCallState {
  * 4. ERROR: message.isError == true
  * 5. SUCCESS: 以上都不匹配（非运行中、无错误、有内容）
  *
- * 关键设计决策（修复 P0 漏洞 V1-01）：
+ * 关键设计决策（修复已知缺陷 V1-01）：
  * - 不依赖 TaskGroup.isStreaming（工具执行期间 isStreaming=false）
  * - 直接从 liveOutput 是否为 null 推导 Running 状态
  * - 冷启动时 PENDING_TOOL_MARKER 残留 + liveOutput=null + agentState=Idle → Cancelled

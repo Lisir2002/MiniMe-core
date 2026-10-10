@@ -61,7 +61,7 @@ class ZthCircuitBreakerManager @Inject constructor(
         if (sessionId != null) increment(sessionId = sessionId, tier, cls.subClass.name)
     }
 
-    // ── 外部入口 2：查询「当前是否允许执行」（Phase 5 StatefulAgentWorkflow 调） ──────────
+    // ── 外部入口 2：查询「当前是否允许执行」（ StatefulAgentWorkflow 调） ──────────
 
     suspend fun isAllowed(sessionId: String?, tier: ZthPresetTier): AllowanceResult {
         if (tier == ZthPresetTier.DISABLED) return AllowanceResult.ALLOW
@@ -277,7 +277,7 @@ class ZthCircuitBreakerManager @Inject constructor(
 }
 
 /**
- * Manager 对外「允许/拒绝」结果（含原因，Phase 5 StatefulAgentWorkflow 传进 FailureClassifier 直接造 FailureClassification）。
+ * Manager 对外「允许/拒绝」结果（含原因， StatefulAgentWorkflow 传进 FailureClassifier 直接造 FailureClassification）。
  */
 data class AllowanceResult(
     val allowed: Boolean,

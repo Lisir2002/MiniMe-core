@@ -10,7 +10,7 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * P2-12 端口绑定：把 agent 域携带 Android IO/磁盘/DB 实现的 Repository 端口
+ * 把 agent 域携带 Android IO/磁盘/DB 实现的 Repository 端口
  * 绑定到 data 层实现。实现均为 @Singleton @Inject，与原作用域一致。
  *
  * 独立 @Module 以避免与 [com.mini.me_core.di.AgentModule]（object，不能 @Binds）相互干扰。

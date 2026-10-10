@@ -301,7 +301,7 @@ class SystemPromptProvider @Inject constructor(
     @Volatile private var goalInjectEnabled = true
     @Volatile private var layeredRulesEnabled = true
 
-    // P1：注入诊断面板（最近一次 step 注入的源级诊断）
+    // 注入诊断面板（最近一次 step 注入的源级诊断）
     data class SourceDiagnosis(
         val name: String,
         val chars: Int,
@@ -387,7 +387,7 @@ class SystemPromptProvider @Inject constructor(
 
     /**
      * step 前注入 Source 一次登记（D1-1 + D3-2 追加分层规则摘要 + D4-3 追加 SOP 清单摘要）：
-     * 顺序（审计定稿，理解优先）：goal(P0) → 问判注入(P1) → 行为模式(P1) → plan-pending(P1)
+     * 顺序（理解优先）：goal(P0) → 问判注入(P1) → 行为模式(P1) → plan-pending(P1)
      * → playbook-stage(P1) → GoalAdjustEvent(P1) → 分层规则摘要(P1) → SOP 清单摘要(P1)
      * → GoalStale(P2) → loop-advisory(P2)。
      * 分层规则摘要插在 P1 组末尾（order 6）、SOP 清单摘要紧随其后（order 7），
@@ -443,7 +443,7 @@ class SystemPromptProvider @Inject constructor(
      * 避免 Playbook 阶段目标与 goal 维护信号互相干扰（对齐 norm-chain §3.3 阶段注入审计定稿）。
      */
     suspend fun buildStepInjections(ctx: AgentContext): String? {
-        // P0 拆分：读取 step 前注入子开关状态，存入 volatile 缓存供 build() 基线部分使用
+        // 读取 step 前注入子开关状态，存入 volatile 缓存供 build() 基线部分使用
         staticRulesEnabled = normFlowSettingsRepository.isStepInjectStaticRulesActive()
         projectAgentsEnabled = normFlowSettingsRepository.isStepInjectProjectAgentsActive()
         goalInjectEnabled = normFlowSettingsRepository.isStepInjectGoalActive()
@@ -463,7 +463,7 @@ class SystemPromptProvider @Inject constructor(
         playbookStageSource.feed(sessionId, stageView)
         val playbookActive = stageView != null
 
-        // P2：构建诊断列表（逐源记录过滤/空/保留状态）
+        // 构建诊断列表（逐源记录过滤/空/保留状态）
         val diagnosis = mutableListOf<SourceDiagnosis>()
         val candidateEntries = mutableListOf<Triple<StepInjectionAssembler.Entry, String, Boolean>>()
 
@@ -506,7 +506,7 @@ class SystemPromptProvider @Inject constructor(
         val entries = candidateEntries.map { it.first }
         val result = stepAssembler.assemble(entries)
 
-        // P2：判定预算裁剪——对比最终输出中包含哪些候选条目
+        // 判定预算裁剪——对比最终输出中包含哪些候选条目
         val keptContents = result?.split("\n\n")?.toSet() ?: emptySet()
         candidateEntries.forEach { (entry, name, _) ->
             val isKept = result != null && entry.content in keptContents

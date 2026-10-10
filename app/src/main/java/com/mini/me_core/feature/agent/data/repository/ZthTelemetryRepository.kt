@@ -27,7 +27,7 @@ class ZthTelemetryRepository @Inject constructor(
     private val v2Agent: V2AgentRepository,
 ) {
 
-    // ── 写入：14 指标路径（Phase 5 Facade 逐个调）────────────────────────
+    // ── 写入：14 指标路径（ Facade 逐个调）────────────────────────
 
     suspend fun recordFuseTripped(sessionId: String?, tier: Int, subClass: String, failureCount: Long) {
         insertSha("FUSE", "TRIPPED_$subClass", tier, sessionId, metricA = failureCount)
@@ -99,7 +99,7 @@ class ZthTelemetryRepository @Inject constructor(
         v2Agent.deleteTelemetryOlderThan(cutoff)
     }
 
-    // ── Phase 4.2 Firestore：Entity ↔ Dto 映射入口（SyncManager 调） ────────
+    // ── .2 Firestore：Entity ↔ Dto 映射入口（SyncManager 调） ────────
 
     fun toFirestoreDto(e: Zth_telemetry_events): Map<String, Any?> = mapOf(
         "id" to e.id, "eventKind" to e.event_kind, "eventSubKind" to e.event_sub_kind,

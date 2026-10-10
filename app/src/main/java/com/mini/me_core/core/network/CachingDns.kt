@@ -5,7 +5,7 @@ import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * OkHttp 异步 DNS 缓存（网络层优化设计 C3）。
+ * OkHttp 异步 DNS 缓存（网络层优化设计）。
  *
  * 包装系统解析 [Dns.SYSTEM]，以短 TTL 缓存 host → IP 的解析结果，避免流式首字节前
  * 每次都走系统 DNS（弱网下几十~几百 ms，直接抬升 TTFT）。

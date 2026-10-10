@@ -30,7 +30,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** P2：护栏拦截日志列表页。 */
+/** 护栏拦截日志列表页。 */
 @Composable
 fun GuardLogsScreen(
     onBack: () -> Unit,

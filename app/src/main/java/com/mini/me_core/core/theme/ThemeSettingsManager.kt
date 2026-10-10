@@ -24,7 +24,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 主题设置管理器（Phase 4 + Phase 5）。
+ * 主题设置管理器。
  *
  * 负责：
  * 1. 从 KVStore 加载/持久化用户主题设置（外观模式 + 预设选择 + 自定义颜色 + 背景图 + 显示偏好）
@@ -57,19 +57,19 @@ class ThemeSettingsManager @Inject constructor(
 
     /**
      * 根据暗色标志和当前设置，计算应使用的 SemanticColors。
-     * Phase 5：先从预设获取基础颜色，再用 customOverrides 覆盖指定字段。
+     * 先从预设获取基础颜色，再用 customOverrides 覆盖指定字段。
      * 由 Composable 层在重组时调用。
      */
     fun resolveColors(isDark: Boolean): SemanticColors {
         val preset = ThemePresets.byId(_settings.value.presetId)
         val base = if (isDark) preset.darkColors else preset.lightColors
-        // Phase 5：应用自定义颜色覆盖
+        // 应用自定义颜色覆盖
         return CustomColorFields.applyOverrides(base, _settings.value.customOverrides)
     }
 
     /**
      * 根据暗色标志和当前设置，计算完整的 AppThemeState。
-     * Phase 5：包含背景图 URI、遮罩浓度、卡片透明度。
+     * 包含背景图 URI、遮罩浓度、卡片透明度。
      */
     fun resolveThemeState(isDark: Boolean): AppThemeState {
         val colors = resolveColors(isDark)
@@ -83,7 +83,7 @@ class ThemeSettingsManager @Inject constructor(
         )
     }
 
-    // ── Phase 4 已有方法（保持签名不变）──
+    // ── 已有方法（保持签名不变）──
 
     /** 切换外观模式（AUTO / LIGHT / DARK）。 */
     suspend fun setMode(mode: ThemeMode) {
@@ -102,7 +102,7 @@ class ThemeSettingsManager @Inject constructor(
         persist(ThemeSettings.DEFAULT)
     }
 
-    // ── Phase 5 新增方法 ──
+    // ── 新增方法 ──
 
     /**
      * 更新或清除单个自定义颜色。

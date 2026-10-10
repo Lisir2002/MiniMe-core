@@ -302,7 +302,7 @@ fun ChatDrawerContent(
                     onValueChange = { renameText = it },
                     singleLine = true,
                     label = { Text(stringResource(R.string.chat_session_name)) },
-                    // C3：IME 回车 = 提交（与确认按钮等效）
+                    // IME 回车 = 提交（与确认按钮等效）
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = {
                         if (canSubmit) {

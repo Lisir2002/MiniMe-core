@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
-/** P1：规范查看器 ViewModel（注入 AgentAssetRegistry / SopRegistry，只读展示）。 */
+/** 规范查看器 ViewModel（注入 AgentAssetRegistry / SopRegistry，只读展示）。 */
 @HiltViewModel
 class NormFlowAssetViewModel @Inject constructor(
     private val agentAssetRegistry: AgentAssetRegistry,

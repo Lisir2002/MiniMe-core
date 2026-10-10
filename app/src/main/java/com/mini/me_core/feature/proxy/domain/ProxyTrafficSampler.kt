@@ -12,7 +12,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * P1-8：代理流量采样器。
+ * 代理流量采样器。
  *
  * 跟随 [ClashProxyManager.state] 的 enabled：代理开启时每 60s 拉一次 mihomo /connections 累计计数，
  * 与上一次基线做差，把「这 60s 的增量 up/down」写入 proxy_traffic 表；关闭时停止采样并重置基线，

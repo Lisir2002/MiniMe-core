@@ -26,7 +26,7 @@ enum class ThemeMode {
 }
 
 /**
- * 圆角风格枚举（Phase 5 显示偏好）。
+ * 圆角风格枚举（显示偏好）。
  *
  * ROUNDED = 圆角（默认，配合 [ThemeSettings.cornerRadius] 自定义半径）
  * Sharp = 直角（0dp）
@@ -85,13 +85,13 @@ data class ThemePreset(
 /**
  * 用户主题设置（持久化存储）。
  *
- * Phase 4：外观模式 + 预设选择
- * Phase 5：扩展自定义颜色覆盖、背景图、显示偏好（圆角/字体/动效）
+ * 外观模式 + 预设选择
+ * 扩展自定义颜色覆盖、背景图、显示偏好（圆角/字体/动效）
  *
  * @property mode 外观模式
  * @property presetId 当前应用的预设 ID
  * @property customOverrides 自定义颜色覆盖 Map（key=友好色名字, value=ARGB hex 字符串）。
- *           Phase 5 复用此字段存储 10 项可自定义颜色，与 Phase 4 设计一致。
+ *           复用此字段存储 10 项可自定义颜色，与既有设计一致。
  * @property backgroundImage 背景图 URI（null=无背景图）
  * @property backgroundMask 背景图遮罩浓度（0.0-1.0，默认 0.5）
  * @property cardOpacity 卡片透明度（0.0-1.0，默认 1.0）
@@ -138,7 +138,7 @@ data class ThemeSettings(
 }
 
 /**
- * 10 项可自定义颜色的友好名称到 SemanticColors 字段的映射（Phase 5）。
+ * 10 项可自定义颜色的友好名称到 SemanticColors 字段的映射。
  *
  * key = 用户在 UI 上看到的友好名称，value = SemanticColors 对应字段的取值函数。
  * 自定义颜色覆盖时，先从预设获取基础色，再用 customOverrides Map 覆盖指定字段。

@@ -97,7 +97,7 @@ class ZthCapabilityAuditRepository @Inject constructor(
         v2Agent.listRestoreLogsExpiredNotRestored(nowMs)
 
 
-    // ── Phase 4.2 Firestore：L0 ↔ Dto 映射 ──────────────────────────
+    // ── .2 Firestore：L0 ↔ Dto 映射 ──────────────────────────
 
     fun l0ToDto(e: V2L0Log): Map<String, Any?> = mapOf(
         "id" to e.id, "sessionId" to e.session_id,

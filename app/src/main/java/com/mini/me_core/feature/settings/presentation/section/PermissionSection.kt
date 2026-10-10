@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * P2-17 行为保持搬迁：权限规则域（全局规则 / 当前项目规则 / 项目名快照）。
+ *  行为保持搬迁：权限规则域（全局规则 / 当前项目规则 / 项目名快照）。
  * 逻辑原属 SettingsViewModel，逐字搬迁；协程仍由同一 viewModelScope 驱动。
  */
 internal class PermissionSection(

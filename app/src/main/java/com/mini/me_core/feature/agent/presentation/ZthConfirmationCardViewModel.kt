@@ -30,7 +30,7 @@ import java.util.UUID
  * 不变性：
  *   VM-INV-1：commit 成功后才把 pendingConfirmationCard 置空（失败留着，用户可再试）
  *   VM-INV-2：commit 进行期间 uiState.committing=true；UI 禁止 Swipe/点击（避免重复点）
- *   VM-INV-3：tier 来自 ZthTierRepository（Phase 3.4 写），UI 上默认 BALANCED
+ *   VM-INV-3：tier 来自 ZthTierRepository，UI 上默认 BALANCED
  */
 @HiltViewModel
 class ZthConfirmationCardViewModel @Inject constructor(
@@ -77,7 +77,7 @@ class ZthConfirmationCardViewModel @Inject constructor(
     /** 状态机：每个 card 一个实例（pendingCard 变化时重建）。 */
     private var stateMachine: ZthConfirmationCardStateMachine? = null
 
-    // ── 对外 API 1：Phase 5 触发挂起卡片 ──────────────────────────────────
+    // ── 对外 API 1： 触发挂起卡片 ──────────────────────────────────
 
     fun triggerCard(payload: ConfirmationCardPayload) {
         val sm = ZthConfirmationCardStateMachine(payload.tier)
@@ -85,7 +85,7 @@ class ZthConfirmationCardViewModel @Inject constructor(
         val r = sm.onEvent(CardEvent.TRIGGER_CARD)
         viewModelScope.launch {
             if (r.action == CardAction.LOAD_SENTINEL_CONTEXT) {
-                // 实际 Phase 5 可在这里读 DB sentinel 链；简化直接 SHOW
+                // 实际  可在这里读 DB sentinel 链；简化直接 SHOW
                 val r2 = sm.onEvent(CardEvent.LOAD_CONTEXT_DONE)
                 applyUiStateFromTransition(r2, payload.copy())
             } else {

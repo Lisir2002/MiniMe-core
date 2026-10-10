@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
 /**
  * workspace 域 Repository（设计 §11.4 / L2）：工程 + 文件索引门面。
  *
- * v2-full-takeover P0-1：补 Flow 响应式读，对齐 Room DAO 的 5 个 Flow 查询。
+ * 补 Flow 响应式读，对齐 Room DAO 的 5 个 Flow 查询。
  */
 class WorkspaceRepository(private val db: WorkspaceDb) {
 
@@ -188,7 +188,7 @@ class WorkspaceRepository(private val db: WorkspaceDb) {
         q.upsertEncryptionState(masterKeyFingerprint, dekCiphertext, encScheme, lastRotatedAt, rotationCounter, biometricRequired, migratedFromV1)
     }
 
-    // ── P0-2 补齐列级 setter 与 REPLACE 语义 ──
+    // ── 补齐列级 setter 与 REPLACE 语义 ──
 
     suspend fun upsertRemoteConnection(
         id: String, name: String, protocol: String, host: String, port: Long, username: String,
@@ -207,7 +207,7 @@ class WorkspaceRepository(private val db: WorkspaceDb) {
         q.insertOrReplaceRemoteMount(id, connectionId, remotePath, localMountPath, isActive, autoConnect)
     }
 
-    // ── P0-1 Flow 响应式读（对齐 Room DAO 的 5 个 Flow 查询）──
+    // ── Flow 响应式读（对齐 Room DAO 的 5 个 Flow 查询）──
 
     fun observeAllProjects(): Flow<List<Workspace_project>> =
         q.selectAllProjects().asFlow().mapToList(Dispatchers.IO)

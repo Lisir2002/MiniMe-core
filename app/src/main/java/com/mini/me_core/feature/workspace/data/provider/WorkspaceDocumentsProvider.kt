@@ -27,7 +27,7 @@ import java.util.LinkedList
  *
  * docId 直接用文件绝对路径（与 Termux 实现一致），简单且跨进程稳定。
  *
- * ============= RC61b hotfix3 =============
+ * ============= =============
  * ContentProvider 生命周期早于 Application.onCreate：其 onCreate() 在 Application.attachBaseContext
  * 之后、Application.onCreate 之前被系统调用。因此**这里的任何 RuntimeException 都会直接杀死整个进程**
  * （Android 对 Provider 异常的惩罚比 Activity 更严，没有崩溃弹窗直接消失）。本 Provider 因此做三条铁律：
@@ -72,7 +72,7 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
      * 根下唯一对外可见的子目录名白名单：工作区 `projects` 与 AI 配置 `minime`（容器内 /root/.minime，
      * 含 skills/ 与 mcp.json）。两者首次访问即创建，其余 filesDir 内部目录不列出。
      *
-     * RC61b hotfix3: **这里绝对不能再同步调 ContainerInstaller.extractDocs(ctx())**。
+     * : **这里绝对不能再同步调 ContainerInstaller.extractDocs(ctx())**。
      * 它会触发 AssetManager.open（主线程 IO）且在个别 ROM 上会因 asset 路径不存在等原因抛
      * RuntimeException，直接穿透到 queryRoots→ContentProvider→系统杀进程。
      * 提取 docs 改为「MiniMeCore appScope 后台协程 + ContainerInstaller.init 协程」两处异步完成，
@@ -88,7 +88,7 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
     }
 
     /** minSdk 26 上基类无 requireContext()，这里自取非空 context。
-     *  RC61b hotfix3：返回值非空，任何失败都转 Provider 安全的 FileNotFoundException。 */
+     * 返回值非空，任何失败都转 Provider 安全的 FileNotFoundException。 */
     private fun ctx(): android.content.Context =
         context ?: throw FileNotFoundException("Provider context unavailable")
 
@@ -115,7 +115,7 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
     }
 
     /**
-     * RC61b：全链路沙箱校验。任何以「文件绝对路径」作为 docId 的访问都必须先过这关：
+     * 全链路沙箱校验。任何以「文件绝对路径」作为 docId 的访问都必须先过这关：
      *   1. 先 canonicalize 规范化（解 symlink、去 /../ 等），防止路径混淆。
      *   2. 根限定为 baseDir().canonicalPath（app 私有 filesDir），禁止越权到
      *      databases/、shared_prefs/、rootfs 等敏感目录。
@@ -309,7 +309,7 @@ class WorkspaceDocumentsProvider : DocumentsProvider() {
     }
 
     override fun isChildDocument(parentDocumentId: String, documentId: String): Boolean {
-        // RC61b 修正：先通过 sandboxedFile 校验双方均在沙箱内，再 canonical 前缀比较。
+        // 先通过 sandboxedFile 校验双方均在沙箱内，再 canonical 前缀比较。
         // 防止 docId 路径混淆、或者一方是跳出沙箱的 symlink。
         return runCatching {
             val parent = sandboxedFile(parentDocumentId).canonicalPath

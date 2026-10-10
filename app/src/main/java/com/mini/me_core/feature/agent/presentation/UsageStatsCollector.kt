@@ -9,7 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * 用量统计聚合器（P1-08 从 AIAgentViewModel 提取，行为保持搬迁）。
+ * 用量统计聚合器（ 从 AIAgentViewModel 提取，行为保持搬迁）。
  *
  * 仅负责 token 用量的持久化与「回合用量卡片」落库：
  * - AssistantText 到达后异步写 token 用量（落库到 v2Agent，不阻塞循环）；

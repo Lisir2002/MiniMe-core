@@ -7,7 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
-/** P2：护栏日志 ViewModel，从 GuardLogRepository 读取最近拦截记录。 */
+/** 护栏日志 ViewModel，从 GuardLogRepository 读取最近拦截记录。 */
 @HiltViewModel
 class GuardLogsViewModel @Inject constructor(
     private val guardLogRepository: GuardLogRepository

@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
- * P2-17 行为保持搬迁：D1-7 规范流程域（总开关 / step_inject / tool_guard / 用量卡片 /
+ *  行为保持搬迁：D1-7 规范流程域（总开关 / step_inject / tool_guard / 用量卡片 /
  * 推理预算 / SOP / Playbook 自动触发 / 空转收敛 / 文件观察 / P2 护栏独立开关 / 预设与导入导出）。
  * 全部状态与默认值原样搬迁；协程仍由同一 viewModelScope 驱动。
  */
@@ -64,19 +64,19 @@ internal class NormFlowSection(
     private val _fileObservationEnabled = MutableStateFlow(true)
     val fileObservationEnabled: StateFlow<Boolean> = _fileObservationEnabled.asStateFlow()
 
-    // P1：推理预算强度（low/medium/high，默认 medium）
+    // 推理预算强度（low/medium/high，默认 medium）
     private val _reasoningBudgetLevel = MutableStateFlow("medium")
     val reasoningBudgetLevel: StateFlow<String> = _reasoningBudgetLevel.asStateFlow()
 
-    // P1：空转收敛阈值轮数（默认 6）
+    // 空转收敛阈值轮数（默认 6）
     private val _idleConvergeRounds = MutableStateFlow(6)
     val idleConvergeRounds: StateFlow<Int> = _idleConvergeRounds.asStateFlow()
 
-    // P1：当前预设方案
+    // 当前预设方案
     private val _activePreset = MutableStateFlow("standard")
     val activePreset: StateFlow<String> = _activePreset.asStateFlow()
 
-    // P2：新增护栏独立开关
+    // 新增护栏独立开关
     private val _guardDangerousCommandEnabled = MutableStateFlow(false)
     val guardDangerousCommandEnabled: StateFlow<Boolean> = _guardDangerousCommandEnabled.asStateFlow()
 
@@ -86,7 +86,7 @@ internal class NormFlowSection(
     private val _guardPathBoundaryEnabled = MutableStateFlow(false)
     val guardPathBoundaryEnabled: StateFlow<Boolean> = _guardPathBoundaryEnabled.asStateFlow()
 
-    // P2：用量卡片显示项
+    // 用量卡片显示项
     private val _usageCardItems = MutableStateFlow<Set<String>>(setOf("token"))
     val usageCardItems: StateFlow<Set<String>> = _usageCardItems.asStateFlow()
 
@@ -213,7 +213,7 @@ internal class NormFlowSection(
     }
 
     // D1-7 规范流程统一开关：总开关/子开关持久化（workflow 运行期读同一 repository）。
-    // P1：用户手动调整后自动标记为 custom 预设。
+    // 用户手动调整后自动标记为 custom 预设。
     fun setNormFlowEnabled(enabled: Boolean) {
         scope.launch {
             normFlowSettingsRepository.setNormFlowEnabled(enabled)
@@ -307,7 +307,7 @@ internal class NormFlowSection(
         }
     }
 
-    // P1：推理预算强度
+    // 推理预算强度
     fun setReasoningBudgetLevel(level: String) {
         scope.launch {
             normFlowSettingsRepository.setReasoningBudgetLevel(level)
@@ -315,7 +315,7 @@ internal class NormFlowSection(
         }
     }
 
-    // P1：空转收敛阈值
+    // 空转收敛阈值
     fun setIdleConvergeRounds(rounds: Int) {
         scope.launch {
             normFlowSettingsRepository.setIdleConvergeRounds(rounds)
@@ -323,14 +323,14 @@ internal class NormFlowSection(
         }
     }
 
-    // P1：应用预设方案
+    // 应用预设方案
     fun applyPreset(preset: String) {
         scope.launch {
             normFlowSettingsRepository.applyPreset(preset)
         }
     }
 
-    // P2：新增护栏独立开关
+    // 新增护栏独立开关
     fun setGuardDangerousCommandEnabled(enabled: Boolean) {
         scope.launch {
             normFlowSettingsRepository.setGuardDangerousCommandEnabled(enabled)
@@ -353,7 +353,7 @@ internal class NormFlowSection(
         }
     }
 
-    // P2：用量卡片显示项（切换某个 item）
+    // 用量卡片显示项（切换某个 item）
     fun toggleUsageCardItem(item: String) {
         scope.launch {
             val current = _usageCardItems.value
@@ -363,9 +363,9 @@ internal class NormFlowSection(
         }
     }
 
-    // P3：导出配置
+    // 导出配置
     fun exportConfig(): String = normFlowSettingsRepository.exportConfig()
 
-    // P3：导入配置
+    // 导入配置
     fun importConfig(json: String): Boolean = normFlowSettingsRepository.importConfig(json)
 }

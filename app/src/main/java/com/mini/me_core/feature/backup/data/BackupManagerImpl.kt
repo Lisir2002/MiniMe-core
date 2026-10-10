@@ -32,7 +32,7 @@ import javax.inject.Singleton
  * 调用方（[com.mini.me_core.feature.backup.presentation.BackupViewModel]、
  * [AutoBackupManager] 等）与 Hilt 绑定零改动。
  *
- * P3-17 机械拆分：原约 928 行实现被按职责拆为三个同包 internal 协作者，本类只负责装配与委托：
+ * 原约 928 行实现被按职责拆为三个同包 internal 协作者，本类只负责装配与委托：
  * - [store]：快照读写/临时文件/低层 tar 流管道（[BackupSnapshotStore]）；
  * - [exporter]：导出、七域快照采集、打包与口令流式加密输出（[BackupExporter]）；
  * - [restorer]：恢复、解包、版本/完整性校验与回写（[BackupRestorer]）。

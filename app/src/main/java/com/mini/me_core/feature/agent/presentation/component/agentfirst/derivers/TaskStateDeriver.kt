@@ -46,7 +46,7 @@ enum class TaskState {
  * 推导逻辑（按优先级从高到低）：
  * 1. WAITING_APPROVAL: pendingPermission != null
  * 2. RUNNING: group.isStreaming == true || 该 group 的 TOOL 消息有对应 runningTool
- *    （关键 P0 修复：isStreaming 仅在文本流式时为 true，工具执行期间 isStreaming=false，
+ *    （关键修复：isStreaming 仅在文本流式时为 true，工具执行期间 isStreaming=false，
  *     必须额外检查 runningTool 匹配，否则工具执行期间 TaskCard 不会显示 Running）
  * 3. PLANNING: !isStreaming && 有 REASONING 子分组 && 无 TOOL 子分组 && 无 REPLY 子分组
  * 4. FAILED: !isStreaming && 最后一条 TOOL 消息 isError=true（且非 Cancelled）

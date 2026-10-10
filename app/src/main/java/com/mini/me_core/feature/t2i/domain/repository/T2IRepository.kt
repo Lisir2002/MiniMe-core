@@ -6,7 +6,7 @@ import com.mini.mecore.datalayer.sqldelight.t2i.T2i_task
 import kotlinx.coroutines.flow.Flow
 
 /**
- * T2I 域门面（v2-full-takeover P2-2）。
+ * T2I 域门面。
  *
  * 目的：把 [com.mini.me_core.feature.agent.domain.execution.tool.image.GenerateImageTool] 与
  * [com.mini.me_core.feature.t2i.domain.permission.T2IPermissionPolicyEngine] 从 Room DAO

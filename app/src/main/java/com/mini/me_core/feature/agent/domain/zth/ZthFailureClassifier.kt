@@ -17,7 +17,7 @@ import javax.net.ssl.SSLHandshakeException
  *
  * 逻辑严谨性保证（C.2.2 决策矩阵 100% 覆盖 168 分支）：
  * 1) **先细分类 Throwable → FailureSubClass（28 值，枚举 ordinal 锁死顺序，不依赖 Throwable message）**
- * 2) **FailureSubClass → failureClass（6 值，P1 设计的 6 顶层类）**
+ * 2) **FailureSubClass → failureClass（6 值，即 6 顶层类）**
  * 3) **根据 (subClass, tier) 二维 switch 显式填写 10 列：severityTier/requiresUserConfirmation/requiresLlmReview/
  *    triggersFuseCountIncrement/requiresLinkageMigration/telemetryRequired/showOfflineBanner/autoRecoveryHint**
  * 4) **所有未命中的分支 → 进入 `UNEXPECTED_THROWABLE_MISSING_MAPPING` 兜底（抛 IllegalStateException 便于 JUnit 发现漏覆盖）**

@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
- * P2-17 行为保持搬迁：识图 / 压缩专用模型选择域。
+ *  行为保持搬迁：识图 / 压缩专用模型选择域。
  * 状态与逻辑原属 SettingsViewModel，现由其内部装配；协程仍由同一 viewModelScope 驱动。
  */
 internal class VisionCompactionSection(

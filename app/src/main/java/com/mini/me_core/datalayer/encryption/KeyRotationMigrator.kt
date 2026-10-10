@@ -70,6 +70,7 @@ class KeyRotationMigrator(private val context: Context) {
          */
         fun dekProvider(keyManager: UnifiedKeyManager): PassphraseProvider =
             PassphraseProvider { dbId ->
+                // 每次打开驱动时取 DEK（Keystore 读取），Dispatchers.IO 包裹；驱动创建边界，不加 StrictMode。
                 val dek = runBlocking(Dispatchers.IO) {
                     keyManager.getOrCreateDek(CipherPassphrase.purpose(dbId))
                 }

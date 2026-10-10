@@ -19,7 +19,7 @@ data class ProxyConnectionEntry(
 )
 
 /**
- * P3-19：代理连接审计日志持久化（INFRA 库 proxy_connection_log 表）。
+ * 代理连接审计日志持久化（INFRA 库 proxy_connection_log 表）。
  * 批量插入、分页查询、按域名搜索、过期清理、全量导出。
  */
 @Singleton

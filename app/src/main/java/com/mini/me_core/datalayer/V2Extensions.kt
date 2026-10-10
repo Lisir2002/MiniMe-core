@@ -30,7 +30,7 @@ import com.mini.mecore.datalayer.sqldelight.workspace.Remote_mounts
  * V2 schema 中所有布尔语义列均为 INTEGER (0/1)，业务层用 Boolean。
  * 此处统一封装 `== 1L` 判断，避免业务代码到处写裸比较。
  *
- * P3 迁移阶段 1 外围模块所需；后续阶段（agent 域）需要时再补充。
+ * 数据层外围模块所需；agent 域需要时再补充。
  */
 
 // ── credentials ──────────────────────────────────────────────

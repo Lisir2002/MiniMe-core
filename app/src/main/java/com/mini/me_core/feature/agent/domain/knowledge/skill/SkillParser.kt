@@ -17,7 +17,7 @@ object SkillParser {
     /**
      * 解析一个 skill 目录；无 SKILL.md 或无 name 时视为非法，返回 null。
      *
-     * RC74 元数据升级：解析 version/author/tags/modes/type/dependencies/entry/mcp_tool/icon
+     * 元数据升级：解析 version/author/tags/modes/type/dependencies/entry/mcp_tool/icon
      * 等新字段，全部向后兼容——缺省字段给默认值，`type` 缺省按 [SkillType.PROMPT]。
      * 本次新增：auto_trigger（自动触发开关）+ trigger_conditions（自动触发条件，供工作流触发决策器）。
      * `enabled` 不在此处解析（运行时状态由 Room skill_state 表持久化，不写回技能文件），

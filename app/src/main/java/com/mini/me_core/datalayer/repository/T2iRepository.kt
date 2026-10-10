@@ -13,13 +13,13 @@ import kotlinx.coroutines.withContext
  * t2i 域 Repository（设计 §11.5 / L2）：文生图任务 + 多结果门面。
  * 结果图字节存 BlobStore，本域只留 blob_ref 引用。
  *
- * v2-full-takeover P0-1：补 Flow 响应式读，对齐 Room DAO 的 4 个 Flow 查询。
+ * 补 Flow 响应式读，对齐 Room DAO 的 4 个 Flow 查询。
  */
 class T2iRepository(private val db: T2iDb) {
 
     private val q get() = db.t2iQueries
 
-    // ── 任务（t2i_task，P2-2 对齐 Room T2ITaskDao 全集）──
+    // ── 任务（t2i_task，对齐 Room T2ITaskDao 全集）──
 
     suspend fun insertTask(
         id: String, sessionId: String, messageId: String, prompt: String, negativePrompt: String,
@@ -199,7 +199,7 @@ class T2iRepository(private val db: T2iDb) {
     suspend fun deleteT2iProviderModels(providerId: String) =
         withContext(Dispatchers.IO) { q.deleteT2iProviderModels(providerId) }
 
-    // ── P0-1 Flow 响应式读（对齐 Room DAO 的 4 个 Flow 查询）──
+    // ── Flow 响应式读（对齐 Room DAO 的 4 个 Flow 查询）──
 
     fun observeAllTasks(): Flow<List<T2i_task>> =
         q.selectAllTasks().asFlow().mapToList(Dispatchers.IO)

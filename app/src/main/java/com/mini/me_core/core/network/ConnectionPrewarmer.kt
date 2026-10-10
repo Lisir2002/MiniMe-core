@@ -13,7 +13,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 连接预热（网络层优化设计 C1）。
+ * 连接预热。
  *
  * 对目标 AI host 后台发起一个最小请求（GET /），预建 DNS + TCP + TLS + HTTP/2 握手，
  * 连接留在共享 OkHttp 连接池，正式请求复用后省掉 1~3 RTT 的首字节延迟（TTFT）。

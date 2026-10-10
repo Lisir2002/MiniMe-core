@@ -28,7 +28,7 @@ class ZthPlanApprovalRepository @Inject constructor(
     private val telemetry: ZthTelemetryRepository
 ) {
 
-    /** Phase 5 onFailure：AI 删除了 sentinel/checkpoint/保留行 → 写审计表（加密 keys JSON）。 */
+    /**  onFailure：AI 删除了 sentinel/checkpoint/保留行 → 写审计表（加密 keys JSON）。 */
     suspend fun recordHardConstraintDelete(
         sessionId: String, affectedTableName: String,
         affectedKeysJsonPlaintext: String, triggerSubClass: String
@@ -59,7 +59,7 @@ class ZthPlanApprovalRepository @Inject constructor(
     suspend fun markRolledBack(auditId: String) =
         v2Agent.markDeleteAuditRolledBack(auditId)
 
-    // ── Phase 4.2 Firestore：HardConstraintDelete ↔ Dto 映射 ──────────
+    // ── .2 Firestore：HardConstraintDelete ↔ Dto 映射 ──────────
     // 说明：跨设备同步不存 s_affectedKeysCiphertext（只有本地 Keystore 能解开；同步只用于「统计与通知」）。
 
     fun deleteAuditToDto(e: V2DeleteAudit): Map<String, Any?> = mapOf(

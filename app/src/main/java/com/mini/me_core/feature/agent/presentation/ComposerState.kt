@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 输入框草稿状态（P1-08 从 AIAgentViewModel 提取，行为保持搬迁）。
+ * 输入框草稿状态（ 从 AIAgentViewModel 提取，行为保持搬迁）。
  *
  * 原审计计划称「ComposerViewModel」，但它不是 @HiltViewModel（铁律#4 禁止新增 Hilt VM），
  * 仅为普通 internal 协作者，故命名 [ComposerState]，只拥有输入框文本草稿的读写。

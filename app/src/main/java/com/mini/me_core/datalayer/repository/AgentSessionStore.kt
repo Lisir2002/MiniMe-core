@@ -79,7 +79,7 @@ internal class AgentSessionStore(private val db: AgentDb) {
 
     /**
      * 批量 upsert 会话（备份恢复用）。
-     * P1 修复：原实现 forEach 逐条 upsert 无事务包裹，每条 INSERT 都是独立 autocommit，
+     * 原实现 forEach 逐条 upsert 无事务包裹，每条 INSERT 都是独立 autocommit，
      * 大数据量下产生大量 fsync 导致极慢。改为单事务包裹，要么全部成功要么全部回滚。
      */
     suspend fun upsertAllSessions(sessions: List<Agent_session>) = withContext(Dispatchers.IO) {

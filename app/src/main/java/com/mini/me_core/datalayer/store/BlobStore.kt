@@ -20,7 +20,7 @@ class BlobStore(private val db: InfraDb, private val blobDir: File) {
 
     private val q get() = db.blobQueries
 
-    /** P1 修复：BLOB 写入大小护栏，防止超大字节数组导致 OOM。10MB 上限。 */
+    /** BLOB 写入大小护栏，防止超大字节数组导致 OOM。10MB 上限。 */
     private val maxBlobSize = 10L * 1024 * 1024
 
     /** 内联阈值：≤ 此值的 BLOB 存 DB；超过则落盘（见类注释 M10）。 */
@@ -33,7 +33,7 @@ class BlobStore(private val db: InfraDb, private val blobDir: File) {
 
     /**
      * 存储大二进制。
-     * P1 修复：原 INSERT + SELECT last_insert_rowid() 无事务包裹，并发下可能返回错误 id；
+     * 原 INSERT + SELECT last_insert_rowid() 无事务包裹，并发下可能返回错误 id；
      * 同时增加大小护栏，超过 10MB 抛异常拒绝写入，避免 OOM。
      * M10：超过内联阈值时改为落盘，DB 仅持路径，缩短写锁占用。
      */

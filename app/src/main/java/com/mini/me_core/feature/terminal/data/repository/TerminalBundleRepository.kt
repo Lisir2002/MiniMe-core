@@ -25,7 +25,7 @@ import javax.inject.Singleton
  *      通过 StateFlow 暴露给 UI。
  *   2. 负责把状态「落盘」：写入 `.bundle-<stableKey>-v<N>.done` 标记文件到 rootfs 目录；
  *      读磁盘标记来恢复冷启动后的状态。
- *   3. 负责「存量用户迁移」：如果检测到旧版 RC13/RC14 的 `.provisioned` 标记，
+ *   3. 负责「存量用户迁移」：如果检测到旧版 /的 `.provisioned` 标记，
  *      自动把全部 7 个 bundle 标为 Installed（保证用户升级后不会要求重下）。
  *
  * 不负责真正的 apk add / apk del——那是 LinuxContainerEngine 的事。

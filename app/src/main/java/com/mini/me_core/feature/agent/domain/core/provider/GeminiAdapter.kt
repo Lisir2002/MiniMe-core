@@ -27,7 +27,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import java.io.IOException
 
-/** P1 定点字段抽取路径：Gemini 流式所需标量字段（candidates[0].content.parts[0]，数组下标为路径段）。 */
+/** 定点字段抽取路径：Gemini 流式所需标量字段（candidates[0].content.parts[0]，数组下标为路径段）。 */
 private val GEMINI_STREAM_PATHS: List<List<String>> = listOf(
     listOf("usageMetadata", "promptTokenCount"),
     listOf("usageMetadata", "candidatesTokenCount"),
@@ -260,7 +260,7 @@ class GeminiAdapter @Inject constructor(
                             val data = line.removePrefix("data:").trim()
                             if (data.isEmpty()) continue
                             rawSse.append(line).append('\n')
-                            // P1 定点字段抽取：热路径（text/thought 增量）只取目标标量，不建整树。
+                            // 定点字段抽取：热路径（text/thought 增量）只取目标标量，不建整树。
                             val m = runCatching { SseFieldExtractor.extract(data, GEMINI_STREAM_PATHS) }.getOrElse { emptyMap() }
 
                             try {

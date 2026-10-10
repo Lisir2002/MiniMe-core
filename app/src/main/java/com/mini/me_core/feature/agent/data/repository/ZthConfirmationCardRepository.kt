@@ -13,11 +13,11 @@ import javax.inject.Singleton
  *
  * LINK-INV 4 写事务不在这里（在 ZthConfirmationCardManager 内显式 4 步 + CAS）。
  * 这里只提供：
- *   - Phase 5 prePlan 查「此 chainId 是否已被用户决策过」（幂等 ConfirmationCard 不重复弹）
+ *   -  prePlan 查「此 chainId 是否已被用户决策过」（幂等 ConfirmationCard 不重复弹）
  *   - UI sentinel 时间线 observeBySession
  *   - C.4.3 崩溃恢复 listUnexpiredBySession
  *   - C.4.2 一键回滚 markAllRollbackBySession
- *   - Phase 4.2 Firestore Dto 映射
+ *   - .2 Firestore Dto 映射
  *
  * 不变性：
  *   CARD-REPO-INV-1：所有 s_* 加密列绝不在 Repo 层解密（解密仅在需要展示时由 UI VM 完成）
@@ -29,7 +29,7 @@ class ZthConfirmationCardRepository @Inject constructor(
     private val telemetry: ZthTelemetryRepository
 ) {
 
-    /** Phase 5 Facade：弹卡前查询 chainId 是否已决策（已存在 → 直接复用 choice，不重复弹卡）。 */
+    /**  Facade：弹卡前查询 chainId 是否已决策（已存在 → 直接复用 choice，不重复弹卡）。 */
     suspend fun getSentinelsByChain(chainId: String): List<V2Sentinel> =
         v2Agent.listSentinelsByChain(chainId)
 
@@ -51,7 +51,7 @@ class ZthConfirmationCardRepository @Inject constructor(
     suspend fun getRejectionAudit(sentinelId: String): V2RejectionAudit? =
         v2Agent.listRejectionAudits(sentinelId).firstOrNull()
 
-    /** Manager 写入成功后，打一条 CARD.DECISION 遥测（Phase 4.1 14 指标写入路径之一）。 */
+    /** Manager 写入成功后，打一条 CARD.DECISION 遥测（.1 14 指标写入路径之一）。 */
     suspend fun recordDecisionTelemetry(
         sessionId: String?, tier: Int, cardTemplateId: String,
         choice: String, swipeVerified: Boolean, latencyMs: Long
@@ -59,7 +59,7 @@ class ZthConfirmationCardRepository @Inject constructor(
         telemetry.recordCardDecision(sessionId, tier, cardTemplateId, choice, swipeVerified, latencyMs)
     }
 
-    // ── Phase 4.2 Firestore：Sentinel + RejectionAudit ↔ Dto 映射 ────────
+    // ── .2 Firestore：Sentinel + RejectionAudit ↔ Dto 映射 ────────
     // CARD-REPO-INV-2：不跨设备同步 s_* 加密列（本地 Keystore-only）；同步只含元数据。
 
     fun sentinelToDto(e: V2Sentinel): Map<String, Any?> = mapOf(
@@ -111,7 +111,7 @@ class ZthConfirmationCardRepository @Inject constructor(
             created_at_ms = (m["createdAtMs"] as? Number)?.toLong() ?: System.currentTimeMillis()
         )
 
-    // ── Phase 4.2 Sync 辅助：批量全量拉（push 到 Firestore） ─────────
+    // ── .2 Sync 辅助：批量全量拉（push 到 Firestore） ─────────
 
     suspend fun getAllSentinels(): List<V2Sentinel> =
         v2Agent.listAllSentinels()

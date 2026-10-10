@@ -12,7 +12,7 @@ import javax.inject.Singleton
  *
  * 职责：
  *   prePlan：为「AI 即将写代码」创建 checkpoint（含所有要修改文件的 hash 快照）
- *   Postflight 失败：按 checkpointId 还原文件（Phase 5 onFailure 调）
+ *   Postflight 失败：按 checkpointId 还原文件（ onFailure 调）
  *   CrashRecovery：启动时扫未过期 checkpoint（C.4.3）
  *
  * 不变性：
@@ -55,7 +55,7 @@ class ZthCheckpointRepository @Inject constructor(
         )
     }
 
-    /** Phase 5 Postflight 失败：列出 checkpoint + 所有快照（用于文件还原）。 */
+    /**  Postflight 失败：列出 checkpoint + 所有快照（用于文件还原）。 */
     suspend fun getCheckpointWithSnapshots(checkpointId: String):
             Pair<V2Checkpoint, List<V2Snapshot>>? {
         val ck = v2Agent.getCheckpointById(checkpointId) ?: return null
@@ -80,7 +80,7 @@ class ZthCheckpointRepository @Inject constructor(
         v2Agent.deleteCheckpointsBefore(cutoffTimestamp)
     }
 
-    // ── Phase 4.2 Firestore：V2 ↔ Dto 映射入口 ─────────────────
+    // ── .2 Firestore：V2 ↔ Dto 映射入口 ─────────────────
 
     fun checkpointToDto(e: V2Checkpoint): Map<String, Any?> = mapOf(
         "id" to e.id, "sessionId" to e.session_id, "userMessageId" to e.user_message_id,

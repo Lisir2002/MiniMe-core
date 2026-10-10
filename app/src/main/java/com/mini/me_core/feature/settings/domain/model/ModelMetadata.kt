@@ -12,7 +12,7 @@ data class ModelMetadata(
     val supportsReasoning: Boolean = false,
     val source: Source = Source.INFERRED,
     /**
-     * RC63 兼容端点推断链路的审计信息：UI 上的智能预填 banner、来源徽章用它显示
+     * 兼容端点推断链路的审计信息：UI 上的智能预填 banner、来源徽章用它显示
      * 「当前支持（Vision/Tools/Reasoning）来自官方 catalog / 启发式匹配 / 兼容端点策略 / 用户手动覆盖」
      * 便于小白理解自己为什么被判定成支持/不支持。仅 INFERRED 源非 null，MODELS_DEV 源为 null。
      */

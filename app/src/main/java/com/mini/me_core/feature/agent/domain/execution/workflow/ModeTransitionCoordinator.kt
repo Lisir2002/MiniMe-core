@@ -6,7 +6,7 @@ import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * 执行模式切换守卫（P1-09 从 StatefulAgentWorkflow 整体搬迁的叶子协作者）。
+ * 执行模式切换守卫（ 从 StatefulAgentWorkflow 整体搬迁的叶子协作者）。
  *
  * 职责：纯计算 switchMode 工具是否触发执行模式（PLAN/AUTO/BUILD 等）切换——
  * 仅返回「候选新上下文 + 是否发生切换」的二元判定，不 awaitApproval、不发事件、不改主上下文。

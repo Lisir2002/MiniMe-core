@@ -11,7 +11,7 @@ import com.mini.me_core.datalayer.monitor.MonitoringDriverWrapper
  * 当前为「单连接 holder」：每库一个 SqlDriver（WAL + synchronous=FULL，读写同连接），
  * 通过此接口暴露，守护单写者、零并发写风险。
  *
- * v2-full-takeover P3：在首次创建 driver 后、返回给任何调用者之前，触发 [onOpened] 回调，
+ * 在首次创建 driver 后、返回给任何调用者之前，触发 [onOpened] 回调，
  * 确保 MigrationEngine.ensureSchema + SchemaSelfHealer 自愈总是在业务查询之前完成。
  *
  * 新架构（db-encryption-redesign）：driver 创建统一走 [EncryptedDatabaseManager]，

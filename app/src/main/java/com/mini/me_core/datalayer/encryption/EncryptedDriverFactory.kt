@@ -62,6 +62,7 @@ class EncryptedDriverFactory(
      * @throws DatabaseEncryptionException 驱动创建失败时
      */
     fun createBlocking(definition: DatabaseDefinition): SqlDriver {
+        // 密钥库 DEK 读取（Keystore/磁盘），Dispatchers.IO 包裹；初始化边界，非主线程，不加 StrictMode。
         val dek = runBlocking(Dispatchers.IO) {
             keyManager.getOrCreateDek(CipherPassphrase.purpose(definition.id))
         }

@@ -3,8 +3,8 @@ package com.mini.me_core.feature.agent.data.remote.zth
 import kotlinx.serialization.Serializable
 
 /**
- * Firestore 数据层通用 envelope（Phase 4 接入后 C.4.18 LWW 合并用）。
- * 任何 Firestore 文档顶层必带这 6 列（Phase 4 FirestoreSyncer 读写时以此 envelope 存）。
+ * Firestore 数据层通用 envelope（后续接入后 LWW 合并用）。
+ * 任何 Firestore 文档顶层必带这 6 列（FirestoreSyncer 读写时以此 envelope 存）。
  *  - `ct`：AES-256-GCM(shared_sync_key, dto_payload_json) base64
  *  - `hmac`：HMAC-SHA256(shared_sync_key, ct) base64 → 防未授权设备非法写入
  *  - `updatedAtMs` + `updatedAtDeviceId`：LWW 冲突合并（跨设备冲突用单调时间戳）
@@ -22,7 +22,7 @@ data class ZthSentinelFirestoreDto(
     val chainIndex: Int,
     val cardTemplateId: String,
     val triggerSubClass: String,
-    /** Firestore 同步时此值依然是加密后 blob（shared_sync_key 二次 wrap 后），Phase 4 解包。 */
+    /** Firestore 同步时此值依然是加密后 blob（shared_sync_key 二次 wrap 后），解包。 */
     val planPayloadCiphertext: String,
     val userTextCiphertext: String? = null,
     val cardPayloadCiphertext: String,

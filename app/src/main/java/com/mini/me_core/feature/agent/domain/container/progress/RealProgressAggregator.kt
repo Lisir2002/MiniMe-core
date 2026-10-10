@@ -160,7 +160,7 @@ class RealProgressAggregator @Inject constructor(
      * @param forceFailSnapshot
      *   true 表示本次会话明确失败（apk exit!=0 或有 failedReason），需要立刻把 UI 快照切到
      *   FAILED phase 并把 slots 清空 + speed 归零，避免用户看到「FAILED 0%」但顶栏依然显示
-     *   「X 槽并行 · Y KB/s」好像还在继续占网占线程的假像（RC61c 用户截图事故）。
+     *   「X 槽并行 · Y KB/s」好像还在继续占网占线程的假像（用户截图事故）。
      *   false 走原来的语义：停 ticker 不强制改状态（DONE 分支用）。
      */
     fun endSession(forceFailSnapshot: Boolean = false) {

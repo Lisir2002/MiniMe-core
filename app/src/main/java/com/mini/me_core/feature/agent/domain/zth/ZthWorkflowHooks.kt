@@ -9,13 +9,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * C.5 Phase 5：StatefulAgentWorkflow 集成钩子（**薄包装，零侵入核心循环**）。
+ * C.5 StatefulAgentWorkflow 集成钩子（**薄包装，零侵入核心循环**）。
  *
  * ### 设计原则（不破坏现有 StatefulAgentWorkflow 的 3 个不变性）
  *  - HOOK-INV-1：4 个 hook 函数只做「数据转换 → 调用 ZthGuardAggregateFacade」，不修改 workflow 状态树。
  *    workflow 侧调用 hook 后自行根据返回值决定后续 reducer/side effect（非黑盒）。
  *  - HOOK-INV-2：不修改 `AgentSessionState`、`AgentAction`、`AgentSideEffect` 定义（避免破坏
- *    StatefulAgentWorkflow 现有 reducer 的完备 when 覆盖——RC62~RC64e 曾因 Action 改动引入 Unresolved reference）。
+ *    StatefulAgentWorkflow 现有 reducer 的完备 when 覆盖——~曾因 Action 改动引入 Unresolved reference）。
  *  - HOOK-INV-3：此文件不依赖 Compose / ViewModel（纯 domain 层 Kotlin，可 JUnit）。
  *    UI 层的 ConfirmationCard 触发由 Facade 内部通过 `Provider<ZthConfirmationCardViewModel>` 懒加载。
  *

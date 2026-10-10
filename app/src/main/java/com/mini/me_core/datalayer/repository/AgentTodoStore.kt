@@ -30,7 +30,7 @@ internal class AgentTodoStore(private val db: AgentDb) {
 
     suspend fun deleteTodo(id: String) = withContext(Dispatchers.IO) { q.deleteTodoItem(id) }
 
-    // ── P2-3 备份流式导出/还原（对齐 TodoItemDao 分页 + upsertAll）─────────
+    // ── 备份流式导出/还原（对齐 TodoItemDao 分页 + upsertAll）─────────
 
     suspend fun getTodoPageAfter(
         lastCreatedAtMs: Long, lastId: String, limit: Long,
@@ -46,7 +46,7 @@ internal class AgentTodoStore(private val db: AgentDb) {
 
     /**
      * 批量 upsert 待办（备份恢复用）。
-     * P1 修复：原 forEach 逐条 upsert 无事务包裹，改为单事务保证原子性和性能。
+     * 原 forEach 逐条 upsert 无事务包裹，改为单事务保证原子性和性能。
      */
     suspend fun upsertAllTodos(todos: List<Todo_items>) = withContext(Dispatchers.IO) {
         db.transaction {
@@ -59,7 +59,7 @@ internal class AgentTodoStore(private val db: AgentDb) {
         }
     }
 
-    // ── P2-3 会话级联删除（对齐 SessionUseCase.deleteSession）─────────────
+    // ── 会话级联删除（对齐 SessionUseCase.deleteSession）─────────────
 
     suspend fun deleteTodosBySession(sessionId: String) =
         withContext(Dispatchers.IO) { q.deleteTodoItemsBySession(sessionId) }

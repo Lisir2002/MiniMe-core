@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * P2-17 行为保持搬迁：AI 供应商域（供应商 CRUD / 模型拉取与测试 / 模型元数据覆盖 /
+ *  行为保持搬迁：AI 供应商域（供应商 CRUD / 模型拉取与测试 / 模型元数据覆盖 /
  * 兼容端点全局策略 / 供应商级连通性测试）。逻辑原属 SettingsViewModel，逐字搬迁。
  */
 @Suppress("TooManyFunctions", "ClassOrdering") // 行为保持搬迁：供应商域方法全部原样保留（ClassOrdering 原条目本在 baseline）
@@ -59,9 +59,9 @@ internal class ProviderSection(
     val customFetchState: StateFlow<FetchState> = _customFetchState.asStateFlow()
 
     /**
-     * RC72：保存提供商时的错误提示通道（一次性，消费后自动清空）。
+     * 保存提供商时的错误提示通道（一次性，消费后自动清空）。
      *
-     * 背景：RC71 把 AIProviderRepositoryImpl.toEntity 的「加密失败」从静默落空串改成抛异常，
+     * 背景：把 AIProviderRepositoryImpl.toEntity 的「加密失败」从静默落空串改成抛异常，
      * 以杜绝密钥被空串覆盖。但 ViewModel 的 saveProvider 用 viewModelScope.launch 无 try-catch，
      * 未捕获的协程异常会直接导致 App 崩溃（闪退）。这里接管异常：不崩溃、不静默丢密钥，
      * 而是把错误暴露给 UI 弹提示。
@@ -80,19 +80,19 @@ internal class ProviderSection(
     private val _modelMetadata = MutableStateFlow<Map<String, ModelMetadata>>(emptyMap())
     val modelMetadata: StateFlow<Map<String, ModelMetadata>> = _modelMetadata.asStateFlow()
 
-    /** RC63 备选方案③：兼容端点「默认策略」流 + 快照（ProviderEditorScreen Tab0 下拉选择 + 选项卡小角标用）。 */
+    /** 备选方案③：兼容端点「默认策略」流 + 快照（ProviderEditorScreen Tab0 下拉选择 + 选项卡小角标用）。 */
     val compatibilityDefaultPolicyFlow: StateFlow<DefaultPolicy>
         get() = compatibilityPolicyRepository.defaultPolicyFlow.stateIn(
             scope, SharingStarted.Eagerly, DefaultPolicy.STRICT
         )
 
-    /** RC63 备选方案②「发送失败自动降级」总开关。 */
+    /** 备选方案②「发送失败自动降级」总开关。 */
     val autoDowngradeOnSendFailureFlow: StateFlow<Boolean>
         get() = compatibilityPolicyRepository.autoDowngradeOnSendFailureFlow.stateIn(
             scope, SharingStarted.Eagerly, true
         )
 
-    /** RC63 viewImage 守卫策略（FALLBACK_VISION_MODEL vs FAIL_FAST）。 */
+    /** Image 守卫策略（FALLBACK_VISION_MODEL vs FAIL_FAST）。 */
     val viewImageUnknownGuardPolicyFlow: StateFlow<ViewImageUnknownGuardPolicy>
         get() = compatibilityPolicyRepository.viewImageUnknownGuardPolicyFlow.stateIn(
             scope, SharingStarted.Eagerly,
@@ -146,7 +146,7 @@ internal class ProviderSection(
 
     fun saveProvider(provider: AIProviderConfig) {
         scope.launch {
-            // RC72：接管保存异常，避免未捕获协程异常导致崩溃（闪退）。
+            // 接管保存异常，避免未捕获协程异常导致崩溃（闪退）。
             // 底层 toEntity 在加密失败时会抛异常（防止密钥被空串覆盖），必须在这里捕获，
             // 否则 viewModelScope.launch 的未捕获异常会直接闪退。
             runCatching { repository.saveProvider(provider) }
@@ -343,7 +343,7 @@ internal class ProviderSection(
     }
 
     // ────────────────────────────────────────────────────────────────
-    // RC63 备选方案③：兼容端点全局策略设置（ProviderEditorScreen Tab0 调用）
+    // 备选方案③：兼容端点全局策略设置（ProviderEditorScreen Tab0 调用）
     // ────────────────────────────────────────────────────────────────
 
     fun setCompatibilityDefaultPolicy(policy: DefaultPolicy) {
@@ -359,7 +359,7 @@ internal class ProviderSection(
     }
 
     // ────────────────────────────────────────────────────────────────
-    // RC63 备选方案④：单模型能力复选框覆盖（ProviderEditorScreen Tab1 调用）
+    // 备选方案④：单模型能力复选框覆盖（ProviderEditorScreen Tab1 调用）
     // ────────────────────────────────────────────────────────────────
 
     /** 观察某模型的手动覆盖（用于 ModelSettingsSheet 实时回显勾选状态）。 */

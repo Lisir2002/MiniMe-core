@@ -3,12 +3,12 @@ package com.mini.me_core.core.security
 /**
  * ZTH 跨设备共享密钥（C.4.18 方案 C：完整 Firestore 双向同步）。
  *
- * ### Phase 1.5 设计约束（Preflight P12 纠正）
+ * ### 设计约束
  * 项目目前未引入：
  *  - Argon2id KDF 库（如 argon2-jvm / lazysodium）
  *  - BIP-39 助记词库（如 bitcoinj / cashlib）
  *  - Firebase/Firestore BOM SDK
- *  因此 **Phase 1 只定义接口契约和占位数据结构**，**Phase 4 才加 Gradle 依赖**并实现：
+ *  因此 **只定义接口契约和占位数据结构**，**真实实现时才加 Gradle 依赖**并落地：
  *
  *    a) build.gradle.kts 加 implementation(platform("com.google.firebase:firebase-bom:..."))
  *    b) 加 argon2 / BIP-39 纯 Kotlin 依赖
@@ -24,15 +24,15 @@ package com.mini.me_core.core.security
  */
 interface ZthSharedSyncKeyStore {
 
-    /** Phase 4 真实实现：用户输入口令 + 确认口令（一致）→ 生成助记词并显示 1 次。 */
+    /** 真实实现：用户输入口令 + 确认口令（一致）→ 生成助记词并显示 1 次。 */
     sealed interface GenerateResult {
         data class Success(val bip39Mnemonic8Words: List<String>) : GenerateResult
         data class PasswordMismatch(val reason: String) : GenerateResult
-        /** Phase 1 占位：依赖未加载。 */
+        /** 占位实现：依赖未加载。 */
         object DependencyNotReady : GenerateResult
     }
 
-    /** Phase 4 真实实现：用户输入 8 词助记词 → 反向转回 shared_sync_key。 */
+    /** 真实实现：用户输入 8 词助记词 → 反向转回 shared_sync_key。 */
     sealed interface ImportResult {
         data class Success(val restored: Boolean) : ImportResult
         data class InvalidMnemonic(val reason: String) : ImportResult
@@ -43,13 +43,13 @@ interface ZthSharedSyncKeyStore {
 
     suspend fun importFromMnemonic(mnemonicWords: List<String>): ImportResult
 
-    /** Phase 1 占位：任何时候调用都抛 DependencyNotReady → Phase 4 真实现覆写。 */
+    /** 占位实现：任何时候调用都抛 DependencyNotReady → 真实实现覆写。 */
     fun isReady(): Boolean = false
 }
 
 /**
- * Phase 1 临时实现：保证依赖图编译通过（Phase 2+ 不引用 Firestore），Phase 4 替换为 RealZthSharedSyncKeyStore。
- * 所有方法返回 DependencyNotReady；UI 层接收到则显示「跨设备同步：Phase 4 后激活」。
+ * 临时实现：保证依赖图编译通过（不引用 Firestore），真实实现替换为 RealZthSharedSyncKeyStore。
+ * 所有方法返回 DependencyNotReady；UI 层接收到则显示「跨设备同步：待激活」。
  */
 class PlaceholderZthSharedSyncKeyStore : ZthSharedSyncKeyStore {
     override suspend fun generateSharedKey(

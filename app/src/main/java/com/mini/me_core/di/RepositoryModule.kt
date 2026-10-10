@@ -13,10 +13,10 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * 业务 Repository DI（v2-full-takeover P2 批 1，去双路径后）。
+ * 业务 Repository DI。
  *
  * 数据层已完全由 V2 SQLDelight 接管，直接注入 V2 实现。
- * 旧 Room 实现类在 P3 剔除。
+ * 旧 Room 实现类已剔除。
  */
 @Module
 @InstallIn(SingletonComponent::class)

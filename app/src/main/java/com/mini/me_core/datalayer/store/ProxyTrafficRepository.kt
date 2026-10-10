@@ -14,7 +14,7 @@ data class TrafficUsage(
 }
 
 /**
- * P1-8：代理流量采样持久化（INFRA 库 proxy_traffic 表）。
+ * 代理流量采样持久化（INFRA 库 proxy_traffic 表）。
  *
  * 采样行由 [com.mini.me_core.feature.proxy.domain.ProxyTrafficSampler] 写入；
  * 这里提供今日 / 本周 / 累计用量聚合查询，全部同步（SQLDelight 连接池内执行）。

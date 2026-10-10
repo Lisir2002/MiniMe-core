@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
  * credentials 域 Repository（设计 §11.2 / L2）：远程连接与密钥的访问门面。
  * secret 走独立表 [Cred_secret]，与连接元数据隔离；库级加密启用时该库优先级最高（设计 §8）。
  *
- * v2-full-takeover P0-1：补 Flow 响应式读，对齐 Room DAO 的 1 个 Flow 查询。
+ * 补 Flow 响应式读，对齐 Room DAO 的 1 个 Flow 查询。
  */
 class CredentialsRepository(private val db: CredentialsDb) {
 
@@ -66,7 +66,7 @@ class CredentialsRepository(private val db: CredentialsDb) {
     suspend fun deleteGitCredential(id: String) =
         withContext(Dispatchers.IO) { q.deleteGitCredential(id) }
 
-    // ── P0-2 补齐列级 setter 与 REPLACE 语义 ──
+    // ── 补齐列级 setter 与 REPLACE 语义 ──
 
     /**
      * Upsert Git 凭据：isDefault=true 时先清同 host 默认，再写入，单事务原子。
@@ -103,7 +103,7 @@ class CredentialsRepository(private val db: CredentialsDb) {
     suspend fun countGitCredentials(): Long =
         withContext(Dispatchers.IO) { q.selectGitCredentialCount().executeAsOne() }
 
-    // ── P0-1 Flow 响应式读（对齐 Room DAO 的 1 个 Flow 查询）──
+    // ── Flow 响应式读（对齐 Room DAO 的 1 个 Flow 查询）──
 
     fun observeAllGitCredentials(): Flow<List<com.mini.mecore.datalayer.sqldelight.credentials.Git_credentials>> =
         q.selectAllGitCredentials().asFlow().mapToList(Dispatchers.IO)

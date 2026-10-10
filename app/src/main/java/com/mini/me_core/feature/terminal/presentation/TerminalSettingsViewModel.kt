@@ -59,7 +59,7 @@ import javax.inject.Inject
  *  - 容器 Profile 管理：内置 + 自定义 profile 列表、激活切换、增删改、远程 SSH 模式切换。
  */
 @HiltViewModel
-@Suppress("LongParameterList") // 构造参数个数保持，仅容器/SSH 类型由具体类改为端口接口（P3-12）
+@Suppress("LongParameterList") // 构造参数个数保持，仅容器/SSH 类型由具体类改为端口接口
 class TerminalSettingsViewModel @Inject constructor(
     application: Application,
     private val settingsRepo: TerminalSettingsRepository,
@@ -80,7 +80,7 @@ class TerminalSettingsViewModel @Inject constructor(
     /** 容器文件访问层（F3.1 文件管理器用）。 */
     val fileAccess: ContainerFileAccess get() = containerFileAccess
 
-    /** P1 模块10：文件管理器剪切板状态（提升到 ViewModel，切换子 tab 不丢失）。 */
+    /**  模块10：文件管理器剪切板状态（提升到 ViewModel，切换子 tab 不丢失）。 */
     var fileClipboard: Triple<List<String>, Boolean, Int> by mutableStateOf(Triple(emptyList(), false, 0))
         private set
 

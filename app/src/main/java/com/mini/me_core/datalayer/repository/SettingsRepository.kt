@@ -15,8 +15,8 @@ import kotlinx.coroutines.withContext
  * settings 域 Repository（设计 §11.3 / L2）：档案 + 强类型偏好表门面。
  * 通用 KV（非强类型偏好）由 infra KVStore 承接，settings 域只保留 profile/pref 强类型表。
  *
- * v2-full-takeover P0-1/P0-2：补 ai_providers 的 Flow 响应式读与列级 setter，
- * 语义逐条对齐 Room `AIProviderDao`（含 RC68 active 互斥不变量的事务化）。
+ * 补 ai_providers 的 Flow 响应式读与列级 setter，
+ * 语义逐条对齐 Room `AIProviderDao`（含 active 互斥不变量的事务化）。
  */
 class SettingsRepository(private val db: SettingsDb) {
 
@@ -58,7 +58,7 @@ class SettingsRepository(private val db: SettingsDb) {
 
     /**
      * 保存（对齐 Room `@Insert(onConflict = REPLACE)`）：不存在则插、存在则整行替换。
-     * isActive=true 时先清全部 active —— 复刻 RC68 P0-1 不变量（全库最多一行 active），
+     * isActive=true 时先清全部 active —— 复刻 active 互斥不变量（全库最多一行 active），
      * 且两步收进单事务，消除 Room 版的非原子窗口。
      */
     suspend fun saveProvider(
@@ -101,7 +101,7 @@ class SettingsRepository(private val db: SettingsDb) {
     suspend fun getActiveProvider(): Ai_providers? =
         withContext(Dispatchers.IO) { q.selectActiveProvider().executeAsOneOrNull() }
 
-    /** 切换激活（RC68 P0-1 互斥不变量事务化：清全部 + 置指定，一步到位）。 */
+    /** 切换激活（互斥不变量事务化：清全部 + 置指定，一步到位）。 */
     suspend fun setActiveProvider(id: String) = withContext(Dispatchers.IO) {
         db.transaction {
             q.deactivateAllProviders()
@@ -124,11 +124,11 @@ class SettingsRepository(private val db: SettingsDb) {
     suspend fun setProviderEnabled(id: String, isEnabled: Boolean) =
         withContext(Dispatchers.IO) { q.setProviderEnabled(if (isEnabled) 1L else 0L, id) }
 
-    /** RC71：仅更新密文列（加密失败中止路径由调用方保证，不触碰其它列）。 */
+    /** 仅更新密文列（加密失败中止路径由调用方保证，不触碰其它列）。 */
     suspend fun updateEncryptedApiKey(id: String, newEncrypted: String) =
         withContext(Dispatchers.IO) { q.updateEncryptedApiKey(newEncrypted, id) }
 
-    // ── P1-3 parity 校验原语（行数比对用）──
+    // ── parity 校验原语（行数比对用）──
 
     suspend fun countProviders(): Long =
         withContext(Dispatchers.IO) { q.selectProviderCount().executeAsOne() }

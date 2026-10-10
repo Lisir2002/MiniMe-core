@@ -34,9 +34,9 @@ data class ProxyRuntimeState(
     val controllerPort: Int = ClashProxyManager.CONTROLLER_PORT,
     /** 控制器最近一次是否连得上 mihomo。 */
     val controllerReachable: Boolean = false,
-    /** P0-3：内核崩溃后正在指数退避自动恢复中（UI 显示「内核异常恢复中」）。 */
+    /** 内核崩溃后正在指数退避自动恢复中（UI 显示「内核异常恢复中」）。 */
     val recovering: Boolean = false,
-    /** P0-3：当前是第几次崩溃自动重启（1 起；recovering=true 时有效）。 */
+    /** 当前是第几次崩溃自动重启（1 起；recovering=true 时有效）。 */
     val recoveryAttempt: Int = 0,
 )
 
@@ -78,7 +78,7 @@ data class ProxyTraffic(
     val down: Long,
 )
 
-/** P3-18：预热实例状态（UI 在 profile 列表展示 运行中/预热中/未启动）。 */
+/** 预热实例状态（UI 在 profile 列表展示 运行中/预热中/未启动）。 */
 data class WarmupState(
     val warmProfileId: String? = null,
     val warming: Boolean = false,
@@ -94,7 +94,7 @@ data class WarmupState(
 /**
  * 容器内 mihomo 代理引擎管理器（生命周期仿 [com.mini.me_core.feature.agent.domain.container.bridge.RcbBridge]）。
  *
- * P2-16 拆分后本类为**薄门面（facade）**：类名、包名、构造函数签名与 Hilt 注解保持不变，
+ *  拆分后本类为**薄门面（facade）**：类名、包名、构造函数签名与 Hilt 注解保持不变，
  * 原 public/internal 方法签名全部保留并委托给同包协作者，调用方零改动即可编译。
  *
  * 职责分层（《网络代理设计 v1.0》§2.3 / §5）：
@@ -132,10 +132,10 @@ class ClashProxyManager @Inject constructor(
         internal const val CONFIG_FILE = "config.yaml"
         internal const val SECRET_FILE = "secret"
 
-        /** P0-5：control secret 在 KVStore 中的键（密文形式，与订阅 secret 同一套 CredentialEncryptor）。 */
+        /** control secret 在 KVStore 中的键（密文形式，与订阅 secret 同一套 CredentialEncryptor）。 */
         internal const val CONTROL_SECRET_KEY = "control_secret"
 
-        /** P2-15：上次成功使用的端口持久化键。 */
+        /** 上次成功使用的端口持久化键。 */
         internal const val MIXED_PORT_KEY = "mixed_port"
         internal const val CONTROLLER_PORT_KEY = "controller_port"
         internal const val PORT_RETRY_MAX = 10
@@ -152,7 +152,7 @@ class ClashProxyManager @Inject constructor(
             "mixed-port", "port", "socks-port", "redir-port",
             "tproxy-port", "external-controller", "external-ui",
             "secret", "allow-lan", "bind-address", "mode",
-            // P0-2：危险/不可信顶层键补全剥离。dns 由固定防泄露块接管；script 可执行内联脚本；
+            // 危险/不可信顶层键补全剥离。dns 由固定防泄露块接管；script 可执行内联脚本；
             // profile 控制持久化行为；geodata-mode 影响 geoip 判定。这些键此前只在 dangerScan
             // 提示而未实际剥离，订阅可夹带恶意配置绕过沙箱，现统一在合成阶段剥离。
             "dns", "script", "profile", "geodata-mode"
@@ -190,7 +190,7 @@ class ClashProxyManager @Inject constructor(
         const val MIHOMO_AMD64_ASSET = "mihomo-android-amd64-$MIHOMO_VERSION.gz"
         const val MIHOMO_AMD64_GZ_SHA256 = "f930e62c24f6f6ae18790282963d47eadaeed61346a8d869ca899acdb8c7cf29"
 
-        /** P0-3：崩溃后最多自动重启次数（退避 1s→2s→4s 共 3 次，之后标记不可用）。 */
+        /** 崩溃后最多自动重启次数（退避 1s→2s→4s 共 3 次，之后标记不可用）。 */
         internal const val MAX_CRASH_RESTARTS = 3
     }
 
@@ -201,7 +201,7 @@ class ClashProxyManager @Inject constructor(
     @Volatile
     private var enabledCache: Boolean = false
 
-    // ── P2-16：协作者装配（普通 internal 类，门面构造；依赖全部来自门面已注入对象） ──
+    // ── 协作者装配（普通 internal 类，门面构造；依赖全部来自门面已注入对象） ──
 
     /** 配置产物目录 filesDir/minime/proxy（旧实现 configDir() 原样搬迁为 lambda）。 */
     private val configDir: () -> File = {
@@ -255,11 +255,11 @@ class ClashProxyManager @Inject constructor(
         setEnabledCache = { enabledCache = it },
     )
 
-    /** P3-18：预热实例状态（UI 显示 运行中/预热中/未启动）。 */
+    /** 预热实例状态（UI 显示 运行中/预热中/未启动）。 */
     val warmupState: StateFlow<WarmupState> = processManager.warmupState
 
     init {
-        // P0-5：secret 改为加密存储（CredentialEncryptor + KVStore），需在协程中异步解密。
+        // secret 改为加密存储（CredentialEncryptor + KVStore），需在协程中异步解密。
         // 必须先于任何内核拉起/控制面请求完成——on()/controllerRequest 等 suspend 入口会 await secretReady。
         CoroutineScope(Dispatchers.IO).launch {
             runCatching { secretStore.loadOrCreate() }
@@ -307,13 +307,13 @@ class ClashProxyManager @Inject constructor(
                 _state.update { it.copy(activeProfileId = id) }
             }
         }
-        // 网络层优化 C5：AI 接口直连/代理分流开关 → 同步给 App 网络层路由写位（默认关 = 全走代理）
+        // AI 接口直连/代理分流开关 → 同步给 App 网络层路由写位（默认关 = 全走代理）
         CoroutineScope(Dispatchers.IO).launch {
             repository.aiHostsDirectFlow.collect { direct ->
                 routeHolder.setAiHostsDirect(direct)
             }
         }
-        // P1-7：订阅自动更新周期检查（每 15 分钟扫描一次，按各 profile 的 updateIntervalHours 决定是否到期）。
+        // 订阅自动更新周期检查（每 15 分钟扫描一次，按各 profile 的 updateIntervalHours 决定是否到期）。
         // 沿用 appScope 协程周期循环模式（与 scheduleScheduler 一致）；mihomo 仅在本进程存活时运行，
         // 进程死亡时热重载无意义，故不引入 WorkManager。
         CoroutineScope(Dispatchers.IO).launch {
@@ -330,14 +330,14 @@ class ClashProxyManager @Inject constructor(
     /** 供容器/上层读取的启用态（同步、非挂起）。 */
     fun isEnabled(): Boolean = enabledCache
 
-    /** P1-9：mihomo 内核进程是否存活（诊断用，同步非挂起）。 */
+    /** mihomo 内核进程是否存活（诊断用，同步非挂起）。 */
     fun isKernelAlive(): Boolean = processManager.isKernelAlive()
 
-    /** P1-9：经内核真实出口测 generate_204 延迟（ms）；控制器不可达/超时返回 null。 */
+    /** 经内核真实出口测 generate_204 延迟（ms）；控制器不可达/超时返回 null。 */
     suspend fun testOutboundLatency(): Long? = controlClient.testOutboundLatency()
 
     /**
-     * P1-8：读 mihomo 累计流量计数 [uploadTotal, downloadTotal]（/connections 顶层字段，自内核启动起累计）。
+     * 读 mihomo 累计流量计数 [uploadTotal, downloadTotal]（/connections 顶层字段，自内核启动起累计）。
      * 控制器不可达返回 null。差值由调用方（采样器）计算。
      */
     suspend fun readTrafficCounters(): Pair<Long, Long>? = controlClient.readTrafficCounters()
@@ -345,14 +345,14 @@ class ClashProxyManager @Inject constructor(
     /** 控制器地址 "127.0.0.1:port"。 */
     fun controllerAddress(): String = "$CONTROLLER_HOST:${ports.controller}"
 
-    /** P2-15：当前实际 mixed 端口（供 UI 展示）。 */
+    /** 当前实际 mixed 端口（供 UI 展示）。 */
     fun mixedPort(): Int = ports.mixed
 
-    /** P3-19：公开的控制面请求包装（供连接审计日志读取 /connections）。 */
+    /** 公开的控制面请求包装（供连接审计日志读取 /connections）。 */
     suspend fun controllerRequestPublic(method: String, path: String): String? =
         controlClient.controllerRequest(method, path)
 
-    /** P2-15：是否因冲突避让过默认端口。 */
+    /** 是否因冲突避让过默认端口。 */
     fun portAdjusted(): Boolean = ports.mixedWasAdjusted
 
     fun controllerSecret(): String = secretStore.secret
@@ -366,7 +366,7 @@ class ClashProxyManager @Inject constructor(
     suspend fun fetchSubscriptionYaml(url: String): String? =
         subscriptionService.fetchSubscriptionYaml(url)
 
-    /** P1-7：手动/自动刷新某个订阅型 profile。委托 [ClashSubscriptionService]。 */
+    /** 手动/自动刷新某个订阅型 profile。委托 [ClashSubscriptionService]。 */
     suspend fun refreshSubscriptionNow(id: String): Boolean =
         subscriptionService.refreshSubscriptionNow(id)
 
@@ -402,7 +402,7 @@ class ClashProxyManager @Inject constructor(
     suspend fun selectProxyNode(group: String, node: String): Boolean =
         controlClient.selectProxyNode(group, node)
 
-    /** P1-11：热重载配置（不杀进程、不断连）。委托 [ClashControlClient.reloadConfig]。 */
+    /** 热重载配置（不杀进程、不断连）。委托 [ClashControlClient.reloadConfig]。 */
     suspend fun reloadConfig(configYaml: String): Boolean = controlClient.reloadConfig(configYaml)
 
     /** /traffic WS 实时推流（零轮询）。委托 [ClashControlClient.trafficFlow]。 */
@@ -431,9 +431,9 @@ class ClashProxyManager @Inject constructor(
         synthesizer.writeConfigFile(config)
         // 内核必须实际跑起来并让控制面就绪，才能把开关置为 enabled——
         // 否则 App 流量会被 routeHolder 打进无人监听的 7890（`Failed to connect to /127.0.0.1:7890`）。
-        // P1-11：内核已在运行时优先热重载（不杀进程、不断连）；热重载失败才回退到 restart。
-        // P2-15：启动前检测/避让端口冲突（内核未在跑时才需要；已在跑则端口已定）。
-        // P3-18：内核未在跑时，若目标 profile 已预热，直接提升预热进程为主进程（零冷启动）。
+        // 内核已在运行时优先热重载（不杀进程、不断连）；热重载失败才回退到 restart。
+        // 启动前检测/避让端口冲突（内核未在跑时才需要；已在跑则端口已定）。
+        // 内核未在跑时，若目标 profile 已预热，直接提升预热进程为主进程（零冷启动）。
         val wasAlive = processManager.isKernelAlive()
         val kernelOk = when {
             wasAlive -> {
@@ -461,13 +461,13 @@ class ClashProxyManager @Inject constructor(
         // 同步写位：不等 DataStore flow 的异步 emit，消除「on() 返回后立刻发请求仍走直连」的竞态窗口。
         // 后续 flow 收集器也会写同一组值（幂等）。
         enabledCache = true
-        // P0-3：用户手动拉起成功视为新会话，清零崩溃退避计数并清除恢复中状态。
+        // 用户手动拉起成功视为新会话，清零崩溃退避计数并清除恢复中状态。
         processManager.resetCrashAttempts()
         routeHolder.update(true, "127.0.0.1:${ports.mixed}")
         _state.update { it.copy(enabled = true, activeProfileId = profileId, recovering = false, recoveryAttempt = 0) }
-        // P2-14：进入前台保活通知。
+        // 进入前台保活通知。
         runCatching { ProxyForegroundService.start(context, ports.mixed) }
-        // P3-18：记录本次活跃 profile；若有上一个不同的 profile，后台预热它（延迟 8s，不阻塞 on() 返回）。
+        // 记录本次活跃 profile；若有上一个不同的 profile，后台预热它（延迟 8s，不阻塞 on() 返回）。
         val previous = processManager.lastActiveProfileId
         processManager.lastActiveProfileId = profileId
         if (previous != null && previous != profileId) {
@@ -489,11 +489,11 @@ class ClashProxyManager @Inject constructor(
         repository.setProxyEnabled(false)
         // 同步写位（同 on()），不等 flow 异步 emit。
         enabledCache = false
-        // P0-3：用户主动关闭，重置崩溃退避计数与恢复中状态。
+        // 用户主动关闭，重置崩溃退避计数与恢复中状态。
         processManager.resetCrashAttempts()
         routeHolder.update(false, "127.0.0.1:${ports.mixed}")
         _state.update { it.copy(enabled = false, recovering = false, recoveryAttempt = 0) }
-        // P2-14：退出前台保活。
+        // 退出前台保活。
         runCatching { ProxyForegroundService.stop(context) }
         FileLogger.i(TAG, "network_proxy OFF")
     }

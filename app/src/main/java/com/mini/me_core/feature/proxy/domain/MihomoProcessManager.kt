@@ -22,14 +22,14 @@ import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 
 /**
- * P2-16 拆分产物：mihomo / clash 进程启停、生命周期、端口与二进制资源。
+ * 拆分产物：mihomo / clash 进程启停、生命周期、端口与二进制资源。
  *
  * 逻辑原样搬迁自 [ClashProxyManager]：
  *  - 二进制按 ABI 挑 android 构建资产，下载即算 SHA256（官方校验和），走 [directClient]（NO_PROXY）自举；
  *  - 子进程以 `-d <dir> -f config.yaml` 拉起，绑定 127.0.0.1；waitFor 监视异常退出并指数退避自恢复
  *    （1s→2s→4s，最多 3 次，耗尽则标记不可用）；
  *  - 端口冲突自动 +1 避让并持久化；
- *  - P3-18 预热池：独立端口/配置目录/进程后台预热，命中即零冷启动提升为主进程。
+ *  -  预热池：独立端口/配置目录/进程后台预热，命中即零冷启动提升为主进程。
  */
 @Suppress("LongParameterList", "TooManyFunctions") // 行为保持搬迁：LongParameterList 为协作者装配签名；TooManyFunctions 因进程生命周期/二进制下载/端口避让/崩溃恢复/预热池内聚在同一类，仅机械提取不拆分职责
 internal class MihomoProcessManager(
@@ -73,7 +73,7 @@ internal class MihomoProcessManager(
         okHttp.newBuilder().proxy(java.net.Proxy.NO_PROXY).build()
     }
 
-    // ── P3-18：多实例预热池状态 ──────────────────────────────────────────────
+    // ── 多实例预热池状态 ──────────────────────────────────────────────
     @Volatile
     private var warmProfileId: String? = null
 
@@ -93,10 +93,10 @@ internal class MihomoProcessManager(
     private val _warmupState = MutableStateFlow(WarmupState())
     val warmupState: kotlinx.coroutines.flow.StateFlow<WarmupState> = _warmupState.asStateFlow()
 
-    /** P1-9：mihomo 内核进程是否存活（诊断用，同步非挂起）。 */
+    /** mihomo 内核进程是否存活（诊断用，同步非挂起）。 */
     fun isKernelAlive(): Boolean = mihomoProcess?.isAlive == true
 
-    /** P0-3：用户手动拉起成功视为新会话，清零崩溃退避计数。 */
+    /** 用户手动拉起成功视为新会话，清零崩溃退避计数。 */
     fun resetCrashAttempts() {
         crashRestartAttempts = 0
     }
@@ -198,7 +198,7 @@ internal class MihomoProcessManager(
     // ============================ 端口避让 ============================
 
     /**
-     * P2-15：在启动 mihomo 前选定空闲端口。
+     * 在启动 mihomo 前选定空闲端口。
      * 优先用上次持久化的端口；若仍被占用则从默认 7890/9090 起 +1 试绑（最多 10 次）。
      */
     fun ensurePortsSelected() {
@@ -275,7 +275,7 @@ internal class MihomoProcessManager(
                     mihomoProcess = null
                     FileLogger.w(tag, "mihomo 内核进程退出 code=${p.exitValue()}（详见 mihomo.log）")
                     logKernelLogTail()
-                    // P0-3：用户仍要求代理开启时，指数退避自动重启（1s→2s→4s，最多 3 次）。
+                    // 用户仍要求代理开启时，指数退避自动重启（1s→2s→4s，最多 3 次）。
                     // 主动 off()/on() 重启路径会先把 mihomoProcess 置 null，故此处 mihomoProcess===p
                     // 即「非主动关闭的异常退出」，才进入自恢复。
                     if (isEnabledCache() && !crashRestartInProgress) {
@@ -370,7 +370,7 @@ internal class MihomoProcessManager(
     }
 
     /**
-     * P0-3：mihomo 内核异常退出后的指数退避自动重启。
+     * mihomo 内核异常退出后的指数退避自动重启。
      * 退避序列 1s → 2s → 4s，最多 MAX_CRASH_RESTARTS 次；成功则清零计数并恢复 `stateFlow`；
      * 连续失败耗尽则把代理标记为不可用（enabled=false + routeHolder 切直连兜底）。
      * 全程持 [kernelMutex]，与 on()/off() 互斥。
@@ -378,7 +378,7 @@ internal class MihomoProcessManager(
     /** 单次崩溃重启尝试结果：成功 / 下一轮退避 / 退避窗口内用户已关闭（放弃）。 */
     private enum class CrashAttempt { SUCCESS, RETRY, ABORTED }
 
-    /** P0-3：第 n 次退避毫秒数（1s→2s→4s），与原内联 when 逐字等价。 */
+    /** 第 n 次退避毫秒数（1s→2s→4s），与原内联 when 逐字等价。 */
     private fun crashBackoffMs(attempt: Int): Long = when (attempt) {
         1 -> 1000L
         2 -> 2000L
@@ -445,7 +445,7 @@ internal class MihomoProcessManager(
     }
 
     /**
-     * P0-3：mihomo 内核异常退出后的指数退避自动重启。
+     * mihomo 内核异常退出后的指数退避自动重启。
      * 全程持 [kernelMutex]，与 on()/off() 互斥；退避期间用户关闭代理会被 [isEnabledCache] 检查拦下。
      */
     @Suppress("TooGenericExceptionCaught") // 行为保持搬迁：进程状态机必须隔离任意异常（含协程/IO），避免自恢复崩溃传播；cause 经 t.message 记入 FileLogger
@@ -473,7 +473,7 @@ internal class MihomoProcessManager(
         }
     }
 
-    // ── P3-18：多实例预热 ────────────────────────────────────────────────────────
+    // ── 多实例预热 ────────────────────────────────────────────────────────
 
     private fun warmupDir(): File = File(configDir(), "warmup").apply { mkdirs() }
 
@@ -543,7 +543,7 @@ internal class MihomoProcessManager(
     }
 
     /**
-     * P3-18：切换时若目标正是预热实例，直接提升为主进程（零冷启动）。
+     * 切换时若目标正是预热实例，直接提升为主进程（零冷启动）。
      * @return true=已提升（调用方跳过正常启动流程）。
      */
     fun promoteWarmIfMatches(profileId: String?): Boolean {

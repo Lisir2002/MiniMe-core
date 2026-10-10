@@ -16,7 +16,7 @@ data class GuardLogEntry(
 )
 
 /**
- * 护栏拦截日志（P2）：内存环形缓冲，最近 [MAX_ENTRIES] 条。
+ * 护栏拦截日志：内存环形缓冲，最近 [MAX_ENTRIES] 条。
  * 新记录入队首，超出容量移除队尾。通过 [logsFlow] 暴露给 UI。
  *
  * 另维护累计「拦截」计数 [blockCount]（仅统计 Block 级真正拦截，不含 Advisory 提醒），

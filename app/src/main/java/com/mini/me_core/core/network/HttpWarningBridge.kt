@@ -11,7 +11,7 @@ import javax.inject.Singleton
  * 明文 HTTP 请求警告桥：OkHttp 拦截器探测到非回环地址的 `http://` 请求时上报，
  * 全局弹窗宿主（[com.mini.me_core.core.ui.GlobalHttpWarningDialogHost]）订阅本桥在任意页面弹出安全提示。
  *
- * 设计约束（对齐 CredentialRequestBridge 的全局弹窗模式，安全审计 P2-7）：
+ * 设计约束（对齐 CredentialRequestBridge 的全局弹窗模式，安全审计）：
  * - 每个 App 进程会话只提示首个明文请求，避免模型/工具每轮请求都刷弹窗（进程重启后重新提示）；
  * - 回环地址（localhost / 127.0.0.1 / ::1）不触发——内置 MCP 服务器、mihomo 控制面等本地明文端点
  *   属预期行为，提示反而造成噪音。

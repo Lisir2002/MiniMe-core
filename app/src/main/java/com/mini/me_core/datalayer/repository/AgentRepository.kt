@@ -37,11 +37,11 @@ import kotlinx.coroutines.withContext
  * agent 域 Repository（设计 §11.1 / L2）：会话/消息/子块/工具调用/检查点 的访问门面。
  * 业务只依赖本门面，不直接写 SQL。
  *
- * v2-full-takeover P0-1：补 Flow 响应式读，对齐 Room DAO 的 22 个 Flow 查询。
- * v2-full-takeover P2-3：agent_session / agent_message 对齐 Room 实体全列，
+ * 补 Flow 响应式读，对齐 Room DAO 的 22 个 Flow 查询。
+ * agent_session / agent_message 对齐 Room 实体全列，
  *  本门面补齐 ChatSessionDao(22) + AgentMessageDao(25) 全部等价方法。
  *
- * P3-16（本阶段拆分）：按职责下沉为同包协作者，本类保留为薄门面——
+ * 按职责下沉为同包协作者，本类保留为薄门面——
  * 类名、构造签名、[WakeQueueStore] 实现、Hilt 绑定、所有 public 方法签名与行为均不变；
  * 仅把调用转发给下列 store，事务封装 [runInTx] 仍在门面。
  */
@@ -228,8 +228,8 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
 
     suspend fun markRestoreLogRestored(id: String) = compaction.markRestoreLogRestored(id)
 
-    // P3 已完成：原 legacy V1 写入方法块（appendMessage/appendPart/appendToolCall/saveCheckpoint）
-    // 及其唯一依赖 V1toV2FullMigrator 已全仓零调用、迁移类已不存在，按「P3 后删除」清理。
+    // 原 legacy V1 写入方法块（appendMessage/appendPart/appendToolCall/saveCheckpoint）
+    // 及其唯一依赖 V1toV2FullMigrator 已全仓零调用、迁移类已不存在，按清理约定删除。
 
     // ── 阶段 1 补表：todo / checkpoint 快照 / 编辑 hunk / 模式切换 ──────
 
@@ -895,7 +895,7 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
     suspend fun deleteTelemetryOlderThan(beforeMs: Long) =
         zth.deleteTelemetryOlderThan(beforeMs)
 
-    // ── P2-4 事务封装（对齐 Room withTransaction 语义）────────────────────
+    // ── 事务封装（对齐 Room withTransaction 语义）────────────────────
 
     /**
      * 在单事务内执行 [block]（同线程顺序执行，SQLDelight 2.2.1 的 ThreadLocal 事务）。

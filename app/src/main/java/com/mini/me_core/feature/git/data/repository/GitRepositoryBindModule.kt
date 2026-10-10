@@ -8,7 +8,7 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * P2-12 端口绑定：把 [GitRepository] 端口绑定到 data 层实现（容器命令执行 + 工作区文件直读）。
+ * 把 [GitRepository] 端口绑定到 data 层实现（容器命令执行 + 工作区文件直读）。
  */
 @Module
 @InstallIn(SingletonComponent::class)

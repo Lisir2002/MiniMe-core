@@ -105,6 +105,7 @@ class AndroidVersionProbe(
         return try {
             // purpose 与 passphrase 必须与 EncryptedDriverFactory 完全一致（共用 CipherPassphrase），
             // 否则会出现「driver 能开、probe 打不开」的假损坏。
+            // 只读版本探测边界：DEK 经 Keystore 读取，Dispatchers.IO 包裹；非主线程，不加 StrictMode。
             val dek = runBlocking(Dispatchers.IO) { km.getOrCreateDek(CipherPassphrase.purpose(lib)) }
             // L2：从同一来源派生「字符串 + 字节」两态，保证与 driver 侧的口令完全一致。
             val open = CipherPassphrase.openParams(CipherPassphrase.encode(dek))

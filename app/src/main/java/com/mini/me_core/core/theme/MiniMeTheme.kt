@@ -205,7 +205,7 @@ private fun Typography.scaleFontSize(scale: Float): Typography {
 }
 
 /**
- * 从 SemanticColors 构建 Material3 ColorScheme（Phase 5）。
+ * 从 SemanticColors 构建 Material3 ColorScheme。
  *
  * 将自定义语义色映射到 Material3 ColorScheme 的关键字段，
  * 这样使用 MaterialTheme.colorScheme 的组件也能跟随主题变化。
@@ -231,7 +231,7 @@ private fun buildColorSchemeFromSemantic(
         error = colors.error,
         onError = colors.onError,
         outline = colors.borderDefault,
-        // Phase 5 补全：映射遗漏的 Material3 ColorScheme 字段，使主题预设色完整覆盖
+        // 映射遗漏的 Material3 ColorScheme 字段，使主题预设色完整覆盖
         outlineVariant = colors.borderMuted,
         tertiary = colors.success,
         errorContainer = colors.errorContainer,
@@ -271,13 +271,13 @@ private fun rememberBitmapFromUri(uri: String?): ImageBitmap? {
 @Composable
 fun MiniMeTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Phase 4：可选自定义语义色（来自主题预设）。null 时使用默认 Light/Dark。
+    // 可选自定义语义色（来自主题预设）。null 时使用默认 Light/Dark。
     customColors: com.mini.me_core.core.theme.tokens.SemanticColors? = null,
-    // Phase 5：背景图 URI（null=无背景图）
+    // 背景图 URI（null=无背景图）
     backgroundImageUri: String? = null,
-    // Phase 5：背景图遮罩浓度（0.0-1.0）
+    // 背景图遮罩浓度（0.0-1.0）
     backgroundScrim: Float = 0.4f,
-    // Phase 5：卡片透明度（0.0-1.0）
+    // 卡片透明度（0.0-1.0）
     cardAlpha: Float = 1.0f,
     // 问题3：显示偏好——圆角风格
     cornerStyle: com.mini.me_core.core.theme.tokens.CornerStyle = com.mini.me_core.core.theme.tokens.CornerStyle.ROUNDED,
@@ -291,7 +291,7 @@ fun MiniMeTheme(
     fontWeightScale: Float = 1.0f,
     content: @Composable () -> Unit
 ) {
-    // Phase 5：如果有自定义颜色，构建动态 Material3 ColorScheme；否则用默认
+    // 如果有自定义颜色，构建动态 Material3 ColorScheme；否则用默认
     val colorScheme = if (customColors != null) {
         buildColorSchemeFromSemantic(customColors, darkTheme)
     } else if (darkTheme) DarkColorScheme else LightColorScheme
@@ -341,7 +341,7 @@ fun MiniMeTheme(
         )
     }
 
-    // Phase 5：加载背景图
+    // 加载背景图
     val bgBitmap = rememberBitmapFromUri(backgroundImageUri)
 
     // 同步全局动画缩放 holder（供非 Composable 上下文使用，如 NavHost 过渡动画）
@@ -362,7 +362,7 @@ fun MiniMeTheme(
             colorScheme = colorScheme,
             typography = scaledTypography,
         ) {
-            // Phase 5：如果有背景图，在根布局添加图片层 + 遮罩层
+            // 如果有背景图，在根布局添加图片层 + 遮罩层
             if (bgBitmap != null && backgroundImageUri != null) {
                 Box(
                     modifier = Modifier

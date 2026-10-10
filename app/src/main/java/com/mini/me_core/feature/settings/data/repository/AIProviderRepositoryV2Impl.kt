@@ -19,10 +19,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * AIProvider 仓库 V2 实现（v2-full-takeover P2-1 批 1：settings 域切 V2 读源）。
+ * AIProvider 仓库 V2 实现（ 批 1：settings 域切 V2 读源）。
  *
- * 语义与 Room 版完全对齐（RC68 P0-1 active 互斥 / RC71 加密失败中止 / RC68 SCHEMA 38 只写密文列）：
- *  - 读：V2 observeProviders() / observeActiveProvider()（Flow 响应式，P0-1 补齐）；
+ * 语义与 Room 版完全对齐（active 互斥 / 加密失败中止 / SCHEMA 38 只写密文列）：
+ *  - 读：V2 observeProviders() / observeActiveProvider()（Flow 响应式， 补齐）；
  *  - 写：V2 saveProvider() 内含「isActive 时先 deactivateAll」事务化（比 Room 版的两步非原子更强）；
  *  - 加密：保留 CredentialEncryptor 列级加解密唯一入口，失败抛异常中止保存。
  */
@@ -70,12 +70,12 @@ class AIProviderRepositoryV2Impl @Inject constructor(
 
     override suspend fun saveProvider(provider: AIProviderConfig) {
         FileLogger.i(TAG, "保存提供商 id=${provider.id} name=${provider.name} active=${provider.isActive} enabled=${provider.isEnabled}")
-        // RC71：先取已存在的密文，供「用户未改 API Key」时保留，避免空串覆盖。
+        // 先取已存在的密文，供「用户未改 API Key」时保留，避免空串覆盖。
         val existingEncrypted = runCatching {
             v2.getProvider(provider.id)?.encrypted_api_key ?: ""
         }.getOrDefault("")
         val encrypted = encryptApiKeyOrThrow(provider.apiKey, existingEncrypted)
-        // V2 saveProvider 内含 RC68 P0-1 不变量（isActive 时先 deactivateAll），且为单事务。
+        // V2 saveProvider 内含 active 互斥不变量（isActive 时先 deactivateAll），且为单事务。
         v2.saveProvider(
             id = provider.id,
             name = provider.name,
@@ -135,7 +135,7 @@ class AIProviderRepositoryV2Impl @Inject constructor(
     }
 
     /**
-     * RC71：apiKey 非空 → 必须加密成功，失败抛异常中止保存（绝不写空串覆盖已有密文）；
+     * apiKey 非空 → 必须加密成功，失败抛异常中止保存（绝不写空串覆盖已有密文）；
      * apiKey 为空但已有密文 → 保留已有密文；都无 → 空串。
      */
     private suspend fun encryptApiKeyOrThrow(apiKey: String, existingEncrypted: String): String = when {
@@ -151,7 +151,7 @@ class AIProviderRepositoryV2Impl @Inject constructor(
         else -> ""
     }
 
-    /** 只从密文列解密；解密失败 → 空串 + 日志，不崩 UI（RC68 SCHEMA 38）。 */
+    /** 只从密文列解密；解密失败 → 空串 + 日志，不崩 UI（SCHEMA 38）。 */
     private suspend fun decryptApiKey(encryptedApiKey: String): String {
         if (encryptedApiKey.isEmpty()) return ""
         return runCatching { encryptor.decrypt(encryptedApiKey) }
@@ -171,7 +171,7 @@ class AIProviderRepositoryV2Impl @Inject constructor(
             defaultModel = default_model,
             isActive = isActive,
             models = modelList,
-            // RC68 SCHEMA 38：selectedModel 冗余概念已合并进 defaultModel（UI 上同一语义）。
+            // SCHEMA 38：selectedModel 冗余概念已合并进 defaultModel（UI 上同一语义）。
             selectedModel = default_model,
             isEnabled = isEnabled,
             useFullUrl = useFullUrl,

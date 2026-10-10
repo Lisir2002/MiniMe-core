@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * P2-17 行为保持搬迁：运行日志查看器域（日志读取 / 显示与日期筛选 / 实时尾随 / 等级与搜索状态）。
+ *  行为保持搬迁：运行日志查看器域（日志读取 / 显示与日期筛选 / 实时尾随 / 等级与搜索状态）。
  * FetchState/ConnectionTestState/DateRangeMode/LogViewerUiState 类型本身保留在 presentation 包，
  * 此处只搬迁其状态与逻辑；协程仍由同一 viewModelScope 驱动。
  */

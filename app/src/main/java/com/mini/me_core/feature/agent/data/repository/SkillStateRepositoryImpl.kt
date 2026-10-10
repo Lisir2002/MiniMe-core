@@ -21,7 +21,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 技能状态仓库实现（RC74 新增，v47 扩展作用域覆盖 + 对话级双向控制）。
+ * 技能状态仓库实现（v47 扩展作用域覆盖 + 对话级双向控制）。
  */
 @Suppress("ClassOrdering") // 行为保持搬迁：companion/属性顺序沿用原 domain 类，不重排
 @Singleton

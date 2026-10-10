@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /**
- * Agent 循环外围协作者（P1-08 从 AIAgentViewModel 提取，行为保持搬迁）。
+ * Agent 循环外围协作者（ 从 AIAgentViewModel 提取，行为保持搬迁）。
  *
  * 负责「后台命令完成事件」的缓冲与投递：
  * - 订阅 [TerminalSessionManager.tabFinishedEvents]；

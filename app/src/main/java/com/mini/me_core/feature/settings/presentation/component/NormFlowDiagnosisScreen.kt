@@ -38,7 +38,7 @@ import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.core.theme.components.AppTopAppBar
 
-/** P2：注入诊断面板——显示最近一次 step 注入的源级诊断与完整内容。 */
+/** 注入诊断面板——显示最近一次 step 注入的源级诊断与完整内容。 */
 @Composable
 fun NormFlowDiagnosisScreen(
     onBack: () -> Unit,

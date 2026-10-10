@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
- * P2-17 行为保持搬迁：主题域。
+ *  行为保持搬迁：主题域。
  * 设置即时生效后通过 [emitEffect] 向门面的 SettingEffect 通道投递 Applied 事件（语义等同原 tryEmit）。
  */
 internal class ThemeSection(

@@ -42,7 +42,7 @@ import com.mini.me_core.feature.agent.domain.core.prompt.AgentAsset
 import com.mini.me_core.feature.agent.domain.knowledge.sop.SopAsset
 import com.mini.me_core.core.theme.Spacing
 
-/** P1：规范查看器（只读）：静态规则 / SOP 两个 Tab，点击项查看全文。 */
+/** 规范查看器（只读）：静态规则 / SOP 两个 Tab，点击项查看全文。 */
 @Composable
 fun NormFlowAssetViewerScreen(
     initialTab: Int,

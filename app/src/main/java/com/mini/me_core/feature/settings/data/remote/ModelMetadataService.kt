@@ -49,7 +49,7 @@ import javax.inject.Singleton
 class ModelMetadataService @Inject constructor(
     @param:ApplicationContext private val context: Context,
     /**
-     * 兼容端点默认策略 Repository（RC63 备选方案③）。
+     * 兼容端点默认策略 Repository（备选方案③）。
      * 仅在 resolve → findMetadata 命中失败走 default() fallback 的时候才读取，
      * catalog 已收录（MODELS_DEV 源）的模型完全不读，保证不影响整体。
      */
@@ -293,13 +293,13 @@ class ModelMetadataService @Inject constructor(
     }
 
     /**
-     * RC63 决策链最后一步：按优先级合并兼容端点策略 & ④单模型复选框手动覆盖。
+     * 决策链最后一步：按优先级合并兼容端点策略 & ④单模型复选框手动覆盖。
      *
      * 合并原则（严格保证不影响整体）：
      *  - MODELS_DEV 源（catalog 收录模型）：仅应用④单模型覆盖（其他任何策略不碰）。
      *    为什么 catalog 收录也要允许覆盖？因为有些 catalog（api.official.json）的信息会比
      *    用户真实接入的兼容端点滞后或漏字段，小白想手动覆盖支持 vision/tools/reasoning
-     *    时必须允许覆盖，这是 RC63 「针对性修复独立出来」的真正落脚点——用户掌控一切。
+     *    时必须允许覆盖，这是 「针对性修复独立出来」的真正落脚点——用户掌控一切。
      *  - INFERRED 源（自定义兼容端点 / 未收录模型）：
      *      1) 先应用「③ 兼容端点 DefaultPolicy」（STRICT / HEURISTIC / LAX / MANUAL）；
      *      2) 再应用「④ 单模型复选框覆盖」（最高优先级）。
@@ -316,11 +316,11 @@ class ModelMetadataService @Inject constructor(
             val (v, t, r) = when (policy) {
                 DefaultPolicy.STRICT,
                 DefaultPolicy.HEURISTIC -> {
-                    // 严格/启发式：保持 probablyVision/Tools/Reasoning 的默认值不变（RC62d 语义）。
+                    // 严格/启发式：保持 probablyVision/Tools/Reasoning 的默认值不变（语义）。
                     Triple(base.supportsVision, base.supportsTools, base.supportsReasoning)
                 }
                 DefaultPolicy.LAX -> {
-                    // 宽松：INFERRED 一律三能力 true（RC62e 行为），用户手动开启。
+                    // 宽松：INFERRED 一律三能力 true（行为），用户手动开启。
                     Triple(true, true, true)
                 }
                 DefaultPolicy.MANUAL -> {
@@ -400,7 +400,7 @@ class ModelMetadataService @Inject constructor(
         }
     }
 
-    // —— RC63 备选方案④对外接口：设置页 UI（单选按钮 / 一键推荐）统一通过下面几个方法写入覆盖。 ——
+    // —— 备选方案④对外接口：设置页 UI（单选按钮 / 一键推荐）统一通过下面几个方法写入覆盖。 ——
 
     /** 保存（或覆盖）单个模型的手动覆盖。不想覆盖的字段传 null（维持自动决策）。 */
     suspend fun saveOverride(

@@ -10,7 +10,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * T2I 门面 V2 实现（v2-full-takeover P2-2：t2i 域切 V2 读源）。
+ * T2I 门面 V2 实现（：t2i 域切 V2 读源）。
  *
  * 读写都走 V2 SQLDelight 库；映射层负责 snake_case ↔ Room Entity 字段转换。
  * 写路径语义对齐 Room：provider 激活互斥（deactivateAll + activate 单事务）、

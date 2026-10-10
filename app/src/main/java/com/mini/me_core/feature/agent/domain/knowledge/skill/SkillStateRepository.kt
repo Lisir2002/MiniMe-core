@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.Flow
 import java.io.File
 
 /**
- * 技能解析结果（RC74 新增）：技能 + 其依赖解析状态。
+ * 技能解析结果：技能 + 其依赖解析状态。
  */
 data class SkillResolution(
     val skill: Skill,
@@ -18,7 +18,7 @@ data class SkillResolution(
 }
 
 /**
- * 技能状态仓库端口（RC74 新增，v47 扩展作用域覆盖 + 对话级双向控制）。
+ * 技能状态仓库端口（v47 扩展作用域覆盖 + 对话级双向控制）。
  * 实现（磁盘技能扫描 + SQLDelight 状态读写）位于 data 层。
  */
 @Suppress("TooManyFunctions") // 端口面按全部调用点聚合，行为保持搬迁，不拆分接口

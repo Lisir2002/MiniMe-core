@@ -49,6 +49,9 @@ class EncryptedDatabaseManager(
     /**
      * 阻塞版本的getDriver（供ConnectionPool在非协程上下文中调用）。
      * 内部使用runBlocking切换到IO线程。
+     *
+     * 边界：ConnectionPool 冷开初始化路径一次性调用（磁盘/密钥 DB 同步打开），已显式
+     * Dispatchers.IO 包裹，不在主线程；不加 StrictMode 探测（该路径即初始化边界本身）。
      */
     fun getDriverBlocking(dbId: String): SqlDriver {
         return runBlocking(Dispatchers.IO) {

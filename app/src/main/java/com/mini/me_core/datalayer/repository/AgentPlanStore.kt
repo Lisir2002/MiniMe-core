@@ -38,7 +38,7 @@ internal class AgentPlanStore(private val db: AgentDb) {
 
     suspend fun deleteGoal(goalId: String) = withContext(Dispatchers.IO) { q.deleteGoal(goalId) }
 
-    // ── P2-4 GoalService 等价 ──────────────────────────────────────────
+    // ── GoalService 等价 ──────────────────────────────────────────
 
     suspend fun getGoalById(goalId: String): Agent_goals? =
         withContext(Dispatchers.IO) { q.selectGoalById(goalId).executeAsOneOrNull() }
@@ -88,7 +88,7 @@ internal class AgentPlanStore(private val db: AgentDb) {
 
     suspend fun deletePlan(planId: String) = withContext(Dispatchers.IO) { q.deletePlan(planId) }
 
-    // ── P2-4 PlanService 等价 ──────────────────────────────────────────
+    // ── PlanService 等价 ──────────────────────────────────────────
 
     suspend fun getPlanById(planId: String): Agent_plans? =
         withContext(Dispatchers.IO) { q.selectPlanById(planId).executeAsOneOrNull() }

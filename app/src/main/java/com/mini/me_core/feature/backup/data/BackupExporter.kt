@@ -55,7 +55,7 @@ import java.io.OutputStream
  * [BackupOptions] 自身默认值保证；大表（sessions/messages/todos）走 jsonl 分页流式，其余表与
  * DataStore 目录走 [DataRegistry] 全量段。所有依赖由 [BackupManagerImpl] 装配时传入。
  */
-@Suppress("LongParameterList") // P3-17 机械拆分：构造函数签名保持与原注入依赖一致，逐参搬运
+@Suppress("LongParameterList") // 构造函数签名保持与原注入依赖一致，逐参搬运
 internal class BackupExporter(
     private val context: Context,
     private val store: BackupSnapshotStore,

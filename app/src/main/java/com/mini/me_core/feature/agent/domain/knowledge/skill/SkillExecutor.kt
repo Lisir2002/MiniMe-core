@@ -13,7 +13,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 技能执行结果（RC74 新增）。
+ * 技能执行结果。
  */
 sealed class SkillExecutionResult {
     data class Success(val output: String) : SkillExecutionResult()
@@ -21,7 +21,7 @@ sealed class SkillExecutionResult {
 }
 
 /**
- * 技能执行器（RC74 新增；重写「技能调用工具」后仅保留 PROMPT/SCRIPT 两条执行路径）。
+ * 技能执行器（；重写「技能调用工具」后仅保留 PROMPT/SCRIPT 两条执行路径）。
  *
  * - [SkillType.PROMPT]：返回指令正文（注入上下文），无执行、无安全风险。
  * - [SkillType.SCRIPT]：在 PRoot 容器内沙箱执行入口脚本，执行前经 [ToolPermissionManager] 审批，

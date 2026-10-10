@@ -12,10 +12,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Git 凭据仓库 V2 实现（v2-full-takeover P2-1 批 1：credentials 域切 V2 读源）。
+ * Git 凭据仓库 V2 实现（ 批 1：credentials 域切 V2 读源）。
  *
  * 语义与 Room 版对齐，并修正两处旧实现缺陷：
- *  - 加密失败必须中止保存（RC71），绝不写空串覆盖已有密文（Room 版 toEntity 静默降级）；
+ *  - 加密失败必须中止保存，绝不写空串覆盖已有密文（Room 版 toEntity 静默降级）；
  *  - 写操作事务化：isDefault 置位前先 clearDefaultForHost，避免 host 内出现多条默认。
  * 读走 V2 observeAllGitCredentials()（Flow 响应式，对齐 Room DAO 的 1 个 Flow 查询）。
  */
@@ -76,7 +76,7 @@ class CredentialRepositoryV2Impl @Inject constructor(
     }
 
     /**
-     * RC71：token 非空 → 加密失败必须抛异常中止保存（绝不落空串）；
+     * token 非空 → 加密失败必须抛异常中止保存（绝不落空串）；
      * token 为空但已有密文 → 保留旧密文；都无 → 空串。
      */
     private suspend fun encryptTokenOrThrow(token: String, existingEncrypted: String): String = when {
@@ -92,7 +92,7 @@ class CredentialRepositoryV2Impl @Inject constructor(
         else -> ""
     }
 
-    /** 只从密文列解密；解密失败 → 空串 + 日志，不崩 UI（RC68 SCHEMA 38）。 */
+    /** 只从密文列解密；解密失败 → 空串 + 日志，不崩 UI（SCHEMA 38）。 */
     private suspend fun decryptToken(encryptedToken: String): String {
         if (encryptedToken.isEmpty()) return ""
         return runCatching { encryptor.decrypt(encryptedToken) }

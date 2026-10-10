@@ -14,8 +14,8 @@ import javax.inject.Singleton
  * 实现原则：
  * 1. 不要重新造 Keystore 轮子 → 直接委托给 [CredentialEncryptor]（V2 前缀 AES-256-GCM）
  *    MasterKey + DEK 两层架构。ZTH 用独立 alias 避免和凭据互串，由 CredentialEncryptor 自己保证。
- * 2. 启动构造：纯内存赋值，不碰 IO/Keystore（遵循 RC61a 启动期 ANR 规避约定）。
- * 3. 所有 encrypt/decrypt 必须在 Dispatchers.IO 线程调用（RC61a 启动阻塞修正）。
+ * 2. 启动构造：纯内存赋值，不碰 IO/Keystore（遵循启动期 ANR 规避约定）。
+ * 3. 所有 encrypt/decrypt 必须在 Dispatchers.IO 线程调用（启动阻塞修正）。
  *    上层业务如果在非 IO 线程调用，抛 [IllegalStateException]（早期 fail-fast，比 ANR 好）。
  *
  * 对应不变性：
@@ -48,7 +48,7 @@ class ZthSensitiveColumnCrypto @Inject constructor(
 
     suspend fun encrypt(plaintext: String): String {
         if (!initDone.get()) error("ZthSensitiveColumnCrypto 未初始化：先调 ensureReady()")
-        // 未来 Phase 3 如需要 thread 断言，可加 Looper/调度器检测；目前先由上层 withContext(Dispatchers.IO) 保
+        // 未来如需 thread 断言，可加 Looper/调度器检测；目前先由上层 withContext(Dispatchers.IO) 保
         return credentialEncryptor.encrypt(plaintext) // 走 V2:<base64(IV+ct+tag)>
     }
 

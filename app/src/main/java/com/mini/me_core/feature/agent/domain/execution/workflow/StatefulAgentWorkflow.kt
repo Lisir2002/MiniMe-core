@@ -102,7 +102,7 @@ class StatefulAgentWorkflow @Inject constructor(
     @Named("direct") private val okHttpClient: OkHttpClient,
     // 代理隔离：模型高级参数 needsProxy=true 时使用此客户端走 mihomo 代理，false 时用上面的直连客户端。
     @Named("proxy") private val proxyOkHttpClient: OkHttpClient,
-    // 阶段5：代理健康检测器，模型请求失败时自动诊断代理状态。
+    // 代理健康检测器，模型请求失败时自动诊断代理状态。
     private val proxyHealthMonitor: com.mini.me_core.feature.proxy.domain.ProxyHealthMonitor,
     private val promptProvider: SystemPromptProvider,
     private val permissionManager: ToolPermissionManager,
@@ -114,7 +114,7 @@ class StatefulAgentWorkflow @Inject constructor(
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     /**
-     * RC63 备选方案③兼容端点策略 & ②自动降级总开关。
+     * 备选方案③兼容端点策略 & ②自动降级总开关。
      * 读两个字段：(a) viewImage 未收录模型守卫策略（FALLBACK_VISION_MODEL vs FAIL_FAST）；
      * (b) 备选方案②「发送失败自动降级」总开关（用户关掉则即使触发也不自动降级）。
      */
@@ -149,7 +149,7 @@ class StatefulAgentWorkflow @Inject constructor(
     private val fileObservationGuard: FileObservationGuard,
     /** D1-7 规范流程统一开关：总开关 norm_flow_enabled + 子开关 step_inject / tool_guard（对齐 norm-chain §3.5）。 */
     private val normFlowSettingsRepository: com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository,
-    /** P2：护栏拦截日志（Block / Advisory 记录到内存环形缓冲）。 */
+    /** 护栏拦截日志（Block / Advisory 记录到内存环形缓冲）。 */
     private val guardLogRepository: com.mini.me_core.feature.agent.domain.core.guard.GuardLogRepository,
     /** D2-3/5 运行轨迹服务：工具执行完成追加 tool 轨迹、turn 边界轻量标记；空转收敛/阶段总结/审计的数据源。 */
     private val trajectoryService: TrajectoryService,
@@ -171,7 +171,7 @@ class StatefulAgentWorkflow @Inject constructor(
     }
 
     // ════════════════════════════════════════════════════════════════
-    // P1-09 行为保持机械重构：以下叶子协作者由主类已注入对象装配，
+    // 以下叶子协作者由主类已注入对象装配，
     // 仅整体搬走可独立的叶子职责；主类仍保留 while 状态机骨架与整体编排顺序。
     // 依赖一律经主类已注入对象传入，不新增 Hilt 模块 / Manifest / 资源。
     // ════════════════════════════════════════════════════════════════
@@ -312,7 +312,7 @@ class StatefulAgentWorkflow @Inject constructor(
         val errorCode: String = "USER_REJECTED"
     )
 
-    // internal：P1-09 起 ToolBatchExecutor 跨类引用（行为保持搬迁，仅提升可见性，字段/默认值不变）。
+    // internal：ToolBatchExecutor 跨类引用（行为保持搬迁，仅提升可见性，字段/默认值不变）。
     internal data class ToolRunResult(
         val raw: String,
         val isError: Boolean,
@@ -452,7 +452,7 @@ class StatefulAgentWorkflow @Inject constructor(
                         effects.add(AgentSideEffect.RequestPermission(remaining.first()))
                     } else {
                         // ════════════════════════════════════════════════════════════
-                        // ZTH 接入点 B（hookPreToolAudit）：Phase 5 C.5 四方联动第 2 站
+                        // ZTH 接入点 B（hookPreToolAudit）： C.5 四方联动第 2 站
                         // 插入位置：PermissionEvaluated reducer 所有 toolCall 已批准（approved
                         //   集合已满 + remaining.isEmpty），effects.add(ExecuteToolBatch) 之前。
                         // 接入代码（示例，不改状态树只做挂起审查）：
@@ -525,7 +525,7 @@ class StatefulAgentWorkflow @Inject constructor(
             }
             is AgentAction.ToolBatchFinished -> {
                 // ════════════════════════════════════════════════════════════
-                // ZTH 接入点 C（hookPostToolAudit）：Phase 5 C.5 四方联动第 3 站
+                // ZTH 接入点 C（hookPostToolAudit）： C.5 四方联动第 3 站
                 // 插入位置：ToolBatchFinished reducer 入口（已进入 reducer，action.results
                 //   可用），在组装 appendedMessages 之前。
                 // 接入代码（示例，每个 tool result 逐一挂 postTool 幻觉扫）：
@@ -861,7 +861,7 @@ class StatefulAgentWorkflow @Inject constructor(
                         // （reasoningEffort，默认 MEDIUM）透传给 provider；关闭则禁用推理参数
                         // （对齐 norm-chain §3.7.2「新增推理预算配置，开启后按 provider 能力传 reasoning 参数」）。
                         val reasoningEffortForRound = if (normFlowSettingsRepository.isReasoningBudgetActive()) {
-                            // P1：会话级 reasoningEffort 优先；未设置时回退到全局 reasoning_budget_level
+                            // 会话级 reasoningEffort 优先；未设置时回退到全局 reasoning_budget_level
                             currentContext.reasoningEffort?.takeIf { it.isNotBlank() }
                                 ?: try { normFlowSettingsRepository.getReasoningBudgetLevel() }
                                 catch (e: Exception) { "medium" }
@@ -947,7 +947,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                     throw e
                                 } catch (e: Exception) {
                                     coroutineContext.ensureActive()
-                                    // 阶段5：网络错误时自动诊断代理（不经过模型调用，避免模型绕圈子）。
+                                    // 网络错误时自动诊断代理（不经过模型调用，避免模型绕圈子）。
                                     if (isRetriableNetworkError(e) && activeConfig.needsProxy) {
                                         FileLogger.w(TAG, "模型请求网络错误，自动触发代理健康诊断: ${e.message}")
                                         proxyHealthMonitor.forceCheck()
@@ -1116,7 +1116,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                 // 而落库的接力消息又没产生，表现为「思考显示后凭空消失且无报错」。
                                 // 有正文或有思考其一即落库；两者皆空则不写空消息。
                                 // ════════════════════════════════════════════════════════════
-                                // ZTH 接入点 D（hookOnThrowable）：Phase 5 C.5 四方联动第 4 站
+                                // ZTH 接入点 D（hookOnThrowable）： C.5 四方联动第 4 站
                                 // 插入位置：CallLlm catch(e: Exception) 分支，备选方案② visionFallback
                                 //   已尝试完毕但未命中（进入本 else 分支，准备走 LlmError 原逻辑）之前。
                                 // 接入代码（示例，不改 state 结构，把 hook 返回 banner 注入 errorMessage）：
@@ -1275,7 +1275,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                 // PLAN→BUILD 时挂起 workflow，等待用户在计划审查面板批准后才继续
                                 if (newCtx.mode == AgentMode.BUILD) {
                                     // ════════════════════════════════════════════════════════════
-                                    // ZTH 接入点 A（hookPrePlanAudit）：Phase 5 C.5 四方联动第 1 站
+                                    // ZTH 接入点 A（hookPrePlanAudit）： C.5 四方联动第 1 站
                                     // 插入位置：SwitchModeTool(PLAN→BUILD) 完成上下文切换计算后，
                                     //           planApprovalManager.awaitApproval() 调用之前。
                                     // 接入代码（示例，保持 HOOK-INV 不破坏 reducer 不变性）：

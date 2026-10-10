@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 import java.io.OutputStream
 
 /**
- * 会话生命周期控制器（P1-08 从 AIAgentViewModel 提取，行为保持搬迁）。
+ * 会话生命周期控制器（ 从 AIAgentViewModel 提取，行为保持搬迁）。
  *
  * 内聚「会话加载/选择/新建/删除/撤销/重命名/工作台绑定/导出/默认模型绑定」等会话 CRUD。
  * 会话级流式/工具/错误等 transient UI 状态仍由门面持有，本类通过三个回调在原有时序点清理：

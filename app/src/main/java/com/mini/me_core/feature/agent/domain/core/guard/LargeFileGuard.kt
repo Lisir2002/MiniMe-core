@@ -9,7 +9,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 大文件护栏（P2）：writeFile/editFile 写入内容超过 500KB 时 Advisory 警告（不阻断）。
+ * 大文件护栏：writeFile/editFile 写入内容超过 500KB 时 Advisory 警告（不阻断）。
  *
  * 由 guard_large_file_enabled 独立开关控制（默认关）。
  */

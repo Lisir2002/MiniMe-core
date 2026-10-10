@@ -12,7 +12,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 
 /**
- * v2-full-takeover P0-3：[MigrationEngine] 文件级快照安全网语义单测。
+ * [MigrationEngine] 文件级快照安全网语义单测。
  *
  * 重点是 [MigrationEngine.restoreSnapshot] 的**拷贝方向**：
  * 历史实现为 `main.copyTo(bak)`，会用（迁移失败后的）主库覆盖唯一的安全网快照，

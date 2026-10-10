@@ -21,7 +21,7 @@ enum class FailureClass {
 
 /**
  * ZTH 幻觉 SubClass（决策矩阵第二维）。
- * Phase 1.1 先定义 C.4 已讨论过的 20（原）+ 4（新增 INFRA_PACKAGE_*）+ 1（INFRA_PACKAGE_MANAGER_MISMATCH）= 25 个值。
+ * 先定义 C.4 已讨论过的 20（原）+ 4（新增 INFRA_PACKAGE_*）+ 1（INFRA_PACKAGE_MANAGER_MISMATCH）= 25 个值。
  * 后续 C.4.x 新增值必须加在末尾（避免 ordinal 变化破坏 Room ENUM 持久化顺序）。
  */
 enum class FailureSubClass {
@@ -101,7 +101,7 @@ enum class FailureSubClass {
 /**
  * C.4.3 / C.4.6 HallucinationCircuitBreaker 状态机 6 态 + TRANSITIONING 原子中间态。
  * 共 7 值（C.4.3 加 TRANSITIONING，FuseState 新增 1）。
- * 状态机合法转移（Phase 3 单测必须 100% 覆盖）：
+ * 状态机合法转移（单测必须 100% 覆盖）：
  *   CLOSED → HALF_OPEN（C.4.6 冷却 T_cool 到期）
  *   CLOSED → OPEN（FUSE_TRIP 事件）
  *   HALF_OPEN → OPEN（HALF_TRIP 阈值 hit）
@@ -120,14 +120,14 @@ enum class FuseState {
     /**
      * C.4.3 原子中间态（C.4.6 session 级隔离的乐观锁迁移）：
      * 从 OPEN → HALF_OPEN 必经此态；LINK-INV 四方迁移成功进入 HALF_OPEN，
-     * 失败自动回滚 OPEN 并 kill-switch-1 置位（Phase 3 LINK-INV-0~6 实现）。
+     * 失败自动回滚 OPEN 并 kill-switch-1 置位（LINK-INV-0~6 实现）。
      */
     TRANSITIONING
 }
 
 /**
  * ZTH FailureClassifier 统一输出（决策矩阵输入）。
- * Phase 2 ZthFailureClassifier.classify(Throwable, Context) → FailureClassification。
+ * ZthFailureClassifier.classify(Throwable, Context) → FailureClassification。
  * 对应 C.2.2 决策矩阵 10 列的「机器可读」承载结构。
  */
 data class FailureClassification(

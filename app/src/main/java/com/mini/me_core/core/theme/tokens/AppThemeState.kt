@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.Color
  * 应用主题状态。
  *
  * 包含语义色、暗色模式标志、背景图相关参数。
- * Phase 0：只实现 colors + isDark，背景图参数预留接口（Phase 4 实现）。
+ * 只实现 colors + isDark，背景图参数为预留接口。
  *
  * 不可变，主题切换时整体替换。
  */
@@ -19,7 +19,7 @@ import androidx.compose.ui.graphics.Color
 data class AppThemeState(
     val colors: SemanticColors,
     val isDark: Boolean,
-    // ── 背景图相关（Phase 4 实现，当前为默认值）──
+    // ── 背景图相关（预留参数，当前为默认值）──
     val backgroundImageUri: String? = null,
     val backgroundScrim: Float = PrimitiveAlpha.Scrim,
     val cardAlpha: Float = PrimitiveAlpha.Card,
@@ -62,7 +62,7 @@ object AppTheme {
 /**
  * 应用主题 Provider。
  *
- * Phase 0：包裹现有 MaterialTheme，同时提供 LocalAppTheme。
+ * 包裹现有 MaterialTheme，同时提供 LocalAppTheme。
  * 现有 `MiniMeTheme()` 调用点零改动，内部委托给本 Provider。
  *
  * @param isDark 是否暗色模式（由现有 LocalAppDarkMode 传入）

@@ -25,7 +25,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * 工具批量执行叶子（P1-09 从 StatefulAgentWorkflow 整体搬迁的叶子协作者）。
+ * 工具批量执行叶子（ 从 StatefulAgentWorkflow 整体搬迁的叶子协作者）。
  *
  * 职责：单个工具的六段式执行流水线（pre-execute 缓存 → guard 链 → execute → post-execute 媒体剥离
  * /文件观察 → finalizeContent 定型 → 只读副作用）、流式工具的聚合进度发布、D1-3 护栏链遍历短路。
@@ -98,7 +98,7 @@ internal class ToolBatchExecutor(
                 }
             }
             if (name == "viewImage" && !modelCallRouter.activeModelSupportsVision(context.sessionId)) {
-                // RC63 备选方案③：viewImage 守卫策略（默认自动回退识图模型，FAIL_FAST 则直接报错提示用户）
+                // 备选方案③：viewImage 守卫策略（默认自动回退识图模型，FAIL_FAST 则直接报错提示用户）
                 val guardPolicy = compatibilityPolicyRepository.getViewImageUnknownGuardPolicy()
                 val fallbackReady = modelCallRouter.visionFallbackReady()
                 if (guardPolicy == ViewImageUnknownGuardPolicy.FAIL_FAST || !fallbackReady) {
@@ -200,7 +200,7 @@ internal class ToolBatchExecutor(
     ): ToolResult.Error? {
         val fileObservationActive = normFlowSettingsRepository.isFileObservationActive()
         for (guard in toolGuards) {
-            // P0：文件观察护栏独立开关关闭时跳过该护栏
+            // 文件观察护栏独立开关关闭时跳过该护栏
             if (guard.id == "file-observation" && !fileObservationActive) continue
             val verdict = try {
                 guard.guard(

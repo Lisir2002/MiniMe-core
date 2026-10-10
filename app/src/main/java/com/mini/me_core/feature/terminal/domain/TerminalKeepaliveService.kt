@@ -66,7 +66,7 @@ class TerminalKeepaliveService : Service() {
                     }
                 }
                 else -> {
-                    // RC61b 兜底分支：
+                    // 兜底分支：
                     //   a) null intent → START_STICKY 重建，状态丢失
                     //   b) 未知 action → 不明确意图
                     // 保守处理：立即 enter foreground，避免 DID_NOT_START_IN_TIME 崩溃

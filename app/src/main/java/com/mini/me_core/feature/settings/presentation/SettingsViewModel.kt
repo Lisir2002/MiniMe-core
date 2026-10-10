@@ -69,7 +69,7 @@ import kotlinx.coroutines.launch
 import com.mini.me_core.feature.settings.presentation.component.SettingsSection
 
 /**
- * P2-17 行为保持重构：本类是设置页**唯一** @HiltViewModel 瘦门面。
+ *  行为保持重构：本类是设置页**唯一** @HiltViewModel 瘦门面。
  *
  * 按设置域内聚的状态与逻辑已原样搬迁到同包 section/ 下的普通 internal 协作者
  * （ProviderSection / VisionCompactionSection / LogViewerSection / NormFlowSection /
@@ -102,7 +102,7 @@ class SettingsViewModel @Inject constructor(
     private val remoteSshConnection: RemoteSshConnection,
     private val remoteRepository: RemoteRepository,
     val auditLogRepository: RemoteAuditLogRepository,
-    /** RC63 备选方案③：兼容端点全局策略（STRICT/HEURISTIC/LAX/MANUAL + 自动降级 + viewImage 守卫）。 */
+    /** 备选方案③：兼容端点全局策略（STRICT/HEURISTIC/LAX/MANUAL + 自动降级 + viewImage 守卫）。 */
     private val compatibilityPolicyRepository: CompatibilityPolicyRepository,
     /** 设置页搜索历史（KVStore 持久化，最近 10 条）。 */
     private val searchHistoryManager: SettingsSearchHistoryManager,
@@ -176,7 +176,7 @@ class SettingsViewModel @Inject constructor(
         permissionRulesRepository = permissionRulesRepository,
     )
 
-    // RC62：跨屏幕设置页跳转的「待打开分区」信号。
+    // 跨屏幕设置页跳转的「待打开分区」信号。
     // - 背景：MainActivity 有两个地方会触发「跳转到 SSH 主机配置」：
     //     1) SettingsScreen 内部 onNavigateToSshHosts lambda（本就在 Settings 路由栈内）
     //     2) TerminalSettingsScreen 的 SSH 菜单项（从 terminal_settings 路由先 pop 回 settings，
@@ -300,15 +300,15 @@ class SettingsViewModel @Inject constructor(
     val testing: StateFlow<Set<String>> = providerSection.testing
     val connectionTestState: StateFlow<ConnectionTestState> = providerSection.connectionTestState
 
-    /** RC63 备选方案③：兼容端点「默认策略」流（保持原 get() 语义：每次访问新建 Eagerly stateIn）。 */
+    /** 备选方案③：兼容端点「默认策略」流（保持原 get() 语义：每次访问新建 Eagerly stateIn）。 */
     val compatibilityDefaultPolicyFlow: StateFlow<DefaultPolicy>
         get() = providerSection.compatibilityDefaultPolicyFlow
 
-    /** RC63 备选方案②「发送失败自动降级」总开关。 */
+    /** 备选方案②「发送失败自动降级」总开关。 */
     val autoDowngradeOnSendFailureFlow: StateFlow<Boolean>
         get() = providerSection.autoDowngradeOnSendFailureFlow
 
-    /** RC63 viewImage 守卫策略（FALLBACK_VISION_MODEL vs FAIL_FAST）。 */
+    /** Image 守卫策略（FALLBACK_VISION_MODEL vs FAIL_FAST）。 */
     val viewImageUnknownGuardPolicyFlow: StateFlow<ViewImageUnknownGuardPolicy>
         get() = providerSection.viewImageUnknownGuardPolicyFlow
 

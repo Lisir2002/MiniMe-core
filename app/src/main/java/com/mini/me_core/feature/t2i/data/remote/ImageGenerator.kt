@@ -237,7 +237,7 @@ class OpenAiCompatibleImageGenerator @Inject constructor(
         val imageFile = File(outputDir, "$taskId.png")
         imageFile.writeBytes(rawBytes)
 
-        // 缩略图：RC69 第一版简化——直接与主图相同路径，等 UI 真正需要时再替换为
+        // 缩略图：第一版简化——直接与主图相同路径，等 UI 真正需要时再替换为
         //   BitmapFactory.decodeByteArray + createScaledBitmap 生成缩小版。
         //   这样避免在非 UI 模块引入 android.graphics.*（单元测试时可独立跑 Provider 层）。
         val thumbFile = File(outputDir, "${taskId}_thumb.png")

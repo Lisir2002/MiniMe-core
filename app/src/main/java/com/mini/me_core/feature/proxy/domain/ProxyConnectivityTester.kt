@@ -13,7 +13,7 @@ import javax.inject.Singleton
 enum class TrafficLight { GREEN, YELLOW, RED }
 
 /**
- * P1-9：一次代理连接诊断的结果（四项检查）。
+ * 一次代理连接诊断的结果（四项检查）。
  *
  *  - [processAlive]：mihomo 子进程是否存活；
  *  - [controllerReachable]：127.0.0.1:9090 控制面 GET /configs 是否可达；
@@ -37,7 +37,7 @@ data class ProxyDiagnosticResult(
 }
 
 /**
- * P1-9：代理连接诊断器。启用代理后自动跑一次，UI 用交通灯展示，可手动重测。
+ * 代理连接诊断器。启用代理后自动跑一次，UI 用交通灯展示，可手动重测。
  * 纯读、无副作用；任何单项失败不影响其他项。
  */
 @Singleton

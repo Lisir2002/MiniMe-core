@@ -9,7 +9,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /**
- * P2-16 拆分产物：远程订阅下载 / 更新。
+ * 拆分产物：远程订阅下载 / 更新。
  *
  * 逻辑原样搬迁自 [ClashProxyManager]：
  *  - 订阅抓取伪装成 clash.meta UA（订阅商 nginx 按 UA 白名单放行，否则回 406 HTML）；
@@ -61,7 +61,7 @@ internal class ClashSubscriptionService(
     }
 
     /**
-     * P1-7：手动/自动刷新某个订阅型 profile。
+     * 手动/自动刷新某个订阅型 profile。
      *
      * 拉取远端最新 YAML → 更新 updatedAt（URL 不变故 cipher 不换）→ 若该 profile 正是当前活跃且内核
      * 在跑，热重载新配置（不杀进程）。manual 型 / 拉取失败返回 false，不影响其他 profile。
@@ -82,7 +82,7 @@ internal class ClashSubscriptionService(
         return false
     }
 
-    /** P1-7：周期检查所有 autoUpdate 订阅型 profile 是否到期，逐个刷新（失败隔离，不影响其他）。 */
+    /** 周期检查所有 autoUpdate 订阅型 profile 是否到期，逐个刷新（失败隔离，不影响其他）。 */
     suspend fun autoUpdateDueSubscriptions() {
         val now = System.currentTimeMillis()
         val subs = runCatching { repository.subscriptionsFlow.first() }.getOrDefault(emptyList())

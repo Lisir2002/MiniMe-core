@@ -32,7 +32,7 @@ import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.core.theme.components.AppTopAppBar
 
-/** P3：分层规则管理页（只读列表 + 启用/禁用内存覆盖）。 */
+/** 分层规则管理页（只读列表 + 启用/禁用内存覆盖）。 */
 @Composable
 fun RuleManagerScreen(
     onBack: () -> Unit,

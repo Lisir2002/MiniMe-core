@@ -1,7 +1,7 @@
 package com.mini.me_core.core.util
 
 /**
- * DB-SHIELD-RC68 P1-5：全局 Enum.valueOf() 安全壳。
+ * 全局 Enum.valueOf() 安全壳。
  * 所有 `Enum.valueOf(str)` 调用应统一走本 helper，禁止直接 `MessageRole.valueOf(role)` ——
  * 老数据/备份导入/未来 Enum 重构改名时会直接抛 IllegalArgumentException（UI 线程=崩）。
  */

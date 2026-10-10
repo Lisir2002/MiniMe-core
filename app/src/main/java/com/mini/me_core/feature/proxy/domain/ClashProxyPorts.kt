@@ -1,7 +1,7 @@
 package com.mini.me_core.feature.proxy.domain
 
 /**
- * P2-16 拆分产物：运行时端口共享持有对象。
+ * 拆分产物：运行时端口共享持有对象。
  *
  * 由 [ClashProxyManager] 在构造时创建并传给各协作者。所有实例方法（合成配置 / controller 请求 /
  * env 注入 / 预热换端口 / 提升预热实例）一律读写这里的两个字段，与拆分前读写

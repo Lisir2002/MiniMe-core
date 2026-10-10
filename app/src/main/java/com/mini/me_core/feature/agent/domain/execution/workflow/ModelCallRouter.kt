@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import okhttp3.OkHttpClient
 
 /**
- * 模型调用路由（P1-09 从 StatefulAgentWorkflow 整体搬迁的叶子协作者）。
+ * 模型调用路由（ 从 StatefulAgentWorkflow 整体搬迁的叶子协作者）。
  *
  * 职责：解析当前生效/备用/识图/压缩专用 provider 配置、按 needsProxy 装配独立 [AIProvider] 实例、
  * 查询模型视觉能力与识图兜底可用性。纯路由叶子——不触碰状态机、不发事件、不执行工具，
@@ -153,7 +153,7 @@ internal class ModelCallRouter(
      *      if (!activeModelSupportsVision(...)) → 直接抛「当前聊天模型不支持图片输入」
      *  (2) `pendingVisionRound` 是否启用独立识图模型 fallback 的判定入口。
      *
-     *  RC63 判定链优先级（从高到低）：
+     *  判定链优先级（从高到低）：
      *  - ④ 单模型复选框手动覆盖（ModelCapabilityOverrideDao，在 resolve 内处理）；
      *  - catalog 明确 supportsVision=true → 支持；
      *  - catalog 明确 supportsVision=false（MODELS_DEV 收录的纯文本模型）→ 不支持；
@@ -168,9 +168,9 @@ internal class ModelCallRouter(
 
     /**
      * 发送前是否应该把图片带给模型。
-     * RC63 判定链与 [activeModelSupportsVision] 严格一致；
-     * 2026-08-10 RC63 按用户要求**撤销 RC62e 的 `source==INFERRED → 一律 true` 全局放宽**，
-     * 恢复 RC62d 之前的严格语义。未收录兼容端点模型仅当 probablyVision 启发式
+     * 判定链与 [activeModelSupportsVision] 严格一致；
+     * 2026-08-10 按用户要求**撤销 的 `source==INFERRED → 一律 true` 全局放宽**，
+     * 恢复 之前的严格语义。未收录兼容端点模型仅当 probablyVision 启发式
      * （或③兼容端点策略 / ④单模型覆盖）命中时才会带图发送，避免全局放宽的副作用。
      */
     suspend fun shouldSendImages(sessionId: String?): Boolean {

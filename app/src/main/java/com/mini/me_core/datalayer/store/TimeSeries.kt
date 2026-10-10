@@ -20,7 +20,7 @@ class TimeSeries(private val db: InfraDb) {
 
     /**
      * 记录一条时序数据。
-     * P1 修复：原 INSERT + SELECT last_insert_rowid() 无事务包裹，并发下可能返回错误 id。
+     * 原 INSERT + SELECT last_insert_rowid() 无事务包裹，并发下可能返回错误 id。
      */
     fun record(ts: Long, type: String, payloadJson: String, meta: String? = null): Long {
         var id = 0L

@@ -28,7 +28,7 @@ internal class AgentMessageStore(private val db: AgentDb) {
 
     /**
      * 批量插入消息。
-     * P1 修复：原实现 forEach 调用 suspend insertMessage，每条消息都 withContext 跳线程，
+     * 原实现 forEach 调用 suspend insertMessage，每条消息都 withContext 跳线程，
      * 既慢又无法保证原子性。改为单事务内直接调用 queries.insertMessage，同线程顺序执行。
      */
     suspend fun insertAllMessages(messages: List<Agent_message>) = withContext(Dispatchers.IO) {

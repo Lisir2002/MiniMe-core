@@ -13,11 +13,11 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * P3-12 端口绑定：把 [ContainerEnginePort] / [ContainerInstallerPort] / [SshConnectionPort]
+ * 把 [ContainerEnginePort] / [ContainerInstallerPort] / [SshConnectionPort]
  * 绑定到 agent 域的薄适配器。适配器内部委托到原 @Singleton 具体单例，
  * 因此 terminal / workspace 通过端口拿到的仍是同一实例、同一作用域。
  *
- * 独立 @Module 以避免与 [AgentModule]（object，不能 @Binds）以及 P2-12 的
+ * 独立 @Module 以避免与 [AgentModule]（object，不能 @Binds）以及
  * Mcp/Permission/Git/Packager 仓库绑定相互干扰。
  */
 @Module

@@ -29,17 +29,17 @@ class NormFlowSettingsRepository @Inject constructor(
         const val STEP_INJECT_PROJECT_AGENTS_ENABLED_KEY = "step_inject_project_agents_enabled"
         // 文件观察护栏独立开关
         const val FILE_OBSERVATION_ENABLED_KEY = "file_observation_enabled"
-        // P1：推理预算强度（low/medium/high）
+        // 推理预算强度（low/medium/high）
         const val REASONING_BUDGET_LEVEL_KEY = "reasoning_budget_level"
-        // P1：空转收敛阈值轮数
+        // 空转收敛阈值轮数
         const val IDLE_CONVERGE_ROUNDS_KEY = "idle_converge_rounds"
-        // P1：当前预设方案
+        // 当前预设方案
         const val ACTIVE_PRESET_KEY = "active_preset"
-        // P2：新增护栏独立开关（默认关）
+        // 新增护栏独立开关（默认关）
         const val GUARD_DANGEROUS_COMMAND_ENABLED_KEY = "guard_dangerous_command_enabled"
         const val GUARD_LARGE_FILE_ENABLED_KEY = "guard_large_file_enabled"
         const val GUARD_PATH_BOUNDARY_ENABLED_KEY = "guard_path_boundary_enabled"
-        // P2：用量卡片显示项（逗号分隔，默认仅 token）
+        // 用量卡片显示项（逗号分隔，默认仅 token）
         const val USAGE_CARD_ITEMS_KEY = "usage_card_items"
     }
 
@@ -58,17 +58,17 @@ class NormFlowSettingsRepository @Inject constructor(
     val stepInjectProjectAgentsEnabledFlow: Flow<Boolean> = kv.observeBool(NS, STEP_INJECT_PROJECT_AGENTS_ENABLED_KEY).map { it ?: true }
     // 文件观察护栏独立开关（默认开）
     val fileObservationEnabledFlow: Flow<Boolean> = kv.observeBool(NS, FILE_OBSERVATION_ENABLED_KEY).map { it ?: true }
-    // P1：推理预算强度（默认 medium）
+    // 推理预算强度（默认 medium）
     val reasoningBudgetLevelFlow: Flow<String> = kv.observeString(NS, REASONING_BUDGET_LEVEL_KEY).map { it ?: "medium" }
-    // P1：空转收敛阈值（默认 6 轮）
+    // 空转收敛阈值（默认 6 轮）
     val idleConvergeRoundsFlow: Flow<Int> = kv.observeInt(NS, IDLE_CONVERGE_ROUNDS_KEY).map { it?.toInt() ?: 6 }
-    // P1：当前预设方案（默认 standard）
+    // 当前预设方案（默认 standard）
     val activePresetFlow: Flow<String> = kv.observeString(NS, ACTIVE_PRESET_KEY).map { it ?: "standard" }
-    // P2：新增护栏独立开关（默认关）
+    // 新增护栏独立开关（默认关）
     val guardDangerousCommandEnabledFlow: Flow<Boolean> = kv.observeBool(NS, GUARD_DANGEROUS_COMMAND_ENABLED_KEY).map { it ?: false }
     val guardLargeFileEnabledFlow: Flow<Boolean> = kv.observeBool(NS, GUARD_LARGE_FILE_ENABLED_KEY).map { it ?: false }
     val guardPathBoundaryEnabledFlow: Flow<Boolean> = kv.observeBool(NS, GUARD_PATH_BOUNDARY_ENABLED_KEY).map { it ?: true }
-    // P2：用量卡片显示项（默认仅 token）
+    // 用量卡片显示项（默认仅 token）
     val usageCardItemsFlow: Flow<Set<String>> = kv.observeString(NS, USAGE_CARD_ITEMS_KEY).map { raw ->
         raw?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet() ?: setOf("token")
     }
@@ -86,27 +86,27 @@ class NormFlowSettingsRepository @Inject constructor(
     suspend fun setStepInjectLayeredRulesEnabled(enabled: Boolean) { kv.putBool(NS, STEP_INJECT_LAYERED_RULES_ENABLED_KEY, enabled) }
     suspend fun setStepInjectProjectAgentsEnabled(enabled: Boolean) { kv.putBool(NS, STEP_INJECT_PROJECT_AGENTS_ENABLED_KEY, enabled) }
     suspend fun setFileObservationEnabled(enabled: Boolean) { kv.putBool(NS, FILE_OBSERVATION_ENABLED_KEY, enabled) }
-    // P2：新增护栏独立开关
+    // 新增护栏独立开关
     suspend fun setGuardDangerousCommandEnabled(enabled: Boolean) { kv.putBool(NS, GUARD_DANGEROUS_COMMAND_ENABLED_KEY, enabled) }
     suspend fun setGuardLargeFileEnabled(enabled: Boolean) { kv.putBool(NS, GUARD_LARGE_FILE_ENABLED_KEY, enabled) }
     suspend fun setGuardPathBoundaryEnabled(enabled: Boolean) { kv.putBool(NS, GUARD_PATH_BOUNDARY_ENABLED_KEY, enabled) }
-    // P2：用量卡片显示项
+    // 用量卡片显示项
     suspend fun setUsageCardItems(items: Set<String>) { kv.putString(NS, USAGE_CARD_ITEMS_KEY, items.joinToString(",")) }
     suspend fun getUsageCardItems(): Set<String> = usageCardItemsFlow.first()
-    // P1：推理预算强度
+    // 推理预算强度
     suspend fun setReasoningBudgetLevel(level: String) { kv.putString(NS, REASONING_BUDGET_LEVEL_KEY, level) }
     suspend fun getReasoningBudgetLevel(): String = reasoningBudgetLevelFlow.first()
-    // P1：空转收敛阈值
+    // 空转收敛阈值
     suspend fun setIdleConvergeRounds(rounds: Int) { kv.putInt(NS, IDLE_CONVERGE_ROUNDS_KEY, rounds.toLong()) }
     suspend fun getIdleConvergeRounds(): Int = idleConvergeRoundsFlow.first()
-    // P1：预设方案
+    // 预设方案
     suspend fun setActivePreset(preset: String) { kv.putString(NS, ACTIVE_PRESET_KEY, preset) }
     suspend fun getActivePreset(): String = activePresetFlow.first()
 
-    /** P1：用户手动调整任意开关后调用，将预设标记为 custom。 */
+    /** 用户手动调整任意开关后调用，将预设标记为 custom。 */
     suspend fun markCustom() { kv.putString(NS, ACTIVE_PRESET_KEY, "custom") }
 
-    /** P1：批量应用预设方案。 */
+    /** 批量应用预设方案。 */
     suspend fun applyPreset(preset: String) {
         when (preset) {
             "strict" -> {
@@ -187,12 +187,12 @@ class NormFlowSettingsRepository @Inject constructor(
     suspend fun isStepInjectLayeredRulesActive(): Boolean = isStepInjectActive() && stepInjectLayeredRulesEnabledFlow.first()
     suspend fun isStepInjectProjectAgentsActive(): Boolean = normFlowEnabledFlow.first() && stepInjectProjectAgentsEnabledFlow.first()
     suspend fun isFileObservationActive(): Boolean = isToolGuardActive() && fileObservationEnabledFlow.first()
-    // P2：新增护栏 active 判断（总开关 && tool_guard && 自身开关）
+    // 新增护栏 active 判断（总开关 && tool_guard && 自身开关）
     suspend fun isGuardDangerousCommandActive(): Boolean = isToolGuardActive() && guardDangerousCommandEnabledFlow.first()
     suspend fun isGuardLargeFileActive(): Boolean = isToolGuardActive() && guardLargeFileEnabledFlow.first()
     suspend fun isGuardPathBoundaryActive(): Boolean = isToolGuardActive() && guardPathBoundaryEnabledFlow.first()
 
-    // P3：配置导出/导入（手动 JSON 构造）
+    // 配置导出/导入（手动 JSON 构造）
     fun exportConfig(): String {
         val sb = StringBuilder("{")
         val entries = mutableListOf<String>()
