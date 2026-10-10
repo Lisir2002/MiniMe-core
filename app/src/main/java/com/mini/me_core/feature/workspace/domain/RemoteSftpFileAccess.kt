@@ -6,14 +6,52 @@ import com.mini.me_core.feature.agent.domain.container.friendlySshError
 import com.mini.me_core.feature.workspace.data.repository.WorkspaceRepository
 import com.mini.me_core.feature.workspace.domain.WorkspacePathMapper.Companion.CONTAINER_ROOT
 import kotlinx.coroutines.runBlocking
-import java.io.BufferedReader
 import java.io.File
-import java.io.InputStreamReader
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.NoSuchFileException
 import javax.inject.Inject
 
 private const val TAG = "RemoteSftpFileAccess"
+
+/** 远程命令执行失败（非零退出或 stderr 有内容）时抛出，供调用方感知并重试/报错。 */
+open class RemoteCommandFailedException(
+    val exitCode: Int,
+    /** 脱敏后的 stderr 片段（截断，避免回显超长内容）。 */
+    val stderr: String,
+    message: String,
+) : RuntimeException(message)
+
+/** 远程写文件失败的类型化异常（非零退出/解码失败）。 */
+class RemoteWriteFailedException(
+    val remotePath: String,
+    exitCode: Int,
+    stderr: String,
+) : RemoteCommandFailedException(exitCode, stderr, "远程写入失败(code=$exitCode): $remotePath")
+
+private data class ExecResult(
+    val stdout: String,
+    val stderr: String,
+    val exitCode: Int,
+)
+
+/**
+ * 远程写/命令结果的判定（纯逻辑，便于单测）：
+ * 非零退出即失败并抛类型化异常，绝不静默当成功；stderr 截断为脱敏片段回传。
+ */
+internal object RemoteExecDecider {
+    const val TAIL_LIMIT = 300
+    fun tail(s: String): String = s.trim().take(TAIL_LIMIT)
+
+    /** 写操作结果判定：exitCode!=0 抛 [RemoteWriteFailedException]。 */
+    fun requireWriteSuccess(exitCode: Int, stderr: String, remotePath: String) {
+        if (exitCode != 0) throw RemoteWriteFailedException(remotePath, exitCode, tail(stderr))
+    }
+
+    /** 一般命令（mkdirs 等）结果判定：exitCode!=0 抛 [RemoteCommandFailedException]。 */
+    fun requireSuccess(exitCode: Int, stderr: String, ctx: String) {
+        if (exitCode != 0) throw RemoteCommandFailedException(exitCode, tail(stderr), "$ctx (code=$exitCode)")
+    }
+}
 
 /**
  * [FileAccessProvider] 的远程实现：用 SSH exec channel 执行命令读写远程文件。
@@ -76,58 +114,64 @@ class RemoteSftpFileAccess @Inject constructor(
     private fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
 
     /**
-     * 同步执行远程命令并返回完整 stdout。失败时抛友好异常。
+     * 同步执行远程命令，返回 (stdout, stderr, exitCode)。
+     *
+     * 必须消费 errorStream（stderr）：否则远程报错会留在管道里、或误判为成功（假成功）。
+     * 先读 stderr（小、阻塞到命令结束）再读 stdout，避免 stderr 管道填满造成反压；
+     * session 与所有流都在 try/finally 中关闭，杜绝句柄泄漏。
      *
      * 此处阻塞是因为 FileAccessProvider 接口为同步设计，被 Agent 工具层调用；
      * 工具执行本身运行在后台协程中，runBlocking 仅桥接到 IO 线程执行 SSH 命令，
      * 不阻塞主线程。
      */
-    private fun execSync(command: String): String = runBlocking {
+    private fun execResult(command: String): ExecResult = runBlocking {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val session = try {
                 connection.startExecSession(command)
             } catch (e: Exception) {
                 throw RuntimeException(friendlySshError(e), e)
             }
+            var stdout = ""
+            var stderr = ""
+            var exitCode = -1
             try {
-                val reader = BufferedReader(InputStreamReader(session.inputStream))
-                val output = reader.readText()
-                // readText 读到流结束，但 exitStatus 可能还没就绪——close 后才保证有值
+                stderr = runCatching {
+                    session.errorStream.bufferedReader().use { it.readText() }
+                }.getOrDefault("")
+                stdout = runCatching {
+                    session.inputStream.bufferedReader().use { it.readText() }
+                }.getOrDefault("")
+                exitCode = runCatching { session.exitStatus }.getOrNull() ?: -1
+            } finally {
                 runCatching { session.close() }
-                val exitCode = session.exitStatus
-                if (exitCode != null && exitCode != 0) {
-                    FileLogger.w(TAG, "命令退出码=$exitCode: $command")
-                }
-                output
-            } catch (e: Exception) {
-                runCatching { session.close() }
-                throw e
             }
+            ExecResult(stdout, stderr, exitCode)
         }
     }
 
     /**
-     * 同步执行远程命令，返回退出码（不抛异常）。
-     * 同 [execSync]，阻塞桥接至 IO 线程，调用方为后台 Agent 工具执行上下文。
+     * 同步执行远程命令并返回完整 stdout。非零退出时抛 [RemoteCommandFailedException]（带回脱敏 stderr），
+     * 不再仅打 warn 把失败当成功。
      */
-    private fun execExitCode(command: String): Int = runBlocking {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val session = try {
-                connection.startExecSession(command)
-            } catch (e: Exception) {
-                FileLogger.w(TAG, friendlySshError(e), e)
-                return@withContext -1
-            }
-            try {
-                BufferedReader(InputStreamReader(session.inputStream)).readText()
-                runCatching { session.close() }
-                session.exitStatus ?: -1
-            } catch (e: Exception) {
-                runCatching { session.close() }
-                FileLogger.w(TAG, "命令执行异常: $command", e)
-                -1
-            }
+    private fun execSync(command: String): String {
+        val r = execResult(command)
+        if (r.exitCode != 0) {
+            val tail = r.stderr.trim().take(300)
+            FileLogger.w(TAG, "远程命令退出码=${r.exitCode}${if (tail.isNotEmpty()) "，stderr: $tail" else ""}")
+            throw RemoteCommandFailedException(r.exitCode, tail, "远程命令执行失败(code=${r.exitCode})")
         }
+        return r.stdout
+    }
+
+    /**
+     * 同步执行远程命令，返回退出码（不抛异常）。
+     * 仅用于「退出码即结果」的探测类命令（test -e/-d/-f）；写/改类操作禁止用它吞掉失败。
+     */
+    private fun execExitCode(command: String): Int = try {
+        execResult(command).exitCode
+    } catch (e: Exception) {
+        FileLogger.w(TAG, "命令执行异常: ${friendlySshError(e)}", e)
+        -1
     }
 
     override fun readFile(path: String): String {
@@ -149,16 +193,23 @@ class RemoteSftpFileAccess @Inject constructor(
     override fun writeFile(path: String, content: String, overwrite: Boolean) {
         val remote = toRemotePath(path)
         if (exists(path) && !overwrite) throw FileAlreadyExistsException(File(remote))
-        // 确保父目录存在
+        // 确保父目录存在；父目录创建失败必须上抛，不能静默继续写（否则写落到不存在路径）。
         val parent = remote.substringBeforeLast('/', "")
-        if (parent.isNotEmpty()) execExitCode("mkdir -p ${shellQuote(parent)}")
+        if (parent.isNotEmpty()) {
+            val mkdirR = execResult("mkdir -p ${shellQuote(parent)}")
+            RemoteExecDecider.requireSuccess(mkdirR.exitCode, mkdirR.stderr, "远程创建父目录失败: $parent")
+        }
         // 用 base64 中转写入：内容编码为单行 base64（无换行、无引号、无特殊字符），远程解码落盘。
         // 相比 printf %s 直接把原始内容作命令行参数传递，base64 不受换行/引号/二进制内容的破坏，
         // 与 readBytes/copyToLocal 的 base64 中转方式对称。
         val b64 = java.util.Base64.getEncoder().encodeToString(content.toByteArray(Charsets.UTF_8))
         val redirect = if (overwrite) ">" else ">>"
-        val exit = execExitCode("printf %s ${shellQuote(b64)} | base64 -d $redirect ${shellQuote(remote)}")
-        if (exit != 0) FileLogger.w(TAG, "writeFile 退出码=$exit: $remote")
+        val r = execResult("printf %s ${shellQuote(b64)} | base64 -d $redirect ${shellQuote(remote)}")
+        if (r.exitCode != 0) {
+            // 非零退出绝不当成功：上抛类型化异常，调用方（Agent 工具/UI）可感知并重试或报错。
+            FileLogger.w(TAG, "writeFile 退出码=${r.exitCode}: $remote${if (r.stderr.isNotBlank()) " stderr: ${RemoteExecDecider.tail(r.stderr)}" else ""}")
+            RemoteExecDecider.requireWriteSuccess(r.exitCode, r.stderr, remote)
+        }
     }
 
     override fun exists(path: String): Boolean {
@@ -264,7 +315,8 @@ class RemoteSftpFileAccess @Inject constructor(
 
     override fun mkdirs(path: String) {
         val remote = toRemotePath(path)
-        execExitCode("mkdir -p ${shellQuote(remote)}")
+        val r = execResult("mkdir -p ${shellQuote(remote)}")
+        RemoteExecDecider.requireSuccess(r.exitCode, r.stderr, "远程创建目录失败: $remote")
     }
 
     override fun parentPath(path: String): String? {

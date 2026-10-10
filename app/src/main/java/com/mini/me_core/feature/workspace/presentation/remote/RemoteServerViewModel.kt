@@ -23,6 +23,8 @@ import com.mini.me_core.feature.workspace.domain.model.Workspace
 import com.mini.me_core.feature.workspace.data.repository.WorkspaceRepository
 import com.mini.me_core.feature.settings.data.repository.SyncSettingsRepository
 import com.mini.me_core.feature.workspace.domain.remote.ftp.FtpServerManager
+import com.mini.me_core.feature.workspace.domain.repository.PendingHostKeyRequest
+import com.mini.me_core.core.security.HostKeyTrustDecision
 import com.mini.me_core.datalayer.store.KVStore
 
 @HiltViewModel
@@ -53,9 +55,37 @@ class RemoteServerViewModel @Inject constructor(
     private val _testingConnectionIds = MutableStateFlow<Set<String>>(emptySet())
     val testingConnectionIds: StateFlow<Set<String>> = _testingConnectionIds.asStateFlow()
 
+    /** 待用户确认的 SSH 首连主机指纹（非空时弹确认框）。 */
+    val pendingHostKey: StateFlow<PendingHostKeyRequest?> = repository.pendingHostKey
+
+    /** 待用户确认的明文 FTP 主机（非空时弹风险确认框）。 */
+    val pendingCleartextFtp: StateFlow<String?> = repository.pendingCleartextFtp
+
     init {
         loadData()
         loadMountSyncDirections()
+    }
+
+    /** 用户对 SSH 首连指纹做出决策：本次信任 / 永久信任 / 拒绝。 */
+    fun resolvePendingHostKey(decision: HostKeyTrustDecision) {
+        repository.resolvePendingHostKey(decision)
+    }
+
+    /** 关闭指纹确认弹窗（等价拒绝连接）。 */
+    fun cancelPendingHostKey() {
+        repository.cancelPendingHostKey()
+    }
+
+    /** 用户对某主机的明文 FTP 风险做出确认/拒绝。 */
+    fun resolveCleartextFtp(confirmed: Boolean) {
+        repository.resolveCleartextFtp(confirmed)
+    }
+
+    /** 切换 FTP「局域网访问」（明文对全网卡暴露）。开启需 UI 先弹风险确认。 */
+    fun setFtpLanExposed(enabled: Boolean) {
+        viewModelScope.launch {
+            ftpServerManager.setLanExposed(enabled)
+        }
     }
 
     private fun loadMountSyncDirections() {

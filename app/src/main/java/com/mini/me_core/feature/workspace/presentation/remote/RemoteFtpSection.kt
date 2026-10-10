@@ -40,7 +40,13 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
     val password by viewModel.ftpServerManager.password.collectAsStateWithLifecycle()
     val isAnonymous by viewModel.ftpServerManager.isAnonymous.collectAsStateWithLifecycle()
     val autoStart by viewModel.ftpServerManager.autoStart.collectAsStateWithLifecycle()
+    val isLanExposed by viewModel.ftpServerManager.isLanExposed.collectAsStateWithLifecycle()
     val errorMessage by viewModel.ftpServerManager.errorMessage.collectAsStateWithLifecycle()
+
+    // 安全确认弹窗状态
+    val pendingHostKey by viewModel.pendingHostKey.collectAsStateWithLifecycle()
+    val pendingCleartextFtp by viewModel.pendingCleartextFtp.collectAsStateWithLifecycle()
+    var showLanRiskDialog by remember { mutableStateOf(false) }
 
     var editPort by remember(port) { mutableStateOf(port.toString()) }
     var editUsername by remember(username) { mutableStateOf(username) }
@@ -50,6 +56,81 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
     var editAutoStart by remember(autoStart) { mutableStateOf(autoStart) }
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+
+    // ── SSH 首连主机指纹确认框（fail-closed：不决策则连接一直挂起/拒绝） ──
+    pendingHostKey?.let { req ->
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelPendingHostKey() },
+            title = { Text("确认主机身份") },
+            text = {
+                Column {
+                    Text("首次连接 ${req.hostKey}。请核对服务器指纹是否与管理员提供的一致：")
+                    Spacer(modifier = Modifier.height(PrimitiveSpacing.Sm))
+                    Text(
+                        req.fingerprintSha256,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                Row {
+                    TextButton(onClick = { viewModel.resolvePendingHostKey(com.mini.me_core.core.security.HostKeyTrustDecision.TRUST_ONCE) }) {
+                        Text("本次信任")
+                    }
+                    TextButton(onClick = { viewModel.resolvePendingHostKey(com.mini.me_core.core.security.HostKeyTrustDecision.TRUST_ALWAYS) }) {
+                        Text("永久信任")
+                    }
+                    TextButton(onClick = { viewModel.cancelPendingHostKey() }) {
+                        Text("拒绝", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        )
+    }
+
+    // ── 明文 FTP 风险确认框 ──
+    pendingCleartextFtp?.let { host ->
+        AlertDialog(
+            onDismissRequest = { viewModel.resolveCleartextFtp(false) },
+            title = { Text("明文 FTP 风险") },
+            text = {
+                Text("连接 $host 使用明文 FTP：账号口令与文件在网络中明文传输，同网段可被嗅探。" +
+                    "建议改用 SFTP。是否仍要明文连接该主机？（确认后仅对该主机生效）")
+            },
+            confirmButton = {
+                Row {
+                    TextButton(onClick = { viewModel.resolveCleartextFtp(false) }) {
+                        Text("取消", color = MaterialTheme.colorScheme.error)
+                    }
+                    TextButton(onClick = { viewModel.resolveCleartextFtp(true) }) {
+                        Text("确认并连接")
+                    }
+                }
+            }
+        )
+    }
+
+    // ── 开启局域网访问的明文风险二次确认框 ──
+    if (showLanRiskDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanRiskDialog = false },
+            title = { Text("开启局域网访问？") },
+            text = {
+                Text("开启后 FTP 将对同网段所有设备开放，且为明文传输：账号口令与文件内容可被同网段嗅探。" +
+                    "请确认当前网络可信（如家/办公室 Wi-Fi，非公共网络）。")
+            },
+            confirmButton = {
+                Row {
+                    TextButton(onClick = { showLanRiskDialog = false }) { Text("取消") }
+                    TextButton(onClick = {
+                        showLanRiskDialog = false
+                        viewModel.setFtpLanExposed(true)
+                    }) { Text("确认开启", color = MaterialTheme.colorScheme.error) }
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -191,6 +272,14 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                         }
                     }
                 )
+                // 查看口令入口：点击眼睛图标即可显示；系统已自动为未设置弱口令的账号生成强随机口令。
+                if (!editAnonymous) {
+                    Text(
+                        text = "建议：使用强口令（至少 8 位、非纯数字）。未设置时系统已自动生成随机强口令，点击右侧眼睛图标可查看。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -214,6 +303,28 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                         Text(text = stringResource(R.string.ftp_auto_start_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = editAutoStart, onCheckedChange = { editAutoStart = it })
+                }
+
+                // 局域网访问开关：默认关（仅回环）。打开时必须经风险二次确认。
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "局域网访问（明文暴露）", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            text = if (isLanExposed) "已对同网段开放（明文）" else "默认仅本机回环可访问",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isLanExposed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = isLanExposed,
+                        onCheckedChange = { wantOn ->
+                            if (wantOn) showLanRiskDialog = true else viewModel.setFtpLanExposed(false)
+                        }
+                    )
                 }
 
                 AppButton(

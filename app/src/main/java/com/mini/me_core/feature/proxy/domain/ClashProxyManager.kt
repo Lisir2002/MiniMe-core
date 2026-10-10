@@ -38,7 +38,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.constructor.SafeConstructor
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -134,6 +136,9 @@ class ClashProxyManager @Inject constructor(
     private val credentialEncryptor: CredentialEncryptor,
     private val kv: KVStore,
 ) {
+    // 本类为大型单例（约 1300 行），companion 置于类首是既有结构（已建 baseline）；
+    // 仅本轮新增的 newSafeYaml 触发 ClassOrdering，重排风险高，按规约局部抑制。
+    @Suppress("ClassOrdering")
     companion object {
         private const val TAG = "ClashProxyManager"
         const val MIXED_PORT = 7890
@@ -150,6 +155,13 @@ class ClashProxyManager @Inject constructor(
         private const val MIXED_PORT_KEY = "mixed_port"
         private const val CONTROLLER_PORT_KEY = "controller_port"
         private const val PORT_RETRY_MAX = 10
+
+        /**
+         * 用显式 [SafeConstructor] 构造 Yaml：远程订阅/任何外部 YAML 均不可信，
+         * 必须禁用任意 Java 类型标签（!!type）反序列化，只接受标准标量/集合结构。
+         * internal 以便单测断言恶意标签文档不会被实例化。
+         */
+        internal fun newSafeYaml(): Yaml = Yaml(SafeConstructor(LoaderOptions()))
 
         /** 被覆盖块接管、需从源配置剥离的顶层键（避免与 fixed override 冲突或被恶意夹带）。 */
         val OVERRIDDEN_KEYS = listOf(
@@ -500,7 +512,8 @@ class ClashProxyManager @Inject constructor(
     fun synthesizeConfig(sourceYaml: String): String {
         val clean = LinkedHashMap<Any?, Any?>()
         try {
-            val root = Yaml().load<Any?>(sourceYaml)
+            // 外部订阅不可信：用 SafeConstructor 解析，禁止任意类型标签。
+            val root = newSafeYaml().load<Any?>(sourceYaml)
             if (root is Map<*, *>) {
                 root.forEach { (k, v) ->
                     val key = k?.toString() ?: return@forEach
@@ -639,7 +652,8 @@ class ClashProxyManager @Inject constructor(
      */
     fun parseClashConfig(yaml: String): ClashConfigSummary {
         return try {
-            val root = Yaml().load<Any?>(yaml)
+            // 外部配置不可信：SafeConstructor 禁止 !! 任意类型标签。
+            val root = newSafeYaml().load<Any?>(yaml)
             if (root !is Map<*, *>) {
                 return ClashConfigSummary(ok = false, error = "不是合法的 YAML 映射")
             }
@@ -983,7 +997,7 @@ class ClashProxyManager @Inject constructor(
 
     /** 落盘 config.yaml 是否能解析为 YAML 映射（mihomo 加载前的最后一道闸，防「配损坏 → 秒退」）。 */
     private fun validateConfigFile(f: java.io.File): Boolean = runCatching {
-        val root = Yaml().load<Any?>(f.readText(Charsets.UTF_8))
+        val root = newSafeYaml().load<Any?>(f.readText(Charsets.UTF_8))
         root is Map<*, *>
     }.getOrDefault(false)
 

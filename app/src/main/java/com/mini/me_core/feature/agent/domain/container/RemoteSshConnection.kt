@@ -45,6 +45,16 @@ class RemoteSshConnection @Inject constructor(
 
     private val mutex = Mutex()
 
+    /**
+     * 专门串行化「开取 SSH channel（startSession）」这一步的锁。
+     *
+     * sshj 的 SSHClient.startSession() 不是线程安全的：exec 与 shell 并发开 channel 会竞争
+     * 同一 transport 状态。临界区只覆盖开 channel 本身（IO 在 [Dispatchers.IO] 上），
+     * 后续 exec/PTY/读写/close 全部在锁外进行，避免持锁做网络 IO 造成死锁。
+     * 与 [mutex]（连接生命周期）是不同的锁，且从不在持有 A 时去抢 B，故无锁序死锁。
+     */
+    private val channelMutex = Mutex()
+
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     /** 连接状态流，供 UI 显示指示器、工作区初始化等待连接就绪。 */
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
@@ -85,6 +95,15 @@ class RemoteSshConnection @Inject constructor(
     var config: RemoteConnectionConfig? = null
         private set
 
+    /** 在 [channelMutex] 保护下开一个 Session；调用方负责关闭。 */
+    private suspend fun openSession(): Session {
+        val client = sshClient ?: throw IllegalStateException("SSH 未连接")
+        return withContext(Dispatchers.IO) { client.startSession() }
+    }
+
+    /** 单引号转义：远程路径拼进 shell 前统一经此（与 RemoteSftpFileAccess 同款）。 */
+    private fun shq(s: String): String = "'" + s.replace("'", "'\\''") + "'"
+
     suspend fun connect(config: RemoteConnectionConfig) = mutex.withLock {
         if (isConnected() && this.config == config) return@withLock
         disconnectInternal()
@@ -117,8 +136,8 @@ class RemoteSshConnection @Inject constructor(
                 sshClient = client
                 // 查远程真实 home（root 是 /root，普通用户是 /home/xxx），供文件工具展开 ~
                 runCatching {
-                    val s = client.startSession()
-                    val cmd = s.exec("echo \$HOME")
+                    val s = openSession()
+                    val cmd = withContext(Dispatchers.IO) { s.exec("echo \$HOME") }
                     remoteHome = java.io.BufferedReader(java.io.InputStreamReader(cmd.inputStream))
                         .readText().trim().ifEmpty { null }
                     s.close()
@@ -161,17 +180,19 @@ class RemoteSshConnection @Inject constructor(
         sshClient?.isConnected == true && sshClient?.isAuthenticated == true
 
     /** 开一个 exec session 执行命令。调用方负责关闭返回的 Command。 */
-    fun startExecSession(command: String): Session.Command {
-        val client = sshClient ?: throw IllegalStateException("SSH 未连接")
-        val session = client.startSession()
-        return session.exec(command)
+    suspend fun startExecSession(command: String): Session.Command {
+        // 开 channel 与 exec 投递分开：开取串行化（channelMutex），exec 的网络 IO 在锁外。
+        val session = channelMutex.withLock { openSession() }
+        return try {
+            withContext(Dispatchers.IO) { session.exec(command) }
+        } catch (e: Exception) {
+            runCatching { session.close() }
+            throw e
+        }
     }
 
     /** 开一个新的 Session，供调用方分配 PTY 并启动 shell。调用方负责关闭 Session。 */
-    fun startShellSession(): Session {
-        val client = sshClient ?: throw IllegalStateException("SSH 未连接")
-        return client.startSession()
-    }
+    suspend fun startShellSession(): Session = channelMutex.withLock { openSession() }
 
     /** 获取共享的 SFTP client（惰性创建）。调用方不应关闭它——由 [disconnect] 统一管理。 */
     suspend fun getSftpClient(): SFTPClient = mutex.withLock {
@@ -245,8 +266,8 @@ class RemoteSshConnection @Inject constructor(
         if (ws.isEmpty()) return
         withContext(Dispatchers.IO) {
             runCatching {
-                val session = client.startSession()
-                val cmd = session.exec("ln -sfn '$ws' ~/workspace 2>/dev/null; echo done")
+                val session = openSession()
+                val cmd = withContext(Dispatchers.IO) { session.exec("ln -sfn ${shq(ws)} ~/workspace 2>/dev/null; echo done") }
                 java.io.BufferedReader(java.io.InputStreamReader(cmd.inputStream)).readText()
                 session.close()
             }.onFailure { FileLogger.w(TAG, "更新 workspace 符号链接失败: $ws", it) }
@@ -267,14 +288,17 @@ class RemoteSshConnection @Inject constructor(
         val destDir = home.trimEnd('/') + "/.minime/docs"
         withContext(Dispatchers.IO) {
             runCatching {
-                val mkdirSession = client.startSession()
-                mkdirSession.exec("mkdir -p '$destDir'").join()
+                val mkdirSession = openSession()
+                withContext(Dispatchers.IO) { mkdirSession.exec("mkdir -p ${shq(destDir)}").join() }
                 mkdirSession.close()
                 for ((name, content) in docs) {
                     val dest = "$destDir/$name"
-                    val escaped = content.replace("\\", "\\\\").replace("'", "'\\\"'\"'")
-                    val session = client.startSession()
-                    session.exec("printf %s '$escaped' > '$dest'").join()
+                    // 内容用 base64 中转，避免引号/换行破坏命令行（与文件写入链路一致）。
+                    val b64 = java.util.Base64.getEncoder().encodeToString(content.toByteArray(Charsets.UTF_8))
+                    val session = openSession()
+                    withContext(Dispatchers.IO) {
+                        session.exec("printf %s ${shq(b64)} | base64 -d > ${shq(dest)}").join()
+                    }
                     session.close()
                 }
                 FileLogger.i(TAG, "已同步 ${docs.size} 个文档到远程 $destDir")

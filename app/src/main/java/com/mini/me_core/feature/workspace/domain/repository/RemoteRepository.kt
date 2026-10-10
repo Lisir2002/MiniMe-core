@@ -2,6 +2,8 @@ package com.mini.me_core.feature.workspace.domain.repository
 
 import com.mini.me_core.core.security.CredentialEncryptor
 import com.mini.me_core.core.security.HostKeyManager
+import com.mini.me_core.core.security.HostKeyTrustCallback
+import com.mini.me_core.core.security.HostKeyTrustDecision
 import com.mini.me_core.datalayer.autoConnect
 import com.mini.me_core.datalayer.isActive
 import com.mini.me_core.datalayer.repository.WorkspaceRepository as V2WorkspaceRepository
@@ -10,12 +12,17 @@ import com.mini.me_core.feature.workspace.domain.model.RemoteMount
 import com.mini.me_core.feature.workspace.domain.model.RemoteProtocol
 import com.mini.me_core.feature.workspace.domain.remote.RemoteAuth
 import com.mini.me_core.feature.workspace.domain.remote.SyncEngine
+import com.mini.me_core.feature.workspace.domain.remote.ftp.CleartextFtpNotConfirmedException
 import com.mini.me_core.feature.workspace.domain.remote.ftp.FtpSyncClient
 import com.mini.me_core.feature.workspace.domain.remote.local.LocalSyncClient
 import com.mini.me_core.feature.workspace.domain.remote.sftp.SftpSyncClient
+import com.mini.me_core.datalayer.store.KVStore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -24,15 +31,107 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** 待用户决策的首次连接主机密钥请求（UI 据此弹出指纹确认框）。 */
+data class PendingHostKeyRequest(
+    val hostKey: String,
+    val fingerprintSha256: String,
+)
+
 @Singleton
 class RemoteRepository @Inject constructor(
     private val v2Workspace: V2WorkspaceRepository,
     private val syncSettings: com.mini.me_core.feature.settings.data.repository.SyncSettingsRepository,
     private val hostKeyManager: HostKeyManager,
     private val encryptor: CredentialEncryptor,
+    private val kv: KVStore,
 ) {
     private val activeEngines = ConcurrentHashMap<String, SyncEngine>()
     private val activeEngineIds = MutableStateFlow<Set<String>>(emptySet())
+
+    // ── SSH 首连指纹确认（fail-closed：未弹 UI/用户拒绝即拒连） ──────────────────────
+    private val _pendingHostKey = MutableStateFlow<PendingHostKeyRequest?>(null)
+    /** 待用户确认的主机密钥请求（非空时 UI 弹确认框）。后台自动重连路径也走这里，但无 UI 时由超时拒绝。 */
+    val pendingHostKey: StateFlow<PendingHostKeyRequest?> = _pendingHostKey.asStateFlow()
+    private var pendingHostKeyDeferred: CompletableDeferred<HostKeyTrustDecision>? = null
+
+    // ── 明文 FTP 风险确认（per-host 持久化，默认拒绝静默明文登录） ───────────────────
+    private val _pendingCleartextFtp = MutableStateFlow<String?>(null)
+    /** 待用户确认的明文 FTP 主机（非空时 UI 弹风险确认框）。 */
+    val pendingCleartextFtp: StateFlow<String?> = _pendingCleartextFtp.asStateFlow()
+    private var pendingCleartextDeferred: CompletableDeferred<Boolean>? = null
+
+    init {
+        // 把 HostKeyManager 的首连回调接到 UI 状态：ssh 验证线程在此同步等待用户决策。
+        // 该回调由 sshj 在 transport 线程上同步调用（非挂起），故用 runBlocking 等待 UI 决策。
+        hostKeyManager.trustCallback = HostKeyTrustCallback { hostKey, fingerprintSha256 ->
+            // 已有未决请求时，新请求直接 REJECT（fail-closed，避免弹窗排队错乱）。
+            if (pendingHostKeyDeferred != null) {
+                return@HostKeyTrustCallback HostKeyTrustDecision.REJECT
+            }
+            val deferred = CompletableDeferred<HostKeyTrustDecision>()
+            pendingHostKeyDeferred = deferred
+            _pendingHostKey.value = PendingHostKeyRequest(hostKey, fingerprintSha256)
+            try {
+                kotlinx.coroutines.runBlocking { deferred.await() }
+            } catch (e: Exception) {
+                HostKeyTrustDecision.REJECT
+            } finally {
+                _pendingHostKey.value = null
+                pendingHostKeyDeferred = null
+            }
+        }
+    }
+
+    /** UI：用户对首连指纹做出决策（本次信任 / 永久信任 / 拒绝）。 */
+    fun resolvePendingHostKey(decision: HostKeyTrustDecision) {
+        pendingHostKeyDeferred?.complete(decision)
+    }
+
+    /** UI：取消主机密钥确认弹窗（等价于拒绝）。 */
+    fun cancelPendingHostKey() {
+        pendingHostKeyDeferred?.complete(HostKeyTrustDecision.REJECT)
+    }
+
+    private suspend fun awaitCleartextFtpConfirmation(host: String): Boolean {
+        if (kv.getBool(FTP_CLEARTEXT_NS, cleartextKey(host)) == true) return true
+        // 已有未决请求 → 拒绝
+        if (pendingCleartextDeferred != null) return false
+        val deferred = CompletableDeferred<Boolean>()
+        pendingCleartextDeferred = deferred
+        _pendingCleartextFtp.value = host
+        val ok = try {
+            deferred.await()
+        } catch (e: Exception) {
+            false
+        } finally {
+            _pendingCleartextFtp.value = null
+            pendingCleartextDeferred = null
+        }
+        if (ok) {
+            // 用户显式确认过该主机的明文风险 → 持久化，后续不再打扰。
+            kv.putBool(FTP_CLEARTEXT_NS, cleartextKey(host), true)
+        }
+        return ok
+    }
+
+    /** UI：用户确认/拒绝某主机的明文 FTP 风险。 */
+    fun resolveCleartextFtp(confirmed: Boolean) {
+        pendingCleartextDeferred?.complete(confirmed)
+    }
+
+    /**
+     * 构造明文 FTP 客户端：先等待用户对该主机的明文风险确认（per-host 已确认则直接放行），
+     * 未确认即抛 [CleartextFtpNotConfirmedException]（fail-closed，引导走 SFTP/FTPS 或显式确认）。
+     */
+    private suspend fun buildFtpClient(host: String): FtpSyncClient {
+        val confirmed = awaitCleartextFtpConfirmation(host)
+        if (!confirmed) {
+            throw CleartextFtpNotConfirmedException(
+                "明文 FTP 未获风险确认：账号口令与文件均明文传输。请确认承担明文风险，或改用 SFTP。"
+            )
+        }
+        return FtpSyncClient(cleartextConfirmedByUser = true)
+    }
 
     private suspend fun getConnectionRow(id: String): com.mini.mecore.datalayer.sqldelight.workspace.Remote_connections? =
         v2Workspace.getRemoteConnection(id)
@@ -175,7 +274,7 @@ class RemoteRepository @Inject constructor(
 
             val client = when (conn.protocol) {
                 RemoteProtocol.SFTP -> SftpSyncClient(hostKeyManager.createVerifier())
-                RemoteProtocol.FTP -> FtpSyncClient()
+                RemoteProtocol.FTP -> buildFtpClient(conn.host)
                 RemoteProtocol.LOCAL -> LocalSyncClient()
             }
 
@@ -241,7 +340,7 @@ class RemoteRepository @Inject constructor(
         try {
             val client = when (protocol) {
                 RemoteProtocol.SFTP -> SftpSyncClient(hostKeyManager.createVerifier())
-                RemoteProtocol.FTP -> FtpSyncClient()
+                RemoteProtocol.FTP -> buildFtpClient(host)
                 RemoteProtocol.LOCAL -> LocalSyncClient()
             }
             client.connect(host, port, username, auth)
@@ -260,7 +359,7 @@ class RemoteRepository @Inject constructor(
 
             val client = when (conn.protocol) {
                 RemoteProtocol.SFTP -> SftpSyncClient(hostKeyManager.createVerifier())
-                RemoteProtocol.FTP -> FtpSyncClient()
+                RemoteProtocol.FTP -> buildFtpClient(conn.host)
                 RemoteProtocol.LOCAL -> LocalSyncClient()
             }
             val auth = resolveAuth(connRow.auth_type, connRow.auth_data, connRow.passphrase)
@@ -280,7 +379,7 @@ class RemoteRepository @Inject constructor(
 
             val client = when (conn.protocol) {
                 RemoteProtocol.SFTP -> SftpSyncClient(hostKeyManager.createVerifier())
-                RemoteProtocol.FTP -> FtpSyncClient()
+                RemoteProtocol.FTP -> buildFtpClient(conn.host)
                 RemoteProtocol.LOCAL -> LocalSyncClient()
             }
             val auth = resolveAuth(connRow.auth_type, connRow.auth_data, connRow.passphrase)
@@ -354,5 +453,10 @@ class RemoteRepository @Inject constructor(
             RemoteAuth.PrivateKey(authData, decryptCredential(passphrase))
         // PASSWORD 或未知类型：统一当作密码登录，避免老数据 authType 被脏写就完全登不上。
         else -> RemoteAuth.Password(decryptCredential(authData))
+    }
+
+    private companion object {
+        const val FTP_CLEARTEXT_NS = "remote_ftp_cleartext"
+        fun cleartextKey(host: String) = "ok_$host"
     }
 }

@@ -34,6 +34,15 @@ private const val DEFAULT_COLUMNS = 80
 private const val DEFAULT_ROWS = 24
 
 /**
+ * shell 单引号转义（与 RemoteSftpFileAccess/ContainerFileAccess 同款实现）。
+ * 任何外部来源字符串（工作区路径、配置路径等）拼进远程 shell 命令前必须经此函数，
+ * 否则路径中的单引号会闭合引号造成命令注入。internal 以便同模块单测覆盖注入反例。
+ */
+internal object ShellQuote {
+    fun quote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
+}
+
+/**
  * 远程 SSH 终端会话管理器：用 sshj shell channel 驱动 [TerminalSession]（接 [SshShellBackend]），
  * 与本地 [TerminalSessionManager]（fork PTY 进程）共用同一套 UI/工具接口。
  *
@@ -144,7 +153,7 @@ class RemoteTerminalSessionManager @Inject constructor(
         val wsPath = workdir?.takeIf { it.isNotBlank() }
             ?: workspaceRepository.currentPath()
         if (wsPath.isNotBlank() && wsPath != "/") {
-            termSession.write("cd ~/workspace 2>/dev/null || cd '${wsPath.trimEnd('/')}' 2>/dev/null\n")
+            termSession.write("cd ~/workspace 2>/dev/null || cd ${ShellQuote.quote(wsPath.trimEnd('/'))} 2>/dev/null\n")
         }
         if (command != null) {
             val init = command + (if (notify) "" else "; exec /bin/sh")
@@ -310,7 +319,7 @@ class RemoteTerminalSessionManager @Inject constructor(
         // 失败回退到 connection.config.remoteWorkspacePath 的真实路径，保证用户重连后仍在工作区内。
         val wsPath = connection.config?.remoteWorkspacePath
         if (!wsPath.isNullOrBlank() && wsPath != "/") {
-            termSession.write("cd ~/workspace 2>/dev/null || cd '${wsPath.trimEnd('/')}' 2>/dev/null\n")
+            termSession.write("cd ~/workspace 2>/dev/null || cd ${ShellQuote.quote(wsPath.trimEnd('/'))} 2>/dev/null\n")
         }
         val newTab = TerminalTab(
             id = old.id,
