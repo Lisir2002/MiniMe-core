@@ -1,15 +1,34 @@
 package com.mini.me_core.datalayer.repository
 
-import app.cash.sqldelight.coroutines.asFlow
-import app.cash.sqldelight.coroutines.mapToList
-import app.cash.sqldelight.coroutines.mapToOneOrNull
-import com.mini.me_core.datalayer.exception.DataLayerErrorCode
-import com.mini.me_core.datalayer.exception.DataLayerException
-import com.mini.me_core.datalayer.util.escapeSqlLike
 import com.mini.mecore.datalayer.sqldelight.AgentDb
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_checkpoint
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_message
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_goals
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_jobs
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_playbook_runs
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_plans
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session
+import com.mini.mecore.datalayer.sqldelight.agent.Agent_trajectories
+import com.mini.mecore.datalayer.sqldelight.agent.Checkpoint_file_snapshots
+import com.mini.mecore.datalayer.sqldelight.agent.File_edit_hunks
+import com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides
+import com.mini.mecore.datalayer.sqldelight.agent.Model_custom_configs
+import com.mini.mecore.datalayer.sqldelight.agent.Model_sampling_configs
+import com.mini.mecore.datalayer.sqldelight.agent.Mode_switch_history
 import com.mini.mecore.datalayer.sqldelight.agent.SelectAllSessionsWithCount
+import com.mini.mecore.datalayer.sqldelight.agent.SelectTrajectoryAggregateBySession
+import com.mini.mecore.datalayer.sqldelight.agent.Session_checkpoints
+import com.mini.mecore.datalayer.sqldelight.agent.Skill_conversation_state
+import com.mini.mecore.datalayer.sqldelight.agent.Skill_state
+import com.mini.mecore.datalayer.sqldelight.agent.Todo_items
+import com.mini.mecore.datalayer.sqldelight.agent.Wake_queue
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_hallucination_fuses
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_hard_constraint_delete_audits
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_l0_soft_compact_restore_logs
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_sentinel_plan_rejection_audits
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_telemetry_events
+import com.mini.mecore.datalayer.sqldelight.agent.Zth_user_confirmed_sentinels
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -21,892 +40,860 @@ import kotlinx.coroutines.withContext
  * v2-full-takeover P0-1：补 Flow 响应式读，对齐 Room DAO 的 22 个 Flow 查询。
  * v2-full-takeover P2-3：agent_session / agent_message 对齐 Room 实体全列，
  *  本门面补齐 ChatSessionDao(22) + AgentMessageDao(25) 全部等价方法。
+ *
+ * P3-16（本阶段拆分）：按职责下沉为同包协作者，本类保留为薄门面——
+ * 类名、构造签名、[WakeQueueStore] 实现、Hilt 绑定、所有 public 方法签名与行为均不变；
+ * 仅把调用转发给下列 store，事务封装 [runInTx] 仍在门面。
  */
 class AgentRepository(private val db: AgentDb) : WakeQueueStore {
 
     private val q get() = db.agentQueries
 
+    private val sessions = AgentSessionStore(db)
+    private val messages = AgentMessageStore(db)
+    private val compaction = AgentCompactionStore(db)
+    private val todos = AgentTodoStore(db)
+    private val checkpoints = AgentCheckpointStore(db)
+    private val plans = AgentPlanStore(db)
+    private val jobSchedules = AgentJobScheduleStore(db)
+    private val trajectories = AgentTrajectoryStore(db)
+    private val skills = AgentSkillStore(db)
+    private val wake = AgentWakeStore(db)
+    private val zth = AgentZthStore(db)
+    private val modelConfigs = AgentModelConfigStore(db)
+
     // ── 会话（ChatSessionDao 等价）──────────────────────────────────────
 
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun upsertSession(
         id: String, title: String?, mode: String, model: String?, status: String,
         createdAtMs: Long, updatedAtMs: Long, workspacePath: String, reasoningEffort: String,
         providerId: String?, totalInputTokens: Long, totalOutputTokens: Long, lastInputTokens: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.upsertSession(id, title, mode, model, status, createdAtMs, updatedAtMs, workspacePath, reasoningEffort, providerId, totalInputTokens, totalOutputTokens, lastInputTokens)
-    }
+    ) = sessions.upsertSession(
+        id, title, mode, model, status, createdAtMs, updatedAtMs, workspacePath,
+        reasoningEffort, providerId, totalInputTokens, totalOutputTokens, lastInputTokens,
+    )
 
     suspend fun createSession(
         id: String, title: String?, mode: String, model: String?, now: Long = System.currentTimeMillis(),
-    ) = withContext(Dispatchers.IO) {
-        q.insertSession(id, title, mode, model, "active", now, now, "", "MEDIUM", null, 0L, 0L, 0L)
-    }
+    ) = sessions.createSession(id, title, mode, model, now)
 
-    suspend fun listSessions(): List<Agent_session> =
-        withContext(Dispatchers.IO) { q.selectAllSessions().executeAsList() }
+    suspend fun listSessions(): List<Agent_session> = sessions.listSessions()
 
-    suspend fun getSession(id: String): Agent_session? =
-        withContext(Dispatchers.IO) { q.selectSessionById(id).executeAsOneOrNull() }
+    suspend fun getSession(id: String): Agent_session? = sessions.getSession(id)
 
     suspend fun renameSession(id: String, title: String, now: Long = System.currentTimeMillis()) =
-        withContext(Dispatchers.IO) { q.updateSessionTitle(title, now, id) }
+        sessions.renameSession(id, title, now)
 
-    suspend fun deleteSession(id: String) = withContext(Dispatchers.IO) { q.deleteSession(id) }
+    suspend fun deleteSession(id: String) = sessions.deleteSession(id)
 
     /** 备份「覆盖恢复」专用：清空会话大表（消息/待办需各自调用 deleteAllMessages / deleteAllTodos）。 */
-    suspend fun deleteAllSessions() = withContext(Dispatchers.IO) { q.deleteAllSessions() }
+    suspend fun deleteAllSessions() = sessions.deleteAllSessions()
 
     suspend fun getAllSessionsByWorkspaceOnce(workspacePath: String): List<Agent_session> =
-        withContext(Dispatchers.IO) { q.selectSessionsByWorkspace(workspacePath).executeAsList() }
+        sessions.getAllSessionsByWorkspaceOnce(workspacePath)
 
     fun observeAllSessionsByWorkspace(workspacePath: String): Flow<List<Agent_session>> =
-        q.selectSessionsByWorkspace(workspacePath).asFlow().mapToList(Dispatchers.IO)
+        sessions.observeAllSessionsByWorkspace(workspacePath)
 
     fun observeAllSessionsWithCount(): Flow<List<SelectAllSessionsWithCount>> =
-        q.selectAllSessionsWithCount().asFlow().mapToList(Dispatchers.IO)
+        sessions.observeAllSessionsWithCount()
 
-    suspend fun getAllOnce(): List<Agent_session> =
-        withContext(Dispatchers.IO) { q.selectAllSessions().executeAsList() }
+    suspend fun getAllOnce(): List<Agent_session> = sessions.getAllOnce()
 
-    suspend fun getMostRecentOnce(): Agent_session? =
-        withContext(Dispatchers.IO) { q.selectMostRecentSession().executeAsOneOrNull() }
+    suspend fun getMostRecentOnce(): Agent_session? = sessions.getMostRecentOnce()
 
-    suspend fun getUnboundSessionsOnce(): List<Agent_session> =
-        withContext(Dispatchers.IO) { q.selectUnboundSessions().executeAsList() }
+    suspend fun getUnboundSessionsOnce(): List<Agent_session> = sessions.getUnboundSessionsOnce()
 
-    suspend fun countSessions(): Long =
-        withContext(Dispatchers.IO) { q.countSessions().executeAsOne() }
+    suspend fun countSessions(): Long = sessions.countSessions()
 
-    suspend fun getSessionPageAfter(lastUpdatedAtMs: Long, lastId: String, limit: Long): List<Agent_session> =
-        withContext(Dispatchers.IO) { q.selectSessionPageAfter(lastUpdatedAtMs, lastUpdatedAtMs, lastId, limit).executeAsList() }
+    suspend fun getSessionPageAfter(
+        lastUpdatedAtMs: Long, lastId: String, limit: Long,
+    ): List<Agent_session> = sessions.getSessionPageAfter(lastUpdatedAtMs, lastId, limit)
 
-    /**
-     * 批量 upsert 会话（备份恢复用）。
-     * P1 修复：原实现 forEach 逐条 upsert 无事务包裹，每条 INSERT 都是独立 autocommit，
-     * 大数据量下产生大量 fsync 导致极慢。改为单事务包裹，要么全部成功要么全部回滚。
-     */
-    suspend fun upsertAllSessions(sessions: List<Agent_session>) = withContext(Dispatchers.IO) {
-        db.transaction {
-            sessions.forEach { s ->
-                q.upsertSession(s.id, s.title, s.mode, s.model, s.status, s.created_at, s.updated_at, s.workspace_path, s.reasoning_effort, s.provider_id, s.total_input_tokens, s.total_output_tokens, s.last_input_tokens)
-            }
-        }
-    }
+    suspend fun upsertAllSessions(sessions: List<Agent_session>) = this.sessions.upsertAllSessions(sessions)
 
-    suspend fun getSessionById(id: String): Agent_session? =
-        withContext(Dispatchers.IO) { q.selectSessionById(id).executeAsOneOrNull() }
+    suspend fun getSessionById(id: String): Agent_session? = sessions.getSessionById(id)
 
-    suspend fun updateTitle(id: String, title: String) =
-        withContext(Dispatchers.IO) { q.updateSessionTitle(title, System.currentTimeMillis(), id) }
+    suspend fun updateTitle(id: String, title: String) = sessions.updateTitle(id, title)
 
     suspend fun updateWorkspacePath(oldPath: String, newPath: String) =
-        withContext(Dispatchers.IO) { q.updateSessionWorkspacePath(newPath, oldPath) }
+        sessions.updateWorkspacePath(oldPath, newPath)
 
-    suspend fun setWorkspacePath(id: String, path: String) =
-        withContext(Dispatchers.IO) { q.setSessionWorkspacePath(path, id) }
+    suspend fun setWorkspacePath(id: String, path: String) = sessions.setWorkspacePath(id, path)
 
-    suspend fun touch(id: String, updatedAtMs: Long) =
-        withContext(Dispatchers.IO) { q.touchSession(updatedAtMs, id) }
+    suspend fun touch(id: String, updatedAtMs: Long) = sessions.touch(id, updatedAtMs)
 
     suspend fun updateProviderModel(id: String, providerId: String?, model: String?) =
-        withContext(Dispatchers.IO) { q.updateSessionProviderModel(providerId, model, id) }
+        sessions.updateProviderModel(id, providerId, model)
 
     suspend fun updateReasoningEffort(id: String, effort: String) =
-        withContext(Dispatchers.IO) { q.updateSessionReasoningEffort(effort, id) }
+        sessions.updateReasoningEffort(id, effort)
 
     suspend fun addTokenUsage(id: String, inputTokens: Long, outputTokens: Long) =
-        withContext(Dispatchers.IO) { q.addSessionTokenUsage(inputTokens, outputTokens, id) }
+        sessions.addTokenUsage(id, inputTokens, outputTokens)
 
     suspend fun updateLastInputTokens(id: String, lastInputTokens: Long) =
-        withContext(Dispatchers.IO) { q.updateSessionLastInputTokens(lastInputTokens, id) }
+        sessions.updateLastInputTokens(id, lastInputTokens)
+
+    fun observeAllSessions(): Flow<List<Agent_session>> = sessions.observeAllSessions()
+
+    fun observeSessionById(id: String): Flow<Agent_session?> = sessions.observeSessionById(id)
 
     // ── 消息（AgentMessageDao 等价）──────────────────────────────────────
 
-    suspend fun insertMessage(e: Agent_message) = withContext(Dispatchers.IO) {
-        q.insertMessage(e.id, e.session_id, e.role, e.seq, e.created_at, e.task_id, e.content, e.tool_calls_json, e.tool_call_id, e.tool_name, e.tool_args, e.is_error, e.reasoning, e.signature, e.attachments_json, e.is_compacted, e.is_context_summary, e.is_compaction_marker, e.input_tokens, e.output_tokens, e.chunk_group_id, e.chunk_index)
-    }
+    suspend fun insertMessage(e: Agent_message) = messages.insertMessage(e)
 
-    /**
-     * 批量插入消息。
-     * P1 修复：原实现 forEach 调用 suspend insertMessage，每条消息都 withContext 跳线程，
-     * 既慢又无法保证原子性。改为单事务内直接调用 queries.insertMessage，同线程顺序执行。
-     */
-    suspend fun insertAllMessages(messages: List<Agent_message>) = withContext(Dispatchers.IO) {
-        db.transaction {
-            messages.forEach { e ->
-                q.insertMessage(e.id, e.session_id, e.role, e.seq, e.created_at, e.task_id, e.content, e.tool_calls_json, e.tool_call_id, e.tool_name, e.tool_args, e.is_error, e.reasoning, e.signature, e.attachments_json, e.is_compacted, e.is_context_summary, e.is_compaction_marker, e.input_tokens, e.output_tokens, e.chunk_group_id, e.chunk_index)
-            }
-        }
-    }
+    suspend fun insertAllMessages(messages: List<Agent_message>) =
+        this.messages.insertAllMessages(messages)
 
     fun observeMessagesBySession(sessionId: String): Flow<List<Agent_message>> =
-        q.selectMessagesBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
+        messages.observeMessagesBySession(sessionId)
 
     fun observeMessagesBySessionPaged(sessionId: String, limit: Long): Flow<List<Agent_message>> =
-        q.selectMessagesBySessionPaged(sessionId, limit).asFlow().mapToList(Dispatchers.IO)
+        messages.observeMessagesBySessionPaged(sessionId, limit)
 
     suspend fun getMessagesBySessionOnce(sessionId: String): List<Agent_message> =
-        withContext(Dispatchers.IO) { q.selectMessagesBySession(sessionId).executeAsList() }
+        messages.getMessagesBySessionOnce(sessionId)
 
-    suspend fun deleteBySession(sessionId: String) =
-        withContext(Dispatchers.IO) { q.deleteMessagesBySession(sessionId) }
+    suspend fun deleteBySession(sessionId: String) = messages.deleteBySession(sessionId)
 
-    suspend fun deleteMessagesBeforeTimestamp(sessionId: String, cutoffTimestamp: Long) =
-        withContext(Dispatchers.IO) { q.deleteMessagesBeforeTimestamp(sessionId, cutoffTimestamp) }
+    suspend fun deleteAllMessages() = messages.deleteAllMessages()
 
-    suspend fun markMessagesCompactedBeforeTimestamp(sessionId: String, cutoffTimestamp: Long) =
-        withContext(Dispatchers.IO) { q.markMessagesCompactedBeforeTimestamp(sessionId, cutoffTimestamp) }
-
-    suspend fun markMessagesCompactedInclusiveFromTimestamp(sessionId: String, cutoffTimestamp: Long) =
-        withContext(Dispatchers.IO) { q.markMessagesCompactedInclusiveFromTimestamp(sessionId, cutoffTimestamp) }
-
-    suspend fun deleteAllMessages() = withContext(Dispatchers.IO) { q.deleteAllMessages() }
-
-    suspend fun getMessageById(id: String): Agent_message? =
-        withContext(Dispatchers.IO) { q.selectMessageById(id).executeAsOneOrNull() }
+    suspend fun getMessageById(id: String): Agent_message? = messages.getMessageById(id)
 
     suspend fun updateMessageContent(id: String, content: String) =
-        withContext(Dispatchers.IO) { q.updateMessageContent(content, id) }
+        messages.updateMessageContent(id, content)
 
     suspend fun updateMessageContentAndReasoning(id: String, content: String, reasoning: String?) =
-        withContext(Dispatchers.IO) { q.updateMessageContentAndReasoning(content, reasoning, id) }
+        messages.updateMessageContentAndReasoning(id, content, reasoning)
 
-    suspend fun deleteMessageById(id: String) =
-        withContext(Dispatchers.IO) { q.deleteMessageById(id) }
+    suspend fun deleteMessageById(id: String) = messages.deleteMessageById(id)
+
+    suspend fun markPendingToolsInterrupted(
+        toolRole: String, pendingPrefix: String, interruptedContent: String,
+    ): Long = messages.markPendingToolsInterrupted(toolRole, pendingPrefix, interruptedContent)
+
+    suspend fun searchMessages(query: String): List<Agent_message> = messages.searchMessages(query)
+
+    suspend fun getAllMessagesOnce(): List<Agent_message> = messages.getAllMessagesOnce()
+
+    suspend fun getMessagePageAfter(
+        lastTimestamp: Long, lastId: String, limit: Long,
+    ): List<Agent_message> = messages.getMessagePageAfter(lastTimestamp, lastId, limit)
+
+    suspend fun getPageBySessionAfter(
+        sessionId: String, lastTimestamp: Long, lastId: String, limit: Long,
+    ): List<Agent_message> =
+        messages.getPageBySessionAfter(sessionId, lastTimestamp, lastId, limit)
+
+    // ── 上下文压缩/摘要 ────────────────────────────────────────────────
+
+    suspend fun deleteMessagesBeforeTimestamp(sessionId: String, cutoffTimestamp: Long) =
+        compaction.deleteMessagesBeforeTimestamp(sessionId, cutoffTimestamp)
+
+    suspend fun markMessagesCompactedBeforeTimestamp(sessionId: String, cutoffTimestamp: Long) =
+        compaction.markMessagesCompactedBeforeTimestamp(sessionId, cutoffTimestamp)
+
+    suspend fun markMessagesCompactedInclusiveFromTimestamp(sessionId: String, cutoffTimestamp: Long) =
+        compaction.markMessagesCompactedInclusiveFromTimestamp(sessionId, cutoffTimestamp)
 
     suspend fun deleteMessagesInclusiveFromTimestamp(sessionId: String, cutoffTimestamp: Long) =
-        withContext(Dispatchers.IO) { q.deleteMessagesInclusiveFromTimestamp(sessionId, cutoffTimestamp) }
+        compaction.deleteMessagesInclusiveFromTimestamp(sessionId, cutoffTimestamp)
 
     suspend fun deleteMessagesExclusiveAfterTimestamp(sessionId: String, cutoffTimestamp: Long) =
-        withContext(Dispatchers.IO) { q.deleteMessagesExclusiveAfterTimestamp(sessionId, cutoffTimestamp) }
+        compaction.deleteMessagesExclusiveAfterTimestamp(sessionId, cutoffTimestamp)
 
-    suspend fun markPendingToolsInterrupted(toolRole: String, pendingPrefix: String, interruptedContent: String): Long =
-        withContext(Dispatchers.IO) { q.markPendingToolsInterrupted(interruptedContent, toolRole, pendingPrefix).value }
+    fun observeRestoreLogsBySession(sessionId: String): Flow<List<Zth_l0_soft_compact_restore_logs>> =
+        compaction.observeRestoreLogsBySession(sessionId)
 
-    suspend fun searchMessages(query: String): List<Agent_message> =
-        // M7：转义用户输入中的 \ % _，配合 .sq 的 `LIKE ... ESCAPE '\'`，避免被当通配符。
-        withContext(Dispatchers.IO) { q.searchMessages(escapeSqlLike(query)).executeAsList() }
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
+    suspend fun insertRestoreLog(
+        id: String, sessionId: String, firstMessageId: String, lastMessageId: String,
+        originalRowCount: Long, tokensBefore: Long, tokensAfter: Long,
+        sCompactSourceDigestCiphertext: String, expireAtMs: Long, restoredFlag: Long, createdAtMs: Long,
+    ) = compaction.insertRestoreLog(
+        id, sessionId, firstMessageId, lastMessageId, originalRowCount, tokensBefore,
+        tokensAfter, sCompactSourceDigestCiphertext, expireAtMs, restoredFlag, createdAtMs,
+    )
 
-    suspend fun getAllMessagesOnce(): List<Agent_message> =
-        withContext(Dispatchers.IO) { q.selectAllMessages().executeAsList() }
+    suspend fun listRestoreLogs(sessionId: String): List<Zth_l0_soft_compact_restore_logs> =
+        compaction.listRestoreLogs(sessionId)
 
-    suspend fun getMessagePageAfter(lastTimestamp: Long, lastId: String, limit: Long): List<Agent_message> =
-        withContext(Dispatchers.IO) { q.selectMessagePageAfter(lastTimestamp, lastTimestamp, lastId, limit).executeAsList() }
+    suspend fun listRestoreLogsExpiredNotRestored(nowMs: Long): List<Zth_l0_soft_compact_restore_logs> =
+        compaction.listRestoreLogsExpiredNotRestored(nowMs)
 
-    suspend fun getPageBySessionAfter(sessionId: String, lastTimestamp: Long, lastId: String, limit: Long): List<Agent_message> =
-        withContext(Dispatchers.IO) { q.selectMessagePageBySessionAfter(sessionId, lastTimestamp, lastTimestamp, lastId, limit).executeAsList() }
+    suspend fun listAllRestoreLogs(): List<Zth_l0_soft_compact_restore_logs> =
+        compaction.listAllRestoreLogs()
+
+    suspend fun markRestoreLogRestored(id: String) = compaction.markRestoreLogRestored(id)
 
     // P3 已完成：原 legacy V1 写入方法块（appendMessage/appendPart/appendToolCall/saveCheckpoint）
     // 及其唯一依赖 V1toV2FullMigrator 已全仓零调用、迁移类已不存在，按「P3 后删除」清理。
 
-    suspend fun listCheckpoints(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Agent_checkpoint> =
-        withContext(Dispatchers.IO) { q.selectCheckpointsBySession(sessionId).executeAsList() }
+    // ── 阶段 1 补表：todo / checkpoint 快照 / 编辑 hunk / 模式切换 ──────
 
-    fun observeAllSessions(): Flow<List<Agent_session>> =
-        q.selectAllSessions().asFlow().mapToList(Dispatchers.IO)
-
-    fun observeSessionById(id: String): Flow<Agent_session?> =
-        q.selectSessionById(id).asFlow().mapToOneOrNull(Dispatchers.IO)
-
-    fun observeCheckpointsBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Agent_checkpoint>> =
-        q.selectCheckpointsBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observeFileEditHunksBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.File_edit_hunks>> =
-        q.selectFileEditHunksBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observeModeSwitchesBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Mode_switch_history>> =
-        q.selectModeSwitchesBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observeGoalsBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Agent_goals>> =
-        q.selectGoalsBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observePlansBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Agent_plans>> =
-        q.selectPlansBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observeJobsBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Agent_jobs>> =
-        q.selectJobsBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observeSchedulesBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules>> =
-        q.selectSchedulesBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observeTrajectoriesBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Agent_trajectories>> =
-        q.selectTrajectoriesBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observePlaybookRunsBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Agent_playbook_runs>> =
-        q.selectPlaybookRunsBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observeAllSkillStates(): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Skill_state>> =
-        q.selectAllSkillStates().asFlow().mapToList(Dispatchers.IO)
-
-    fun observePendingWakeItems(): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Wake_queue>> =
-        q.selectPendingWakeItems().asFlow().mapToList(Dispatchers.IO)
-
-    fun observeSentinelsBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Zth_user_confirmed_sentinels>> =
-        q.selectSentinelsBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observeFuse(scope: String, scopeId: String): Flow<com.mini.mecore.datalayer.sqldelight.agent.Zth_hallucination_fuses?> =
-        q.selectFuse(scope, scopeId).asFlow().mapToOneOrNull(Dispatchers.IO)
-
-    fun observeAllFuses(): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Zth_hallucination_fuses>> =
-        q.selectAllFuses().asFlow().mapToList(Dispatchers.IO)
-
-    fun observeRejectionAuditsBySentinel(sentinelId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Zth_sentinel_plan_rejection_audits>> =
-        q.selectRejectionAuditsBySentinel(sentinelId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observeRestoreLogsBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Zth_l0_soft_compact_restore_logs>> =
-        q.selectRestoreLogsBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
-
-    fun observeTelemetryByKind(eventKind: String, limit: Long): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Zth_telemetry_events>> =
-        q.selectTelemetryByKind(eventKind, limit).asFlow().mapToList(Dispatchers.IO)
-
-    fun observeAllTelemetry(): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Zth_telemetry_events>> =
-        q.selectAllTelemetry().asFlow().mapToList(Dispatchers.IO)
-
-    // ── 阶段 1 补表方法（todo / checkpoint 快照 / 编辑 hunk / 模式切换 / 能力覆盖 / 编排 / 技能 / wake / zth）──
-
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun insertTodo(
         id: String, sessionId: String, subject: String, description: String, status: String,
         priority: Long, order: Long, createdAtMs: Long, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertTodoItem(id, sessionId, subject, description, status, priority, order, createdAtMs, updatedAtMs)
-    }
+    ) = todos.insertTodo(
+        id, sessionId, subject, description, status, priority, order, createdAtMs, updatedAtMs,
+    )
 
-    suspend fun listTodos(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Todo_items> =
-        withContext(Dispatchers.IO) { q.selectTodoItemsBySession(sessionId).executeAsList() }
+    suspend fun listTodos(sessionId: String): List<Todo_items> = todos.listTodos(sessionId)
 
     suspend fun updateTodoStatus(id: String, status: String, updatedAtMs: Long) =
-        withContext(Dispatchers.IO) { q.updateTodoItemStatus(status, updatedAtMs, id) }
+        todos.updateTodoStatus(id, status, updatedAtMs)
 
-    suspend fun deleteTodo(id: String) = withContext(Dispatchers.IO) { q.deleteTodoItem(id) }
+    suspend fun deleteTodo(id: String) = todos.deleteTodo(id)
 
-    // ── P2-3 备份流式导出/还原（对齐 TodoItemDao 分页 + upsertAll）─────────
+    suspend fun getTodoPageAfter(
+        lastCreatedAtMs: Long, lastId: String, limit: Long,
+    ): List<Todo_items> = todos.getTodoPageAfter(lastCreatedAtMs, lastId, limit)
 
-    suspend fun getTodoPageAfter(lastCreatedAtMs: Long, lastId: String, limit: Long): List<com.mini.mecore.datalayer.sqldelight.agent.Todo_items> =
-        withContext(Dispatchers.IO) { q.selectTodoPageAfter(lastCreatedAtMs, lastId, limit).executeAsList() }
+    suspend fun getTodoPageBySessionAfter(
+        sessionId: String, lastCreatedAtMs: Long, lastId: String, limit: Long,
+    ): List<Todo_items> =
+        todos.getTodoPageBySessionAfter(sessionId, lastCreatedAtMs, lastId, limit)
 
-    suspend fun getTodoPageBySessionAfter(sessionId: String, lastCreatedAtMs: Long, lastId: String, limit: Long): List<com.mini.mecore.datalayer.sqldelight.agent.Todo_items> =
-        withContext(Dispatchers.IO) { q.selectTodoPageBySessionAfter(sessionId, lastCreatedAtMs, lastId, limit).executeAsList() }
+    suspend fun upsertAllTodos(todos: List<Todo_items>) = this.todos.upsertAllTodos(todos)
 
-    /**
-     * 批量 upsert 待办（备份恢复用）。
-     * P1 修复：原 forEach 逐条 upsert 无事务包裹，改为单事务保证原子性和性能。
-     */
-    suspend fun upsertAllTodos(todos: List<com.mini.mecore.datalayer.sqldelight.agent.Todo_items>) = withContext(Dispatchers.IO) {
-        db.transaction {
-            todos.forEach { t ->
-                q.upsertTodoItem(t.id, t.session_id, t.subject, t.description, t.status, t.priority, t.sort_order, t.created_at_ms, t.updated_at_ms)
-            }
-        }
-    }
+    suspend fun deleteTodosBySession(sessionId: String) = todos.deleteTodosBySession(sessionId)
 
-    // ── P2-3 会话级联删除（对齐 SessionUseCase.deleteSession）─────────────
+    suspend fun deleteAllTodos() = todos.deleteAllTodos()
 
-    suspend fun deleteTodosBySession(sessionId: String) =
-        withContext(Dispatchers.IO) { q.deleteTodoItemsBySession(sessionId) }
+    // ── checkpoint（V1 列表 + V2 session_checkpoints + 文件快照）─────────
 
-    /** 备份「覆盖恢复」专用：清空待办大表。 */
-    suspend fun deleteAllTodos() = withContext(Dispatchers.IO) { q.deleteAllTodos() }
+    suspend fun listCheckpoints(sessionId: String): List<Agent_checkpoint> =
+        checkpoints.listCheckpoints(sessionId)
 
-    suspend fun deleteFileEditHunksBySession(sessionId: String) =
-        withContext(Dispatchers.IO) { q.deleteFileEditHunksBySession(sessionId) }
-
-    suspend fun deleteModeSwitchesBySession(sessionId: String) =
-        withContext(Dispatchers.IO) { q.deleteModeSwitchesBySession(sessionId) }
-
-    suspend fun deleteWakeItemsBySession(sessionId: String) =
-        withContext(Dispatchers.IO) { q.deleteWakeItemsBySession(sessionId) }
-
-    suspend fun deleteGoalsBySession(sessionId: String) =
-        withContext(Dispatchers.IO) { q.deleteGoalsBySession(sessionId) }
-
-    suspend fun deletePlansBySession(sessionId: String) =
-        withContext(Dispatchers.IO) { q.deletePlansBySession(sessionId) }
-
-    suspend fun deleteJobsBySession(sessionId: String) =
-        withContext(Dispatchers.IO) { q.deleteJobsBySession(sessionId) }
-
-    suspend fun deleteSchedulesBySession(sessionId: String) =
-        withContext(Dispatchers.IO) { q.deleteSchedulesBySession(sessionId) }
+    fun observeCheckpointsBySession(sessionId: String): Flow<List<Agent_checkpoint>> =
+        checkpoints.observeCheckpointsBySession(sessionId)
 
     suspend fun insertCheckpointFull(
         id: String, sessionId: String, userMessageId: String, promptSnippet: String, createdAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertCheckpointFull(id, sessionId, userMessageId, promptSnippet, createdAtMs)
-    }
+    ) = checkpoints.insertCheckpointFull(id, sessionId, userMessageId, promptSnippet, createdAtMs)
 
-    suspend fun getCheckpointById(checkpointId: String): com.mini.mecore.datalayer.sqldelight.agent.Session_checkpoints? =
-        withContext(Dispatchers.IO) { q.selectCheckpointById(checkpointId).executeAsOneOrNull() }
+    suspend fun getCheckpointById(checkpointId: String): Session_checkpoints? =
+        checkpoints.getCheckpointById(checkpointId)
 
-    suspend fun getCheckpointByMessageId(messageId: String): com.mini.mecore.datalayer.sqldelight.agent.Session_checkpoints? =
-        withContext(Dispatchers.IO) { q.selectCheckpointByMessageId(messageId).executeAsOneOrNull() }
+    suspend fun getCheckpointByMessageId(messageId: String): Session_checkpoints? =
+        checkpoints.getCheckpointByMessageId(messageId)
 
-    suspend fun listCheckpointsForSession(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Session_checkpoints> =
-        withContext(Dispatchers.IO) { q.selectSessionCheckpoints(sessionId).executeAsList() }
+    suspend fun listCheckpointsForSession(sessionId: String): List<Session_checkpoints> =
+        checkpoints.listCheckpointsForSession(sessionId)
 
-    suspend fun deleteCheckpointsBySession(sessionId: String) {
-        withContext(Dispatchers.IO) { q.deleteCheckpointsBySession(sessionId) }
-    }
+    suspend fun deleteCheckpointsBySession(sessionId: String) =
+        checkpoints.deleteCheckpointsBySession(sessionId)
 
-    suspend fun deleteCheckpointsBefore(cutoffTimestamp: Long) {
-        withContext(Dispatchers.IO) { q.deleteCheckpointsBefore(cutoffTimestamp) }
-    }
+    suspend fun deleteCheckpointsBefore(cutoffTimestamp: Long) =
+        checkpoints.deleteCheckpointsBefore(cutoffTimestamp)
 
     suspend fun insertCheckpointFileSnapshot(
         id: String, checkpointId: String, filePath: String, snapshotRelativePath: String,
         changeType: String, createdAt: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertCheckpointFileSnapshot(id, checkpointId, filePath, snapshotRelativePath, changeType, createdAt)
-    }
+    ) = checkpoints.insertCheckpointFileSnapshot(
+        id, checkpointId, filePath, snapshotRelativePath, changeType, createdAt,
+    )
 
-    suspend fun listCheckpointFileSnapshots(checkpointId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Checkpoint_file_snapshots> =
-        withContext(Dispatchers.IO) { q.selectCheckpointFileSnapshots(checkpointId).executeAsList() }
+    suspend fun listCheckpointFileSnapshots(checkpointId: String): List<Checkpoint_file_snapshots> =
+        checkpoints.listCheckpointFileSnapshots(checkpointId)
 
     suspend fun countCheckpointFileSnapshot(checkpointId: String, filePath: String): Long =
-        withContext(Dispatchers.IO) { q.countCheckpointFileSnapshot(checkpointId, filePath).executeAsOne() }
+        checkpoints.countCheckpointFileSnapshot(checkpointId, filePath)
 
-    suspend fun deleteCheckpointFileSnapshotsBySession(sessionId: String) {
-        withContext(Dispatchers.IO) { q.deleteCheckpointFileSnapshotsBySession(sessionId) }
-    }
+    suspend fun deleteCheckpointFileSnapshotsBySession(sessionId: String) =
+        checkpoints.deleteCheckpointFileSnapshotsBySession(sessionId)
 
+    // ── 文件编辑 hunk / 模式切换 ────────────────────────────────────────
+
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun insertFileEditHunk(
         id: String, sessionId: String, filePath: String, operation: String, hunk: String,
         oldContent: String, newContent: String, createdAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertFileEditHunk(id, sessionId, filePath, operation, hunk, oldContent, newContent, createdAtMs)
-    }
+    ) = checkpoints.insertFileEditHunk(
+        id, sessionId, filePath, operation, hunk, oldContent, newContent, createdAtMs,
+    )
 
-    suspend fun listFileEditHunks(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.File_edit_hunks> =
-        withContext(Dispatchers.IO) { q.selectFileEditHunksBySession(sessionId).executeAsList() }
+    suspend fun listFileEditHunks(sessionId: String): List<File_edit_hunks> =
+        checkpoints.listFileEditHunks(sessionId)
+
+    fun observeFileEditHunksBySession(sessionId: String): Flow<List<File_edit_hunks>> =
+        checkpoints.observeFileEditHunksBySession(sessionId)
+
+    suspend fun deleteFileEditHunksBySession(sessionId: String) =
+        checkpoints.deleteFileEditHunksBySession(sessionId)
 
     suspend fun insertModeSwitch(
         sessionId: String, fromMode: String, toMode: String, reason: String, timestampMs: Long,
-    ) = withContext(Dispatchers.IO) { q.insertModeSwitch(sessionId, fromMode, toMode, reason, timestampMs) }
+    ) = checkpoints.insertModeSwitch(sessionId, fromMode, toMode, reason, timestampMs)
 
-    suspend fun listModeSwitches(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Mode_switch_history> =
-        withContext(Dispatchers.IO) { q.selectModeSwitchesBySession(sessionId).executeAsList() }
+    suspend fun listModeSwitches(sessionId: String): List<Mode_switch_history> =
+        checkpoints.listModeSwitches(sessionId)
 
+    fun observeModeSwitchesBySession(sessionId: String): Flow<List<Mode_switch_history>> =
+        checkpoints.observeModeSwitchesBySession(sessionId)
+
+    suspend fun deleteModeSwitchesBySession(sessionId: String) =
+        checkpoints.deleteModeSwitchesBySession(sessionId)
+
+    // ── 模型覆盖：能力 / token 上限 / 采样参数 ───────────────────────────
+
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun upsertCapabilityOverride(
         id: String, providerType: String, modelId: String,
         overrideVision: Long?, overrideTools: Long?, overrideReasoning: Long?,
         overrideVideo: Long?, overrideAudio: Long?, overrideCode: Long?, overrideStructuredOutput: Long?,
         updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertCapabilityOverride(id, providerType, modelId, overrideVision, overrideTools, overrideReasoning, overrideVideo, overrideAudio, overrideCode, overrideStructuredOutput, updatedAtMs)
-    }
+    ) = modelConfigs.upsertCapabilityOverride(
+        id, providerType, modelId, overrideVision, overrideTools, overrideReasoning,
+        overrideVideo, overrideAudio, overrideCode, overrideStructuredOutput, updatedAtMs,
+    )
 
-    suspend fun getCapabilityOverride(providerType: String, modelId: String): com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides? =
-        withContext(Dispatchers.IO) { q.selectCapabilityOverride(providerType, modelId).executeAsOneOrNull() }
+    suspend fun getCapabilityOverride(providerType: String, modelId: String): Model_capability_overrides? =
+        modelConfigs.getCapabilityOverride(providerType, modelId)
 
-    fun observeCapabilityOverride(providerType: String, modelId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Model_capability_overrides>> =
-        q.observeCapabilityOverride(providerType, modelId).asFlow().mapToList(Dispatchers.IO)
+    fun observeCapabilityOverride(
+        providerType: String, modelId: String,
+    ): Flow<List<Model_capability_overrides>> =
+        modelConfigs.observeCapabilityOverride(providerType, modelId)
 
     suspend fun deleteCapabilityOverride(providerType: String, modelId: String) =
-        withContext(Dispatchers.IO) { q.deleteCapabilityOverride(providerType, modelId) }
+        modelConfigs.deleteCapabilityOverride(providerType, modelId)
 
     suspend fun deleteCapabilityOverridesByProvider(providerType: String) =
-        withContext(Dispatchers.IO) { q.deleteCapabilityOverridesByProvider(providerType) }
-
-    // ── 模型自定义配置（输入/输出 token 上限覆盖）──────────────────────
+        modelConfigs.deleteCapabilityOverridesByProvider(providerType)
 
     suspend fun upsertCustomConfig(
         id: String, providerType: String, modelId: String,
         customInputTokens: Long?, customOutputTokens: Long?, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertCustomConfig(id, providerType, modelId, customInputTokens, customOutputTokens, updatedAtMs)
-    }
+    ) = modelConfigs.upsertCustomConfig(
+        id, providerType, modelId, customInputTokens, customOutputTokens, updatedAtMs,
+    )
 
-    suspend fun getCustomConfig(providerType: String, modelId: String): com.mini.mecore.datalayer.sqldelight.agent.Model_custom_configs? =
-        withContext(Dispatchers.IO) { q.getCustomConfig(providerType, modelId).executeAsOneOrNull() }
+    suspend fun getCustomConfig(providerType: String, modelId: String): Model_custom_configs? =
+        modelConfigs.getCustomConfig(providerType, modelId)
 
-    fun observeCustomConfig(providerType: String, modelId: String): Flow<com.mini.mecore.datalayer.sqldelight.agent.Model_custom_configs?> =
-        q.observeCustomConfig(providerType, modelId).asFlow().mapToOneOrNull(Dispatchers.IO)
+    fun observeCustomConfig(providerType: String, modelId: String): Flow<Model_custom_configs?> =
+        modelConfigs.observeCustomConfig(providerType, modelId)
 
     suspend fun deleteCustomConfig(providerType: String, modelId: String) =
-        withContext(Dispatchers.IO) { q.deleteCustomConfig(providerType, modelId) }
+        modelConfigs.deleteCustomConfig(providerType, modelId)
 
     suspend fun deleteCustomConfigsByProvider(providerType: String) =
-        withContext(Dispatchers.IO) { q.deleteCustomConfigsByProvider(providerType) }
-
-    // ── 模型级采样参数覆盖（temperature/topP/maxTokens，与供应商级物理隔离）──────────
+        modelConfigs.deleteCustomConfigsByProvider(providerType)
 
     suspend fun upsertSamplingConfig(
         id: String, providerType: String, modelId: String,
         customTemperature: Double?, customTopP: Double?, customMaxTokens: Long?, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertSamplingConfig(id, providerType, modelId, customTemperature, customTopP, customMaxTokens, updatedAtMs)
-    }
+    ) = modelConfigs.upsertSamplingConfig(
+        id, providerType, modelId, customTemperature, customTopP, customMaxTokens, updatedAtMs,
+    )
 
-    suspend fun getSamplingConfig(providerType: String, modelId: String): com.mini.mecore.datalayer.sqldelight.agent.Model_sampling_configs? =
-        withContext(Dispatchers.IO) { q.getSamplingConfig(providerType, modelId).executeAsOneOrNull() }
+    suspend fun getSamplingConfig(providerType: String, modelId: String): Model_sampling_configs? =
+        modelConfigs.getSamplingConfig(providerType, modelId)
 
-    fun observeSamplingConfig(providerType: String, modelId: String): Flow<com.mini.mecore.datalayer.sqldelight.agent.Model_sampling_configs?> =
-        q.observeSamplingConfig(providerType, modelId).asFlow().mapToOneOrNull(Dispatchers.IO)
+    fun observeSamplingConfig(
+        providerType: String, modelId: String,
+    ): Flow<Model_sampling_configs?> =
+        modelConfigs.observeSamplingConfig(providerType, modelId)
 
     suspend fun deleteSamplingConfig(providerType: String, modelId: String) =
-        withContext(Dispatchers.IO) { q.deleteSamplingConfig(providerType, modelId) }
+        modelConfigs.deleteSamplingConfig(providerType, modelId)
 
     suspend fun deleteSamplingConfigsByProvider(providerType: String) =
-        withContext(Dispatchers.IO) { q.deleteSamplingConfigsByProvider(providerType) }
+        modelConfigs.deleteSamplingConfigsByProvider(providerType)
 
+    // ── Goals / Plans ──────────────────────────────────────────────────
+
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun insertGoal(
         goalId: String, sessionId: String, text: String, status: String, revision: Long,
         parentGoalId: String, roundSeq: Long, createdAtMs: Long, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertGoal(goalId, sessionId, text, status, revision, parentGoalId, roundSeq, createdAtMs, updatedAtMs)
-    }
+    ) = plans.insertGoal(
+        goalId, sessionId, text, status, revision, parentGoalId, roundSeq, createdAtMs, updatedAtMs,
+    )
 
-    suspend fun listGoals(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Agent_goals> =
-        withContext(Dispatchers.IO) { q.selectGoalsBySession(sessionId).executeAsList() }
+    suspend fun listGoals(sessionId: String): List<Agent_goals> = plans.listGoals(sessionId)
+
+    fun observeGoalsBySession(sessionId: String): Flow<List<Agent_goals>> =
+        plans.observeGoalsBySession(sessionId)
 
     suspend fun updateGoalStatus(goalId: String, status: String, updatedAtMs: Long) =
-        withContext(Dispatchers.IO) { q.updateGoalStatus(status, updatedAtMs, goalId) }
+        plans.updateGoalStatus(goalId, status, updatedAtMs)
 
-    suspend fun deleteGoal(goalId: String) = withContext(Dispatchers.IO) { q.deleteGoal(goalId) }
+    suspend fun deleteGoal(goalId: String) = plans.deleteGoal(goalId)
 
-    // ── P2-4 GoalService 等价 ──────────────────────────────────────────
+    suspend fun getGoalById(goalId: String): Agent_goals? = plans.getGoalById(goalId)
 
-    suspend fun getGoalById(goalId: String): com.mini.mecore.datalayer.sqldelight.agent.Agent_goals? =
-        withContext(Dispatchers.IO) { q.selectGoalById(goalId).executeAsOneOrNull() }
-
-    suspend fun getActiveGoalBySession(sessionId: String): com.mini.mecore.datalayer.sqldelight.agent.Agent_goals? =
-        withContext(Dispatchers.IO) { q.selectActiveGoalBySession(sessionId).executeAsOneOrNull() }
+    suspend fun getActiveGoalBySession(sessionId: String): Agent_goals? =
+        plans.getActiveGoalBySession(sessionId)
 
     /** 阻塞版（仅供 [runInTx] 事务块内使用，同线程）。 */
-    fun getActiveGoalBySessionBlocking(sessionId: String): com.mini.mecore.datalayer.sqldelight.agent.Agent_goals? =
-        q.selectActiveGoalBySession(sessionId).executeAsOneOrNull()
+    fun getActiveGoalBySessionBlocking(sessionId: String): Agent_goals? =
+        plans.getActiveGoalBySessionBlocking(sessionId)
 
     suspend fun casUpdateGoalStatusAndText(
-        goalId: String, status: String, text: String, newRevision: Long, expectedRevision: Long, updatedAtMs: Long,
-    ): Long = withContext(Dispatchers.IO) {
-        q.casUpdateGoalStatusAndText(status, text, newRevision, updatedAtMs, goalId, expectedRevision).value
-    }
+        goalId: String, status: String, text: String, newRevision: Long,
+        expectedRevision: Long, updatedAtMs: Long,
+    ): Long = plans.casUpdateGoalStatusAndText(
+        goalId, status, text, newRevision, expectedRevision, updatedAtMs,
+    )
 
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun upsertGoal(
         goalId: String, sessionId: String, text: String, status: String, revision: Long,
         parentGoalId: String, roundSeq: Long, createdAtMs: Long, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.upsertGoal(goalId, sessionId, text, status, revision, parentGoalId, roundSeq, createdAtMs, updatedAtMs)
-    }
+    ) = plans.upsertGoal(
+        goalId, sessionId, text, status, revision, parentGoalId, roundSeq, createdAtMs, updatedAtMs,
+    )
 
+    suspend fun deleteGoalsBySession(sessionId: String) = plans.deleteGoalsBySession(sessionId)
+
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun insertPlan(
         planId: String, sessionId: String, title: String, steps: String, status: String,
         pendingSelection: String, createdAtMs: Long, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertPlan(planId, sessionId, title, steps, status, pendingSelection, createdAtMs, updatedAtMs)
-    }
+    ) = plans.insertPlan(
+        planId, sessionId, title, steps, status, pendingSelection, createdAtMs, updatedAtMs,
+    )
 
-    suspend fun listPlans(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Agent_plans> =
-        withContext(Dispatchers.IO) { q.selectPlansBySession(sessionId).executeAsList() }
+    suspend fun listPlans(sessionId: String): List<Agent_plans> = plans.listPlans(sessionId)
+
+    fun observePlansBySession(sessionId: String): Flow<List<Agent_plans>> =
+        plans.observePlansBySession(sessionId)
 
     suspend fun updatePlanStatus(planId: String, status: String, updatedAtMs: Long) =
-        withContext(Dispatchers.IO) { q.updatePlanStatus(status, updatedAtMs, planId) }
+        plans.updatePlanStatus(planId, status, updatedAtMs)
 
-    suspend fun deletePlan(planId: String) = withContext(Dispatchers.IO) { q.deletePlan(planId) }
+    suspend fun deletePlan(planId: String) = plans.deletePlan(planId)
 
-    // ── P2-4 PlanService 等价 ──────────────────────────────────────────
+    suspend fun getPlanById(planId: String): Agent_plans? = plans.getPlanById(planId)
 
-    suspend fun getPlanById(planId: String): com.mini.mecore.datalayer.sqldelight.agent.Agent_plans? =
-        withContext(Dispatchers.IO) { q.selectPlanById(planId).executeAsOneOrNull() }
-
-    suspend fun getLatestPlanBySession(sessionId: String): com.mini.mecore.datalayer.sqldelight.agent.Agent_plans? =
-        withContext(Dispatchers.IO) { q.selectLatestPlanBySession(sessionId).executeAsOneOrNull() }
+    suspend fun getLatestPlanBySession(sessionId: String): Agent_plans? =
+        plans.getLatestPlanBySession(sessionId)
 
     /** 阻塞版（仅供 [runInTx] 事务块内使用，同线程）。 */
-    fun getLatestPlanBySessionBlocking(sessionId: String): com.mini.mecore.datalayer.sqldelight.agent.Agent_plans? =
-        q.selectLatestPlanBySession(sessionId).executeAsOneOrNull()
+    fun getLatestPlanBySessionBlocking(sessionId: String): Agent_plans? =
+        plans.getLatestPlanBySessionBlocking(sessionId)
 
     suspend fun updatePlanContent(
         planId: String, status: String, steps: String, pendingSelection: String, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.updatePlanContent(status, steps, pendingSelection, updatedAtMs, planId)
-    }
+    ) = plans.updatePlanContent(planId, status, steps, pendingSelection, updatedAtMs)
 
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun upsertPlan(
         planId: String, sessionId: String, title: String, steps: String, status: String,
         pendingSelection: String, createdAtMs: Long, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.upsertPlan(planId, sessionId, title, steps, status, pendingSelection, createdAtMs, updatedAtMs)
-    }
+    ) = plans.upsertPlan(
+        planId, sessionId, title, steps, status, pendingSelection, createdAtMs, updatedAtMs,
+    )
 
+    suspend fun deletePlansBySession(sessionId: String) = plans.deletePlansBySession(sessionId)
+
+    // ── Jobs / Schedules ──────────────────────────────────────────────
+
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun insertJob(
         jobId: String, sessionId: String, kind: String, title: String, status: String,
         exitCode: Long?, outputLocator: String, createdAtMs: Long, finishedAtMs: Long?, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertJob(jobId, sessionId, kind, title, status, exitCode, outputLocator, createdAtMs, finishedAtMs, updatedAtMs)
-    }
+    ) = jobSchedules.insertJob(
+        jobId, sessionId, kind, title, status, exitCode, outputLocator,
+        createdAtMs, finishedAtMs, updatedAtMs,
+    )
 
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun upsertJob(
         jobId: String, sessionId: String, kind: String, title: String, status: String,
         exitCode: Long?, outputLocator: String, createdAtMs: Long, finishedAtMs: Long?, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.upsertJob(jobId, sessionId, kind, title, status, exitCode, outputLocator, createdAtMs, finishedAtMs, updatedAtMs)
-    }
+    ) = jobSchedules.upsertJob(
+        jobId, sessionId, kind, title, status, exitCode, outputLocator,
+        createdAtMs, finishedAtMs, updatedAtMs,
+    )
 
-    suspend fun getJobById(jobId: String): com.mini.mecore.datalayer.sqldelight.agent.Agent_jobs? =
-        withContext(Dispatchers.IO) { q.selectJobById(jobId).executeAsOneOrNull() }
+    suspend fun getJobById(jobId: String): Agent_jobs? = jobSchedules.getJobById(jobId)
 
-    suspend fun listJobs(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Agent_jobs> =
-        withContext(Dispatchers.IO) { q.selectJobsBySession(sessionId).executeAsList() }
+    suspend fun listJobs(sessionId: String): List<Agent_jobs> = jobSchedules.listJobs(sessionId)
 
-    suspend fun listRunningJobs(): List<com.mini.mecore.datalayer.sqldelight.agent.Agent_jobs> =
-        withContext(Dispatchers.IO) { q.selectRunningJobs().executeAsList() }
+    fun observeJobsBySession(sessionId: String): Flow<List<Agent_jobs>> =
+        jobSchedules.observeJobsBySession(sessionId)
+
+    suspend fun listRunningJobs(): List<Agent_jobs> = jobSchedules.listRunningJobs()
 
     suspend fun updateJobStatus(
         jobId: String, status: String, exitCode: Long?, outputLocator: String,
         finishedAtMs: Long?, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.updateJobStatus(status, exitCode, outputLocator, finishedAtMs, updatedAtMs, jobId)
-    }
+    ) = jobSchedules.updateJobStatus(
+        jobId, status, exitCode, outputLocator, finishedAtMs, updatedAtMs,
+    )
 
     suspend fun updateJobResult(
         jobId: String, status: String, exitCode: Long?, finishedAtMs: Long?, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.updateJobResult(status, exitCode, finishedAtMs, updatedAtMs, jobId)
-    }
+    ) = jobSchedules.updateJobResult(jobId, status, exitCode, finishedAtMs, updatedAtMs)
 
-    suspend fun deleteJob(jobId: String) = withContext(Dispatchers.IO) { q.deleteJob(jobId) }
+    suspend fun deleteJob(jobId: String) = jobSchedules.deleteJob(jobId)
 
+    suspend fun deleteJobsBySession(sessionId: String) =
+        jobSchedules.deleteJobsBySession(sessionId)
+
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun insertSchedule(
         scheduleId: String, sessionId: String, rule: String, args: String, status: String,
         enabled: Long, createdAtMs: Long, lastFiredAtMs: Long?, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertSchedule(scheduleId, sessionId, rule, args, status, enabled, createdAtMs, lastFiredAtMs, updatedAtMs)
-    }
+    ) = jobSchedules.insertSchedule(
+        scheduleId, sessionId, rule, args, status, enabled, createdAtMs, lastFiredAtMs, updatedAtMs,
+    )
 
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun upsertSchedule(
         scheduleId: String, sessionId: String, rule: String, args: String, status: String,
         enabled: Long, createdAtMs: Long, lastFiredAtMs: Long?, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.upsertSchedule(scheduleId, sessionId, rule, args, status, enabled, createdAtMs, lastFiredAtMs, updatedAtMs)
-    }
+    ) = jobSchedules.upsertSchedule(
+        scheduleId, sessionId, rule, args, status, enabled, createdAtMs, lastFiredAtMs, updatedAtMs,
+    )
 
-    suspend fun getScheduleById(scheduleId: String): com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules? =
-        withContext(Dispatchers.IO) { q.selectScheduleById(scheduleId).executeAsOneOrNull() }
+    suspend fun getScheduleById(scheduleId: String): Agent_schedules? =
+        jobSchedules.getScheduleById(scheduleId)
 
-    suspend fun listSchedules(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules> =
-        withContext(Dispatchers.IO) { q.selectSchedulesBySession(sessionId).executeAsList() }
+    suspend fun listSchedules(sessionId: String): List<Agent_schedules> =
+        jobSchedules.listSchedules(sessionId)
 
-    suspend fun getPendingSchedules(): List<com.mini.mecore.datalayer.sqldelight.agent.Agent_schedules> =
-        withContext(Dispatchers.IO) { q.selectPendingSchedules().executeAsList() }
+    fun observeSchedulesBySession(sessionId: String): Flow<List<Agent_schedules>> =
+        jobSchedules.observeSchedulesBySession(sessionId)
 
-    suspend fun updateScheduleStatus(scheduleId: String, status: String, lastFiredAtMs: Long?, updatedAtMs: Long) =
-        withContext(Dispatchers.IO) { q.updateScheduleStatus(status, lastFiredAtMs, updatedAtMs, scheduleId) }
+    suspend fun getPendingSchedules(): List<Agent_schedules> =
+        jobSchedules.getPendingSchedules()
+
+    suspend fun updateScheduleStatus(
+        scheduleId: String, status: String, lastFiredAtMs: Long?, updatedAtMs: Long,
+    ) = jobSchedules.updateScheduleStatus(scheduleId, status, lastFiredAtMs, updatedAtMs)
 
     suspend fun updateScheduleState(
         scheduleId: String, status: String, enabled: Long, lastFiredAtMs: Long?, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.updateScheduleState(status, enabled, lastFiredAtMs, updatedAtMs, scheduleId)
-    }
+    ) = jobSchedules.updateScheduleState(
+        scheduleId, status, enabled, lastFiredAtMs, updatedAtMs,
+    )
 
-    suspend fun deleteSchedule(scheduleId: String) = withContext(Dispatchers.IO) { q.deleteSchedule(scheduleId) }
+    suspend fun deleteSchedule(scheduleId: String) = jobSchedules.deleteSchedule(scheduleId)
 
+    suspend fun deleteSchedulesBySession(sessionId: String) =
+        jobSchedules.deleteSchedulesBySession(sessionId)
+
+    // ── Trajectories / Playbook runs ───────────────────────────────────
+
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun insertTrajectory(
         trajectoryId: String, sessionId: String, taskId: String, turnIndex: Long, kind: String,
         toolName: String, argsHash: String, resultSummary: String, isError: Long, durationMs: Long,
         tokensIn: Long, tokensOut: Long, ts: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertTrajectory(trajectoryId, sessionId, taskId, turnIndex, kind, toolName, argsHash, resultSummary, isError, durationMs, tokensIn, tokensOut, ts)
-    }
+    ) = trajectories.insertTrajectory(
+        trajectoryId, sessionId, taskId, turnIndex, kind, toolName, argsHash,
+        resultSummary, isError, durationMs, tokensIn, tokensOut, ts,
+    )
 
-    suspend fun listTrajectories(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Agent_trajectories> =
-        withContext(Dispatchers.IO) { q.selectTrajectoriesBySession(sessionId).executeAsList() }
+    suspend fun listTrajectories(sessionId: String): List<Agent_trajectories> =
+        trajectories.listTrajectories(sessionId)
 
-    suspend fun listTrajectoriesByTask(taskId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Agent_trajectories> =
-        withContext(Dispatchers.IO) { q.selectTrajectoriesByTask(taskId).executeAsList() }
+    fun observeTrajectoriesBySession(sessionId: String): Flow<List<Agent_trajectories>> =
+        trajectories.observeTrajectoriesBySession(sessionId)
+
+    suspend fun listTrajectoriesByTask(taskId: String): List<Agent_trajectories> =
+        trajectories.listTrajectoriesByTask(taskId)
 
     suspend fun getLatestTaskId(sessionId: String): String? =
-        withContext(Dispatchers.IO) { q.selectLatestTaskIdBySession(sessionId).executeAsOneOrNull() }
+        trajectories.getLatestTaskId(sessionId)
 
     suspend fun getMaxTurnIndex(sessionId: String, taskId: String): Int? =
-        withContext(Dispatchers.IO) { q.selectMaxTurnIndexBySessionTask(sessionId, taskId).executeAsOneOrNull()?.MAX?.toInt() }
+        trajectories.getMaxTurnIndex(sessionId, taskId)
 
-    suspend fun getTrajectoryAggregate(sessionId: String): com.mini.mecore.datalayer.sqldelight.agent.SelectTrajectoryAggregateBySession =
-        withContext(Dispatchers.IO) { q.selectTrajectoryAggregateBySession(sessionId).executeAsOne() }
+    suspend fun getTrajectoryAggregate(sessionId: String): SelectTrajectoryAggregateBySession =
+        trajectories.getTrajectoryAggregate(sessionId)
 
     suspend fun deleteTrajectories(sessionId: String) =
-        withContext(Dispatchers.IO) { q.deleteTrajectoriesBySession(sessionId) }
+        trajectories.deleteTrajectories(sessionId)
 
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun insertPlaybookRun(
         playbookRunId: String, sessionId: String, playbookName: String, currentStageIndex: Long,
         stageStatuses: String, status: String, createdAtMs: Long, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertPlaybookRun(playbookRunId, sessionId, playbookName, currentStageIndex, stageStatuses, status, createdAtMs, updatedAtMs)
-    }
+    ) = trajectories.insertPlaybookRun(
+        playbookRunId, sessionId, playbookName, currentStageIndex, stageStatuses,
+        status, createdAtMs, updatedAtMs,
+    )
 
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun upsertPlaybookRun(
         playbookRunId: String, sessionId: String, playbookName: String, currentStageIndex: Long,
         stageStatuses: String, status: String, createdAtMs: Long, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.upsertPlaybookRun(playbookRunId, sessionId, playbookName, currentStageIndex, stageStatuses, status, createdAtMs, updatedAtMs)
-    }
+    ) = trajectories.upsertPlaybookRun(
+        playbookRunId, sessionId, playbookName, currentStageIndex, stageStatuses,
+        status, createdAtMs, updatedAtMs,
+    )
 
-    suspend fun getPlaybookRunById(runId: String): com.mini.mecore.datalayer.sqldelight.agent.Agent_playbook_runs? =
-        withContext(Dispatchers.IO) { q.selectPlaybookRunById(runId).executeAsOneOrNull() }
+    suspend fun getPlaybookRunById(runId: String): Agent_playbook_runs? =
+        trajectories.getPlaybookRunById(runId)
 
-    suspend fun listPlaybookRuns(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Agent_playbook_runs> =
-        withContext(Dispatchers.IO) { q.selectPlaybookRunsBySession(sessionId).executeAsList() }
+    suspend fun listPlaybookRuns(sessionId: String): List<Agent_playbook_runs> =
+        trajectories.listPlaybookRuns(sessionId)
 
-    suspend fun getLatestPlaybookBySession(sessionId: String): com.mini.mecore.datalayer.sqldelight.agent.Agent_playbook_runs? =
-        withContext(Dispatchers.IO) { q.selectLatestPlaybookBySession(sessionId).executeAsOneOrNull() }
+    fun observePlaybookRunsBySession(sessionId: String): Flow<List<Agent_playbook_runs>> =
+        trajectories.observePlaybookRunsBySession(sessionId)
 
-    suspend fun getLatestPlaybookBySessionAndStatus(sessionId: String, status: String): com.mini.mecore.datalayer.sqldelight.agent.Agent_playbook_runs? =
-        withContext(Dispatchers.IO) { q.selectLatestPlaybookBySessionAndStatus(sessionId, status).executeAsOneOrNull() }
+    suspend fun getLatestPlaybookBySession(sessionId: String): Agent_playbook_runs? =
+        trajectories.getLatestPlaybookBySession(sessionId)
 
-    suspend fun listRunningPlaybookRuns(): List<com.mini.mecore.datalayer.sqldelight.agent.Agent_playbook_runs> =
-        withContext(Dispatchers.IO) { q.selectRunningPlaybookRuns().executeAsList() }
+    suspend fun getLatestPlaybookBySessionAndStatus(
+        sessionId: String, status: String,
+    ): Agent_playbook_runs? = trajectories.getLatestPlaybookBySessionAndStatus(sessionId, status)
+
+    suspend fun listRunningPlaybookRuns(): List<Agent_playbook_runs> =
+        trajectories.listRunningPlaybookRuns()
 
     suspend fun updatePlaybookRun(
-        playbookRunId: String, currentStageIndex: Long, stageStatuses: String, status: String, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.updatePlaybookRun(currentStageIndex, stageStatuses, status, updatedAtMs, playbookRunId)
-    }
+        playbookRunId: String, currentStageIndex: Long, stageStatuses: String,
+        status: String, updatedAtMs: Long,
+    ) = trajectories.updatePlaybookRun(
+        playbookRunId, currentStageIndex, stageStatuses, status, updatedAtMs,
+    )
 
     suspend fun deletePlaybookRunsBySession(sessionId: String) =
-        withContext(Dispatchers.IO) { q.deletePlaybookRunsBySession(sessionId) }
+        trajectories.deletePlaybookRunsBySession(sessionId)
+
+    // ── Skill states ───────────────────────────────────────────────────
 
     suspend fun upsertSkillState(
         id: String, enabled: Long, version: String, source: String, installedAtMs: Long,
         scopeOverride: String?, agentTypeOverride: String?,
-    ) = withContext(Dispatchers.IO) {
-        q.insertSkillState(id, enabled, version, source, installedAtMs, scopeOverride, agentTypeOverride)
-    }
+    ) = skills.upsertSkillState(
+        id, enabled, version, source, installedAtMs, scopeOverride, agentTypeOverride,
+    )
 
-    suspend fun getSkillState(id: String): com.mini.mecore.datalayer.sqldelight.agent.Skill_state? =
-        withContext(Dispatchers.IO) { q.selectSkillStateById(id).executeAsOneOrNull() }
+    suspend fun getSkillState(id: String): Skill_state? = skills.getSkillState(id)
 
-    suspend fun listSkillStates(): List<com.mini.mecore.datalayer.sqldelight.agent.Skill_state> =
-        withContext(Dispatchers.IO) { q.selectAllSkillStates().executeAsList() }
+    suspend fun listSkillStates(): List<Skill_state> = skills.listSkillStates()
+
+    fun observeAllSkillStates(): Flow<List<Skill_state>> = skills.observeAllSkillStates()
 
     suspend fun upsertSkillConversationState(skillId: String, sessionId: String, enabled: Long) =
-        withContext(Dispatchers.IO) { q.upsertSkillConversationState(skillId, sessionId, enabled) }
+        skills.upsertSkillConversationState(skillId, sessionId, enabled)
 
-    suspend fun getSkillConversationState(skillId: String, sessionId: String): com.mini.mecore.datalayer.sqldelight.agent.Skill_conversation_state? =
-        withContext(Dispatchers.IO) { q.selectSkillConversationState(skillId, sessionId).executeAsOneOrNull() }
+    suspend fun getSkillConversationState(
+        skillId: String, sessionId: String,
+    ): Skill_conversation_state? = skills.getSkillConversationState(skillId, sessionId)
 
-    suspend fun listSkillConversationStates(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Skill_conversation_state> =
-        withContext(Dispatchers.IO) { q.selectSkillConversationStatesBySession(sessionId).executeAsList() }
+    suspend fun listSkillConversationStates(sessionId: String): List<Skill_conversation_state> =
+        skills.listSkillConversationStates(sessionId)
 
     suspend fun listEnabledSkillIds(sessionId: String): List<String> =
-        withContext(Dispatchers.IO) { q.selectSkillConversationStatesEnabledBySession(sessionId).executeAsList() }
+        skills.listEnabledSkillIds(sessionId)
 
     suspend fun listDisabledSkillIds(sessionId: String): List<String> =
-        withContext(Dispatchers.IO) { q.selectSkillConversationStatesDisabledBySession(sessionId).executeAsList() }
+        skills.listDisabledSkillIds(sessionId)
 
-    fun observeSkillConversationStatesBySession(sessionId: String): Flow<List<com.mini.mecore.datalayer.sqldelight.agent.Skill_conversation_state>> =
-        q.observeSkillConversationStatesBySession(sessionId).asFlow().mapToList(Dispatchers.IO)
+    fun observeSkillConversationStatesBySession(
+        sessionId: String,
+    ): Flow<List<Skill_conversation_state>> =
+        skills.observeSkillConversationStatesBySession(sessionId)
 
-    suspend fun setSkillStateEnabled(id: String, enabled: Long) {
-        withContext(Dispatchers.IO) { q.updateSkillStateEnabled(enabled, id) }
-    }
+    suspend fun setSkillStateEnabled(id: String, enabled: Long) =
+        skills.setSkillStateEnabled(id, enabled)
 
-    suspend fun setSkillStateScopeOverride(id: String, scope: String?, agentType: String?) {
-        withContext(Dispatchers.IO) { q.updateSkillStateScopeOverride(scope, agentType, id) }
-    }
+    suspend fun setSkillStateScopeOverride(id: String, scope: String?, agentType: String?) =
+        skills.setSkillStateScopeOverride(id, scope, agentType)
 
-    suspend fun listScopedSkillStates(): List<com.mini.mecore.datalayer.sqldelight.agent.Skill_state> =
-        withContext(Dispatchers.IO) { q.selectScopedSkillStates().executeAsList() }
-            .map { row ->
-                com.mini.mecore.datalayer.sqldelight.agent.Skill_state(
-                    id = row.id,
-                    enabled = row.enabled,
-                    version = row.version,
-                    source = row.source,
-                    installed_at_ms = row.installed_at_ms,
-                    scope_override = row.scope_override,
-                    agent_type_override = row.agent_type_override,
-                )
-            }
+    suspend fun listScopedSkillStates(): List<Skill_state> = skills.listScopedSkillStates()
 
-    suspend fun deleteSkillStateById(id: String) {
-        withContext(Dispatchers.IO) { q.deleteSkillStateById(id) }
-    }
+    suspend fun deleteSkillStateById(id: String) = skills.deleteSkillStateById(id)
 
-    suspend fun deleteSkillConversationState(skillId: String, sessionId: String) {
-        withContext(Dispatchers.IO) { q.deleteSkillConversationState(skillId, sessionId) }
-    }
+    suspend fun deleteSkillConversationState(skillId: String, sessionId: String) =
+        skills.deleteSkillConversationState(skillId, sessionId)
 
-    suspend fun deleteSkillConversationStatesBySkill(skillId: String) {
-        withContext(Dispatchers.IO) { q.deleteSkillConversationStatesBySkill(skillId) }
-    }
+    suspend fun deleteSkillConversationStatesBySkill(skillId: String) =
+        skills.deleteSkillConversationStatesBySkill(skillId)
 
-    suspend fun deleteSkillConversationStatesBySession(sessionId: String) {
-        withContext(Dispatchers.IO) { q.deleteSkillConversationStatesBySession(sessionId) }
-    }
+    suspend fun deleteSkillConversationStatesBySession(sessionId: String) =
+        skills.deleteSkillConversationStatesBySession(sessionId)
+
+    // ── Wake queue ─────────────────────────────────────────────────────
 
     suspend fun insertWakeItem(
         wakeId: String, sessionId: String, source: String, type: String, content: String,
         status: String, createdAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertWakeItem(wakeId, sessionId, source, type, content, status, createdAtMs)
-    }
+    ) = wake.insertWakeItem(
+        wakeId, sessionId, source, type, content, status, createdAtMs,
+    )
 
     override suspend fun upsertWakeItem(
         wakeId: String, sessionId: String, source: String, type: String, content: String,
         status: String, createdAtMs: Long,
-    ): Unit = withContext(Dispatchers.IO) {
-        q.upsertWakeItem(wakeId, sessionId, source, type, content, status, createdAtMs)
-        Unit
-    }
+    ): Unit = wake.upsertWakeItem(
+        wakeId, sessionId, source, type, content, status, createdAtMs,
+    )
 
-    override suspend fun listPendingWakeItems(): List<com.mini.mecore.datalayer.sqldelight.agent.Wake_queue> =
-        withContext(Dispatchers.IO) { q.selectPendingWakeItems().executeAsList() }
+    override suspend fun listPendingWakeItems(): List<Wake_queue> = wake.listPendingWakeItems()
 
-    override suspend fun listWakeBySessionAndStatus(sessionId: String, status: String): List<com.mini.mecore.datalayer.sqldelight.agent.Wake_queue> =
-        withContext(Dispatchers.IO) { q.selectWakeBySessionAndStatus(status, sessionId).executeAsList() }
+    override suspend fun listWakeBySessionAndStatus(
+        sessionId: String, status: String,
+    ): List<Wake_queue> = wake.listWakeBySessionAndStatus(sessionId, status)
 
-    suspend fun markWakeItemConsumed(wakeId: String) =
-        withContext(Dispatchers.IO) { q.markWakeItemConsumed(wakeId) }
+    suspend fun markWakeItemConsumed(wakeId: String) = wake.markWakeItemConsumed(wakeId)
 
     override suspend fun markWakeItemsConsumedBatch(ids: List<String>, status: String): Unit =
-        withContext(Dispatchers.IO) {
-            // 待确认2：SQLDelight 对空列表生成 `IN ()`，SQLite 允许但语义为 false（不更新任何行）。
-            // 显式短路，避免「空列表被误当成全量」的歧义，也省一次无意义的写事务。
-            if (ids.isEmpty()) return@withContext
-            q.markWakeItemsConsumedBatch(status, ids)
-            Unit
-        }
+        wake.markWakeItemsConsumedBatch(ids, status)
 
+    fun observePendingWakeItems(): Flow<List<Wake_queue>> = wake.observePendingWakeItems()
+
+    suspend fun deleteWakeItemsBySession(sessionId: String) =
+        wake.deleteWakeItemsBySession(sessionId)
+
+    // ── ZTH：sentinels / fuses / audits / telemetry ────────────────────
+
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun insertSentinel(
         id: String, sessionId: String, linkageVersion: Long, chainId: String, chainIndex: Long,
         cardTemplateId: String, triggerSubClass: String, sPlanPayloadCiphertext: String,
         sUserTextCiphertext: String?, sCardPayloadCiphertext: String, userChoice: String,
         swipeVerified: Long, sModifiedPlanCiphertext: String?, expireAtMs: Long, rollbackFlag: Long, createdAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertSentinel(id, sessionId, linkageVersion, chainId, chainIndex, cardTemplateId, triggerSubClass, sPlanPayloadCiphertext, sUserTextCiphertext, sCardPayloadCiphertext, userChoice, swipeVerified, sModifiedPlanCiphertext, expireAtMs, rollbackFlag, createdAtMs)
-    }
+    ) = zth.insertSentinel(
+        id, sessionId, linkageVersion, chainId, chainIndex, cardTemplateId, triggerSubClass,
+        sPlanPayloadCiphertext, sUserTextCiphertext, sCardPayloadCiphertext, userChoice,
+        swipeVerified, sModifiedPlanCiphertext, expireAtMs, rollbackFlag, createdAtMs,
+    )
 
-    suspend fun listSentinels(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_user_confirmed_sentinels> =
-        withContext(Dispatchers.IO) { q.selectSentinelsBySession(sessionId).executeAsList() }
+    suspend fun listSentinels(sessionId: String): List<Zth_user_confirmed_sentinels> =
+        zth.listSentinels(sessionId)
 
-    suspend fun listSentinelsByChain(chainId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_user_confirmed_sentinels> =
-        withContext(Dispatchers.IO) { q.selectSentinelsByChain(chainId).executeAsList() }
+    fun observeSentinelsBySession(
+        sessionId: String,
+    ): Flow<List<Zth_user_confirmed_sentinels>> =
+        zth.observeSentinelsBySession(sessionId)
 
-    suspend fun listSentinelsUnexpiredBySession(sessionId: String, nowMs: Long): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_user_confirmed_sentinels> =
-        withContext(Dispatchers.IO) { q.selectSentinelsUnexpiredBySession(sessionId, nowMs).executeAsList() }
+    suspend fun listSentinelsByChain(chainId: String): List<Zth_user_confirmed_sentinels> =
+        zth.listSentinelsByChain(chainId)
 
-    suspend fun listAllSentinels(): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_user_confirmed_sentinels> =
-        withContext(Dispatchers.IO) { q.selectAllSentinels().executeAsList() }
+    suspend fun listSentinelsUnexpiredBySession(
+        sessionId: String, nowMs: Long,
+    ): List<Zth_user_confirmed_sentinels> =
+        zth.listSentinelsUnexpiredBySession(sessionId, nowMs)
 
-    suspend fun markAllSentinelsRollbackBySession(sessionId: String) {
-        withContext(Dispatchers.IO) { q.updateAllSentinelsRollbackBySession(sessionId) }
-    }
+    suspend fun listAllSentinels(): List<Zth_user_confirmed_sentinels> =
+        zth.listAllSentinels()
 
-    suspend fun deleteSentinelById(id: String) {
-        withContext(Dispatchers.IO) { q.deleteSentinelById(id) }
-    }
+    suspend fun markAllSentinelsRollbackBySession(sessionId: String) =
+        zth.markAllSentinelsRollbackBySession(sessionId)
+
+    suspend fun deleteSentinelById(id: String) = zth.deleteSentinelById(id)
 
     suspend fun updateSentinelChoice(
         id: String, userChoice: String, swipeVerified: Long, sModifiedPlanCiphertext: String?,
-    ) = withContext(Dispatchers.IO) { q.updateSentinelChoice(userChoice, swipeVerified, sModifiedPlanCiphertext, id) }
+    ) = zth.updateSentinelChoice(id, userChoice, swipeVerified, sModifiedPlanCiphertext)
 
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun upsertFuse(
         id: String, scope: String, scopeId: String, state: String, linkageVersion: Long,
         failureCount: Long, openSinceMs: Long, lastProbeAtMs: Long, killSwitch1Triggered: Long,
         killSwitch2SoftDisabled: Long, lastTripSubclass: String?, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertFuse(id, scope, scopeId, state, linkageVersion, failureCount, openSinceMs, lastProbeAtMs, killSwitch1Triggered, killSwitch2SoftDisabled, lastTripSubclass, updatedAtMs)
-    }
+    ) = zth.upsertFuse(
+        id, scope, scopeId, state, linkageVersion, failureCount, openSinceMs, lastProbeAtMs,
+        killSwitch1Triggered, killSwitch2SoftDisabled, lastTripSubclass, updatedAtMs,
+    )
 
-    suspend fun getFuse(scope: String, scopeId: String): com.mini.mecore.datalayer.sqldelight.agent.Zth_hallucination_fuses? =
-        withContext(Dispatchers.IO) { q.selectFuse(scope, scopeId).executeAsOneOrNull() }
+    suspend fun getFuse(scope: String, scopeId: String): Zth_hallucination_fuses? =
+        zth.getFuse(scope, scopeId)
 
-    suspend fun getFuseVersion(id: String): Long? =
-        withContext(Dispatchers.IO) { q.selectFuseVersion(id).executeAsOneOrNull() }
+    fun observeFuse(scope: String, scopeId: String): Flow<Zth_hallucination_fuses?> =
+        zth.observeFuse(scope, scopeId)
 
-    suspend fun casUpdateFuseState(id: String, expectedVersion: Long, newState: String, nowMs: Long): Long =
-        withContext(Dispatchers.IO) {
-            q.casUpdateFuseState(newState, nowMs, id, expectedVersion).value
-        }
+    suspend fun getFuseVersion(id: String): Long? = zth.getFuseVersion(id)
+
+    suspend fun casUpdateFuseState(
+        id: String, expectedVersion: Long, newState: String, nowMs: Long,
+    ): Long = zth.casUpdateFuseState(id, expectedVersion, newState, nowMs)
 
     suspend fun triggerFuseKillSwitch1(id: String, nowMs: Long) =
-        withContext(Dispatchers.IO) { q.triggerFuseKillSwitch1(nowMs, id) }
+        zth.triggerFuseKillSwitch1(id, nowMs)
 
-    suspend fun listAllFuses(): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_hallucination_fuses> =
-        withContext(Dispatchers.IO) { q.selectAllFuses().executeAsList() }
+    suspend fun listAllFuses(): List<Zth_hallucination_fuses> = zth.listAllFuses()
 
+    fun observeAllFuses(): Flow<List<Zth_hallucination_fuses>> = zth.observeAllFuses()
+
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun updateFuseState(
         scope: String, scopeId: String, state: String, failureCount: Long, lastProbeAtMs: Long,
         killSwitch1Triggered: Long, killSwitch2SoftDisabled: Long, lastTripSubclass: String?, updatedAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.updateFuseState(state, failureCount, lastProbeAtMs, killSwitch1Triggered, killSwitch2SoftDisabled, lastTripSubclass, updatedAtMs, scope, scopeId)
-    }
+    ) = zth.updateFuseState(
+        scope = scope, scopeId = scopeId, state = state, failureCount = failureCount,
+        lastProbeAtMs = lastProbeAtMs, killSwitch1Triggered = killSwitch1Triggered,
+        killSwitch2SoftDisabled = killSwitch2SoftDisabled, lastTripSubclass = lastTripSubclass,
+        updatedAtMs = updatedAtMs,
+    )
 
     suspend fun insertRejectionAudit(
         id: String, sentinelId: String, rejectionType: String, sReasonCiphertext: String?,
         sRejectedPlanSnapshotCiphertext: String, createdAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertRejectionAudit(id, sentinelId, rejectionType, sReasonCiphertext, sRejectedPlanSnapshotCiphertext, createdAtMs)
-    }
+    ) = zth.insertRejectionAudit(
+        id, sentinelId, rejectionType, sReasonCiphertext, sRejectedPlanSnapshotCiphertext, createdAtMs,
+    )
 
-    suspend fun listRejectionAudits(sentinelId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_sentinel_plan_rejection_audits> =
-        withContext(Dispatchers.IO) { q.selectRejectionAuditsBySentinel(sentinelId).executeAsList() }
+    suspend fun listRejectionAudits(sentinelId: String): List<Zth_sentinel_plan_rejection_audits> =
+        zth.listRejectionAudits(sentinelId)
 
-    suspend fun listAllRejectionAudits(): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_sentinel_plan_rejection_audits> =
-        withContext(Dispatchers.IO) { q.selectRejectionAuditsAll().executeAsList() }
+    fun observeRejectionAuditsBySentinel(
+        sentinelId: String,
+    ): Flow<List<Zth_sentinel_plan_rejection_audits>> =
+        zth.observeRejectionAuditsBySentinel(sentinelId)
+
+    suspend fun listAllRejectionAudits(): List<Zth_sentinel_plan_rejection_audits> =
+        zth.listAllRejectionAudits()
 
     suspend fun insertDeleteAudit(
         id: String, sessionId: String, affectedTableName: String, sAffectedKeysCiphertext: String,
         triggerSubClass: String, rollbackApplied: Long, createdAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertDeleteAudit(id, sessionId, affectedTableName, sAffectedKeysCiphertext, triggerSubClass, rollbackApplied, createdAtMs)
-    }
+    ) = zth.insertDeleteAudit(
+        id, sessionId, affectedTableName, sAffectedKeysCiphertext, triggerSubClass,
+        rollbackApplied, createdAtMs,
+    )
 
-    suspend fun listDeleteAuditsPendingRollback(): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_hard_constraint_delete_audits> =
-        withContext(Dispatchers.IO) { q.selectDeleteAuditsPendingRollback().executeAsList() }
+    suspend fun listDeleteAuditsPendingRollback(): List<Zth_hard_constraint_delete_audits> =
+        zth.listDeleteAuditsPendingRollback()
 
-    suspend fun listAllDeleteAudits(): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_hard_constraint_delete_audits> =
-        withContext(Dispatchers.IO) { q.selectAllDeleteAudits().executeAsList() }
+    suspend fun listAllDeleteAudits(): List<Zth_hard_constraint_delete_audits> =
+        zth.listAllDeleteAudits()
 
-    suspend fun markDeleteAuditRolledBack(id: String) {
-        withContext(Dispatchers.IO) { q.updateDeleteAuditRolledBack(id) }
-    }
+    suspend fun markDeleteAuditRolledBack(id: String) = zth.markDeleteAuditRolledBack(id)
 
-    suspend fun insertRestoreLog(
-        id: String, sessionId: String, firstMessageId: String, lastMessageId: String,
-        originalRowCount: Long, tokensBefore: Long, tokensAfter: Long,
-        sCompactSourceDigestCiphertext: String, expireAtMs: Long, restoredFlag: Long, createdAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertRestoreLog(id, sessionId, firstMessageId, lastMessageId, originalRowCount, tokensBefore, tokensAfter, sCompactSourceDigestCiphertext, expireAtMs, restoredFlag, createdAtMs)
-    }
-
-    suspend fun listRestoreLogs(sessionId: String): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_l0_soft_compact_restore_logs> =
-        withContext(Dispatchers.IO) { q.selectRestoreLogsBySession(sessionId).executeAsList() }
-
-    suspend fun listRestoreLogsExpiredNotRestored(nowMs: Long): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_l0_soft_compact_restore_logs> =
-        withContext(Dispatchers.IO) { q.selectRestoreLogsExpiredNotRestored(nowMs).executeAsList() }
-
-    suspend fun listAllRestoreLogs(): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_l0_soft_compact_restore_logs> =
-        withContext(Dispatchers.IO) { q.selectAllRestoreLogs().executeAsList() }
-
-    suspend fun markRestoreLogRestored(id: String) {
-        withContext(Dispatchers.IO) { q.updateRestoreLogRestored(id) }
-    }
-
+    @Suppress("LongParameterList") // 签名对应表结构，行为保持
     suspend fun insertTelemetryEvent(
         eventKind: String, eventSubKind: String, severityTier: Long, sessionSha256Prefix: String?,
         latencyMs: Long?, flagA: Long?, flagB: Long?, metricA: Long?, metricB: Long?, createdAtMs: Long,
-    ) = withContext(Dispatchers.IO) {
-        q.insertTelemetryEvent(eventKind, eventSubKind, severityTier, sessionSha256Prefix, latencyMs, flagA, flagB, metricA, metricB, createdAtMs)
-    }
+    ) = zth.insertTelemetryEvent(
+        eventKind, eventSubKind, severityTier, sessionSha256Prefix, latencyMs,
+        flagA, flagB, metricA, metricB, createdAtMs,
+    )
 
-    suspend fun listTelemetryByKind(eventKind: String, limit: Long): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_telemetry_events> =
-        withContext(Dispatchers.IO) { q.selectTelemetryByKind(eventKind, limit).executeAsList() }
+    suspend fun listTelemetryByKind(eventKind: String, limit: Long): List<Zth_telemetry_events> =
+        zth.listTelemetryByKind(eventKind, limit)
+
+    fun observeTelemetryByKind(
+        eventKind: String, limit: Long,
+    ): Flow<List<Zth_telemetry_events>> =
+        zth.observeTelemetryByKind(eventKind, limit)
 
     suspend fun countTelemetryByKind(eventKind: String): Long =
-        withContext(Dispatchers.IO) { q.countTelemetryByKind(eventKind).executeAsOne() }
+        zth.countTelemetryByKind(eventKind)
 
-    suspend fun listAllTelemetry(): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_telemetry_events> =
-        withContext(Dispatchers.IO) { q.selectAllTelemetry().executeAsList() }
+    suspend fun listAllTelemetry(): List<Zth_telemetry_events> = zth.listAllTelemetry()
 
-    suspend fun listTelemetryRange(fromMs: Long, toMs: Long): List<com.mini.mecore.datalayer.sqldelight.agent.Zth_telemetry_events> =
-        withContext(Dispatchers.IO) { q.selectTelemetryRange(fromMs, toMs).executeAsList() }
+    fun observeAllTelemetry(): Flow<List<Zth_telemetry_events>> = zth.observeAllTelemetry()
 
-    suspend fun countAllTelemetry(): Long =
-        withContext(Dispatchers.IO) { q.countAllTelemetry().executeAsOne() }
+    suspend fun listTelemetryRange(fromMs: Long, toMs: Long): List<Zth_telemetry_events> =
+        zth.listTelemetryRange(fromMs, toMs)
 
-    suspend fun deleteTelemetryOlderThan(beforeMs: Long) {
-        withContext(Dispatchers.IO) { q.deleteTelemetryOlderThan(beforeMs) }
-    }
+    suspend fun countAllTelemetry(): Long = zth.countAllTelemetry()
+
+    suspend fun deleteTelemetryOlderThan(beforeMs: Long) =
+        zth.deleteTelemetryOlderThan(beforeMs)
 
     // ── P2-4 事务封装（对齐 Room withTransaction 语义）────────────────────
 
@@ -928,68 +915,5 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
                 block(AgentTx(q))
             }
         }
-    }
-}
-
-/** V2 agent 域事务门面：仅供 [AgentRepository.runInTx] 事务块内使用（阻塞执行，同线程）。 */
-class AgentTx internal constructor(private val q: com.mini.mecore.datalayer.sqldelight.agent.AgentQueries) {
-    fun deleteBySession(sessionId: String) { q.deleteMessagesBySession(sessionId) }
-    fun deleteTodosBySession(sessionId: String) { q.deleteTodoItemsBySession(sessionId) }
-    fun deleteFileEditHunksBySession(sessionId: String) { q.deleteFileEditHunksBySession(sessionId) }
-    fun deleteModeSwitchesBySession(sessionId: String) { q.deleteModeSwitchesBySession(sessionId) }
-    fun deleteSkillConversationStatesBySession(sessionId: String) { q.deleteSkillConversationStatesBySession(sessionId) }
-    fun deleteWakeItemsBySession(sessionId: String) { q.deleteWakeItemsBySession(sessionId) }
-    fun deleteGoalsBySession(sessionId: String) { q.deleteGoalsBySession(sessionId) }
-    fun deletePlansBySession(sessionId: String) { q.deletePlansBySession(sessionId) }
-    fun deleteJobsBySession(sessionId: String) { q.deleteJobsBySession(sessionId) }
-    fun deleteSchedulesBySession(sessionId: String) { q.deleteSchedulesBySession(sessionId) }
-    fun deleteTrajectories(sessionId: String) { q.deleteTrajectoriesBySession(sessionId) }
-    fun deleteSession(id: String) { q.deleteSession(id) }
-
-    // TodoTool replaceTodos 事务：delete + upsert 原子替换
-    fun replaceTodos(sessionId: String, todos: List<com.mini.mecore.datalayer.sqldelight.agent.Todo_items>) {
-        q.deleteTodoItemsBySession(sessionId)
-        todos.forEach { t ->
-            q.upsertTodoItem(t.id, t.session_id, t.subject, t.description, t.status, t.priority, t.sort_order, t.created_at_ms, t.updated_at_ms)
-        }
-    }
-
-    // GoalService.activate 事务：CAS 放弃旧 ACTIVE + 插入新目标
-    fun activateGoal(
-        sessionId: String,
-        old: com.mini.mecore.datalayer.sqldelight.agent.Agent_goals?,
-        goalId: String, text: String, status: String, revision: Long,
-        parentGoalId: String, roundSeq: Long, createdAtMs: Long, updatedAtMs: Long,
-    ) {
-        old?.let { o ->
-            // M9：CAS 的**受影响行数必须判等 1**。
-            // 过去返回值被丢弃，一旦 revision 被并发改掉（CAS 未命中，返回 0），
-            // 旧 ACTIVE 目标不会被放弃，而新目标照常插入 —— 同一会话出现两个 ACTIVE 目标，
-            // Agent 行为随之分裂。现在未命中即抛 CONCURRENT_ACCESS，整事务回滚，由调用方重试。
-            val affected = q.casUpdateGoalStatusAndText(
-                "ABANDONED", o.text, o.revision + 1, updatedAtMs, o.goal_id, o.revision,
-            ).value
-            if (affected != 1L) {
-                throw DataLayerException(
-                    "放弃旧 ACTIVE 目标失败（CAS 未命中，revision 疑似被并发修改）：" +
-                        "goal=${o.goal_id}, expectedRevision=${o.revision}, affected=$affected",
-                    DataLayerErrorCode.CONCURRENT_ACCESS,
-                )
-            }
-        }
-        q.upsertGoal(goalId, sessionId, text, status, revision, parentGoalId, roundSeq, createdAtMs, updatedAtMs)
-    }
-
-    // PlanService.propose 事务：旧计划置 ABANDONED + 插入新 DRAFT
-    fun proposePlan(
-        sessionId: String,
-        old: com.mini.mecore.datalayer.sqldelight.agent.Agent_plans?,
-        planId: String, title: String, steps: String, status: String, pendingSelection: String,
-        createdAtMs: Long, updatedAtMs: Long,
-    ) {
-        old?.let { o ->
-            q.updatePlanContent("ABANDONED", o.steps, o.pending_selection, updatedAtMs, o.plan_id)
-        }
-        q.upsertPlan(planId, sessionId, title, steps, status, pendingSelection, createdAtMs, updatedAtMs)
     }
 }
