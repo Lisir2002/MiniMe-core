@@ -27,7 +27,6 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.browser.domain.antidetect.AntidetectController
-import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintInjector
 import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintManager
 import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintProfile
 import com.mini.me_core.feature.browser.domain.fingerprint.WebViewFingerprintApplier
@@ -57,13 +56,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.net.URI
-import java.net.URL
 import java.util.UUID
 import java.util.concurrent.Executor
 import javax.inject.Inject
@@ -97,6 +91,14 @@ class BrowserController @Inject constructor(
     private val fingerprintManager: FingerprintManager,
     private val antidetectController: AntidetectController
 ) {
+    // ── 行为保持搬迁的协作者（普通 internal 类，由本门面装配；依赖经门面已注入对象传入） ──
+    /** 导航 URL 规范化 / 安全校验 / 限流提示（安全策略原样搬迁）。 */
+    private val securityPolicy = BrowserSecurityPolicy()
+    /** 模型侧下载编排（等待/取宿主文件/URL 抓文件）。 */
+    private val downloadControl = BrowserDownloadControl(downloadManager, okHttp, context)
+    /** 指纹反检测注入（HTML 拦截注入 + onPageStarted 兜底注入）。 */
+    private val fingerprintControl = BrowserFingerprintControl(fingerprintManager, okHttp)
+
     private companion object {
         const val TAG = "BrowserController"
 
@@ -105,9 +107,6 @@ class BrowserController @Inject constructor(
 
         /** 快照元素数量上限：超大页面只取前N个可交互控件。 */
         const val MAX_SNAPSHOT_ELEMENTS = 300
-
-        /** 导航协议白名单：拦截危险scheme。 */
-        val ALLOWED_SCHEMES = setOf("http", "https")
 
         /** 桌面版网页UA。 */
         const val DESKTOP_UA =
@@ -641,20 +640,11 @@ class BrowserController @Inject constructor(
 
     // ─────────────────────── 模型/工具操作（suspend） ───────────────────────
 
-    /** 规范化 URL：无协议时自动补 https://。 */
-    fun normalizeUrl(url: String): String =
-        if (url.matches(Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://.*"))) url else "https://$url"
+    /** 规范化 URL：无协议时自动补 https://（委托 [BrowserSecurityPolicy]，行为保持搬迁）。 */
+    fun normalizeUrl(url: String): String = securityPolicy.normalizeUrl(url)
 
-    /** 校验导航目标：返回 null 表示安全，否则返回拦截原因（供工具侧返回错误）。 */
-    fun validateUrl(url: String): String? {
-        val normalized = normalizeUrl(url)
-        val scheme = runCatching { URI(normalized).scheme }.getOrNull()?.lowercase()
-            ?: return "无法解析 URL：$url"
-        if (scheme !in ALLOWED_SCHEMES) {
-            return "已拦截导航：不允许的协议 '$scheme'（仅允许 http/https）。"
-        }
-        return null
-    }
+    /** 校验导航目标：返回 null 表示安全，否则返回拦截原因（委托 [BrowserSecurityPolicy]，行为保持搬迁）。 */
+    fun validateUrl(url: String): String? = securityPolicy.validateUrl(url)
 
     /** 打开 URL 并返回页面快照。危险协议会被拒绝加载。 */
     suspend fun navigate(url: String): BrowserPageSnapshot = mutex.withLock {
@@ -1481,8 +1471,8 @@ class BrowserController @Inject constructor(
 
     // ─────────────────────────── 下载 ───────────────────────────
 
-    /** 列出最近下载任务（供 downloads 工具查询）。 */
-    fun listDownloads(): List<BrowserDownloadInfo> = downloadManager.downloads.value
+    /** 列出最近下载任务（供 downloads 工具查询；委托 [BrowserDownloadControl]，行为保持搬迁）。 */
+    fun listDownloads(): List<BrowserDownloadInfo> = downloadControl.listDownloads()
 
     // ─────────────────────────── 内部实现 ───────────────────────────
 
@@ -1611,7 +1601,7 @@ class BrowserController @Inject constructor(
                     (url.startsWith("http://") || url.startsWith("https://"))
                 ) {
                     try {
-                        return injectFingerprintIntoHtml(url, request)
+                        return fingerprintControl.injectFingerprintIntoHtml(url, request)
                     } catch (e: Exception) {
                         FileLogger.w(TAG, "指纹注入失败，降级为正常加载: $url", e)
                     }
@@ -1622,7 +1612,7 @@ class BrowserController @Inject constructor(
                 adBlocker.reset()
                 onTabLoading(tabId, true)
                 // document-start 拦截失败时的兜底：页面开始加载即注入指纹 JS，尽量早于页面脚本执行
-                if (view != null) injectFingerprintScript(view)
+                if (view != null) fingerprintControl.injectFingerprintScript(view)
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 onTabFinished(tabId, view, url)
@@ -1755,69 +1745,9 @@ class BrowserController @Inject constructor(
     }
 
     // ─────────────────────── 指纹注入 ───────────────────────
-
-    /**
-     * 拦截主框架 HTML 请求，在 <head> 首行注入指纹伪装脚本。
-     *
-     * 通过 OkHttp 拉取原始 HTML，注入 `<script>` 标签后返回修改后的响应。
-     * 注入位置在 `<head>` 标签之后（若无 head 则在 `<html>` 之后），
-     * 确保伪装脚本在页面自身任何脚本之前执行。
-     *
-     * 注入失败时返回 null，WebView 正常加载原页面（不影响浏览）。
-     */
-    private fun injectFingerprintIntoHtml(
-        url: String,
-        request: WebResourceRequest
-    ): android.webkit.WebResourceResponse? {
-        val profile = fingerprintManager.getCurrent() ?: return null
-        // 真实指纹（无伪装配置）不注入脚本
-        if (profile.id == FingerprintProfile.DEFAULT_ID && !profile.webglSpoofEnabled) return null
-
-        // 用 OkHttp 拉取原始 HTML（复用 WebView 的请求头，保持 Cookie/Session 一致）
-        val builder = Request.Builder().url(url).get()
-        request.requestHeaders?.forEach { (key, value) ->
-            if (key !in setOf("host", "content-length", "accept-encoding")) {
-                builder.addHeader(key, value)
-            }
-        }
-        val response: Response = okHttp.newCall(builder.build()).execute()
-        val body = response.body ?: return null
-        val contentType = response.header("Content-Type", "") ?: ""
-        // 仅处理 HTML 响应
-        if (!contentType.contains("text/html", ignoreCase = true)) {
-            body.close()
-            response.close()
-            return null
-        }
-
-        val originalHtml = body.string()
-        val script = FingerprintInjector.generateScript(profile)
-        val injectTag = "<script>$script</script>"
-
-        // 在 <head> 首行注入；若无 <head> 则在 <html> 后注入；都没有则在开头注入
-        val modifiedHtml = when {
-            originalHtml.contains("<head>", ignoreCase = true) ->
-                originalHtml.replaceFirst(Regex("<head[^>]*>", RegexOption.IGNORE_CASE), "$0$injectTag")
-            originalHtml.contains("<html>", ignoreCase = true) ->
-                originalHtml.replaceFirst(Regex("<html[^>]*>", RegexOption.IGNORE_CASE), "$0$injectTag")
-            else -> injectTag + originalHtml
-        }
-
-        // 构建修改后的响应
-        val newResponse = android.webkit.WebResourceResponse(
-            "text/html",
-            response.header("Content-Encoding", "utf-8"),
-            ByteArrayInputStream(modifiedHtml.toByteArray())
-        )
-        // 复制响应头
-        val responseHeaders = mutableMapOf<String, String>()
-        response.headers.names().forEach { name ->
-            response.header(name)?.let { responseHeaders[name] = it }
-        }
-        newResponse.responseHeaders = responseHeaders
-        response.close()
-        return newResponse
-    }
+    // 注：HTML 拦截注入（injectFingerprintIntoHtml）与 onPageStarted 兜底注入
+    // （injectFingerprintScript）已原样搬迁到 [BrowserFingerprintControl]，
+    // 调用点（shouldInterceptRequest / onPageStarted）通过 fingerprintControl 触发。
 
     /**
      * 切换指纹配置，可选自动重新加载当前页面使新指纹生效。
@@ -1872,13 +1802,6 @@ class BrowserController @Inject constructor(
         // 桌面版 UA 由 toggleDesktopMode 接管，指纹 UA 不覆盖它
         if (_uiState.value.desktopMode) return
         WebViewFingerprintApplier.apply(wv, profile)
-    }
-
-    /** 通过 evaluateJavascript 注入指纹伪装脚本（onPageStarted 兜底用）。 */
-    private fun injectFingerprintScript(webView: WebView) {
-        val profile = fingerprintManager.getCurrent() ?: return
-        if (profile.id == FingerprintProfile.DEFAULT_ID) return
-        WebViewFingerprintApplier.injectScript(webView, profile)
     }
 
     /** 获取当前反爬控制器（供工具层调用）。 */
@@ -2460,14 +2383,8 @@ class BrowserController @Inject constructor(
         evalJs(JS_GET_SCROLL_POS)
     }
 
-    /** 检测到限流响应（429/403）时的提示。 */
-    fun rateLimitHint(statusCode: Int): String? {
-        return when (statusCode) {
-            429 -> "检测到 429 Too Many Requests，建议：1) 增加 set_request_interval 间隔 2) 切换 User-Agent 3) 通过代理工具切换节点"
-            403 -> "检测到 403 Forbidden，可能被风控拦截，建议：1) 切换 User-Agent 2) 使用 apply_stealth 3) 通过代理工具切换 IP"
-            else -> null
-        }
-    }
+    /** 检测到限流响应（429/403）时的提示（委托 [BrowserSecurityPolicy]，行为保持搬迁）。 */
+    fun rateLimitHint(statusCode: Int): String? = securityPolicy.rateLimitHint(statusCode)
 
     // ═══════════════════════════════════════════════════════════════
     // 第三批：会话与闭环控制器方法
@@ -2549,44 +2466,16 @@ class BrowserController @Inject constructor(
     /** 切换隐身模式（委托给已有 setIncognito）。 */
     fun setIncognitoMode(on: Boolean) = setIncognito(on)
 
-    // ── 下载闭环 ──
+    // ── 下载闭环（委托 [BrowserDownloadControl]，行为保持搬迁） ──
     /** 等待下载完成（监听下载管理器状态）。 */
-    suspend fun waitForDownload(timeoutMs: Long = 30_000): BrowserDownloadInfo? {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            val downloads = downloadManager.downloads.value
-            val recent = downloads.firstOrNull()
-            if (recent != null && recent.status == "done") return recent
-            if (recent != null && recent.status == "error") return recent
-            delay(500)
-        }
-        return null
-    }
+    suspend fun waitForDownload(timeoutMs: Long = 30_000): BrowserDownloadInfo? =
+        downloadControl.waitForDownload(timeoutMs)
 
     /** 下载文件到 workspace 目录。 */
-    fun downloadToWorkspace(downloadId: String): File? {
-        val info = downloadManager.downloads.value.firstOrNull { it.id == downloadId }
-            ?: return null
-        return downloadManager.hostFile(info)
-    }
+    fun downloadToWorkspace(downloadId: String): File? = downloadControl.downloadToWorkspace(downloadId)
 
     /** 从 URL 下载文件并返回本地 File。 */
-    suspend fun downloadFileFromUrl(url: String): File? {
-        return withContext(Dispatchers.IO) {
-            runCatching {
-                val req = Request.Builder().url(url).build()
-                val resp = okHttp.newCall(req).execute()
-                if (!resp.isSuccessful) return@withContext null
-                val fileName = url.substringAfterLast('/').substringBefore('?').ifBlank { "download_${System.currentTimeMillis()}" }
-                val dir = java.io.File(context.cacheDir, "downloads").apply { mkdirs() }
-                val file = java.io.File(dir, fileName)
-                resp.body?.byteStream()?.use { input ->
-                    file.outputStream().use { output -> input.copyTo(output) }
-                }
-                file
-            }.getOrNull()
-        }
-    }
+    suspend fun downloadFileFromUrl(url: String): File? = downloadControl.downloadFileFromUrl(url)
 
     // ── 验证码辅助 + 安全审计 ──
     /** 检测页面验证码。 */
