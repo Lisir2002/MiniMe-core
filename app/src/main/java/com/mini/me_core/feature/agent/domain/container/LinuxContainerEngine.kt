@@ -136,9 +136,20 @@ class LinuxContainerEngine @Inject constructor(
     @Volatile
     private var approvedMcpConfigSnapshot: Pair<String, Long>? = null
 
-    /** 桥接令牌是否已为本容器会话启动；会话结束后由 [onContainerSessionEnd] 复位。 */
-    @Volatile
-    private var bridgeSessionActive: Boolean = false
+    // ── P2-19 拆分出的同包协作者（普通 internal 类，由门面装配；依赖经门面已注入对象传入） ──
+    // 协作者只做纯装配/文件操作，不持有生命周期 StateFlow；currentProfile / storageShareEnabled
+    // 以 live supplier 传入（profile 运行时可切换），行为与原内联实现逐字一致。
+    private val rootfsManager = RootfsManager(containerInstaller)
+    private val bridgeInjector = RcbBridgeInjector(rcbBridge)
+    private val prootBuilder = ProotInvocationBuilder(
+        installer = containerInstaller,
+        proxyManager = proxyManager,
+        bridgeInjector = bridgeInjector,
+        profileProvider = { currentProfile },
+        storageShareEnabledProvider = { storageShareEnabled },
+        shellProvider = { defaultShell() },
+        onMcpConfigChange = { detectContainerSideMcpConfigChange() },
+    )
 
     /** 存储共享是否开着（供终端构造提示横幅等 UI 侧判断）。 */
     fun isStorageShareEnabled(): Boolean = storageShareEnabled
@@ -180,8 +191,7 @@ class LinuxContainerEngine @Inject constructor(
      * 由终端/AI 会话销毁路径调用。
      */
     fun onContainerSessionEnd() {
-        rcbBridge.endBridgeSession()
-        bridgeSessionActive = false
+        bridgeInjector.endSession()
     }
 
     init {
@@ -324,7 +334,7 @@ class LinuxContainerEngine @Inject constructor(
     ): Flow<CommandEvent> = flow {
         val effectiveTimeout = timeoutMs.coerceIn(1L, MAX_TIMEOUT_MS)
         FileLogger.d(TAG, "执行命令(流式) cwd=$projectPath timeout=${effectiveTimeout}ms: $command")
-        val process = startContainerProcess(command, projectPath)
+        val process = prootBuilder.startContainerProcess(command, projectPath)
         val timedOut = AtomicBoolean(false)
         // 看门狗跑在独立 scope（独立 Job）上：若放进包裹 emit 的 coroutineScope 里，emit 的
         // Job 与 flow 收集者不一致会触发「Flow invariant is violated」。这里仅用它在超时时杀进程。
@@ -450,7 +460,7 @@ class LinuxContainerEngine @Inject constructor(
         try {
             val effectiveTimeout = timeoutMs.coerceIn(1L, MAX_TIMEOUT_MS)
             FileLogger.d(TAG, "执行命令(同步) cwd=$projectPath timeout=${effectiveTimeout}ms: $command")
-            val process = startContainerProcess(command, projectPath)
+            val process = prootBuilder.startContainerProcess(command, projectPath)
             val timedOut = AtomicBoolean(false)
             val cancellationHook = currentCoroutineContext()[Job]?.invokeOnCompletion { cause ->
                 if (cause is CancellationException && process.isAlive) {
@@ -987,23 +997,7 @@ class LinuxContainerEngine @Inject constructor(
         }
         bundleRepository.resetAllToNotInstalled()
         val profile = currentProfile
-        runCatching {
-            containerInstaller.rootfsDirFor(profile).deleteRecursively()
-        }
-        // 清理宿主侧可执行（跨 profile 共用的 proot 全套都清；x86_64 原生 proot 与 x86_64 专用 qemu
-        // 只在当前或 x86_64 架构下清）
-        runCatching { containerInstaller.prootBin.delete() }
-        runCatching { containerInstaller.prootLoader.delete() }
-        runCatching { containerInstaller.prootLoader32.delete() }
-        runCatching { containerInstaller.prootX86Bin.delete() }
-        runCatching { containerInstaller.prootX86Loader.delete() }
-        runCatching { containerInstaller.prootX86Loader32.delete() }
-        runCatching { containerInstaller.prootX86LibDir.deleteRecursively() }
-        if (profile.arch == ContainerArch.X86_64) {
-            runCatching { containerInstaller.rootfsX86Dir.deleteRecursively() }
-            runCatching { containerInstaller.qemuX86Bin.delete() }
-            runCatching { containerInstaller.qemuX86Bin.parentFile?.listFiles { f -> f.name.startsWith("qemu-") }?.forEach { it.delete() } }
-        }
+        rootfsManager.deleteContainerFiles(profile)
         _initProgress.value = ContainerInitState.Idle
     }
 
@@ -1024,19 +1018,7 @@ class LinuxContainerEngine @Inject constructor(
         // 1) 杀掉本 app 进程树下的 proot / qemu 子进程。
         //    宿主 shell 下用 pkill 按可执行文件名匹配；proot 跑在本 app UID 下，权限足够。
         //    忽略一切失败（无权限 / 无匹配进程都是正常情况）。
-        runCatching {
-            val prootNames = buildList {
-                add(containerInstaller.prootBin.name)
-                containerInstaller.prootX86Bin.name.let { if (it.isNotBlank()) add(it) }
-                containerInstaller.qemuX86Bin.name.let { if (it.isNotBlank()) add(it) }
-            }.distinct()
-            val killScript = prootNames.joinToString(" ") { "pkill -9 -x '$it' 2>/dev/null || true" }
-            val pb = ProcessBuilder("/system/bin/sh", "-c", killScript)
-                .redirectErrorStream(true)
-            val p = pb.start()
-            runCatching { p.inputStream.readBytes() }
-            runCatching { p.waitFor() }
-        }.onFailure { FileLogger.w(TAG, "杀掉 proot 进程失败（不阻塞重启）", it) }
+        rootfsManager.killRunningProotProcesses()
 
         // 2) 等待一小段时间让进程真正退出，避免 ETXTBSY / 句柄占用。
         delay(300)
@@ -1149,26 +1131,6 @@ class LinuxContainerEngine @Inject constructor(
     /** 超时提示行（拼进输出，喂回模型/展示给用户）。 */
     private fun timeoutNotice(timeoutMs: Long): String =
         "[命令执行超时：超过 ${timeoutMs}ms 已被强制终止]"
-
-    /**
-     * 启动进程。rootfs/proot 安装就绪则用 PRoot 进入容器；
-     * 否则回退到 Android 原生 shell（rootfs 缺失时的兜底）。
-     */
-    private fun startContainerProcess(command: String, projectPath: String?): Process {
-        val profile = currentProfile
-        val useProot = containerInstaller.isInstalledFor(profile)
-
-        val processBuilder = if (useProot) {
-            buildProcessBuilder(buildProotInvocation(command, projectPath))
-        } else {
-            FileLogger.w(TAG, "PRoot 未安装，回退到原生 shell")
-            buildNativeProcess(command, projectPath)
-        }
-
-        // Redirect stderr to stdout so we capture everything in one stream
-        processBuilder.redirectErrorStream(true)
-        return processBuilder.start()
-    }
 
     /** 容器是否已安装就绪（按当前 profile）。 */
     override fun isContainerInstalled(): Boolean = containerInstaller.isInstalledFor(currentProfile)
@@ -1302,14 +1264,7 @@ class LinuxContainerEngine @Inject constructor(
         // x86_64 原生 proot，无需 qemu（installRootfsX86 已一并部署 x86_64 proot）。
         // 原因：isInstalledX86 为了避免 ETXTBSY 循环不把 qemu 存在性当硬条件，此处做"
         // 最后一英里"同步；copyAsset 内部有原子 rename + ETXTBSY 捕获，不会崩。
-        if (profile.arch == ContainerArch.X86_64 && !EnvironmentDetector.hostIsX86_64) {
-            runCatching { containerInstaller.deployQemuX86() }
-                .onFailure { t -> FileLogger.w(TAG, "doInit: deployQemuX86 失败 (不抛): ${t.message}") }
-            // 若 qemu 仍然缺失则打告警，buildBaseProotArgv 也会同步打，两边齐提醒用户。
-            if (!containerInstaller.qemuX86Bin.exists()) {
-                FileLogger.w(TAG, "doInit: x86_64 profile 但 qemu 仍缺失（${containerInstaller.qemuX86Bin.absolutePath}），请再次点击初始化或重启 App")
-            }
-        }
+        rootfsManager.ensureQemuTranslationDeployed(profile)
 
         // RC61f：rootfs 装好后，异步清理上一次 APP crash/kill 遗留下来的 /var/cache/apk/*.part 半截文件
         // （用户反馈：安装失败不删垃圾，点按钮重试 N 次，手机存储里越堆越多几 MB 的 .apk.part 占空间）
@@ -1339,11 +1294,8 @@ class LinuxContainerEngine @Inject constructor(
      * 以长驻进程方式在容器内执行命令（如 `sshd -D`）。调用前需保证容器已安装。
      * 与 [runCommandStream] 不同，这里不读取/消费输出流，由调用方决定如何处理（通常丢弃）。
      */
-    fun startProotProcess(command: String, projectPath: String?): Process {
-        val pb = buildProcessBuilder(buildProotInvocation(command, projectPath))
-        pb.redirectErrorStream(true)
-        return pb.start()
-    }
+    fun startProotProcess(command: String, projectPath: String?): Process =
+        prootBuilder.startProotProcess(command, projectPath)
 
     /**
      * 以长驻进程方式在容器内启动一个程序并保留**分离的** stdin/stdout/stderr，供调用方
@@ -1361,195 +1313,13 @@ class LinuxContainerEngine @Inject constructor(
         programArgs: List<String>,
         projectPath: String?,
         extraEnv: Map<String, String> = emptyMap()
-    ): Process {
-        val invocation = buildStdioInvocation(program, programArgs, projectPath, extraEnv)
-        val pb = buildProcessBuilder(invocation)
-        // 刻意不 redirectErrorStream：stdout 留给 JSON-RPC，stderr 由调用方单独消费。
-        return pb.start()
-    }
-
-    /**
-     * 构造「在容器内直接 exec 某程序（保留分离流）」的 PRoot 调用。
-     * 用 `sh -c 'exec "$0" "$@"' program arg1 arg2 …` 把参数原样交给 execvp，规避引号问题。
-     */
-    private fun buildStdioInvocation(
-        program: String,
-        programArgs: List<String>,
-        projectPath: String?,
-        extraEnv: Map<String, String>
-    ): ProotInvocation {
-        val argv = buildBaseProotArgv(projectPath)
-        argv.add("/bin/sh")
-        argv.add("-c")
-        argv.add("exec \"\$0\" \"\$@\"")
-        argv.add(program)
-        argv.addAll(programArgs)
-        return ProotInvocation(argv, buildContainerEnv() + extraEnv)
-    }
+    ): Process = prootBuilder.startStdioProcess(program, programArgs, projectPath, extraEnv)
 
     /**
      * 构造进入容器执行 [command] 的完整 PRoot 调用（argv + env）。
      * 暴露给终端会话：Termux TerminalSession 需要把可执行文件与参数分开传入。
+     * 装配细节（绑定顺序 / env / 桥令牌）已迁至 [ProotInvocationBuilder]，此处仅薄委托。
      */
-    fun buildProotInvocation(command: String, projectPath: String?): ProotInvocation {
-        val argv = buildBaseProotArgv(projectPath)
-        // 用 [defaultShell]：bash 装好后 AI 命令与终端会话都走 bash；装机期间/失败回退 /bin/sh。
-        argv.add(defaultShell())
-        argv.add("-c")
-        argv.add(command)
-        return ProotInvocation(argv, buildContainerEnv())
-    }
-
-    /**
-     * 构造 PRoot 调用的公共前缀 argv：proot 二进制 + rootfs + 标准绑定 + 伪 root + 工作区绑定，
-     * 但**不含**最终的客户机命令（由各调用方自行追加 `/bin/sh -c …` 或 `exec` 形式）。
-     */
-    private fun buildBaseProotArgv(projectPath: String?): MutableList<String> {
-        val profile = currentProfile
-        val rootfs = containerInstaller.rootfsDirFor(profile).absolutePath
-        // 按 profile + 宿主架构取正确架构的 proot 可执行（x86_64 宿主跑 x86_64 容器 → x86_64 原生 proot）
-        val prootBin = containerInstaller.prootBinFor(profile).absolutePath
-
-        val argv = mutableListOf(
-            prootBin,
-            "-r", rootfs,
-            "-b", "/dev",
-            "-b", "/proc",
-            "-b", "/sys",
-            "-b", "/system",  // 绑定 /system 让宿主动态库可用
-            "-0"              // 伪 root，apk 等需要
-        )
-
-        // x86_64 容器 + 非 x86_64 宿主（arm64 宿主）：proot 的 -q 注入静态 qemu 转译器（宿主 arm64 运行，
-        // 翻译容器内 x86_64 用户态指令）。-q 后的路径是「宿主侧」绝对路径（qemu 本体跑在 proot 之外，
-        // 需宿主 loader 加载），且 qemu 二进制须在 rootfs 之外可见——proot 自身直接 exec 它，不走 rootfs 翻译。
-        // x86_64 宿主（x86_64 模拟器）原生执行 x86_64 rootfs，无需 -q。
-        if (profile.arch == ContainerArch.X86_64 && !EnvironmentDetector.hostIsX86_64) {
-            val qemu = containerInstaller.qemuX86Bin
-            if (qemu.exists()) {
-                argv.add("-q")
-                argv.add(qemu.absolutePath)
-            } else {
-                FileLogger.w(TAG, "x86_64 profile 已选但 qemu 转译器缺失（${qemu.absolutePath}），按原生 aarch64 启动将失败，请重新初始化容器")
-            }
-        }
-
-        // 把当前工作区目录绑定到容器内 ~/workspace（即 /root/workspace），使命令与文件工具作用于同一目录
-        if (projectPath != null) {
-            argv.add("-b")
-            argv.add("$projectPath:/root/workspace")
-            argv.add("-w")
-            argv.add("/root/workspace")
-        }
-
-        // 把 AI 配置目录绑定到容器内 /root/.minime（读写）：内含 skills/（load_skill 读到的指令常引用
-        // skill 目录里的脚本，AI 用 execute_command 执行 `python /root/.minime/skills/<name>/x.py` 等）与
-        // mcp.json（MCP 配置）。宿主物理目录独立于 rootfs，容器升级重装不丢用户数据。
-        // 基础解释器 python3(3.12) 与 git 由 [provisionIfNeeded] 在首次初始化时自动 `apk add`；
-        // node 等其他运行时仍由 skill / 用户自行保证。proot 的 -b 要求源路径存在，故先确保目录已建。
-        val minimeDir = containerInstaller.minimeDir.apply { mkdirs() }
-        argv.add("-b")
-        argv.add("${minimeDir.absolutePath}:/root/.minime")
-
-        // 容器侧 mcp.json 变更只标记「待确认」，不在这里触发任何宿主重载。
-        detectContainerSideMcpConfigChange()
-
-        // 「共享设备存储」：开启时把设备外存绑定到容器内 /root/storage/shared（对齐 Termux 心智）。
-        // 走 legacy storage（targetSdk=28），`Environment.getExternalStorageDirectory()` 一般在
-        // 真机返回 /storage/emulated/0，源路径存在才能被 proot -b。per-process 视图，新进程即生效。
-        if (storageShareEnabled) {
-            val external = android.os.Environment.getExternalStorageDirectory()
-            if (external != null && external.exists()) {
-                // proot 的 -b 只会在「父目录存在」时自动创建固定目标点；rootfs 里通常没有
-                // /root/storage，若不先建父目录，proot 无法生成 /root/storage/shared，导致 ls 报 no such。
-                java.io.File("$rootfs/root/storage").mkdirs()
-                argv.add("-b")
-                argv.add("${external.absolutePath}:/root/storage/shared")
-            } else {
-                FileLogger.w(TAG, "存储共享已开启但外存路径不可用（${external?.absolutePath}），跳过绑定")
-            }
-        }
-
-        // F3.5：自动挂载宿主 Download 目录到容器 /mnt/shared，实现容器与宿主快速互传。
-        // 与存储共享同走 legacy storage；源目录不存在时跳过（与外存共享一致）。
-        runCatching {
-            val download = android.os.Environment.getExternalStoragePublicDirectory(
-                android.os.Environment.DIRECTORY_DOWNLOADS
-            )
-            if (download != null && download.exists()) {
-                java.io.File("$rootfs/mnt").mkdirs()
-                argv.add("-b")
-                argv.add("${download.absolutePath}:/mnt/shared")
-            }
-        }
-
-        // 自定义 profile 的额外绑定与参数（内置 profile 这俩为空，此段无操作，等价于改动前）
-        for (b in profile.extraBindings) {
-            argv.add("-b")
-            argv.add(b)
-        }
-        argv.addAll(profile.extraArgs)
-
-        return argv
-    }
-
-    /** 容器内进程的标准环境变量（proot loader / 动态库 / PATH / HOME 等）。 */
-    private fun buildContainerEnv(): Map<String, String> {
-        val profile = currentProfile
-        // 桥接会话：本容器会话首个 proot 进程时生成一次性随机令牌；同会话后续进程复用。
-        val bridgeAddr = rcbBridge.address()
-        val bridgeToken = if (bridgeSessionActive && rcbBridge.authToken().isNotEmpty()) {
-            rcbBridge.authToken()
-        } else {
-            bridgeSessionActive = true
-            rcbBridge.startBridgeSession()
-        }
-        val env = mapOf(
-            // Android proot 必需的环境变量
-            "PROOT_TMP_DIR" to containerInstaller.prootTmpDir.absolutePath, // Android 没有 /tmp
-            // Termux proot 的 loader 分离，必须用 PROOT_LOADER/_32 指向，否则无法注入子进程而起不来。
-            // 按 profile + 宿主架构取对应架构的 loader（x86_64 宿主 → x86_64 原生 loader）。
-            "PROOT_LOADER" to containerInstaller.prootLoaderFor(profile).absolutePath,
-            "PROOT_LOADER_32" to containerInstaller.prootLoader32For(profile).absolutePath,
-            // Termux proot 动态链接 libtalloc.so.2 / libandroid-shmem.so，需让 linker64 能找到它们；
-            // libc.so/liblog.so 走系统默认路径(/system/lib64)。
-            "LD_LIBRARY_PATH" to "${containerInstaller.prootLibDirFor(profile).absolutePath}:/system/lib64:/system/lib",
-            // 说明（statx / seccomp）：旧 proot 5.1.0 的 seccomp 过滤表没有 statx，Node 用 statx 解析
-            // 模块路径会拿到未翻译的 ~/workspace/xxx → ENOENT「Cannot find module」。Termux proot
-            // (5.1.107.x) 的 seccomp 过滤表已包含 statx，默认 seccomp 模式即可正确翻译，故此处
-            // **刻意不设 PROOT_NO_SECCOMP**——这正是 Termux 自己用 proot 的方式；强制全量 ptrace
-            // (PROOT_NO_SECCOMP=1) 反而在本设备触发过 ptrace(PEEKDATA) I/O error。
-            "PATH" to "/root/.minime/bin:/usr/bin:/bin:/usr/sbin:/sbin",
-            "HOME" to "/root",
-            // 容器 ⇄ 宿主桥端点：让 rcb-* 命令能连回宿主 App（见 RcbBridge）。
-            // 令牌为本会话一次性随机值：会话内首个 proot 进程启动时生成并注入 env，
-            // 会话结束 [onContainerSessionEnd] 立即失效；剪贴板读写另由宿主按次确认门控。
-            "RCB_BRIDGE_ADDR" to bridgeAddr,
-            "RCB_BRIDGE_TOKEN" to bridgeToken,
-            // git 全局配置指向持久挂载里的 .gitconfig（/root/.minime 绑定到宿主 filesDir/minime，
-            // 跨 rootfs 升级不丢）。git-credentials 同放该目录，credential.helper=store 经此读。
-            // 让终端/AI/UI 三端 git 都读同一份配置与凭据，详见 GitCredentialsFileSync。
-            "GIT_CONFIG_GLOBAL" to "/root/.minime/.gitconfig",
-            "TERM" to "xterm-256color",
-            "LANG" to "C.UTF-8"
-        )
-        // 网络代理（VPN）：启用时注入 http/https/all_proxy → 127.0.0.1:7890（容器内 mihomo 与宿主
-        // 共享 loopback，同一实例），NO_PROXY 保护本地服务；未启用则并入空 map 等价不改动。
-        return env + proxyManager.exportContainerEnv()
-    }
-
-    private fun buildProcessBuilder(invocation: ProotInvocation): ProcessBuilder {
-        val processBuilder = ProcessBuilder(invocation.argv)
-        processBuilder.environment().putAll(invocation.env)
-        return processBuilder
-    }
-
-    private fun buildNativeProcess(command: String, projectPath: String?): ProcessBuilder {
-        // Fallback to Android's native shell
-        val processBuilder = ProcessBuilder("/system/bin/sh", "-c", command)
-        if (projectPath != null) {
-            processBuilder.directory(java.io.File(projectPath))
-        }
-        return processBuilder
-    }
+    fun buildProotInvocation(command: String, projectPath: String?): ProotInvocation =
+        prootBuilder.buildProotInvocation(command, projectPath)
 }
