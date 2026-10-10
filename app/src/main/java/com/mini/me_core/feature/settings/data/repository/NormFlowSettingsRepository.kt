@@ -67,7 +67,7 @@ class NormFlowSettingsRepository @Inject constructor(
     // P2：新增护栏独立开关（默认关）
     val guardDangerousCommandEnabledFlow: Flow<Boolean> = kv.observeBool(NS, GUARD_DANGEROUS_COMMAND_ENABLED_KEY).map { it ?: false }
     val guardLargeFileEnabledFlow: Flow<Boolean> = kv.observeBool(NS, GUARD_LARGE_FILE_ENABLED_KEY).map { it ?: false }
-    val guardPathBoundaryEnabledFlow: Flow<Boolean> = kv.observeBool(NS, GUARD_PATH_BOUNDARY_ENABLED_KEY).map { it ?: false }
+    val guardPathBoundaryEnabledFlow: Flow<Boolean> = kv.observeBool(NS, GUARD_PATH_BOUNDARY_ENABLED_KEY).map { it ?: true }
     // P2：用量卡片显示项（默认仅 token）
     val usageCardItemsFlow: Flow<Set<String>> = kv.observeString(NS, USAGE_CARD_ITEMS_KEY).map { raw ->
         raw?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet() ?: setOf("token")

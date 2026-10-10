@@ -6,10 +6,14 @@
     - files/database_crashes/（Funnel4 崩溃备份）
     - files/zth_*/（ZTH 加密相关元数据）
     - shared_prefs/（设置项 DataStore 不在这里，语言/保活/日志等级走这个）
-  禁止备份：
-    - cache/（临时文件、APK 下载缓存）
-    - code_cache/（dex 编译缓存）
-    - no_backup/（将来放会话临时上下文压缩中间产物）
+
+  安全红线（密钥/凭据绝不进 Google 云备份与设备迁移）：
+    - 排除 sharedpref "minime_unified_keys"：EncryptedSharedPreferences 里存放
+      数据库 DEK（主密钥包裹后的对称密钥）。即便 MasterKey 在硬件 Keystore 不可导出，
+      也不把 DEK 信封随云备份带走。
+    - 排除 database "minime_credentials_v2.db"（含 -wal/-shm）：凭据库本身是密文，
+      与 DEK 一起出现在云端等于双重冗余，按最小权限原则直接不带走。
+    - 排除 cache/、code_cache/、no_backup/ 临时文件。
 -->
 <data-extraction-rules>
     <cloud-backup>
@@ -17,6 +21,10 @@
         <include domain="file" path="database_crashes" />
         <include domain="file" path="zth_security" />
         <include domain="sharedpref" path="." />
+        <exclude domain="database" path="minime_credentials_v2.db" />
+        <exclude domain="database" path="minime_credentials_v2.db-wal" />
+        <exclude domain="database" path="minime_credentials_v2.db-shm" />
+        <exclude domain="sharedpref" path="minime_unified_keys" />
         <exclude domain="cache" path="." />
         <exclude domain="code_cache" path="." />
         <exclude domain="no_backup" path="." />
@@ -26,6 +34,10 @@
         <include domain="file" path="database_crashes" />
         <include domain="file" path="zth_security" />
         <include domain="sharedpref" path="." />
+        <exclude domain="database" path="minime_credentials_v2.db" />
+        <exclude domain="database" path="minime_credentials_v2.db-wal" />
+        <exclude domain="database" path="minime_credentials_v2.db-shm" />
+        <exclude domain="sharedpref" path="minime_unified_keys" />
         <exclude domain="cache" path="." />
         <exclude domain="code_cache" path="." />
         <exclude domain="no_backup" path="." />

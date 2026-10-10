@@ -1,10 +1,6 @@
 package com.mini.me_core.core.util
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Environment
-import androidx.core.content.ContextCompat
 import java.io.File
 
 /**
@@ -29,32 +25,26 @@ object LogLevelController {
 /**
  * 日志目录解析的共用实现（审计 M）。
  *
- * [FileLogger] 与 [AILogger] 曾各自复制一份「公共外部存储 → 外部私有 → 内部」的回退链，
- * 逐行雷同。这里收敛为单一实现，两者传入各自的子目录名即可。
+ * 安全口径：日志**默认只写应用私有内部目录**（`filesDir/<subDir>`），任何第三方应用
+ * 不可读。历史上默认写公共 Documents（卸载保留、文件管理器可见）会把含 token /
+ * 命令 / 路径的日志暴露给任意应用，已废弃；公共目录只允许「用户显式导出日志」时
+ * 一次性写入，且导出前全量脱敏（见 FileLogger.exportLogsToDownloads）。
  */
 object LogDirResolver {
 
     /**
-     * 解析某类日志的目录：优先公共外部存储 `Documents/<root>/<subdir>`（卸载后保留，
-     * 需 WRITE_EXTERNAL_STORAGE，targetSdk=28 下可写）；权限未授予时回退外部私有目录，
-     * 再回退内部存储。
+     * 解析日志目录：固定为应用私有内部目录 `filesDir/<subDir>`。
+     * 不再因 WRITE_EXTERNAL_STORAGE 权限而自动切换到公共 Documents。
      */
-    @Suppress("DEPRECATION") // targetSdk=28 下 getExternalStoragePublicDirectory 仍可用且不受分区存储限制
-    fun resolve(context: Context, subDir: String): File {
-        if (hasExternalStorageWrite(context)) {
-            val base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val dir = File(File(base, LogConfig.publicRootDir), subDir)
-            if (dir.exists() || dir.mkdirs()) return dir
-        }
-        val base = context.getExternalFilesDir(null) ?: context.filesDir
-        return File(base, subDir).apply { mkdirs() }
+    fun resolve(context: Context, subDir: String): File =
+        File(context.filesDir, subDir).apply { mkdirs() }
+
+    /**
+     * 历史上用于权限授予后把日志切到公共目录；该行为已废弃，保留方法签名以兼容
+     * 既有调用方——现在为 no-op，日志目录恒定为应用私有目录。
+     */
+    @Suppress("UnusedParameter") // 保留回调签名，函数为 no-op
+    fun onExternalStorageGranted(context: Context) {
+        // no-op：日志不再自动写入公共外部存储。
     }
-
-    private fun hasExternalStorageWrite(context: Context): Boolean =
-        Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
-            PackageManager.PERMISSION_GRANTED
-
-    /** 供 [FileLogger] 的 legacy 导出路径（API <29）复用同一权限判定。 */
-    fun hasExternalStorageWritePermission(context: Context): Boolean = hasExternalStorageWrite(context)
 }

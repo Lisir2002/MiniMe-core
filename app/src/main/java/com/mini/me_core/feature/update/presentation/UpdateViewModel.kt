@@ -279,11 +279,10 @@ class UpdateViewModel @Inject constructor(
     }
 
     fun install(filePath: String) {
-        val ok = ApkInstaller.install(app, filePath)
-        if (!ok) {
-            viewModelScope.launch {
-                _snackbar.emit(app.getString(R.string.update_install_failed))
-            }
+        val assetSize = activeRelease?.fileSizeBytes ?: 0L
+        val result = ApkInstaller.install(app, filePath, expectedSizeBytes = assetSize)
+        if (result is ApkInstaller.InstallResult.Rejected) {
+            viewModelScope.launch { _snackbar.emit(result.reason) }
         }
     }
 

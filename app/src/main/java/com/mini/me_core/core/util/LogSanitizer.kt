@@ -59,6 +59,28 @@ object LogSanitizer {
         RegexOption.IGNORE_CASE
     )
 
+    // 4b) 命令行凭据参数：--password xxx / --token=xxx / --api-key xxx / --secret xxx。
+    //     组 1=参数名连字符（保留），组 2=值（打码）。
+    private val CLI_FLAG_CREDENTIAL_REGEX = Regex(
+        "(--?(?:password|passwd|token|api-?key|secret|passphrase))(?:=|\\s+)([^\\s,;\"']+)",
+        RegexOption.IGNORE_CASE
+    )
+
+    // 4c) URL 内嵌凭据：https://user:password@host → https://[REDACTED]@host。
+    private val URL_USERINFO_REGEX = Regex(
+        "[a-zA-Z][a-zA-Z0-9+.-]*://[^\\s/@:]+:[^\\s/@]*@"
+    )
+
+    // 4d) 已知前缀的长令牌（OpenAI sk-* / GitHub gh*_* / Slack xox*-* / AWS AKIA* / Google AIza*）。
+    private val KNOWN_TOKEN_REGEX = Regex(
+        "\\b(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{16,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})\\b"
+    )
+
+    // 4e) PEM 私钥块：整段打码（BEGIN/END 之间全部内容）。
+    private val PRIVATE_KEY_BLOCK_REGEX = Regex(
+        "-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----"
+    )
+
     // 5a) data: URI 内嵌 base64 媒体：data:image/png;base64,<512+ chars>
     private val DATA_URL_MEDIA_REGEX =
         Regex("data:((?:image|audio|video)/[A-Za-z0-9.+-]+);base64,([A-Za-z0-9+/=_-]{512,})")
@@ -89,6 +111,15 @@ object LogSanitizer {
         out = INLINE_KV_REGEX.replace(out) { m ->
             m.groupValues[1] + "=[REDACTED]"
         }
+        out = CLI_FLAG_CREDENTIAL_REGEX.replace(out) { m ->
+            m.groupValues[1] + " [REDACTED]"
+        }
+        out = URL_USERINFO_REGEX.replace(out) { m ->
+            val scheme = m.value.substringBefore("://")
+            "$scheme://[REDACTED]@"
+        }
+        out = KNOWN_TOKEN_REGEX.replace(out) { "[REDACTED_TOKEN]" }
+        out = PRIVATE_KEY_BLOCK_REGEX.replace(out) { "[REDACTED PRIVATE KEY BLOCK]" }
         out = DATA_URL_MEDIA_REGEX.replace(out) { m ->
             val mime = m.groupValues[1]
             val data = m.groupValues[2]

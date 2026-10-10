@@ -126,8 +126,63 @@ class LinuxContainerEngine @Inject constructor(
     @Volatile
     private var storageShareEnabled: Boolean = false
 
+    // ── 容器侧 MCP 配置变更待确认门控 ────────────────────────────────────
+    // 容器内对 /root/.minime/mcp.json 的改写不得被宿主自动热加载生效；检测到变更仅标记
+    // 「待确认」，由宿主侧显式 [acknowledgeMcpConfigChange] 后才允许宿主 MCP 侧采纳。
+    private val _pendingMcpConfigChange = MutableStateFlow(false)
+    val pendingMcpConfigChange: StateFlow<Boolean> = _pendingMcpConfigChange.asStateFlow()
+
+    /** 已确认采纳的 mcp.json 基线（canonical 路径 + lastModified）。 */
+    @Volatile
+    private var approvedMcpConfigSnapshot: Pair<String, Long>? = null
+
+    /** 桥接令牌是否已为本容器会话启动；会话结束后由 [onContainerSessionEnd] 复位。 */
+    @Volatile
+    private var bridgeSessionActive: Boolean = false
+
     /** 存储共享是否开着（供终端构造提示横幅等 UI 侧判断）。 */
     fun isStorageShareEnabled(): Boolean = storageShareEnabled
+
+    /**
+     * 检查容器侧 mcp.json 是否相对已确认基线发生了变更；若变更则置「待确认」，
+     * 宿主 MCP 加载侧不得在此自动热加载。用户在宿主 UI 确认后调用
+     * [acknowledgeMcpConfigChange] 才把基线推进到当前内容。
+     */
+    private fun detectContainerSideMcpConfigChange() {
+        runCatching {
+            val minimeDir = containerInstaller.minimeDir
+            val mcpFile = java.io.File(minimeDir, "mcp.json")
+            if (!mcpFile.exists()) return@runCatching
+            val canonical = mcpFile.canonicalPath
+            val mtime = mcpFile.lastModified()
+            val baseline = approvedMcpConfigSnapshot?.let { McpConfigChangeGate.Snapshot(it.first, it.second) }
+            // 首次见到直接采纳为基线（不提示）；仅当基线之后内容被改才标记待确认。
+            if (McpConfigChangeGate.shouldFlagPending(baseline, canonical, mtime) && !_pendingMcpConfigChange.value) {
+                _pendingMcpConfigChange.value = true
+                FileLogger.w(TAG, "检测到容器侧 mcp.json 变更，已标记待宿主确认（不自动热加载）")
+            } else if (baseline == null) {
+                approvedMcpConfigSnapshot = canonical to mtime
+            }
+        }
+    }
+
+    /** 宿主侧显式确认采纳容器侧 mcp.json 变更。 */
+    fun acknowledgeMcpConfigChange() {
+        runCatching {
+            val mcpFile = java.io.File(containerInstaller.minimeDir, "mcp.json")
+            approvedMcpConfigSnapshot = if (mcpFile.exists()) mcpFile.canonicalPath to mcpFile.lastModified() else null
+        }
+        _pendingMcpConfigChange.value = false
+    }
+
+    /**
+     * 容器会话结束：使本会话的一次性桥接令牌立即失效（下次会话重新生成）。
+     * 由终端/AI 会话销毁路径调用。
+     */
+    fun onContainerSessionEnd() {
+        rcbBridge.endBridgeSession()
+        bridgeSessionActive = false
+    }
 
     init {
         // 冷启动首帧：基于默认 profile（宿主架构对应内置容器）检查磁盘安装状态，
@@ -1396,6 +1451,9 @@ class LinuxContainerEngine @Inject constructor(
         argv.add("-b")
         argv.add("${minimeDir.absolutePath}:/root/.minime")
 
+        // 容器侧 mcp.json 变更只标记「待确认」，不在这里触发任何宿主重载。
+        detectContainerSideMcpConfigChange()
+
         // 「共享设备存储」：开启时把设备外存绑定到容器内 /root/storage/shared（对齐 Termux 心智）。
         // 走 legacy storage（targetSdk=28），`Environment.getExternalStorageDirectory()` 一般在
         // 真机返回 /storage/emulated/0，源路径存在才能被 proot -b。per-process 视图，新进程即生效。
@@ -1438,6 +1496,14 @@ class LinuxContainerEngine @Inject constructor(
     /** 容器内进程的标准环境变量（proot loader / 动态库 / PATH / HOME 等）。 */
     private fun buildContainerEnv(): Map<String, String> {
         val profile = currentProfile
+        // 桥接会话：本容器会话首个 proot 进程时生成一次性随机令牌；同会话后续进程复用。
+        val bridgeAddr = rcbBridge.address()
+        val bridgeToken = if (bridgeSessionActive && rcbBridge.authToken().isNotEmpty()) {
+            rcbBridge.authToken()
+        } else {
+            bridgeSessionActive = true
+            rcbBridge.startBridgeSession()
+        }
         val env = mapOf(
             // Android proot 必需的环境变量
             "PROOT_TMP_DIR" to containerInstaller.prootTmpDir.absolutePath, // Android 没有 /tmp
@@ -1455,9 +1521,11 @@ class LinuxContainerEngine @Inject constructor(
             // (PROOT_NO_SECCOMP=1) 反而在本设备触发过 ptrace(PEEKDATA) I/O error。
             "PATH" to "/root/.minime/bin:/usr/bin:/bin:/usr/sbin:/sbin",
             "HOME" to "/root",
-            // 容器 ⇄ 宿主桥端点：让 rcb-* 命令能连回宿主 App（见 RcbBridge）。首次调用会懒启动服务。
-            "RCB_BRIDGE_ADDR" to rcbBridge.address(),
-            "RCB_BRIDGE_TOKEN" to rcbBridge.authToken(),
+            // 容器 ⇄ 宿主桥端点：让 rcb-* 命令能连回宿主 App（见 RcbBridge）。
+            // 令牌为本会话一次性随机值：会话内首个 proot 进程启动时生成并注入 env，
+            // 会话结束 [onContainerSessionEnd] 立即失效；剪贴板读写另由宿主按次确认门控。
+            "RCB_BRIDGE_ADDR" to bridgeAddr,
+            "RCB_BRIDGE_TOKEN" to bridgeToken,
             // git 全局配置指向持久挂载里的 .gitconfig（/root/.minime 绑定到宿主 filesDir/minime，
             // 跨 rootfs 升级不丢）。git-credentials 同放该目录，credential.helper=store 经此读。
             // 让终端/AI/UI 三端 git 都读同一份配置与凭据，详见 GitCredentialsFileSync。

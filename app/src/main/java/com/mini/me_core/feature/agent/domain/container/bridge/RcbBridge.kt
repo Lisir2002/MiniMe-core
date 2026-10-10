@@ -12,22 +12,25 @@ import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.InetSocketAddress
 import java.net.ServerSocket
+import java.security.MessageDigest
+import java.security.SecureRandom
 import java.util.Base64
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.random.Random
+
+/** 桥接触发的剪贴板操作方向。 */
+enum class ClipboardDirection { READ, WRITE }
 
 /**
  * 容器 ⇄ 宿主桥（loopback TCP）：让容器内 `rcb-*` 命令把「剪贴板/URL/通知」操作交给 App 处理。
  *
- * 设计要点（见《终端增强设计 v1.1》「Topic 2 RcbBridge」，含安全评审修正）：
- *  - **loopback TCP + 握手令牌**：绑定 127.0.0.1 随机端口（外网不可达），连接首行须带 [token]
- *    （由环境变量 RCB_BRIDGE_TOKEN 注入容器），否则直接拒绝。
- *  - **能力隔离（默认最小权限）**：`share` **不支持**（防止把容器内/整卡文件经系统分享渗出）；
- *    `open_url` 需宿主侧注入 [openUrlHandler] 且默认空实现（仅记日志，交 UI 决定是否真正打开）。
- *  - **行协议 + base64 载荷**：shell 里拼 JSON 转义易错、单行又传不了多行文本，故命令行形如
- *    `cmd [base64(param)]`，文本参数一律 base64 化，天然免转义、免行数问题。
- *  - 令牌在容器进程 env 里，同容器进程可读；故对这些进程采取「最小权限 + 关键操作宿主确认」策略。
+ * 安全模型（secure by default / 最小权限）：
+ *  - **loopback TCP + 每次桥接会话随机一次性令牌**：绑定 127.0.0.1 随机端口，连接首行
+ *    必须带 [startBridgeSession] 刚生成的令牌（32 字节 SecureRandom → base64url）；
+ *    令牌随会话启动重新生成，[endBridgeSession] 后立即失效，杜绝静态/可复用令牌。
+ *  - **剪贴板读写默认拒绝**：[clipboardGate] 默认 `false`（fail-closed）。宿主 UI 接入
+ *    「按次确认」后才放行；桥本身不携带任何静默读写剪贴板的能力。
+ *  - `share` 跨进程系统分享默认禁用（防文件渗出）；`open_url` 需宿主侧 [openUrlHandler]。
  */
 @Singleton
 class RcbBridge @Inject constructor(
@@ -37,6 +40,9 @@ class RcbBridge @Inject constructor(
         private const val TAG = "RcbBridge"
         private const val HOST = "127.0.0.1"
         private const val BIN_DIR = "bin" // 容器内即 /root/.minime/bin → 已注入 PATH
+
+        /** 令牌熵：32 字节（256 bit），base64url 编码后约 43 字符。 */
+        private const val TOKEN_BYTES = 32
     }
 
     @Volatile
@@ -45,11 +51,19 @@ class RcbBridge @Inject constructor(
     @Volatile
     private var port: Int = -1
 
+    /** 当前桥接会话令牌；会话结束置空（失效）。 */
     @Volatile
     private var token: String = ""
 
     @Volatile
     private var started = false
+
+    /**
+     * 剪贴板操作门控（宿主 UI 注入）。返回 true 才放行本次读/写；默认拒绝。
+     * 回调在桥接受控线程调用，宿主实现应自行切换到主线程做按次确认。
+     */
+    @Volatile
+    var clipboardGate: (ClipboardDirection) -> Boolean = { false }
 
     /** 打开 URL 的宿主侧实现（默认不真正打开，只记日志）。回调在主线程调用。 */
     @Volatile
@@ -58,13 +72,12 @@ class RcbBridge @Inject constructor(
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val rand = Random(System.currentTimeMillis())
+    private val secureRandom = SecureRandom()
 
-    /** 确保服务已启动并写好 rcb-* helper，返回 "127.0.0.1:port"。首次调用才真正 bind + 写脚本。 */
+    /** 确保服务已启动并写好 rcb-* helper，返回 "127.0.0.1:port"。 */
     fun ensureStarted(): String {
         synchronized(this) {
             if (started) return "$HOST:$port"
-            token = (0 until 24).joinToString("") { "abcdefghijklmnopqrstuvwxyz0123456789"[rand.nextInt(36)].toString() }
             val ss = ServerSocket().apply {
                 reuseAddress = true
                 bind(InetSocketAddress(HOST, 0))
@@ -81,12 +94,30 @@ class RcbBridge @Inject constructor(
         }
     }
 
+    /**
+     * 开始一次新的桥接会话：生成全新随机一次性令牌并返回。同一桥服务可反复开新会话；
+     * 新令牌替换旧令牌（旧令牌立即失效）。
+     */
+    fun startBridgeSession(): String {
+        ensureStarted()
+        synchronized(this) {
+            token = BridgeTokenFactory.generate(secureRandom)
+            FileLogger.i(TAG, "桥接会话令牌已轮换（一次性，${BridgeTokenFactory.TOKEN_BYTES * 8} bit）")
+            return token
+        }
+    }
+
+    /** 结束桥接会话：令牌立即失效，新连接全部拒绝。 */
+    fun endBridgeSession() {
+        synchronized(this) {
+            token = ""
+        }
+    }
+
     fun address(): String = ensureStarted()
 
-    fun authToken(): String {
-        ensureStarted()
-        return token
-    }
+    /** 当前会话令牌；未开始会话时返回空串（调用方不应注入容器）。 */
+    fun authToken(): String = synchronized(this) { token }
 
     private fun acceptLoop(ss: ServerSocket) {
         while (!ss.isClosed) {
@@ -108,7 +139,11 @@ class RcbBridge @Inject constructor(
             socket.soTimeout = 20_000
             val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
             val writer = PrintWriter(socket.getOutputStream(), true)
-            if (reader.readLine()?.trim() != token) {
+            val presented = reader.readLine()?.trim().orEmpty()
+            val expected = token
+            if (expected.isEmpty() || presented.isEmpty() ||
+                !MessageDigest.isEqual(expected.toByteArray(), presented.toByteArray())
+            ) {
                 writer.println("err auth_failed")
                 return
             }
@@ -131,12 +166,22 @@ class RcbBridge @Inject constructor(
         val arg = b64?.let { runCatching { String(Base64.getDecoder().decode(it), Charsets.UTF_8) }.getOrNull() }
         return when (cmd) {
             "clipboard_get" -> {
-                val text = clipboardText()
-                "ok ${Base64.getEncoder().encodeToString((text ?: "").toByteArray(Charsets.UTF_8))}"
+                if (!clipboardGate(ClipboardDirection.READ)) {
+                    FileLogger.w(TAG, "桥接触读剪贴板被门控拒绝（默认拒绝）")
+                    "err capability_denied"
+                } else {
+                    val text = clipboardText()
+                    "ok ${Base64.getEncoder().encodeToString((text ?: "").toByteArray(Charsets.UTF_8))}"
+                }
             }
             "clipboard_set" -> if (arg == null) "err missing_text" else {
-                setClipboard(arg)
-                "ok"
+                if (!clipboardGate(ClipboardDirection.WRITE)) {
+                    FileLogger.w(TAG, "桥接触写剪贴板被门控拒绝（默认拒绝）")
+                    "err capability_denied"
+                } else {
+                    setClipboard(arg)
+                    "ok"
+                }
             }
             "open_url" -> if (arg.isNullOrBlank()) "err missing_url" else {
                 mainHandler.post { openUrlHandler(arg) }
@@ -197,9 +242,9 @@ class RcbBridge @Inject constructor(
             writeHelper(binDir, "rcb-clipboard",
                 """
                 |#!/bin/bash
-                |# rcb-clipboard get|set [text]
+                |# rcb-clipboard get|set [text]（宿主侧默认拒绝，需按次确认）
                 |MODE="${'$'}{1:-}"
-                |case "${'$'}MODE" in
+                |case "${'$'}{MODE}" in
                 |  get)
                 |    REPLY="${'$'}(rcb-send clipboard_get)"
                 |    case "${'$'}REPLY" in
@@ -208,7 +253,7 @@ class RcbBridge @Inject constructor(
                 |        echo
                 |        ;;
                 |      *)
-                |        echo "${'$'}REPLY" >&2
+                |        echo "${'$'}{REPLY}" >&2
                 |        exit 1
                 |        ;;
                 |    esac
@@ -227,14 +272,14 @@ class RcbBridge @Inject constructor(
                 """
                 |#!/bin/bash
                 |# rcb-open-url URL：让宿主 App 打开链接（需宿主侧接线，否则仅记日志）
-                |[ -n "${'$'}1" ] || { echo "用法: rcb-open-url URL" >&2; exit 1; }
+                |[ -n "${'$'}{1}" ] || { echo "用法: rcb-open-url URL" >&2; exit 1; }
                 |rcb-send open_url "${'$'}1"
                 |""".trimMargin())
             writeHelper(binDir, "rcb-open",
                 """
                 |#!/bin/bash
                 |# rcb-open PATH：把路径交给宿主（作为 URL/file 处理，需宿主接线）
-                |[ -n "${'$'}1" ] || { echo "用法: rcb-open PATH" >&2; exit 1; }
+                |[ -n "${'$'}{1}" ] || { echo "用法: rcb-open PATH" >&2; exit 1; }
                 |rcb-send open_url "${'$'}1"
                 |""".trimMargin())
             writeHelper(binDir, "rcb-toast",

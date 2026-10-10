@@ -23,11 +23,9 @@ import java.util.concurrent.TimeUnit
 /**
  * 把日志落盘到 App 的存储，方便在没有连接 adb 的情况下调试。实现 [Logger] 接口。
  *
- * 日志写入**公共外部存储** `Documents/MiniMe-core/logs/`（当 WRITE_EXTERNAL_STORAGE 权限已授予时），
- * 该目录在应用卸载后**仍然保留**，便于卸载后排查问题；权限未授予时回退到外部私有目录
- * `getExternalFilesDir/logs/`（不可用时再回退内部 `filesDir/logs/`），按天分文件
- * （log-yyyy-MM-dd.txt）。公共外部目录可通过文件管理器在
- * `/storage/emulated/0/Documents/MiniMe-core/logs/` 直接查看，无需 root。
+ * 日志默认写**应用私有内部目录** `filesDir/logs/`（任何第三方应用不可读），按天分文件
+ * （log-yyyy-MM-dd.txt）。公共目录（Documents / Download）只在用户显式「导出日志」时
+ * 一次性写入，且导出前对每一行执行全量 [LogSanitizer] 脱敏（见 [exportLogsToDownloads]）。
  *
  * 写入管线（重构后）：
  *  - 调用线程构建「一行」（时间戳 / 等级 / Tag / **调用线程名** / 脱敏后的消息 + 堆栈），
@@ -38,8 +36,7 @@ import java.util.concurrent.TimeUnit
  *  - 每个新文件写格式头（格式版本 / app 版本 / pid），便于附属日志应用做版本联动。
  *
  * 所有写入镜像一份到 [android.util.Log]。支持按等级过滤：低于 [minLevel] 的日志一律跳过。
- * 使用前需在 [Application.onCreate] 调用一次 [init]；外部存储权限运行时授予后调用
- * [onExternalStorageGranted] 把目录切到公共存储。
+ * 使用前需在 [Application.onCreate] 调用一次 [init]。
  */
 object FileLogger : Logger {
 
@@ -123,20 +120,13 @@ object FileLogger : Logger {
     }
 
     /**
-     * 外部存储权限在运行时被授予后调用，把日志目录切换到公共外部存储（卸载后仍保留）。
-     * [init] 通常发生在 Application.onCreate（早于权限授予），因此需要在此处重新解析目录。
+     * 历史上外部存储权限授予后把日志目录切到公共外部存储；该行为已废弃。
+     * 日志恒定写应用私有内部目录（见 [LogDirResolver.resolve]），公共目录只允许
+     * 用户显式导出时一次性写入（[exportLogsToDownloads]，导出前全量脱敏）。
      */
+    @Suppress("UnusedParameter") // 保留回调签名（MainActivity 权限回调），函数为 no-op
     fun onExternalStorageGranted(context: Context) {
-        val newDir = resolveLogDir(context)
-        val current = logDir
-        if (current == null || newDir.absolutePath != current.absolutePath) {
-            logDir = newDir
-            ioExecutor.execute {
-                closeWriter()
-                cleanupOldLogs(newDir)
-            }
-            i(TAG, "外部存储权限已授予，日志目录切换为: ${newDir.absolutePath}")
-        }
+        // no-op：不再自动切换到公共存储。
     }
 
     /**
@@ -257,10 +247,19 @@ object FileLogger : Logger {
     ): List<String> {
         // 一致性契约：任何"读走 log 文件内容"的动作前先 flush（见 flush() 注释）。
         flush()
+        // 导出到公共目录前全量脱敏：磁盘上的历史行可能是旧版规则写入的，
+        // 导出时再做一次完整 [LogSanitizer] 扫描（逐行流式，避免 OOM）。
         val exported = mutableListOf<String>()
         for (file in listLogFiles()) {
             val ok = publishToPublic(context, file.name) { out ->
-                FileInputStream(file).use { it.copyTo(out, 8192) }
+                OutputStreamWriter(out, Charsets.UTF_8).use { w ->
+                    FileInputStream(file).bufferedReader(Charsets.UTF_8).use { reader ->
+                        reader.forEachLine { line ->
+                            w.write(sanitizeText(line))
+                            w.write('\n'.code)
+                        }
+                    }
+                }
             }
             if (ok) exported.add(file.name)
         }
@@ -312,7 +311,13 @@ object FileLogger : Logger {
 
     @Suppress("DEPRECATION") // targetSdk=28 下 getExternalStoragePublicDirectory 仍可用
     private fun publishViaLegacyFile(context: Context, name: String, block: (OutputStream) -> Unit) {
-        if (!LogDirResolver.hasExternalStorageWritePermission(context)) throw IllegalStateException("未授予存储权限")
+        // 仅「用户显式导出到公共 Download」才走此分支：仍需 legacy 存储权限，否则拒绝。
+        // 日常日志落盘不受此分支影响（恒定写应用私有 filesDir）。
+        val mounted = Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
+        val granted = context.checkSelfPermission(
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!mounted || !granted) throw IllegalStateException("未授予存储权限")
         val base = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         val dir = File(File(base, LogConfig.publicRootDir), LogConfig.logSubdir)
         if (!dir.exists() && !dir.mkdirs()) throw IllegalStateException("无法创建导出目录")

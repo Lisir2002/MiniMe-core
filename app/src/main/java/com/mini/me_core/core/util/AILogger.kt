@@ -112,20 +112,12 @@ object AILogger {
     }
 
     /**
-     * 外部存储权限在运行时被授予后调用，把日志目录切换到公共外部存储（卸载后仍保留）。
-     * [init] 通常发生在 Application.onCreate（早于权限授予），因此需要在此处重新解析目录。
+     * 历史上用于把 AI 会话日志切到公共外部存储；该行为已废弃——日志恒定写应用私有目录
+     * （见 [LogDirResolver.resolve]）。保留方法签名以兼容 MainActivity 权限回调。
      */
+    @Suppress("UnusedParameter") // 保留回调签名（MainActivity 权限回调），函数为 no-op
     fun onExternalStorageGranted(context: Context) {
-        val newDir = resolveLogDir(context)
-        val current = logDir
-        if (current == null || newDir.absolutePath != current.absolutePath) {
-            logDir = newDir
-            ioExecutor.execute {
-                closeAllWriters()
-                cleanupOldLogs(newDir)
-            }
-            FileLogger.i(TAG, "外部存储权限已授予，AI 会话日志目录切换为: ${newDir.absolutePath}")
-        }
+        // no-op：AI 会话日志（含完整请求体）绝不写入公共目录。
     }
 
     /**
@@ -243,12 +235,6 @@ object AILogger {
 
     private fun aiHeaderText(): String =
         "# MiniMe AI Log Format v${LogConfig.formatVersion}\n"
-
-    private fun closeAllWriters() {
-        sessionWriters.values.forEach { runCatching { it.writer.flush(); it.writer.close() } }
-        sessionWriters.clear()
-        counters.clear()
-    }
 
     /** 删除超过 [LogConfig.maxAgeDays] 天未更新的会话日志文件（含滚动文件）。规则收敛于 [DiagnosticCleanup]。 */
     private fun cleanupOldLogs(dir: File) = DiagnosticCleanup.cleanupAiLogs(dir)
