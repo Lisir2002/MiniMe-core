@@ -2,6 +2,8 @@ package com.mini.me_core.core.security
 
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -122,5 +124,96 @@ class UserPasswordBackupCryptoTest {
         assertNull(crypto.sniffHeader(ByteArrayInputStream(ByteArray(64) { 0x42 })))
         // 输入不足 64B 也不抛，返回 null
         assertNull(crypto.sniffHeader(ByteArrayInputStream(ByteArray(3))))
+    }
+
+    // ============== 迭代数钳制 ==============
+
+    @Test
+    fun encrypt_iterBelowMin_clampedToMin() {
+        val out = ByteArrayOutputStream()
+        // 显式传过低迭代数：应被钳到下限 120_000。
+        crypto.encryptingOutputStream(out, "pw".toCharArray(), explicitIter = 1_000).use {
+            it.write("x".toByteArray())
+        }
+        val info = crypto.sniffHeader(ByteArrayInputStream(out.toByteArray()))
+        assertNotNull(info)
+        assertEquals(120_000, info!!.iteration)
+    }
+
+    @Test
+    fun encrypt_iterAboveMax_clampedToMax() {
+        val out = ByteArrayOutputStream()
+        // 显式传过高迭代数：应被钳到上限 2_000_000（防 DoS）。
+        crypto.encryptingOutputStream(out, "pw".toCharArray(), explicitIter = 50_000_000).use {
+            it.write("x".toByteArray())
+        }
+        val info = crypto.sniffHeader(ByteArrayInputStream(out.toByteArray()))
+        assertNotNull(info)
+        assertEquals(2_000_000, info!!.iteration)
+    }
+
+    @Test
+    fun decrypt_iterBelowMinHeader_throwsTampered() {
+        // 手工构造一个迭代数过低（1_000）的 64B 头：解密应在派生密钥前拒绝。
+        val header = buildFakeHeader(iter = 1_000)
+        val stream = ByteArrayInputStream(header + ByteArray(48))
+        assertThrows(UserPasswordBackupCrypto.BackupTamperedException::class.java) {
+            crypto.decryptingInputStream(stream, "pw".toCharArray()).use { it.readBytes() }
+        }
+    }
+
+    @Test
+    fun decrypt_iterAboveMaxHeader_throwsTampered() {
+        // 手工构造一个迭代数过高（Int.MAX_VALUE）的 64B 头：解密应在派生密钥前拒绝（防 DoS）。
+        val header = buildFakeHeader(iter = Int.MAX_VALUE)
+        val stream = ByteArrayInputStream(header + ByteArray(48))
+        assertThrows(UserPasswordBackupCrypto.BackupTamperedException::class.java) {
+            crypto.decryptingInputStream(stream, "pw".toCharArray()).use { it.readBytes() }
+        }
+    }
+
+    // ============== 流式分块加解密（>chunk） ==============
+
+    @Test
+    fun encrypt_largePayload_streamingRoundTrip() {
+        // 256KB payload，远大于内部 64KB 分块，验证 hold-back 48B(tag+HMAC) 跨多块正确。
+        val plain = ByteArray(256 * 1024) { (it % 251).toByte() }
+        val password = "streaming-pw".toCharArray()
+
+        val out = ByteArrayOutputStream()
+        crypto.encryptingOutputStream(out, password).use { it.write(plain) }
+        val encrypted = out.toByteArray()
+
+        val decrypted = crypto.decryptingInputStream(ByteArrayInputStream(encrypted), password)
+            .use { it.readBytes() }
+        assertArrayEquals(plain, decrypted)
+    }
+
+    @Test
+    fun decrypt_largePayload_tamperedThrows() {
+        val plain = ByteArray(200 * 1024) { (it % 131).toByte() }
+        val password = "pw".toCharArray()
+        val out = ByteArrayOutputStream()
+        crypto.encryptingOutputStream(out, password).use { it.write(plain) }
+        val bytes = out.toByteArray()
+
+        // 翻转中间密文一个字节 → GCM tag / HMAC 必然失败。
+        bytes[64 + 40_000] = (bytes[64 + 40_000].toInt() xor 0x01).toByte()
+
+        assertThrows(UserPasswordBackupCrypto.BackupWrongPasswordException::class.java) {
+            crypto.decryptingInputStream(ByteArrayInputStream(bytes), password).use { it.readBytes() }
+        }
+    }
+
+    private fun buildFakeHeader(iter: Int): ByteArray {
+        val header = ByteArray(64)
+        ByteBuffer.wrap(header).order(ByteOrder.BIG_ENDIAN).apply {
+            putShort(0x5243.toShort()) // 'RC'
+            put(0x01) // version
+            put(ByteArray(16)) // salt
+            putInt(iter)
+            put(ByteArray(12)) // iv
+        }
+        return header
     }
 }

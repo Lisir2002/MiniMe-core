@@ -5,9 +5,6 @@ import com.mini.mecore.datalayer.sqldelight.workspace.Credential_encryption_stat
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.encryption.UnifiedKeyManager
 import com.mini.me_core.datalayer.repository.WorkspaceRepository as V2WorkspaceRepository
-import com.mini.me_core.feature.workspace.domain.RemoteAuditAction
-import com.mini.me_core.feature.workspace.domain.RemoteAuditCategory
-import com.mini.me_core.feature.workspace.domain.repository.RemoteAuditLogRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.security.KeyStore
 import javax.crypto.Cipher
+import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -43,7 +41,7 @@ import javax.inject.Singleton
 class CredentialEncryptor @Inject constructor(
     @ApplicationContext private val context: Context,
     private val v2Workspace: V2WorkspaceRepository,
-    private val auditLogRepo: RemoteAuditLogRepository,
+    private val auditSink: SecurityAuditSink,
     private val keyManager: UnifiedKeyManager,
 ) {
     private companion object {
@@ -202,7 +200,7 @@ class CredentialEncryptor @Inject constructor(
      * 三路解密：
      * - "V2:" 前缀 → UnifiedKeyManager.decrypt
      * - 空串 → ""
-     * - 无前缀 → V1 legacy 尝试，失败回退明文
+     * - 无前缀 → V1 legacy 尝试；解密失败 fail-closed 返回 ""，绝不回吐密文
      */
     suspend fun decrypt(formatted: String, fieldName: String = "unknown"): String = withContext(Dispatchers.IO) {
         if (formatted.isEmpty()) return@withContext ""
@@ -226,8 +224,21 @@ class CredentialEncryptor @Inject constructor(
             }
         }
 
-        // 无前缀：V1 legacy
-        decryptV1Legacy(formatted)
+        // 无前缀：V1 legacy。解密失败一律 fail-closed，绝不把密文当明文回吐。
+        // （作为 withContext 块的最后一个表达式，不用非局部 return。）
+        try {
+            val plain = decryptV1Legacy(formatted)
+            decryptFailures[fieldName]?.set(0)
+            plain
+        } catch (e: Exception) {
+            val count = decryptFailures.getOrPut(fieldName) { AtomicInteger(0) }.incrementAndGet()
+            if (count >= 3) {
+                corruptedFields.add(fieldName)
+                FileLogger.e(TAG, "字段[$fieldName] 连续 $count 次 V1 解密失败，标记为损坏")
+            }
+            FileLogger.e(TAG, "V1解密失败 field=$fieldName failCount=$count（fail-closed，不回吐密文）", e)
+            ""
+        }
     }
 
     /** 返回当前已标记为损坏的字段集合。 */
@@ -269,9 +280,9 @@ class CredentialEncryptor @Inject constructor(
             _dekRotatedEvent.value = startMs
             FileLogger.i(TAG, "field_credentials DEK轮换完成")
 
-            auditLogRepo.append(
-                category = RemoteAuditCategory.CREDENTIAL,
-                action = RemoteAuditAction.CRED_ROTATE_DEK,
+            auditSink.recordSecurityEvent(
+                category = SecurityAuditCategory.CREDENTIAL,
+                action = SecurityAuditAction.CRED_ROTATE_DEK,
                 success = true,
                 message = "DEK轮换完成（UnifiedKeyManager）",
             )
@@ -293,13 +304,31 @@ class CredentialEncryptor @Inject constructor(
     // ============== 生物识别（新架构简化） ==============
 
     /**
-     * 切换MasterKey的生物识别保护。
-     * 新架构下MasterKey由EncryptedSharedPreferences管理，暂不支持运行时切换生物识别绑定。
-     * 保留接口以兼容UI调用。
+     * 生物识别保护是否**真正生效**。
+     *
+     * 当前 MasterKey 由 [UnifiedKeyManager] 内的 EncryptedSharedPreferences 统一构建，
+     * 未开启 `setUserAuthenticationRequired(true)`；若强行在该共享 MasterKey 上绑定用户认证，
+     * 后台/连接池等无 BiometricPrompt 的 DEK 访问路径会全部失败。因此在 UI/认证接线完成前，
+     * 本方法固定返回 false —— fail-closed，避免「开关打开但实际空转」的假安全感。
+     *
+     * UI 层（SecuritySettingsScreen）/ BiometricConfigRepository 应据此把生物锁标注为「未生效」，
+     * 而非呈现为已启用。接线完成后（MasterKey 独立构建 + 解密 DEK 前走 BiometricPrompt），
+     * 改为按 [biometricRequired] 状态返回。
+     */
+    // MasterKey 绑定用户认证前显式回 false，UI 据此标注未生效（有意的 fail-closed 占位）。
+    @Suppress("FunctionOnlyReturningConstant")
+    fun isBiometricEffectivelyEnabled(): Boolean = false
+
+    /**
+     * 切换MasterKey的生物识别保护请求位。
+     *
+     * 注意：新架构下 MasterKey 由 EncryptedSharedPreferences 统一管理，运行时切换生物识别绑定
+     * 尚未接线，[isBiometricEffectivelyEnabled] 在接线完成前恒为 false。这里只持久化用户的请求位，
+     * 避免静默声称已启用。保留接口以兼容 UI 调用。
      */
     suspend fun setBiometricRequired(required: Boolean): OperationResult<Unit> =
         withContext(Dispatchers.IO) {
-            FileLogger.i(TAG, "生物识别保护切换为: $required（新架构由系统统一管理，记录状态）")
+            FileLogger.i(TAG, "生物识别保护请求位切换为: $required（当前未真正生效，见 isBiometricEffectivelyEnabled）")
             val existing = getState()
             upsertState(
                 V2EncryptionState(
@@ -345,9 +374,9 @@ class CredentialEncryptor @Inject constructor(
         )
 
         FileLogger.i(TAG, "紧急重置完成（UnifiedKeyManager）")
-        auditLogRepo.append(
-            category = RemoteAuditCategory.SECURITY,
-            action = RemoteAuditAction.EMERGENCY_RESET_MASTERKEY,
+        auditSink.recordSecurityEvent(
+            category = SecurityAuditCategory.SECURITY,
+            action = SecurityAuditAction.EMERGENCY_RESET_MASTERKEY,
             success = true,
             message = "紧急重置完成（UnifiedKeyManager）",
         )
@@ -361,27 +390,49 @@ class CredentialEncryptor @Inject constructor(
 
     // ============== 辅助方法 ==============
 
-    /** 兼容旧版 V1 单密钥解密。 */
+    /**
+     * 兼容旧版 V1 单密钥解密。
+     *
+     * fail-closed：任何一步失败（Base64 非法 / 格式过短 / 旧密钥不存在 / GCM tag 校验失败）
+     * 都抛 [LegacyCredentialFormatException]，**绝不**把原始密文字节当明文返回。
+     * 调用方（[decrypt]）按解密失败处理并提示用户重新输入/迁移。
+     */
     private fun decryptV1Legacy(formatted: String): String {
-        return try {
-            val combined = Base64.getDecoder().decode(formatted)
-            if (combined.size < IV_LEN + 1) return formatted
+        val combined = decodeLegacyV1Wire(formatted)
+        val iv = combined.copyOfRange(0, IV_LEN)
+        val ciphertext = combined.copyOfRange(IV_LEN, combined.size)
+        val secretKey = loadLegacyV1SecretKey()
 
-            val iv = combined.copyOfRange(0, IV_LEN)
-            val ciphertext = combined.copyOfRange(IV_LEN, combined.size)
-
-            val keyStore = KeyStore.getInstance("AndroidKeyStore")
-            keyStore.load(null)
-            val alias = "minime_credential_key"
-            val entry = keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry
-                ?: return formatted
-
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.DECRYPT_MODE, entry.secretKey, GCMParameterSpec(GCM_TAG_BITS, iv))
-            String(cipher.doFinal(ciphertext), Charsets.UTF_8)
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        try {
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_BITS, iv))
+            return String(cipher.doFinal(ciphertext), Charsets.UTF_8)
         } catch (e: Exception) {
-            formatted
+            throw LegacyCredentialFormatException("V1 GCM tag 校验失败或密文损坏", e)
         }
+    }
+
+    /** 解码并做 V1 线格式长度校验。 */
+    private fun decodeLegacyV1Wire(formatted: String): ByteArray {
+        val combined = try {
+            Base64.getDecoder().decode(formatted)
+        } catch (e: IllegalArgumentException) {
+            throw LegacyCredentialFormatException("V1 密文不是合法 Base64", e)
+        }
+        if (combined.size < IV_LEN + 1) {
+            throw LegacyCredentialFormatException("V1 密文长度不足（${combined.size}B）")
+        }
+        return combined
+    }
+
+    /** 从 AndroidKeyStore 取旧版 V1 单密钥。 */
+    private fun loadLegacyV1SecretKey(): SecretKey {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        val alias = "minime_credential_key"
+        val entry = keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry
+            ?: throw LegacyCredentialFormatException("V1 密钥不存在($alias)，旧凭据需重新输入")
+        return entry.secretKey
     }
 
     /** 检查 V1 单密钥是否存在。 */
@@ -458,6 +509,10 @@ class CredentialEncryptor @Inject constructor(
 
 /** MasterKey被外部重置时抛出的异常。 */
 class MasterKeyTamperedException(message: String) : Exception(message)
+
+/** V1 旧格式凭据解密失败时抛出的类型化异常（fail-closed，绝不回吐密文）。 */
+class LegacyCredentialFormatException(message: String, cause: Throwable? = null) :
+    SecurityException(message, cause)
 
 /** 操作结果封装。 */
 sealed class OperationResult<T> {

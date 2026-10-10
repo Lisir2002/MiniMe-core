@@ -180,16 +180,20 @@ class CredentialRequestBridge @Inject constructor(
         if (_request.value?.requestId == requestId) _request.value = null
     }
 
-    /** 先写 .tmp 再 rename 原子写，避免 helper 轮询读到半截文件。仿 [GitCredentialsFileSync] 的写法。 */
+    /** 先写 .tmp 再 rename 原子写，权限收紧 0600，避免 helper 轮询读到半截文件。仿 [GitCredentialsFileSync] 的写法。 */
     private fun writeRespAtomically(dir: File, requestId: String, content: String) {
         val target = File(dir, RESP_PREFIX + requestId)
         val tmp = File(dir, "$RESP_PREFIX${requestId}.tmp")
         runCatching {
             tmp.writeText(content)
+            SecuredFiles.tightenToOwnerOnly(tmp)
             if (target.exists()) target.delete()
             if (!tmp.renameTo(target)) {
                 target.writeText(content)
+                SecuredFiles.tightenToOwnerOnly(target)
                 tmp.delete()
+            } else {
+                SecuredFiles.tightenToOwnerOnly(target)
             }
         }.onFailure { FileLogger.e(TAG, "写凭据响应文件失败", it) }
     }

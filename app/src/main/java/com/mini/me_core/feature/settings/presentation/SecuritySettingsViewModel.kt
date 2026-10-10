@@ -44,6 +44,12 @@ data class RotationHistoryEntry(
 data class SecurityUiState(
     val biometricRequired: Boolean = false,
     val biometricSupported: Boolean = true,
+    /**
+     * 生物锁是否真正生效（MasterKey 是否绑定用户认证）。
+     * 当前版本恒为 false：共享 MasterKey 未开 setUserAuthenticationRequired，
+     * 开关只是请求位。UI 据此标注「未生效」，不假装已启用。
+     */
+    val biometricEffectivelyEnabled: Boolean = false,
     val rotationCounter: Int = 0,
     val lastRotatedAt: Long = 0L,
     val loading: Boolean = false,
@@ -145,6 +151,7 @@ class SecuritySettingsViewModel @Inject constructor(
                     val fresh = SecurityScoreCalculator.Inputs.isKeyFresh(state.last_rotated_at, now)
                     _baseState.value = _baseState.value.copy(
                         biometricRequired = state.biometric_required != 0L,
+                        biometricEffectivelyEnabled = encryptor.isBiometricEffectivelyEnabled(),
                         rotationCounter = state.rotation_counter.toInt(),
                         lastRotatedAt = state.last_rotated_at,
                         keyStale = !fresh,

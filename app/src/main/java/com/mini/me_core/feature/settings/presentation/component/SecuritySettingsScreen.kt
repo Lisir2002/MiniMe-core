@@ -120,6 +120,7 @@ fun SecuritySettingsScreen(
             BiometricCard(
                 required = uiState.biometricRequired,
                 supported = uiState.biometricSupported,
+                effectivelyEnabled = uiState.biometricEffectivelyEnabled,
                 scopes = uiState.biometricScopes,
                 timeout = uiState.biometricTimeout,
                 onToggle = { newValue ->
@@ -432,10 +433,14 @@ private fun RotationCard(
 
 // ── 生物识别卡片 ──────────────────────────────────────────────────
 
+// BiometricCard 是 Composable：FunctionNaming 是 Compose PascalCase 惯例的已知误报；
+// LongParameterList/LongMethod 来自卡片内联了 scope/timeout 两组选项 UI，保持单文件可读。
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 @Composable
 private fun BiometricCard(
     required: Boolean,
     supported: Boolean,
+    effectivelyEnabled: Boolean,
     scopes: Set<BiometricScope>,
     timeout: BiometricTimeoutMinutes,
     onToggle: (Boolean) -> Unit,
@@ -470,6 +475,15 @@ private fun BiometricCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // fail-closed 标注：当前版本生物锁未真正生效时，常驻一行提示，避免开关看似已启用。
+            if (!effectivelyEnabled) {
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    text = "当前版本生物锁尚未真正生效（MasterKey 未绑定用户认证）；此处仅记录开启请求，解密暂不强制生物识别。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
             if (!supported) {
                 Spacer(Modifier.height(Spacing.xs))
                 Text(

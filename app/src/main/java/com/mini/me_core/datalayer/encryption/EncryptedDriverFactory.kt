@@ -46,6 +46,8 @@ class EncryptedDriverFactory(
     private val context: Context,
     private val keyManager: UnifiedKeyManager,
     private val enableForeignKeys: Boolean = true,
+    /** 删库重建决策策略；默认拒绝任何自动删库，仅快照隔离坏文件。 */
+    private val rebuildPolicy: DatabaseRebuildPolicy = DenyingRebuildPolicy(),
 ) {
 
     companion object {
@@ -98,21 +100,57 @@ class EncryptedDriverFactory(
      */
     private fun createDriverWithRecovery(definition: DatabaseDefinition, passphraseBytes: ByteArray): SqlDriver {
         return try {
-            // clearPassphrase=false：禁止 SQLCipher 首次打开后清除内存中的口令。
-            // 默认行为会在首次打开后把口令置空，一旦连接被关闭重开（Room/SQLDelight 内部重试、
-            // 迁移流程重入等），就会抛「passphrase appears to be cleared」直接崩溃。
-            // 口令在驱动整个生命周期内保留，换取连接可安全重入；驱动关闭后由调用方擦除。
-            val cipherFactory = SupportFactory(passphraseBytes, null, false)
-            val driver = AndroidSqliteDriver(
-                schema = definition.schema,
-                context = context,
-                name = definition.fileName,
-                factory = cipherFactory,
-            )
-            applyPragmas(driver, definition.id)
-            driver
+            openDriver(definition, passphraseBytes)
         } catch (e: Exception) {
-            if (isCorruptionError(e)) {
+            handleOpenFailure(definition, e, passphraseBytes)
+        }
+    }
+
+    /** 正常打开加密驱动（clearPassphrase=false 保留口令，保证连接可重入）。 */
+    private fun openDriver(definition: DatabaseDefinition, passphraseBytes: ByteArray): SqlDriver {
+        // clearPassphrase=false：禁止 SQLCipher 首次打开后清除内存中的口令。
+        // 默认行为会在首次打开后把口令置空，一旦连接被关闭重开（Room/SQLDelight 内部重试、
+        // 迁移流程重入等），就会抛「passphrase appears to be cleared」直接崩溃。
+        // 口令在驱动整个生命周期内保留，换取连接可安全重入；驱动关闭后由调用方擦除。
+        val cipherFactory = SupportFactory(passphraseBytes, null, false)
+        val driver = AndroidSqliteDriver(
+            schema = definition.schema,
+            context = context,
+            name = definition.fileName,
+            factory = cipherFactory,
+        )
+        applyPragmas(driver, definition.id)
+        return driver
+    }
+
+    /**
+     * 打开失败的统一处置：瞬时错误原样上抛；真实损坏先快照再由策略决定是否删库重建。
+     * 本函数是失败分发器，按契约必须把原始异常上抛，故显式抑制 ThrowsCount。
+     */
+    @Suppress("ThrowsCount")
+    private fun handleOpenFailure(definition: DatabaseDefinition, e: Exception, passphraseBytes: ByteArray): SqlDriver {
+        when {
+            // 连接态/密钥态瞬时错误：绝不删库重建，原样上抛（由上层重试/修复连接）。
+            isTransientOrKeyStateError(e) -> {
+                FileLogger.w(
+                    TAG,
+                    "检测到连接态/密钥态瞬时错误（不删库）: ${definition.id} " +
+                        "(${e.javaClass.simpleName}: ${e.message})",
+                )
+                throw e
+            }
+            // 真实文件损坏：先快照隔离，再由策略决定是否删库重建。
+            isRealCorruptionError(e) -> {
+                val dbFile = context.getDatabasePath(definition.fileName)
+                if (!rebuildPolicy.allowAutoRebuild(dbFile, e)) {
+                    FileLogger.w(
+                        TAG,
+                        "检测到数据库真实损坏，但策略拒绝自动删库（仅快照隔离）: ${definition.id}",
+                    )
+                    // 仍然先快照坏文件保留证据，再上抛，让用户/上层显式决策。
+                    backupCorruptedFile(dbFile, definition.id)
+                    throw e
+                }
                 FileLogger.w(TAG, "检测到数据库损坏: ${definition.id}（${e.javaClass.simpleName}: ${e.message}），启动自动恢复")
                 val recovered = tryRecoverAndReopen(definition, passphraseBytes)
                 if (recovered != null) {
@@ -120,24 +158,20 @@ class EncryptedDriverFactory(
                     return recovered
                 }
                 FileLogger.e(TAG, "数据库损坏自动恢复失败（二次打开仍异常）: ${definition.id}")
+                throw e
             }
-            throw e
+            else -> throw e
         }
     }
 
-    /** 判断异常是否为数据库文件损坏类型。 */
-    private fun isCorruptionError(e: Exception): Boolean {
-        val msg = (e.message ?: "").lowercase(Locale.ROOT)
-        val causeMsg = (e.cause?.message ?: "").lowercase(Locale.ROOT)
-        val combined = "$msg $causeMsg"
-        return combined.contains("file is not a database") ||
-            combined.contains("malformed database") ||
-            combined.contains("database disk image is malformed") ||
-            combined.contains("encryption error") ||
-            combined.contains("passphrase appears to be cleared") ||
-            combined.contains("not an error") ||
-            (e.cause is android.database.sqlite.SQLiteException)
-    }
+    /** 判断是否为「真实文件级损坏」（委托给可单测的分类器）。 */
+    private fun isRealCorruptionError(e: Exception): Boolean =
+        DatabaseErrorClassifier.isRealCorruption(e)
+
+    /** 判断是否为「连接态/密钥态瞬时错误」（委托给可单测的分类器）。 */
+    private fun isTransientOrKeyStateError(e: Exception): Boolean =
+        DatabaseErrorClassifier.isTransientOrKeyState(e) ||
+            (e.cause is android.database.sqlite.SQLiteException && !isRealCorruptionError(e))
 
     /** 备份损坏文件、删除原文件及 WAL/SHM，然后重新打开。成功返回驱动，失败返回 null。 */
     private fun tryRecoverAndReopen(definition: DatabaseDefinition, passphraseBytes: ByteArray): SqlDriver? {

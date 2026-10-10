@@ -67,16 +67,26 @@ class GitCredentialsFileSync @Inject constructor(
         writeAtomically(File(minimeDir, CREDENTIALS_NAME), sb.toString())
     }
 
-    /** 先写 `.tmp` 再 rename，避免容器侧/git 读到半截文件。 */
+    /**
+     * 先写 `.tmp` 再 rename，最后把权限收紧到 0600（仅属主可读写）。
+     *
+     * git-credentials 含 https token，必须：
+     *  - 文件权限 0600（group/other 不可读写），容器内即使以 root 跑也不向其他 uid 暴露；
+     *  - 内容/host 指纹进日志时只打印 host，绝不回显 token。
+     */
     private fun writeAtomically(target: File, content: String) {
         val tmp = File(target.parentFile, "${target.name}.tmp")
         tmp.writeText(content)
+        SecuredFiles.tightenToOwnerOnly(tmp)
         if (target.exists()) target.delete()
         if (!tmp.renameTo(target)) {
             // 兜底：rename 失败（某些 FS 跨 inode）则直接写目标。
             target.writeText(content)
+            SecuredFiles.tightenToOwnerOnly(target)
             tmp.delete()
+            return
         }
+        SecuredFiles.tightenToOwnerOnly(target)
     }
 
     private fun enc(part: String): String = URLEncoder.encode(part, "UTF-8")
