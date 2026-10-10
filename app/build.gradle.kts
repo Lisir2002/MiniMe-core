@@ -1,4 +1,6 @@
 import java.io.FileInputStream
+import java.security.KeyStore
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -21,13 +23,40 @@ val brandIconFamily: String = extra["brandIconFamily"] as String
 
 // 从本地 keystore.properties 读取 release 签名密钥（已 gitignore，不入库）。
 // CI 构建前从 GitHub Secrets 恢复为 app/minime.jks + app/keystore.properties；
-// 本地开发需自行创建该文件（从安全渠道获取密钥），缺少即 release 构建失败。
-// 若文件不存在（如 CI 环境）则跳过，release 产出 unsigned 包。
+// 本地开发需自行创建该文件（从安全渠道获取密钥）。
+//
+// P1-04 签名口令治理（懒加载 + 任务图 fail-closed）：
+//   - 配置期（sync / help / compileDebugKotlin / test）绝不因 keystore.properties 缺失而失败——
+//     文件不存在时 Properties 为空，下面的 release signingConfig 仅占位、不读真实口令。
+//   - 缺密钥绝不静默回退 debug keystore 当正式签名；真正的"缺密钥/指纹不符即失败"判断
+//     推迟到文件底部 gradle.taskGraph.whenReady 守卫：仅当任务图含产出正式包的任务时才校验。
+//   - 各字段可由 keystore.properties 提供，也可由环境变量覆盖（CI 本地调试同样适用）：
+//     storeFile←KEYSTORE_STORE_FILE，storePassword←KEYSTORE_STORE_PASSWORD，
+//     keyAlias←KEYSTORE_KEY_ALIAS，keyPassword←KEYSTORE_KEY_PASSWORD，
+//     expectedCertSha256←EXPECTED_CERT_SHA256。
 val keystorePropertiesFile = file("keystore.properties")
 val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
+
+// 解析单个签名字段：优先 keystore.properties，其次环境变量；都没有返回 null。
+// 配置期只解析、不抛错（抛错一律留给 taskGraph.whenReady 守卫）。
+fun ksProp(key: String, env: String): String? {
+    val fromFile = keystoreProperties.getProperty(key)
+    if (!fromFile.isNullOrBlank()) return fromFile.trim()
+    val fromEnv = System.getenv(env)
+    return fromEnv?.trim()?.takeIf { it.isNotEmpty() }
+}
+
+// release 签名字段（懒解析结果；storeFile 缺省指向 app/minime.jks）。
+val releaseStoreFilePath: String = ksProp("storeFile", "KEYSTORE_STORE_FILE") ?: "minime.jks"
+val releaseJksFile: java.io.File = file(releaseStoreFilePath)
+val releaseStorePassword: String? = ksProp("storePassword", "KEYSTORE_STORE_PASSWORD")
+val releaseKeyAlias: String? = ksProp("keyAlias", "KEYSTORE_KEY_ALIAS") ?: "minime"
+val releaseKeyPassword: String? = ksProp("keyPassword", "KEYSTORE_KEY_PASSWORD")
+// 官方签名证书 SHA-256 白名单（小写 hex，可带冒号/空格；缺失则 release 任务 fail-closed）。
+val releaseExpectedCertSha256: String? = ksProp("expectedCertSha256", "EXPECTED_CERT_SHA256")
 
 // 版本号策略（四段 x.x.x.x，最高 999.999.999.999，从 0.0.0.1 起迭代）：
 //   - 正式版 / RC：完全由 git tag 驱动（v0.0.0.1 / v0.0.0.1-rcN / v0.0.0.10 / v0.0.1.0），
@@ -136,16 +165,16 @@ android {
         }
 
         create("release") {
-            // 唯一官方密钥：必须存在 app/keystore.properties（CI 从 GitHub Secrets 恢复，本地需自行创建），指向 minime.jks。
-            // 缺少即失败——正式版不再可能被 debug keystore 签名发出。
-            require(keystorePropertiesFile.exists()) {
-                "release 正式签名密钥缺失：缺少 app/keystore.properties（唯一官方密钥，CI 从 Secrets 恢复）。" +
-                    "正式 release 必须用同一把官方密钥（见 branding.gradle.kts 签名策略）。"
-            }
-            storeFile = file(keystoreProperties["storeFile"] as String)
-            storePassword = keystoreProperties["storePassword"] as String
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
+            // 唯一官方密钥（app/minime.jks + keystore.properties，CI 从 GitHub Secrets 恢复）。
+            // 懒加载：仅当字段已解析到时才填充；缺失时留空占位——
+            //   - 配置期（sync/help/compileDebug/test）不抛错；
+            //   - 绝不回退 debug keystore 当正式签名；
+            //   - 真正的 fail-closed 由文件底部 gradle.taskGraph.whenReady 守卫执行
+            //     （缺密钥文件 / 缺字段 / 缺证书白名单 / 指纹不符 → 立即 throw）。
+            storeFile = releaseJksFile
+            if (releaseStorePassword != null) storePassword = releaseStorePassword
+            if (releaseKeyAlias != null) keyAlias = releaseKeyAlias
+            if (releaseKeyPassword != null) keyPassword = releaseKeyPassword
             enableV1Signing = true
             enableV2Signing = true
         }
@@ -221,10 +250,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
 
-            // signingConfigs.release 顶层已经保证永远有值：
-            //   - 有 keystore.properties → 正式 release 签名；
-            //   - 没有 → 回退到 debug keystore（零配置 CI 仍能签出可安装的 release APK）。
-            // 因此这里直接绑定，不再做 exists 判断，保证 assembleRelease 永远产出 APK。
+            // signingConfigs.release 懒加载绑定：
+            //   - CI/本地有密钥 → 正式 release 签名；
+            //   - 无密钥 → signingConfig 占位但由文件底部 taskGraph.whenReady 守卫在执行前 throw，
+            //     绝不会用 debug keystore 签出可安装的正式 APK。
             signingConfig = signingConfigs.getByName("release")
 
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -369,6 +398,69 @@ androidComponents {
 
 /** 允许的 applicationId 白名单：release=com.mini.me_core，debug 带 .debug 后缀（与 release 数据隔离）。 */
 val ALLOWED_APPLICATION_IDS = setOf("com.mini.me_core", "com.mini.me_core.debug")
+
+// ── P1-04 任务图守卫：release 产出 fail-closed ─────────────────────────────
+// 配置期不读密钥（懒加载），但一旦任务图里出现"产出正式包"的任务
+// （任务名含 Release 或 Bundle 且不含 Debug，如 assembleRelease/bundleRelease/packageRelease），
+// 立即在任务执行前校验官方密钥与证书指纹；任一条件不满足即 throw GradleException，
+// 阻止正式包被 debug keystore 或非官方密钥签出。debug/help/compileDebug/test 任务图不含此类任务，不受影响。
+gradle.taskGraph.whenReady {
+    val hasReleaseArtifactTask = allTasks.any { t ->
+        val n = t.name
+        (n.contains("Release") || n.contains("Bundle")) && !n.contains("Debug")
+    }
+    if (!hasReleaseArtifactTask) return@whenReady
+
+    fun failRelease(msg: String): Nothing = throw GradleException(
+        "[P1-04 release 签名守卫] $msg\n" +
+            "  → 正式 release 必须使用唯一官方密钥。CI 需从 GitHub Secrets 恢复 " +
+            "app/keystore.properties（含 storePassword/keyAlias/keyPassword/expectedCertSha256）" +
+            "与 app/minime.jks；本地开发如需出 release 包，须从安全渠道获取官方密钥放入 app/。"
+    )
+
+    if (!keystorePropertiesFile.exists()) {
+        failRelease("缺少 app/keystore.properties（storePassword/keyAlias/keyPassword/expectedCertSha256）。")
+    }
+    if (!releaseJksFile.exists()) {
+        failRelease("缺少签名密钥文件 ${releaseJksFile.path}（app/minime.jks）。")
+    }
+    val storePw = releaseStorePassword
+        ?: failRelease("缺少 storePassword（keystore.properties 或环境变量 KEYSTORE_STORE_PASSWORD）。")
+    val keyAliasV = releaseKeyAlias
+        ?: failRelease("缺少 keyAlias（keystore.properties 或环境变量 KEYSTORE_KEY_ALIAS）。")
+    if (releaseKeyPassword == null) {
+        failRelease("缺少 keyPassword（keystore.properties 或环境变量 KEYSTORE_KEY_PASSWORD）。")
+    }
+    val expectedRaw = releaseExpectedCertSha256
+        ?: failRelease("缺少官方证书 SHA-256 白名单 expectedCertSha256（keystore.properties 或环境变量 EXPECTED_CERT_SHA256）。")
+
+    // 从官方 keystore 取出别名证书并计算 SHA-256（先后兼容 PKCS12 / JKS 两种容器类型）。
+    val certEncoded = run {
+        val errors = mutableListOf<String>()
+        var encoded: ByteArray? = null
+        for (type in listOf("PKCS12", "JKS")) {
+            try {
+                val ks = KeyStore.getInstance(type)
+                FileInputStream(releaseJksFile).use { ks.load(it, storePw.toCharArray()) }
+                val cert = ks.getCertificate(keyAliasV)
+                    ?: error("别名 $keyAliasV 不存在于 $type")
+                encoded = cert.encoded
+                break
+            } catch (e: Exception) {
+                errors += "$type: ${e.message}"
+            }
+        }
+        encoded ?: failRelease("无法从 $releaseJksFile 读取别名 $keyAliasV 的证书（${errors.joinToString("; ")}）。")
+    }
+    val actualSha256 = MessageDigest.getInstance("SHA-256").digest(certEncoded)
+        .joinToString("") { "%02x".format(it) }
+    val expectedNorm = expectedRaw.replace(":", "").replace(" ", "").trim().lowercase()
+
+    // 常量时间比较，防时序侧信道；缺失白名单值/比对不一致均 fail-closed（上方已保证两者非空）。
+    if (!MessageDigest.isEqual(actualSha256.toByteArray(), expectedNorm.toByteArray())) {
+        failRelease("签名证书 SHA-256 与官方白名单不匹配。\n    实际: $actualSha256\n    预期: $expectedNorm")
+    }
+}
 
 dependencies {
     // custom_lint 框架：加载 :lint-checks 模块注册的自定义规则，:app:lintRelease 时自动执行。

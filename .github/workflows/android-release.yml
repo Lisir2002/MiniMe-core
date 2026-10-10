@@ -37,9 +37,12 @@ jobs:
 
       # 【签名策略 · 唯一官方密钥】正式 release 一律使用「唯一官方 keystore」：
       #   密钥通过 GitHub Secrets 注入（SIGNING_KEYSTORE_BASE64 / SIGNING_STORE_PASSWORD /
-      #   SIGNING_KEY_PASSWORD / SIGNING_KEY_ALIAS），CI 构建前恢复为 app/minime.jks +
-      #   app/keystore.properties。密钥文件不入库，防止仓库泄露导致签名被伪造。
+      #   SIGNING_KEY_PASSWORD / SIGNING_KEY_ALIAS / EXPECTED_SIGNING_CERT_FINGERPRINT），
+      #   CI 构建前恢复为 app/minime.jks + app/keystore.properties（含 expectedCertSha256）。
+      #   密钥文件不入库，防止仓库泄露导致签名被伪造。
       #   缺少任一 Secret 即构建失败，不存在「静默回退 debug keystore 当正式签名」。
+      #   expectedCertSha256 同时作为构建期白名单：app/build.gradle.kts 的 taskGraph 守卫会
+      #   用 MessageDigest 计算实际签名证书 SHA-256 并与之常量时间比对，不符即 fail-closed。
       #   debug keystore（~/.android/debug.keystore）仅由 AGP 开发期自动生成用于 debug 构建，release 与它无关。
       - name: Restore signing keystore from GitHub Secrets
         env:
@@ -47,20 +50,23 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_EXPECTED_CERT_SHA256: ${{ secrets.EXPECTED_SIGNING_CERT_FINGERPRINT }}
         run: |
           set -e
           : "${SIGNING_KEYSTORE_BASE64:?::error::Secret SIGNING_KEYSTORE_BASE64 未配置}"
           : "${SIGNING_STORE_PASSWORD:?::error::Secret SIGNING_STORE_PASSWORD 未配置}"
           : "${SIGNING_KEY_PASSWORD:?::error::Secret SIGNING_KEY_PASSWORD 未配置}"
           : "${SIGNING_KEY_ALIAS:?::error::Secret SIGNING_KEY_ALIAS 未配置}"
+          : "${SIGNING_EXPECTED_CERT_SHA256:?::error::Secret EXPECTED_SIGNING_CERT_FINGERPRINT 未配置}"
           echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > app/minime.jks
           cat > app/keystore.properties << EOF
           storeFile=minime.jks
           storePassword=$SIGNING_STORE_PASSWORD
           keyAlias=$SIGNING_KEY_ALIAS
           keyPassword=$SIGNING_KEY_PASSWORD
+          expectedCertSha256=$SIGNING_EXPECTED_CERT_SHA256
           EOF
-          echo "✓ 签名密钥已从 Secrets 恢复（app/minime.jks + app/keystore.properties）"
+          echo "✓ 签名密钥已从 Secrets 恢复（app/minime.jks + app/keystore.properties，含 expectedCertSha256）"
           ls -la app/minime.jks app/keystore.properties
       - name: Set up Android SDK (use pre-installed + manual install)
         run: |
