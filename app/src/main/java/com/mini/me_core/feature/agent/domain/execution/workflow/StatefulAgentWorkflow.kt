@@ -13,8 +13,6 @@ import com.mini.me_core.feature.agent.domain.session.goal.GoalService
 import com.mini.me_core.feature.agent.domain.session.plan.statusEnum
 import com.mini.me_core.feature.agent.domain.core.guard.FileObservationGuard
 import com.mini.me_core.feature.agent.domain.core.guard.ToolGuard
-import com.mini.me_core.feature.agent.domain.core.guard.ToolGuardContext
-import com.mini.me_core.feature.agent.domain.core.guard.ToolGuardResult
 import com.mini.me_core.feature.agent.domain.execution.permission.PermissionChoice
 import com.mini.me_core.feature.agent.domain.execution.permission.PermissionScope
 import com.mini.me_core.feature.agent.domain.execution.permission.ToolPermissionPolicyEngine
@@ -46,14 +44,9 @@ import com.mini.me_core.feature.agent.domain.execution.tool.ToolResultCache
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolEventBus
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolEvent
 import com.mini.me_core.feature.agent.domain.execution.tool.IncrementalIndexStore
-import com.mini.me_core.feature.agent.domain.execution.tool.ActionIndex
-import com.mini.me_core.feature.agent.domain.execution.tool.RoundSnapshot
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolSessionState
-import com.mini.me_core.feature.agent.domain.execution.tool.ToolOutputRecord
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolErrorClass
 import com.mini.me_core.feature.agent.domain.execution.tool.RetryPolicy
-import com.mini.me_core.feature.agent.domain.execution.tool.classifyError
-import com.mini.me_core.feature.agent.domain.execution.tool.ToolStreamEvent
 import com.mini.me_core.feature.agent.domain.execution.tool.toTransportString
 import com.mini.me_core.feature.agent.domain.execution.tool.toToolResult
 import com.mini.me_core.feature.agent.domain.session.trajectory.TrajectoryService
@@ -68,19 +61,12 @@ import com.mini.me_core.feature.agent.domain.schedule.wake.WakeQueueManager
 import com.mini.me_core.feature.agent.presentation.AgentAttachment
 import com.mini.me_core.feature.settings.data.remote.ModelMetadataService
 import com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepository
-import com.mini.me_core.feature.settings.data.repository.ViewImageUnknownGuardPolicy
 import com.mini.me_core.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.VisionModelSettingsRepository
-import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.agent.data.remote.anthropic.AnthropicApi
 import com.mini.me_core.feature.agent.data.remote.gemini.GeminiApi
 import com.mini.me_core.feature.agent.data.remote.openai.OpenAIApi
-import com.mini.me_core.feature.agent.domain.core.provider.AnthropicAdapter
-import com.mini.me_core.feature.agent.domain.core.provider.GeminiAdapter
-import com.mini.me_core.feature.agent.domain.core.provider.OpenAIAdapter
 import okhttp3.OkHttpClient
-import com.mini.me_core.feature.settings.domain.model.ModelMetadata
-import com.mini.me_core.feature.settings.domain.model.ProviderType
 import com.mini.me_core.feature.settings.domain.repository.AIProviderRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
@@ -94,14 +80,11 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import javax.inject.Inject
 import javax.inject.Named
 
@@ -187,16 +170,51 @@ class StatefulAgentWorkflow @Inject constructor(
         }
     }
 
+    // ════════════════════════════════════════════════════════════════
+    // P1-09 行为保持机械重构：以下叶子协作者由主类已注入对象装配，
+    // 仅整体搬走可独立的叶子职责；主类仍保留 while 状态机骨架与整体编排顺序。
+    // 依赖一律经主类已注入对象传入，不新增 Hilt 模块 / Manifest / 资源。
+    // ════════════════════════════════════════════════════════════════
+    /** 模型调用路由：provider 解析/装配/故障转移、识图与压缩专用模型、视觉能力判定。 */
+    private val modelCallRouter = ModelCallRouter(
+        aiProviderRepository = aiProviderRepository,
+        sessionUseCase = sessionUseCase,
+        openAIApi = openAIApi,
+        anthropicApi = anthropicApi,
+        geminiApi = geminiApi,
+        okHttpClient = okHttpClient,
+        proxyOkHttpClient = proxyOkHttpClient,
+        modelMetadataService = modelMetadataService,
+        visionModelSettingsRepository = visionModelSettingsRepository,
+        compactionModelSettingsRepository = compactionModelSettingsRepository
+    )
+    /** 结果脱敏/整形：媒体提取与剥离、图片净化、识图文本回退。 */
+    private val resultSanitizer = ResultSanitizer(modelCallRouter)
+    /** 事件落库/索引：L6 增量索引、L2 会话产物记录、L7 工具事件发布。 */
+    private val eventTracer = EventTracer(
+        incrementalIndexStore,
+        toolRegistry,
+        toolEventBus
+    )
+    /** 执行模式切换守卫：switchMode → PLAN/AUTO/BUILD 切换的纯判定。 */
+    private val modeCoordinator = ModeTransitionCoordinator()
+    /** 工具批量执行叶子：单工具六段式流水线、流式聚合、D1-3 护栏链。 */
+    private val toolBatchExecutor = ToolBatchExecutor(
+        toolResultCache = toolResultCache,
+        compatibilityPolicyRepository = compatibilityPolicyRepository,
+        normFlowSettingsRepository = normFlowSettingsRepository,
+        toolOutputStore = toolOutputStore,
+        fileObservationGuard = fileObservationGuard,
+        toolGuards = toolGuards,
+        guardLogRepository = guardLogRepository,
+        modelCallRouter = modelCallRouter,
+        resultSanitizer = resultSanitizer,
+        eventTracer = eventTracer
+    )
+
     private companion object {
         const val TAG = "StatefulAgentWorkflow"
-        const val LIVE_TAIL_CHARS = 4_000
-        const val PROGRESS_INTERVAL_MS = 250L
         const val USER_REJECTED_CODE = "USER_REJECTED"
-        /** L6 增量索引：动作摘要截断长度，避免大结果全量写入内存索引。 */
-        const val SUMMARY_CHARS = 512
-
-        /** D1-4 文件观察纪律：仅 agent 文件工具链（readFile/writeFile/editFile）生效。 */
-        val FILE_OBSERVED_TOOLS = setOf("readFile", "writeFile", "editFile")
 
         /**
          * 截断续写上限：模型回复连续被 max_tokens/length 截断（isTruncated）时，最多续写几轮。
@@ -294,13 +312,14 @@ class StatefulAgentWorkflow @Inject constructor(
         val errorCode: String = "USER_REJECTED"
     )
 
-    private data class ToolRunResult(
+    // internal：P1-09 起 ToolBatchExecutor 跨类引用（行为保持搬迁，仅提升可见性，字段/默认值不变）。
+    internal data class ToolRunResult(
         val raw: String,
         val isError: Boolean,
         val images: List<AgentImage> = emptyList(),
         /** 仅 sendFile 等展示型工具：随结果附带的文件卡片元数据，供 UI 渲染，不回放进模型上下文。 */
         val attachments: List<com.mini.me_core.feature.agent.presentation.AgentAttachment> = emptyList(),
-        /** L3 错误分类：成功为 null，失败按 [classifyError] 推断，供 L4 调度器判定是否重试。 */
+        /** L3 错误分类：成功为 null，失败按 `classifyError` 推断，供 L4 调度器判定是否重试。 */
         val errorClass: ToolErrorClass? = null,
         /** D2-3 执行耗时毫秒（含重试累计），供轨迹表 / 用量卡片「本回合耗时」聚合。 */
         val durationMs: Long = 0
@@ -327,62 +346,15 @@ class StatefulAgentWorkflow @Inject constructor(
         data class CancelToolBatch(val toolCalls: List<ToolCall>) : AgentSideEffect
     }
 
-    private suspend fun getActiveProvider(sessionId: String?): AIProvider {
-        return getActiveProviderWithConfig(sessionId).first
-    }
-
-    /**
-     * 同 [getActiveProvider]，但同时返回 [AIProviderConfig]，供工作流读取 fallbackProviderId 等配置字段。
-     */
-    private suspend fun getActiveProviderWithConfig(sessionId: String?): Pair<AIProvider, AIProviderConfig> {
-        val config = resolveProviderConfig(sessionId)
-            ?: throw IllegalStateException("尚未配置 AI 提供商，请到设置中添加并选择一个")
-        if (config.apiKey.isBlank()) throw IllegalStateException("「${config.name}」未填写 API Key")
-        if (config.effectiveModel.isBlank()) throw IllegalStateException("「${config.name}」未选择模型")
-        return createStandaloneProvider(config, sessionId) to config
-    }
-
-    /**
-     * 供应商故障转移：根据 [fallbackProviderId] 创建备用 provider 实例。
-     * 备用 provider 的配置独立从数据库读取，不继承主 provider 的运行时状态。
-     * 返回 null 表示备用 provider 不存在、被禁用或无 API Key，不应切换。
-     */
-    private suspend fun resolveFallbackProvider(fallbackId: String, sessionId: String?): AIProvider? {
-        if (fallbackId.isBlank()) return null
-        val fallbackConfig = aiProviderRepository.getProviderById(fallbackId) ?: return null
-        if (!fallbackConfig.isEnabled || fallbackConfig.apiKey.isBlank()) return null
-        if (fallbackConfig.effectiveModel.isBlank()) return null
-        return runCatching { createStandaloneProvider(fallbackConfig, sessionId) }.getOrNull()
-    }
-
-    /**
-     * 解析当前生效的 provider 配置：优先用 session 绑定的 providerId/model，回退全局 active provider。
-     * session 绑定的 provider 不存在或已禁用时回退全局，保证老会话与异常数据不中断。
-     */
-    private suspend fun resolveProviderConfig(sessionId: String?): AIProviderConfig? {
-        if (sessionId != null) {
-            val session = sessionUseCase.getSessionById(sessionId)
-            val boundProviderId = session?.provider_id
-            val boundModel = session?.model
-            if (!boundProviderId.isNullOrBlank()) {
-                val config = aiProviderRepository.getProviderById(boundProviderId)
-                if (config != null && config.isEnabled && config.apiKey.isNotBlank()) {
-                    return if (!boundModel.isNullOrBlank()) config.copy(selectedModel = boundModel) else config
-                }
-            }
-        }
-        return aiProviderRepository.getActiveProviderSync()
-    }
-
     override suspend fun compactSession(sessionId: String, onEvent: suspend (AgentEvent) -> Unit): Boolean {
-        val config = resolveProviderConfig(sessionId)
+        val config = modelCallRouter.resolveProviderConfig(sessionId)
             ?: throw IllegalStateException("尚未配置 AI 提供商，请到设置中添加并选择一个")
         if (config.apiKey.isBlank()) throw IllegalStateException("「${config.name}」未填写 API Key")
         if (config.effectiveModel.isBlank()) throw IllegalStateException("「${config.name}」未选择模型")
-        val provider = createStandaloneProvider(config, sessionId)
+        val provider = modelCallRouter.createStandaloneProvider(config, sessionId)
         val history = messagePersistenceUseCase.buildHistory(sessionId, "__manual_compress__")
         if (history.size <= 2) return false
-        val compactionProvider = resolveCompactionFallbackProvider() ?: provider
+        val compactionProvider = modelCallRouter.resolveCompactionFallbackProvider() ?: provider
         // 非流式故障转移：压缩请求失败且错误可重试、且配置了备用 provider 时，切到备用 provider 重试一次。
         val compacted = try {
             contextCompactor.compactIfNeeded(history, compactionProvider, sessionId, force = true, onEvent = onEvent)
@@ -390,7 +362,7 @@ class StatefulAgentWorkflow @Inject constructor(
             throw e
         } catch (e: Exception) {
             if (isRetriableNetworkError(e) && !config.fallbackProviderId.isNullOrBlank()) {
-                val fallback = resolveFallbackProvider(config.fallbackProviderId, sessionId)
+                val fallback = modelCallRouter.resolveFallbackProvider(config.fallbackProviderId, sessionId)
                 if (fallback != null) {
                     FileLogger.i(TAG, "压缩 provider [${config.name}] 失败，故障转移到备用 provider [${config.fallbackProviderId}]: ${e.message}")
                     return contextCompactor.compactIfNeeded(history, fallback, sessionId, force = true, onEvent = onEvent).let { it.size != history.size }
@@ -399,50 +371,6 @@ class StatefulAgentWorkflow @Inject constructor(
             throw e
         }
         return compacted.size != history.size
-    }
-
-    /**
-     * 根据 [config] 创建一个全新的、独立的 [AIProvider] 实例。
-     * 用于识图回退和上下文压缩等独立请求场景，完全不占用或修改主对话所用的 Provider 单例。
-     *
-     * 代理隔离：根据 [AIProviderConfig.needsProxy] 选择网络客户端。
-     * - needsProxy=true → proxyOkHttpClient（走 mihomo 代理，含健康降级与熔断）
-     * - needsProxy=false → okHttpClient（强制直连，不受系统代理污染）
-     */
-    private suspend fun createStandaloneProvider(config: AIProviderConfig, sessionId: String?): AIProvider {
-        // 代理路由选择：needsProxy 开关真正生效，决定模型请求走直连还是代理。
-        val useProxy = config.needsProxy
-        val clientForProvider = if (useProxy) proxyOkHttpClient else okHttpClient
-        // 代理路由日志：记录每个模型的网络出口，便于排查"代理污染模型接口"类问题。
-        com.mini.me_core.core.util.FileLogger.i(
-            TAG,
-            "模型网络路由: name=${config.name} model=${config.effectiveModel} " +
-                "baseUrl=${config.baseUrl} needsProxy=$useProxy → ${if (useProxy) "代理出口(mihomo)" else "直连(NO_PROXY)"}"
-        )
-        val provider: AIProvider = when (config.type) {
-            ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi, clientForProvider)
-            ProviderType.GEMINI -> GeminiAdapter(geminiApi, clientForProvider)
-            else -> OpenAIAdapter(openAIApi, clientForProvider)
-        }
-        provider.apiKey = config.apiKey
-        provider.baseUrl = config.baseUrl
-        provider.model = config.effectiveModel
-        provider.useFullUrl = config.useFullUrl
-        provider.useResponseApi = config.useResponseApi
-        // 模型级采样参数覆盖：严格优先级 模型级(非null) > 供应商级默认。
-        // 只读 providerConfig，绝不修改；解析结果只设置到当前 provider 实例。
-        val samplingConfig = runCatching {
-            modelMetadataService.observeSamplingConfig(config.type, config.effectiveModel).firstOrNull()
-        }.getOrNull()
-        val resolved = modelMetadataService.resolveSamplingParams(config, samplingConfig)
-        provider.temperature = resolved.temperature
-        provider.topP = resolved.topP
-        provider.maxTokens = resolved.maxTokens
-        provider.apiPath = config.apiPath
-        provider.requestTimeout = config.requestTimeout
-        provider.retryCount = config.retryCount
-        provider.logSessionId = sessionId
-        return provider
     }
 
     /** 核心 Reducer，接收旧状态与 Action，返回新状态以及触发的副作用列表 (纯函数) */
@@ -729,7 +657,7 @@ class StatefulAgentWorkflow @Inject constructor(
         // 互不依赖，放到 IO 线程并行执行，避免在收集线程上串行阻塞、拖慢首字节反馈。
         val prepared = coroutineScope {
             val systemPromptDeferred = async(Dispatchers.IO) { promptProvider.build(currentContext) }
-            val providerDeferred = async(Dispatchers.IO) { getActiveProviderWithConfig(currentContext.sessionId) }
+            val providerDeferred = async(Dispatchers.IO) { modelCallRouter.getActiveProviderWithConfig(currentContext.sessionId) }
             systemPromptDeferred.await() to providerDeferred.await()
         }
         var systemPrompt = prepared.first
@@ -946,10 +874,10 @@ class StatefulAgentWorkflow @Inject constructor(
                             systemPrompt?.let { "$it\n\n$stepInjection" } ?: stepInjection
                         }
                         // 识图轮：若当前聊天模型无 vision，使用独立识图模型发送
-                        val visionProvider = if (state.pendingVisionRound) resolveVisionFallbackProvider(currentContext.sessionId) else null
+                        val visionProvider = if (state.pendingVisionRound) modelCallRouter.resolveVisionFallbackProvider(currentContext.sessionId) else null
                         val providerInUse = visionProvider ?: aiProvider
                         // 压缩轮：若配置了压缩专用模型，使用独立压缩模型压缩
-                        val compactionProvider = resolveCompactionFallbackProvider(currentContext.sessionId) ?: providerInUse
+                        val compactionProvider = modelCallRouter.resolveCompactionFallbackProvider(currentContext.sessionId) ?: providerInUse
                         // 优先消费工具执行间隙的预压缩结果；没有（首轮）则按原逻辑同步压缩。
                         val preCompacted = try {
                             pendingCompaction?.await()
@@ -982,14 +910,14 @@ class StatefulAgentWorkflow @Inject constructor(
                         // sendImages 提级到 try 外面：catch 块（备选方案②自动降级）需要访问它判断
                         // "本轮原本就是带图发送"，否则 try 里定义的局部变量 catch 不可见，
                         // 会出现 Unresolved reference 'sendImages' 编译错。
-                        val sendImages = state.pendingVisionRound || shouldSendImages(currentContext.sessionId)
+                        val sendImages = state.pendingVisionRound || modelCallRouter.shouldSendImages(currentContext.sessionId)
 
                         try {
                             // 发送前按实际模型的视觉能力处理图片（同 execute 路径）。
                             // 注意：这里用 shouldSendImages 而不是 activeModelSupportsVision，
                             // 是为了避免把 source=INFERRED 的自定义多模态模型误当成纯文本模型，
                             // 发送前剥离图片导致模型「图都收不到还怎么识别」。
-                            val messagesToSend = sanitizeImagesForModel(compactedMessages, sendImages)
+                            val messagesToSend = resultSanitizer.sanitizeImagesForModel(compactedMessages, sendImages)
                             // 供应商故障转移：主 provider 首字节前失败时，切到备用 provider 重试一次。
                             // 一旦已输出 TextDelta（acc/reasoningAcc 非空）则不切换，避免重复文本。
                             var streamProvider: AIProvider = providerInUse
@@ -1029,7 +957,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                         && isRetriableNetworkError(e)
                                         && !activeConfig.fallbackProviderId.isNullOrBlank()
                                     ) {
-                                        val fallback = resolveFallbackProvider(activeConfig.fallbackProviderId, currentContext.sessionId)
+                                        val fallback = modelCallRouter.resolveFallbackProvider(activeConfig.fallbackProviderId, currentContext.sessionId)
                                         if (fallback != null) {
                                             fallbackUsed = true
                                             FileLogger.i(TAG, "主 provider [${activeConfig.name}] 首字节前失败，故障转移到备用 provider [${activeConfig.fallbackProviderId}]: ${e.message}")
@@ -1101,14 +1029,14 @@ class StatefulAgentWorkflow @Inject constructor(
                             ) {
                                 // 先标记降级已尝试，避免死循环
                                 state = state.copy(visionFallbackRetried = true)
-                                val fallbackReady = visionFallbackReady()
+                                val fallbackReady = modelCallRouter.visionFallbackReady()
                                 val fallbackDescription = buildString {
                                     append("【系统提示】原请求包含图片，检测到当前模型不支持「多模态识图（Vision）」，")
                                     if (fallbackReady) append("已启用「识图专用模型」自动识别图片内容后，以纯文本形式重新发送。")
                                     else append("未配置「识图专用模型」，已自动去掉图片并转为纯文本发送；若需要识别图片内容，请在设置中指定一个支持「多模态识图（Vision）」能力的模型，或在当前模型的能力覆盖中手动开启「多模态识图（Vision）」。")
                                 }
                                 // 构造去 images 的消息 + 前置系统提示 UserMessage
-                                val textOnlyMessages = sanitizeImagesForModel(compactedMessages, supportsVision = false).toMutableList()
+                                val textOnlyMessages = resultSanitizer.sanitizeImagesForModel(compactedMessages, supportsVision = false).toMutableList()
                                 val firstUserIndex = textOnlyMessages.indexOfFirst { it is AgentMessage.UserMessage }
                                 if (firstUserIndex >= 0) {
                                     val origin = textOnlyMessages[firstUserIndex] as AgentMessage.UserMessage
@@ -1139,7 +1067,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                                     )
                                                 )
                                                 runCatching {
-                                                    val summary = runVisionFallback(fake, currentContext.sessionId, null)
+                                                    val summary = resultSanitizer.runVisionFallback(fake, currentContext.sessionId, null)
                                                     append(summary)
                                                 }.onFailure { append("摘要失败：${it.message}") }
                                             } else {
@@ -1268,7 +1196,7 @@ class StatefulAgentWorkflow @Inject constructor(
                         // 快照末尾必为上一轮 assistant（含 toolCalls），tail 至少保留它，追加 toolResult 不会孤立。
                         if (pendingCompaction == null) {
                             pendingCompactionBaseCount = state.messages.size
-                            val compactionProvider = resolveCompactionFallbackProvider(currentContext.sessionId) ?: aiProvider
+                            val compactionProvider = modelCallRouter.resolveCompactionFallbackProvider(currentContext.sessionId) ?: aiProvider
                             val messagesSnapshot = state.messages
                             val producer = this
                             pendingCompaction = async(Dispatchers.IO) {
@@ -1304,9 +1232,9 @@ class StatefulAgentWorkflow @Inject constructor(
                                                     tool, call,
                                                     execute = { t, c ->
                                                         if (t is StreamingAgentTool) {
-                                                            runToolStream(t, c, currentContext) { send(it) }
+                                                            toolBatchExecutor.runStream(t, c, currentContext) { send(it) }
                                                         } else {
-                                                            runToolSync(t, c, currentContext)
+                                                            toolBatchExecutor.runSync(t, c, currentContext)
                                                         }
                                                     },
                                                     isRetryable = { r ->
@@ -1337,7 +1265,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                 ?: ToolRunResult(ToolResult.Error("工具未执行", "TOOL_NOT_EXECUTED").toTransportString(), true)
                             var rawResult = runResult.raw
                             var isError = runResult.isError
-                            val (newCtx, updated) = checkAndUpdateMode(toolCall, isError, currentContext)
+                            val (newCtx, updated) = modeCoordinator.checkAndUpdateMode(toolCall, isError, currentContext)
                             if (updated) {
                                 val reason = (toolCall.arguments["reason"] as? JsonPrimitive)?.content?.trim()
                                     ?: toolCall.arguments["reason"]?.toString()?.replace("\"", "")?.trim()
@@ -1438,7 +1366,7 @@ class StatefulAgentWorkflow @Inject constructor(
                         // （与上方轨迹写库同款静默降级；DB/IO 异常若未捕获会中断 channelFlow，
                         // 表现为「模型输出/工具执行时报错」，是需规避的隐性崩溃入口）。
                         try {
-                            recordIncrementalRound(currentContext, batchResults)
+                            eventTracer.recordIncrementalRound(currentContext, batchResults)
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
@@ -1761,533 +1689,6 @@ class StatefulAgentWorkflow @Inject constructor(
                 .mapNotNull { it.jsonPrimitive.contentOrNull?.trim() }
                 .filter { it.isNotBlank() }
         }.getOrDefault(emptyList())
-    }
-
-    private suspend fun runToolSync(tool: AgentTool?, toolCall: ToolCall, context: AgentContext): ToolRunResult {
-        val name = toolCall.name
-        if (tool == null) {
-            val error = ToolResult.Error("工具 $name 不存在", "TOOL_NOT_FOUND")
-            recordSessionOutput(context, toolCall.id, name, error)
-            return ToolRunResult(error.toTransportString(), true, errorClass = classifyError(error.code))
-        }
-        return try {
-            // ── pre-execute 段（D1-5，六段式流水线契约：pre-execute → guard → execute →
-            //    post-execute → finalizeContent → result）：门——执行前可短路/变换的入口。
-            //    ① L5 结果缓存：纯读工具（readFile/search/list）按 (toolName, argsHash) 键控，
-            //    命中则直接复用结果（短路返回）；文件类工具由 mtime + TTL 双机制失效。
-            //    ② viewImage 守卫：当前模型不支持多模态时自动降级识图模型 / FAIL_FAST。
-            val cacheKey = if (name in ToolResultCache.FILE_TOOLS) {
-                context.sessionId?.let { sid -> toolResultCache.buildKey(name, toolCall.arguments, sid) }
-            } else {
-                null
-            }
-            if (cacheKey != null) {
-                val cached = toolResultCache.get(cacheKey)
-                if (cached != null) {
-                    val cachedTransport = cached.toTransportString()
-                    recordSessionOutput(context, toolCall.id, name, cached)
-                    recordIncrementalAction(name, cachedTransport, context)
-                    val errorClass = (cached as? ToolResult.Error)?.let { classifyError(it.code) }
-                    return ToolRunResult(cachedTransport, cached is ToolResult.Error, errorClass = errorClass)
-                }
-            }
-            if (name == "viewImage" && !activeModelSupportsVision(context.sessionId)) {
-                // RC63 备选方案③：viewImage 守卫策略（默认自动回退识图模型，FAIL_FAST 则直接报错提示用户）
-                val guardPolicy = compatibilityPolicyRepository.getViewImageUnknownGuardPolicy()
-                val fallbackReady = visionFallbackReady()
-                if (guardPolicy == ViewImageUnknownGuardPolicy.FAIL_FAST || !fallbackReady) {
-                    val error = ToolResult.Error(
-                        "当前聊天模型不支持「多模态识图（Vision）」能力，且未配置专用的「多模态识图（Vision）」兜底模型。请在【设置 → 默认模型 → 识图模型】中指定一个支持「多模态识图（Vision）」能力的模型后再查看图片。\n" +
-                            "💡 你也可以在【设置 → AI 提供商 → 该模型 → 能力覆盖】中手动开启「多模态识图（Vision）」复选框，一步修复。",
-                        "MODEL_VISION_UNSUPPORTED"
-                    )
-                    recordSessionOutput(context, toolCall.id, name, error)
-                    return ToolRunResult(
-                        error.toTransportString(),
-                        true,
-                        errorClass = classifyError(error.code)
-                    )
-                }
-                // 非多模态模型：同步用识图模型理解图片，文本结果直接作为工具返回
-                val result = tool.executeWithContext(toolCall.arguments, context)
-                val userPrompt = (toolCall.arguments["prompt"] as? JsonPrimitive)?.contentOrNull?.trim()
-                val textResult = runVisionFallback(result, context.sessionId, userPrompt)
-                val processed = toolOutputStore.process(name, toolCall.id, ToolResult.Success(JsonObject(mapOf(
-                    "content" to JsonPrimitive(textResult),
-                    "model" to JsonPrimitive("vision-fallback")
-                ))))
-                recordSessionOutput(context, toolCall.id, name, processed)
-                return ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, emptyList())
-            }
-            // ── guard 段（D1-3，六段式流水线契约）：execute 前遍历护栏链，首个 BLOCK 短路 ──
-            // 护栏链：权限检查（workflow 层既有）→ 文件观察（本批新增）→ 危险命令/超时钳制
-            // （ExecuteCommandTool 工具层既有，保持原位，经本判定契约对齐）。
-            // D1-7 统一开关：总开关 norm_flow_enabled 或子开关 tool_guard 关闭时跳过护栏链
-            // （对齐 norm-chain §3.5，默认开启；关闭即 guard 链 + 文件观察不生效）。
-            if (normFlowSettingsRepository.isToolGuardActive()) {
-                runToolGuards(name, toolCall, context)?.let { blocked ->
-                    recordSessionOutput(context, toolCall.id, name, blocked)
-                    recordIncrementalAction(name, blocked.toTransportString(), context)
-                    val errorClass = classifyError(blocked.code)
-                    return ToolRunResult(blocked.toTransportString(), true, errorClass = errorClass)
-                }
-            }
-            // ── execute 段：执行工具（含流式工具的聚合兜底） ──
-            val result = tool.executeWithContext(toolCall.arguments, context)
-            // ── post-execute 段：可改写结果——媒体（图片/附件）从正文剥离走独立通道，
-            //    以 text 形态进入结果定型；文件观察版本更新（markObserved）亦在本段（见下）。
-            val images = if (name == "viewImage") extractInlineImages(result) else emptyList()
-            val attachments = if (name == "sendFile") extractAttachments(result) else emptyList()
-            val transportResult = when {
-                images.isNotEmpty() -> stripInlineImages(result)
-                attachments.isNotEmpty() -> stripAttachments(result)
-                else -> result
-            }
-            // ── finalizeContent 段：结果定型——toolOutputStore.process 统一为 canonical 形态
-            //    （对齐 RunCodeTool 的 canonical JSON 输出语义），供下游只读消费。
-            val processed = toolOutputStore.process(name, toolCall.id, transportResult)
-            recordSessionOutput(context, toolCall.id, name, processed)
-            // L5 写缓存：仅成功结果入缓存，失败不缓存（避免缓存错误）。
-            if (cacheKey != null && processed is ToolResult.Success) {
-                toolResultCache.put(cacheKey, processed)
-            }
-            // L7 事件发布：工具成功后广播对应事件，驱动缓存失效、上下文增量刷新等联动。
-            // ── post-execute 段：文件观察版本更新（D1-4，readFile/writeFile/editFile 成功后记录当前 mtime，
-            //    使「写入即已知」成立、避免「自己刚改过又被拦」；失败静默降级不阻断主流程）。
-            if (processed is ToolResult.Success) {
-                if (name in FILE_OBSERVED_TOOLS) {
-                    (toolCall.arguments["path"] as? JsonPrimitive)?.contentOrNull?.let { fileObservationGuard.markObserved(it) }
-                }
-                publishToolEvent(name, toolCall, processed, context)
-            }
-            // ── result 段：只读观测——写结果缓存（仅成功）、发布工具事件、记录增量索引，
-            //    均为不改变结果本体的只读副作用（side-effect），六段契约到此结束。
-            // L6 增量索引：记录工具动作摘要（成功与失败均记录，作为状态变化）。
-            // 复用下方 transportString，避免对完整结果重复序列化。
-            val transportString = processed.toTransportString()
-            recordIncrementalAction(name, transportString, context)
-            val errorClass = (processed as? ToolResult.Error)?.let { classifyError(it.code) }
-            ToolRunResult(transportString, processed is ToolResult.Error, images, attachments, errorClass)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            val error = ToolResult.Error("工具执行失败: ${e.message}", "TOOL_EXECUTION_FAILED")
-            recordSessionOutput(context, toolCall.id, name, error)
-            ToolRunResult(error.toTransportString(), true, errorClass = classifyError(error.code))
-        }
-    }
-
-    /**
-     * D1-3 guard 段：遍历护栏链，首个 [ToolGuardResult.Block] 短路（工具不执行）；
-     * [ToolGuardResult.Advisory] 不阻断，记录日志（提醒队列，供上层注入给模型）。
-     * 单个护栏异常静默按放行处理，不阻断主流程。
-     * @return 非 null = 被某护栏拦截，调用方直接以该错误返回模型。
-     */
-    private suspend fun runToolGuards(
-        name: String,
-        toolCall: ToolCall,
-        context: AgentContext
-    ): ToolResult.Error? {
-        val fileObservationActive = normFlowSettingsRepository.isFileObservationActive()
-        for (guard in toolGuards) {
-            // P0：文件观察护栏独立开关关闭时跳过该护栏
-            if (guard.id == "file-observation" && !fileObservationActive) continue
-            val verdict = try {
-                guard.guard(
-                    ToolGuardContext(
-                        toolName = name,
-                        args = toolCall.arguments,
-                        sessionId = context.sessionId,
-                        projectRoot = context.projectRoot
-                    )
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                FileLogger.w(TAG, "护栏 ${guard.id} 判定异常，按放行处理", e)
-                continue
-            }
-            when (verdict) {
-                is ToolGuardResult.Block -> {
-                    FileLogger.w(TAG, "护栏 ${guard.id} 拦截 $name: ${verdict.code} ${verdict.message}")
-                    guardLogRepository.log(
-                        com.mini.me_core.feature.agent.domain.core.guard.GuardLogEntry(
-                            timestamp = System.currentTimeMillis(),
-                            toolName = name,
-                            guardId = guard.id,
-                            code = verdict.code,
-                            message = verdict.message
-                        ),
-                        isBlock = true
-                    )
-                    return ToolResult.Error(verdict.message, verdict.code)
-                }
-                is ToolGuardResult.Advisory -> {
-                    FileLogger.w(TAG, "护栏 ${guard.id} 提醒 $name: ${verdict.code} ${verdict.message}")
-                    guardLogRepository.log(
-                        com.mini.me_core.feature.agent.domain.core.guard.GuardLogEntry(
-                            timestamp = System.currentTimeMillis(),
-                            toolName = name,
-                            guardId = guard.id,
-                            code = verdict.code,
-                            message = verdict.message
-                        )
-                    )
-                }
-                ToolGuardResult.Pass -> Unit
-            }
-        }
-        return null
-    }
-
-    /**
-     * L7 事件发布（事件解耦 M1）：工具成功后广播对应事件，驱动缓存失效、上下文增量刷新等联动。
-     *
-     * 事件全部由工具自身经 [AgentTool.buildPostExecutionEvent] 钩子声明（file.edited / file.written /
-     * todo.updated / state.memory.updated / state.skill.loaded / state.mode.changed / file.mutated），
-     * 本方法只解析工具实例、统一查询钩子并发布，不再感知具体工具名；hash/diff 等字段级详情由工具侧组装。
-     */
-    private suspend fun publishToolEvent(name: String, toolCall: ToolCall, result: ToolResult, context: AgentContext) {
-        val tool = toolRegistry.getTool(name) ?: return
-        tool.buildPostExecutionEvent(toolCall, result, context)?.let { toolEventBus.publish(it) }
-    }
-
-    /**
-     * L6 增量索引：记录工具动作摘要。
-     *
-     * 性能关键：接收已序列化的 [transportString]（调用方 [runToolSync] 已序列化一次，
-     * 此处复用避免对完整结果重复 toTransportString）；data 只存截断摘要，避免内存膨胀。
-     */
-    private suspend fun recordIncrementalAction(name: String, transportString: String, context: AgentContext) {
-        val sessionId = context.sessionId ?: return
-        val summary = transportString.take(SUMMARY_CHARS)
-        incrementalIndexStore.recordAction(
-            sessionId,
-            ActionIndex(
-                actionType = name,
-                data = JsonPrimitive(summary),
-                dataHash = transportString.hashCode().toString()
-            )
-        )
-    }
-
-    /**
-     * L6 增量索引：记录本批轮次快照并触发持久化（轮次级索引）。
-     */
-    private suspend fun recordIncrementalRound(context: AgentContext, batchResults: List<ToolBatchResult>) {
-        val sessionId = context.sessionId ?: return
-        if (batchResults.isEmpty()) return
-        val actions = batchResults.map { br ->
-            ActionIndex(
-                actionType = br.toolName,
-                data = JsonPrimitive(br.result.take(SUMMARY_CHARS)),
-                dataHash = br.result.hashCode().toString()
-            )
-        }
-        // O(1) 读取输出计数作为轮次号，避免每次全量遍历 outputs。
-        val round = context.sessionState?.outputCount ?: 0
-        incrementalIndexStore.recordRound(
-            sessionId,
-            RoundSnapshot(round, actions, "本批 ${actions.size} 个工具动作")
-        )
-        incrementalIndexStore.persist(sessionId)
-    }
-
-    /**
-     * L2 共享会话状态：把单次工具执行结果写入 [ToolSessionState.outputs]（callId 索引），
-     * 供后续工具按 callId 直连引用前序产物。成功记录 errorClass=null，失败按 [classifyError] 分类。
-     */
-    private fun recordSessionOutput(context: AgentContext, callId: String, toolName: String, result: ToolResult) {
-        val state = context.sessionState ?: return
-        val errorClass = when (result) {
-            is ToolResult.Error -> classifyError(result.code)
-            else -> null
-        }
-        state.recordOutput(
-            ToolOutputRecord(
-                callId = callId,
-                toolName = toolName,
-                result = result,
-                errorClass = errorClass
-            )
-        )
-    }
-
-    /**
-     * 非多模态模型的 viewImage 回退：从工具结果中提取 base64 图片，
-     * 同步发给识图专用模型理解内容，返回文本结果。
-     */
-    private suspend fun runVisionFallback(result: ToolResult, sessionId: String?, customPrompt: String? = null): String {
-        val data = (result as? ToolResult.Success)?.data as? JsonObject
-            ?: return "无法解析图片数据"
-        val image = data["image"] as? JsonObject
-            ?: return "无法提取图片数据"
-        val mimeType = image["mime_type"]?.jsonPrimitive?.contentOrNull
-            ?: return "无法识别图片格式"
-        val base64Data = image["base64_data"]?.jsonPrimitive?.contentOrNull
-            ?: return "无法读取图片数据"
-        val path = image["path"]?.jsonPrimitive?.contentOrNull.orEmpty()
-
-        val agentImage = AgentImage(mimeType = mimeType, base64Data = base64Data, path = path)
-        val visionProvider = resolveVisionFallbackProvider(sessionId)
-            ?: return "「多模态识图（Vision）」兜底模型不可用，请先在设置中启用。"
-
-        val promptText = if (!customPrompt.isNullOrBlank()) {
-            "请针对用户/模型的如下关注重点，详细分析并描述这张图片：\n$customPrompt"
-        } else {
-            "请详细描述这张图片的内容，包括其中出现的文字、元素、布局、颜色等关键信息。"
-        }
-
-        try {
-            val messages = listOf(
-                AgentMessage.UserMessage(
-                    content = promptText,
-                    images = listOf(agentImage)
-                )
-            )
-            val response = visionProvider.complete("", messages, emptyList())
-            return response.content.ifBlank { "（识图模型未返回内容）" }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            FileLogger.e(TAG, "识图回退失败", e)
-            return "识图失败: ${e.message}"
-        }
-    }
-
-    /**
-     * 当前聊天模型是否「有原生能力支持多模态」。
-     *
-     * 影响两条关键链路：
-     *  (1) `runToolSync(name=="viewImage")` L586 的守卫：
-     *      if (!activeModelSupportsVision(...)) → 直接抛「当前聊天模型不支持图片输入」
-     *      这条就是用户接入 step-3.7-flash 时截图里看到的错误文案。
-     *
-     *  (2) `pendingVisionRound` 是否启用独立识图模型 fallback 的判定入口。
-     *
-     *  RC63 判定链优先级（从高到低）：
-     *  - ④ 单模型复选框手动覆盖（`ModelCapabilityOverrideDao`，在 resolve 内处理）；
-     *  - catalog 明确 supportsVision=true → 支持；
-     *  - catalog 明确 supportsVision=false（MODELS_DEV 收录的纯文本模型）→ 不支持；
-     *  - ③ 兼容端点默认策略 Repository（STRICT/HEURISTIC/LAX/MANUAL，resolve 内处理）；
-     *  - probablyVision 启发式（step- 家族白名单在 ModelMetadataService.default() 命中即为 true）。
-     *
-     *  RC63 关键决策（按用户要求「针对性修复独立出来」）：
-     *  - **撤销 RC62e 的 `source==INFERRED → 一律 true` 全局放宽**；
-     *  - 这里只返回最终 `metadata.supportsVision` 布尔值；
-     *  - step-3.7-flash 修复仅由 probablyVision step- 家族白名单单独命中，
-     *    不影响其他未收录模型（它们恢复 RC62d 之前的严格语义）。
-     */
-    private suspend fun activeModelSupportsVision(sessionId: String?): Boolean {
-        val config = resolveProviderConfig(sessionId) ?: return false
-        val metadata = modelMetadataService.resolve(config.type, config.effectiveModel)
-        return metadata.supportsVision
-    }
-
-    /**
-     * 发送前是否应该把图片带给模型。
-     * RC63 判定链与 [activeModelSupportsVision] 严格一致；
-     * 2026-08-10 RC63 按用户要求**撤销 RC62e 的 `source==INFERRED → 一律 true` 全局放宽**，
-     * 恢复 RC62d 之前的严格语义。未收录兼容端点模型仅当 probablyVision 启发式
-     * （或③兼容端点策略 / ④单模型覆盖）命中时才会带图发送，避免全局放宽的副作用。
-     */
-    private suspend fun shouldSendImages(sessionId: String?): Boolean {
-        val config = resolveProviderConfig(sessionId) ?: return false
-        val metadata = modelMetadataService.resolve(config.type, config.effectiveModel)
-        return metadata.supportsVision
-    }
-
-    /**
-     * 发送前按模型视觉能力处理消息中的图片：
-     * - 支持 vision：原样返回。
-     * - 不支持：剥离所有图片（仅影响本次发送，不动持久化数据），历史/输入中的图片不会原样发给
-     *   非多模态模型导致请求失败；切回多模态模型后图片上下文仍可正常使用。
-     */
-    private fun sanitizeImagesForModel(
-        messages: List<AgentMessage>,
-        supportsVision: Boolean
-    ): List<AgentMessage> {
-        if (supportsVision) return messages
-        return messages.map { msg ->
-            when (msg) {
-                is AgentMessage.UserMessage ->
-                    if (msg.images.isEmpty()) msg
-                    else msg.copy(images = emptyList(), content = msg.content.ifBlank { "（图片已省略：当前模型不支持图片输入）" })
-                is AgentMessage.ToolResultMessage ->
-                    if (msg.images.isEmpty()) msg else msg.copy(images = emptyList())
-                is AgentMessage.AssistantMessage -> msg
-            }
-        }
-    }
-
-    /**
-     * 识图专用兜底模型是否可用：已配置 providerId 且指向的 provider/model 存在、有 apiKey、且其
-     * ModelMetadata.supportsVision 为真。识图轮仅当 [activeModelSupportsVision] 为 false 时才回退到它。
-     * 未配置（providerId 空）即视为「跟随聊天模型」，不构成兜底 → 返回 false。
-     */
-    private suspend fun visionFallbackReady(): Boolean {
-        val providerId = visionModelSettingsRepository.getVisionProviderId().trim()
-        if (providerId.isEmpty()) return false
-        val model = visionModelSettingsRepository.getVisionModel().trim()
-        if (model.isEmpty()) return false
-        val config = aiProviderRepository.getProviderById(providerId) ?: return false
-        if (!config.isEnabled) return false
-        if (config.apiKey.isBlank()) return false
-        val metadata = modelMetadataService.resolve(config.type, model)
-        return metadata.supportsVision
-    }
-
-    /**
-     * 识图轮专用 provider 解析。仅当当前聊天模型不支持 vision、且专用模型已配置且可用时返回
-     * 全新的独立 AIProvider 实例；否则返回 null（表示无需切换、沿用 aiProvider）。
-     */
-    private suspend fun resolveVisionFallbackProvider(sessionId: String?): AIProvider? {
-        if (activeModelSupportsVision(sessionId)) return null // 当前聊天模型就有原生能力，直接用之
-        if (!visionFallbackReady()) return null       // 无可用兜底，仍沿用 aiProvider（守卫已先行拦截并报错）
-        val providerId = visionModelSettingsRepository.getVisionProviderId().trim()
-        val model = visionModelSettingsRepository.getVisionModel().trim()
-        val config = aiProviderRepository.getProviderById(providerId)
-            ?: error("识图专用模型配置丢失")
-        if (config.apiKey.isBlank()) error("识图专用模型「${config.name}」未填写 API Key")
-        if (model.isBlank()) error("识图专用模型未指定模型")
-        return createStandaloneProvider(config.copy(selectedModel = model), sessionId)
-    }
-
-    /**
-     * 压缩轮专用 provider 解析。若用户配置了压缩专用模型且 provider 存在、已启用、有 apiKey，
-     * 则返回全新的独立 AIProvider 实例；否则返回 null（沿用当前聊天模型）。
-     */
-    private suspend fun resolveCompactionFallbackProvider(sessionId: String? = null): AIProvider? {
-        val providerId = compactionModelSettingsRepository.getCompactionProviderId().trim()
-        if (providerId.isEmpty()) return null
-        val model = compactionModelSettingsRepository.getCompactionModel().trim()
-        if (model.isEmpty()) return null
-        val config = aiProviderRepository.getProviderById(providerId) ?: return null
-        if (!config.isEnabled || config.apiKey.isBlank()) return null
-        return createStandaloneProvider(config.copy(selectedModel = model), sessionId)
-    }
-
-    private suspend fun runToolStream(
-        tool: StreamingAgentTool, 
-        toolCall: ToolCall,
-        context: AgentContext,
-        onEvent: suspend (AgentEvent) -> Unit
-    ): ToolRunResult {
-        val live = StringBuilder()
-        var lastEmitMs = 0L
-        var finalResult: ToolResult? = null
-        try {
-            tool.executeStream(toolCall.arguments, context).collect { ev ->
-                when (ev) {
-                    is ToolStreamEvent.Progress -> {
-                        live.append(ev.chunk).append('\n')
-                        if (live.length > LIVE_TAIL_CHARS) {
-                            live.delete(0, live.length - LIVE_TAIL_CHARS)
-                        }
-                        val now = System.currentTimeMillis()
-                        if (now - lastEmitMs >= PROGRESS_INTERVAL_MS) {
-                            lastEmitMs = now
-                            onEvent(AgentEvent.ToolCallProgress(toolCall.id, toolCall.name, live.toString()))
-                        }
-                    }
-                    is ToolStreamEvent.Completed -> finalResult = ev.result
-                }
-            }
-            val result = finalResult ?: ToolResult.Error("流式工具未返回结果", "MISSING_STREAM_RESULT")
-            val processed = toolOutputStore.process(toolCall.name, toolCall.id, result)
-            // L7 事件发布：流式工具（如 Bash）成功后同样广播事件，驱动缓存失效等联动。
-            if (processed is ToolResult.Success) {
-                publishToolEvent(toolCall.name, toolCall, processed, context)
-            }
-            val errorClass = (processed as? ToolResult.Error)?.let { classifyError(it.code) }
-            return ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, errorClass = errorClass)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            val error = ToolResult.Error("工具执行失败: ${e.message}", "TOOL_EXECUTION_FAILED")
-            return ToolRunResult(error.toTransportString(), true, errorClass = classifyError(error.code))
-        }
-    }
-
-    private fun checkAndUpdateMode(toolCall: ToolCall, isError: Boolean, currentContext: AgentContext): Pair<AgentContext, Boolean> {
-        if (toolCall.name == "switchMode" && !isError) {
-            val targetModeStr = (toolCall.arguments["mode"] as? JsonPrimitive)?.content?.trim()?.uppercase()
-                ?: toolCall.arguments["mode"]?.toString()?.replace("\"", "")?.trim()?.uppercase()
-            if (targetModeStr != null) {
-                runCatching { AgentMode.valueOf(targetModeStr) }.getOrNull()?.let { newMode ->
-                    if (currentContext.mode != newMode) {
-                        return currentContext.copy(mode = newMode) to true
-                    }
-                }
-            }
-        }
-        return currentContext to false
-    }
-
-    private fun extractInlineImages(result: ToolResult): List<AgentImage> {
-        val data = (result as? ToolResult.Success)?.data as? JsonObject ?: return emptyList()
-        val image = data["image"] as? JsonObject ?: return emptyList()
-        val mimeType = image["mime_type"]?.jsonPrimitive?.contentOrNull ?: return emptyList()
-        val base64Data = image["base64_data"]?.jsonPrimitive?.contentOrNull ?: return emptyList()
-        val path = image["path"]?.jsonPrimitive?.contentOrNull.orEmpty()
-        if (!mimeType.startsWith("image/") || base64Data.isBlank()) return emptyList()
-        return listOf(AgentImage(mimeType = mimeType, base64Data = base64Data, path = path))
-    }
-
-    /**
-     * 从 sendFile 工具结果的 `files` 数组提取文件卡片元数据（含宿主本地路径，供 UI 打开文件用）。
-     * 任一文件缺关键字段则整体返回空（与 sendFile 的原子语义一致）。
-     */
-    private fun extractAttachments(result: ToolResult): List<AgentAttachment> {
-        val data = (result as? ToolResult.Success)?.data as? JsonObject ?: return emptyList()
-        val files = data["files"] as? JsonArray ?: return emptyList()
-        val attachments = files.mapNotNull { elem ->
-            val obj = elem as? JsonObject ?: return@mapNotNull null
-            val path = obj["path"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-            val localPath = obj["local_path"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-            val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: path.substringAfterLast('/')
-            val mimeType = obj["mime_type"]?.jsonPrimitive?.contentOrNull ?: "application/octet-stream"
-            AgentAttachment(
-                fileName = name,
-                containerPath = path,
-                localPath = localPath,
-                mimeType = mimeType,
-                sizeBytes = obj["size_bytes"]?.jsonPrimitive?.longOrNull ?: 0L,
-                isImage = obj["is_image"]?.jsonPrimitive?.booleanOrNull ?: mimeType.startsWith("image/")
-            )
-        }
-        return if (attachments.size == files.size) attachments else emptyList()
-    }
-
-    /** 从回传给模型的 sendFile 结果中剥离宿主本地路径（模型只应看到容器路径）。 */
-    private fun stripAttachments(result: ToolResult): ToolResult {
-        val success = result as? ToolResult.Success ?: return result
-        val data = success.data as? JsonObject ?: return result
-        val strippedFiles = (data["files"] as? JsonArray)?.map { elem ->
-            val obj = elem as? JsonObject ?: return@map elem
-            JsonObject(obj.toMutableMap().apply { remove("local_path") })
-        } ?: return result
-        val strippedData = data.toMutableMap().apply {
-            this["files"] = JsonArray(strippedFiles)
-            this["files_attached"] = JsonPrimitive(true)
-        }
-        return ToolResult.Success(JsonObject(strippedData))
-    }
-
-    private fun stripInlineImages(result: ToolResult): ToolResult {
-        val success = result as? ToolResult.Success ?: return result
-        val data = success.data as? JsonObject ?: return result
-        val image = data["image"] as? JsonObject ?: return result
-        val strippedImage = image.toMutableMap().apply {
-            remove("base64_data")
-            this["base64_omitted"] = JsonPrimitive(true)
-            this["note"] = JsonPrimitive("图片数据已作为视觉输入附加，未写入文本工具结果。")
-        }
-        val strippedData = data.toMutableMap().apply {
-            this["image"] = JsonObject(strippedImage)
-            this["image_attached"] = JsonPrimitive(true)
-        }
-        return ToolResult.Success(JsonObject(strippedData))
     }
 
     private suspend fun requestPermissionIfNeeded(
