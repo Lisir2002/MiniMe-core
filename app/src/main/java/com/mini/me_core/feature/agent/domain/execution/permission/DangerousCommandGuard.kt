@@ -142,7 +142,6 @@ object DangerousCommandGuard {
 
     // ---------- Block 判定 ----------
 
-    private val PROCESS_SUB_RE = Regex("""(?i)<\s*\(\s*(?:curl|wget|wget2)\b""")
     private val KEYFILE_OVERWRITE_RE = Regex(
         """(?i)(?<![<>=])\s*>\s+/etc/(?:passwd|shadow|group|hosts|sudoers)\b"""
     )
@@ -192,10 +191,8 @@ object DangerousCommandGuard {
                 return "安全防护：禁止下载后直接执行远程脚本（供应链/代码执行风险）。请先 `curl -O` 下载检查，或用包管理器安装，而非 `curl URL | sh` 直接执行。"
             }
         }
-        // B1 兜底：进程替换 `<(curl ...)`
-        if (PROCESS_SUB_RE.containsMatchIn(command)) {
-            return "安全防护：禁止下载后直接执行远程脚本（供应链/代码执行风险）。请先 `curl -O` 下载检查，而非 `bash <(curl URL)` 直接执行。"
-        }
+        // B1 兜底：进程替换 / 跨段下载即执行 / 内联解释器联网 exec（下沉到 DownloadExecGuard）。
+        DownloadExecGuard.blockReason(command, segments, joiners)?.let { return it }
 
         // B2：chmod/chown 系统目录权限破坏（递归或宽松权限位）
         for (seg in segments) {
@@ -265,8 +262,6 @@ object DangerousCommandGuard {
 
         return null
     }
-
-    // ---------- Warn 判定 ----------
 
     private val SUDO_HIGH_RISK_RE = Regex(
         """(?i)\bsudo\b\s+(?:-[a-zA-Z]+\s+)*(?:chmod|chown|rm|shutdown|mkfs|dd|iptables|useradd|usermod)\b"""

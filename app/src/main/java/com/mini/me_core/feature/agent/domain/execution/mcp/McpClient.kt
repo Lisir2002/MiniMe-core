@@ -77,7 +77,9 @@ class McpClient(
         val result = response.result ?: throw McpException(message = "[$serverName] tools/call 无 result")
 
         val isError = (result["isError"] as? JsonPrimitive)?.contentOrNull == "true"
-        val text = flattenContent(result["content"])
+        val rawText = flattenContent(result["content"])
+        // MCP 返回文本为不可信外部数据：中和其中的指令模式并加围栏，防止被模型当作越权指令。
+        val text = McpContentSanitizer.sanitizeResult(rawText)
         return if (isError) "Error: $text" else text
     }
 

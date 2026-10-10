@@ -31,7 +31,9 @@ object BuiltInSafeCommands {
         "git stash list", "git remote -v"
     )
 
-    /** 自动放行的安全命令前缀（按 token 前缀匹配）。 */
+    /**
+     * 自动放行的安全命令前缀（按 token 前缀匹配）。
+     */
     val SAFE_PREFIXES: List<String> = listOf(
         // —— 目录/文件元信息查看（只读）——
         "ls", "pwd", "tree", "stat", "file", "du", "df",
@@ -48,7 +50,44 @@ object BuiltInSafeCommands {
         "ps", "top", "free", "htop", "vmstat", "lscpu", "lsblk", "arch", "clear", "history", "true", "false"
     ) + GIT_READ_ONLY_PREFIXES
 
-    /** 该段是否命中任一内置安全前缀。 */
-    fun isSafe(segmentTokens: List<String>): Boolean =
-        SAFE_PREFIXES.any { ShellCommandParser.matches(it, segmentTokens) }
+    /**
+     * 凭据/私钥类路径片段（小写包含即命中，大小写不敏感）。
+     * 命中这些路径的「只读」命令（cat/head/tail/grep/echo 等）也不进内置白名单，降级为 ASK。
+     */
+    private val CREDENTIAL_PATH_FRAGMENTS = listOf(
+        ".ssh", ".aws", ".env", ".pem",
+        "id_rsa", "id_ed25519", "id_dsa", "id_ecdsa",
+        "credentials", ".netrc", ".minime",
+        "shadow", "passwd", "sudoers", "gshadow",
+        ".gnupg", ".keychain", "wallet"
+    )
+
+    /** 裸 shell 变量展开：`$FOO` / `${FOO}`（不含 `$(...)`，那已由解析器判为不可静态判定）。 */
+    private val BARE_VAR_RE = Regex("""\$\{?[A-Za-z_][A-Za-z0-9_]*\}?""")
+
+    /** 该 token 是否指向凭据/私钥类路径。 */
+    private fun touchesCredentialPath(token: String): Boolean {
+        val lower = token.lowercase()
+        return CREDENTIAL_PATH_FRAGMENTS.any { lower.contains(it) }
+    }
+
+    /** 该 token 是否含裸 shell 变量展开。 */
+    private fun hasBareVar(token: String): Boolean = BARE_VAR_RE.containsMatchIn(token)
+
+    /**
+     * 该段是否命中任一内置安全前缀。
+     *
+     * 安全兜底：即使命令前缀在白名单内，只要参数指向凭据/私钥类路径，或含裸 `$VAR`/`${VAR}`
+     * （取值不可静态判定），也不自动放行——由上层降级为 ASK（fail-closed）。
+     */
+    fun isSafe(segmentTokens: List<String>): Boolean {
+        if (SAFE_PREFIXES.none { ShellCommandParser.matches(it, segmentTokens) }) return false
+        // 排除程序名本身（programPrefix），仅对参数 token 做凭据/变量扫描。
+        val eff = ShellCommandParser.programPrefix(segmentTokens)?.let { prog ->
+            segmentTokens.filter { it != prog }
+        } ?: segmentTokens
+        if (eff.any { touchesCredentialPath(it) }) return false
+        if (eff.any { hasBareVar(it) }) return false
+        return true
+    }
 }

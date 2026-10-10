@@ -1206,7 +1206,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                 if (partial.isNotEmpty() || reasoning.isNotBlank()) {
                                     send(AgentEvent.AssistantText(partial, emptyList(), reasoning))
                                 }
-                                actionQueue.addLast(AgentAction.LlmError("LLM 调用失败: ${e.message}"))
+                                actionQueue.addLast(AgentAction.LlmError("LLM 调用失败: ${AgentErrorSanitizer.sanitize(e.message)}"))
                             }
                         } finally {
                             if (state.pendingVisionRound) state = state.copy(pendingVisionRound = false)
@@ -1675,7 +1675,7 @@ class StatefulAgentWorkflow @Inject constructor(
                 }
             } catch (e: Exception) {
                 FileLogger.w(TAG, "技能自动触发执行异常: ${skill.id}", e)
-                "[自动触发异常] ${e.message}" to true
+                "[自动触发异常] ${AgentErrorSanitizer.sanitize(e.message)}" to true
             }
             // 会话级去重仅在「成功执行」后标记：失败/被用户拒绝不标记，用户可重试后再触发（根治"失败也算触发过"）。
             if (!isError) {

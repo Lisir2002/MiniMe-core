@@ -98,18 +98,30 @@ class PermissionRulesRepository @Inject constructor(
         if (state.value != null) return
         mutex.withLock {
             if (state.value != null) return
-            state.value = loadFromFile(projectFileForPath(workspacePath))
+            state.value = loadFromFile(projectFileForPath(workspacePath), enforceProjectRulePolicy = true)
         }
     }
 
-    private suspend fun loadFromFile(file: File): List<PermissionRule> =
+    private suspend fun loadFromFile(file: File, enforceProjectRulePolicy: Boolean = false): List<PermissionRule> =
         withContext(Dispatchers.IO) {
             if (!file.isFile) return@withContext emptyList()
             runCatching {
                 JSON.decodeFromString<PermissionFile>(file.readText()).toRuleList()
             }.getOrElse {
-                FileLogger.w(TAG, "读取 ${file.path} 失败: ${it.message}")
+                FileLogger.w(TAG, "读取 ${file.name} 失败: ${it.message}")
                 emptyList()
+            }.let { rules ->
+                if (!enforceProjectRulePolicy) return@let rules
+                // 项目规则落在可被 AI 改写的工作区内：禁止整工具 shell ALLOW（防自我提权）。
+                val (valid, invalid) = ProjectRuleValidator.filterProjectRules(rules)
+                if (invalid.isNotEmpty()) {
+                    FileLogger.w(
+                        TAG,
+                        "项目权限文件忽略 ${invalid.size} 条非法整工具 ALLOW 规则: " +
+                            invalid.joinToString("; ") { "${it.rule.toolName}(${it.rule.pattern})[${it.reason}]" }
+                    )
+                }
+                valid
             }
         }
 
@@ -182,6 +194,12 @@ class PermissionRulesRepository @Inject constructor(
         when (scope) {
             PermissionScope.GLOBAL -> editGlobal { if (rule !in it) it.add(rule) }
             PermissionScope.PROJECT -> {
+                // 项目规则写入前同样过校验器：shell/terminal 整工具 ALLOW 拒绝落盘，防 AI 自我提权。
+                val reason = ProjectRuleValidator.validate(rule)
+                if (reason != null) {
+                    FileLogger.w(TAG, "拒绝写入项目级整工具 ALLOW 规则[${rule.toolName} ${rule.pattern}]: $reason")
+                    return
+                }
                 val workspacePath = workspaceRepository.currentPath()
                 editProject(workspacePath) { if (rule !in it) it.add(rule) }
             }

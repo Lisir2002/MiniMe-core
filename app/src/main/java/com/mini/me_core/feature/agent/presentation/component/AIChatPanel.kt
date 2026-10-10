@@ -936,12 +936,7 @@ private fun ScrollToBottomButton(
                 slideOutVertically(tween(150)) { it / 3 } +
                 scaleOut(tween(150))
         ) {
-            var pressed by remember { mutableStateOf(false) }
-            val pressScale by animateFloatAsState(
-                targetValue = if (pressed) 0.92f else 1f,
-                animationSpec = tween(100),
-                label = "scrollButtonPress"
-            )
+            val pressBounce = rememberPressBounce()
             val hasUnread = unreadCount > 0
             val unreadText = if (unreadCount > 99) "99+" else unreadCount.toString()
             val contentDesc = if (hasUnread) {
@@ -951,7 +946,7 @@ private fun ScrollToBottomButton(
             }
 
             Surface(
-                modifier = Modifier.scale(pressScale),
+                modifier = Modifier.scale(pressBounce.scale),
                 shape = if (hasUnread) RoundedCornerShape(20.dp) else CircleShape,
                 color = MaterialTheme.colorScheme.primary,
                 tonalElevation = 4.dp,
@@ -961,12 +956,8 @@ private fun ScrollToBottomButton(
                     modifier = Modifier
                         .clickable(
                             onClick = {
-                                pressed = true
+                                pressBounce.trigger()
                                 onClick()
-                                kotlinx.coroutines.GlobalScope.launch {
-                                    kotlinx.coroutines.delay(150)
-                                    pressed = false
-                                }
                             }
                         )
                         .then(
@@ -1002,4 +993,34 @@ private fun ScrollToBottomButton(
         }
     }
 }
+
+/**
+ * 按钮按压回弹状态：按下时缩放到 0.92f，150ms 后自动复位。
+ * 抽离为独立 rememberer，避免 [ScrollToBottomButton] 承载按压动画的协程与状态逻辑。
+ * 复位协程由 [LaunchedEffect] 管理，随组合释放，不使用 GlobalScope。
+ */
+@Composable
+private fun rememberPressBounce(): PressBounceState {
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.92f else 1f,
+        animationSpec = tween(100),
+        label = "pressBounce"
+    )
+    LaunchedEffect(pressed) {
+        if (pressed) {
+            kotlinx.coroutines.delay(150)
+            pressed = false
+        }
+    }
+    return PressBounceState(
+        scale = scale,
+        trigger = { pressed = true }
+    )
+}
+
+private data class PressBounceState(
+    val scale: Float,
+    val trigger: () -> Unit
+)
 

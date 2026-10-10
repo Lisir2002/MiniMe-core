@@ -11,9 +11,9 @@ import kotlinx.serialization.json.JsonObject
  * 达到阈值时，生成 advisory 提醒（不阻塞、不改写、决策留给模型），由 workflow 在下一轮
  * CallLlm 时注入系统提示词末尾。
  *
- * 实现参考 [com.mini.me_core.core.network.DeltaAccumulator] 的观测思路：仅做状态统计与
- * 阈值判定，不持有业务逻辑。提醒按阈值级只触发一次（同一 streak 内 3/5/8 各提醒一次），
- * 参数签名经规范化 JSON 序列化，保证「相同参数」判定可靠。
+ * 线程安全：[record] 可能在并行 awaitAll 的多协程下被并发调用，[takeAdvisory] 由
+ * 非挂起的 PromptSource.build 同步取走。所有可变状态统一由对象锁保护，保证 streak 计数
+ * 与 pendingAdvisory 不丢、不重、不竞态。
  */
 class LoopGuardTracker(
     /** 连续相同调用提醒阈值序列（升序）。 */
@@ -26,7 +26,7 @@ class LoopGuardTracker(
     private var currentArgsSignature: String? = null
 
     /** 当前连续相同调用的次数。 */
-    private var count = 0
+    private var count: Int = 0
 
     /** 当前 streak 内已提醒过的阈值级，避免同一级重复提醒。 */
     private val announced = mutableSetOf<Int>()
@@ -35,16 +35,16 @@ class LoopGuardTracker(
     private var pendingAdvisory: String? = null
 
     /** 已累积的连续相同调用次数（供可观测/单测断言）。 */
-    val currentCount: Int get() = count
+    val currentCount: Int get() = synchronized(this) { count }
 
     /** 当前被连续追踪的工具名（供可观测/单测断言）。 */
-    val currentToolName: String? get() = currentTool
+    val currentToolName: String? get() = synchronized(this) { currentTool }
 
     /**
      * 记录一次已执行（或已批准执行）的工具调用。工具名与参数签名均与上次相同则 streak +1；
      * 否则重置 streak。命中未提醒的阈值级时生成 pending 提醒，由 [takeAdvisory] 取走。
      */
-    fun record(toolName: String, args: Map<String, JsonElement>) {
+    fun record(toolName: String, args: Map<String, JsonElement>) = synchronized(this) {
         val signature = argsSignature(args)
         if (toolName == currentTool && signature == currentArgsSignature) {
             count += 1
@@ -61,10 +61,10 @@ class LoopGuardTracker(
     }
 
     /** 取走待注入的提醒（一次性消费）；无未消费提醒时返回 null。 */
-    fun takeAdvisory(): String? {
+    fun takeAdvisory(): String? = synchronized(this) {
         val advisory = pendingAdvisory
         pendingAdvisory = null
-        return advisory
+        advisory
     }
 
     /** 规范化参数签名：稳定键序 JSON 序列化 + 长度上限（大参数如文件内容只取前段参与判定）。 */

@@ -85,45 +85,13 @@ class ToolPermissionPolicyEngine @Inject constructor(
         sandboxMode: SandboxMode? = null
     ): EvalResult {
         val capabilities = tool?.effectiveCapabilities(args).orEmpty()
-        sandboxMode?.let { sb ->
-            if (sb.isReadOnly && isDangerousTool(toolName, args, capabilities)) {
-                return EvalResult(
-                    Verdict.DENY, emptyList(),
-                    denyReason = "当前为 read-only 沙箱模式，系统物理沙盒已禁止任何修改类操作（含写文件/执行命令）。" +
-                        "请仅调用只读工具探索，不要尝试修改文件或执行命令；如需修改请显式切换沙箱模式。"
-                )
-            }
-            if (sb.isWorkspaceRestricted &&
-                capabilities.any { it in OUTSIDE_WORKSPACE_CAPABILITIES }
-            ) {
-                return EvalResult(
-                    Verdict.DENY, emptyList(),
-                    denyReason = "当前为 workspace-write 沙箱模式，禁止越出工作区的操作（容器环境/Agent 配置/网络写/外部工具/设备存储）。" +
-                        "工作区内文件读写与命令执行不受影响。"
-                )
-            }
-        }
-        if (mode == com.mini.me_core.feature.agent.domain.core.model.AgentMode.PLAN && isDangerousTool(toolName, args, capabilities)) {
-            return EvalResult(Verdict.DENY, emptyList(), denyReason = "当前处于 PLAN（计划）模式，系统物理沙盒已禁止修改系统状态或执行写操作。请在计划模式下仅调用只读工具探索代码，不要尝试修改文件或执行命令。")
-        }
+
+        val precheck = sandboxOrPlanDeny(toolName, args, capabilities, mode, sandboxMode)
+        if (precheck != null) return precheck
 
         if (mode == com.mini.me_core.feature.agent.domain.core.model.AgentMode.AUTO) {
-            // AUTO 模式放行所有权限，但仍保留灾难性 rm 防护（根目录/系统目录删除）与危险命令静态拦截
-            if (isShellTool(toolName, args)) {
-                val command = ((args["command"] ?: args["input"]) as? JsonPrimitive)?.content
-                if (command != null) {
-                    val analysis = ShellCommandParser.analyze(command)
-                    val blockReason = DangerousCommandGuard.blockReason(command)
-                    if (blockReason != null) {
-                        return EvalResult(Verdict.DENY, emptyList(), denyReason = blockReason)
-                    }
-                    val catastrophicReason = checkCatastrophicRm(analysis.segments)
-                    if (catastrophicReason != null) {
-                        return EvalResult(Verdict.DENY, emptyList(), denyReason = catastrophicReason)
-                    }
-                }
-            }
-            return EvalResult(Verdict.ALLOW, emptyList())
+            val autoResult = evaluateAuto(toolName, args, capabilities)
+            if (autoResult != null) return autoResult
         }
 
         if (capabilities == setOf(ToolCapability.READ_AGENT_CONFIG)) {
@@ -132,6 +100,96 @@ class ToolPermissionPolicyEngine @Inject constructor(
 
         val rules = rulesRepo.loadEffectiveForCurrentProject().filter { it.toolName == toolName }
         return if (isShellTool(toolName, args)) evaluateShell(rules, args) else evaluateGeneric(rules, capabilities)
+    }
+
+    /** 沙箱与 PLAN 模式的硬性拒绝前置；未命中返回 null。 */
+    private fun sandboxOrPlanDeny(
+        toolName: String,
+        args: Map<String, JsonElement>,
+        capabilities: Set<ToolCapability>,
+        mode: com.mini.me_core.feature.agent.domain.core.model.AgentMode,
+        sandboxMode: SandboxMode?
+    ): EvalResult? {
+        sandboxMode?.let { sb ->
+            if (sb.isReadOnly && isDangerousTool(toolName, args, capabilities)) {
+                return EvalResult(
+                    Verdict.DENY, emptyList(),
+                    denyReason = "当前为 read-only 沙箱模式，系统物理沙盒已禁止任何修改类操作（含写文件/执行命令）。" +
+                        "请仅调用只读工具探索，不要尝试修改文件或执行命令；如需修改请显式切换沙箱模式。"
+                )
+            }
+            if (sb.isWorkspaceRestricted && capabilities.any { it in OUTSIDE_WORKSPACE_CAPABILITIES }) {
+                return EvalResult(
+                    Verdict.DENY, emptyList(),
+                    denyReason = "当前为 workspace-write 沙箱模式，禁止越出工作区的操作（容器环境/Agent 配置/网络写/外部工具/设备存储）。" +
+                        "工作区内文件读写与命令执行不受影响。"
+                )
+            }
+        }
+        if (mode == com.mini.me_core.feature.agent.domain.core.model.AgentMode.PLAN &&
+            isDangerousTool(toolName, args, capabilities)
+        ) {
+            return EvalResult(
+                Verdict.DENY, emptyList(),
+                denyReason = "当前处于 PLAN（计划）模式，系统物理沙盒已禁止修改系统状态或执行写操作。请在计划模式下仅调用只读工具探索代码，不要尝试修改文件或执行命令。"
+            )
+        }
+        return null
+    }
+
+    /**
+     * AUTO 模式评估（fail-closed）。返回 null 表示非 AUTO 专属分支，落入通用规则评估。
+     *
+     *  - shell 命令：灾难 rm/危险命令 DENY → 不可静态判定 ASK 不可记忆 → 内置只读白名单 ALLOW
+     *    → 其余走与 NORMAL 相同的规则评估；
+     *  - 非 shell 的外部/配置类工具（EXTERNAL_TOOL 等）：ASK 不可记忆；
+     *  - 其余非 shell 工具：ALLOW。
+     */
+    private suspend fun evaluateAuto(
+        toolName: String,
+        args: Map<String, JsonElement>,
+        capabilities: Set<ToolCapability>
+    ): EvalResult? {
+        if (isShellTool(toolName, args)) {
+            val command = ((args["command"] ?: args["input"]) as? JsonPrimitive)?.content
+            if (command != null) {
+                return evaluateAutoShell(toolName, args, command)
+            }
+        }
+        if (capabilities.any { it in NON_REMEMBERABLE_CAPABILITIES }) {
+            return EvalResult(
+                Verdict.ASK,
+                rememberablePatterns = emptyList(),
+                rememberDisabledReason = "该工具会修改 Agent 配置、容器环境或调用外部动态工具，自动模式下也仅支持单次放行"
+            )
+        }
+        return EvalResult(Verdict.ALLOW, emptyList())
+    }
+
+    /** AUTO 模式下的 shell 命令评估（fail-closed）。 */
+    private suspend fun evaluateAutoShell(
+        toolName: String,
+        args: Map<String, JsonElement>,
+        command: String
+    ): EvalResult {
+        val analysis = ShellCommandParser.analyze(command)
+        val denyReason = DangerousCommandGuard.blockReason(command)
+            ?: checkCatastrophicRm(analysis.segments)
+        if (denyReason != null) {
+            return EvalResult(Verdict.DENY, emptyList(), denyReason = denyReason)
+        }
+        if (!analysis.analyzable) {
+            return EvalResult(
+                Verdict.ASK,
+                rememberablePatterns = emptyList(),
+                rememberDisabledReason = "命令含命令替换/here-doc/未闭合引号等不可静态判定结构，为安全起见在自动模式下也需单次确认"
+            )
+        }
+        if (analysis.segments.isNotEmpty() && analysis.segments.all { BuiltInSafeCommands.isSafe(it) }) {
+            return EvalResult(Verdict.ALLOW, emptyList())
+        }
+        val rules = rulesRepo.loadEffectiveForCurrentProject().filter { it.toolName == toolName }
+        return evaluateShell(rules, args)
     }
 
     private fun isDangerousTool(toolName: String, args: Map<String, JsonElement>, capabilities: Set<ToolCapability>): Boolean {
@@ -193,26 +251,8 @@ class ToolPermissionPolicyEngine @Inject constructor(
         return EvalResult(Verdict.ASK, listOf(PermissionRule.WHOLE_TOOL))
     }
 
-    private fun checkCatastrophicRm(segments: List<List<String>>): String? {
-        val sysDirs = setOf("/bin", "/boot", "/dev", "/etc", "/home", "/lib", "/lib64", "/opt", "/proc", "/root", "/run", "/sbin", "/sys", "/usr", "/var")
-        for (seg in segments) {
-            val rmInfo = ShellCommandParser.parseRmInfo(seg)
-            if (!rmInfo.isRm) continue
-            for (rawPath in rmInfo.targetPaths) {
-                val p = rawPath.trim()
-                val normalized = if (p.length > 1) p.trimEnd('/') else p
-                if (normalized == "/" || normalized == "/*" || normalized == "//*") return "安全防护：禁止执行高危删除操作（根目录删除）"
-                if (normalized == "*" || normalized == ".*" || normalized == "." || normalized == "./*" || normalized == ".." || normalized == "../.*") return "安全防护：禁止执行高危删除操作（全局或相对路径通配删除）"
-                if (normalized == "~" || normalized == "~/*") return "安全防护：禁止执行高危删除操作（用户目录删除）"
-                if (normalized == "~/workspace" || normalized == "~/workspace/*" || normalized == "~/workspace/.*" || normalized == "~/workspace/." || normalized == "~/workspace/.." || normalized.startsWith("~/workspace/../") || normalized == "/root/workspace" || normalized == "/root/workspace/*" || normalized == "/root/workspace/.*" || normalized == "/root/workspace/." || normalized == "/root/workspace/.." || normalized.startsWith("/root/workspace/../") || normalized == "workspace" || normalized == "workspace/*") return "安全防护：禁止执行高危删除操作（工作区根目录删除）"
-                if (normalized == "/tmp" || normalized == "/tmp/*") return "安全防护：禁止执行高危删除操作（系统临时目录整体删除）"
-                if (sysDirs.any { normalized == it || normalized.startsWith("$it/") || normalized.startsWith("$it/*") }) {
-                    return "安全防护：禁止执行高危删除操作（系统关键目录删除）"
-                }
-            }
-        }
-        return null
-    }
+    internal fun checkCatastrophicRm(segments: List<List<String>>): String? =
+        CatastrophicRmGuard.reason(segments)
 
     private fun evaluateShell(rules: List<PermissionRule>, args: Map<String, JsonElement>): EvalResult {
         val command = ((args["command"] ?: args["input"]) as? JsonPrimitive)?.content

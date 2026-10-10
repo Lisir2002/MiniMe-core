@@ -40,7 +40,7 @@ class McpTool(
     override val name: String = buildNamespacedName(client.serverName, descriptor.name)
 
     override val description: String =
-        descriptor.description ?: "MCP 工具 ${descriptor.name}（来自 ${client.serverName}）"
+        McpContentSanitizer.sanitizeDescription(descriptor.description, client.serverName, descriptor.name)
     override val capabilities = setOf(ToolCapability.EXTERNAL_TOOL)
 
     // MCP 工具直接用原始 schema，不走 parameters 这条路；保留空 map 满足基类契约。
