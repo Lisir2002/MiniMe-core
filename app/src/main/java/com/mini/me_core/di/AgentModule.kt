@@ -71,7 +71,7 @@ object AgentModule {
     // DbSplitMigrator 一次性拆库）已全部移除。本模块只保留网络/工具/工作流绑定。
     // ══════════════════════════════════════════════════════════
 
-    // ══ RC69 T2I：ImageGenerator（interface）→ OpenAiCompatibleImageGenerator（实现）绑定
+    // ══ T2I：ImageGenerator（interface）→ OpenAiCompatibleImageGenerator（实现）绑定
     //   AgentModule 是 @Module object，不能用 @Binds，所以用 @Provides 包一层构造器注入的 impl。
     @Provides
     @Singleton
@@ -87,10 +87,10 @@ object AgentModule {
             com.mini.me_core.feature.t2i.data.remote.T2IModelProbeService = impl
 
     // ══════════════════════════════════════════════════════════
-    // 阶段1：双 OkHttpClient 实例隔离
+    // 双 OkHttpClient 实例隔离
     //   - directClient（@Named("direct")）：直连，不走代理。用于国内模型、压缩/识图等子模型。
     //   - proxyClient（@Named("proxy")）：走 proxySelector。用于需要代理的国外模型（OpenAI/Anthropic/Gemini）。
-    //   代理不通时由 ProxyHealthMonitor + ProxyRouteHolder 自动降级为直连（见阶段4）。
+    //   代理不通时由 ProxyHealthMonitor + ProxyRouteHolder 自动降级为直连（见 ProxyHealthMonitor 降级路径）。
     // ══════════════════════════════════════════════════════════
 
     /** 直连 OkHttpClient：强制 NO_PROXY，所有请求直接出网，彻底隔绝系统代理污染。 */
@@ -110,7 +110,7 @@ object AgentModule {
             // 即使系统 WiFi 设置了全局代理、或应用内某处调用了 ProxySelector.setDefault，
             // directClient 也绝对不会走代理，确保国内模型接口零污染。
             .proxy(Proxy.NO_PROXY)
-            // 安全审计 P2-7：探测非回环明文 http:// 请求并全局弹窗提示改用 HTTPS（仅上报不阻断）。
+            // 安全审计：探测非回环明文 http:// 请求并全局弹窗提示改用 HTTPS（仅上报不阻断）。
             .addInterceptor(com.mini.me_core.core.network.HttpWarningInterceptor(httpWarningBridge))
             // F6.6：仅 debug 构建加入网络监控拦截器（记录 URL/状态/耗时/大小，敏感头脱敏）；
             // release 不加入，零开销、零隐私泄漏。
@@ -119,11 +119,11 @@ object AgentModule {
                     addInterceptor(com.mini.me_core.core.performance.NetworkMonitorInterceptor())
                 }
             }
-            // 网络层优化 C2：连接池调优（默认 5 连接 / 5min 保活）。模型接口常往返复用，
+            // 连接池调优（默认 5 连接 / 5min 保活）。模型接口常往返复用，
             // 放宽到 8 连接 / 15min 提升长连接复用率，降低首字节（TTFT）延迟。
             .connectionPool(okhttp3.ConnectionPool(8, 15, TimeUnit.MINUTES))
-            // 网络层优化 C3：短 TTL DNS 缓存，避免每次连接走系统 DNS（弱网可省几十~几百 ms）。
-            // 网络层优化 C5+：系统解析失败时回退公共 DNS（223.5.5.5 等）兜底，规避
+            // 短 TTL DNS 缓存，避免每次连接走系统 DNS（弱网可省几十~几百 ms）。
+            // 系统解析失败时回退公共 DNS（223.5.5.5 等）兜底，规避
             // "Unable to resolve host"（被网络分流/私人 DNS 劫持时系统查不到、公共 DNS 却可查）。
             .dns(com.mini.me_core.core.network.PublicDnsFallback(com.mini.me_core.core.network.CachingDns()))
             .build()
@@ -138,7 +138,7 @@ object AgentModule {
         httpWarningBridge: com.mini.me_core.core.network.HttpWarningBridge
     ): OkHttpClient {
         // 配置与 directClient 完全一致，唯一区别是挂载了 proxySelector。
-        // 后续阶段（阶段4）proxySelector 会感知 ProxyHealthMonitor，代理不通时自动降级直连。
+        // 后续 proxySelector 会感知 ProxyHealthMonitor，代理不通时自动降级直连。
         return OkHttpClient.Builder()
             .connectTimeout(120, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS)
@@ -173,7 +173,7 @@ object AgentModule {
     @Singleton
     @Named("OpenAI")
     fun provideOpenAIRetrofit(@Named("direct") client: OkHttpClient): Retrofit {
-        // 阶段1：暂时统一用 direct client，后续阶段按 needsProxy 配置路由到 proxyClient。
+        // 暂时统一用 direct client，后续按 needsProxy 配置路由到 proxyClient。
         return Retrofit.Builder()
             .baseUrl("https://api.openai.com/")
             .client(client)
@@ -185,7 +185,7 @@ object AgentModule {
     @Singleton
     @Named("Anthropic")
     fun provideAnthropicRetrofit(@Named("direct") client: OkHttpClient): Retrofit {
-        // 阶段1：暂时统一用 direct client，后续阶段按 needsProxy 配置路由到 proxyClient。
+        // 暂时统一用 direct client，后续按 needsProxy 配置路由到 proxyClient。
         return Retrofit.Builder()
             .baseUrl("https://api.anthropic.com/")
             .client(client)
@@ -209,7 +209,7 @@ object AgentModule {
     @Singleton
     @Named("Gemini")
     fun provideGeminiRetrofit(@Named("direct") client: OkHttpClient): Retrofit {
-        // 阶段1：暂时统一用 direct client，后续阶段按 needsProxy 配置路由到 proxyClient。
+        // 暂时统一用 direct client，后续按 needsProxy 配置路由到 proxyClient。
         return Retrofit.Builder()
             .baseUrl("https://generativelanguage.googleapis.com/")
             .client(client)
@@ -344,7 +344,7 @@ object AgentModule {
             registerTool("switchMode", switchModeTool)
             registerTool("todo", todoTool)
             registerTool("memory", memoryTool)
-            // ══ RC69 T2I 文生图工具：generateImage(prompt="...", width, height, steps, hd, model)
+            // ══ T2I 文生图工具：generateImage(prompt="...", width, height, steps, hd, model)
             registerTool("generateImage", generateImageTool)
             // ══ 内置服务浏览器：模型在共享 WebView 会话中浏览/操作网页（含容器服务与登录站点）
             registerTool("browser", browserTool)
@@ -449,87 +449,94 @@ object AgentModule {
         return com.mini.me_core.feature.agent.domain.execution.tool.IncrementalIndexStore()
     }
 
+    // StatefulAgentWorkflow 依赖按层分组（层内保持注入/实参原顺序，未做任何重排或实例化改动）：
+    // 模型/供应商层 → 网络/代理层 → 提示词/权限/审批 → 上下文压缩 → 计划审批 → 工具产物
+    // → 模型/设置配置 → 会话/持久化 → 工具执行调度 → 技能/Hook/唤醒 → 目标/计划 → 护栏 → 设置/护栏日志 → 轨迹/剧本。
     @Provides
     @Singleton
     fun provideAgentWorkflow(
+        // ── 模型/供应商层 ──
         toolRegistry: ToolRegistry,
         aiProviderRepository: AIProviderRepository,
         openAIApi: OpenAIApi,
         anthropicApi: AnthropicApi,
         geminiApi: GeminiApi,
+        // ── 网络/代理层 ──
         @Named("direct") okHttpClient: OkHttpClient,
         @Named("proxy") proxyOkHttpClient: OkHttpClient,
         proxyHealthMonitor: com.mini.me_core.feature.proxy.domain.ProxyHealthMonitor,
+        // ── 提示词 / 权限 / 审批 ──
         promptProvider: SystemPromptProvider,
         permissionManager: ToolPermissionManager,
         policyEngine: ToolPermissionPolicyEngine,
+        // ── 上下文压缩 ──
         contextCompactor: com.mini.me_core.feature.agent.domain.execution.workflow.ContextCompactor,
+        // ── 计划审批 ──
         planApprovalManager: com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalManager,
+        // ── 工具产物 ──
         toolOutputStore: ToolOutputStore,
+        // ── 模型 / 设置配置 ──
         modelMetadataService: ModelMetadataService,
         visionModelSettingsRepository: com.mini.me_core.feature.settings.data.repository.VisionModelSettingsRepository,
         compactionModelSettingsRepository: com.mini.me_core.feature.settings.data.repository.CompactionModelSettingsRepository,
         compatibilityPolicyRepository: com.mini.me_core.feature.settings.data.repository.CompatibilityPolicyRepository,
+        // ── 会话 / 持久化 ──
         sessionUseCase: com.mini.me_core.feature.agent.domain.session.SessionUseCase,
         messagePersistenceUseCase: com.mini.me_core.feature.agent.domain.session.MessagePersistenceUseCase,
         checkpointManager: com.mini.me_core.feature.agent.domain.session.checkpoint.CheckpointManager,
+        // ── 工具执行调度 ──
         dependencyScheduler: com.mini.me_core.feature.agent.domain.execution.tool.ToolDependencyScheduler,
         toolResultCache: com.mini.me_core.feature.agent.domain.execution.tool.ToolResultCache,
         toolEventBus: com.mini.me_core.feature.agent.domain.execution.tool.ToolEventBus,
         incrementalIndexStore: com.mini.me_core.feature.agent.domain.execution.tool.IncrementalIndexStore,
+        // ── 技能 / Hook / 唤醒调度 ──
         skillStateRepository: com.mini.me_core.feature.agent.domain.knowledge.skill.SkillStateRepository,
         skillExecutor: com.mini.me_core.feature.agent.domain.knowledge.skill.SkillExecutor,
         skillRuntimeProbe: com.mini.me_core.feature.agent.domain.knowledge.skill.SkillRuntimeProbe,
         hookDispatcher: com.mini.me_core.feature.agent.domain.core.hook.HookDispatcher,
         wakeQueueManager: com.mini.me_core.feature.agent.domain.schedule.wake.WakeQueueManager,
+        // ── 目标 / 计划 ──
         goalService: com.mini.me_core.feature.agent.domain.session.goal.GoalService,
         planService: com.mini.me_core.feature.agent.domain.session.plan.PlanService,
+        // ── 护栏 ──
         toolGuards: Set<@JvmSuppressWildcards com.mini.me_core.feature.agent.domain.core.guard.ToolGuard>,
         fileObservationGuard: com.mini.me_core.feature.agent.domain.core.guard.FileObservationGuard,
+        // ── 设置 / 护栏日志 ──
         normFlowSettingsRepository: com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository,
         guardLogRepository: com.mini.me_core.feature.agent.domain.core.guard.GuardLogRepository,
+        // ── 轨迹 / 剧本 ──
         trajectoryService: com.mini.me_core.feature.agent.domain.session.trajectory.TrajectoryService,
         playbookExecutor: com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookExecutor
     ): AgentWorkflow {
         return com.mini.me_core.feature.agent.domain.execution.workflow.StatefulAgentWorkflow(
-            toolRegistry,
-            aiProviderRepository,
-            openAIApi,
-            anthropicApi,
-            geminiApi,
-            okHttpClient,
-            proxyOkHttpClient,
-            proxyHealthMonitor,
-            promptProvider,
-            permissionManager,
-            policyEngine,
+            // ── 模型/供应商层 ──
+            toolRegistry, aiProviderRepository, openAIApi, anthropicApi, geminiApi,
+            // ── 网络/代理层 ──
+            okHttpClient, proxyOkHttpClient, proxyHealthMonitor,
+            // ── 提示词 / 权限 / 审批 ──
+            promptProvider, permissionManager, policyEngine,
+            // ── 上下文压缩 ──
             contextCompactor,
+            // ── 计划审批 ──
             planApprovalManager,
+            // ── 工具产物 ──
             toolOutputStore,
-            modelMetadataService,
-            visionModelSettingsRepository,
-            compactionModelSettingsRepository,
-            compatibilityPolicyRepository,
-            sessionUseCase,
-            messagePersistenceUseCase,
-            checkpointManager,
-            dependencyScheduler,
-            toolResultCache,
-            toolEventBus,
-            incrementalIndexStore,
-            skillStateRepository,
-            skillExecutor,
-            skillRuntimeProbe,
-            hookDispatcher,
-            wakeQueueManager,
-            goalService,
-            planService,
-            toolGuards,
-            fileObservationGuard,
-            normFlowSettingsRepository,
-            guardLogRepository,
-            trajectoryService,
-            playbookExecutor
+            // ── 模型 / 设置配置 ──
+            modelMetadataService, visionModelSettingsRepository, compactionModelSettingsRepository, compatibilityPolicyRepository,
+            // ── 会话 / 持久化 ──
+            sessionUseCase, messagePersistenceUseCase, checkpointManager,
+            // ── 工具执行调度 ──
+            dependencyScheduler, toolResultCache, toolEventBus, incrementalIndexStore,
+            // ── 技能 / Hook / 唤醒调度 ──
+            skillStateRepository, skillExecutor, skillRuntimeProbe, hookDispatcher, wakeQueueManager,
+            // ── 目标 / 计划 ──
+            goalService, planService,
+            // ── 护栏 ──
+            toolGuards, fileObservationGuard,
+            // ── 设置 / 护栏日志 ──
+            normFlowSettingsRepository, guardLogRepository,
+            // ── 轨迹 / 剧本 ──
+            trajectoryService, playbookExecutor
         )
     }
 }
