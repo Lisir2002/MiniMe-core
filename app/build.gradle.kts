@@ -626,4 +626,6 @@ detekt {
     allRules = false
     source.setFrom(files("src/main/java"))
     parallel = true
+    // 存量问题记账在 baseline（来自 main 基线），门禁只拦截本次改动引入的新问题。
+    baseline = file("$rootDir/config/detekt/baseline.xml")
 }

@@ -10,7 +10,6 @@ build:
 config:
   validation: true
   warningsAsErrors: false
-  checkExhaustiveWhen: false
 
 processors:
   active: true
@@ -198,8 +197,6 @@ empty-blocks:
 
 exceptions:
   active: true
-  CatchRuntimeException:
-    active: true
   ExceptionRaisedInUnexpectedLocation:
     active: true
     methodNames: ['equals', 'finalize', 'hashCode', 'toString']
@@ -291,7 +288,6 @@ naming:
     active: true
     parameterPattern: '[a-z][A-Za-z0-9]*'
     excludeClassPattern: '$^'
-    ignoresOverridden: true
   InvalidPackageDeclaration:
     active: true
     requireRootInDeclaration: false
@@ -315,7 +311,8 @@ naming:
     privatePropertyPattern: '(_)?[A-Za-z][_A-Za-z0-9]*'
   PackageNaming:
     active: true
-    packagePattern: '[a-z]+(\.[a-z][A-Za-z0-9]*)*'
+    # 项目根包名为 com.mini.me_core（段内含下划线），在默认规则基础上允许段内下划线。
+    packagePattern: '[a-z]+(\.[a-z][A-Za-z0-9_]*)*'
   TopLevelPropertyNaming:
     active: true
     constantPattern: '[A-Z][_A-Z0-9]*'
@@ -332,7 +329,6 @@ naming:
     variablePattern: '[a-z][A-Za-z0-9]*'
     privateVariablePattern: '(_)?[a-z][A-Za-z0-9]*'
     excludeClassPattern: '$^'
-    ignoresOverridden: true
 
 performance:
   active: true
@@ -402,12 +398,6 @@ potential-bugs:
     active: true
   IteratorHasNextCallsNextMethod:
     active: true
-  JavaCollectionsStaticMethod:
-    active: false
-  LazyThreadSafetyMode:
-    active: true
-  UnconditionalJumpInLoop:
-    active: true
   UnsafeCallOnNullableType:
     active: true
   UnsafeCast:
@@ -451,7 +441,7 @@ style:
     includeLineWrapping: false
   ForbiddenComment:
     active: true
-    values: ['FIXME', 'STOPSHIP', 'TODO:']
+    comments: ['FIXME', 'STOPSHIP', 'TODO:']
     allowedPatterns: ''
   ForbiddenImport:
     active: false
@@ -485,7 +475,7 @@ style:
     ignoreEnums: false
     ignoreRanges: false
     ignoreExtensionFunctions: true
-  MandatoryBracesIfStatements:
+  BracesOnIfStatements:
     active: false
   MaxChainedCallsOnSameLine:
     active: false

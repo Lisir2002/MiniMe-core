@@ -40,10 +40,11 @@
   ```properties
   # app/keystore.properties
   storeFile=minime.jks
-  storePassword=9d4d4f44c1eaf5bcd57c68c5c4dab893
+  storePassword=9d4d4f44****（已脱敏）
   keyAlias=minime
-  keyPassword=9d4d4f44c1eaf5bcd57c68c5c4dab893
+  keyPassword=9d4d4f44****（已脱敏）
   ```
+  > 修复说明（security-hardening）：明文签名口令已从全部 `build.gradle.kts` 与 CI 工作流移除，改由 GitHub Secrets（`SIGNING_STORE_PASSWORD` 等）在发布时注入；release 构建在缺少密钥或证书指纹不匹配时 fail-closed。为保证老用户可覆盖升级，本次未轮换 keystore；完整处置见 `SECURITY.md`。
   仓库 `git ls-files` 确认 `app/minime.jks`、`app/keystore.properties` 均被跟踪；仓库为 **Public**，任何人 clone 即可下载签名私钥与口令。`SECURITY.md:52` 与 `branding.gradle.kts:37-38` 已「维护者知情决策」地承认这一点。
 - **风险描述**：私钥口令明文且公开。任何人均可用同一把 `minime.jks` 签名 APK，使其与官方包具有**相同签名指纹**。
 - **影响**：
