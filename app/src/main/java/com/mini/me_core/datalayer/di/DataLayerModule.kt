@@ -224,55 +224,51 @@ object DataLayerModule {
 
     // ── 6 个 Database：从 ConnectionPool 获取加密驱动 ──────────────────
 
+    // schema 校验与结构自愈的唯一入口是 ConnectionPool.onOpened（见 provideConnectionPool 的 hook）：
+    // pool.driver(lib) 首次冷开时在写缓存前同步执行 ensureSchema（AGENT 库另跑 4 个自愈/复核），
+    // 失败即关连接、不缓存、异常上抛，下次打开自动重跑。这里不再二次调用——
+    // 二次 ensureSchema 命中「版本已对齐 no-op」、二次自愈命中「列已齐 skip」，属纯冗余幂等调用，
+    // 且 onOpened 已对致命拒绝（MigrationRejected）上抛、对自愈失败 onFailure 上抛，失败路径与原二次调用等价。
+
     @Provides
     @Singleton
-    fun provideAgentDb(pool: ConnectionPool, engine: MigrationEngine): AgentDb {
+    fun provideAgentDb(pool: ConnectionPool): AgentDb {
         val driver = pool.driver(LibName.AGENT)
-        engine.ensureSchema(LibName.AGENT, driver, AgentDb.Schema)
-        SchemaSelfHealer.healAgentSession(driver)
-        SchemaSelfHealer.healAgentMessage(driver)
-        SchemaSelfHealer.ensureAgentMessageUsable(driver)
-        SchemaSelfHealer.ensureAgentSessionUsable(driver)
         return AgentDb(driver)
     }
 
     @Provides
     @Singleton
-    fun provideCredentialsDb(pool: ConnectionPool, engine: MigrationEngine): CredentialsDb {
+    fun provideCredentialsDb(pool: ConnectionPool): CredentialsDb {
         val driver = pool.driver(LibName.CREDENTIALS)
-        engine.ensureSchema(LibName.CREDENTIALS, driver, CredentialsDb.Schema)
         return CredentialsDb(driver)
     }
 
     @Provides
     @Singleton
-    fun provideSettingsDb(pool: ConnectionPool, engine: MigrationEngine): SettingsDb {
+    fun provideSettingsDb(pool: ConnectionPool): SettingsDb {
         val driver = pool.driver(LibName.SETTINGS)
-        engine.ensureSchema(LibName.SETTINGS, driver, SettingsDb.Schema)
         return SettingsDb(driver)
     }
 
     @Provides
     @Singleton
-    fun provideWorkspaceDb(pool: ConnectionPool, engine: MigrationEngine): WorkspaceDb {
+    fun provideWorkspaceDb(pool: ConnectionPool): WorkspaceDb {
         val driver = pool.driver(LibName.WORKSPACE)
-        engine.ensureSchema(LibName.WORKSPACE, driver, WorkspaceDb.Schema)
         return WorkspaceDb(driver)
     }
 
     @Provides
     @Singleton
-    fun provideT2iDb(pool: ConnectionPool, engine: MigrationEngine): T2iDb {
+    fun provideT2iDb(pool: ConnectionPool): T2iDb {
         val driver = pool.driver(LibName.T2I)
-        engine.ensureSchema(LibName.T2I, driver, T2iDb.Schema)
         return T2iDb(driver)
     }
 
     @Provides
     @Singleton
-    fun provideInfraDb(pool: ConnectionPool, engine: MigrationEngine): InfraDb {
+    fun provideInfraDb(pool: ConnectionPool): InfraDb {
         val driver = pool.driver(LibName.INFRA)
-        engine.ensureSchema(LibName.INFRA, driver, InfraDb.Schema)
         return InfraDb(driver)
     }
 
@@ -328,7 +324,7 @@ object DataLayerModule {
     @Singleton
     fun provideT2iRepository(db: T2iDb): T2iRepository = T2iRepository(db)
 
-    // ── P2 扩展：健康检查 / 备份恢复 / 清理 / 性能监控 ───────────────────
+    // ── 健康检查 / 备份恢复 / 清理 / 性能监控 ───────────────────
 
     @Provides
     @Singleton
