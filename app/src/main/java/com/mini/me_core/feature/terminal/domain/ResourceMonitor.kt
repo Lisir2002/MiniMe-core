@@ -1,6 +1,6 @@
 package com.mini.me_core.feature.terminal.domain
 
-import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
+import com.mini.me_core.core.container.api.ContainerEnginePort
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -21,7 +21,7 @@ data class ResourceSnapshot(
  */
 @Singleton
 class ResourceMonitor @Inject constructor(
-    private val engine: LinuxContainerEngine,
+    private val engine: ContainerEnginePort,
 ) {
     fun sampleFlow(intervalMs: Long = 2000L): Flow<ResourceSnapshot> = flow {
         var prevIdle: Long = 0L

@@ -66,8 +66,8 @@ object EnvironmentDetector {
      * 供「首次启动未持久化 profile」时选用（见 ContainerSettingsRepository 与 LinuxContainerEngine）。
      */
     fun defaultProfileId(): String =
-        if (hostIsX86_64) com.mini.me_core.feature.agent.domain.container.ContainerProfile.BUILTIN_X86_ID
-        else com.mini.me_core.feature.agent.domain.container.ContainerProfile.BUILTIN_ID
+        if (hostIsX86_64) com.mini.me_core.core.container.api.ContainerProfile.BUILTIN_X86_ID
+        else com.mini.me_core.core.container.api.ContainerProfile.BUILTIN_ID
 
     /**
      * 安全读取 `ro.kernel.qemu`（最可靠的模拟器信号）。该属性走隐藏 API [android.os.SystemProperties]，

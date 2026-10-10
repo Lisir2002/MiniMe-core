@@ -1,7 +1,7 @@
 package com.mini.me_core.feature.agent.presentation
 
 import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
-import com.mini.me_core.feature.agent.domain.container.ContainerInitState
+import com.mini.me_core.core.container.api.ContainerInitState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

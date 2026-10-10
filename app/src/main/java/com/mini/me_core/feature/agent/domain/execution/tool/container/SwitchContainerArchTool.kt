@@ -1,8 +1,8 @@
 package com.mini.me_core.feature.agent.domain.execution.tool.container
 
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.ContainerArch
-import com.mini.me_core.feature.agent.domain.container.ContainerProfile
+import com.mini.me_core.core.container.api.ContainerArch
+import com.mini.me_core.core.container.api.ContainerProfile
 import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType

@@ -39,9 +39,9 @@ import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
-import com.mini.me_core.feature.agent.domain.container.ContainerArch
-import com.mini.me_core.feature.agent.domain.container.ContainerProfile
-import com.mini.me_core.feature.agent.domain.container.RootfsSource
+import com.mini.me_core.core.container.api.ContainerArch
+import com.mini.me_core.core.container.api.ContainerProfile
+import com.mini.me_core.core.container.api.RootfsSource
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
 

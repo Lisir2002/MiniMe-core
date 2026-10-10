@@ -1,7 +1,7 @@
 package com.mini.me_core.feature.terminal.domain
 
+import com.mini.me_core.core.container.api.ContainerEnginePort
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,7 +27,7 @@ data class ContainerFileEntry(
  */
 @Singleton
 class ContainerFileAccess @Inject constructor(
-    private val engine: LinuxContainerEngine,
+    private val engine: ContainerEnginePort,
 ) {
     companion object {
         private const val TAG = "ContainerFileAccess"

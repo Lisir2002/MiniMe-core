@@ -2,9 +2,9 @@ package com.mini.me_core.feature.settings.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mini.me_core.feature.agent.domain.container.ConnectionState
+import com.mini.me_core.core.container.api.ConnectionState
 import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
-import com.mini.me_core.feature.agent.domain.container.ContainerProfile
+import com.mini.me_core.core.container.api.ContainerProfile
 import com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpConfigRepository
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpManager

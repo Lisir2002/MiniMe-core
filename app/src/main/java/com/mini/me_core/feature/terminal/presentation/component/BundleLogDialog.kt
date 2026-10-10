@@ -78,10 +78,10 @@ import androidx.compose.ui.window.DialogProperties
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.components.AppTopAppBar
-import com.mini.me_core.feature.agent.domain.container.progress.AggregateProgressState
-import com.mini.me_core.feature.agent.domain.container.progress.InstallPhase
-import com.mini.me_core.feature.agent.domain.container.progress.LogLine
-import com.mini.me_core.feature.agent.domain.container.progress.LogLineKind
+import com.mini.me_core.core.container.api.AggregateProgressState
+import com.mini.me_core.core.container.api.InstallPhase
+import com.mini.me_core.core.container.api.LogLine
+import com.mini.me_core.core.container.api.LogLineKind
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Build

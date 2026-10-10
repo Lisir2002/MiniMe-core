@@ -1,5 +1,7 @@
 package com.mini.me_core.feature.agent.domain.container.progress
 
+import com.mini.me_core.core.container.api.DownloadSlot
+import com.mini.me_core.core.container.api.SlotStatus
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.domain.container.CommandEvent
 import com.mini.me_core.feature.agent.domain.container.ContainerInstaller

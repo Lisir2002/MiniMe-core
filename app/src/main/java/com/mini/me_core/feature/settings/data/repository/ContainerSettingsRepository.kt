@@ -2,7 +2,7 @@ package com.mini.me_core.feature.settings.data.repository
 
 import com.mini.me_core.core.environment.EnvironmentDetector
 import com.mini.me_core.datalayer.store.KVStore
-import com.mini.me_core.feature.agent.domain.container.ContainerProfile
+import com.mini.me_core.core.container.api.ContainerProfile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map

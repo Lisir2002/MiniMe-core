@@ -58,9 +58,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.container.ContainerArch
-import com.mini.me_core.feature.agent.domain.container.ContainerProfile
-import com.mini.me_core.feature.agent.domain.container.RootfsSource
+import com.mini.me_core.core.container.api.ContainerArch
+import com.mini.me_core.core.container.api.ContainerProfile
+import com.mini.me_core.core.container.api.RootfsSource
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
 import com.mini.me_core.feature.workspace.domain.model.RemoteProtocol

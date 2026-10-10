@@ -51,8 +51,8 @@ import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.components.AppBottomSheet
 import com.mini.me_core.core.theme.components.AppTextField
-import com.mini.me_core.feature.agent.domain.container.ContainerProfile
-import com.mini.me_core.feature.agent.domain.container.RootfsSource
+import com.mini.me_core.core.container.api.ContainerProfile
+import com.mini.me_core.core.container.api.RootfsSource
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.workspace.domain.model.RemoteConnection
 import com.mini.me_core.feature.workspace.domain.model.RemoteProtocol

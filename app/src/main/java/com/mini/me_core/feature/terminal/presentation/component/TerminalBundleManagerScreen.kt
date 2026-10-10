@@ -68,8 +68,8 @@ import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.core.theme.components.AppSegmentedControl
-import com.mini.me_core.feature.agent.domain.container.ContainerInitState
-import com.mini.me_core.feature.agent.domain.container.GlobalInstallArchiveStore
+import com.mini.me_core.core.container.api.ContainerInitState
+import com.mini.me_core.core.container.api.GlobalInstallArchiveStore
 import com.mini.me_core.feature.terminal.data.bundle.BundleInstallState
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId
 import com.mini.me_core.feature.terminal.presentation.TerminalSettingsViewModel

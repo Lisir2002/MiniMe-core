@@ -1,6 +1,5 @@
-package com.mini.me_core.feature.agent.domain.container
+package com.mini.me_core.core.container.api
 
-import com.mini.me_core.feature.agent.domain.container.progress.AggregateProgressState
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId
 
 /**

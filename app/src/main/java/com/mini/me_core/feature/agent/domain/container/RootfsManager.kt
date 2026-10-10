@@ -1,5 +1,7 @@
 package com.mini.me_core.feature.agent.domain.container
 
+import com.mini.me_core.core.container.api.ContainerArch
+import com.mini.me_core.core.container.api.ContainerProfile
 import com.mini.me_core.core.environment.EnvironmentDetector
 import com.mini.me_core.core.util.FileLogger
 

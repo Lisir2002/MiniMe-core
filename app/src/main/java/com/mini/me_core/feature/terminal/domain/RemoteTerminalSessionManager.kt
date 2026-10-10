@@ -1,7 +1,7 @@
 package com.mini.me_core.feature.terminal.domain
 
+import com.mini.me_core.core.container.api.SshConnectionPort
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
 import com.mini.me_core.feature.workspace.data.repository.WorkspaceRepository
@@ -50,7 +50,7 @@ internal object ShellQuote {
  */
 @Singleton
 class RemoteTerminalSessionManager @Inject constructor(
-    private val connection: RemoteSshConnection,
+    private val connection: SshConnectionPort,
     private val modeHolder: ExecutionModeHolder,
     private val workspaceRepository: WorkspaceRepository
 ) : TerminalSessionProvider {

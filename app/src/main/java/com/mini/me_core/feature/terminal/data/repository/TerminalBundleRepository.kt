@@ -1,7 +1,7 @@
 package com.mini.me_core.feature.terminal.data.repository
 
+import com.mini.me_core.core.container.api.ContainerInstallerPort
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
 import com.mini.me_core.feature.terminal.data.bundle.BundleInstallState
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundle
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId
@@ -33,7 +33,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class TerminalBundleRepository @Inject constructor(
-    private val containerInstaller: ContainerInstaller
+    private val containerInstaller: ContainerInstallerPort
 ) {
     private companion object {
         const val TAG = "TerminalBundleRepo"

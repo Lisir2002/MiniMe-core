@@ -558,7 +558,7 @@ fun AIChatPanel(
             Box(modifier = Modifier.weight(1f)) {
                 if (!messagesReady) {
                     // 远程模式连接未就绪时显示连接状态占位，避免空白或旧工作区记录闪烁
-                    if (isRemote && connectionState != null && connectionState != com.mini.me_core.feature.agent.domain.container.ConnectionState.CONNECTED) {
+                    if (isRemote && connectionState != null && connectionState != com.mini.me_core.core.container.api.ConnectionState.CONNECTED) {
                         RemoteConnectingPlaceholder(state = connectionState)
                     }
                 } else if (messages.isEmpty()) {

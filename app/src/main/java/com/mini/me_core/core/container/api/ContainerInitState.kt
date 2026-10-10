@@ -1,9 +1,9 @@
-package com.mini.me_core.feature.agent.domain.container
+package com.mini.me_core.core.container.api
 
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId
 
 /**
- * 容器初始化的实时进度状态。由 [LinuxContainerEngine.initProgress] 暴露，供终端页 / 终端设置页 / AI 页等所有
+ * 容器初始化的实时进度状态。由 LinuxContainerEngine.initProgress 暴露，供终端页 / 终端设置页 / AI 页等所有
  * 初始化入口共享同一份进度（engine 为 @Singleton）。StateFlow 自动 conflation，高频更新只保留最新值。
  *
  * 改造后把原来的 monolithic「InstallingPackages」细化到 bundle 级，

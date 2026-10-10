@@ -1,8 +1,8 @@
 package com.mini.me_core.feature.workspace.domain
 
+import com.mini.me_core.core.container.api.SshConnectionPort
+import com.mini.me_core.core.container.api.friendlySshError
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
-import com.mini.me_core.feature.agent.domain.container.friendlySshError
 import com.mini.me_core.feature.workspace.data.repository.WorkspaceRepository
 import com.mini.me_core.feature.workspace.domain.WorkspacePathMapper.Companion.CONTAINER_ROOT
 import kotlinx.coroutines.runBlocking
@@ -66,7 +66,7 @@ internal object RemoteExecDecider {
  * 文本文件用 `cat`/重定向读写，二进制文件用 `base64` 中转。
  */
 class RemoteSftpFileAccess @Inject constructor(
-    private val connection: RemoteSshConnection,
+    private val connection: SshConnectionPort,
     private val workspaceRepository: WorkspaceRepository
 ) : FileAccessProvider {
 

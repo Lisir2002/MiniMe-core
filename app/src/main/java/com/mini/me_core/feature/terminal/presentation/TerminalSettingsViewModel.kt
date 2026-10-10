@@ -7,15 +7,15 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.R
+import com.mini.me_core.core.container.api.AggregateProgressState
+import com.mini.me_core.core.container.api.ContainerArch
+import com.mini.me_core.core.container.api.ContainerEnginePort
+import com.mini.me_core.core.container.api.ContainerInstallerPort
+import com.mini.me_core.core.container.api.ContainerProfile
+import com.mini.me_core.core.container.api.RemoteConnectionConfig
+import com.mini.me_core.core.container.api.RootfsSource
+import com.mini.me_core.core.container.api.SshConnectionPort
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.ContainerArch
-import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
-import com.mini.me_core.feature.agent.domain.container.ContainerProfile
-import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
-import com.mini.me_core.feature.agent.domain.container.RemoteConnectionConfig
-import com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
-import com.mini.me_core.feature.agent.domain.container.RootfsSource
-import com.mini.me_core.feature.agent.domain.container.progress.AggregateProgressState
 import com.mini.me_core.feature.settings.data.repository.ContainerSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
@@ -59,18 +59,19 @@ import javax.inject.Inject
  *  - 容器 Profile 管理：内置 + 自定义 profile 列表、激活切换、增删改、远程 SSH 模式切换。
  */
 @HiltViewModel
+@Suppress("LongParameterList") // 构造参数个数保持，仅容器/SSH 类型由具体类改为端口接口（P3-12）
 class TerminalSettingsViewModel @Inject constructor(
     application: Application,
     private val settingsRepo: TerminalSettingsRepository,
     private val bundleRepo: TerminalBundleRepository,
-    private val containerEngine: LinuxContainerEngine,
+    private val containerEngine: ContainerEnginePort,
     private val containerSettingsRepository: ContainerSettingsRepository,
     private val remoteRepository: RemoteRepository,
     private val terminalSessionManager: TerminalSessionManager,
     private val executionModeRepository: ExecutionModeRepository,
-    private val containerInstaller: ContainerInstaller,
+    private val containerInstaller: ContainerInstallerPort,
     private val executionModeHolder: ExecutionModeHolder,
-    private val remoteSshConnection: RemoteSshConnection,
+    private val remoteSshConnection: SshConnectionPort,
     private val containerFileAccess: ContainerFileAccess,
 ) : AndroidViewModel(application) {
 
@@ -135,7 +136,7 @@ class TerminalSettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     // ── 深度进度：Level 2+3 聚合器 StateFlow（公开给 Bundle 卡片 + Dialog 用） ──
-    val aggregateProgress: StateFlow<AggregateProgressState> = containerEngine.progressAggregator.state
+    val aggregateProgress: StateFlow<AggregateProgressState> = containerEngine.aggregateProgress
 
     val keepSessionWhenLeave: StateFlow<Boolean> = settingsRepo.keepSessionWhenLeaveFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -170,11 +171,11 @@ class TerminalSettingsViewModel @Inject constructor(
 
     // ── 容器环境卡片 ──────────────────────────────────────────────
     /** 容器初始化进度（与终端页 AppLoadingState 同源）。 */
-    val containerInit: StateFlow<com.mini.me_core.feature.agent.domain.container.ContainerInitState> =
+    val containerInit: StateFlow<com.mini.me_core.core.container.api.ContainerInitState> =
         containerEngine.initProgress.stateIn(
             viewModelScope,
             SharingStarted.Eagerly,
-            com.mini.me_core.feature.agent.domain.container.ContainerInitState.Idle
+            com.mini.me_core.core.container.api.ContainerInitState.Idle
         )
 
     /** 容器是否物理安装好（rootfs+proot）。方便 UI 直接判断状态。 */
@@ -182,14 +183,14 @@ class TerminalSettingsViewModel @Inject constructor(
     val containerInstalled: StateFlow<Boolean> = containerInit
         .map { state ->
             when (state) {
-                is com.mini.me_core.feature.agent.domain.container.ContainerInitState.Ready -> true
-                is com.mini.me_core.feature.agent.domain.container.ContainerInitState.BundleInstalling,
-                is com.mini.me_core.feature.agent.domain.container.ContainerInitState.BundleUninstalling -> true
-                com.mini.me_core.feature.agent.domain.container.ContainerInitState.Restarting -> true
-                is com.mini.me_core.feature.agent.domain.container.ContainerInitState.ExtractingRootfs,
-                com.mini.me_core.feature.agent.domain.container.ContainerInitState.DeployingProot,
-                com.mini.me_core.feature.agent.domain.container.ContainerInitState.Idle,
-                is com.mini.me_core.feature.agent.domain.container.ContainerInitState.Failed -> false
+                is com.mini.me_core.core.container.api.ContainerInitState.Ready -> true
+                is com.mini.me_core.core.container.api.ContainerInitState.BundleInstalling,
+                is com.mini.me_core.core.container.api.ContainerInitState.BundleUninstalling -> true
+                com.mini.me_core.core.container.api.ContainerInitState.Restarting -> true
+                is com.mini.me_core.core.container.api.ContainerInitState.ExtractingRootfs,
+                com.mini.me_core.core.container.api.ContainerInitState.DeployingProot,
+                com.mini.me_core.core.container.api.ContainerInitState.Idle,
+                is com.mini.me_core.core.container.api.ContainerInitState.Failed -> false
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
@@ -300,9 +301,9 @@ class TerminalSettingsViewModel @Inject constructor(
         // 另外任何容器安装状态 true→false / false→true 的跳变都再补一次。
         viewModelScope.launch {
             containerInit.collect { state ->
-                val readyish = state is com.mini.me_core.feature.agent.domain.container.ContainerInitState.Ready
-                    || state is com.mini.me_core.feature.agent.domain.container.ContainerInitState.BundleInstalling
-                    || state is com.mini.me_core.feature.agent.domain.container.ContainerInitState.BundleUninstalling
+                val readyish = state is com.mini.me_core.core.container.api.ContainerInitState.Ready
+                    || state is com.mini.me_core.core.container.api.ContainerInitState.BundleInstalling
+                    || state is com.mini.me_core.core.container.api.ContainerInitState.BundleUninstalling
                 if (readyish) {
                     _storageUsedMb.value = computeRootfsSizeMb()
                 }

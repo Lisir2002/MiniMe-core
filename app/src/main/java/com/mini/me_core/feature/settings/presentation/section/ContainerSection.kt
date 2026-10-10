@@ -1,12 +1,12 @@
 package com.mini.me_core.feature.settings.presentation.section
 
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.ConnectionState
-import com.mini.me_core.feature.agent.domain.container.ContainerArch
+import com.mini.me_core.core.container.api.ConnectionState
+import com.mini.me_core.core.container.api.ContainerArch
 import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
-import com.mini.me_core.feature.agent.domain.container.ContainerProfile
+import com.mini.me_core.core.container.api.ContainerProfile
 import com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
-import com.mini.me_core.feature.agent.domain.container.RootfsSource
+import com.mini.me_core.core.container.api.RootfsSource
 import com.mini.me_core.feature.settings.data.repository.ContainerSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
@@ -130,7 +130,7 @@ internal class ContainerSection(
                     // 运行时切换需主动连接（启动时由 MiniMeCore 连）；复用 RemoteSshConnection.connect
                     runCatching {
                         remoteSshConnection.connect(
-                            com.mini.me_core.feature.agent.domain.container.RemoteConnectionConfig(
+                            com.mini.me_core.core.container.api.RemoteConnectionConfig(
                                 host = conn.host,
                                 port = conn.port,
                                 username = conn.username,

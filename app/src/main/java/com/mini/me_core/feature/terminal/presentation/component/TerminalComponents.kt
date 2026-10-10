@@ -82,7 +82,7 @@ import com.mini.me_core.R
 import com.mini.me_core.core.theme.Elevation
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.container.ContainerInitState
+import com.mini.me_core.core.container.api.ContainerInitState
 import com.mini.me_core.feature.terminal.data.repository.TerminalFontSizes
 import com.mini.me_core.feature.terminal.domain.RunState
 import com.mini.me_core.feature.terminal.domain.TabColorMarker

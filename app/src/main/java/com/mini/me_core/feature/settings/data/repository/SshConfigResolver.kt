@@ -1,9 +1,9 @@
 package com.mini.me_core.feature.settings.data.repository
 
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.ContainerProfile
-import com.mini.me_core.feature.agent.domain.container.RemoteConnectionConfig
-import com.mini.me_core.feature.agent.domain.container.RootfsSource
+import com.mini.me_core.core.container.api.ContainerProfile
+import com.mini.me_core.core.container.api.RemoteConnectionConfig
+import com.mini.me_core.core.container.api.RootfsSource
 import com.mini.me_core.feature.workspace.domain.repository.RemoteRepository
 import kotlinx.coroutines.flow.first
 

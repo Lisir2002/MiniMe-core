@@ -10,7 +10,6 @@ import android.provider.DocumentsProvider
 import android.webkit.MimeTypeMap
 import com.mini.me_core.R
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
 import java.io.File
 import java.io.FileNotFoundException
 import java.util.LinkedList

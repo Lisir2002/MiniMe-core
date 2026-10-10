@@ -9,7 +9,6 @@ import com.mini.me_core.feature.agent.data.remote.openai.OpenAIApi
 import com.mini.me_core.feature.agent.domain.container.CommandEngine
 import com.mini.me_core.feature.agent.domain.container.DelegatingCommandEngine
 import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
-import com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
 import com.mini.me_core.feature.agent.domain.container.RemoteSshEngine
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
@@ -247,7 +246,7 @@ object AgentModule {
     @Provides
     @Singleton
     fun provideRemoteSftpFileAccess(
-        connection: RemoteSshConnection,
+        connection: com.mini.me_core.core.container.api.SshConnectionPort,
         workspaceRepository: com.mini.me_core.feature.workspace.data.repository.WorkspaceRepository
     ): RemoteSftpFileAccess = RemoteSftpFileAccess(connection, workspaceRepository)
 

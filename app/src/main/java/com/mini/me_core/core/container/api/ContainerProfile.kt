@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.container
+package com.mini.me_core.core.container.api
 
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import kotlinx.serialization.Serializable

@@ -2,8 +2,8 @@ package com.mini.me_core.feature.terminal.domain
 
 import android.content.Context
 import android.content.Intent
+import com.mini.me_core.core.container.api.ContainerEnginePort
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
 import com.mini.me_core.feature.terminal.presentation.component.AppTerminalSessionClient
 import com.mini.me_core.feature.terminal.presentation.component.TextInputTracker
 import com.mini.me_core.feature.workspace.data.repository.WorkspaceRepository
@@ -47,7 +47,7 @@ import kotlin.concurrent.withLock
 @Singleton
 class TerminalSessionManager @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
-    private val containerEngine: LinuxContainerEngine,
+    private val containerEngine: ContainerEnginePort,
     private val workspaceRepository: WorkspaceRepository
 ) : TerminalSessionProvider {
     private companion object {

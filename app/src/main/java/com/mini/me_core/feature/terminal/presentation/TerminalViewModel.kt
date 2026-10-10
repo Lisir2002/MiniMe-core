@@ -2,9 +2,9 @@ package com.mini.me_core.feature.terminal.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mini.me_core.core.container.api.ContainerEnginePort
+import com.mini.me_core.core.container.api.ContainerInitState
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.ContainerInitState
-import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
 import com.mini.me_core.feature.terminal.data.bundle.BundleInstallState
@@ -45,7 +45,7 @@ class TerminalViewModel @Inject constructor(
     private val localManager: TerminalSessionManager,
     private val remoteManager: RemoteTerminalSessionManager,
     private val modeHolder: ExecutionModeHolder,
-    private val containerEngine: LinuxContainerEngine,
+    private val containerEngine: ContainerEnginePort,
     private val settingsRepo: TerminalSettingsRepository,
     private val bundleRepo: TerminalBundleRepository
 ) : ViewModel() {

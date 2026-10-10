@@ -1,12 +1,12 @@
 package com.mini.me_core.feature.workspace.data.repository
 
 import android.content.Context
+import com.mini.me_core.core.container.api.ConnectionState
+import com.mini.me_core.core.container.api.SshConnectionPort
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.store.KVStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
-import com.mini.me_core.feature.agent.domain.container.ConnectionState
-import com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
 import com.mini.me_core.feature.agent.domain.session.SessionUseCase
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
@@ -33,7 +33,7 @@ const val CURRENT_WORKSPACE_KEY = "current_workspace_name"
 class WorkspaceRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val executionModeHolder: ExecutionModeHolder,
-    private val remoteSshConnection: RemoteSshConnection,
+    private val remoteSshConnection: SshConnectionPort,
     private val v2Agent: V2AgentRepository,
     private val sessionUseCase: SessionUseCase,
     private val kv: KVStore,

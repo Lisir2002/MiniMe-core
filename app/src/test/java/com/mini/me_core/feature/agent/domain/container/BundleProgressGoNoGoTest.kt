@@ -1,6 +1,12 @@
 package com.mini.me_core.feature.agent.domain.container.progress
 
-import com.mini.me_core.feature.agent.domain.container.GlobalInstallArchiveStore
+import com.mini.me_core.core.container.api.AggregateProgressState
+import com.mini.me_core.core.container.api.GlobalInstallArchiveStore
+import com.mini.me_core.core.container.api.InstallPhase
+import com.mini.me_core.core.container.api.LogLine
+import com.mini.me_core.core.container.api.LogLineKind
+import com.mini.me_core.core.container.api.LogLineStore
+import com.mini.me_core.core.container.api.RingBuffer
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId
 import kotlin.math.roundToInt
 import org.junit.After

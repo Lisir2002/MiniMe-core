@@ -1,5 +1,7 @@
 package com.mini.me_core.feature.agent.domain.container
 
+import com.mini.me_core.core.container.api.ContainerInitState
+import com.mini.me_core.core.container.api.friendlySshError
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.domain.container.CommandEngine
 import kotlinx.coroutines.CancellationException

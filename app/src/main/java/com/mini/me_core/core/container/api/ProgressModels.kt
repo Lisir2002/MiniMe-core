@@ -1,4 +1,4 @@
-package com.mini.me_core.feature.agent.domain.container.progress
+package com.mini.me_core.core.container.api
 
 import androidx.compose.runtime.Immutable
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId

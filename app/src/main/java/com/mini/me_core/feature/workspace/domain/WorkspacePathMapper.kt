@@ -1,9 +1,9 @@
 package com.mini.me_core.feature.workspace.domain
 
+import com.mini.me_core.core.container.api.ContainerInstallerPort
+import com.mini.me_core.core.container.api.ContainerProfile
 import com.mini.me_core.core.security.SecurityAuditSink
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
-import com.mini.me_core.feature.agent.domain.container.ContainerProfile
 import com.mini.me_core.feature.settings.data.repository.ContainerSettingsRepository
 import com.mini.me_core.feature.workspace.data.repository.WorkspaceRepository
 import kotlinx.coroutines.CoroutineScope
@@ -54,7 +54,7 @@ object PathBoundary {
 @Singleton
 class WorkspacePathMapper @Inject constructor(
     private val workspaceRepository: WorkspaceRepository,
-    private val containerInstaller: ContainerInstaller,
+    private val containerInstaller: ContainerInstallerPort,
     private val containerSettingsRepository: ContainerSettingsRepository,
     private val auditSink: SecurityAuditSink,
 ) {

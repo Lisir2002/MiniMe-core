@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming", "LongMethod", "LongParameterList") // Compose 命名/长组件约定；P3-12 仅容器类型移包改引用，UI 行为保持
+
 package com.mini.me_core.feature.terminal.presentation.component
 
 import androidx.compose.foundation.background
@@ -99,9 +101,9 @@ import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.tokens.PrimitiveSpacing
 import com.mini.me_core.core.ui.rememberPersistentScrollState
-import com.mini.me_core.feature.agent.domain.container.ContainerArch
-import com.mini.me_core.feature.agent.domain.container.ContainerProfile
-import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
+import com.mini.me_core.core.container.api.ContainerArch
+import com.mini.me_core.core.container.api.ContainerProfile
+import com.mini.me_core.core.container.api.DEFAULT_APK_MIRROR
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.terminal.data.repository.CursorStyle
 import com.mini.me_core.feature.terminal.data.repository.ScrollbackLines
@@ -524,7 +526,7 @@ fun TerminalContainerScreen(
     // 镜像源选择
     if (showMirrorPicker) {
         MirrorPickerDialogInternal(
-            current = ContainerInstaller.ALPINE_MIRROR,
+            current = DEFAULT_APK_MIRROR,
             onDismiss = { showMirrorPicker = false },
             onConfirm = { mirror ->
                 viewModel.setMirrorAndRefresh(mirror)
@@ -688,7 +690,7 @@ fun TerminalContainerScreen(
 private fun ContainerTabContent(
     scrollState: androidx.compose.foundation.ScrollState,
     viewModel: TerminalSettingsViewModel,
-    containerInit: com.mini.me_core.feature.agent.domain.container.ContainerInitState,
+    containerInit: com.mini.me_core.core.container.api.ContainerInitState,
     containerInstalled: Boolean,
     storageUsedMb: Long,
     profiles: List<ContainerProfile>,

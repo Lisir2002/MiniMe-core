@@ -55,8 +55,8 @@ import com.mini.me_core.core.theme.Brand
 import com.mini.me_core.core.theme.Elevation
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
-import com.mini.me_core.feature.agent.domain.container.ContainerArch
-import com.mini.me_core.feature.agent.domain.container.ContainerInitState
+import com.mini.me_core.core.container.api.ContainerArch
+import com.mini.me_core.core.container.api.ContainerInitState
 import com.mini.me_core.feature.terminal.data.bundle.BundleInstallState
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundle
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId

@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming", "LongMethod", "LongParameterList") // Compose 命名/长组件约定；P3-12 仅 ConnectionState 移包改引用，UI 行为保持
+
 package com.mini.me_core.feature.agent.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
@@ -65,7 +67,7 @@ internal fun ChatHeader(
     onNavigateToTerminal: () -> Unit,
     onNavigateToGit: () -> Unit,
     onNavigateToBrowser: () -> Unit = {},
-    connectionState: com.mini.me_core.feature.agent.domain.container.ConnectionState? = null
+    connectionState: com.mini.me_core.core.container.api.ConnectionState? = null
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -180,16 +182,16 @@ internal fun ChatHeader(
 
 @Composable
 private fun ConnectionIndicator(
-    state: com.mini.me_core.feature.agent.domain.container.ConnectionState
+    state: com.mini.me_core.core.container.api.ConnectionState
 ) {
     val (dotColor, text) = when (state) {
-        com.mini.me_core.feature.agent.domain.container.ConnectionState.CONNECTED ->
+        com.mini.me_core.core.container.api.ConnectionState.CONNECTED ->
             MaterialTheme.colorScheme.primary to stringResource(R.string.chat_ssh_connected)
-        com.mini.me_core.feature.agent.domain.container.ConnectionState.CONNECTING ->
+        com.mini.me_core.core.container.api.ConnectionState.CONNECTING ->
             MaterialTheme.colorScheme.tertiary to stringResource(R.string.chat_ssh_connecting)
-        com.mini.me_core.feature.agent.domain.container.ConnectionState.FAILED ->
+        com.mini.me_core.core.container.api.ConnectionState.FAILED ->
             MaterialTheme.colorScheme.error to stringResource(R.string.chat_ssh_failed)
-        com.mini.me_core.feature.agent.domain.container.ConnectionState.DISCONNECTED ->
+        com.mini.me_core.core.container.api.ConnectionState.DISCONNECTED ->
             MaterialTheme.colorScheme.outline to stringResource(R.string.chat_ssh_disconnected)
     }
     Row(
@@ -225,13 +227,13 @@ private fun TokenStats(inputTokens: Int, outputTokens: Int) {
 
 @Composable
 internal fun RemoteConnectingPlaceholder(
-    state: com.mini.me_core.feature.agent.domain.container.ConnectionState
+    state: com.mini.me_core.core.container.api.ConnectionState
 ) {
     val text = when (state) {
-        com.mini.me_core.feature.agent.domain.container.ConnectionState.CONNECTING -> stringResource(R.string.chat_connecting_remote)
-        com.mini.me_core.feature.agent.domain.container.ConnectionState.FAILED -> stringResource(R.string.chat_remote_connect_failed)
-        com.mini.me_core.feature.agent.domain.container.ConnectionState.DISCONNECTED -> stringResource(R.string.chat_no_remote_connection)
-        com.mini.me_core.feature.agent.domain.container.ConnectionState.CONNECTED -> ""
+        com.mini.me_core.core.container.api.ConnectionState.CONNECTING -> stringResource(R.string.chat_connecting_remote)
+        com.mini.me_core.core.container.api.ConnectionState.FAILED -> stringResource(R.string.chat_remote_connect_failed)
+        com.mini.me_core.core.container.api.ConnectionState.DISCONNECTED -> stringResource(R.string.chat_no_remote_connection)
+        com.mini.me_core.core.container.api.ConnectionState.CONNECTED -> ""
     }
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -241,7 +243,7 @@ internal fun RemoteConnectingPlaceholder(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
-            if (state == com.mini.me_core.feature.agent.domain.container.ConnectionState.CONNECTING) {
+            if (state == com.mini.me_core.core.container.api.ConnectionState.CONNECTING) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(28.dp),
                     strokeWidth = 2.dp,

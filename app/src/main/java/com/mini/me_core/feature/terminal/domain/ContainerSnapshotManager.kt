@@ -1,9 +1,9 @@
 package com.mini.me_core.feature.terminal.domain
 
 import android.content.Context
+import com.mini.me_core.core.container.api.ContainerInstallerPort
+import com.mini.me_core.core.container.api.ContainerProfile
 import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
-import com.mini.me_core.feature.agent.domain.container.ContainerProfile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -28,7 +28,7 @@ data class ContainerSnapshot(
 @Singleton
 class ContainerSnapshotManager @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val installer: ContainerInstaller,
+    private val installer: ContainerInstallerPort,
 ) {
     companion object { private const val TAG = "ContainerSnapshot" }
 

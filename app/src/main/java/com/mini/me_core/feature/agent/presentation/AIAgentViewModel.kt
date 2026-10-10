@@ -13,7 +13,7 @@ import com.mini.me_core.feature.agent.domain.session.checkpoint.CheckpointManage
 import com.mini.me_core.datalayer.toChatSession
 import com.mini.me_core.datalayer.toUIMessage
 import com.mini.me_core.feature.agent.data.CodeChangeTracker
-import com.mini.me_core.feature.agent.domain.container.ContainerInitState
+import com.mini.me_core.core.container.api.ContainerInitState
 import com.mini.me_core.feature.agent.domain.container.LinuxContainerEngine
 import com.mini.me_core.feature.settings.domain.repository.AIProviderRepository
 import com.mini.me_core.feature.settings.data.repository.DefaultModelSettingsRepository

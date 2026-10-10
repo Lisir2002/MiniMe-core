@@ -2,6 +2,10 @@ package com.mini.me_core.feature.agent.domain.container
 
 import android.content.Context
 import android.system.Os
+import com.mini.me_core.core.container.api.ContainerArch
+import com.mini.me_core.core.container.api.ContainerInitState
+import com.mini.me_core.core.container.api.ContainerProfile
+import com.mini.me_core.core.container.api.RootfsSource
 import com.mini.me_core.core.environment.EnvironmentDetector
 import com.mini.me_core.core.util.FileLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -25,6 +29,7 @@ import javax.inject.Singleton
  * 二进制为 arm64 版，两架构共用。x86_64 额外安装 qemu-user-linux-arm64-x86_64 静态
  * 二进制（宿主 arm64 运行，翻译 x86_64 用户态指令）。
  */
+@Suppress("ClassOrdering") // companion 在文件顶部（含 ALPINE_MIRROR 等常量），历史布局保持
 @Singleton
 class ContainerInstaller @Inject constructor(
     @param:ApplicationContext private val context: Context
@@ -158,7 +163,7 @@ class ContainerInstaller @Inject constructor(
          * 无 CA 证书库会导致 HTTPS 握手失败并被 apk 误报成 "Permission denied"（首次安装直接卡死）。
          * apk 对索引与每个 .apk 都用 /etc/apk/keys 的签名独立校验，故 http 传输仍保证完整性。
          */
-        const val ALPINE_MIRROR = "http://mirrors.aliyun.com/alpine"
+        const val ALPINE_MIRROR = com.mini.me_core.core.container.api.DEFAULT_APK_MIRROR
 
         /**
          * 安装版本。换 rootfs / proot 或改安装逻辑时 +1，触发重新解压。
