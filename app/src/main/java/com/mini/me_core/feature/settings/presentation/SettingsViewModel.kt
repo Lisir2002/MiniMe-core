@@ -2,14 +2,10 @@ package com.mini.me_core.feature.settings.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mini.me_core.core.util.FileLogger
-import com.mini.me_core.core.util.LogLevel
 import com.mini.me_core.feature.agent.domain.container.ConnectionState
-import com.mini.me_core.feature.agent.domain.container.ContainerArch
 import com.mini.me_core.feature.agent.domain.container.ContainerInstaller
 import com.mini.me_core.feature.agent.domain.container.ContainerProfile
 import com.mini.me_core.feature.agent.domain.container.RemoteSshConnection
-import com.mini.me_core.feature.agent.domain.container.RootfsSource
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpConfigRepository
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpManager
 import com.mini.me_core.feature.agent.domain.execution.mcp.server.McpServerManager
@@ -38,7 +34,6 @@ import com.mini.me_core.feature.agent.domain.core.guard.GuardLogRepository
 import com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookExecutor
 import com.mini.me_core.feature.agent.domain.core.prompt.NormFlowStatsRepository
 
-import com.mini.me_core.core.util.LogLineParser
 import com.mini.me_core.feature.settings.data.repository.LogFilterSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.LogSettingsRepository
 import com.mini.me_core.feature.settings.data.repository.SettingsSearchHistoryManager
@@ -51,101 +46,38 @@ import com.mini.me_core.feature.settings.domain.model.AIProviderConfig
 import com.mini.me_core.feature.settings.domain.model.ModelMetadata
 import com.mini.me_core.feature.settings.domain.model.ProviderType
 import com.mini.me_core.feature.settings.domain.repository.AIProviderRepository
+import com.mini.me_core.feature.settings.presentation.section.ContainerSection
+import com.mini.me_core.feature.settings.presentation.section.LogViewerSection
+import com.mini.me_core.feature.settings.presentation.section.McpSection
+import com.mini.me_core.feature.settings.presentation.section.NormFlowSection
+import com.mini.me_core.feature.settings.presentation.section.PermissionSection
+import com.mini.me_core.feature.settings.presentation.section.ProviderSection
+import com.mini.me_core.feature.settings.presentation.section.ThemeSection
+import com.mini.me_core.feature.settings.presentation.section.VisionCompactionSection
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import javax.inject.Inject
 import com.mini.me_core.feature.settings.presentation.component.SettingsSection
-import com.mini.me_core.R
-
-sealed class FetchState {
-    object Idle : FetchState()
-    object Loading : FetchState()
-    data class Success(val models: List<String>) : FetchState()
-    data class Error(val message: String) : FetchState()
-}
-
-/** 供应商级连通性测试状态（点击「测试连接」时通过 GET /v1/models 验证 Key + 端点）。 */
-sealed class ConnectionTestState {
-    object Idle : ConnectionTestState()
-    object Loading : ConnectionTestState()
-    data class Success(val message: String) : ConnectionTestState()
-    data class Error(val message: String) : ConnectionTestState()
-}
 
 /**
- * 日志查看器的日期范围模式。
+ * P2-17 行为保持重构：本类是设置页**唯一** @HiltViewModel 瘦门面。
  *
- * 单一数据源：文件下拉与高级筛选底部弹窗都从 [LogViewerUiState.dateRangeMode] 读取，
- * 保证两处状态严格同步（见设计文档 §7.4）。
- *
- * - [TODAY] / [YESTERDAY] / [LAST_3_DAYS] / [LAST_7_DAYS] / [ALL]：快捷范围
- * - [SINGLE_FILE]：单文件精确查看（由 [LogViewerUiState.selectedFileName] 指定）
- * - [CUSTOM]：自定义起止日期（由 [LogViewerUiState.customDateStart]/[customDateEnd] 指定）
+ * 按设置域内聚的状态与逻辑已原样搬迁到同包 section/ 下的普通 internal 协作者
+ * （ProviderSection / VisionCompactionSection / LogViewerSection / NormFlowSection /
+ * ThemeSection / ContainerSection / McpSection / PermissionSection），UI 注入点零改动。
+ * 每个对外 StateFlow 与公开方法都与原类同名同类型并委托对应 section；
+ * 所有协程仍由同一 viewModelScope 驱动（section 通过构造拿到该 scope）。
  */
-enum class DateRangeMode {
-    TODAY, YESTERDAY, LAST_3_DAYS, LAST_7_DAYS, ALL, SINGLE_FILE, CUSTOM
-}
-
-data class LogViewerUiState(
-    val files: List<String> = emptyList(),
-    val selectedFileName: String? = null,
-    val filterServerName: String? = null,
-    val content: String = "",
-    val totalLines: Int = 0,
-    val shownLines: Int = 0,
-    val loading: Boolean = false,
-    val error: String? = null,
-
-    // 筛选面板：默认收起，只通过点击筛选图标打开，通过 X 关闭
-    val filterPanelExpanded: Boolean = false,
-    val selectedDates: Set<String> = emptySet(),
-    val selectedLevels: Set<LogLevel> = emptySet(),
-    val selectedTags: Set<String> = emptySet(),
-    val allAvailableTags: List<String> = emptyList(),
-
-    // 日期范围：快捷范围由 [dateRangeMode] 驱动，自定义范围由 customDateStart/End 指定
-    val dateRangeMode: DateRangeMode = DateRangeMode.TODAY,
-    val customDateStart: String? = null,
-    val customDateEnd: String? = null,
-
-    // 搜索
-    val searchQuery: String = "",
-
-    // 实时尾随
-    val liveTailEnabled: Boolean = false,
-    val hasNewLogs: Boolean = false,
-
-    // ── 新增字段（运行日志查看器 UI 重构）──
-    /** 各等级行数统计（文件/日期作用域内、等级/Tag/搜索过滤前），供筛选栏数量徽章使用。 */
-    val levelCounts: Map<LogLevel, Int> = emptyMap(),
-    /** 当前最低记录等级（写入阈值），与显示筛选区分。 */
-    val recordLevel: LogLevel = LogLevel.VERBOSE,
-    /** 顶栏搜索是否展开。 */
-    val searchExpanded: Boolean = false,
-    /** 搜索结果当前匹配下标（1-based 展示给用户）与总匹配数。 */
-    val currentMatchIndex: Int = 0,
-    val totalMatches: Int = 0,
-    /** 被折叠的等级集合（再次点击筛选 chip 时该等级整组折叠为一行）。 */
-    val collapsedLevels: Set<LogLevel> = emptySet(),
-    /** 是否自动贴底滚动（用户上滑后置 false，显示「返回最新」）。 */
-    val isAutoScrolling: Boolean = true
-)
-
+@Suppress("TooManyFunctions", "ClassOrdering") // 瘦门面按设置域聚合委托，行为保持（ClassOrdering 原条目本在 baseline）
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val repository: AIProviderRepository,
@@ -183,12 +115,66 @@ class SettingsViewModel @Inject constructor(
     /** 仪表盘统计：累计注入 token 估算。 */
     private val normFlowStatsRepository: NormFlowStatsRepository,
 ) : ViewModel() {
-    private companion object {
-        const val MAX_LOG_LINES = 1200
 
-        /** 仪表盘空转轮数轮询间隔（毫秒）：前台展示足够实时，避免高频刷新。 */
-        const val IDLE_ROUND_POLL_MS = 2_000L
+    // ── F5.5 变更生效即时反馈（嵌套类型保持原位，SettingsScreen 以 SettingsViewModel.SettingEffect 引用）──
+    /** 设置变更效果事件：立即生效提示 / 需重启提示。 */
+    sealed interface SettingEffect {
+        /** 变更已即时生效（Snackbar 提示）。 */
+        data object Applied : SettingEffect
+        /** 变更需重启应用后生效（Snackbar 带「立即重启」）。 */
+        data object NeedsRestart : SettingEffect
     }
+    private val _settingEffect = kotlinx.coroutines.flow.MutableSharedFlow<SettingEffect>(extraBufferCapacity = 4)
+    val settingEffect: kotlinx.coroutines.flow.SharedFlow<SettingEffect> = _settingEffect.asSharedFlow()
+
+    // ── 各域 section 装配：构造顺序与原 init 块内 collector 启动顺序一致 ──
+    private val providerSection = ProviderSection(
+        scope = viewModelScope,
+        repository = repository,
+        modelApiService = modelApiService,
+        modelMetadataService = modelMetadataService,
+        compatibilityPolicyRepository = compatibilityPolicyRepository,
+    )
+    private val visionCompactionSection = VisionCompactionSection(
+        scope = viewModelScope,
+        visionModelSettingsRepository = visionModelSettingsRepository,
+        compactionModelSettingsRepository = compactionModelSettingsRepository,
+    )
+    private val logViewerSection = LogViewerSection(
+        scope = viewModelScope,
+        logSettingsRepository = logSettingsRepository,
+        logFilterSettingsRepository = logFilterSettingsRepository,
+    )
+    private val normFlowSection = NormFlowSection(
+        scope = viewModelScope,
+        normFlowSettingsRepository = normFlowSettingsRepository,
+    )
+    private val themeSection = ThemeSection(
+        scope = viewModelScope,
+        themeSettingsRepository = themeSettingsRepository,
+    ) { effect ->
+        // 语义等同原 _settingEffect.tryEmit(...)
+        _settingEffect.tryEmit(effect)
+    }
+    private val containerSection = ContainerSection(
+        scope = viewModelScope,
+        containerSettingsRepository = containerSettingsRepository,
+        containerInstaller = containerInstaller,
+        executionModeRepository = executionModeRepository,
+        executionModeHolder = executionModeHolder,
+        remoteSshConnection = remoteSshConnection,
+        remoteRepository = remoteRepository,
+    )
+    private val mcpSection = McpSection(
+        scope = viewModelScope,
+        mcpConfigRepository = mcpConfigRepository,
+        mcpManager = mcpManager,
+        mcpServerManager = mcpServerManager,
+    )
+    private val permissionSection = PermissionSection(
+        scope = viewModelScope,
+        permissionRulesRepository = permissionRulesRepository,
+    )
 
     // RC62：跨屏幕设置页跳转的「待打开分区」信号。
     // - 背景：MainActivity 有两个地方会触发「跳转到 SSH 主机配置」：
@@ -226,25 +212,6 @@ class SettingsViewModel @Inject constructor(
     // ── 设置页搜索历史（KVStore 持久化，最近 10 条）──
     val searchHistory: StateFlow<List<String>> = searchHistoryManager.history
 
-    // ── 防截图录屏开关（供 MainActivity / SettingsScreen 统一动态控制 FLAG_SECURE）──
-    val secureScreenEnabled: StateFlow<Boolean> = secureScreenRepository.enabledFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    /** 防截图录屏保护范围（仅供应商编辑页 / 所有敏感页 / 全局）。 */
-    val secureScreenScope: StateFlow<SecureScreenScope> = secureScreenRepository.scopeFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, SecureScreenScope.DEFAULT)
-
-    // ── F5.5 变更生效即时反馈 ──
-    /** 设置变更效果事件：立即生效提示 / 需重启提示。 */
-    sealed interface SettingEffect {
-        /** 变更已即时生效（Snackbar 提示）。 */
-        data object Applied : SettingEffect
-        /** 变更需重启应用后生效（Snackbar 带「立即重启」）。 */
-        data object NeedsRestart : SettingEffect
-    }
-    private val _settingEffect = kotlinx.coroutines.flow.MutableSharedFlow<SettingEffect>(extraBufferCapacity = 4)
-    val settingEffect: kotlinx.coroutines.flow.SharedFlow<SettingEffect> = _settingEffect.asSharedFlow()
-
     /** 记录一次搜索词（在 IME Search / 点击结果时调用）。 */
     fun recordSearch(query: String) {
         viewModelScope.launch { searchHistoryManager.recordSearch(query) }
@@ -260,47 +227,32 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { searchHistoryManager.removeHistoryItem(query) }
     }
 
-    // ── 缓存：所有已读入的行（供局部过滤使用，避免重复读文件） ──
-    private var _cachedRawLines: List<String> = emptyList()
+    // ── 防截图录屏开关（供 MainActivity / SettingsScreen 统一动态控制 FLAG_SECURE）──
+    val secureScreenEnabled: StateFlow<Boolean> = secureScreenRepository.enabledFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
-    // ── 筛选防抖触发器：每次筛选变化递增，外层 debounce 300ms 后消费 ──
-    private val _filterTrigger = MutableStateFlow(0L)
+    /** 防截图录屏保护范围（仅供应商编辑页 / 所有敏感页 / 全局）。 */
+    val secureScreenScope: StateFlow<SecureScreenScope> = secureScreenRepository.scopeFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SecureScreenScope.DEFAULT)
 
-    // ── 实时尾随文件观察器 ──
-    private var _liveTailFileObserver: android.os.FileObserver? = null
-
-    private val _providers = MutableStateFlow<List<AIProviderConfig>>(emptyList())
-    val providers: StateFlow<List<AIProviderConfig>> = _providers.asStateFlow()
-
-    private val _activeProvider = MutableStateFlow<AIProviderConfig?>(null)
-    val activeProvider: StateFlow<AIProviderConfig?> = _activeProvider.asStateFlow()
-
-    /** 识图专用模型选择：providerId 为空即「跟随当前聊天模型」。 */
-    private val _visionProviderId = MutableStateFlow("")
-    val visionProviderId: StateFlow<String> = _visionProviderId.asStateFlow()
-
-    private val _visionModel = MutableStateFlow("")
-    val visionModel: StateFlow<String> = _visionModel.asStateFlow()
-
-    /** 压缩专用模型选择：providerId 为空即「跟随当前聊天模型」。 */
-    private val _compactionProviderId = MutableStateFlow("")
-    val compactionProviderId: StateFlow<String> = _compactionProviderId.asStateFlow()
-
-    private val _compactionModel = MutableStateFlow("")
-    val compactionModel: StateFlow<String> = _compactionModel.asStateFlow()
-
-    private val _logLevel = MutableStateFlow(LogLevel.VERBOSE)
-    val logLevel: StateFlow<LogLevel> = _logLevel.asStateFlow()
-
-    private val _logViewerState = MutableStateFlow(LogViewerUiState())
-    val logViewerState: StateFlow<LogViewerUiState> = _logViewerState.asStateFlow()
-
+    // ── Keepalive（仅持久化标志位——启停 Service 由 MiniMeCore 监听 enabledFlow 统一完成）──
     private val _keepaliveEnabled = MutableStateFlow(false)
     val keepaliveEnabled: StateFlow<Boolean> = _keepaliveEnabled.asStateFlow()
 
-    /** D1-7 规范流程统一开关：总开关 + step_inject/tool_guard 子开关（对齐 norm-chain §3.5）。 */
-    private val _normFlowEnabled = MutableStateFlow(true)
-    val normFlowEnabled: StateFlow<Boolean> = _normFlowEnabled.asStateFlow()
+    init {
+        viewModelScope.launch {
+            keepaliveSettingsRepository.enabledFlow.collectLatest {
+                _keepaliveEnabled.value = it
+            }
+        }
+    }
+
+    fun setKeepaliveEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            keepaliveSettingsRepository.setEnabled(enabled)
+            _settingEffect.tryEmit(SettingEffect.NeedsRestart)
+        }
+    }
 
     // ── 仪表盘真实统计（替代原硬编码 "--"/"0"/"0"）────────────────────────────
     /** 护栏累计拦截次数（Block 级，Advisory 不计）。 */
@@ -320,1702 +272,10 @@ class SettingsViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
-    private val _stepInjectEnabled = MutableStateFlow(true)
-    val stepInjectEnabled: StateFlow<Boolean> = _stepInjectEnabled.asStateFlow()
-
-    private val _toolGuardEnabled = MutableStateFlow(true)
-    val toolGuardEnabled: StateFlow<Boolean> = _toolGuardEnabled.asStateFlow()
-
-    // D2-2/D2-4 规范流程子开关：推理预算 / 用量卡片（默认开，保持现有行为）。
-    private val _reasoningBudgetEnabled = MutableStateFlow(true)
-    val reasoningBudgetEnabled: StateFlow<Boolean> = _reasoningBudgetEnabled.asStateFlow()
-
-    private val _usageCardEnabled = MutableStateFlow(true)
-    val usageCardEnabled: StateFlow<Boolean> = _usageCardEnabled.asStateFlow()
-
-    // D4-3 SOP 清单摘要常驻注入子开关（默认开）。
-    private val _sopSummaryEnabled = MutableStateFlow(true)
-    val sopSummaryEnabled: StateFlow<Boolean> = _sopSummaryEnabled.asStateFlow()
-
-    // D5-pa Playbook 自动触发子开关（默认开，对齐 §3.5）。
-    private val _playbookAutoEnabled = MutableStateFlow(true)
-    val playbookAutoEnabled: StateFlow<Boolean> = _playbookAutoEnabled.asStateFlow()
-
-    // D2-1 空转软收敛子开关（默认关：研究/浏览类请求会被误伤收敛，按需开启）。
-    private val _idleConvergeEnabled = MutableStateFlow(false)
-    val idleConvergeEnabled: StateFlow<Boolean> = _idleConvergeEnabled.asStateFlow()
-
-    // P0 step 前注入子开关（默认全开）
-    private val _stepInjectGoalEnabled = MutableStateFlow(true)
-    val stepInjectGoalEnabled: StateFlow<Boolean> = _stepInjectGoalEnabled.asStateFlow()
-
-    private val _stepInjectStaticRulesEnabled = MutableStateFlow(true)
-    val stepInjectStaticRulesEnabled: StateFlow<Boolean> = _stepInjectStaticRulesEnabled.asStateFlow()
-
-    private val _stepInjectLayeredRulesEnabled = MutableStateFlow(true)
-    val stepInjectLayeredRulesEnabled: StateFlow<Boolean> = _stepInjectLayeredRulesEnabled.asStateFlow()
-
-    private val _stepInjectProjectAgentsEnabled = MutableStateFlow(true)
-    val stepInjectProjectAgentsEnabled: StateFlow<Boolean> = _stepInjectProjectAgentsEnabled.asStateFlow()
-
-    // 文件观察护栏独立开关（默认开）
-    private val _fileObservationEnabled = MutableStateFlow(true)
-    val fileObservationEnabled: StateFlow<Boolean> = _fileObservationEnabled.asStateFlow()
-
-    // P1：推理预算强度（low/medium/high，默认 medium）
-    private val _reasoningBudgetLevel = MutableStateFlow("medium")
-    val reasoningBudgetLevel: StateFlow<String> = _reasoningBudgetLevel.asStateFlow()
-
-    // P1：空转收敛阈值轮数（默认 6）
-    private val _idleConvergeRounds = MutableStateFlow(6)
-    val idleConvergeRounds: StateFlow<Int> = _idleConvergeRounds.asStateFlow()
-
-    // P1：当前预设方案
-    private val _activePreset = MutableStateFlow("standard")
-    val activePreset: StateFlow<String> = _activePreset.asStateFlow()
-
-    // P2：新增护栏独立开关
-    private val _guardDangerousCommandEnabled = MutableStateFlow(false)
-    val guardDangerousCommandEnabled: StateFlow<Boolean> = _guardDangerousCommandEnabled.asStateFlow()
-
-    private val _guardLargeFileEnabled = MutableStateFlow(false)
-    val guardLargeFileEnabled: StateFlow<Boolean> = _guardLargeFileEnabled.asStateFlow()
-
-    private val _guardPathBoundaryEnabled = MutableStateFlow(false)
-    val guardPathBoundaryEnabled: StateFlow<Boolean> = _guardPathBoundaryEnabled.asStateFlow()
-
-    // P2：用量卡片显示项
-    private val _usageCardItems = MutableStateFlow<Set<String>>(setOf("token"))
-    val usageCardItems: StateFlow<Set<String>> = _usageCardItems.asStateFlow()
-
-    private val _themeMode = MutableStateFlow(AppThemeMode.AUTO)
-    val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
-
-    private val _mcpServers = MutableStateFlow<List<McpServerConfig>>(emptyList())
-    val mcpServers: StateFlow<List<McpServerConfig>> = _mcpServers.asStateFlow()
-
-    val mcpStatuses: StateFlow<List<McpServerStatus>> = mcpManager.statuses
-
-    private val _mcpReloading = MutableStateFlow(false)
-    val mcpReloading: StateFlow<Boolean> = _mcpReloading.asStateFlow()
-
-    // ── 内置 MCP 服务器（把自己开放出去） ──
-    val mcpServerIsRunning: StateFlow<Boolean> = mcpServerManager.isRunning
-    val mcpServerPort: StateFlow<Int> = mcpServerManager.port
-    val mcpServerToken: StateFlow<String> = mcpServerManager.token
-    val mcpServerRequireApproval: StateFlow<Boolean> = mcpServerManager.requireApproval
-    val mcpServerAutoStart: StateFlow<Boolean> = mcpServerManager.autoStart
-    val mcpServerUrl: StateFlow<String> = mcpServerManager.serverUrl
-    val mcpServerError: StateFlow<String?> = mcpServerManager.errorMessage
-
-    fun toggleMcpServer() = viewModelScope.launch { mcpServerManager.toggleServer() }
-
-    fun saveMcpServerConfig(port: Int, requireApproval: Boolean, autoStart: Boolean) =
-        viewModelScope.launch { mcpServerManager.saveConfig(port, requireApproval, autoStart) }
-
-    fun regenerateMcpServerToken() = viewModelScope.launch { mcpServerManager.regenerateToken() }
-
-    private val _fetchState = MutableStateFlow<FetchState>(FetchState.Idle)
-    val fetchState: StateFlow<FetchState> = _fetchState.asStateFlow()
-
-    /** 内置供应商向导「选择模型」步骤的拉取状态（与编辑页 [_fetchState] 隔离，避免互相干扰）。 */
-    private val _builtInFetchState = MutableStateFlow<FetchState>(FetchState.Idle)
-    val builtInFetchState: StateFlow<FetchState> = _builtInFetchState.asStateFlow()
-
-    /** 自定义供应商向导「选择模型」步骤的拉取状态（同样与编辑页 [_fetchState] 隔离）。 */
-    private val _customFetchState = MutableStateFlow<FetchState>(FetchState.Idle)
-    val customFetchState: StateFlow<FetchState> = _customFetchState.asStateFlow()
-
-    /**
-     * RC72：保存提供商时的错误提示通道（一次性，消费后自动清空）。
-     *
-     * 背景：RC71 把 AIProviderRepositoryImpl.toEntity 的「加密失败」从静默落空串改成抛异常，
-     * 以杜绝密钥被空串覆盖。但 ViewModel 的 saveProvider 用 viewModelScope.launch 无 try-catch，
-     * 未捕获的协程异常会直接导致 App 崩溃（闪退）。这里接管异常：不崩溃、不静默丢密钥，
-     * 而是把错误暴露给 UI 弹提示。
-     */
-    private val _saveError = MutableStateFlow<String?>(null)
-    val saveError: StateFlow<String?> = _saveError.asStateFlow()
-
-    /** 消费一次保存错误提示（UI 展示后调用），避免重复弹。 */
-    fun consumeSaveError() {
-        _saveError.value = null
-    }
-
-    private val _testResults = MutableStateFlow<Map<String, ModelTestResult>>(emptyMap())
-    val testResults: StateFlow<Map<String, ModelTestResult>> = _testResults.asStateFlow()
-
-    private val _modelMetadata = MutableStateFlow<Map<String, ModelMetadata>>(emptyMap())
-    val modelMetadata: StateFlow<Map<String, ModelMetadata>> = _modelMetadata.asStateFlow()
-
-    /** RC63 备选方案③：兼容端点「默认策略」流 + 快照（ProviderEditorScreen Tab0 下拉选择 + 选项卡小角标用）。 */
-    val compatibilityDefaultPolicyFlow: StateFlow<DefaultPolicy>
-        get() = compatibilityPolicyRepository.defaultPolicyFlow.stateIn(
-            viewModelScope, SharingStarted.Eagerly, DefaultPolicy.STRICT
-        )
-
-    /** RC63 备选方案②「发送失败自动降级」总开关。 */
-    val autoDowngradeOnSendFailureFlow: StateFlow<Boolean>
-        get() = compatibilityPolicyRepository.autoDowngradeOnSendFailureFlow.stateIn(
-            viewModelScope, SharingStarted.Eagerly, true
-        )
-
-    /** RC63 viewImage 守卫策略（FALLBACK_VISION_MODEL vs FAIL_FAST）。 */
-    val viewImageUnknownGuardPolicyFlow: StateFlow<ViewImageUnknownGuardPolicy>
-        get() = compatibilityPolicyRepository.viewImageUnknownGuardPolicyFlow.stateIn(
-            viewModelScope, SharingStarted.Eagerly,
-            ViewImageUnknownGuardPolicy.FALLBACK_VISION_MODEL
-        )
-
-    private val _testing = MutableStateFlow<Set<String>>(emptySet())
-    val testing: StateFlow<Set<String>> = _testing.asStateFlow()
-
-    private val _globalRules = MutableStateFlow<List<PermissionRule>>(emptyList())
-    val globalRules: StateFlow<List<PermissionRule>> = _globalRules.asStateFlow()
-
-    private val _projectRules = MutableStateFlow<List<PermissionRule>>(emptyList())
-    val projectRules: StateFlow<List<PermissionRule>> = _projectRules.asStateFlow()
-
-    val currentProjectName: StateFlow<String?> = permissionRulesRepository.currentProjectNameFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
-
-    private val _activeProfileId = MutableStateFlow(ContainerProfile.BUILTIN_ID)
-    val activeProfileId: StateFlow<String> = _activeProfileId.asStateFlow()
-
-    /** 「共享设备存储」：把设备外存绑定进容器 /root/storage/shared（默认关）。 */
-    private val _storageShareEnabled = MutableStateFlow(false)
-    val storageShareEnabled: StateFlow<Boolean> = _storageShareEnabled.asStateFlow()
-
-    private val _customProfiles = MutableStateFlow<List<ContainerProfile>>(emptyList())
-    val customProfiles: StateFlow<List<ContainerProfile>> = _customProfiles.asStateFlow()
-
-    /** 全部 profile（内置 arm64 + 内置 x86_64 + 自定义），供 UI 列出。 */
-    val profiles: StateFlow<List<ContainerProfile>> = customProfiles
-        .map { listOf(ContainerProfile.BUILTIN_ALPINE, ContainerProfile.BUILTIN_ALPINE_X86) + it }
-        .stateIn(
-            viewModelScope,
-            kotlinx.coroutines.flow.SharingStarted.Eagerly,
-            listOf(ContainerProfile.BUILTIN_ALPINE, ContainerProfile.BUILTIN_ALPINE_X86)
-        )
-
-    /** 当前执行模式（本地 PRoot / 远程 SSH），供 UI 判断是否显示远程连接指示器。 */
-    val executionMode: StateFlow<ExecutionMode> = executionModeHolder.mode
-
-    /** 远程 SSH 连接状态，供 UI 显示指示器。 */
-    val connectionState: StateFlow<ConnectionState> = remoteSshConnection.connectionState
-
-    /** 工作区已配置的远程连接通道，供容器镜像 SSH 模式下拉复用。 */
-    val remoteConnections: StateFlow<List<RemoteConnection>> = remoteRepository.getConnections()
-        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptyList())
-
-    init {
-        viewModelScope.launch {
-            // 启动即保证有激活提供商（若库中存在却无激活项），避免主页模型胶囊因 activeProvider=null 消失。
-            repository.ensureActiveProvider()
-
-            launch {
-                repository.getAllProviders().collectLatest {
-                    _providers.value = it
-                    // 运行期兜底：提供商列表变化后若仍无激活项且有提供商，自动激活首个。
-                    if (_activeProvider.value == null && it.isNotEmpty()) {
-                        repository.ensureActiveProvider()
-                    }
-                }
-            }
-
-            launch {
-                repository.getActiveProvider().collectLatest {
-                    _activeProvider.value = it
-                }
-            }
-
-            launch {
-                visionModelSettingsRepository.providerIdFlow.collectLatest {
-                    _visionProviderId.value = it
-                }
-            }
-
-            launch {
-                visionModelSettingsRepository.modelFlow.collectLatest {
-                    _visionModel.value = it
-                }
-            }
-
-            launch {
-                compactionModelSettingsRepository.providerIdFlow.collectLatest {
-                    _compactionProviderId.value = it
-                }
-            }
-
-            launch {
-                compactionModelSettingsRepository.modelFlow.collectLatest {
-                    _compactionModel.value = it
-                }
-            }
-
-            launch {
-                logSettingsRepository.levelFlow.collectLatest {
-                    _logLevel.value = it
-                }
-            }
-
-            // 恢复持久化的日志筛选偏好（等级 / Tag；日期范围默认「今天」，不持久化旧的列表/范围开关）
-            launch {
-                val levels = logFilterSettingsRepository.readSelectedLevels()
-                val tags = logFilterSettingsRepository.readSelectedTags()
-                _logViewerState.update {
-                    it.copy(
-                        selectedLevels = levels,
-                        selectedTags = tags
-                    )
-                }
-            }
-
-            // 记录等级（写入阈值）变化时同步进日志查看器 UiState，供顶部「记录等级」行展示
-            launch {
-                _logLevel.collectLatest { level ->
-                    _logViewerState.update { it.copy(recordLevel = level) }
-                }
-            }
-
-            launch {
-                keepaliveSettingsRepository.enabledFlow.collectLatest {
-                    _keepaliveEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.normFlowEnabledFlow.collectLatest {
-                    _normFlowEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.stepInjectEnabledFlow.collectLatest {
-                    _stepInjectEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.toolGuardEnabledFlow.collectLatest {
-                    _toolGuardEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.reasoningBudgetEnabledFlow.collectLatest {
-                    _reasoningBudgetEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.usageCardEnabledFlow.collectLatest {
-                    _usageCardEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.sopSummaryEnabledFlow.collectLatest {
-                    _sopSummaryEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.playbookAutoEnabledFlow.collectLatest {
-                    _playbookAutoEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.idleConvergeEnabledFlow.collectLatest {
-                    _idleConvergeEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.stepInjectGoalEnabledFlow.collectLatest {
-                    _stepInjectGoalEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.stepInjectStaticRulesEnabledFlow.collectLatest {
-                    _stepInjectStaticRulesEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.stepInjectLayeredRulesEnabledFlow.collectLatest {
-                    _stepInjectLayeredRulesEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.stepInjectProjectAgentsEnabledFlow.collectLatest {
-                    _stepInjectProjectAgentsEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.fileObservationEnabledFlow.collectLatest {
-                    _fileObservationEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.reasoningBudgetLevelFlow.collectLatest {
-                    _reasoningBudgetLevel.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.idleConvergeRoundsFlow.collectLatest {
-                    _idleConvergeRounds.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.activePresetFlow.collectLatest {
-                    _activePreset.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.guardDangerousCommandEnabledFlow.collectLatest {
-                    _guardDangerousCommandEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.guardLargeFileEnabledFlow.collectLatest {
-                    _guardLargeFileEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.guardPathBoundaryEnabledFlow.collectLatest {
-                    _guardPathBoundaryEnabled.value = it
-                }
-            }
-
-            launch {
-                normFlowSettingsRepository.usageCardItemsFlow.collectLatest {
-                    _usageCardItems.value = it
-                }
-            }
-
-            launch {
-                themeSettingsRepository.themeModeFlow.collectLatest {
-                    _themeMode.value = it
-                }
-            }
-
-            launch {
-                containerSettingsRepository.activeProfileIdFlow.collectLatest {
-                    _activeProfileId.value = it
-                }
-            }
-
-            launch {
-                containerSettingsRepository.customProfilesFlow.collectLatest {
-                    _customProfiles.value = it
-                }
-            }
-
-            launch {
-                containerSettingsRepository.storageShareEnabledFlow.collectLatest {
-                    _storageShareEnabled.value = it
-                }
-            }
-
-            launch {
-                mcpConfigRepository.serversFlow.collectLatest {
-                    _mcpServers.value = it
-                }
-            }
-
-            launch {
-                permissionRulesRepository.globalRulesFlow.collectLatest {
-                    _globalRules.value = it
-                }
-            }
-
-            launch {
-                permissionRulesRepository.currentProjectRulesFlow.collectLatest {
-                    _projectRules.value = it
-                }
-            }
-
-            // ── 筛选防抖消费者：筛选变化 300ms 后重新应用过滤 ──
-            launch {
-                _filterTrigger.debounce(300).collectLatest { _ ->
-                    applyLocalFilters()
-                }
-            }
-        }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        stopLiveTail()
-    }
-
-    fun upsertMcpServer(originalName: String?, config: McpServerConfig) {
-        viewModelScope.launch {
-            val ordered = LinkedHashMap<String, McpServerConfig>()
-            _mcpServers.value.forEach { ordered[it.name] = it }
-            if (originalName != null && originalName != config.name) {
-                ordered.remove(originalName)
-            }
-            ordered[config.name] = config
-            persistMcpServers(ordered.values.toList())
-        }
-    }
-
-    fun deleteMcpServer(name: String) {
-        viewModelScope.launch {
-            persistMcpServers(_mcpServers.value.filterNot { it.name == name })
-        }
-    }
-
-    fun setMcpServerEnabled(name: String, enabled: Boolean) {
-        viewModelScope.launch {
-            persistMcpServers(_mcpServers.value.map { if (it.name == name) it.copy(enabled = enabled) else it })
-        }
-    }
-
-    fun reloadMcp() {
-        viewModelScope.launch {
-            _mcpReloading.value = true
-            try {
-                mcpManager.reload()
-            } finally {
-                _mcpReloading.value = false
-            }
-        }
-    }
-
-    fun getMcpServerTools(serverName: String?): List<McpToolDescriptor> {
-        if (serverName.isNullOrBlank()) return emptyList()
-        return mcpManager.getServerTools(serverName)
-    }
-
-    private suspend fun persistMcpServers(servers: List<McpServerConfig>) {
-        mcpConfigRepository.setServers(servers)
-        _mcpReloading.value = true
-        try {
-            mcpManager.reload()
-        } finally {
-            _mcpReloading.value = false
-        }
-    }
-
-    fun setLogLevel(level: LogLevel) {
-        viewModelScope.launch {
-            logSettingsRepository.setLevel(level)
-        }
-    }
-
-    fun refreshLogs(filterServerName: String? = _logViewerState.value.filterServerName) {
-        loadLogs(
-            filterServerName = filterServerName?.takeIf { it.isNotBlank() },
-            preferredFileName = _logViewerState.value.selectedFileName
-        )
-    }
-
-    fun selectLogFile(fileName: String) {
-        loadLogs(
-            filterServerName = _logViewerState.value.filterServerName,
-            preferredFileName = fileName
-        )
-    }
-
-    // ── 筛选控制方法 ──
-
-    fun toggleFilterPanel() {
-        // 只打开，不关闭；关闭由 closeFilterPanel() 负责
-        _logViewerState.update { it.copy(filterPanelExpanded = true) }
-    }
-
-    fun closeFilterPanel() {
-        _logViewerState.update { it.copy(filterPanelExpanded = false) }
-    }
-
-    fun setSelectedDates(dates: Set<String>) {
-        _logViewerState.update { it.copy(selectedDates = dates) }
-        loadLogs(
-            filterServerName = _logViewerState.value.filterServerName,
-            preferredFileName = _logViewerState.value.selectedFileName
-        )
-    }
-
-    // ── 日期范围：快捷范围 / 单文件 / 自定义（设计文档 §7）──
-
-    /**
-     * 设置快捷日期范围（今天/昨天/近3天/近7天/全部）。
-     * 翻译成 [selectedDates] / 自定义范围后复用现有 [filterFilesByDate] 逻辑重新加载。
-     */
-    fun setDateRangeMode(mode: DateRangeMode) {
-        val (dates, rangeStart, rangeEnd) = resolveDateScope(mode, null)
-        _logViewerState.update {
-            it.copy(
-                dateRangeMode = mode,
-                selectedDates = dates,
-                customDateStart = rangeStart,
-                customDateEnd = rangeEnd,
-                selectedFileName = null
-            )
-        }
-        loadLogs(
-            filterServerName = _logViewerState.value.filterServerName,
-            preferredFileName = null
-        )
-    }
-
-    /** 选择单个日志文件：作用域收窄到该文件对应的日期。 */
-    fun selectSingleFile(fileName: String) {
-        // L1：用统一解析器取逻辑日期，兼容滚动件（log-<date>.N.txt 也解析为 <date>）。
-        val fileDate = com.mini.me_core.core.util.LogFiles.parseAppLogDate(fileName)
-            ?: fileName.removePrefix("log-").removeSuffix(".txt")
-        _logViewerState.update {
-            it.copy(
-                dateRangeMode = DateRangeMode.SINGLE_FILE,
-                selectedDates = setOf(fileDate),
-                customDateStart = null,
-                customDateEnd = null,
-                selectedFileName = fileName
-            )
-        }
-        loadLogs(
-            filterServerName = _logViewerState.value.filterServerName,
-            preferredFileName = fileName
-        )
-    }
-
-    /** 设置自定义日期范围（yyyy-MM-dd，含端点）；起止都为空时等价于「全部」。 */
-    fun setCustomDateRange(start: String?, end: String?) {
-        _logViewerState.update {
-            it.copy(
-                dateRangeMode = if (start == null && end == null) DateRangeMode.ALL else DateRangeMode.CUSTOM,
-                selectedDates = emptySet(),
-                customDateStart = start,
-                customDateEnd = end,
-                selectedFileName = null
-            )
-        }
-        loadLogs(
-            filterServerName = _logViewerState.value.filterServerName,
-            preferredFileName = null
-        )
-    }
-
-    /** 设置最低记录等级（写入阈值），持久化后由 FileLogger 实时生效。 */
-    fun setRecordLevel(level: LogLevel) {
-        viewModelScope.launch {
-            logSettingsRepository.setLevel(level)
-        }
-    }
-
-    // ── 显示筛选快捷操作（运行日志查看器重构）──
-
-    /** 显示筛选「全部」：清空等级多选，展示所有等级。 */
-    fun clearDisplayLevels() {
-        _logViewerState.update { it.copy(selectedLevels = emptySet(), collapsedLevels = emptySet()) }
-        viewModelScope.launch { logFilterSettingsRepository.saveSelectedLevels(emptySet()) }
-        triggerDebouncedFilter()
-    }
-
-    /**
-     * 快速筛选栏点击某等级：
-     * - 若该等级已是唯一选中 → 折叠/展开该等级整组行；
-     * - 否则 → 仅显示该等级（单选快速过滤）。
-     */
-    fun quickFilterLevel(level: LogLevel) {
-        val current = _logViewerState.value
-        if (current.selectedLevels == setOf(level)) {
-            toggleLevelCollapse(level)
-        } else {
-            _logViewerState.update {
-                it.copy(selectedLevels = setOf(level), collapsedLevels = emptySet())
-            }
-            viewModelScope.launch { logFilterSettingsRepository.saveSelectedLevels(setOf(level)) }
-            triggerDebouncedFilter()
-        }
-    }
-
-    /** 折叠/展开某等级整组行（设计文档 §5.3/§10.6）。 */
-    fun toggleLevelCollapse(level: LogLevel) {
-        _logViewerState.update {
-            val newCollapsed = if (level in it.collapsedLevels) it.collapsedLevels - level else it.collapsedLevels + level
-            it.copy(collapsedLevels = newCollapsed)
-        }
-    }
-
-    /** 顶栏搜索展开/收起；收起时清空关键词恢复完整日志。 */
-    fun setSearchExpanded(expanded: Boolean) {
-        _logViewerState.update { it.copy(searchExpanded = expanded) }
-        if (!expanded) {
-            _logViewerState.update {
-                it.copy(searchQuery = "", currentMatchIndex = 0, totalMatches = 0)
-            }
-            triggerDebouncedFilter()
-        }
-    }
-
-    /** 搜索结果上一处/下一处跳转（Stage 4 完善滚动定位）。 */
-    fun prevMatch() {
-        val total = _logViewerState.value.totalMatches
-        if (total <= 0) return
-        _logViewerState.update { it.copy(currentMatchIndex = (it.currentMatchIndex - 1 + total) % total) }
-    }
-
-    fun nextMatch() {
-        val total = _logViewerState.value.totalMatches
-        if (total <= 0) return
-        _logViewerState.update { it.copy(currentMatchIndex = (it.currentMatchIndex + 1) % total) }
-    }
-
-    /** 把快捷日期模式翻译成 [filterFilesByDate] 能理解的 (选中日期集合, 范围起止)。 */
-    private fun resolveDateScope(mode: DateRangeMode, singleFileName: String?): Triple<Set<String>, String?, String?> {
-        val today = java.time.LocalDate.now()
-        val fmt = java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
-        return when (mode) {
-            DateRangeMode.TODAY -> Triple(setOf(fmt.format(today)), null, null)
-            DateRangeMode.YESTERDAY -> Triple(setOf(fmt.format(today.minusDays(1))), null, null)
-            DateRangeMode.LAST_3_DAYS -> Triple((0L..2L).map { fmt.format(today.minusDays(it)) }.toSet(), null, null)
-            DateRangeMode.LAST_7_DAYS -> Triple(emptySet(), fmt.format(today.minusDays(6)), fmt.format(today))
-            DateRangeMode.ALL -> Triple(emptySet(), null, null)
-            DateRangeMode.SINGLE_FILE -> {
-                // L1：统一解析器，兼容滚动件。
-                val date = singleFileName?.let { com.mini.me_core.core.util.LogFiles.parseAppLogDate(it) }
-                    ?: singleFileName?.removePrefix("log-")?.removeSuffix(".txt")
-                Triple(date?.let { setOf(it) } ?: emptySet(), null, null)
-            }
-            DateRangeMode.CUSTOM -> Triple(emptySet(), null, null) // 起止由调用方写入 state
-        }
-    }
-
-    fun toggleLevel(level: LogLevel) {
-        _logViewerState.update { current ->
-            val newLevels = if (level in current.selectedLevels) {
-                current.selectedLevels - level
-            } else {
-                current.selectedLevels + level
-            }
-            current.copy(selectedLevels = newLevels)
-        }
-        viewModelScope.launch {
-            logFilterSettingsRepository.saveSelectedLevels(_logViewerState.value.selectedLevels)
-        }
-        // 局部过滤：不重新读文件
-        triggerDebouncedFilter()
-    }
-
-    fun toggleTag(tag: String) {
-        _logViewerState.update { current ->
-            val newTags = if (tag in current.selectedTags) {
-                current.selectedTags - tag
-            } else {
-                current.selectedTags + tag
-            }
-            current.copy(selectedTags = newTags)
-        }
-        viewModelScope.launch {
-            logFilterSettingsRepository.saveSelectedTags(_logViewerState.value.selectedTags)
-        }
-        // 局部过滤：不重新读文件
-        triggerDebouncedFilter()
-    }
-
-    fun setSearchQuery(query: String) {
-        _logViewerState.update { it.copy(searchQuery = query) }
-        // 局部过滤：不重新读文件
-        triggerDebouncedFilter()
-    }
-
-    fun resetFilters() {
-        _logViewerState.update {
-            it.copy(
-                selectedDates = emptySet(),
-                selectedLevels = emptySet(),
-                selectedTags = emptySet(),
-                searchQuery = "",
-                customDateStart = null,
-                customDateEnd = null,
-                collapsedLevels = emptySet()
-            )
-        }
-        viewModelScope.launch {
-            logFilterSettingsRepository.saveSelectedLevels(emptySet())
-            logFilterSettingsRepository.saveSelectedTags(emptySet())
-        }
-        // 局部过滤：不重新读文件
-        applyLocalFilters()
-    }
-
-    // ── 实时尾随 ──
-
-    fun toggleLiveTail() {
-        val current = _logViewerState.value
-        if (current.liveTailEnabled) {
-            stopLiveTail()
-        } else {
-            startLiveTail()
-        }
-    }
-
-    private fun startLiveTail() {
-        _logViewerState.update { it.copy(liveTailEnabled = true, hasNewLogs = false) }
-        // 启动 FileObserver 监听日志目录变化
-        val logDir = FileLogger.getLogDir() ?: return
-        _liveTailFileObserver = object : android.os.FileObserver(logDir, android.os.FileObserver.CLOSE_WRITE) {
-            override fun onEvent(event: Int, path: String?) {
-                if (path != null && path.startsWith("log-")) {
-                    _logViewerState.update { it.copy(hasNewLogs = true) }
-                }
-            }
-        }.apply { startWatching() }
-        // 立即刷新一次
-        refreshLogs()
-    }
-
-    private fun stopLiveTail() {
-        _liveTailFileObserver?.stopWatching()
-        _liveTailFileObserver = null
-        _logViewerState.update { it.copy(liveTailEnabled = false, hasNewLogs = false) }
-    }
-
-    fun dismissNewLogs() {
-        _logViewerState.update { it.copy(hasNewLogs = false) }
-        refreshLogs()
-    }
-
-    // ── 防抖触发 ──
-
-    private fun triggerDebouncedFilter() {
-        _filterTrigger.update { it + 1 }
-    }
-
-    /** 局部过滤：仅对已缓存的行做内存过滤，不重新读文件。 */
-    private fun applyLocalFilters() {
-        val snapshot = _logViewerState.value
-        val allLines = _cachedRawLines
-        if (allLines.isEmpty()) return
-
-        val filteredLines = allLines.filter { line ->
-            matchesFilters(line, snapshot.filterServerName, snapshot)
-        }
-        val visibleLines = filteredLines.takeLast(MAX_LOG_LINES)
-
-        val allTags = LogLineParser.extractTags(allLines)
-
-        // 搜索匹配数：在可见行中统计命中搜索词的行数（大小写不敏感）
-        val query = snapshot.searchQuery.trim()
-        val totalMatches = if (query.isEmpty()) 0 else visibleLines.count { it.contains(query, ignoreCase = true) }
-
-        _logViewerState.update {
-            it.copy(
-                content = visibleLines.joinToString("\n"),
-                totalLines = filteredLines.size,
-                shownLines = visibleLines.size,
-                allAvailableTags = allTags,
-                loading = false,
-                totalMatches = totalMatches,
-                currentMatchIndex = if (query.isEmpty()) 0 else 0,
-            )
-        }
-    }
-
-    /** 实时尾随是否自动贴底滚动（用户上滑置 false，点「返回最新」置 true）。 */
-    fun setAutoScrolling(autoScrolling: Boolean) {
-        _logViewerState.update { it.copy(isAutoScrolling = autoScrolling) }
-    }
-
-    // ── 核心加载逻辑 ──
-
-    /** 流式读取日志：从文件尾部向前扫描，只读最后 N 行。 */
-    private fun loadLogs(filterServerName: String?, preferredFileName: String?) {
-        viewModelScope.launch {
-            val snapshot = _logViewerState.value
-            _logViewerState.update {
-                it.copy(
-                    loading = true,
-                    filterServerName = filterServerName,
-                    error = null
-                )
-            }
-            val state = withContext(Dispatchers.IO) {
-                runCatching {
-                    val allFiles = FileLogger.listLogFiles()
-                    if (allFiles.isEmpty()) {
-                        _cachedRawLines = emptyList()
-                        return@runCatching LogViewerUiState(
-                            filterServerName = filterServerName,
-                            error = "还没有日志文件"
-                        )
-                    }
-
-                    // 1. 按日期筛选文件列表
-                    val matchedFiles = filterFilesByDate(allFiles, snapshot)
-
-                    // 2. 流式读取：从每个文件尾部向前扫描，只读最后 MAX_LOG_LINES 行
-                    val allLines = readTailLines(matchedFiles, MAX_LOG_LINES * 2)
-
-                    // 3. 缓存原始行（供局部过滤使用）
-                    _cachedRawLines = allLines
-
-                    // 4. 提取所有可用 Tag
-                    val allTags = LogLineParser.extractTags(allLines)
-
-                    // 4.1 各等级行数统计（文件/日期作用域内、等级/Tag/搜索过滤前），供筛选栏数量徽章
-                    val levelCounts = countLevels(allLines)
-
-                    // 5. 多维度过滤
-                    val filteredLines = allLines.filter { line ->
-                        matchesFilters(line, filterServerName, snapshot)
-                    }
-
-                    // 6. 尾部截断
-                    val visibleLines = filteredLines.takeLast(MAX_LOG_LINES)
-
-                    // 7. 确定选中文件名
-                    val selectedName = preferredFileName
-                        ?: allFiles.firstOrNull { it.name == preferredFileName }?.name
-                        ?: matchedFiles.lastOrNull()?.name
-                        ?: allFiles.lastOrNull()?.name
-
-                    LogViewerUiState(
-                        files = allFiles.map { it.name },
-                        selectedFileName = selectedName,
-                        filterServerName = filterServerName,
-                        content = visibleLines.joinToString("\n"),
-                        totalLines = filteredLines.size,
-                        shownLines = visibleLines.size,
-                        selectedDates = snapshot.selectedDates,
-                        selectedLevels = snapshot.selectedLevels,
-                        selectedTags = snapshot.selectedTags,
-                        allAvailableTags = allTags,
-                        dateRangeMode = snapshot.dateRangeMode,
-                        customDateStart = snapshot.customDateStart,
-                        customDateEnd = snapshot.customDateEnd,
-                        searchQuery = snapshot.searchQuery,
-                        liveTailEnabled = snapshot.liveTailEnabled,
-                        levelCounts = levelCounts,
-                        recordLevel = snapshot.recordLevel,
-                        searchExpanded = snapshot.searchExpanded,
-                        currentMatchIndex = snapshot.currentMatchIndex,
-                        totalMatches = snapshot.totalMatches,
-                        collapsedLevels = snapshot.collapsedLevels,
-                        isAutoScrolling = snapshot.isAutoScrolling
-                    )
-                }.getOrElse { e ->
-                    LogViewerUiState(
-                        filterServerName = filterServerName,
-                        error = "读取日志失败: ${e.message}"
-                    )
-                }
-            }
-            _logViewerState.value = state
-        }
-    }
-
-    /** 从多个文件尾部向前读取，收集最多 maxLines 行。 */
-    private fun readTailLines(files: List<java.io.File>, maxLines: Int): List<String> {
-        if (files.isEmpty()) return emptyList()
-        val result = mutableListOf<String>()
-        // 从最新文件开始读（文件列表按日期排序，最后一个是最近）
-        for (file in files.reversed()) {
-            if (result.size >= maxLines) break
-            val lines = readFileTail(file, maxLines - result.size)
-            result.addAll(0, lines) // 插到前面保持时间顺序
-        }
-        return result
-    }
-
-    /** 从单个文件尾部读取最后 n 行（UTF-8 安全）。 */
-    private fun readFileTail(file: java.io.File, n: Int): List<String> {
-        if (!file.exists() || file.length() == 0L) return emptyList()
-        return try {
-            val raf = java.io.RandomAccessFile(file, "r")
-            try {
-                val fileLength = raf.length()
-                // 估算读取字节数：每行按 200 字节估算，至少 8KB
-                val bytesToRead = minOf(fileLength, (n * 200L).coerceAtLeast(8192L))
-                val startPos = fileLength - bytesToRead
-                raf.seek(startPos)
-                val bytes = ByteArray(bytesToRead.toInt())
-                raf.readFully(bytes)
-                // 整块 UTF-8 解码（开头可能截断在多字节字符中间，但 String 解码器会正确处理）
-                String(bytes, Charsets.UTF_8)
-                    .lines()
-                    .takeLast(n)
-                    .map { it.trimEnd('\r') }
-            } finally {
-                raf.close()
-            }
-        } catch (e: Exception) {
-            // 降级（L3）：用流式环形缓冲尾读，避免 readLines 把整个文件读进内存。
-            readFileTailStreaming(file, n)
-        }
-    }
-
-    /** 流式尾读：环形缓冲只保留最后 n 行，内存占用与文件大小无关。 */
-    private fun readFileTailStreaming(file: java.io.File, n: Int): List<String> {
-        val ring = ArrayDeque<String>(n)
-        return try {
-            file.bufferedReader(Charsets.UTF_8).useLines { seq ->
-                seq.forEach { line ->
-                    if (ring.size == n) ring.removeFirst()
-                    ring.addLast(line.trimEnd('\r'))
-                }
-            }
-            ring.toList()
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    /** 按日期筛选条件匹配文件列表。 */
-    private fun filterFilesByDate(
-        allFiles: List<java.io.File>,
-        snapshot: LogViewerUiState
-    ): List<java.io.File> {
-        val dates = snapshot.selectedDates
-        if (dates.isNotEmpty()) {
-            // 列表模式：按选中日期精确匹配（L1：统一解析器，滚动件也归入其逻辑日期）
-            return allFiles.filter { f ->
-                val fileDate = com.mini.me_core.core.util.LogFiles.parseAppLogDate(f.name)
-                fileDate != null && fileDate in dates
-            }
-        }
-        val rangeStart = snapshot.customDateStart
-        val rangeEnd = snapshot.customDateEnd
-        if (rangeStart != null || rangeEnd != null) {
-            // 范围模式：按日期范围筛选
-            return allFiles.filter { f ->
-                val fileDate = com.mini.me_core.core.util.LogFiles.parseAppLogDate(f.name) ?: return@filter false
-                val inRange = (rangeStart == null || fileDate >= rangeStart) &&
-                    (rangeEnd == null || fileDate <= rangeEnd)
-                inRange
-            }
-        }
-        // 无日期筛选：返回所有文件
-        return allFiles
-    }
-
-    /** 统计日志行中各等级的行数（附属行/堆栈不计入）。供显示筛选栏的数量徽章使用。 */
-    /**
-     * 统计**当前已展示行**中各等级的条数（供筛选栏数量徽章）。
-     *
-     * 与 `FileLogger.getStats()` / [com.mini.me_core.core.util.LogStats] 的分工（审计 A3）：
-     *  - 这里统计的是「读进来、且已过筛选」的行 → 反映 UI 当前所见，必须逐行算，不能复用累计统计；
-     *  - `LogStats` 是**写入侧**的进程级累计（按等级/Tag），供诊断与慢查询汇入使用，不随筛选变化。
-     * 两者口径不同、不可互相替代，故不再视为"重复实现"。
-     */
-    private fun countLevels(lines: List<String>): Map<LogLevel, Int> {
-        val counts = HashMap<LogLevel, Int>()
-        for (line in lines) {
-            val parsed = LogLineParser.parse(line) ?: continue
-            val level = parsed.level ?: continue
-            counts[level] = (counts[level] ?: 0) + 1
-        }
-        return counts
-    }
-
-    /** 判断单行是否通过所有筛选条件。 */
-    private fun matchesFilters(
-        line: String,
-        filterServerName: String?,
-        snapshot: LogViewerUiState
-    ): Boolean {
-        val parsed = LogLineParser.parse(line)
-        if (parsed == null) {
-            // 附属行（堆栈等）始终保留
-            return true
-        }
-
-        // filterServerName 过滤（MCP 对话框跳转）
-        if (!filterServerName.isNullOrBlank()) {
-            if (!parsed.raw.contains("[$filterServerName]", ignoreCase = true) &&
-                !parsed.raw.contains(filterServerName, ignoreCase = true)
-            ) {
-                return false
-            }
-        }
-
-        // 等级过滤
-        if (snapshot.selectedLevels.isNotEmpty()) {
-            if (parsed.level == null || parsed.level !in snapshot.selectedLevels) {
-                return false
-            }
-        }
-
-        // Tag 来源过滤
-        if (snapshot.selectedTags.isNotEmpty()) {
-            if (parsed.tag !in snapshot.selectedTags) {
-                return false
-            }
-        }
-
-        // 搜索关键词过滤
-        val query = snapshot.searchQuery.trim()
-        if (query.isNotEmpty()) {
-            if (!parsed.raw.contains(query, ignoreCase = true)) {
-                return false
-            }
-        }
-
-        return true
-    }
-
-    // 仅持久化标志位——启停 Service 由 MiniMeCore 监听 enabledFlow 统一完成。
-    fun setKeepaliveEnabled(enabled: Boolean) {
-        val old = _keepaliveEnabled.value
-        viewModelScope.launch {
-            keepaliveSettingsRepository.setEnabled(enabled)
-            _settingEffect.tryEmit(SettingEffect.NeedsRestart)
-        }
-    }
-
-    // D1-7 规范流程统一开关：总开关/子开关持久化（workflow 运行期读同一 repository）。
-    // P1：用户手动调整后自动标记为 custom 预设。
-    fun setNormFlowEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setNormFlowEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    fun setStepInjectEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setStepInjectEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    fun setToolGuardEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setToolGuardEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    // D2-2/D2-4 规范流程子开关持久化（workflow 运行期读同一 repository）。
-    fun setReasoningBudgetEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setReasoningBudgetEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    fun setUsageCardEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setUsageCardEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    fun setSopSummaryEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setSopSummaryEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    fun setPlaybookAutoEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setPlaybookAutoEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    fun setIdleConvergeEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setIdleConvergeEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    // P0 step 前注入子开关持久化
-    fun setStepInjectGoalEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setStepInjectGoalEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    fun setStepInjectStaticRulesEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setStepInjectStaticRulesEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    fun setStepInjectLayeredRulesEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setStepInjectLayeredRulesEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    fun setStepInjectProjectAgentsEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setStepInjectProjectAgentsEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    fun setFileObservationEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setFileObservationEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    // P1：推理预算强度
-    fun setReasoningBudgetLevel(level: String) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setReasoningBudgetLevel(level)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    // P1：空转收敛阈值
-    fun setIdleConvergeRounds(rounds: Int) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setIdleConvergeRounds(rounds)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    // P1：应用预设方案
-    fun applyPreset(preset: String) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.applyPreset(preset)
-        }
-    }
-
-    // P2：新增护栏独立开关
-    fun setGuardDangerousCommandEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setGuardDangerousCommandEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    fun setGuardLargeFileEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setGuardLargeFileEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    fun setGuardPathBoundaryEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            normFlowSettingsRepository.setGuardPathBoundaryEnabled(enabled)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    // P2：用量卡片显示项（切换某个 item）
-    fun toggleUsageCardItem(item: String) {
-        viewModelScope.launch {
-            val current = _usageCardItems.value
-            val newItems = if (item in current) current - item else current + item
-            normFlowSettingsRepository.setUsageCardItems(newItems)
-            normFlowSettingsRepository.markCustom()
-        }
-    }
-
-    // P3：导出配置
-    fun exportConfig(): String = normFlowSettingsRepository.exportConfig()
-
-    // P3：导入配置
-    fun importConfig(json: String): Boolean = normFlowSettingsRepository.importConfig(json)
-
     // 仪表盘「重置统计」：清空累计注入 token 与护栏拦截日志/计数（空转轮数为运行时快照，不在此清空）。
     fun resetNormFlowStats() {
         normFlowStatsRepository.clear()
         guardLogRepository.clear()
-    }
-
-    fun setThemeMode(mode: AppThemeMode) {
-        val old = _themeMode.value
-        viewModelScope.launch {
-            themeSettingsRepository.setThemeMode(mode)
-            _settingEffect.tryEmit(SettingEffect.Applied)
-        }
-    }
-
-    /**
-     * 切换当前选中的容器 profile，并按其 [ContainerProfile.mode] 同步切全局执行模式。
-     *
-     * 本地镜像 → [ExecutionMode.LOCAL_PROOT]；远程 SSH 镜像 → [ExecutionMode.REMOTE_SSH]，
-     * 并据其 [RootfsSource.RemoteSsh] 绑定的工作区通道构造 [RemoteConnectionSettings] 持久化 + 触发 SSH 连接。
-     * 委托层每次调用读 holder，切换即时生效，无需重启。
-     */
-    fun setActiveContainerProfile(id: String) {
-        viewModelScope.launch {
-            val profile = _customProfiles.value.firstOrNull { it.id == id }
-                ?: when (id) {
-                    ContainerProfile.BUILTIN_ID -> ContainerProfile.BUILTIN_ALPINE
-                    ContainerProfile.BUILTIN_X86_ID -> ContainerProfile.BUILTIN_ALPINE_X86
-                    else -> null
-                } ?: return@launch
-            containerSettingsRepository.setActiveProfile(id)
-            when (profile.mode) {
-                ExecutionMode.LOCAL_PROOT -> {
-                    executionModeRepository.setExecutionMode(ExecutionMode.LOCAL_PROOT)
-                    executionModeHolder.setMode(ExecutionMode.LOCAL_PROOT)
-                }
-
-                ExecutionMode.REMOTE_SSH -> {
-                    val ssh = profile.rootfsSource as? RootfsSource.RemoteSsh ?: return@launch
-                    val conn = remoteConnections.value.firstOrNull { it.id == ssh.connectionId }
-                        ?: return@launch
-                    val auth = runCatching { remoteRepository.getAuthById(ssh.connectionId) }.getOrNull()
-                        ?: com.mini.me_core.feature.workspace.domain.remote.RemoteAuth.Password(conn.password)
-                    val workspacePath = ssh.remoteWorkspacePath.ifBlank { "/home/${conn.username}/workspace" }
-                    // v2 统一数据源：只存 activeConnectionId + workspacePath + profileId，
-                    // 不再重复 host/port/username/password 到 DataStore，避免与 Room 漂移。
-                    val settings = com.mini.me_core.feature.settings.data.repository.RemoteConnectionSettings(
-                        host = "",
-                        port = 22,
-                        username = "",
-                        password = "",
-                        remoteWorkspacePath = workspacePath,
-                        activeConnectionId = ssh.connectionId,
-                    )
-                    executionModeRepository.setRemoteConnection(settings, activeProfileId = id)
-                    executionModeRepository.setExecutionMode(ExecutionMode.REMOTE_SSH)
-                    executionModeHolder.setMode(ExecutionMode.REMOTE_SSH)
-                    // 运行时切换需主动连接（启动时由 MiniMeCore 连）；复用 RemoteSshConnection.connect
-                    runCatching {
-                        remoteSshConnection.connect(
-                            com.mini.me_core.feature.agent.domain.container.RemoteConnectionConfig(
-                                host = conn.host,
-                                port = conn.port,
-                                username = conn.username,
-                                auth = auth,
-                                remoteWorkspacePath = workspacePath
-                            )
-                        )
-                    }.onFailure { FileLogger.w("SettingsViewModel", "切换到远程镜像时 SSH 连接失败", it) }
-                }
-            }
-        }
-    }
-
-    /** 切换「共享设备存储」开关。生效对象为后续启动的容器进程，已运行的 shell 需重开。 */
-    fun setStorageShareEnabled(enabled: Boolean) {
-        viewModelScope.launch { containerSettingsRepository.setStorageShareEnabled(enabled) }
-    }
-
-    /** 重置内置容器（arm64 或 x86_64）：删除对应架构 rootfs，下次初始化重新解压 + provision。 */
-    fun resetBuiltinContainer(profile: ContainerProfile) {
-        viewModelScope.launch {
-            when (profile.arch) {
-                ContainerArch.X86_64 ->
-                    containerInstaller.resetBuiltinX86Rootfs()
-                else -> containerInstaller.resetBuiltinRootfs()
-            }
-        }
-    }
-
-    /** 保存（新增/覆盖）自定义容器 profile。 */
-    fun saveCustomContainerProfile(profile: ContainerProfile) {
-        viewModelScope.launch {
-            containerSettingsRepository.upsertCustomProfile(profile)
-        }
-    }
-
-    /** 编辑自定义 profile：覆盖配置；若镜像来源变了则删旧 rootfs 触发重新解压。 */
-    fun editCustomContainerProfile(profile: ContainerProfile) {
-        viewModelScope.launch {
-            val old = _customProfiles.value.firstOrNull { it.id == profile.id }
-            val oldUri = (old?.rootfsSource as? RootfsSource.LocalFile)?.uri
-            val newUri = (profile.rootfsSource as? RootfsSource.LocalFile)?.uri
-            if (old != null && oldUri != newUri) {
-                containerInstaller.deleteCustomRootfs(profile)
-            }
-            containerSettingsRepository.upsertCustomProfile(profile)
-        }
-    }
-
-    /** 删除自定义 profile，连带清理其 rootfs 目录。 */
-    fun deleteCustomContainerProfile(profile: ContainerProfile) {
-        viewModelScope.launch {
-            containerSettingsRepository.deleteCustomProfile(profile.id)
-            containerInstaller.deleteCustomRootfs(profile)
-            if (_activeProfileId.value == profile.id) {
-                containerSettingsRepository.setActiveProfile(ContainerProfile.BUILTIN_ID)
-                // 删的是当前激活的远程镜像：回退到内置本地镜像，同步切回本地模式
-                if (profile.mode == ExecutionMode.REMOTE_SSH) {
-                    executionModeRepository.setExecutionMode(ExecutionMode.LOCAL_PROOT)
-                    executionModeHolder.setMode(ExecutionMode.LOCAL_PROOT)
-                }
-            }
-        }
-    }
-
-    /** 设置识图专用模型；providerId 留空等同 [clearVisionModel]（跟随聊天模型）。 */
-    fun setVisionModel(providerId: String, model: String) {
-        viewModelScope.launch {
-            visionModelSettingsRepository.setVisionModel(providerId, model)
-        }
-    }
-
-    /** 清空识图专用模型——回退到跟随当前聊天模型。 */
-    fun clearVisionModel() {
-        viewModelScope.launch {
-            visionModelSettingsRepository.clear()
-        }
-    }
-
-    /** 设置压缩专用模型；providerId 留空等同 [clearCompactionModel]（跟随聊天模型）。 */
-    fun setCompactionModel(providerId: String, model: String) {
-        viewModelScope.launch {
-            compactionModelSettingsRepository.setCompactionModel(providerId, model)
-        }
-    }
-
-    /** 清空压缩专用模型——回退到跟随当前聊天模型。 */
-    fun clearCompactionModel() {
-        viewModelScope.launch {
-            compactionModelSettingsRepository.clear()
-        }
-    }
-
-    fun setActiveProvider(id: String) {
-        viewModelScope.launch {
-            repository.setActiveProvider(id)
-        }
-    }
-
-    fun setProviderEnabled(id: String, isEnabled: Boolean) {
-        viewModelScope.launch {
-            repository.setProviderEnabled(id, isEnabled)
-        }
-    }
-
-    fun saveProvider(provider: AIProviderConfig) {
-        viewModelScope.launch {
-            // RC72：接管保存异常，避免未捕获协程异常导致崩溃（闪退）。
-            // 底层 toEntity 在加密失败时会抛异常（防止密钥被空串覆盖），必须在这里捕获，
-            // 否则 viewModelScope.launch 的未捕获异常会直接闪退。
-            runCatching { repository.saveProvider(provider) }
-                .onFailure { e ->
-                    FileLogger.e("SettingsVM", "保存提供商失败: ${e.message}", e)
-                    _saveError.value = e.message ?: "保存失败，请重试"
-                }
-        }
-    }
-
-    fun deleteProvider(id: String) {
-        viewModelScope.launch {
-            val wasActive = repository.getActiveProviderSync()?.id == id
-            val providerToDelete = repository.getProviderById(id)
-            val providerType = providerToDelete?.type
-            repository.deleteProvider(id)
-            // 级联清理：删除供应商时清理其下所有模型级配置（能力覆盖/上下文长度/采样参数三张独立表）。
-            if (providerType != null) {
-                modelMetadataService.clearOverrideByProvider(providerType)
-                modelMetadataService.clearCustomConfigByProvider(providerType)
-                modelMetadataService.clearSamplingConfigByProvider(providerType)
-            }
-            if (wasActive) repository.ensureActiveProvider()
-        }
-    }
-
-    // ── 供应商级连通性测试（GET /v1/models） ──
-    private val _connectionTestState = MutableStateFlow<ConnectionTestState>(ConnectionTestState.Idle)
-    val connectionTestState: StateFlow<ConnectionTestState> = _connectionTestState.asStateFlow()
-
-    fun testProviderConnection(provider: AIProviderConfig) {
-        viewModelScope.launch {
-            _connectionTestState.value = ConnectionTestState.Loading
-            val result = modelApiService.fetchModels(provider.baseUrl, provider.apiKey, provider.type)
-            _connectionTestState.value = result.fold(
-                onSuccess = { models -> ConnectionTestState.Success("连接成功，发现 ${models.size} 个模型") },
-                onFailure = { e -> ConnectionTestState.Error(e.message ?: "连接失败") }
-            )
-        }
-    }
-
-    fun resetConnectionTest() {
-        _connectionTestState.value = ConnectionTestState.Idle
-    }
-
-    // ── 复制供应商（保留全部字段，重置 id / 名称加「（副本）」/ 不激活） ──
-    fun duplicateProvider(id: String) {
-        viewModelScope.launch {
-            val original = repository.getProviderById(id) ?: return@launch
-            val copy = original.copy(
-                id = java.util.UUID.randomUUID().toString(),
-                name = "${original.name}（副本）",
-                isActive = false
-            )
-            runCatching { repository.saveProvider(copy) }
-                .onFailure { e ->
-                    FileLogger.e("SettingsVM", "复制供应商失败: ${e.message}", e)
-                    _saveError.value = e.message ?: "复制失败，请重试"
-                }
-        }
-    }
-
-    // ── 模型收藏：收藏即置顶。切换 favoriteModels 中 modelId 的存在并持久化。 ──
-    fun toggleFavoriteModel(providerId: String, modelId: String) {
-        viewModelScope.launch {
-            val current = repository.getProviderById(providerId) ?: return@launch
-            val newFavorites = if (modelId in current.favoriteModels) {
-                current.favoriteModels - modelId
-            } else {
-                current.favoriteModels + modelId
-            }
-            runCatching { repository.saveProvider(current.copy(favoriteModels = newFavorites)) }
-                .onFailure { e ->
-                    FileLogger.e("SettingsVM", "更新收藏失败: ${e.message}", e)
-                    _saveError.value = e.message ?: "操作失败"
-                }
-        }
-    }
-
-    fun fetchModels(provider: AIProviderConfig) {
-        viewModelScope.launch {
-            _fetchState.value = FetchState.Loading
-            modelApiService.fetchModels(provider.baseUrl, provider.apiKey, provider.type)
-                .onSuccess {
-                    _fetchState.value = FetchState.Success(it)
-                    resolveModelMetadata(provider.type, it)
-                }
-                .onFailure { _fetchState.value = FetchState.Error(it.message ?: "拉取失败") }
-        }
-    }
-
-    fun resolveModelMetadata(type: ProviderType, modelIds: List<String>) {
-        val normalizedIds = modelIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-        if (normalizedIds.isEmpty()) return
-        viewModelScope.launch {
-            val metadata = modelMetadataService.resolveAll(type, normalizedIds)
-            _modelMetadata.update { current -> current + metadata }
-        }
-    }
-
-    /**
-     * 加载所有已启用 provider 的全部模型元数据，合并进 [modelMetadata]。
-     * 供「识图模型」等需要展示跨 provider 模型能力标签的页面在进入时调用--
-     * 这些页面不像 ProviderEditor 那样会在编辑单个 provider 时顺带 resolve，
-     * 不主动加载则 map 为空、所有模型都被误判为不支持图片。
-     *
-     * 实现要点（避免设置页卡顿）：
-     * - 单协程顺序处理各 provider：首个 resolveAll 触发 catalog 加载（内存/磁盘 24h 缓存/内置 assets）并写入内存缓存，
-     *   后续 provider 命中缓存。resolve 链路不发网络请求，models.dev 刷新统一由 App 启动时异步触发。
-     * - 全部解析完一次性 update，避免多次 emit 导致设置页反复重组。
-     */
-    fun loadAllModelMetadata() {
-        val enabled = _providers.value.filter { it.isEnabled }
-        if (enabled.isEmpty()) return
-        viewModelScope.launch {
-            val resolved = mutableMapOf<String, ModelMetadata>()
-            for (provider in enabled) {
-                val ids = provider.models.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-                if (ids.isEmpty()) continue
-                resolved += modelMetadataService.resolveAll(provider.type, ids)
-            }
-            if (resolved.isNotEmpty()) {
-                _modelMetadata.update { it + resolved }
-            }
-        }
-    }
-
-    fun resetFetchState() {
-        _fetchState.value = FetchState.Idle
-    }
-
-    /**
-     * 内置供应商向导：实时拉取模型列表（步骤 3 使用）。
-     *
-     * 复用 [ModelApiService.fetchModels] 的接口探测与 T2I Failover；状态独立于编辑页，
-     * 避免在向导里拉取模型时污染编辑页的 [_fetchState]。
-     */
-    fun fetchBuiltInModels(baseUrl: String, apiKey: String, type: ProviderType) {
-        viewModelScope.launch {
-            _builtInFetchState.value = FetchState.Loading
-            modelApiService.fetchModels(baseUrl, apiKey, type)
-                .onSuccess {
-                    _builtInFetchState.value = FetchState.Success(it)
-                    // 与编辑页一致：解析模型元数据，向导第 3 步才能展示真实能力标签（识图/工具/思考）
-                    resolveModelMetadata(type, it)
-                }
-                .onFailure { _builtInFetchState.value = FetchState.Error(it.message ?: "拉取失败") }
-        }
-    }
-
-    /**
-     * 自定义供应商向导：拉取模型列表（步骤 2 使用）。
-     * 复用 [ModelApiService.fetchModels] 的接口探测与 T2I Failover；状态独立于编辑页与内置向导。
-     */
-    fun fetchCustomModels(baseUrl: String, apiKey: String, type: ProviderType) {
-        viewModelScope.launch {
-            _customFetchState.value = FetchState.Loading
-            modelApiService.fetchModels(baseUrl, apiKey, type)
-                .onSuccess {
-                    _customFetchState.value = FetchState.Success(it)
-                    resolveModelMetadata(type, it)
-                }
-                .onFailure { _customFetchState.value = FetchState.Error(it.message ?: "拉取失败") }
-        }
-    }
-
-    fun testModel(provider: AIProviderConfig, model: String) {
-        viewModelScope.launch {
-            _testing.update { it + model }
-            val result = kotlinx.coroutines.withTimeoutOrNull(30_000) {
-                modelApiService.testModel(provider.baseUrl, provider.apiKey, provider.type, provider.useFullUrl, provider.useResponseApi, model)
-            } ?: ModelTestResult(success = false, latencyMs = 30_000, message = "连接超时（30秒）")
-            _testResults.update { it + (model to result) }
-            _testing.update { it - model }
-        }
-    }
-
-    fun clearTestResults() {
-        _testResults.value = emptyMap()
-        _testing.value = emptySet()
-    }
-
-    fun selectModel(providerId: String, model: String) {
-        viewModelScope.launch {
-            repository.setSelectedModel(providerId, model)
-        }
-    }
-
-    // 主页模型选择：同步更新全局 active provider 的选中模型，使新建会话回退全局时落到用户最近选的模型。
-    fun applyModelGlobally(providerId: String, model: String) {
-        viewModelScope.launch {
-            val activeId = repository.getActiveProviderSync()?.id
-            if (activeId != providerId) {
-                repository.setActiveProvider(providerId)
-            }
-            repository.setSelectedModel(providerId, model)
-        }
-    }
-
-    fun deleteGlobalRule(rule: PermissionRule) {
-        viewModelScope.launch { permissionRulesRepository.removeGlobalRule(rule) }
-    }
-
-    fun deleteProjectRule(rule: PermissionRule) {
-        val name = currentProjectName.value ?: return
-        viewModelScope.launch { permissionRulesRepository.removeProjectRule(name, rule) }
-    }
-
-    fun promoteRuleToGlobal(rule: PermissionRule) {
-        val name = currentProjectName.value ?: return
-        viewModelScope.launch { permissionRulesRepository.promoteToGlobal(name, rule) }
-    }
-
-    // ────────────────────────────────────────────────────────────────
-    // RC63 备选方案③：兼容端点全局策略设置（ProviderEditorScreen Tab0 调用）
-    // ────────────────────────────────────────────────────────────────
-
-    fun setCompatibilityDefaultPolicy(policy: DefaultPolicy) {
-        viewModelScope.launch { compatibilityPolicyRepository.setDefaultPolicy(policy) }
-    }
-
-    fun setAutoDowngradeOnSendFailure(enabled: Boolean) {
-        viewModelScope.launch { compatibilityPolicyRepository.setAutoDowngradeOnSendFailure(enabled) }
-    }
-
-    fun setViewImageUnknownGuardPolicy(policy: ViewImageUnknownGuardPolicy) {
-        viewModelScope.launch { compatibilityPolicyRepository.setViewImageUnknownGuardPolicy(policy) }
-    }
-
-    // ────────────────────────────────────────────────────────────────
-    // RC63 备选方案④：单模型能力复选框覆盖（ProviderEditorScreen Tab1 调用）
-    // ────────────────────────────────────────────────────────────────
-
-    /** 观察某模型的手动覆盖（用于 ModelSettingsSheet 实时回显勾选状态）。 */
-    fun observeCapabilityOverride(type: ProviderType, modelId: String) =
-        modelMetadataService.observeOverride(type, modelId)
-
-    /** 保存某模型的手动覆盖；不想覆盖的字段传 null（保持自动决策）。 */
-    fun saveCapabilityOverride(
-        type: ProviderType,
-        modelId: String,
-        vision: Boolean?,
-        tools: Boolean?,
-        reasoning: Boolean?,
-        video: Boolean?,
-        audio: Boolean?,
-        code: Boolean?,
-        structuredOutput: Boolean?
-    ) {
-        viewModelScope.launch {
-            modelMetadataService.saveOverride(type, modelId, vision, tools, reasoning, video, audio, code, structuredOutput)
-            // 立即重算该 provider 全部模型元数据（以便 ModelSettingsSheet 返回后
-            // ProviderModelRow 的能力徽章与上下文标签立即刷新，用户看不到过期值）。
-            val typeProviderModels = _providers.value
-                .filter { it.type == type && it.models.isNotEmpty() }
-                .flatMap { it.models.map(String::trim).filter(String::isNotEmpty).distinct() }
-                .plus(modelId)
-                .distinct()
-            if (typeProviderModels.isEmpty()) return@launch
-            val refreshed = modelMetadataService.resolveAll(type, typeProviderModels)
-            _modelMetadata.update { it + refreshed }
-        }
-    }
-
-    /** 清除某模型覆盖（恢复自动检测）。 */
-    fun clearCapabilityOverride(type: ProviderType, modelId: String) {
-        viewModelScope.launch {
-            modelMetadataService.clearOverride(type, modelId)
-            val refreshed = modelMetadataService.resolveAll(type, listOf(modelId))
-            _modelMetadata.update { it + refreshed }
-        }
-    }
-
-    // ── 模型自定义配置（输入/输出 token 上限覆盖）──────────────────────
-
-    /** 观察某模型的自定义配置（用于 ModelSettingsSheet 回显输入框）。 */
-    fun observeModelCustomConfig(type: ProviderType, modelId: String) =
-        modelMetadataService.observeCustomConfig(type, modelId)
-
-    /** 保存模型自定义输入/输出 token 上限；传 null 表示不覆盖该字段。保存后立即刷新元数据。 */
-    fun saveModelCustomConfig(type: ProviderType, modelId: String, inputTokens: Int?, outputTokens: Int?) {
-        viewModelScope.launch {
-            modelMetadataService.saveCustomConfig(type, modelId, inputTokens, outputTokens)
-            val refreshed = modelMetadataService.resolveAll(type, listOf(modelId))
-            _modelMetadata.update { it + refreshed }
-        }
-    }
-
-    /** 清除模型自定义配置（恢复自动检测的上下文长度）。 */
-    fun clearModelCustomConfig(type: ProviderType, modelId: String) {
-        viewModelScope.launch {
-            modelMetadataService.clearCustomConfig(type, modelId)
-            val refreshed = modelMetadataService.resolveAll(type, listOf(modelId))
-            _modelMetadata.update { it + refreshed }
-        }
-    }
-
-    // ── 模型级采样参数覆盖（temperature/topP/maxTokens）────────────────────
-
-    /** 观察某模型的采样参数覆盖（用于 ModelSettingsSheet 回显滑块/输入框）。 */
-    fun observeModelSamplingConfig(type: ProviderType, modelId: String) =
-        modelMetadataService.observeSamplingConfig(type, modelId)
-
-    /** 保存模型级采样参数覆盖；传 null 表示不覆盖该字段（继承供应商级默认）。 */
-    fun saveModelSamplingConfig(type: ProviderType, modelId: String, temperature: Float?, topP: Float?, maxTokens: Int?) {
-        viewModelScope.launch {
-            modelMetadataService.saveSamplingConfig(type, modelId, temperature, topP, maxTokens)
-        }
-    }
-
-    /** 清除模型级采样参数覆盖（恢复全部继承供应商级默认值）。 */
-    fun clearModelSamplingConfig(type: ProviderType, modelId: String) {
-        viewModelScope.launch {
-            modelMetadataService.clearSamplingConfig(type, modelId)
-        }
     }
 
     // ── 设置页面滚动位置持久化 ─────────────────────────────────────────────
@@ -2026,5 +286,224 @@ class SettingsViewModel @Inject constructor(
 
     fun setSettingsScrollOffset(offset: Int) {
         if (offset >= 0) _settingsScrollOffset.value = offset
+    }
+
+    // ── ProviderSection 委托面 ────────────────────────────────────────────
+    val providers: StateFlow<List<AIProviderConfig>> = providerSection.providers
+    val activeProvider: StateFlow<AIProviderConfig?> = providerSection.activeProvider
+    val fetchState: StateFlow<FetchState> = providerSection.fetchState
+    val builtInFetchState: StateFlow<FetchState> = providerSection.builtInFetchState
+    val customFetchState: StateFlow<FetchState> = providerSection.customFetchState
+    val saveError: StateFlow<String?> = providerSection.saveError
+    val testResults: StateFlow<Map<String, ModelTestResult>> = providerSection.testResults
+    val modelMetadata: StateFlow<Map<String, ModelMetadata>> = providerSection.modelMetadata
+    val testing: StateFlow<Set<String>> = providerSection.testing
+    val connectionTestState: StateFlow<ConnectionTestState> = providerSection.connectionTestState
+
+    /** RC63 备选方案③：兼容端点「默认策略」流（保持原 get() 语义：每次访问新建 Eagerly stateIn）。 */
+    val compatibilityDefaultPolicyFlow: StateFlow<DefaultPolicy>
+        get() = providerSection.compatibilityDefaultPolicyFlow
+
+    /** RC63 备选方案②「发送失败自动降级」总开关。 */
+    val autoDowngradeOnSendFailureFlow: StateFlow<Boolean>
+        get() = providerSection.autoDowngradeOnSendFailureFlow
+
+    /** RC63 viewImage 守卫策略（FALLBACK_VISION_MODEL vs FAIL_FAST）。 */
+    val viewImageUnknownGuardPolicyFlow: StateFlow<ViewImageUnknownGuardPolicy>
+        get() = providerSection.viewImageUnknownGuardPolicyFlow
+
+    fun consumeSaveError() = providerSection.consumeSaveError()
+    fun setActiveProvider(id: String) = providerSection.setActiveProvider(id)
+    fun setProviderEnabled(id: String, isEnabled: Boolean) = providerSection.setProviderEnabled(id, isEnabled)
+    fun saveProvider(provider: AIProviderConfig) = providerSection.saveProvider(provider)
+    fun deleteProvider(id: String) = providerSection.deleteProvider(id)
+    fun testProviderConnection(provider: AIProviderConfig) = providerSection.testProviderConnection(provider)
+    fun resetConnectionTest() = providerSection.resetConnectionTest()
+    fun duplicateProvider(id: String) = providerSection.duplicateProvider(id)
+    fun toggleFavoriteModel(providerId: String, modelId: String) = providerSection.toggleFavoriteModel(providerId, modelId)
+    fun fetchModels(provider: AIProviderConfig) = providerSection.fetchModels(provider)
+    fun resolveModelMetadata(type: ProviderType, modelIds: List<String>) = providerSection.resolveModelMetadata(type, modelIds)
+    fun loadAllModelMetadata() = providerSection.loadAllModelMetadata()
+    fun resetFetchState() = providerSection.resetFetchState()
+    fun fetchBuiltInModels(baseUrl: String, apiKey: String, type: ProviderType) =
+        providerSection.fetchBuiltInModels(baseUrl, apiKey, type)
+    fun fetchCustomModels(baseUrl: String, apiKey: String, type: ProviderType) =
+        providerSection.fetchCustomModels(baseUrl, apiKey, type)
+    fun testModel(provider: AIProviderConfig, model: String) = providerSection.testModel(provider, model)
+    fun clearTestResults() = providerSection.clearTestResults()
+    fun selectModel(providerId: String, model: String) = providerSection.selectModel(providerId, model)
+    fun applyModelGlobally(providerId: String, model: String) = providerSection.applyModelGlobally(providerId, model)
+    fun setCompatibilityDefaultPolicy(policy: DefaultPolicy) = providerSection.setCompatibilityDefaultPolicy(policy)
+    fun setAutoDowngradeOnSendFailure(enabled: Boolean) = providerSection.setAutoDowngradeOnSendFailure(enabled)
+    fun setViewImageUnknownGuardPolicy(policy: ViewImageUnknownGuardPolicy) = providerSection.setViewImageUnknownGuardPolicy(policy)
+    fun observeCapabilityOverride(type: ProviderType, modelId: String) = providerSection.observeCapabilityOverride(type, modelId)
+
+    @Suppress("LongParameterList") // 签名保持：UI 接线签名不变
+    fun saveCapabilityOverride(
+        type: ProviderType,
+        modelId: String,
+        vision: Boolean?,
+        tools: Boolean?,
+        reasoning: Boolean?,
+        video: Boolean?,
+        audio: Boolean?,
+        code: Boolean?,
+        structuredOutput: Boolean?
+    ) = providerSection.saveCapabilityOverride(type, modelId, vision, tools, reasoning, video, audio, code, structuredOutput)
+
+    fun clearCapabilityOverride(type: ProviderType, modelId: String) = providerSection.clearCapabilityOverride(type, modelId)
+    fun observeModelCustomConfig(type: ProviderType, modelId: String) = providerSection.observeModelCustomConfig(type, modelId)
+    fun saveModelCustomConfig(type: ProviderType, modelId: String, inputTokens: Int?, outputTokens: Int?) =
+        providerSection.saveModelCustomConfig(type, modelId, inputTokens, outputTokens)
+    fun clearModelCustomConfig(type: ProviderType, modelId: String) = providerSection.clearModelCustomConfig(type, modelId)
+    fun observeModelSamplingConfig(type: ProviderType, modelId: String) = providerSection.observeModelSamplingConfig(type, modelId)
+    fun saveModelSamplingConfig(type: ProviderType, modelId: String, temperature: Float?, topP: Float?, maxTokens: Int?) =
+        providerSection.saveModelSamplingConfig(type, modelId, temperature, topP, maxTokens)
+    fun clearModelSamplingConfig(type: ProviderType, modelId: String) = providerSection.clearModelSamplingConfig(type, modelId)
+
+    // ── VisionCompactionSection 委托面 ────────────────────────────────────
+    val visionProviderId: StateFlow<String> = visionCompactionSection.visionProviderId
+    val visionModel: StateFlow<String> = visionCompactionSection.visionModel
+    val compactionProviderId: StateFlow<String> = visionCompactionSection.compactionProviderId
+    val compactionModel: StateFlow<String> = visionCompactionSection.compactionModel
+    fun setVisionModel(providerId: String, model: String) = visionCompactionSection.setVisionModel(providerId, model)
+    fun clearVisionModel() = visionCompactionSection.clearVisionModel()
+    fun setCompactionModel(providerId: String, model: String) = visionCompactionSection.setCompactionModel(providerId, model)
+    fun clearCompactionModel() = visionCompactionSection.clearCompactionModel()
+
+    // ── LogViewerSection 委托面 ──────────────────────────────────────────
+    val logLevel: StateFlow<com.mini.me_core.core.util.LogLevel> = logViewerSection.logLevel
+    val logViewerState: StateFlow<LogViewerUiState> = logViewerSection.logViewerState
+    fun setLogLevel(level: com.mini.me_core.core.util.LogLevel) = logViewerSection.setLogLevel(level)
+    // 默认参数保持原调用点求值语义：无参调用时取当前日志状态的 filterServerName。
+    fun refreshLogs(filterServerName: String? = logViewerSection.logViewerState.value.filterServerName) =
+        logViewerSection.refreshLogs(filterServerName)
+    fun selectLogFile(fileName: String) = logViewerSection.selectLogFile(fileName)
+    fun toggleFilterPanel() = logViewerSection.toggleFilterPanel()
+    fun closeFilterPanel() = logViewerSection.closeFilterPanel()
+    fun setSelectedDates(dates: Set<String>) = logViewerSection.setSelectedDates(dates)
+    fun setDateRangeMode(mode: DateRangeMode) = logViewerSection.setDateRangeMode(mode)
+    fun selectSingleFile(fileName: String) = logViewerSection.selectSingleFile(fileName)
+    fun setCustomDateRange(start: String?, end: String?) = logViewerSection.setCustomDateRange(start, end)
+    fun setRecordLevel(level: com.mini.me_core.core.util.LogLevel) = logViewerSection.setRecordLevel(level)
+    fun clearDisplayLevels() = logViewerSection.clearDisplayLevels()
+    fun quickFilterLevel(level: com.mini.me_core.core.util.LogLevel) = logViewerSection.quickFilterLevel(level)
+    fun toggleLevelCollapse(level: com.mini.me_core.core.util.LogLevel) = logViewerSection.toggleLevelCollapse(level)
+    fun setSearchExpanded(expanded: Boolean) = logViewerSection.setSearchExpanded(expanded)
+    fun prevMatch() = logViewerSection.prevMatch()
+    fun nextMatch() = logViewerSection.nextMatch()
+    fun toggleLevel(level: com.mini.me_core.core.util.LogLevel) = logViewerSection.toggleLevel(level)
+    fun toggleTag(tag: String) = logViewerSection.toggleTag(tag)
+    fun setSearchQuery(query: String) = logViewerSection.setSearchQuery(query)
+    fun resetFilters() = logViewerSection.resetFilters()
+    fun toggleLiveTail() = logViewerSection.toggleLiveTail()
+    fun dismissNewLogs() = logViewerSection.dismissNewLogs()
+    fun setAutoScrolling(autoScrolling: Boolean) = logViewerSection.setAutoScrolling(autoScrolling)
+
+    // ── NormFlowSection 委托面 ───────────────────────────────────────────
+    val normFlowEnabled: StateFlow<Boolean> = normFlowSection.normFlowEnabled
+    val stepInjectEnabled: StateFlow<Boolean> = normFlowSection.stepInjectEnabled
+    val toolGuardEnabled: StateFlow<Boolean> = normFlowSection.toolGuardEnabled
+    val reasoningBudgetEnabled: StateFlow<Boolean> = normFlowSection.reasoningBudgetEnabled
+    val usageCardEnabled: StateFlow<Boolean> = normFlowSection.usageCardEnabled
+    val sopSummaryEnabled: StateFlow<Boolean> = normFlowSection.sopSummaryEnabled
+    val playbookAutoEnabled: StateFlow<Boolean> = normFlowSection.playbookAutoEnabled
+    val idleConvergeEnabled: StateFlow<Boolean> = normFlowSection.idleConvergeEnabled
+    val stepInjectGoalEnabled: StateFlow<Boolean> = normFlowSection.stepInjectGoalEnabled
+    val stepInjectStaticRulesEnabled: StateFlow<Boolean> = normFlowSection.stepInjectStaticRulesEnabled
+    val stepInjectLayeredRulesEnabled: StateFlow<Boolean> = normFlowSection.stepInjectLayeredRulesEnabled
+    val stepInjectProjectAgentsEnabled: StateFlow<Boolean> = normFlowSection.stepInjectProjectAgentsEnabled
+    val fileObservationEnabled: StateFlow<Boolean> = normFlowSection.fileObservationEnabled
+    val reasoningBudgetLevel: StateFlow<String> = normFlowSection.reasoningBudgetLevel
+    val idleConvergeRounds: StateFlow<Int> = normFlowSection.idleConvergeRounds
+    val activePreset: StateFlow<String> = normFlowSection.activePreset
+    val guardDangerousCommandEnabled: StateFlow<Boolean> = normFlowSection.guardDangerousCommandEnabled
+    val guardLargeFileEnabled: StateFlow<Boolean> = normFlowSection.guardLargeFileEnabled
+    val guardPathBoundaryEnabled: StateFlow<Boolean> = normFlowSection.guardPathBoundaryEnabled
+    val usageCardItems: StateFlow<Set<String>> = normFlowSection.usageCardItems
+
+    fun setNormFlowEnabled(enabled: Boolean) = normFlowSection.setNormFlowEnabled(enabled)
+    fun setStepInjectEnabled(enabled: Boolean) = normFlowSection.setStepInjectEnabled(enabled)
+    fun setToolGuardEnabled(enabled: Boolean) = normFlowSection.setToolGuardEnabled(enabled)
+    fun setReasoningBudgetEnabled(enabled: Boolean) = normFlowSection.setReasoningBudgetEnabled(enabled)
+    fun setUsageCardEnabled(enabled: Boolean) = normFlowSection.setUsageCardEnabled(enabled)
+    fun setSopSummaryEnabled(enabled: Boolean) = normFlowSection.setSopSummaryEnabled(enabled)
+    fun setPlaybookAutoEnabled(enabled: Boolean) = normFlowSection.setPlaybookAutoEnabled(enabled)
+    fun setIdleConvergeEnabled(enabled: Boolean) = normFlowSection.setIdleConvergeEnabled(enabled)
+    fun setStepInjectGoalEnabled(enabled: Boolean) = normFlowSection.setStepInjectGoalEnabled(enabled)
+    fun setStepInjectStaticRulesEnabled(enabled: Boolean) = normFlowSection.setStepInjectStaticRulesEnabled(enabled)
+    fun setStepInjectLayeredRulesEnabled(enabled: Boolean) = normFlowSection.setStepInjectLayeredRulesEnabled(enabled)
+    fun setStepInjectProjectAgentsEnabled(enabled: Boolean) = normFlowSection.setStepInjectProjectAgentsEnabled(enabled)
+    fun setFileObservationEnabled(enabled: Boolean) = normFlowSection.setFileObservationEnabled(enabled)
+    fun setReasoningBudgetLevel(level: String) = normFlowSection.setReasoningBudgetLevel(level)
+    fun setIdleConvergeRounds(rounds: Int) = normFlowSection.setIdleConvergeRounds(rounds)
+    fun applyPreset(preset: String) = normFlowSection.applyPreset(preset)
+    fun setGuardDangerousCommandEnabled(enabled: Boolean) = normFlowSection.setGuardDangerousCommandEnabled(enabled)
+    fun setGuardLargeFileEnabled(enabled: Boolean) = normFlowSection.setGuardLargeFileEnabled(enabled)
+    // 安全相关：路径边界开关委托，默认值/键/时机全部原样搬迁。
+    fun setGuardPathBoundaryEnabled(enabled: Boolean) = normFlowSection.setGuardPathBoundaryEnabled(enabled)
+    fun toggleUsageCardItem(item: String) = normFlowSection.toggleUsageCardItem(item)
+    fun exportConfig(): String = normFlowSection.exportConfig()
+    fun importConfig(json: String): Boolean = normFlowSection.importConfig(json)
+
+    // ── ThemeSection 委托面 ──────────────────────────────────────────────
+    val themeMode: StateFlow<AppThemeMode> = themeSection.themeMode
+    fun setThemeMode(mode: AppThemeMode) = themeSection.setThemeMode(mode)
+
+    // ── ContainerSection 委托面 ──────────────────────────────────────────
+    val activeProfileId: StateFlow<String> = containerSection.activeProfileId
+    val storageShareEnabled: StateFlow<Boolean> = containerSection.storageShareEnabled
+    val customProfiles: StateFlow<List<ContainerProfile>> = containerSection.customProfiles
+    val profiles: StateFlow<List<ContainerProfile>> = containerSection.profiles
+    val executionMode: StateFlow<ExecutionMode> = containerSection.executionMode
+    val connectionState: StateFlow<ConnectionState> = containerSection.connectionState
+    val remoteConnections: StateFlow<List<RemoteConnection>> = containerSection.remoteConnections
+    fun setActiveContainerProfile(id: String) = containerSection.setActiveContainerProfile(id)
+    fun setStorageShareEnabled(enabled: Boolean) = containerSection.setStorageShareEnabled(enabled)
+    fun resetBuiltinContainer(profile: ContainerProfile) = containerSection.resetBuiltinContainer(profile)
+    fun saveCustomContainerProfile(profile: ContainerProfile) = containerSection.saveCustomContainerProfile(profile)
+    fun editCustomContainerProfile(profile: ContainerProfile) = containerSection.editCustomContainerProfile(profile)
+    fun deleteCustomContainerProfile(profile: ContainerProfile) = containerSection.deleteCustomContainerProfile(profile)
+
+    // ── McpSection 委托面 ────────────────────────────────────────────────
+    val mcpServers: StateFlow<List<McpServerConfig>> = mcpSection.mcpServers
+    val mcpStatuses: StateFlow<List<McpServerStatus>> = mcpSection.mcpStatuses
+    val mcpReloading: StateFlow<Boolean> = mcpSection.mcpReloading
+    val mcpServerIsRunning: StateFlow<Boolean> = mcpSection.mcpServerIsRunning
+    val mcpServerPort: StateFlow<Int> = mcpSection.mcpServerPort
+    val mcpServerToken: StateFlow<String> = mcpSection.mcpServerToken
+    val mcpServerRequireApproval: StateFlow<Boolean> = mcpSection.mcpServerRequireApproval
+    val mcpServerAutoStart: StateFlow<Boolean> = mcpSection.mcpServerAutoStart
+    val mcpServerUrl: StateFlow<String> = mcpSection.mcpServerUrl
+    val mcpServerError: StateFlow<String?> = mcpSection.mcpServerError
+    fun toggleMcpServer() = mcpSection.toggleMcpServer()
+    fun saveMcpServerConfig(port: Int, requireApproval: Boolean, autoStart: Boolean) =
+        mcpSection.saveMcpServerConfig(port, requireApproval, autoStart)
+    fun regenerateMcpServerToken() = mcpSection.regenerateMcpServerToken()
+    fun upsertMcpServer(originalName: String?, config: McpServerConfig) =
+        mcpSection.upsertMcpServer(originalName, config)
+    fun deleteMcpServer(name: String) = mcpSection.deleteMcpServer(name)
+    fun setMcpServerEnabled(name: String, enabled: Boolean) = mcpSection.setMcpServerEnabled(name, enabled)
+    fun reloadMcp() = mcpSection.reloadMcp()
+    fun getMcpServerTools(serverName: String?): List<McpToolDescriptor> = mcpSection.getMcpServerTools(serverName)
+
+    // ── PermissionSection 委托面 ────────────────────────────────────────
+    val globalRules: StateFlow<List<PermissionRule>> = permissionSection.globalRules
+    val projectRules: StateFlow<List<PermissionRule>> = permissionSection.projectRules
+    val currentProjectName: StateFlow<String?>
+        get() = permissionSection.currentProjectName
+
+    fun deleteGlobalRule(rule: PermissionRule) = permissionSection.deleteGlobalRule(rule)
+    fun deleteProjectRule(rule: PermissionRule) = permissionSection.deleteProjectRule(rule)
+    fun promoteRuleToGlobal(rule: PermissionRule) = permissionSection.promoteRuleToGlobal(rule)
+
+    override fun onCleared() {
+        super.onCleared()
+        logViewerSection.onCleared()
+    }
+
+    private companion object {
+        /** 仪表盘空转轮数轮询间隔（毫秒）：前台展示足够实时，避免高频刷新。 */
+        const val IDLE_ROUND_POLL_MS = 2_000L
     }
 }
