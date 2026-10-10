@@ -10,21 +10,15 @@ import com.mini.me_core.feature.browser.domain.BrowserController
 import com.mini.me_core.feature.browser.domain.BrowserCredential
 import com.mini.me_core.feature.browser.domain.BrowserCredentialStore
 import com.mini.me_core.feature.browser.domain.BrowserDownloadInfo
-import com.mini.me_core.feature.browser.domain.BrowserElement
 import com.mini.me_core.feature.browser.domain.BrowserLoginPromptManager
 import com.mini.me_core.feature.browser.domain.BrowserNetworkRecord
 import com.mini.me_core.feature.browser.domain.BrowserOperationController
 import com.mini.me_core.feature.browser.domain.BrowserPageSnapshot
 import com.mini.me_core.feature.browser.domain.BrowserSnapshotDelta
-import com.mini.me_core.feature.browser.domain.BrowserTabInfo
 import com.mini.me_core.feature.browser.domain.BrowserTakeoverManager
 import com.mini.me_core.feature.browser.domain.SnapshotLevel
 import com.mini.me_core.feature.browser.domain.antidetect.AntidetectController
-import com.mini.me_core.feature.browser.domain.antidetect.SignalDetector
-import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintGenerator
 import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintManager
-import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintProfile
-import com.mini.me_core.feature.browser.domain.fingerprint.FingerprintValidator
 import com.mini.me_core.feature.workspace.domain.WorkspacePathMapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
@@ -34,9 +28,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URI
@@ -113,6 +105,24 @@ class BrowserAgentTool @Inject constructor(
     @Volatile private var circuitBroken = false
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    /** 浏览器错误分类（行为保持自本类原样搬迁到 [BrowserToolErrorClassifier]）。 */
+    private val errorClassifier = BrowserToolErrorClassifier()
+
+    /** 反检测/指纹管理工具域（行为保持自本类原样搬迁到 [BrowserToolAntidetect]）。 */
+    private val antidetectTool = BrowserToolAntidetect(this, browserController, fingerprintManager, antidetectController)
+
+    /** 统一 envelope/快照序列化集群（行为保持自本类原样搬迁到 [BrowserToolEnvelope]）。 */
+    private val env = BrowserToolEnvelope()
+
+    /** 导航工具域。 */
+    private val navTool = BrowserToolNav(env, browserController)
+
+    /** DOM/快照/检查工具域。 */
+    private val inspectTool = BrowserToolInspect(env, browserController)
+
+    /** 交互/写操作工具域。 */
+    private val interactTool = BrowserToolInteract(env, browserController, pathMapper)
 
     override val name = "browser"
     override val description = buildString {
@@ -605,32 +615,32 @@ class BrowserAgentTool @Inject constructor(
             // （如本地服务器断开后，click/type 等操作在 WebView 层无限等待）
             withTimeout(GLOBAL_TIMEOUT_MS) {
                 var result = when (action) {
-                    "navigate" -> doNavigate(args)
-                    "view" -> doView(args)
-                    "snapshot" -> doSnapshot(args)
-                    "page_text" -> doPageText()
-                    "extract" -> doExtract(args)
-                    "click" -> doClick(args)
-                    "type" -> doType(args)
-                    "fill_form" -> doFillForm(args)
-                    "select_option" -> doSelect(args)
-                    "submit" -> doSubmit(args)
-                    "scroll" -> doScroll(args)
-                    "hover" -> doHover(args)
-                    "drag" -> doDrag(args)
-                    "press_key" -> doPressKey(args)
-                    "upload_file" -> doUploadFile(args)
-                    "back" -> doNavigation("back", browserController.back())
-                    "forward" -> doNavigation("forward", browserController.forward())
-                    "reload" -> doNavigation("reload", browserController.reloadPage())
-                    "screenshot" -> doScreenshot(args)
-                    "evaluate" -> doEvaluate(args)
-                    "wait_for" -> doWaitFor(args)
-                    "wait_for_change" -> doWaitForChange(args)
-                    "wait_for_network_idle" -> doWaitForNetworkIdle(args)
-                    "history" -> doHistory()
-                    "get_attribute" -> doGetAttribute(args)
-                    "handle_dialog" -> doHandleDialog(args)
+                    "navigate" -> navTool.doNavigate(args)
+                    "view" -> navTool.doView(args)
+                    "snapshot" -> inspectTool.doSnapshot(args)
+                    "page_text" -> inspectTool.doPageText()
+                    "extract" -> inspectTool.doExtract(args)
+                    "click" -> interactTool.doClick(args)
+                    "type" -> interactTool.doType(args)
+                    "fill_form" -> interactTool.doFillForm(args)
+                    "select_option" -> interactTool.doSelect(args)
+                    "submit" -> interactTool.doSubmit(args)
+                    "scroll" -> interactTool.doScroll(args)
+                    "hover" -> interactTool.doHover(args)
+                    "drag" -> interactTool.doDrag(args)
+                    "press_key" -> interactTool.doPressKey(args)
+                    "upload_file" -> interactTool.doUploadFile(args)
+                    "back" -> navTool.doNavigation("back", browserController.back())
+                    "forward" -> navTool.doNavigation("forward", browserController.forward())
+                    "reload" -> navTool.doNavigation("reload", browserController.reloadPage())
+                    "screenshot" -> inspectTool.doScreenshot(args)
+                    "evaluate" -> inspectTool.doEvaluate(args)
+                    "wait_for" -> inspectTool.doWaitFor(args)
+                    "wait_for_change" -> inspectTool.doWaitForChange(args)
+                    "wait_for_network_idle" -> inspectTool.doWaitForNetworkIdle(args)
+                    "history" -> navTool.doHistory()
+                    "get_attribute" -> inspectTool.doGetAttribute(args)
+                    "handle_dialog" -> inspectTool.doHandleDialog(args)
                     "login" -> doLogin()
                     "takeover" -> doTakeover(args)
                     "new_tab" -> doNewTab(args)
@@ -684,21 +694,21 @@ class BrowserAgentTool @Inject constructor(
                     "spa_navigate" -> doSpaNavigate(args)
                     "api_paginate" -> doApiPaginate(args)
                     // 指纹管理
-                    "fingerprint_list" -> doFingerprintList(args)
-                    "fingerprint_get" -> doFingerprintGet(args)
-                    "fingerprint_set" -> doFingerprintSet(args)
-                    "fingerprint_create" -> doFingerprintCreate(args)
-                    "fingerprint_delete" -> doFingerprintDelete(args)
-                    "fingerprint_validate" -> doFingerprintValidate(args)
-                    "fingerprint_test" -> doFingerprintTest()
+                    "fingerprint_list" -> antidetectTool.doFingerprintList(args)
+                    "fingerprint_get" -> antidetectTool.doFingerprintGet(args)
+                    "fingerprint_set" -> antidetectTool.doFingerprintSet(args)
+                    "fingerprint_create" -> antidetectTool.doFingerprintCreate(args)
+                    "fingerprint_delete" -> antidetectTool.doFingerprintDelete(args)
+                    "fingerprint_validate" -> antidetectTool.doFingerprintValidate(args)
+                    "fingerprint_test" -> antidetectTool.doFingerprintTest()
                     // 反爬控制
-                    "antidetect_status" -> doAntidetectStatus()
-                    "antidetect_signals" -> doAntidetectSignals(args)
-                    "antidetect_adjust" -> doAntidetectAdjust(args)
-                    "antidetect_pause" -> doAntidetectPause(args)
-                    "antidetect_resume" -> doAntidetectResume()
+                    "antidetect_status" -> antidetectTool.doAntidetectStatus()
+                    "antidetect_signals" -> antidetectTool.doAntidetectSignals(args)
+                    "antidetect_adjust" -> antidetectTool.doAntidetectAdjust(args)
+                    "antidetect_pause" -> antidetectTool.doAntidetectPause(args)
+                    "antidetect_resume" -> antidetectTool.doAntidetectResume()
                     // 综合状态
-                    "browser_status" -> doBrowserStatus()
+                    "browser_status" -> antidetectTool.doBrowserStatus()
                     else -> ToolResult.Error("未知动作: $action", "UNKNOWN_ACTION")
                 }
                 // 操作成功：重置连续失败计数和熔断状态
@@ -747,7 +757,7 @@ class BrowserAgentTool @Inject constructor(
         } catch (e: Exception) {
             FileLogger.e(TAG, "browser.$action 失败", e)
             // 错误分类：根据异常消息判断具体原因，帮助模型做出正确决策而非盲目重试
-            val classified = classifyBrowserError(e, action)
+            val classified = errorClassifier.classifyBrowserError(e, action)
             recordFailure(action, classified.second)
             val recovery = operationController.getRecoverySuggestion()
             val takeoverHint = if (operationController.shouldSuggestTakeover())
@@ -783,352 +793,17 @@ class BrowserAgentTool @Inject constructor(
     }
 
     /**
-     * 浏览器错误分类：根据异常类型和消息判断具体原因，
-     * 返回 (用户可读消息, 错误码)。帮助模型区分"服务器断开"和"元素找不到"，
-     * 避免盲目重试形成死循环。
+     * 浏览器错误分类（根据异常类型和消息判断具体原因，返回 (用户可读消息, 错误码)）
+     * 已原样搬迁到 [BrowserToolErrorClassifier]，调用点通过 errorClassifier 触发。
      */
-    private fun classifyBrowserError(e: Exception, action: String): Pair<String, String> {
-        val msg = e.message ?: ""
-        val lowerMsg = msg.lowercase()
-
-        return when {
-            // 连接被拒绝：本地服务器或目标服务已停止
-            lowerMsg.contains("connection refused") || lowerMsg.contains("econnrefused") ->
-                "连接被拒绝：目标服务器可能已停止运行（如本地开发服务已断开）。" +
-                    "请确认服务是否仍在运行，或调用 navigate 检查页面状态。" to "CONNECTION_REFUSED"
-
-            // DNS 解析失败
-            lowerMsg.contains("unable to resolve host") || lowerMsg.contains("nodename nor servname") ->
-                "DNS 解析失败：无法解析目标主机名。请检查 URL 是否正确，或网络连接是否正常。" to "DNS_FAILURE"
-
-            // 连接超时
-            lowerMsg.contains("connection timed out") || lowerMsg.contains("etimedout") ->
-                "连接超时：目标服务器响应过慢或不可达。建议稍后重试，或检查网络/代理设置。" to "CONNECTION_TIMEOUT"
-
-            // 页面无响应 / WebView 相关错误
-            lowerMsg.contains("webview") || lowerMsg.contains("page not responding") ||
-                lowerMsg.contains("javascript interface") || lowerMsg.contains("evaluatejavascript") ->
-                "页面无响应：WebView 可能已卡死。建议调用 navigate 或 reload 重新加载页面。" to "PAGE_UNRESPONSIVE"
-
-            // 元素找不到（业务层面的错误，通常可恢复）
-            lowerMsg.contains("not found") || lowerMsg.contains("no such element") ||
-                lowerMsg.contains("unable to locate") ->
-                "元素未找到：页面中不存在指定元素。可能是页面尚未加载完成、元素已变化，或定位描述不准确。" +
-                    "建议先调用 snapshot 查看当前页面结构，再调整元素定位。" to "ELEMENT_NOT_FOUND"
-
-            // 通用错误
-            else ->
-                "浏览器操作失败: $msg" to "UNKNOWN"
-        }
-    }
 
     // ─────────────────────────── 动作实现 ───────────────────────────
-
-    private suspend fun doNavigate(args: Map<String, JsonElement>): ToolResult {
-        val url = args["url"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("navigate 需要 url 参数", "MISSING_URL")
-        browserController.validateUrl(url)?.let {
-            return envelope("navigate", ok = false, error = it, recoverable = true, summary = "导航被拦截：$it")
-        }
-        val snap = browserController.navigate(url)
-        return envelope(
-            action = "navigate",
-            ok = true,
-            changed = true,
-            summary = "已打开 ${snap.url.ifBlank { url }}（${snap.title.ifBlank { "(无标题)" }}）",
-            snapshot = snapshotToJson(snap, navLevelOf(args))
-        )
-    }
-
-    private suspend fun doSnapshot(args: Map<String, JsonElement>): ToolResult {
-        val level = snapshotLevelOf(args)
-        val autoScroll = args["auto_scroll"]?.jsonPrimitive?.booleanOrNull ?: false
-        val snap = browserController.snapshot(level, autoScroll)
-        return envelope("snapshot", ok = true, summary = snapshotSummary(snap), snapshot = snapshotToJson(snap, level))
-    }
-
-    /** 按需取正文（R2.1）：模型需要页面文本时单独取，不随快照默认返回。 */
-    private suspend fun doPageText(): ToolResult {
-        val text = browserController.pageText().take(MAX_TEXT)
-        return envelope("page_text", ok = true, summary = "页面正文共 ${text.length} 字（超过 ${MAX_TEXT} 字已截断）", note = text)
-    }
-
-    /**
-     * 智能页面查看：可选导航到 url，等待页面稳定，识别页面类型并按需返回对应级别快照。
-     * article -> FULL（含正文）；search_results/product -> STANDARD；其余 -> STANDARD。
-     */
-    private suspend fun doView(args: Map<String, JsonElement>): ToolResult {
-        val url = args["url"]?.jsonPrimitive?.contentOrNull
-        if (url != null) {
-            browserController.validateUrl(url)?.let {
-                return envelope("view", ok = false, error = it, recoverable = true, summary = "导航被拦截：$it")
-            }
-            browserController.navigate(url)
-        }
-        runCatching { browserController.waitForPageReady(3000) }
-        val structured = browserController.extract(null, "text", autoScroll = false, structured = true)
-        val pageType = runCatching {
-            json.parseToJsonElement(structured).jsonObject["page_type"]?.jsonPrimitive?.contentOrNull ?: "unknown"
-        }.getOrNull() ?: "unknown"
-        val level = when (pageType) {
-            "article" -> SnapshotLevel.FULL
-            "search_results", "product" -> SnapshotLevel.STANDARD
-            else -> SnapshotLevel.STANDARD
-        }
-        val snap = browserController.snapshot(level)
-        return envelope(
-            action = "view",
-            ok = true,
-            changed = url != null,
-            summary = "页面类型: $pageType，已获取${level.name.lowercase()}级快照（${snap.elements.size}个元素）",
-            snapshot = snapshotToJson(snap, level),
-            note = structured.take(4000)
-        )
-    }
-
-    private suspend fun doExtract(args: Map<String, JsonElement>): ToolResult {
-        val selector = args["selector"]?.jsonPrimitive?.contentOrNull
-        val mode = args["mode"]?.jsonPrimitive?.contentOrNull ?: "text"
-        val autoScroll = args["auto_scroll"]?.jsonPrimitive?.booleanOrNull ?: false
-        val structured = args["structured"]?.jsonPrimitive?.booleanOrNull ?: false
-        val result = browserController.extract(selector, mode, autoScroll, structured)
-        val note = result.take(MAX_TEXT)
-        val summary = if (structured) {
-            val pageType = runCatching {
-                json.parseToJsonElement(result).jsonObject["page_type"]?.jsonPrimitive?.contentOrNull
-            }.getOrNull()
-            "结构化提取完成（页面类型: ${pageType ?: "unknown"}）"
-        } else {
-            "已按 mode=$mode 抽取数据"
-        }
-        return envelope("extract", ok = true, summary = summary, note = note)
-    }
-
-    // ─────────────────── 写操作（统一 envelope + 增量 delta） ───────────────────
-
-    /**
-     * 写操作统一入口（R2.3 写操作自动验证）：执行动作 → 检测"元素未找到"类失败 →
-     * 取 controller 计算好的增量 delta 一并返回，模型无需自行轮询。
-     */
-    private suspend fun writeEnvelope(action: String, args: Map<String, JsonElement>, run: suspend () -> BrowserPageSnapshot): ToolResult {
-        val snap = run()
-        val notFound = snap.pageText.takeIf { it.startsWith("元素 ") && it.contains("未找到") }
-        if (notFound != null) {
-            return envelope(
-                action = action,
-                ok = false,
-                error = notFound,
-                errorCode = "ELEMENT_NOT_FOUND",
-                recoverable = true,
-                summary = "$action 失败：$notFound",
-                note = "元素可能因页面刷新/重渲染失效。建议：1) 重新 view(snapshot_level=standard) 获取最新元素标识；2) 换用 CSS 绝对路径或语义描述符（role=… name=… index=…）替代 data-rcb-id；3) 不要重复同样的定位方式"
-            )
-        }
-        val delta = browserController.lastDelta()
-        return envelope(
-            action = action,
-            ok = true,
-            changed = delta != null &&
-                (delta.added.isNotEmpty() || delta.changed.isNotEmpty() || delta.removed.isNotEmpty() || delta.textNote.isNotBlank()),
-            summary = delta?.let { writeDeltaSummary(action, it) } ?: "$action 完成",
-            snapshot = snapshotToJson(snap, snapshotLevelOf(args)),
-            delta = delta
-        )
-    }
-
-    private suspend fun doClick(args: Map<String, JsonElement>): ToolResult {
-        val id = args["element_id"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("click 需要 element_id", "MISSING_ELEMENT_ID")
-        return writeEnvelope("click", args) { browserController.click(id) }
-    }
-
-    private suspend fun doType(args: Map<String, JsonElement>): ToolResult {
-        val id = args["element_id"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("type 需要 element_id", "MISSING_ELEMENT_ID")
-        val text = args["text"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("type 需要 text", "MISSING_TEXT")
-        return writeEnvelope("type", args) { browserController.type(id, text) }
-    }
-
-    /** 批量表单填写：fields 为 元素标识 -> 文本 的对象映射，一次性填写多个字段。 */
-    private suspend fun doFillForm(args: Map<String, JsonElement>): ToolResult {
-        val fieldsObj = args["fields"]?.jsonObject
-            ?: return ToolResult.Error("fill_form 需要 fields 参数（对象映射：元素标识->文本）", "MISSING_FIELDS")
-        val fields: Map<String, String> = fieldsObj.mapValues { (_, v) ->
-            v.jsonPrimitive.contentOrNull ?: ""
-        }
-        if (fields.isEmpty()) {
-            return envelope("fill_form", ok = false, recoverable = true, summary = "fill_form 失败：fields 为空", error = "fields 不能为空")
-        }
-        return writeEnvelope("fill_form", args) { browserController.fillForm(fields) }
-    }
-
-    private suspend fun doSelect(args: Map<String, JsonElement>): ToolResult {
-        val id = args["element_id"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("select_option 需要 element_id", "MISSING_ELEMENT_ID")
-        val value = args["value"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("select_option 需要 value", "MISSING_VALUE")
-        return writeEnvelope("select_option", args) { browserController.selectOption(id, value) }
-    }
-
-    private suspend fun doSubmit(args: Map<String, JsonElement>): ToolResult {
-        val id = args["element_id"]?.jsonPrimitive?.contentOrNull
-        return writeEnvelope("submit", args) { browserController.submit(id) }
-    }
-
-    private suspend fun doScroll(args: Map<String, JsonElement>): ToolResult {
-        val direction = args["direction"]?.jsonPrimitive?.contentOrNull ?: "down"
-        return writeEnvelope("scroll", args) { browserController.scroll(direction) }
-    }
-
-    private suspend fun doHover(args: Map<String, JsonElement>): ToolResult {
-        val id = args["element_id"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("hover 需要 element_id", "MISSING_ELEMENT_ID")
-        return writeEnvelope("hover", args) { browserController.hover(id) }
-    }
-
-    private suspend fun doDrag(args: Map<String, JsonElement>): ToolResult {
-        val id = args["element_id"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("drag 需要 element_id", "MISSING_ELEMENT_ID")
-        val targetId = args["target_element_id"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("drag 需要 target_element_id", "MISSING_TARGET_ELEMENT_ID")
-        return writeEnvelope("drag", args) { browserController.drag(id, targetId) }
-    }
-
-    private suspend fun doPressKey(args: Map<String, JsonElement>): ToolResult {
-        val id = args["element_id"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("press_key 需要 element_id", "MISSING_ELEMENT_ID")
-        val key = args["key"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("press_key 需要 key", "MISSING_KEY")
-        return writeEnvelope("press_key", args) { browserController.pressKey(id, key) }
-    }
-
-    private suspend fun doUploadFile(args: Map<String, JsonElement>): ToolResult {
-        val id = args["element_id"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("upload_file 需要 element_id", "MISSING_ELEMENT_ID")
-        val filePath = args["file_path"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("upload_file 需要 file_path", "MISSING_FILE_PATH")
-        val hostFile = runCatching { pathMapper.toHostFile(filePath) }.getOrNull()
-            ?: java.io.File(filePath)
-        val error = browserController.uploadFile(id, hostFile)
-        return if (error == null) {
-            val after = browserController.snapshot(snapshotLevelOf(args))
-            envelope(
-                action = "upload_file",
-                ok = true,
-                summary = "已上传文件 ${pathMapper.toContainerPath(hostFile.absolutePath)} 到元素 #$id",
-                snapshot = snapshotToJson(after, snapshotLevelOf(args))
-            )
-        } else {
-            envelope("upload_file", ok = false, error = error, recoverable = true, summary = "上传失败：$error")
-        }
-    }
-
-    /** 导航类动作统一处理（back/forward/reload）：页面完全变化，默认给 standard 快照。 */
-    private suspend fun doNavigation(action: String, snap: BrowserPageSnapshot): ToolResult {
-        val verb = when (action) {
-            "back" -> "已后退"
-            "forward" -> "已前进"
-            else -> "已刷新"
-        }
-        return envelope(
-            action = action,
-            ok = true,
-            changed = true,
-            summary = "${verb}到 ${snap.title.ifBlank { "(无标题)" }}（${snap.url}）",
-            snapshot = snapshotToJson(snap, navLevelOf(emptyMap()))
-        )
-    }
-
-    private suspend fun doScreenshot(args: Map<String, JsonElement>): ToolResult {
-        val elementId = args["element_id"]?.jsonPrimitive?.contentOrNull
-        val dataUrl = browserController.screenshot(elementId)
-            ?: return envelope(
-                "screenshot", ok = false, recoverable = true,
-                summary = "截图失败", error = "截图失败：浏览器页面尚未渲染（请先在浏览器页打开页面）"
-            )
-        return envelope(
-            action = "screenshot",
-            ok = true,
-            summary = "已截取${if (elementId != null) "元素 #$elementId" else "页面"}截图",
-            note = "data:image/png;base64，多模态模型可直接查看",
-            extra = JsonObject(mapOf("image_data_url" to JsonPrimitive(dataUrl)))
-        )
-    }
-
-    private suspend fun doEvaluate(args: Map<String, JsonElement>): ToolResult {
-        val js = args["js"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("evaluate 需要 js 参数", "MISSING_JS")
-        val result = browserController.evaluate(js)
-        return envelope("evaluate", ok = true, summary = "JS 执行完成", note = result.take(MAX_TEXT))
-    }
-
-    private suspend fun doWaitFor(args: Map<String, JsonElement>): ToolResult {
-        val selector = args["selector"]?.jsonPrimitive?.contentOrNull
-        val timeout = runCatching { args["timeout_ms"]?.jsonPrimitive?.contentOrNull?.toLong() }.getOrNull() ?: 10_000L
-        val snap = browserController.waitFor(selector, timeout)
-        return envelope(
-            action = "wait_for",
-            ok = true,
-            changed = true,
-            summary = "等待完成：${if (selector.isNullOrBlank()) "页面已就绪" else "元素 $selector 已出现"}",
-            snapshot = snapshotToJson(snap, snapshotLevelOf(args))
-        )
-    }
-
-    /** 事件驱动等待页面变化（R2.4）：替代轮询 snapshot，页面 DOM/网络变化即返回摘要。 */
-    private suspend fun doWaitForChange(args: Map<String, JsonElement>): ToolResult {
-        val timeout = runCatching { args["timeout_ms"]?.jsonPrimitive?.contentOrNull?.toLong() }.getOrNull() ?: 15_000L
-        val result = browserController.waitForChange(timeout)
-        return if (result.changed) {
-            envelope(
-                action = "wait_for_change",
-                ok = true,
-                changed = true,
-                summary = "页面发生变化：${result.summary.take(200)}"
-            )
-        } else {
-            envelope(
-                action = "wait_for_change",
-                ok = true,
-                changed = false,
-                summary = "等待 ${timeout}ms 超时，页面无变化",
-                note = "可调用 snapshot 查看当前状态，或继续其他操作"
-            )
-        }
-    }
-
-    /** 等待网络空闲：连续 idleMs 无在途请求即返回，超时则报告。 */
-    private suspend fun doWaitForNetworkIdle(args: Map<String, JsonElement>): ToolResult {
-        val timeoutMs = args["timeout_ms"]?.jsonPrimitive?.intOrNull?.toLong() ?: 10000L
-        val idleMs = args["idle_ms"]?.jsonPrimitive?.intOrNull?.toLong() ?: 500L
-        val ok = browserController.waitForNetworkIdle(timeoutMs, idleMs)
-        return envelope(
-            action = "wait_for_network_idle",
-            ok = ok,
-            summary = if (ok) "网络已空闲（连续${idleMs}ms无在途请求）" else "等待网络空闲超时（${timeoutMs}ms）",
-            recoverable = true
-        )
-    }
-
-    /** 动作历史查询（R2.3）：返回最近 30 条操作 + 结果摘要，避免重复操作。 */
-    private suspend fun doHistory(): ToolResult {
-        val history = browserController.actionHistory()
-        return envelope(
-            action = "history",
-            ok = true,
-            summary = "最近 ${history.size} 条动作",
-            note = history.joinToString("\n")
-        )
-    }
-
-    private suspend fun doGetAttribute(args: Map<String, JsonElement>): ToolResult {
-        val id = args["element_id"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("get_attribute 需要 element_id", "MISSING_ELEMENT_ID")
-        val attr = args["attribute"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("get_attribute 需要 attribute", "MISSING_ATTRIBUTE")
-        val value = browserController.getAttribute(id, attr)
-        return envelope(
-            action = "get_attribute",
-            ok = true,
-            summary = "属性 $attr 读取完成",
-            note = "$id.$attr = ${value ?: "(空)"}"
-        )
-    }
-
-    private suspend fun doHandleDialog(args: Map<String, JsonElement>): ToolResult {
-        val accept = runCatching { args["accept"]?.jsonPrimitive?.contentOrNull?.toBoolean() }.getOrNull() ?: true
-        val handled = browserController.handleDialog(accept)
-        return envelope(
-            action = "handle_dialog",
-            ok = handled,
-            summary = if (handled) "对话框已${if (accept) "确认" else "取消"}" else "当前没有待处理的对话框"
-        )
-    }
+    // 注：navigate/view/page_text/extract/screenshot/evaluate/wait_for*/history/get_attribute/
+    // handle_dialog 已搬迁到 [BrowserToolNav]/[BrowserToolInspect]；
+    // click/type/fill_form/select_option/submit/scroll/hover/drag/press_key/upload_file 及
+    // writeEnvelope 已搬迁到 [BrowserToolInteract]。execute() 的 when 分支经 navTool/inspectTool/
+    // interactTool 触发，统一 envelope 经 env（[BrowserToolEnvelope]）回调。
+    // 以下 doTakeover/doLogin/多标签/网络/iframe/SPA/宏/会话/下载/验证码等动作仍留在门面。
 
     /** 请求用户接管当前页面（验证码/支付/二次认证等），用户完成后返回最新快照。 */
     private suspend fun doTakeover(args: Map<String, JsonElement>): ToolResult {
@@ -2037,339 +1712,10 @@ class BrowserAgentTool @Inject constructor(
         )
     }
 
-    // ─────────────────────── 指纹管理动作 ───────────────────────
-
-    /** 序列化单个指纹配置为 JSON 对象。 */
-    private fun profileToJson(p: FingerprintProfile): JsonObject = JsonObject(
-        mapOf(
-            "id" to JsonPrimitive(p.id),
-            "name" to JsonPrimitive(p.name),
-            "browser" to JsonPrimitive(p.browser),
-            "browser_version" to JsonPrimitive(p.browserVersion),
-            "os" to JsonPrimitive(p.os),
-            "os_version" to JsonPrimitive(p.osVersion),
-            "platform" to JsonPrimitive(p.platform),
-            "region" to JsonPrimitive(p.region),
-            "timezone" to JsonPrimitive(p.timezone),
-            "language" to JsonPrimitive(p.language),
-            "hardware_concurrency" to JsonPrimitive(p.hardwareConcurrency),
-            "device_memory" to JsonPrimitive(p.deviceMemory),
-            "screen" to JsonPrimitive("${p.screenWidth}x${p.screenHeight}"),
-            "score" to JsonPrimitive(p.score),
-            "status" to JsonPrimitive(p.status),
-            "is_available" to JsonPrimitive(p.isAvailable),
-            "is_cooling" to JsonPrimitive(p.isCooling),
-            "total_uses" to JsonPrimitive(p.totalUses),
-            "webrtc_protection" to JsonPrimitive(p.webrtcProtectionLevel),
-            "webgl_spoof" to JsonPrimitive(p.webglSpoofEnabled),
-            "canvas_noise" to JsonPrimitive(p.canvasNoiseEnabled)
-        )
-    )
-
-    /** fingerprint_list：列出所有指纹配置，支持 status/region/browser 筛选。 */
-    private fun doFingerprintList(args: Map<String, JsonElement>): ToolResult {
-        val statusFilter = args["status"]?.jsonPrimitive?.contentOrNull
-        val regionFilter = args["region"]?.jsonPrimitive?.contentOrNull
-        val browserFilter = args["browser"]?.jsonPrimitive?.contentOrNull
-
-        var list = fingerprintManager.getAll()
-        statusFilter?.let { f -> list = list.filter { it.status.equals(f, ignoreCase = true) } }
-        regionFilter?.let { f -> list = list.filter { it.region.equals(f, ignoreCase = true) } }
-        browserFilter?.let { f -> list = list.filter { it.browser.equals(f, ignoreCase = true) } }
-
-        val currentId = fingerprintManager.currentProfileId.value
-        val profilesJson = JsonArray(list.map { p ->
-            JsonObject(profileToJson(p) + ("is_current" to JsonPrimitive(p.id == currentId)))
-        })
-        val stats = fingerprintManager.getStats()
-
-        return envelope(
-            action = "fingerprint_list",
-            ok = true,
-            summary = "共 ${list.size} 个指纹配置（可用 ${stats["available"]}，冷却中 ${stats["cooling"]}）",
-            extra = JsonObject(mapOf(
-                "profiles" to profilesJson,
-                "stats" to JsonObject(stats.mapValues { JsonPrimitive(it.value.toString()) }),
-                "current_id" to JsonPrimitive(currentId ?: "none")
-            ))
-        )
-    }
-
-    /** fingerprint_get：获取当前或指定配置详情。 */
-    private fun doFingerprintGet(args: Map<String, JsonElement>): ToolResult {
-        val profileId = args["profile_id"]?.jsonPrimitive?.contentOrNull
-        val profile = if (profileId.isNullOrBlank()) {
-            fingerprintManager.getCurrent()
-        } else {
-            fingerprintManager.getById(profileId)
-        } ?: return envelope(
-            action = "fingerprint_get",
-            ok = false,
-            error = "指纹配置不存在：${profileId ?: "(当前无激活配置)"}",
-            errorCode = "PROFILE_NOT_FOUND",
-            recoverable = true
-        )
-
-        return envelope(
-            action = "fingerprint_get",
-            ok = true,
-            summary = profile.shortDescription,
-            extra = JsonObject(mapOf("profile" to profileToJson(profile)))
-        )
-    }
-
-    /** fingerprint_set：切换到指定配置，可选自动重载页面。 */
-    private suspend fun doFingerprintSet(args: Map<String, JsonElement>): ToolResult {
-        val profileId = args["profile_id"]?.jsonPrimitive?.contentOrNull
-            ?: return envelope(
-                action = "fingerprint_set",
-                ok = false,
-                error = "缺少 profile_id 参数",
-                errorCode = "MISSING_PROFILE_ID"
-            )
-        val applyNow = args["apply_now"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: true
-
-        val target = browserController.switchFingerprint(profileId, reload = applyNow)
-            ?: return envelope(
-                action = "fingerprint_set",
-                ok = false,
-                error = "无法切换到指纹 $profileId：配置不存在、不可用或正在冷却期",
-                errorCode = "SWITCH_FAILED",
-                recoverable = true
-            )
-
-        return envelope(
-            action = "fingerprint_set",
-            ok = true,
-            changed = true,
-            summary = "已切换到指纹：${target.name}（${target.region} · ${target.browser} ${target.browserVersion}）",
-            note = if (applyNow) "页面已重新加载，新指纹已生效" else "已切换配置，下次页面加载时生效"
-        )
-    }
-
-    /** fingerprint_create：创建随机配置。 */
-    private fun doFingerprintCreate(args: Map<String, JsonElement>): ToolResult {
-        val name = args["name"]?.jsonPrimitive?.contentOrNull
-        val templateName = args["template"]?.jsonPrimitive?.contentOrNull
-        val template = when (templateName?.lowercase()) {
-            "region_us", "us" -> FingerprintGenerator.Template.REGION_US
-            "region_cn", "cn" -> FingerprintGenerator.Template.REGION_CN
-            "region_jp", "jp" -> FingerprintGenerator.Template.REGION_JP
-            "region_eu", "eu" -> FingerprintGenerator.Template.REGION_EU
-            "high_end", "gaming" -> FingerprintGenerator.Template.HIGH_END
-            "mobile", "android" -> FingerprintGenerator.Template.MOBILE
-            else -> null
-        }
-
-        val profile = fingerprintManager.createRandom(template = template, name = name)
-        return envelope(
-            action = "fingerprint_create",
-            ok = true,
-            changed = true,
-            summary = "已创建指纹：${profile.name}（ID: ${profile.id}）",
-            note = "地区=${profile.region}，浏览器=${profile.browser} ${profile.browserVersion}，评分=${profile.score.toInt()}",
-            extra = JsonObject(mapOf("profile" to profileToJson(profile)))
-        )
-    }
-
-    /** fingerprint_delete：删除配置。 */
-    private fun doFingerprintDelete(args: Map<String, JsonElement>): ToolResult {
-        val profileId = args["profile_id"]?.jsonPrimitive?.contentOrNull
-            ?: return envelope(
-                action = "fingerprint_delete",
-                ok = false,
-                error = "缺少 profile_id 参数",
-                errorCode = "MISSING_PROFILE_ID"
-            )
-        val force = args["force"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: false
-
-        val ok = fingerprintManager.delete(profileId, force = force)
-        return if (ok) {
-            envelope(
-                action = "fingerprint_delete",
-                ok = true,
-                changed = true,
-                summary = "已删除指纹配置：$profileId"
-            )
-        } else {
-            envelope(
-                action = "fingerprint_delete",
-                ok = false,
-                error = "删除失败：配置不存在、是当前激活配置（需 force=true）、或为内置真实指纹配置",
-                errorCode = "DELETE_FAILED",
-                recoverable = true
-            )
-        }
-    }
-
-    /** fingerprint_validate：校验配置一致性。 */
-    private fun doFingerprintValidate(args: Map<String, JsonElement>): ToolResult {
-        val profileId = args["profile_id"]?.jsonPrimitive?.contentOrNull
-        val result = fingerprintManager.validate(profileId)
-            ?: return envelope(
-                action = "fingerprint_validate",
-                ok = false,
-                error = "配置不存在或无当前激活配置",
-                errorCode = "PROFILE_NOT_FOUND"
-            )
-
-        val issues = result.issues.joinToString("；") { "${it.field}: ${it.message}" }
-        return envelope(
-            action = "fingerprint_validate",
-            ok = result.valid,
-            summary = if (result.valid) "配置一致性校验通过（评分 ${result.score.toInt()}）"
-                       else "配置存在 ${result.issues.size} 个一致性问题（评分 ${result.score.toInt()}）",
-            note = if (result.valid) "所有指纹字段内部一致" else issues,
-            extra = JsonObject(mapOf(
-                "valid" to JsonPrimitive(result.valid),
-                "score" to JsonPrimitive(result.score),
-                "issue_count" to JsonPrimitive(result.issues.size)
-            ))
-        )
-    }
-
-    /** fingerprint_test：运行指纹检测（简化版：返回当前配置评分和一致性结果）。 */
-    private fun doFingerprintTest(): ToolResult {
-        val current = fingerprintManager.getCurrent()
-            ?: return envelope(
-                action = "fingerprint_test",
-                ok = false,
-                error = "无当前激活指纹配置",
-                errorCode = "NO_PROFILE"
-            )
-        val validation = fingerprintManager.validate()
-        val scriptSize = com.mini.me_core.feature.browser.domain.fingerprint.FingerprintInjector
-            .estimateScriptSize(current)
-
-        return envelope(
-            action = "fingerprint_test",
-            ok = true,
-            summary = "当前指纹：${current.shortDescription}",
-            note = "一致性评分=${validation?.score?.toInt() ?: 0}/100，" +
-                "注入脚本大小=${scriptSize}字节，" +
-                "WebRTC防护级别=${current.webrtcProtectionLevel}",
-            extra = JsonObject(mapOf(
-                "profile" to profileToJson(current),
-                "consistency_score" to JsonPrimitive(validation?.score ?: 0f),
-                "script_size_bytes" to JsonPrimitive(scriptSize)
-            ))
-        )
-    }
-
-    // ─────────────────────── 反爬控制动作 ───────────────────────
-
-    /** antidetect_status：获取当前反爬状态。 */
-    private fun doAntidetectStatus(): ToolResult {
-        val s = antidetectController.state.value
-        return envelope(
-            action = "antidetect_status",
-            ok = true,
-            summary = "反爬状态：detected=${s.detected}，风险=${s.riskLevel}，健康度=${s.healthScore.toInt()}/100",
-            extra = JsonObject(mapOf(
-                "detected" to JsonPrimitive(s.detected),
-                "risk_level" to JsonPrimitive(s.riskLevel),
-                "health_score" to JsonPrimitive(s.healthScore),
-                "consecutive_failures" to JsonPrimitive(s.consecutiveFailures),
-                "paused" to JsonPrimitive(s.paused),
-                "pause_remaining_seconds" to JsonPrimitive(s.pauseRemainingSeconds),
-                "last_detection_at" to JsonPrimitive(s.lastDetectionAt),
-                "last_strategy" to JsonPrimitive(s.lastStrategy ?: "")
-            ))
-        )
-    }
-
-    /** antidetect_signals：获取活跃信号和历史。 */
-    private fun doAntidetectSignals(args: Map<String, JsonElement>): ToolResult {
-        val limit = runCatching { args["limit"]?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull() ?: 10
-        val active = antidetectController.getActiveSignals()
-        val history = antidetectController.getSignalHistory(limit = limit)
-
-        fun signalToJson(sig: SignalDetector.Signal) = JsonObject(mapOf(
-            "type" to JsonPrimitive(sig.type),
-            "severity" to JsonPrimitive(sig.severity),
-            "url" to JsonPrimitive(sig.url),
-            "description" to JsonPrimitive(sig.description),
-            "timestamp" to JsonPrimitive(sig.timestamp)
-        ))
-
-        return envelope(
-            action = "antidetect_signals",
-            ok = true,
-            summary = "活跃信号 ${active.size} 个，历史记录 ${history.size} 条",
-            note = if (active.isEmpty()) "当前无活跃反爬信号"
-                   else active.joinToString("；") { it.description },
-            extra = JsonObject(mapOf(
-                "active_signals" to JsonArray(active.map { signalToJson(it) }),
-                "history" to JsonArray(history.map { signalToJson(it) })
-            ))
-        )
-    }
-
-    /** antidetect_adjust：执行自适应调整。 */
-    private fun doAntidetectAdjust(args: Map<String, JsonElement>): ToolResult {
-        val strategy = args["strategy"]?.jsonPrimitive?.contentOrNull ?: "auto"
-        val reason = args["reason"]?.jsonPrimitive?.contentOrNull ?: "手动触发"
-        val result = antidetectController.adjust(strategy = strategy, reason = reason)
-        return envelope(
-            action = "antidetect_adjust",
-            ok = true,
-            changed = true,
-            summary = "自适应调整完成（策略：$strategy）",
-            note = result
-        )
-    }
-
-    /** antidetect_pause：暂停浏览器操作。 */
-    private fun doAntidetectPause(args: Map<String, JsonElement>): ToolResult {
-        val duration = runCatching { args["duration_seconds"]?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull() ?: 300
-        antidetectController.pause(durationSeconds = duration)
-        return envelope(
-            action = "antidetect_pause",
-            ok = true,
-            changed = true,
-            summary = "已暂停浏览器操作 ${duration} 秒",
-            note = "暂停期间所有浏览器导航和交互操作将被拒绝，调用 antidetect_resume 可提前恢复"
-        )
-    }
-
-    /** antidetect_resume：恢复浏览器操作。 */
-    private fun doAntidetectResume(): ToolResult {
-        antidetectController.resume()
-        return envelope(
-            action = "antidetect_resume",
-            ok = true,
-            changed = true,
-            summary = "已恢复浏览器操作",
-            note = "连续失败计数已重置，活跃信号已清除"
-        )
-    }
-
-    /** browser_status：综合状态（当前指纹+反爬状态+当前URL）。 */
-    private fun doBrowserStatus(): ToolResult {
-        val fp = fingerprintManager.getCurrent()
-        val ad = antidetectController.state.value
-        val currentUrl = browserController.uiState.value.currentUrl
-
-        return envelope(
-            action = "browser_status",
-            ok = true,
-            summary = "当前页面：${currentUrl.ifBlank { "(无)" }}",
-            note = "指纹：${fp?.shortDescription ?: "无"} | " +
-                "反爬：${if (ad.detected) "已检测(${ad.riskLevel})" else "正常"} | " +
-                "健康度：${ad.healthScore.toInt()}/100 | " +
-                "${if (ad.paused) "暂停中(${ad.pauseRemainingSeconds}s)" else "运行中"}",
-            extra = JsonObject(mapOf(
-                "current_url" to JsonPrimitive(currentUrl),
-                "fingerprint" to (fp?.let { profileToJson(it) } ?: JsonObject(emptyMap())),
-                "antidetect" to JsonObject(mapOf(
-                    "detected" to JsonPrimitive(ad.detected),
-                    "risk_level" to JsonPrimitive(ad.riskLevel),
-                    "health_score" to JsonPrimitive(ad.healthScore),
-                    "paused" to JsonPrimitive(ad.paused)
-                ))
-            ))
-        )
-    }
+    // ─────────────────────── 指纹管理 / 反爬控制 / 综合状态 ───────────────────────
+    // 注：profileToJson 与 doFingerprint* / doAntidetect* / doBrowserStatus 已原样搬迁到
+    // [BrowserToolAntidetect]，execute() 的 when 分支通过 antidetectTool 触发；
+    // 统一 envelope 回调本类 [envelope]（已提升为 internal，结构逐字不变）。
 
     private fun downloadToJson(d: BrowserDownloadInfo): JsonObject =
         JsonObject(
@@ -2414,27 +1760,13 @@ class BrowserAgentTool @Inject constructor(
         )
     }
 
-    // ─────────────────────────── 统一 envelope ───────────────────────────
+    // ─────────────────────────── 统一 envelope（委托 [BrowserToolEnvelope]，行为保持搬迁） ───────────────────────────
+    // 实现已整体搬迁到 env；此处保留同名 internal 委托，供门面内尚未搬迁的 doXxx（tabs/network/SPA/
+    // macro/sessions/captcha/takeover/login 等）继续零改动调用，返回 JSON 结构逐字不变。
 
-    /**
-     * 统一动作 envelope（R2.3 干净替换）：所有动作返回 `{ok, action, changed, summary, note|error,
-     * recoverable, snapshot?, delta?}`，[extra] 用于追加结构化的动作专属数据（tabs/requests 等）。
-     */
-    /**
-     * 在已有 ToolResult.Success 的 envelope 中追加 note 提示（用于反爬信号提醒等场景）。
-     * 对 Error 类型直接返回原样不修改。
-     */
-    private fun appendNoteToResult(result: ToolResult, note: String): ToolResult {
-        if (result !is ToolResult.Success) return result
-        val original = result.data as? JsonObject ?: return result
-        val existingNote = (original["note"] as? JsonPrimitive)?.content ?: ""
-        val merged = if (existingNote.isBlank()) note else "$existingNote\n$note"
-        val newFields = original.toMutableMap()
-        newFields["note"] = JsonPrimitive(merged)
-        return ToolResult.Success(JsonObject(newFields))
-    }
+    internal fun appendNoteToResult(result: ToolResult, note: String): ToolResult = env.appendNoteToResult(result, note)
 
-    private fun envelope(
+    internal fun envelope(
         action: String,
         ok: Boolean = true,
         changed: Boolean = false,
@@ -2446,172 +1778,30 @@ class BrowserAgentTool @Inject constructor(
         snapshot: JsonObject? = null,
         delta: BrowserSnapshotDelta? = null,
         extra: JsonObject? = null
-    ): ToolResult {
-        val fields = linkedMapOf<String, JsonElement>(
-            "ok" to JsonPrimitive(ok),
-            "action" to JsonPrimitive(action),
-            "changed" to JsonPrimitive(changed),
-            "summary" to JsonPrimitive(summary)
-        )
-        if (note.isNotBlank()) fields["note"] = JsonPrimitive(note)
-        if (error.isNotBlank()) fields["error"] = JsonPrimitive(error)
-        if (errorCode.isNotBlank()) fields["error_code"] = JsonPrimitive(errorCode)
-        if (recoverable) fields["recoverable"] = JsonPrimitive(true)
-        snapshot?.let { fields["snapshot"] = it }
-        delta?.let { fields["delta"] = deltaToJson(it) }
-        extra?.let { fields.putAll(it) }
-        return ToolResult.Success(JsonObject(fields))
-    }
-
-    /** 增量 delta 序列化（R2.1）：新增/变化元素以紧凑摘要返回，消失元素只给 id。 */
-    private fun deltaToJson(delta: BrowserSnapshotDelta): JsonObject = JsonObject(
-        mapOf(
-            "added" to JsonArray(delta.added.map { elementBriefJson(it) }),
-            "removed" to JsonArray(delta.removed.map { JsonPrimitive(it) }),
-            "changed" to JsonArray(delta.changed.map { elementBriefJson(it) }),
-            "text_note" to JsonPrimitive(delta.textNote)
-        )
+    ): ToolResult = env.envelope(
+        action, ok, changed, summary, note, error, errorCode, recoverable, snapshot, delta, extra
     )
 
-    private fun writeDeltaSummary(action: String, delta: BrowserSnapshotDelta): String = buildString {
-        append(action).append("完成")
-        val parts = mutableListOf<String>()
-        if (delta.added.isNotEmpty()) parts.add("新增 ${delta.added.size}")
-        if (delta.changed.isNotEmpty()) parts.add("变化 ${delta.changed.size}")
-        if (delta.removed.isNotEmpty()) parts.add("消失 ${delta.removed.size}")
-        if (parts.isNotEmpty()) append("：").append(parts.joinToString("，"))
-        if (delta.textNote.isNotBlank()) append("；").append(delta.textNote)
-    }
+    internal fun snapshotToJson(snap: BrowserPageSnapshot, level: SnapshotLevel = SnapshotLevel.SUMMARY): JsonObject =
+        env.snapshotToJson(snap, level)
 
-    private fun snapshotSummary(snap: BrowserPageSnapshot): String = buildString {
-        append("页面「").append(snap.title.ifBlank { "(无标题)" }).append("」")
-        if (snap.url.isNotBlank()) append(" URL=").append(snap.url)
-        val visible = snap.elements.count { it.visible && it.inViewport }
-        append(" 控件 ").append(snap.elements.size).append(" 个（视口内 ").append(visible).append("）")
-        if (snap.hasLoginForm) append("，检测到登录表单")
-        if (snap.pendingRequests > 0) append("，在途请求 ").append(snap.pendingRequests)
-    }
+    internal fun snapshotLevelOf(args: Map<String, JsonElement>): SnapshotLevel = env.snapshotLevelOf(args)
 
-    private fun snapshotLevelOf(args: Map<String, JsonElement>): SnapshotLevel =
-        SnapshotLevel.fromName(args["snapshot_level"]?.jsonPrimitive?.contentOrNull)
+    internal fun navLevelOf(args: Map<String, JsonElement>): SnapshotLevel = env.navLevelOf(args)
 
-    /** 导航/标签切换类动作默认 standard（页面完全变化，给完整元素便于继续操作），可用 snapshot_level 覆盖。 */
-    private fun navLevelOf(args: Map<String, JsonElement>): SnapshotLevel {
-        val explicit = args["snapshot_level"]?.jsonPrimitive?.contentOrNull
-        return if (explicit != null) SnapshotLevel.fromName(explicit) else SnapshotLevel.STANDARD
-    }
+    internal fun snapshotSummary(snap: BrowserPageSnapshot): String = env.snapshotSummary(snap)
 
-    // ─────────────────────────── 序列化辅助 ───────────────────────────
+    internal fun writeDeltaSummary(action: String, delta: BrowserSnapshotDelta): String =
+        env.writeDeltaSummary(action, delta)
 
-    /**
-     * 快照分级序列化（R2.1）：
-     *  - summary：标题/URL/登录信号 + 每控件一行的紧凑摘要（含可操作性标注），不含完整元素与 page_text；
-     *  - standard：summary + 完整元素 JSON；
-     *  - full：standard + page_text。
-     */
-    private fun snapshotToJson(snap: BrowserPageSnapshot, level: SnapshotLevel = SnapshotLevel.SUMMARY): JsonObject {
-        val elements = snap.elements.take(MAX_ELEMENTS)
-        // 每控件一行的紧凑清单 + 可操作性标注（R2.2）：模型可快速扫出「编号 + 控件类型 + 名称 + 状态 + 可操作性」
-        val sb = StringBuilder()
-        for (el in elements) {
-            sb.append('[').append(el.id).append("] ").append(el.kind)
-            val name = el.label.ifBlank { el.text }.ifBlank { el.value }
-            if (name.isNotBlank()) sb.append(" \"").append(name).append('"')
-            when {
-                el.kind.endsWith(":checkbox") || el.kind.endsWith(":radio") ->
-                    sb.append(if (el.checked) " [已勾选]" else " [未勾选]")
-                el.kind == "select" && el.value.isNotBlank() ->
-                    sb.append(" [当前=").append(el.value).append(']')
-            }
-            if (el.kind == "select" && el.options.isNotEmpty()) {
-                sb.append(" 选项=").append(el.options.joinToString("/") { o -> o.text.ifBlank { o.value } })
-            }
-            if (el.required) sb.append(" [必填]")
-            if (el.disabled) sb.append(" [禁用]")
-            // 可操作性标注（R2.2）：不可见/视口外/被遮挡
-            if (!el.visible) sb.append(" [不可见]")
-            else if (el.needsScroll) sb.append(" [视口外]")
-            if (el.overlapped) sb.append(" [被遮挡]")
-            if (el.kind == "link" && el.href.isNotBlank()) sb.append(" -> ").append(el.href)
-            if (el.placeholder.isNotBlank() && el.label.isBlank()) sb.append(" (placeholder=").append(el.placeholder).append(')')
-            sb.append('\n')
-        }
-        // 标题大纲（缩进展示层级，帮助模型快速理解页面结构）
-        val headingSb = StringBuilder()
-        for (h in snap.headings) {
-            headingSb.append("  ".repeat((h.level - 1).coerceAtLeast(0)))
-                .append('H').append(h.level).append(' ').append(h.text).append('\n')
-        }
-        val fields = linkedMapOf<String, JsonElement>(
-            "title" to JsonPrimitive(snap.title),
-            "url" to JsonPrimitive(snap.url),
-            "login_page" to JsonPrimitive(snap.hasLoginForm),
-            "login_hint" to JsonPrimitive(snap.loginHint),
-            "pending_requests" to JsonPrimitive(snap.pendingRequests),
-            "controls_total" to JsonPrimitive(snap.elements.size),
-            "controls_shown" to JsonPrimitive(elements.size),
-            "controls_summary" to JsonPrimitive(sb.toString()),
-            "headings_summary" to JsonPrimitive(headingSb.toString())
-        )
-        if (level != SnapshotLevel.SUMMARY) {
-            fields["headings"] = JsonArray(
-                snap.headings.map { h ->
-                    JsonObject(mapOf("level" to JsonPrimitive(h.level), "text" to JsonPrimitive(h.text)))
-                }
-            )
-            fields["elements"] = JsonArray(elements.map { elementJson(it) })
-        }
-        if (level == SnapshotLevel.FULL) {
-            fields["page_text"] = JsonPrimitive(snap.pageText.take(MAX_TEXT))
-        }
-        return JsonObject(fields)
-    }
+    internal fun deltaToJson(delta: BrowserSnapshotDelta): JsonObject = env.deltaToJson(delta)
 
-    /** 完整元素 JSON（standard/full 级）：含三级定位字段与可操作性标注（R2.2）。 */
-    private fun elementJson(el: BrowserElement): JsonObject = JsonObject(
-        mapOf(
-            "id" to JsonPrimitive(el.id),
-            "kind" to JsonPrimitive(el.kind),
-            "tag" to JsonPrimitive(el.tag),
-            "type" to JsonPrimitive(el.type),
-            "label" to JsonPrimitive(el.label),
-            "text" to JsonPrimitive(if (el.sensitive) "" else el.text),
-            "value" to JsonPrimitive(if (el.sensitive) "" else el.value),
-            "href" to JsonPrimitive(el.href),
-            "placeholder" to JsonPrimitive(el.placeholder),
-            "checked" to JsonPrimitive(el.checked),
-            "disabled" to JsonPrimitive(el.disabled),
-            "required" to JsonPrimitive(el.required),
-            "readonly" to JsonPrimitive(el.readonly),
-            "options" to JsonArray(
-                el.options.map { o ->
-                    JsonObject(mapOf("value" to JsonPrimitive(o.value), "text" to JsonPrimitive(o.text)))
-                }
-            ),
-            "sensitive" to JsonPrimitive(el.sensitive),
-            // R2.2 三级定位 + 可操作性标注
-            "locator" to JsonPrimitive(el.locator),
-            "semantic" to JsonPrimitive(el.semantic),
-            "in_viewport" to JsonPrimitive(el.inViewport),
-            "visible" to JsonPrimitive(el.visible),
-            "needs_scroll" to JsonPrimitive(el.needsScroll),
-            "overlapped" to JsonPrimitive(el.overlapped)
-        )
-    )
-
-    /** 增量/变化元素紧凑摘要（delta 用）。 */
-    private fun elementBriefJson(el: BrowserElement): JsonObject = JsonObject(
-        mapOf(
-            "id" to JsonPrimitive(el.id),
-            "kind" to JsonPrimitive(el.kind),
-            "label" to JsonPrimitive(el.label),
-            "text" to JsonPrimitive(if (el.sensitive) "" else el.text),
-            "in_viewport" to JsonPrimitive(el.inViewport),
-            "visible" to JsonPrimitive(el.visible),
-            "needs_scroll" to JsonPrimitive(el.needsScroll),
-            "overlapped" to JsonPrimitive(el.overlapped)
-        )
-    )
+    /** 写操作统一入口委托（doSafeClick/doHumanType 等未搬迁写操作仍调用）。 */
+    internal suspend fun writeEnvelope(
+        action: String,
+        args: Map<String, JsonElement>,
+        run: suspend () -> BrowserPageSnapshot
+    ): ToolResult = interactTool.writeEnvelope(action, args, run)
 
     private fun extractHost(url: String): String? {
         return runCatching { URI(url).host } .getOrNull()?.lowercase()
