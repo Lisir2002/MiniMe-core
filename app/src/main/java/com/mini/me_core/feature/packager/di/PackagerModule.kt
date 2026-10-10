@@ -1,31 +1,30 @@
 package com.mini.me_core.feature.packager.di
 
-import android.content.Context
+import com.mini.me_core.feature.packager.data.repository.BuildStoreImpl
+import com.mini.me_core.feature.packager.data.repository.ProjectStoreImpl
 import com.mini.me_core.feature.packager.domain.repository.BuildStore
 import com.mini.me_core.feature.packager.domain.repository.ProjectStore
+import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * 应用打包器 Hilt 依赖注入模块
+ * 应用打包器 Hilt 依赖注入模块（P2-12）。
+ *
+ * 端口绑定：[ProjectStore] / [BuildStore] 绑定到 data 层实现。实现类自带
+ * @Inject @Singleton（通过 @ApplicationContext 拿私有目录），作用域与原 @Provides 一致。
  */
 @Module
 @InstallIn(SingletonComponent::class)
-object PackagerModule {
+abstract class PackagerModule {
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideProjectStore(@ApplicationContext context: Context): ProjectStore =
-        ProjectStore(context)
+    abstract fun bindProjectStore(impl: ProjectStoreImpl): ProjectStore
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideBuildStore(
-        @ApplicationContext context: Context,
-        projectStore: ProjectStore
-    ): BuildStore = BuildStore(context, projectStore)
+    abstract fun bindBuildStore(impl: BuildStoreImpl): BuildStore
 }
