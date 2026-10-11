@@ -344,7 +344,7 @@ internal class BackupRestorer(
             }
         }
         if (line.size() > 0) {
-            runCatching { backupJson.decodeFromString(serializer, line.toString(Charsets.UTF_8)) }
+            runCatching { backupJson.decodeFromString(serializer, line.toByteArray().toString(Charsets.UTF_8)) }
                 .onFailure { FileLogger.w("BackupMgr", "restoreJsonl[$tag] 尾行解析失败，跳过", it) }
                 .getOrNull()?.let { batch.add(it) }
         }
@@ -369,7 +369,7 @@ internal class BackupRestorer(
             return 0
         }
         val parsed = runCatching {
-            backupJson.decodeFromString(serializer, line.toString(Charsets.UTF_8))
+            backupJson.decodeFromString(serializer, line.toByteArray().toString(Charsets.UTF_8))
         }.onFailure { FileLogger.w("BackupMgr", "restoreJsonl[$tag] 单行解析失败，跳过", it) }
             .getOrNull()
         line.reset()

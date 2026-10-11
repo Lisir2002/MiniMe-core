@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import android.annotation.SuppressLint
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -337,6 +338,9 @@ internal class LogViewerSection(
         }
     }
 
+    // 双参 FileObserver(File, Int) 自 API 1 起可用，API 29 仅将其废弃而未移除，旧系统上该构造有独立实现、不经过新增的无参构造。
+    // lint 基于新 SDK 的类结构保守地经无参构造报 NewApi，此处已人工确认全版本安全，就地抑制；项目内 ExtensionLoader、SyncEngine 为同一写法。
+    @SuppressLint("NewApi")
     private fun startLiveTail() {
         _logViewerState.update { it.copy(liveTailEnabled = true, hasNewLogs = false) }
         // 启动 FileObserver 监听日志目录变化
