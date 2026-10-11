@@ -194,10 +194,13 @@ class ApkBuilder(
             log("重新打包完成: ${unsignedApk.length()} bytes", callback, logWriter)
             callback.onStepComplete(BuildStep.REPACK, 4, steps.size)
 
-            // Step 6: ZIP 对齐（临时跳过，排查 invalid stored block lengths 问题）
+            // Step 6: ZIP 对齐
+            // 所有未压缩（STORED）文件必须 4 字节对齐，否则部分设备（如 vivo）安装时
+            // 会报「安装应用与当前系统有兼容性问题」。resources.arsc 尤其需要对齐。
             callback.onStepStart(BuildStep.ALIGN, 5, steps.size)
-            val alignedApk = unsignedApk // 临时：直接使用未对齐的 APK
-            log("ZIP 对齐: 临时跳过（排查压缩损坏问题）", callback, logWriter)
+            val alignedApk = File(tempDir, "aligned.apk")
+            ZipAligner.align(unsignedApk, alignedApk)
+            log("ZIP 对齐完成: ${alignedApk.length()} bytes", callback, logWriter)
             callback.onStepComplete(BuildStep.ALIGN, 5, steps.size)
 
             // Step 7: APK 签名
