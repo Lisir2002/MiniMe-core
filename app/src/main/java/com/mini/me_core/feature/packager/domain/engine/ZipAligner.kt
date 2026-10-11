@@ -46,8 +46,11 @@ class ZipAligner {
                     val method = entry!!.method
                     if (method == ZipEntry.STORED) storedCount++ else deflatedCount++
                     // 对于 DEFLATED 条目，预先压缩数据
+                    // 注意：必须使用 nowrap=true 输出 raw deflate 格式（无 zlib 头），
+                    // 这是 ZIP 格式的标准要求。默认 Deflater 会输出 zlib 格式（78 9c 头），
+                    // 导致系统解压失败、报「解析软件包时出现问题」。
                     val compressedData = if (method == ZipEntry.DEFLATED) {
-                        val deflater = Deflater(Deflater.DEFAULT_COMPRESSION)
+                        val deflater = Deflater(Deflater.DEFAULT_COMPRESSION, true)
                         deflater.setInput(data)
                         deflater.finish()
                         val baos = ByteArrayOutputStream(data.size)

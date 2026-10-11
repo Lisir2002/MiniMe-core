@@ -117,4 +117,81 @@ class ZipAlignerTest {
             tmpDir.deleteRecursively()
         }
     }
+
+    /**
+     * 验证 DEFLATED 条目使用 raw deflate 格式（无 zlib 头）。
+     *
+     * ZIP 标准要求 DEFLATED 条目使用 raw deflate，不能带 zlib 头（78 9c）。
+     * 若误用默认 Deflater（输出 zlib 格式），系统解压会失败，
+     * 安装时报「解析软件包时出现问题」。
+     */
+    @Test
+    fun align_deflatedEntriesUseRawDeflate() {
+        val tmpDir = File(System.getProperty("java.io.tmpdir"), "zipalign-test3-${System.nanoTime()}")
+        tmpDir.mkdirs()
+        try {
+            // 创建包含 DEFLATED 条目的测试 APK
+            val input = File(tmpDir, "input.apk")
+            val content = "AndroidManifest.xml test content ".repeat(100).toByteArray()
+            ZipOutputStream(FileOutputStream(input)).use { zos ->
+                val entry = ZipEntry("AndroidManifest.xml")
+                entry.method = ZipEntry.DEFLATED
+                zos.putNextEntry(entry)
+                zos.write(content)
+                zos.closeEntry()
+            }
+
+            val output = File(tmpDir, "aligned.apk")
+            ZipAligner.align(input, output)
+
+            // 解析对齐后的 APK，找到 AndroidManifest.xml 的压缩数据
+            val data = output.readBytes()
+            var pos = 0
+            var compressedData: ByteArray? = null
+            while (pos < data.size - 4) {
+                val magic = (data[pos].toInt() and 0xFF) or
+                        ((data[pos + 1].toInt() and 0xFF) shl 8) or
+                        ((data[pos + 2].toInt() and 0xFF) shl 16) or
+                        ((data[pos + 3].toInt() and 0xFF) shl 24)
+                if (magic != 0x04034b50) break
+
+                val method = (data[pos + 8].toInt() and 0xFF) or
+                        ((data[pos + 9].toInt() and 0xFF) shl 8)
+                val compSize = (data[pos + 18].toInt() and 0xFF) or
+                        ((data[pos + 19].toInt() and 0xFF) shl 8) or
+                        ((data[pos + 20].toInt() and 0xFF) shl 16) or
+                        ((data[pos + 21].toInt() and 0xFF) shl 24)
+                val nameLen = (data[pos + 26].toInt() and 0xFF) or
+                        ((data[pos + 27].toInt() and 0xFF) shl 8)
+                val extraLen = (data[pos + 28].toInt() and 0xFF) or
+                        ((data[pos + 29].toInt() and 0xFF) shl 8)
+                val name = String(data, pos + 30, nameLen, Charsets.UTF_8)
+
+                if (name == "AndroidManifest.xml" && method == ZipEntry.DEFLATED) {
+                    val dataStart = pos + 30 + nameLen + extraLen
+                    compressedData = data.copyOfRange(dataStart, dataStart + compSize)
+                    break
+                }
+                pos = pos + 30 + nameLen + extraLen + compSize
+            }
+
+            assertTrue("应找到 AndroidManifest.xml 的压缩数据", compressedData != null)
+            assertTrue("压缩数据应非空", compressedData!!.isNotEmpty())
+
+            // 验证不是 zlib 格式：zlib 头第一个字节通常是 0x78
+            val firstByte = compressedData[0].toInt() and 0xFF
+            assertTrue("压缩数据不应以 zlib 头(0x78)开头，应为 raw deflate", firstByte != 0x78)
+
+            // 验证可以用 raw deflate 正确解压
+            val inflater = java.util.zip.Inflater(true) // nowrap=true，raw deflate
+            inflater.setInput(compressedData)
+            val result = ByteArray(content.size + 1024)
+            val count = inflater.inflate(result)
+            inflater.end()
+            assertEquals("解压后大小应与原始内容一致", content.size, count)
+            assertEquals(content.contentToString(), result.copyOf(count).contentToString())
+        } finally {
+            tmpDir.deleteRecursively()
+        }
+    }
 }
