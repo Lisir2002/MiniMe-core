@@ -107,8 +107,29 @@ class ManifestEditor {
                 }
             }
 
-            // 找到需要修改的字符串索引
-            val packageIndex = strings.indexOfFirst { it == "com.minime.template" }
+            // 找到需要修改的字符串
+            // 包名相关：精确匹配 "com.minime.template"，以及以 "com.minime.template." 开头
+            // 且后续部分不含大写字母的字符串（权限名、authority 等全小写标识）。
+            // 类名（如 com.minime.template.MainActivity）含大写字母，不替换，
+            // 因为 classes.dex 中的类名保持不变。
+            val oldPackagePrefix = "com.minime.template"
+            val packageReplacements = mutableListOf<Triple<Int, String, String>>()
+            for (i in strings.indices) {
+                val s = strings[i]
+                if (s == oldPackagePrefix) {
+                    packageReplacements.add(Triple(i, s, newPackageName))
+                } else if (s.startsWith("$oldPackagePrefix.") ) {
+                    val suffix = s.removePrefix("$oldPackagePrefix.")
+                    // 类名采用驼峰命名（首字母大写且包含小写字母，如 MainActivity、TemplateApp），
+                    // 不替换，因为 classes.dex 中的类名保持不变。
+                    // 权限名（全大写下划线，如 DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION）
+                    // 和 authority（全小写，如 androidx-startup）不是驼峰类名，需要替换前缀。
+                    val isClassName = suffix.isNotEmpty() && suffix.first().isUpperCase() && suffix.any { it.isLowerCase() }
+                    if (!isClassName) {
+                        packageReplacements.add(Triple(i, s, "$newPackageName.$suffix"))
+                    }
+                }
+            }
             // 应用名可能是"应用模版"或"MiniMe Template"
             val appNameIndex = strings.indexOfFirst { it == "应用模版" || it == "MiniMe Template" }
             // 版本号名称：查找模版版本号或匹配 x.y.z 模式
@@ -118,19 +139,23 @@ class ManifestEditor {
                     ?: strings.indexOfFirst { it.matches(Regex("\\d+\\.\\d+\\.\\d+")) }
             } else -1
 
-            if (packageIndex < 0 && appNameIndex < 0 && versionNameIndex < 0) {
+            if (packageReplacements.isEmpty() && appNameIndex < 0 && versionNameIndex < 0) {
                 // 没有找到目标字符串，可能模版已被修改过
                 FileLogger.w(TAG, "未找到目标字符串（包名/应用名/版本号），模版可能已被修改")
                 return false
             }
 
-            FileLogger.d(TAG, "找到目标字符串: 包名=$packageIndex, 应用名=$appNameIndex, 版本名=$versionNameIndex")
+            FileLogger.d(TAG, "找到目标字符串: 包名相关=${packageReplacements.size}个, 应用名=$appNameIndex, 版本名=$versionNameIndex")
+            packageReplacements.forEach { (idx, old, new) ->
+                FileLogger.d(TAG, "  字符串[$idx]: '$old' -> '$new'")
+            }
 
             // 判断是否需要重建 String Pool
             var needRebuild = false
-            if (packageIndex >= 0) {
-                val newLen = if (isUtf8) newPackageName.toByteArray(Charsets.UTF_8).size else newPackageName.length * 2
-                if (newLen > stringByteLengths[packageIndex]) needRebuild = true
+            for ((_, oldStr, newStr) in packageReplacements) {
+                val newLen = if (isUtf8) newStr.toByteArray(Charsets.UTF_8).size else newStr.length * 2
+                val oldIdx = strings.indexOf(oldStr)
+                if (oldIdx >= 0 && newLen > stringByteLengths[oldIdx]) needRebuild = true
             }
             if (appNameIndex >= 0) {
                 val newLen = if (isUtf8) newAppName.toByteArray(Charsets.UTF_8).size else newAppName.length * 2
@@ -147,7 +172,7 @@ class ManifestEditor {
                     data, buffer, stringPoolStart, spHeaderSize, spChunkSize,
                     stringCount, styleCount, flags, stringsStart, stylesStart,
                     stringOffsets, strings, isUtf8,
-                    packageIndex, newPackageName,
+                    packageReplacements,
                     appNameIndex, newAppName,
                     versionNameIndex, newVersionName
                 )
@@ -157,9 +182,9 @@ class ManifestEditor {
                 val newData = data.copyOf()
                 val newBuffer = ByteBuffer.wrap(newData).order(ByteOrder.LITTLE_ENDIAN)
 
-                if (packageIndex >= 0) {
-                    val strStart = stringPoolStart + stringsStart + stringOffsets[packageIndex]
-                    replaceStringInPlace(newBuffer, strStart, strings[packageIndex], newPackageName, isUtf8)
+                for ((idx, oldStr, newStr) in packageReplacements) {
+                    val strStart = stringPoolStart + stringsStart + stringOffsets[idx]
+                    replaceStringInPlace(newBuffer, strStart, oldStr, newStr, isUtf8)
                 }
                 if (appNameIndex >= 0) {
                     val strStart = stringPoolStart + stringsStart + stringOffsets[appNameIndex]
@@ -424,7 +449,10 @@ class ManifestEditor {
 
         /**
          * 重建 String Pool（当新字符串比旧字符串长时）
+         * AXML 字符串池重建需要传入完整的头部元数据与新旧字符串映射，
+         * 参数较多属底层二进制格式处理的固有复杂度。
          */
+        @Suppress("LongParameterList", "LongMethod")
         private fun rebuildStringPool(
             originalData: ByteArray,
             originalBuffer: ByteBuffer,
@@ -439,8 +467,7 @@ class ManifestEditor {
             oldStringOffsets: IntArray,
             oldStrings: Array<String>,
             isUtf8: Boolean,
-            packageIndex: Int,
-            newPackageName: String,
+            packageReplacements: List<Triple<Int, String, String>>,
             appNameIndex: Int,
             newAppName: String,
             versionNameIndex: Int = -1,
@@ -448,7 +475,9 @@ class ManifestEditor {
         ): ByteArray {
             // 构建新的字符串数组
             val newStrings = oldStrings.copyOf()
-            if (packageIndex >= 0) newStrings[packageIndex] = newPackageName
+            for ((idx, _, newStr) in packageReplacements) {
+                newStrings[idx] = newStr
+            }
             if (appNameIndex >= 0) newStrings[appNameIndex] = newAppName
             if (versionNameIndex >= 0) newStrings[versionNameIndex] = newVersionName
 
