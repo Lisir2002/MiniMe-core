@@ -146,10 +146,23 @@ class ApkBuilder(
             }
             callback.onStepComplete(BuildStep.MODIFY_MANIFEST, 3, steps.size)
 
-            // Step 4.5: 修改 resources.arsc 中的应用名称
-            // 应用名称实际存储在 resources.arsc 全局字符串池，仅改 AXML 不生效
+            // Step 4.5: 修改 resources.arsc 中的包名与应用名称
+            // 包名必须与 AndroidManifest.xml 的 package 属性一致，否则系统安装时报
+            // 「兼容性问题」；应用名称存储在全局字符串池，仅改 AXML 不生效。
             val arscFile = File(extractedDir, "resources.arsc")
             if (arscFile.exists()) {
+                // 先改包名（必须与 Manifest 同步）
+                val pkgModified = ArscEditor.modifyPackageName(
+                    arscFile = arscFile,
+                    newPackageName = project.packageName
+                )
+                if (pkgModified) {
+                    log("resources.arsc 包名修改完成: ${project.packageName}", callback, logWriter)
+                } else {
+                    log("警告: resources.arsc 包名修改失败", callback, logWriter)
+                }
+
+                // 再改应用名称
                 val arscModified = ArscEditor.modifyAppName(
                     arscFile = arscFile,
                     oldName = "应用模版",

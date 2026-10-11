@@ -30,11 +30,85 @@ class ArscEditor {
         // RES_STRING_POOL_TYPE: 0x0001
         private const val RES_STRING_POOL_TYPE = 0x0001
 
+        // RES_TABLE_PACKAGE_TYPE: 0x0200
+        private const val RES_TABLE_PACKAGE_TYPE = 0x0200
+
         // UTF-8 flag
         private const val UTF8_FLAG = 0x100
 
+        // Package chunk 中包名字段的偏移（header(8) + id(4) = 12）
+        private const val PACKAGE_NAME_OFFSET = 12
+
+        // 包名字段固定长度（256 字节，UTF-16LE，可存 127 个字符加终止符）
+        private const val PACKAGE_NAME_BYTES = 256
+
         // 全局字符串池在 arsc 中的偏移（table header 固定 12 字节）
         private const val GLOBAL_STRING_POOL_OFFSET = 12
+
+        /**
+         * 修改 resources.arsc 中的包名（package name）
+         *
+         * resources.arsc 的包名存储在 RES_TABLE_PACKAGE_TYPE chunk 的 name 字段中，
+         * 为固定 256 字节的 UTF-16LE 字符串。打包器改包名时必须同步修改此处，
+         * 否则与 AndroidManifest.xml 的 package 属性不一致，系统安装时会报
+         * 「安装应用与当前系统有兼容性问题」。
+         *
+         * 由于包名字段是固定 256 字节且通常远未用满，直接原地替换并补零即可，
+         * 无需重建整个 arsc。
+         *
+         * @param arscFile resources.arsc 文件
+         * @param newPackageName 新包名（如 com.example.myapp）
+         * @return true 表示修改成功
+         */
+        fun modifyPackageName(arscFile: File, newPackageName: String): Boolean {
+            val data = arscFile.readBytes()
+            FileLogger.d(TAG, "开始修改 resources.arsc 包名: -> '$newPackageName'")
+
+            // 验证 table header
+            val tableType = getShortLE(data, 0)
+            if (tableType != RES_TABLE_TYPE) {
+                FileLogger.e(TAG, "resources.arsc table type 错误: 0x${tableType.toString(16)}")
+                return false
+            }
+
+            // 全局字符串池在偏移 12，读取其大小以定位 Package chunk
+            val spSize = getIntLE(data, GLOBAL_STRING_POOL_OFFSET + 4)
+            val packageOffset = GLOBAL_STRING_POOL_OFFSET + spSize
+
+            // 验证 Package chunk 类型
+            val pkgType = getShortLE(data, packageOffset)
+            if (pkgType != RES_TABLE_PACKAGE_TYPE) {
+                FileLogger.e(TAG, "Package chunk type 错误: 0x${pkgType.toString(16)} @ $packageOffset")
+                return false
+            }
+
+            // 读取原包名（用于日志）
+            val oldNameBytes = data.copyOfRange(
+                packageOffset + PACKAGE_NAME_OFFSET,
+                packageOffset + PACKAGE_NAME_OFFSET + PACKAGE_NAME_BYTES
+            )
+            val oldName = oldNameBytes.toString(Charsets.UTF_16LE).trimEnd('\u0000')
+            FileLogger.d(TAG, "原包名: '$oldName'")
+
+            // 编码新包名为 UTF-16LE
+            val newNameBytes = newPackageName.toByteArray(Charsets.UTF_16LE)
+            if (newNameBytes.size >= PACKAGE_NAME_BYTES) {
+                FileLogger.e(TAG, "新包名过长: ${newNameBytes.size} >= $PACKAGE_NAME_BYTES")
+                return false
+            }
+
+            // 原地替换：写入新包名，剩余区域补零
+            val result = data.copyOf()
+            val nameStart = packageOffset + PACKAGE_NAME_OFFSET
+            System.arraycopy(newNameBytes, 0, result, nameStart, newNameBytes.size)
+            for (i in nameStart + newNameBytes.size until nameStart + PACKAGE_NAME_BYTES) {
+                result[i] = 0
+            }
+
+            arscFile.writeBytes(result)
+            FileLogger.d(TAG, "resources.arsc 包名修改完成: '$oldName' -> '$newPackageName'")
+            return true
+        }
 
         /**
          * 修改 resources.arsc 中的应用名称
