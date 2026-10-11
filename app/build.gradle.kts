@@ -405,9 +405,12 @@ val ALLOWED_APPLICATION_IDS = setOf("com.mini.me_core", "com.mini.me_core.debug"
 // 立即在任务执行前校验官方密钥与证书指纹；任一条件不满足即 throw GradleException，
 // 阻止正式包被 debug keystore 或非官方密钥签出。debug/help/compileDebug/test 任务图不含此类任务，不受影响。
 gradle.taskGraph.whenReady {
+    // 仅当任务图含「:app 模块产出正式包」的任务时才校验签名：
+    // :app:assembleRelease / :app:bundleRelease。其他模块的中间任务、
+    // 纯编译（compileReleaseKotlin）、lint、test 均不触发。
     val hasReleaseArtifactTask = allTasks.any { t ->
-        val n = t.name
-        (n.contains("Release") || n.contains("Bundle")) && !n.contains("Debug")
+        val p = t.path
+        p == ":app:assembleRelease" || p == ":app:bundleRelease"
     }
     if (!hasReleaseArtifactTask) return@whenReady
 

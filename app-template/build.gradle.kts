@@ -109,10 +109,13 @@ dependencies {
 }
 
 // ── P1-04 任务图守卫：release 产出 fail-closed ─────────────────────────────
+// 仅当任务图含「:app-template 模块产出正式包」的任务时才校验签名：
+// :app-template:assembleRelease / :app-template:bundleRelease。
+// 其他模块的中间任务、纯编译（compileReleaseKotlin）、lint、test 均不触发。
 gradle.taskGraph.whenReady {
     val hasReleaseArtifactTask = allTasks.any { t ->
-        val n = t.name
-        (n.contains("Release") || n.contains("Bundle")) && !n.contains("Debug")
+        val p = t.path
+        p == ":app-template:assembleRelease" || p == ":app-template:bundleRelease"
     }
     if (!hasReleaseArtifactTask) return@whenReady
 
