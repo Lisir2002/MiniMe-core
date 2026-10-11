@@ -2,7 +2,6 @@ package com.mini.me_core.feature.packager.domain.engine
 
 import com.mini.me_core.core.util.FileLogger
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -29,9 +28,6 @@ class V2ApkSigner {
 
         /** V2 签名 ID */
         private const val V2_SIGNATURE_ID = 0x7109871a
-
-        /** V3 签名 ID（0xf05368c0，作为有符号 Int 表示） */
-        private const val V3_SIGNATURE_ID: Int = 0xf05368c0.toInt()
 
         /** 签名算法：RSA PKCS#1 v1.5 with SHA256 */
         private const val SIG_ALG_RSA_PKCS1_V15_SHA256 = 0x0103
@@ -77,57 +73,60 @@ class V2ApkSigner {
         ) {
             FileLogger.d(TAG, "开始 V2 签名: ${unsignedApk.name} (${unsignedApk.length()} bytes)")
 
-            // 1. 找到中央目录的起始偏移量
+            // 1. 找到中央目录的起始偏移量与 EOCD 位置
             val centralDirOffset = findCentralDirOffset(unsignedApk)
-            FileLogger.d(TAG, "中央目录偏移量: $centralDirOffset")
+            val apkData = unsignedApk.readBytes()
+            val eocdOffset = findEocdOffset(apkData)
+            FileLogger.d(TAG, "中央目录偏移量: $centralDirOffset, EOCD偏移量: $eocdOffset")
 
-            // 2. 计算 APK 内容的摘要（分块 SHA256）
-            val contentDigest = computeContentDigest(unsignedApk, centralDirOffset)
+            // 2. 计算 content digest：apksigner 验证时将 APK 拆为三个 DataSource 独立分块
+            //    [apkContents=0..centralDirOffset] + [centralDir=centralDirOffset..eocdOffset] + [eocd]
+            //    EOCD 使用原始 unsigned APK 的值（验证时 verifyIntegrity 会将 central_dir_offset
+            //    改回 apkContents.size()），而非签名后更新的值。每个 DataSource 独立按 1MB 分块，
+            //    overall = 0x5a + total_chunk_count(LE) + 所有 chunk digest 拼接。
+            val apkContents = apkData.copyOfRange(0, centralDirOffset.toInt())
+            val centralDir = apkData.copyOfRange(centralDirOffset.toInt(), eocdOffset)
+            val eocd = apkData.copyOfRange(eocdOffset, apkData.size)
+            val contentDigest = computeContentDigest(apkContents, centralDir, eocd)
             FileLogger.d(TAG, "内容摘要计算完成: ${contentDigest.size} bytes")
 
-            // 3. 构建签名数据（长度 + 签名算法ID + 摘要长度 + 摘要）
-            val signatureData = buildSignatureData(contentDigest)
-            FileLogger.d(TAG, "签名数据构建完成: ${signatureData.size} bytes")
+            // 3. 获取证书的 DER 编码与公钥
+            val certBytes = certificate.encoded
+            val publicKeyBytes = certificate.publicKey.encoded
+            FileLogger.d(TAG, "证书 DER 编码: ${certBytes.size} bytes, 公钥: ${publicKeyBytes.size} bytes")
 
-            // 4. 用私钥对签名数据进行 RSA PKCS#1 v1.5 SHA256 签名
-            val signatureBytes = signData(signatureData, privateKey)
+            // 4. 构建完整的 signed-data 并用私钥签名
+            val signedData = buildSignedData(contentDigest, certBytes)
+            FileLogger.d(TAG, "signed-data 构建完成: ${signedData.size} bytes")
+            val signatureBytes = signData(signedData, privateKey)
             FileLogger.d(TAG, "数据签名完成: ${signatureBytes.size} bytes")
 
-            // 5. 获取证书的 DER 编码
-            val certBytes = certificate.encoded
-            FileLogger.d(TAG, "证书 DER 编码: ${certBytes.size} bytes")
-
-            // 6. 构建 V2 签名块
+            // 5. 构建 V2 签名块
             val v2SigningBlock = buildSigningBlock(
                 signatureId = V2_SIGNATURE_ID,
-                contentDigest = contentDigest,
+                signedData = signedData,
                 signatureBytes = signatureBytes,
-                certBytes = certBytes
+                publicKeyBytes = publicKeyBytes
             )
             FileLogger.d(TAG, "V2 签名块构建完成: ${v2SigningBlock.size} bytes")
 
-            // 7. 构建 V3 签名块（与 V2 格式相同，ID 不同）
-            val v3SigningBlock = buildSigningBlock(
-                signatureId = V3_SIGNATURE_ID,
-                contentDigest = contentDigest,
-                signatureBytes = signatureBytes,
-                certBytes = certBytes
-            )
-            FileLogger.d(TAG, "V3 签名块构建完成: ${v3SigningBlock.size} bytes")
+            // 6. V3 签名方案暂不启用：V3 的 signed_data 含 minSdk/maxSdk/proof-of-rotation，
+            //    与 V2 格式不同，复用 V2 格式会被 apksigner 判定为 Malformed list of signers。
+            //    自签名打包器无需密钥轮换，且 V2 已覆盖 minSdk 26+，只输出 V2 即可。
+            FileLogger.d(TAG, "V3 签名块跳过（待正确实现 V3 signed_data 格式）")
 
-            // 8. 合并 V2 + V3 签名块到一个 APK Signing Block 中
-            val combinedBlock = combineSigningBlocks(v2SigningBlock, v3SigningBlock)
-            FileLogger.d(TAG, "合并签名块完成: ${combinedBlock.size} bytes")
+            // 7. 更新 EOCD 的 central_dir_offset（指向签名块后的中央目录），写入签名后 APK
+            val eocdBuffer = ByteBuffer.wrap(eocd).order(ByteOrder.LITTLE_ENDIAN)
+            eocdBuffer.putInt(16, (centralDirOffset + v2SigningBlock.size).toInt())
 
-            // 9. 将签名块插入到 APK 中，更新中央目录偏移量
-            insertSigningBlock(
-                unsignedApk = unsignedApk,
-                signedApk = signedApk,
-                signingBlock = combinedBlock,
-                centralDirOffset = centralDirOffset
-            )
+            FileOutputStream(signedApk).use { output ->
+                output.write(apkContents)
+                output.write(v2SigningBlock)
+                output.write(centralDir)
+                output.write(eocd)
+            }
 
-            FileLogger.d(TAG, "V2+V3 签名完成: ${signedApk.name} (${signedApk.length()} bytes)")
+            FileLogger.d(TAG, "V2 签名完成: ${signedApk.name} (${signedApk.length()} bytes)")
         }
 
         /**
@@ -135,8 +134,11 @@ class V2ApkSigner {
          */
         private fun findCentralDirOffset(apkFile: File): Long {
             val data = apkFile.readBytes()
-            val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+            return findCentralDirOffset(data)
+        }
 
+        private fun findCentralDirOffset(data: ByteArray): Long {
+            val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
             var pos = data.size - 22
             while (pos >= 0) {
                 if (buffer.getInt(pos) == EOCD_SIGNATURE) {
@@ -144,38 +146,58 @@ class V2ApkSigner {
                 }
                 pos--
             }
-            throw IllegalStateException("未找到 EOCD，无法确定中央目录偏移量")
+            error("未找到 EOCD，无法确定中央目录偏移量")
         }
 
         /**
-         * 计算 APK 内容的摘要（根据 AOSP 规范）
+         * 找到 EOCD 在 ZIP 文件中的起始偏移量
          */
-        private fun computeContentDigest(apkFile: File, centralDirOffset: Long): ByteArray {
+        private fun findEocdOffset(data: ByteArray): Int {
+            val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+            var pos = data.size - 22
+            while (pos >= 0) {
+                if (buffer.getInt(pos) == EOCD_SIGNATURE) {
+                    return pos
+                }
+                pos--
+            }
+            error("未找到 EOCD")
+        }
+
+        /**
+         * 计算 APK 内容的 CHUNKED_SHA256 摘要（与 apksigner/AOSP 完全一致）
+         *
+         * apksigner 验证时将 APK 拆为三个 DataSource 独立按 1MB 分块：
+         * [apkContents] + [centralDir] + [eocd]，每个 DataSource 的最后一个 chunk
+         * 可以小于 1MB。overall digest = SHA256(0x5a | total_chunk_count_LE |
+         * 所有 chunk digest 按顺序拼接)。EOCD 使用原始 unsigned APK 的值（验证时
+         * verifyIntegrity 会将 central_dir_offset 改回 apkContents.size()）。
+         */
+        private fun computeContentDigest(
+            apkContents: ByteArray,
+            centralDir: ByteArray,
+            eocd: ByteArray
+        ): ByteArray {
             val chunkDigests = java.io.ByteArrayOutputStream()
             val buffer = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
             var chunkCount = 0
 
-            FileInputStream(apkFile).use { fis ->
-                var remaining = centralDirOffset
-                val chunkBuffer = ByteArray(CHUNK_SIZE)
-
-                while (remaining > 0) {
-                    val toRead = minOf(CHUNK_SIZE.toLong(), remaining).toInt()
-                    val bytesRead = fis.read(chunkBuffer, 0, toRead)
-                    if (bytesRead <= 0) break
-
+            for (source in arrayOf(apkContents, centralDir, eocd)) {
+                var offset = 0
+                while (offset < source.size) {
+                    val toRead = minOf(CHUNK_SIZE, source.size - offset)
                     val chunkData = java.io.ByteArrayOutputStream()
                     chunkData.write(0xa5)
                     buffer.clear()
-                    buffer.putInt(bytesRead)
+                    buffer.putInt(toRead)
                     chunkData.write(buffer.array())
-                    chunkData.write(chunkBuffer, 0, bytesRead)
+                    chunkData.write(source, offset, toRead)
 
                     val chunkDigest = MessageDigest.getInstance("SHA-256")
                         .digest(chunkData.toByteArray())
 
                     chunkDigests.write(chunkDigest)
-                    remaining -= bytesRead
+                    offset += toRead
                     chunkCount++
                 }
             }
@@ -199,17 +221,39 @@ class V2ApkSigner {
         /**
          * 构建签名数据（长度 + 签名算法ID + 摘要长度 + 摘要）
          */
-        private fun buildSignatureData(contentDigest: ByteArray): ByteArray {
-            val dataLength = 4 + 4 + contentDigest.size
-            val result = ByteArray(4 + dataLength)
+        /**
+         * 构建 V2 签名的 signed-data（签名输入，必须与签名块中存储的 signed-data 完全一致）
+         *
+         * 结构: [digests_length(4)] [digests] [certificates_length(4)] [certificates] [additional_attributes_length(4)] [additional_attributes]
+         * digests: [digest_length(4)] [signature_algorithm_id(4)] [digest_data_length(4)] [digest_data]
+         * certificates: [certificate_length(4)] [certificate_data]
+         */
+        private fun buildSignedData(contentDigest: ByteArray, certBytes: ByteArray): ByteArray {
+            // digest 记录内容: 算法ID(4) + 摘要长度(4) + 摘要(32) = 40
+            val digestRecord = ByteArray(40)
+            writeIntLE(digestRecord, 0, SIG_ALG_RSA_PKCS1_V15_SHA256)
+            writeIntLE(digestRecord, 4, contentDigest.size)
+            System.arraycopy(contentDigest, 0, digestRecord, 8, contentDigest.size)
+            // digests 区域 = 记录长度(4) + 记录内容
+            val digestsBlock = ByteArray(4 + digestRecord.size)
+            writeIntLE(digestsBlock, 0, digestRecord.size)
+            System.arraycopy(digestRecord, 0, digestsBlock, 4, digestRecord.size)
+            // certificates 区域 = 证书长度(4) + 证书数据
+            val certSequence = ByteArray(4 + certBytes.size)
+            writeIntLE(certSequence, 0, certBytes.size)
+            System.arraycopy(certBytes, 0, certSequence, 4, certBytes.size)
+            // signed-data 本体：每个长度前缀紧跟其对应数据
+            // [digests_len(4)][digests][certs_len(4)][certs][attrs_len(4)][attrs]
+            // 注意：三个长度字段不能连续放在最前面，否则 apksigner 读完 digests_len
+            // 后切出的区域会包含 certs_len/attrs_len，导致后续字段全部错位。
+            val signerData = ByteArray(4 + digestsBlock.size + 4 + certSequence.size + 4)
             var offset = 0
-
-            writeIntLE(result, offset, dataLength); offset += 4
-            writeIntLE(result, offset, SIG_ALG_RSA_PKCS1_V15_SHA256); offset += 4
-            writeIntLE(result, offset, contentDigest.size); offset += 4
-            System.arraycopy(contentDigest, 0, result, offset, contentDigest.size)
-
-            return result
+            writeIntLE(signerData, offset, digestsBlock.size); offset += 4
+            System.arraycopy(digestsBlock, 0, signerData, offset, digestsBlock.size); offset += digestsBlock.size
+            writeIntLE(signerData, offset, certSequence.size); offset += 4
+            System.arraycopy(certSequence, 0, signerData, offset, certSequence.size); offset += certSequence.size
+            writeIntLE(signerData, offset, 0); offset += 4 // additional_attributes 长度=0
+            return signerData
         }
 
         /**
@@ -227,7 +271,7 @@ class V2ApkSigner {
          *
          * 结构: [size(8)] [ID-value pairs] [size(8)] [magic(16)]
          * ID-value pair: [value_len(8)] [ID(4)] [value]
-         * value: [签名者序列长度(4)] [签名者]
+         * value: [签名者序列长度(4)] [签名者长度(4)] [签名者]
          * 签名者: [签名者数据长度(4)] [签名者数据] [签名序列长度(4)] [签名序列] [公钥长度(4)] [公钥]
          * 签名者数据: [摘要算法序列长度(4)] [证书序列长度(4)] [额外属性序列长度(4)] [摘要算法序列] [证书序列] [额外属性序列]
          * 摘要算法序列: [算法ID(4)] [摘要长度(4)] [摘要(32)]
@@ -235,55 +279,51 @@ class V2ApkSigner {
          */
         private fun buildSigningBlock(
             signatureId: Int,
-            contentDigest: ByteArray,
+            signedData: ByteArray,
             signatureBytes: ByteArray,
-            certBytes: ByteArray
+            publicKeyBytes: ByteArray
         ): ByteArray {
-            // 1. 构建摘要算法序列: 算法ID(4) + 摘要长度(4) + 摘要(32) = 40
-            val digestAlgorithm = ByteArray(40)
-            writeIntLE(digestAlgorithm, 0, SIG_ALG_RSA_PKCS1_V15_SHA256)
-            writeIntLE(digestAlgorithm, 4, contentDigest.size)
-            System.arraycopy(contentDigest, 0, digestAlgorithm, 8, contentDigest.size)
+            // 1. 构建签名记录内容: 算法ID(4) + 签名长度(4) + 签名数据
+            val signatureRecord = ByteArray(4 + 4 + signatureBytes.size)
+            writeIntLE(signatureRecord, 0, SIG_ALG_RSA_PKCS1_V15_SHA256)
+            writeIntLE(signatureRecord, 4, signatureBytes.size)
+            System.arraycopy(signatureBytes, 0, signatureRecord, 8, signatureBytes.size)
+            // signatures 区域 = 记录长度(4) + 记录内容
+            val signaturesBlock = ByteArray(4 + signatureRecord.size)
+            writeIntLE(signaturesBlock, 0, signatureRecord.size)
+            System.arraycopy(signatureRecord, 0, signaturesBlock, 4, signatureRecord.size)
 
-            // 2. 构建证书序列: 证书长度(4) + 证书数据
-            val certSequence = ByteArray(4 + certBytes.size)
-            writeIntLE(certSequence, 0, certBytes.size)
-            System.arraycopy(certBytes, 0, certSequence, 4, certBytes.size)
-
-            // 3. 构建签名者数据: 摘要算法序列长度(4) + 证书序列长度(4) + 额外属性序列长度(4) + 摘要算法序列 + 证书序列
-            val signerDataSize = 4 + 4 + 4 + digestAlgorithm.size + certSequence.size
-            val signerData = ByteArray(signerDataSize)
-            var offset = 0
-            writeIntLE(signerData, offset, digestAlgorithm.size); offset += 4
-            writeIntLE(signerData, offset, certSequence.size); offset += 4
-            writeIntLE(signerData, offset, 0); offset += 4 // 额外属性序列长度=0
-            System.arraycopy(digestAlgorithm, 0, signerData, offset, digestAlgorithm.size); offset += digestAlgorithm.size
-            System.arraycopy(certSequence, 0, signerData, offset, certSequence.size)
-
-            // 4. 构建签名序列: 算法ID(4) + 签名长度(4) + 签名数据
-            val signatures = ByteArray(4 + 4 + signatureBytes.size)
-            writeIntLE(signatures, 0, SIG_ALG_RSA_PKCS1_V15_SHA256)
-            writeIntLE(signatures, 4, signatureBytes.size)
-            System.arraycopy(signatureBytes, 0, signatures, 8, signatureBytes.size)
-
-            // 5. 构建签名者: 签名者数据长度(4) + 签名者数据 + 签名序列长度(4) + 签名序列 + 公钥长度(4) + 公钥(0)
-            val signerSize = 4 + signerData.size + 4 + signatures.size + 4
+            // 2. 构建签名者: 签名者数据长度(4) + 签名者数据 + 签名区域长度(4) + 签名区域 + 公钥长度(4) + 公钥
+            //    公钥必须写入：apksigner 验证器在 parseSigner 中要求 signer 携带公钥，
+            //    公钥长度置 0 会被判定为 Malformed signer block。
+            val signerSize = 4 + signedData.size + 4 + signaturesBlock.size + 4 + publicKeyBytes.size
             val signer = ByteArray(signerSize)
-            offset = 0
-            writeIntLE(signer, offset, signerData.size); offset += 4
-            System.arraycopy(signerData, 0, signer, offset, signerData.size); offset += signerData.size
-            writeIntLE(signer, offset, signatures.size); offset += 4
-            System.arraycopy(signatures, 0, signer, offset, signatures.size); offset += signatures.size
-            writeIntLE(signer, offset, 0) // 公钥长度=0
+            var offset = 0
+            writeIntLE(signer, offset, signedData.size); offset += 4
+            System.arraycopy(signedData, 0, signer, offset, signedData.size); offset += signedData.size
+            writeIntLE(signer, offset, signaturesBlock.size); offset += 4
+            System.arraycopy(signaturesBlock, 0, signer, offset, signaturesBlock.size); offset += signaturesBlock.size
+            writeIntLE(signer, offset, publicKeyBytes.size); offset += 4
+            System.arraycopy(publicKeyBytes, 0, signer, offset, publicKeyBytes.size)
 
-            // 6. 构建签名者序列: 长度(4) + 签名者
-            val signersSequence = ByteArray(4 + signer.size)
-            writeIntLE(signersSequence, 0, signer.size)
-            System.arraycopy(signer, 0, signersSequence, 4, signer.size)
+            // 6. 构建签名者序列: 序列长度(4) + 签名者长度(4) + 签名者
+            //    AOSP V2 规范要求 signers 是 "length-prefixed sequence of length-prefixed
+            //    signer"：每个 signer 前必须有独立的 signer_length 前缀。缺少此前缀时，
+            //    apksigner 会把 signed_data_length 误读为 signer_length，切出错误的
+            //    signer buffer，后续字段全部错位，最终在 parseSigner 读 signatures 时
+            //    抛出 Negative length。
+            val signerWithLength = ByteArray(4 + signer.size)
+            writeIntLE(signerWithLength, 0, signer.size)
+            System.arraycopy(signer, 0, signerWithLength, 4, signer.size)
+            val signersSequence = ByteArray(4 + signerWithLength.size)
+            writeIntLE(signersSequence, 0, signerWithLength.size)
+            System.arraycopy(signerWithLength, 0, signersSequence, 4, signerWithLength.size)
 
-            // 7. 构建 ID-value pair: value_len(8) + ID(4) + value(签名者序列)
+            // 7. ID-value pair: value_len(8) + ID(4) + value(签名者序列)
+            //    规范要求 length 字段包含 4 字节 ID（即 4 + value 长度），少算 4 字节会导致
+            //    解析器读取 ID-value 时错位，apksigner 报 "Malformed list of signers"。
             val idValuePair = ByteArray(8 + 4 + signersSequence.size)
-            writeLongLE(idValuePair, 0, signersSequence.size.toLong())
+            writeLongLE(idValuePair, 0, (signersSequence.size + 4).toLong())
             writeIntLE(idValuePair, 8, signatureId)
             System.arraycopy(signersSequence, 0, idValuePair, 12, signersSequence.size)
 
@@ -300,76 +340,5 @@ class V2ApkSigner {
             return signingBlock
         }
 
-        /**
-         * 合并多个签名块到一个 APK Signing Block 中
-         */
-        private fun combineSigningBlocks(vararg blocks: ByteArray): ByteArray {
-            // 提取所有 ID-value pairs
-            var totalIdValuePairsSize = 0
-            for (block in blocks) {
-                // block 结构: [size(8)] [ID-value pairs] [size(8)] [magic(16)]
-                totalIdValuePairsSize += block.size - 8 - 8 - 16
-            }
-
-            val idValuePairs = ByteArray(totalIdValuePairsSize)
-            var offset = 0
-            for (block in blocks) {
-                val pairSize = block.size - 8 - 8 - 16
-                System.arraycopy(block, 8, idValuePairs, offset, pairSize)
-                offset += pairSize
-            }
-
-            // 构建新的 APK Signing Block
-            val magicBytes = APK_SIG_BLOCK_MAGIC.toByteArray(Charsets.UTF_8)
-            val blockSize = idValuePairs.size + 8 + 16
-            val signingBlock = ByteArray(8 + idValuePairs.size + 8 + 16)
-            offset = 0
-            writeLongLE(signingBlock, offset, blockSize.toLong()); offset += 8
-            System.arraycopy(idValuePairs, 0, signingBlock, offset, idValuePairs.size); offset += idValuePairs.size
-            writeLongLE(signingBlock, offset, blockSize.toLong()); offset += 8
-            System.arraycopy(magicBytes, 0, signingBlock, offset, magicBytes.size)
-
-            return signingBlock
-        }
-
-        /**
-         * 将签名块插入到 APK 中，更新中央目录和 EOCD 的偏移量
-         */
-        private fun insertSigningBlock(
-            unsignedApk: File,
-            signedApk: File,
-            signingBlock: ByteArray,
-            centralDirOffset: Long
-        ) {
-            val data = unsignedApk.readBytes()
-
-            FileOutputStream(signedApk).use { output ->
-                // 1. 写入内容（从开始到中央目录之前）
-                output.write(data, 0, centralDirOffset.toInt())
-
-                // 2. 写入签名块
-                output.write(signingBlock)
-
-                // 3. 写入中央目录和 EOCD（需要更新 EOCD 中的中央目录偏移量）
-                val centralDirAndEocd = data.copyOfRange(centralDirOffset.toInt(), data.size)
-
-                val eocdBuffer = ByteBuffer.wrap(centralDirAndEocd).order(ByteOrder.LITTLE_ENDIAN)
-                var eocdPos = -1
-                for (i in (centralDirAndEocd.size - 22) downTo 0) {
-                    if (eocdBuffer.getInt(i) == EOCD_SIGNATURE) {
-                        eocdPos = i
-                        break
-                    }
-                }
-                if (eocdPos >= 0) {
-                    val newOffset = centralDirOffset + signingBlock.size
-                    eocdBuffer.putInt(eocdPos + 16, newOffset.toInt())
-                }
-
-                output.write(centralDirAndEocd)
-            }
-
-            FileLogger.d(TAG, "签名块插入完成，新中央目录偏移量: ${centralDirOffset + signingBlock.size}")
-        }
     }
 }

@@ -21,14 +21,16 @@ import java.security.cert.X509Certificate
 import java.util.Date
 
 /**
- * APK 签名器（V2 + V3 手动实现方案）
+ * APK 签名器（V2 手动实现方案）
  *
- * 完全不依赖 apksig 库，基于 AOSP 公开标准手动实现 APK Signature Scheme v2 和 v3。
+ * 完全不依赖 apksig 库，基于 AOSP 公开标准手动实现 APK Signature Scheme v2。
  * 解决 apksig 库在 Android 环境下 "Failed to encode signature block" 的根本性兼容问题。
  *
  * 签名方案：
  * - V2（APK Signature Scheme v2）：Android 7.0+，Android 11+ 强制要求
- * - V3（APK Signature Scheme v3）：Android 9.0+，支持密钥轮换
+ *
+ * V3（密钥轮换）暂未启用：V3 的 signed_data 含 minSdk/maxSdk/proof-of-rotation，
+ * 与 V2 格式不同，需独立实现后再合并。自签名打包器无需密钥轮换，V2 已覆盖 minSdk 26+。
  *
  * 注意：当前实现不包含 V1（JAR 签名），最低支持 Android 7.0（API 24）。
  * 如需兼容 Android 6.0 及以下，需额外实现 V1 签名。
