@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
@@ -402,6 +403,8 @@ fun AppNavigation(
     val scope = rememberCoroutineScope()
     // 从侧边栏「工作目录」打开文件阅读页时置位；退出阅读页后自动重开侧边栏（保留所在 tab）。
     var reopenDrawerAfterFileReader by remember { mutableStateOf(false) }
+    // 右侧工具抽屉展开状态：rememberSaveable 保证配置变更 / 进程重建后尽量保留。
+    var rightSidebarOpen by rememberSaveable { mutableStateOf(false) }
 
     // 用于判断当前路由：仅在聊天页允许 Drawer 手势。
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
@@ -445,6 +448,11 @@ fun AppNavigation(
     // 侧边栏打开时，系统返回键先收起侧边栏。
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
+    }
+
+    // 右侧工具抽屉展开时，返回键优先收起它（优先级高于普通返回）。
+    BackHandler(enabled = rightSidebarOpen) {
+        rightSidebarOpen = false
     }
 
     // 侧边栏需要的数据。
@@ -549,6 +557,8 @@ fun AppNavigation(
             }
         }
     ) {
+        // 根 Box：NavHost 之上叠右侧工具抽屉（始终挂在导航外壳，任何路由上都可由聊天顶栏呼出）。
+        Box(modifier = Modifier.fillMaxSize()) {
         androidx.compose.material3.Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -596,9 +606,7 @@ fun AppNavigation(
                         )
                         navController.navigate("settings")
                     },
-                    onNavigateToTerminal = { navController.navigate("terminal") },
-                    onNavigateToGit = { navController.navigate("git") },
-                    onNavigateToBrowser = { navController.navigate("browser") }
+                    onOpenRightSidebar = { rightSidebarOpen = true }
                 )
             }
             composable("settings") {
@@ -805,5 +813,22 @@ fun AppNavigation(
             }
         }
         } // Scaffold content lambda 闭合
+        // 右侧工具抽屉：复用现有 route navigate，占位项 Toast 提示且保持展开。
+        com.mini.me_core.core.ui.RightSidebar(
+            open = rightSidebarOpen,
+            onDismissRequest = { rightSidebarOpen = false },
+            onNavigate = { route ->
+                rightSidebarOpen = false
+                navController.navigate(route)
+            },
+            onPlaceholder = {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.right_sidebar_placeholder),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            },
+        )
+        } // Box 闭合
     }
 }

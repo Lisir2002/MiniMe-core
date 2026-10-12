@@ -3,6 +3,7 @@ package com.mini.me_core.feature.packager.domain.engine
 import android.content.Context
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.packager.domain.model.Project
+import com.mini.me_core.feature.packager.domain.model.toSplashConfigPayload
 import com.mini.me_core.feature.packager.domain.repository.ProjectStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -38,6 +39,7 @@ class ApkBuilder(
         INIT("初始化构建环境"),
         EXTRACT("解压模版 APK"),
         REPLACE_WWW("替换网页资源"),
+        INJECT_SPLASH("注入启动动画"),
         MODIFY_MANIFEST("修改包名与应用名"),
         REPACK("重新打包"),
         ALIGN("ZIP 对齐"),
@@ -184,10 +186,24 @@ class ApkBuilder(
                         put("modules", modules)
                     }
 
-                    // 启动页设置
+                    // 启动页设置（与模板侧 splash 段契约一致：含时长钳制、过渡、背景色、点击跳过、有无自定义图）
+                    val splash = project.splashSettings
+                    val hasSplashImage = splash.customImagePath != null &&
+                        File(splash.customImagePath).exists()
+                    val splashPayload = splash.toSplashConfigPayload(hasSplashImage)
                     config.getJSONObject("splash").apply {
-                        put("enabled", project.splashSettings.enabled)
-                        put("duration", project.splashSettings.delayMs)
+                        put("enabled", splashPayload.enabled)
+                        put("duration", splashPayload.durationMs)
+                        put("autoHide", splashPayload.autoHide)
+                        put("backgroundColor", splashPayload.backgroundColor)
+                        // 无自定义图时显式写 null，模板回退纯底色
+                        if (splashPayload.image != null) {
+                            put("image", splashPayload.image)
+                        } else {
+                            put("image", org.json.JSONObject.NULL)
+                        }
+                        put("transition", splashPayload.transition)
+                        put("skipOnTap", splashPayload.skipOnTap)
                     }
 
                     configFile.writeText(config.toString(2))
@@ -205,8 +221,39 @@ class ApkBuilder(
                 log("警告: assets/config.json 不存在，跳过配置更新", callback, logWriter)
             }
 
+            // Step 3.7: 注入冷启动动画（合成启动位图、覆盖 splash_img、写入 www/splash.html|splash.png）
+            // 必须在 replaceWwwAssets（Step3 会整盘重写 assets/www）之后执行；资源缺失时内部告警跳过，不中断构建。
+            callback.onStepStart(BuildStep.INJECT_SPLASH, 3, steps.size)
+            runCatching {
+                // 主 App 运行时读不到 app-template 源码，splash.html 从自身 assets 拷出作注入来源
+                val splashHtmlSource = File(tempDir, "splash.html")
+                context.assets.open("packager/splash.html").use { input ->
+                    FileOutputStream(splashHtmlSource).use { output -> input.copyTo(output) }
+                }
+                val customImage = project.splashSettings.customImagePath
+                    ?.let { File(it) }
+                    ?.takeIf { it.isFile }
+                val result = SplashInjector.inject(
+                    extractedDir = extractedDir,
+                    settings = project.splashSettings,
+                    customImageFile = customImage,
+                    splashHtmlSource = splashHtmlSource
+                )
+                if (result.windowImageOverwritten) {
+                    log("冷启动窗地位图已覆盖（背景色=${project.splashSettings.backgroundColor}）", callback, logWriter)
+                } else {
+                    log("警告: 模版不含 splash_img 位图，跳过冷启动窗地位图覆盖（前向兼容）", callback, logWriter)
+                }
+                if (result.wwwSplashPngWritten) log("已写入 www/splash.png", callback, logWriter)
+                if (result.splashHtmlWritten) log("已写入 www/splash.html", callback, logWriter)
+            }.onFailure { e ->
+                // 启动动画注入属于增强能力，任何异常都不阻断主流程
+                log("警告: 启动动画注入失败，保留模版默认启动: ${e.message}", callback, logWriter)
+            }
+            callback.onStepComplete(BuildStep.INJECT_SPLASH, 3, steps.size)
+
             // Step 4: 修改 AndroidManifest.xml
-            callback.onStepStart(BuildStep.MODIFY_MANIFEST, 3, steps.size)
+            callback.onStepStart(BuildStep.MODIFY_MANIFEST, 4, steps.size)
             val manifestFile = File(extractedDir, "AndroidManifest.xml")
             if (manifestFile.exists()) {
                 val modified = ManifestEditor.modifyManifest(
@@ -224,7 +271,7 @@ class ApkBuilder(
             } else {
                 log("警告: AndroidManifest.xml 不存在", callback, logWriter)
             }
-            callback.onStepComplete(BuildStep.MODIFY_MANIFEST, 3, steps.size)
+            callback.onStepComplete(BuildStep.MODIFY_MANIFEST, 4, steps.size)
 
             // Step 4.5: 修改 resources.arsc 中的包名与应用名称
             // 包名必须与 AndroidManifest.xml 的 package 属性一致，否则系统安装时报
@@ -268,31 +315,31 @@ class ApkBuilder(
             }
 
             // Step 5: 重新打包
-            callback.onStepStart(BuildStep.REPACK, 4, steps.size)
+            callback.onStepStart(BuildStep.REPACK, 5, steps.size)
             val unsignedApk = File(tempDir, "unsigned.apk")
             ApkModifier.repackApk(extractedDir, unsignedApk)
             log("重新打包完成: ${unsignedApk.length()} bytes", callback, logWriter)
-            callback.onStepComplete(BuildStep.REPACK, 4, steps.size)
+            callback.onStepComplete(BuildStep.REPACK, 5, steps.size)
 
             // Step 6: ZIP 对齐
             // 所有未压缩（STORED）文件必须 4 字节对齐，否则部分设备（如 vivo）安装时
             // 会报「安装应用与当前系统有兼容性问题」。resources.arsc 尤其需要对齐。
-            callback.onStepStart(BuildStep.ALIGN, 5, steps.size)
+            callback.onStepStart(BuildStep.ALIGN, 6, steps.size)
             val alignedApk = File(tempDir, "aligned.apk")
             ZipAligner.align(unsignedApk, alignedApk)
             log("ZIP 对齐完成: ${alignedApk.length()} bytes", callback, logWriter)
-            callback.onStepComplete(BuildStep.ALIGN, 5, steps.size)
+            callback.onStepComplete(BuildStep.ALIGN, 6, steps.size)
 
             // Step 7: APK 签名
-            callback.onStepStart(BuildStep.SIGN, 6, steps.size)
+            callback.onStepStart(BuildStep.SIGN, 7, steps.size)
             val signedApk = File(tempDir, "signed.apk")
             val keystoreFile = File(projectStore.signatureDir, "default.keystore")
             ApkSigner.signApk(alignedApk, signedApk, keystoreFile)
             log("APK 签名完成: ${signedApk.length()} bytes", callback, logWriter)
-            callback.onStepComplete(BuildStep.SIGN, 6, steps.size)
+            callback.onStepComplete(BuildStep.SIGN, 7, steps.size)
 
             // Step 8: 输出
-            callback.onStepStart(BuildStep.OUTPUT, 7, steps.size)
+            callback.onStepStart(BuildStep.OUTPUT, 8, steps.size)
             val finalApkName = "${project.packageName.substringAfterLast('.')}-v${project.versionName}.apk"
             val finalApk = File(outputDir, finalApkName)
             signedApk.copyTo(finalApk, overwrite = true)
@@ -323,7 +370,7 @@ class ApkBuilder(
 
             log("", callback, logWriter)
             log("========== 构建成功 ==========", callback, logWriter)
-            callback.onStepComplete(BuildStep.OUTPUT, 7, steps.size)
+            callback.onStepComplete(BuildStep.OUTPUT, 8, steps.size)
             callback.onSuccess(finalApk, finalApk.length())
 
         } catch (e: Exception) {

@@ -126,9 +126,7 @@ fun AIChatPanel(
     viewModel: AIAgentViewModel,
     onNavigateToSettings: () -> Unit,
     onNavigateToNormFlow: () -> Unit = {},
-    onNavigateToTerminal: () -> Unit = {},
-    onNavigateToGit: () -> Unit = {},
-    onNavigateToBrowser: () -> Unit = {},
+    onOpenRightSidebar: () -> Unit = {},
     settingsViewModel: SettingsViewModel? = null,
     workspaceViewModel: WorkspaceViewModel? = null,
     drawerState: DrawerState,
@@ -543,9 +541,7 @@ fun AIChatPanel(
                     scope.launch { drawerState.open() }
                 },
                 onNewChat = { viewModel.newSession() },
-                onNavigateToTerminal = onNavigateToTerminal,
-                onNavigateToGit = onNavigateToGit,
-                onNavigateToBrowser = onNavigateToBrowser,
+                onOpenRightSidebar = onOpenRightSidebar,
                 connectionState = connectionState?.takeIf { isRemote }
             )
         }

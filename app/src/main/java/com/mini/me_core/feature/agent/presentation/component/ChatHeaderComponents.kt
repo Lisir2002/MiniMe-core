@@ -38,12 +38,10 @@ import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.feature.settings.presentation.component.ModelLogoIcon
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.Public
-import androidx.compose.material.icons.rounded.Terminal
 
 /**
  * 紧凑型聊天顶部栏。
@@ -64,9 +62,7 @@ internal fun ChatHeader(
     outputTokens: Int,
     onOpenDrawer: () -> Unit,
     onNewChat: () -> Unit,
-    onNavigateToTerminal: () -> Unit,
-    onNavigateToGit: () -> Unit,
-    onNavigateToBrowser: () -> Unit = {},
+    onOpenRightSidebar: () -> Unit = {},
     connectionState: com.mini.me_core.core.container.api.ConnectionState? = null
 ) {
     Surface(
@@ -127,34 +123,15 @@ internal fun ChatHeader(
                         tint = headerIconTint(light = Color(0xFF4C8DFF), dark = Color(0xFF7C9FFF)),
                         modifier = Modifier.size(20.dp))
                 }
+                // 工具入口统一收进右侧抽屉，主顶栏只留一个「应用网格」按钮呼出。
                 IconButton(
-                    onClick = onNavigateToGit,
+                    onClick = onOpenRightSidebar,
                     modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
-                        Icons.Rounded.AccountTree,
-                        contentDescription = stringResource(R.string.chat_open_git),
-                        tint = headerIconTint(light = Color(0xFFF59E0B), dark = Color(0xFFFBBF24)),
-                        modifier = Modifier.size(20.dp))
-                }
-                IconButton(
-                    onClick = onNavigateToTerminal,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        Icons.Rounded.Terminal,
-                        contentDescription = stringResource(R.string.chat_open_terminal),
-                        tint = headerIconTint(light = Color(0xFF22C55E), dark = Color(0xFF4ADE80)),
-                        modifier = Modifier.size(20.dp))
-                }
-                IconButton(
-                    onClick = onNavigateToBrowser,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        Icons.Rounded.Public,
-                        contentDescription = stringResource(R.string.chat_open_browser),
-                        tint = headerIconTint(light = Color(0xFF00B4A8), dark = Color(0xFF2DD4BF)),
+                        Icons.Rounded.Apps,
+                        contentDescription = stringResource(R.string.right_sidebar_open),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp))
                 }
             }

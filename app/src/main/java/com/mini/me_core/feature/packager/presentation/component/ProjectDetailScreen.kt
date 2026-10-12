@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +47,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -71,12 +74,14 @@ import com.mini.me_core.core.theme.components.fileIconVisual
 import com.mini.me_core.feature.packager.domain.model.BuildRecord
 import com.mini.me_core.feature.packager.domain.model.BuildStatus
 import com.mini.me_core.feature.packager.domain.model.Project
+import com.mini.me_core.feature.packager.domain.model.normalizedColorOrNull
 import com.mini.me_core.feature.packager.presentation.PackagerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.math.roundToInt
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -266,6 +271,22 @@ private fun OverviewTab(
         }
     }
 
+    // 启动图选择器（选中后复制进项目目录 splash.png，复用图标选择器的 GetContent 模式）
+    val splashPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                val savedPath = withContext(Dispatchers.IO) {
+                    saveImageToProject(context, project.id, uri, "splash.png")
+                }
+                if (savedPath != null) {
+                    viewModel.updateProject(
+                        project.copy(splashSettings = project.splashSettings.copy(customImagePath = savedPath))
+                    )
+                }
+            }
+        }
+    }
+
     // 图标预览：换图会覆盖同一路径文件，用 lastModified 变化驱动重新解码，
     // 避免路径字符串不变导致 Bitmap 缓存不刷新
     val iconFile = project.iconPath?.let { File(it) }.takeIf { it?.exists() == true }
@@ -381,6 +402,15 @@ private fun OverviewTab(
             }
         }
 
+        // 启动动画配置
+        item {
+            SplashConfigCard(
+                project = project,
+                onPickImage = { splashPicker.launch("image/*") },
+                onChange = { updated -> viewModel.updateProject(updated) }
+            )
+        }
+
         // 最近构建
         item {
             CardSection(title = "最近构建") {
@@ -449,6 +479,219 @@ private suspend fun saveIconToProject(context: android.content.Context, projectI
         null
     }
 }
+
+/**
+ * 把图片选择器返回的 uri 保存为项目目录下的指定文件名，返回绝对路径。
+ * 与图标保存逻辑一致：固定落在项目根目录，仅存文件名语义。
+ */
+@Suppress("TooGenericExceptionCaught", "SwallowedException")
+private suspend fun saveImageToProject(
+    context: android.content.Context,
+    projectId: String,
+    uri: Uri,
+    fileName: String
+): String? {
+    return try {
+        val projectDir = File(context.filesDir, "packager/projects/$projectId")
+        val target = File(projectDir, fileName)
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            target.outputStream().use { output -> input.copyTo(output) }
+        }
+        target.absolutePath
+    } catch (e: Exception) {
+        null
+    }
+}
+
+/**
+ * 启动动画配置卡片：启动图、展示时长、过渡效果、背景色、点击跳过。
+ * 所有改动经 [onChange] 回调到 ViewModel 持久化（复用 updateProject 链路）。
+ */
+@Composable
+private fun SplashConfigCard(
+    project: Project,
+    onPickImage: () -> Unit,
+    onChange: (Project) -> Unit
+) {
+    val splash = project.splashSettings
+
+    // 时长与 hex 用本地状态承载，停止拖动/输入后再持久化，避免拖动过程频繁写盘
+    var duration by remember(project.id, splash.delayMs) {
+        mutableIntStateOf(splash.delayMs.coerceIn(500, 5000))
+    }
+    var hexInput by remember(project.id, splash.backgroundColor) {
+        mutableStateOf(splash.backgroundColor)
+    }
+
+    LaunchedEffect(duration) {
+        if (duration != splash.delayMs) {
+            onChange(project.copy(splashSettings = splash.copy(delayMs = duration)))
+        }
+    }
+
+    fun persist(newSettings: com.mini.me_core.feature.packager.domain.model.SplashSettings) {
+        onChange(project.copy(splashSettings = newSettings))
+    }
+
+    CardSection(title = "启动动画") {
+        // 启用开关
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("启用启动页", modifier = Modifier.weight(1f))
+            Switch(checked = splash.enabled, onCheckedChange = { persist(splash.copy(enabled = it)) })
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // 自定义启动图（可选）
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                    .clickable { onPickImage() },
+                contentAlignment = Alignment.Center
+            ) {
+                val splashFile = splash.customImagePath?.let { File(it) }?.takeIf { it.exists() }
+                val preview = splashFile?.let { f ->
+                    remember(f.absolutePath, f.lastModified()) {
+                        android.graphics.BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap()
+                    }
+                }
+                if (preview != null) {
+                    androidx.compose.foundation.Image(
+                        bitmap = preview,
+                        contentDescription = "自定义启动图",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.InsertPhoto,
+                        contentDescription = "选择启动图",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("自定义启动图（可选）", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    if (splash.customImagePath != null) "已选择启动图" else "不选则仅用背景色",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            TextButton(onClick = onPickImage) { Text("选择") }
+            if (splash.customImagePath != null) {
+                TextButton(onClick = { persist(splash.copy(customImagePath = null)) }) { Text("清除") }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // 展示时长滑块
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("展示时长", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text("${duration} ms", style = MaterialTheme.typography.bodyMedium)
+        }
+        Slider(
+            value = duration.toFloat(),
+            onValueChange = { duration = it.roundToHundred() },
+            valueRange = 500f..5000f
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        // 过渡效果
+        Text("过渡效果", style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("fade" to "淡入", "zoom" to "缩放", "slide" to "滑动", "dissolve" to "溶解")
+                .forEach { (value, label) ->
+                    FilterChip(
+                        selected = splash.transition == value,
+                        onClick = { persist(splash.copy(transition = value)) },
+                        label = { Text(label) }
+                    )
+                }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // 背景色：预设色块 + 自定义 hex
+        Text("背景色", style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("#FFFFFF", "#000000", "#1A1A2E", "#16213E", "#F5F5F5").forEach { colorHex ->
+                val selected = splash.backgroundColor.equals(colorHex, ignoreCase = true)
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .androidBgColor(colorHex)
+                        .clickable {
+                            hexInput = colorHex
+                            persist(splash.copy(backgroundColor = colorHex))
+                        }
+                        .then(
+                            if (selected) Modifier.border(
+                                2.dp,
+                                MaterialTheme.colorScheme.primary,
+                                RoundedCornerShape(6.dp)
+                            ) else Modifier
+                        )
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(
+            value = hexInput,
+            onValueChange = { input ->
+                hexInput = input
+                if (input.normalizedColorOrNull() != null) {
+                    persist(splash.copy(backgroundColor = input))
+                }
+            },
+            label = { Text("背景色 (#RRGGBB)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        // 点击跳过
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("点击启动页跳过", modifier = Modifier.weight(1f))
+            Switch(
+                checked = splash.skipOnTap,
+                onCheckedChange = { persist(splash.copy(skipOnTap = it)) }
+            )
+        }
+    }
+}
+
+/** Float 取整到最近的 100 的倍数（滑块步长）。 */
+private fun Float.roundToHundred(): Int = ((this / 100).roundToInt() * 100).coerceIn(500, 5000)
+
+/** 把 #RRGGBB 字符串应用为 Compose 背景色（解析失败回退透明）。 */
+private fun Modifier.androidBgColor(hex: String): Modifier = this.then(
+    Modifier.background(
+        runCatching {
+            androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex))
+        }.getOrDefault(androidx.compose.ui.graphics.Color.Transparent)
+    )
+)
 
 /**
  * 源文件 Tab（目录浏览 + 新建/重命名/删除；点击文件跳转独立代码页）

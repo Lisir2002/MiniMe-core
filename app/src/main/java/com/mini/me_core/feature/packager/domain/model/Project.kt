@@ -73,14 +73,40 @@ data class DisplaySettings(
 
 /**
  * 启动页设置
+ *
+ * 与模板侧 assets/config.json 的 splash 段一一对应（见 [SplashConfigMapper]）。
+ * 所有新字段均带默认值，旧 project.json 缺字段时由 kotlinx.serialization 按默认值补齐，
+ * 无需破坏性迁移。
+ *
+ * @param enabled 启用启动页
+ * @param customImagePath 自定义启动页图片路径（绝对路径；null 表示仅用背景色）
+ * @param delayMs 动画展示时长（毫秒），对外契约范围 500..5000，默认 1500
+ * @param fullscreen 全屏启动页
+ * @param transition 过渡效果（fade/zoom/slide/dissolve，默认 fade）
+ * @param backgroundColor 启动页背景色（#RRGGBB，默认 #FFFFFF）
+ * @param skipOnTap 点击启动页是否跳过
  */
 @Serializable
 data class SplashSettings(
     val enabled: Boolean = true,                // 启用启动页
     val customImagePath: String? = null,        // 自定义启动页图片路径
-    val delayMs: Int = 1000,                    // 启动延迟（毫秒）
-    val fullscreen: Boolean = true              // 全屏启动页
-)
+    val delayMs: Int = 1500,                    // 动画展示时长（毫秒）
+    val fullscreen: Boolean = true,              // 全屏启动页
+    val transition: String = "fade",             // 过渡效果：fade/zoom/slide/dissolve
+    val backgroundColor: String = "#FFFFFF",     // 启动页背景色
+    val skipOnTap: Boolean = false               // 点击启动页跳过
+) {
+    companion object {
+        /** 时长下限（毫秒） */
+        const val MIN_DURATION_MS = 500
+
+        /** 时长上限（毫秒） */
+        const val MAX_DURATION_MS = 5000
+
+        /** 支持的过渡效果 */
+        val SUPPORTED_TRANSITIONS = listOf("fade", "zoom", "slide", "dissolve")
+    }
+}
 
 /**
  * 项目配置

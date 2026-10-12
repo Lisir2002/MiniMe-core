@@ -120,9 +120,15 @@ class ApkModifier {
                     val entry = ZipEntry(relativePath)
                     entry.time = file.lastModified()
 
-                    // 判断是否需要压缩
+                    // 判断是否需要压缩：
+                    // 1) 位图/音视频/resources.arsc 等按扩展名不压缩；
+                    // 2) assets/www 下的网页资源与 assets/config.json 一律不压缩——本地 H5 容器需要
+                    //    AssetManager 直接读取/映射，省去 WebView 首屏加载时的运行时 inflate 开销。
+                    // STORED 条目后续由 zipalign 做 4 字节对齐。
                     val extension = file.extension.lowercase()
-                    if (extension in noCompressExtensions) {
+                    val storeUncompressed = extension in noCompressExtensions ||
+                        isUncompressedWebAsset(relativePath)
+                    if (storeUncompressed) {
                         entry.method = ZipEntry.STORED
                         entry.size = file.length()
                         entry.crc = computeCrc32(file)
@@ -142,10 +148,18 @@ class ApkModifier {
         }
 
         /**
+         * 本地 H5 容器的网页资源与运行时配置在 APK 中不压缩，便于直接读取/映射。
+         */
+        private fun isUncompressedWebAsset(relativePath: String): Boolean {
+            val normalized = relativePath.replace('\\', '/')
+            return normalized.startsWith("assets/www/") ||
+                normalized == "assets/config.json"
+        }
+
+        /**
          * 递归收集目录下所有文件
          */
-        private fun collectFiles(dir: File, files: MutableList<File>) {
-            dir.listFiles()?.forEach { file ->
+        private fun collectFiles(dir: File, files: MutableList<File>) {            dir.listFiles()?.forEach { file ->
                 if (file.isDirectory) {
                     collectFiles(file, files)
                 } else {

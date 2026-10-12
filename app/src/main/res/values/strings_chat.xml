@@ -124,4 +124,17 @@
     <string name="chat_action_new_chat">创建新聊天</string>
     <string name="chat_editing_banner">正在编辑：%1$s</string>
     <string name="chat_edit_cancel">取消编辑</string>
+    <string name="right_sidebar_open">打开工具菜单</string>
+    <string name="right_sidebar_group_tools">工具</string>
+    <string name="right_sidebar_group_dev">开发</string>
+    <string name="right_sidebar_group_other">其他</string>
+    <string name="right_sidebar_terminal">终端</string>
+    <string name="right_sidebar_browser">内置浏览器</string>
+    <string name="right_sidebar_packager">应用打包器</string>
+    <string name="right_sidebar_git">版本控制</string>
+    <string name="right_sidebar_files">文件管理</string>
+    <string name="right_sidebar_settings">设置</string>
+    <string name="right_sidebar_capability">能力中心</string>
+    <string name="right_sidebar_about">关于</string>
+    <string name="right_sidebar_placeholder">该功能即将支持，可从左侧「工作目录」浏览文件</string>
 </resources>
