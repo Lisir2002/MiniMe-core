@@ -814,6 +814,7 @@ fun AppNavigation(
         }
         } // Scaffold content lambda 闭合
         // 右侧工具抽屉：复用现有 route navigate，占位项 Toast 提示且保持展开。
+        val placeholderText = stringResource(R.string.right_sidebar_placeholder)
         com.mini.me_core.core.ui.RightSidebar(
             open = rightSidebarOpen,
             onDismissRequest = { rightSidebarOpen = false },
@@ -824,7 +825,7 @@ fun AppNavigation(
             onPlaceholder = {
                 Toast.makeText(
                     context,
-                    context.getString(R.string.right_sidebar_placeholder),
+                    placeholderText,
                     Toast.LENGTH_SHORT,
                 ).show()
             },
