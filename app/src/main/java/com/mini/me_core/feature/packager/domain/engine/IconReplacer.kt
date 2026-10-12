@@ -13,19 +13,21 @@ import kotlin.math.roundToInt
  *
  * 模版 APK 的启动图标是一个自适应图标（adaptive-icon）：
  *  - res/BW.xml 是编译后的二进制 XML，引用 background 与 foreground 两个图层；
- *  - foreground 图层是一张位图（模版中为 res/pu.png，860×860）。
+ *  - foreground 图层在模版中是矢量 drawable（res/Qr.xml）。
  *
- * 旧实现直接把用户 PNG 字节覆盖到 res/BW.xml，破坏了二进制 XML 结构，
- * 资源解析回退后图标保持不变。正确做法是定位 foreground 引用的位图资源，
- * 把用户图标按自适应图标安全区规则合成后写回该位图。
+ * Android 按文件扩展名决定资源解析方式：把 PNG 字节写入 .xml 文件，系统仍按
+ * 二进制 XML 解析，解析失败后回退默认图标。因此不能覆盖 .xml 前景文件。
  *
- * 处理流程：
- *  1. 解析 res/BW.xml 二进制 XML，取出 foreground 元素 drawable 属性的资源 ID；
- *  2. 解析 resources.arsc 的 package 字符串池，把资源 ID 换算成条目名（如 pu）；
- *  3. 定位 res/<entryName>.png；
- *  4. 将用户图标缩放到前景图尺寸、按 66% 安全区居中合成到透明画布；
- *  5. 以 PNG 覆盖写回。
+ * 正确做法（arsc 字符串池重定向）：
+ *  1. 解析 res/BW.xml 取出 foreground 的资源 ID，再查 resources.arsc 得到其文件
+ *     路径字符串（模版中为 "res/Qr.xml"）；
+ *  2. 在 resources.arsc 的全局字符串池中把该路径原地改写为等长的 .png 路径
+ *     （"res/Qr.xml" -> "res/Qr.png"，均为 10 字节，不改变字符串池长度与任何偏移）；
+ *  3. 把用户图标按自适应图标安全区合成为 432×432 PNG，作为新文件 res/Qr.png
+ *     写入解压目录，原 res/Qr.xml 保留不删（已不被引用，无害）；
+ *  4. 重新打包时新文件随目录一起进入 APK，aapt/系统按 .png 扩展名以位图解码。
  *
+ * 若前景本身就是位图（.png/.webp），则直接按安全区合成后覆盖该文件即可。
  * 任意一步失败都会打日志并返回 false，由调用方决定是否中断构建。
  */
 @Suppress("UtilityClassWithPublicConstructor", "LoopWithTooManyJumpStatements")
@@ -50,93 +52,189 @@ class IconReplacer {
         // 自适应图标安全区占比：72dp 可见 / 108dp 画布
         private const val SAFE_ZONE_RATIO = 0.66f
 
+        // 矢量前景无法解码尺寸时使用的标准自适应画布（108dp × xxxhdpi 4x）
+        private const val STANDARD_CANVAS = 432
+
+        // 当前模版前景的默认路径（arsc 精确解析失败时的兜底）
+        private const val DEFAULT_FOREGROUND_PATH = "res/Qr.xml"
+
         /**
-         * 替换模版 APK 的启动图标前景位图。
+         * 替换模版 APK 的启动图标前景。
          *
          * @param extractedDir 模版 APK 解压根目录（包含 res/ 与 resources.arsc）
          * @param iconFile 用户提供的 PNG/JPG 图标文件
-         * @return true 表示成功写回前景位图；false 表示任何一步失败
+         * @return true 表示替换成功；false 表示任何一步失败
          */
         @JvmStatic
-        @Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount", "TooGenericExceptionCaught", "LoopWithTooManyJumpStatements", "ComplexCondition")
+        @Suppress("LongMethod", "ReturnCount", "TooGenericExceptionCaught", "CyclomaticComplexMethod")
         fun replaceIcon(extractedDir: File, iconFile: File): Boolean {
             if (!extractedDir.isDirectory || !iconFile.isFile) {
                 FileLogger.e(TAG, "参数非法: extractedDir=${extractedDir.exists()}, iconFile=${iconFile.exists()}")
                 return false
             }
 
-            var foregroundFile: File? = null
-            var canvasW = 0
-            var canvasH = 0
-
             try {
-                // 1. 从 BW.xml 取出 foreground 引用的资源 ID
-                val bwXml = File(extractedDir, "res/BW.xml")
-                val resId = if (bwXml.isFile) parseForegroundDrawableResId(bwXml) else -1
+                val arscFile = File(extractedDir, "resources.arsc")
+                val resDir = File(extractedDir, "res")
 
-                // 2. 资源 ID -> resources.arsc 中的实际文件路径（如 res/Qr.xml）
-                if (resId != -1) {
-                    val arsc = File(extractedDir, "resources.arsc")
-                    val foregroundPath = if (arsc.isFile) mapResIdToFilePath(arsc, resId) else null
-                    if (!foregroundPath.isNullOrBlank()) {
-                        foregroundFile = File(extractedDir, foregroundPath)
-                        FileLogger.i(
-                            TAG,
-                            "前景资源: resId=0x${Integer.toHexString(resId)} -> $foregroundPath"
-                        )
-                    }
-                }
+                // 1. 发现前景资源路径（BW.xml -> 资源 ID -> arsc 文件路径）
+                val foregroundPath = discoverForegroundPath(extractedDir, arscFile)
+                FileLogger.i(TAG, "前景资源路径: $foregroundPath")
 
-                // 3. 兜底：解析失败时取 res/ 下尺寸最大的正方形 PNG
-                if (foregroundFile == null || !foregroundFile!!.isFile) {
-                    FileLogger.w(TAG, "精确解析失败，启用兜底扫描 res/ 下最大正方形 PNG")
-                    foregroundFile = findLargestSquarePng(File(extractedDir, "res"))
-                    if (foregroundFile == null) {
-                        FileLogger.e(TAG, "未找到任何候选前景位图")
-                        return false
-                    }
-                }
-
-                // 4. 读取原前景文件尺寸作为画布尺寸
-                //    若前景是 vector/shape drawable XML，BitmapFactory 无法解码，
-                //    使用自适应图标标准画布尺寸兜底
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(foregroundFile!!.absolutePath, bounds)
-                canvasW = bounds.outWidth
-                canvasH = bounds.outHeight
-                if (canvasW <= 0 || canvasH <= 0) {
-                    // vector/shape XML 前景：自适应图标前景层标准为 108dp，
-                    // 以 xxxhdpi(4x) 换算为 432px 作为画布，保证各密度清晰
-                    canvasW = 432
-                    canvasH = 432
-                    FileLogger.i(TAG, "前景为矢量/XML，使用标准画布 ${canvasW}x${canvasH}")
-                }
-
-                // 5. 解码用户图标并合成
+                // 2. 解码用户图标
                 val userBitmap = BitmapFactory.decodeFile(iconFile.absolutePath)
-                if (userBitmap == null || userBitmap.isRecycled || userBitmap.width <= 0 || userBitmap.height <= 0) {
+                if (!isValidBitmap(userBitmap)) {
                     FileLogger.e(TAG, "用户图标解码失败: ${iconFile.absolutePath}")
                     return false
                 }
 
-                val composed = composeSafeZone(userBitmap, canvasW, canvasH)
+                // 3. 按前景类型选择替换策略
+                val targetFile: File
+                val canvas: Int
+                when {
+                    // 3a. 矢量/XML 前景：重定向 arsc 字符串到新的 .png 文件
+                    foregroundPath != null && foregroundPath.endsWith(".xml") -> {
+                        val newPath = foregroundPath.removeSuffix(".xml") + ".png"
+                        if (!redirectArscPath(arscFile, foregroundPath, newPath)) {
+                            userBitmap.recycle()
+                            return false
+                        }
+                        targetFile = File(extractedDir, newPath)
+                        canvas = STANDARD_CANVAS
+                        FileLogger.i(TAG, "arsc 重定向: $foregroundPath -> $newPath")
+                    }
+                    // 3b. 位图前景：直接覆盖原文件，画布沿用原位图尺寸
+                    foregroundPath != null -> {
+                        targetFile = File(extractedDir, foregroundPath)
+                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeFile(targetFile.absolutePath, bounds)
+                        canvas = if (bounds.outWidth > 0 && bounds.outHeight == bounds.outWidth) {
+                            bounds.outWidth
+                        } else {
+                            STANDARD_CANVAS
+                        }
+                    }
+                    // 3c. 兜底：取 res/ 下面积最大的正方形位图
+                    else -> {
+                        FileLogger.w(TAG, "精确解析失败，启用兜底扫描 res/ 下最大正方形位图")
+                        targetFile = findLargestSquarePng(resDir) ?: run {
+                            userBitmap.recycle()
+                            FileLogger.e(TAG, "未找到任何候选前景位图")
+                            return false
+                        }
+                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeFile(targetFile.absolutePath, bounds)
+                        canvas = if (bounds.outWidth > 0) bounds.outWidth else STANDARD_CANVAS
+                    }
+                }
+
+                // 4. 按安全区合成并写回
+                val composed = composeSafeZone(userBitmap, canvas, canvas)
                 userBitmap.recycle()
 
-                FileOutputStream(foregroundFile!!).use { out ->
+                targetFile.parentFile?.mkdirs()
+                FileOutputStream(targetFile).use { out ->
                     if (!composed.compress(Bitmap.CompressFormat.PNG, 100, out)) {
                         composed.recycle()
-                        FileLogger.e(TAG, "PNG 压缩失败: ${foregroundFile!!.name}")
+                        FileLogger.e(TAG, "PNG 压缩失败: ${targetFile.name}")
                         return false
                     }
                 }
                 composed.recycle()
 
-                FileLogger.i(TAG, "图标已写回: ${foregroundFile!!.name} (${canvasW}x${canvasH}, 安全区${(SAFE_ZONE_RATIO * 100).toInt()}%)")
+                FileLogger.i(
+                    TAG,
+                    "图标已写入: ${targetFile.name} (${canvas}x${canvas}, 安全区${(SAFE_ZONE_RATIO * 100).toInt()}%)"
+                )
                 return true
             } catch (e: Exception) {
                 FileLogger.e(TAG, "图标替换异常: ${e.message}", e)
                 return false
             }
+        }
+
+        // ==================== 前景路径发现 ====================
+
+        /**
+         * 解析 BW.xml 取 foreground 资源 ID，再查 arsc 得到文件相对路径。
+         * 任一环节失败时回退到模版默认路径 [DEFAULT_FOREGROUND_PATH]（若该文件存在）。
+         */
+        private fun discoverForegroundPath(extractedDir: File, arscFile: File): String? {
+            val bwXml = File(extractedDir, "res/BW.xml")
+            if (bwXml.isFile && arscFile.isFile) {
+                val resId = parseForegroundDrawableResId(bwXml)
+                if (resId != -1) {
+                    val path = mapResIdToFilePath(arscFile, resId)
+                    if (!path.isNullOrBlank() && File(extractedDir, path).exists()) {
+                        return path
+                    }
+                }
+            }
+            // 兜底：当前模版固定的矢量前景
+            val fallback = File(extractedDir, DEFAULT_FOREGROUND_PATH)
+            return if (fallback.exists()) DEFAULT_FOREGROUND_PATH else null
+        }
+
+        // ==================== arsc 字符串池重定向 ====================
+
+        /**
+         * 在 resources.arsc 字节中把 [oldPath] 原地替换为等长的 [newPath]。
+         *
+         * 要求两者 UTF-8 字节长度完全相同（不改变字符串池长度与后续偏移），
+         * 且旧路径在 arsc 中恰好出现一次，否则不做修改并返回 false。
+         */
+        @Suppress("ReturnCount")
+        fun redirectArscPath(arscFile: File, oldPath: String, newPath: String): Boolean {
+            if (!arscFile.isFile) {
+                FileLogger.e(TAG, "resources.arsc 不存在")
+                return false
+            }
+            val oldBytes = oldPath.toByteArray(Charsets.UTF_8)
+            val newBytes = newPath.toByteArray(Charsets.UTF_8)
+            if (oldBytes.size != newBytes.size) {
+                FileLogger.e(
+                    TAG,
+                    "路径长度不一致，无法原地重定向: '$oldPath'(${oldBytes.size}) vs '$newPath'(${newBytes.size})"
+                )
+                return false
+            }
+
+            val data = arscFile.readBytes()
+
+            // 统计旧路径出现次数，必须恰好一次
+            val occurrences = ArrayList<Int>()
+            var from = 0
+            while (true) {
+                val idx = indexOfBytes(data, oldBytes, from)
+                if (idx == -1) break
+                occurrences.add(idx)
+                from = idx + 1
+            }
+            if (occurrences.isEmpty()) {
+                FileLogger.e(TAG, "arsc 中未找到路径 '$oldPath'")
+                return false
+            }
+            if (occurrences.size > 1) {
+                FileLogger.e(TAG, "arsc 中路径 '$oldPath' 出现 ${occurrences.size} 次，拒绝歧义替换")
+                return false
+            }
+
+            // 原地替换（等长，不改变文件大小）
+            System.arraycopy(newBytes, 0, data, occurrences[0], newBytes.size)
+            FileOutputStream(arscFile).use { it.write(data) }
+            FileLogger.i(TAG, "arsc 字符串池已重定向 @0x${Integer.toHexString(occurrences[0])}")
+            return true
+        }
+
+        /** 在 [data] 中从 [start] 起查找 [needle]，返回首个下标，未找到返回 -1。 */
+        private fun indexOfBytes(data: ByteArray, needle: ByteArray, start: Int): Int {
+            outer@ for (i in start..data.size - needle.size) {
+                for (j in needle.indices) {
+                    if (data[i + j] != needle[j]) continue@outer
+                }
+                return i
+            }
+            return -1
         }
 
         // ==================== AXML 解析 ====================
@@ -183,8 +281,6 @@ class IconReplacer {
             chunkStart: Int,
             strings: List<String>
         ): Int {
-            // chunk header: type(2) headerSize(2) size(4)
-            // body: lineNumber(4) comment(4)
             val headerSize = getShortLE(data, chunkStart + 2)
             // ResXMLTree_attrExt 从 chunkStart + headerSize + 8 开始
             val attrExtStart = chunkStart + headerSize + 8
@@ -215,14 +311,9 @@ class IconReplacer {
          * 把资源 ID（如 0x7f040006）映射为其在 APK 中的相对文件路径（如 "res/Qr.xml"）。
          *
          * 资源 ID = 0xppttteeee：tt 是类型 ID（1-based），eeee 是类型内条目索引。
-         * 不能直接用 keyStrings[eeee] 查条目名——keyStrings 的下标是 ResTable_entry
-         * 里的 keyIdx，不是条目数组下标。正确链路：
-         *  1. 解析全局字符串池（value strings，含 "res/Qr.xml" 这类文件路径）；
-         *  2. 在 package chunk 之后遍历 RES_TABLE_TYPE_TYPE(0x0201) chunk；
-         *  3. 找到 chunk.id == tt 且 density == 0（默认配置）的那个；
-         *  4. entry 数组第 eeee 项的偏移指向 ResTable_entry，其内联 Res_value
-         *     （flags==0 时）dataType==0x03(TYPE_STRING)，data 即全局字符串池索引；
-         *  5. 返回全局字符串池[data]。
+         * 正确链路：解析全局字符串池 -> 遍历默认配置（density==0）的 type chunk ->
+         * 读 entry 索引数组（位于 headerSize 之后）-> entry 数据（位于 entriesStart）->
+         * 内联 Res_value 的 TYPE_STRING data 即全局字符串池索引。
          */
         @Suppress("ReturnCount", "CyclomaticComplexMethod", "CognitiveComplexMethod", "NestedBlockDepth")
         private fun mapResIdToFilePath(arsc: File, resId: Int): String? {
@@ -258,15 +349,14 @@ class IconReplacer {
                     val typeId = data[pos + 8].toInt() and 0xFF
                     val entryCount = getIntLE(data, pos + 12)
                     val entriesStart = getIntLE(data, pos + 16)
-                    // ResTable_config 紧随其后（config 内偏移：size+0,mcc+4,mnc+6,language+8,
-                    // country+10,orientation+12,touchscreen+13,density+14,keyboard+16...）
+                    // ResTable_config 内 density 在偏移 14（size+0,mcc+4,...,touchscreen+13,density+14）
                     val density = getShortLE(data, pos + 20 + 14)
 
                     if (typeId == targetTypeId && density == 0 &&
                         targetEntryIdx in 0 until entryCount
                     ) {
-                        // entry 索引数组紧跟 header 之后（pos + headerSize），
-                        // entriesStart 是 entry 数据区的起始偏移（索引数组之后）。
+                        // entry 索引数组紧跟 header（pos + headerSize），
+                        // entriesStart 指向 entry 数据区（索引数组之后）。
                         val entryArrayStart = pos + headerSize
                         if (entryArrayStart + targetEntryIdx * 4 + 4 <= data.size) {
                             val entryOffset = getIntLE(data, entryArrayStart + targetEntryIdx * 4)
@@ -275,20 +365,13 @@ class IconReplacer {
                                 val entryPos = pos + entriesStart + entryOffset
                                 if (entryPos + 16 <= data.size) {
                                     val flags = getShortLE(data, entryPos + 2)
-                                    val keyIdx = getIntLE(data, entryPos + 4)
                                     // Res_value 内联在 entry + 8：size(2) res0(1) dataType(1) data(4)
                                     val valueDataType = data[entryPos + 11].toInt() and 0xFF
                                     val valueData = getIntLE(data, entryPos + 12)
                                     if (flags == 0 && valueDataType == 0x03 &&
                                         valueData in globalStrings.indices
                                     ) {
-                                        val path = globalStrings[valueData]
-                                        FileLogger.i(
-                                            TAG,
-                                            "arsc: type=$typeId entry=$targetEntryIdx " +
-                                                "keyIdx=$keyIdx -> $path"
-                                        )
-                                        return path
+                                        return globalStrings[valueData]
                                     }
                                 }
                             }
@@ -354,10 +437,10 @@ class IconReplacer {
             }
         }
 
-        // ==================== 前景位图定位 ====================
+        // ==================== 前景位图定位（兜底） ====================
 
         /**
-         * 兜底：扫描 res/ 下所有 PNG，取面积最大的正方形那张作为前景图。
+         * 兜底：扫描 res/ 下所有 PNG/webp，取面积最大的正方形那张作为前景图。
          */
         private fun findLargestSquarePng(resDir: File): File? {
             if (!resDir.isDirectory) return null
@@ -383,11 +466,16 @@ class IconReplacer {
 
         // ==================== 图标合成 ====================
 
+        /** 位图是否可用于合成（非空、未回收、尺寸为正）。 */
+        private fun isValidBitmap(bmp: Bitmap?): Boolean {
+            return bmp != null && !bmp.isRecycled && bmp.width > 0 && bmp.height > 0
+        }
+
         /**
          * 把用户图标按自适应图标安全区合成到透明画布上。
          *
-         * 画布尺寸与原前景位图一致（模版为 860×860）；用户图标先按比例裁剪填充到
-         * 画布的 [SAFE_ZONE_RATIO] 区域，再居中绘制，避免被系统蒙版裁掉边缘。
+         * 用户图标先按比例裁剪填充到画布的 [SAFE_ZONE_RATIO] 区域，再居中绘制，
+         * 避免被系统蒙版裁掉边缘。
          */
         private fun composeSafeZone(src: Bitmap, canvasW: Int, canvasH: Int): Bitmap {
             val out = Bitmap.createBitmap(canvasW, canvasH, Bitmap.Config.ARGB_8888)
