@@ -660,18 +660,6 @@ fun AppNavigation(
                 com.mini.me_core.feature.packager.presentation.component.ProjectDetailScreen(
                     projectId = projectId,
                     viewModel = packagerViewModel,
-                    onNavigateBack = { navController.popBackStack() },
-                    onStartBuild = { project ->
-                        packagerViewModel.startBuild(project)
-                        navController.navigate("packager_build")
-                    }
-                )
-            }
-            // 应用打包器 - 构建过程
-            composable("packager_build") {
-                val packagerViewModel: com.mini.me_core.feature.packager.presentation.PackagerViewModel = hiltViewModel()
-                com.mini.me_core.feature.packager.presentation.component.BuildProgressScreen(
-                    viewModel = packagerViewModel,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

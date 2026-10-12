@@ -1,5 +1,10 @@
+@file:Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod", "CognitiveComplexMethod")
+
 package com.mini.me_core.feature.packager.presentation.component
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,21 +20,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.InsertPhoto
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,43 +48,56 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mini.me_core.core.theme.components.AppTopAppBar
-import com.mini.me_core.feature.packager.domain.engine.ApkAnalyzer
+import com.mini.me_core.core.theme.components.FileBrowserItem
+import com.mini.me_core.core.theme.components.fileIconVisual
+import com.mini.me_core.core.viewer.code.CodeViewerScreen
+import com.mini.me_core.core.viewer.code.CodeViewerViewModel
 import com.mini.me_core.feature.packager.domain.model.BuildRecord
 import com.mini.me_core.feature.packager.domain.model.BuildStatus
 import com.mini.me_core.feature.packager.domain.model.Project
 import com.mini.me_core.feature.packager.presentation.PackagerViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
- * 项目详情页（4个Tab：概览/源文件/配置/构建）
+ * 项目详情页（3个Tab：概览/源文件/配置）
+ *
+ * 构建功能通过顶栏按钮触发，以流程式弹窗展示，不再单独占用Tab页。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProjectDetailScreen(
     projectId: String,
     viewModel: PackagerViewModel = hiltViewModel(),
-    onNavigateBack: () -> Unit,
-    onStartBuild: (Project) -> Unit
+    codeViewerViewModel: CodeViewerViewModel = hiltViewModel(),
+    onNavigateBack: () -> Unit
 ) {
     val projects by viewModel.projects.collectAsState()
     val project = projects.find { it.id == projectId }
     val buildRecords by viewModel.buildRecords.collectAsState()
+    val buildState by viewModel.buildState.collectAsState()
 
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("概览", "源文件", "配置", "构建")
+    val tabs = listOf("概览", "源文件", "配置")
+    var showBuildDialog by remember { mutableStateOf(false) }
 
     if (project == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -92,9 +107,15 @@ fun ProjectDetailScreen(
     }
     val currentProject = project
 
-    // 进入页面时自动加载构建记录
     LaunchedEffect(projectId) {
         viewModel.loadBuildRecords(projectId)
+    }
+
+    // 构建完成后自动显示弹窗
+    LaunchedEffect(buildState.isBuilding) {
+        if (!buildState.isBuilding && (buildState.resultApk != null || buildState.error != null)) {
+            showBuildDialog = true
+        }
     }
 
     Scaffold(
@@ -105,7 +126,10 @@ fun ProjectDetailScreen(
                 navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
                 navigationContentDescription = "返回",
                 actions = {
-                    IconButton(onClick = { onStartBuild(currentProject) }) {
+                    IconButton(onClick = {
+                        showBuildDialog = true
+                        viewModel.startBuild(currentProject)
+                    }) {
                         Icon(Icons.Rounded.PlayArrow, contentDescription = "构建", modifier = Modifier.size(20.dp))
                     }
                 }
@@ -124,19 +148,34 @@ fun ProjectDetailScreen(
             }
 
             when (selectedTab) {
-                0 -> OverviewTab(project = currentProject, buildRecords = buildRecords, viewModel = viewModel, onStartBuild = { onStartBuild(currentProject) })
-                1 -> SourceTab(project = currentProject, viewModel = viewModel)
+                0 -> OverviewTab(
+                    project = currentProject,
+                    buildRecords = buildRecords,
+                    viewModel = viewModel,
+                    onStartBuild = {
+                        showBuildDialog = true
+                        viewModel.startBuild(currentProject)
+                    }
+                )
+                1 -> SourceTab(project = currentProject, viewModel = viewModel, codeViewerViewModel = codeViewerViewModel)
                 2 -> ConfigTab(project = currentProject, viewModel = viewModel)
-                3 -> BuildsTab(buildRecords = buildRecords, onInstall = { record ->
-                    record.apkPath?.let { viewModel.installApk(File(it)) }
-                })
             }
         }
+    }
+
+    // 构建进度弹窗
+    if (showBuildDialog) {
+        BuildProgressDialog(
+            onDismiss = {
+                showBuildDialog = false
+                viewModel.resetBuildState()
+            }
+        )
     }
 }
 
 /**
- * 概览 Tab
+ * 概览 Tab（可编辑基本信息 + 更换图标 + 最近构建）
  */
 @Composable
 private fun OverviewTab(
@@ -145,244 +184,328 @@ private fun OverviewTab(
     viewModel: PackagerViewModel,
     onStartBuild: () -> Unit
 ) {
-    val apkAnalysis: ApkAnalyzer.ApkAnalysis? by viewModel.apkAnalysis.collectAsState()
-    val isAnalyzing by viewModel.isAnalyzing.collectAsState()
-    val latestSuccessBuild = buildRecords.firstOrNull { it.status == BuildStatus.SUCCESS && it.apkPath != null }
+    val scope = rememberCoroutineScope()
+    var isEditing by remember { mutableStateOf(false) }
+    var editName by remember { mutableStateOf(project.name) }
+    var editVersion by remember { mutableStateOf(project.versionName) }
+    var editPackage by remember { mutableStateOf(project.packageName) }
+
+    // 图片选择器
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val iconPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                val savedPath = withContext(Dispatchers.IO) {
+                    saveIconToProject(context, project.id, uri)
+                }
+                if (savedPath != null) {
+                    viewModel.updateProject(project.copy(iconPath = savedPath))
+                }
+            }
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // 应用图标 + 基本信息
         item {
             CardSection(title = "基本信息") {
-                InfoRow("应用名称", project.name)
-                InfoRow("包名", project.packageName)
-                InfoRow("版本", "v${project.versionName} (${project.versionCode})")
-                InfoRow("类型", project.type.displayName)
-                InfoRow("创建时间", formatDateTime(project.createdAt))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 应用图标
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                            .clickable { iconPicker.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (project.iconPath != null && File(project.iconPath).exists()) {
+                            val bitmap = remember(project.iconPath) {
+                                android.graphics.BitmapFactory.decodeFile(project.iconPath)?.asImageBitmap()
+                            }
+                            if (bitmap != null) {
+                                androidx.compose.foundation.Image(
+                                    bitmap = bitmap,
+                                    contentDescription = "应用图标",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.InsertPhoto,
+                                    contentDescription = "更换图标",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        } else {
+                            Icon(
+                                Icons.Default.InsertPhoto,
+                                contentDescription = "更换图标",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (isEditing) {
+                            OutlinedTextField(
+                                value = editName,
+                                onValueChange = { editName = it },
+                                label = { Text("应用名称") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = editPackage,
+                                onValueChange = { editPackage = it },
+                                label = { Text("包名") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = editVersion,
+                                onValueChange = { editVersion = it },
+                                label = { Text("版本号") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                        } else {
+                            InfoRow("应用名称", project.name)
+                            InfoRow("包名", project.packageName)
+                            InfoRow("版本", "v${project.versionName} (${project.versionCode})")
+                            InfoRow("类型", project.type.displayName)
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (isEditing) {
+                        TextButton(onClick = {
+                            viewModel.updateProject(
+                                project.copy(
+                                    name = editName,
+                                    packageName = editPackage,
+                                    versionName = editVersion,
+                                    versionCode = Project.parseVersionCode(editVersion)
+                                )
+                            )
+                            isEditing = false
+                        }) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("保存")
+                        }
+                        TextButton(onClick = {
+                            editName = project.name
+                            editPackage = project.packageName
+                            editVersion = project.versionName
+                            isEditing = false
+                        }) {
+                            Text("取消")
+                        }
+                    } else {
+                        TextButton(onClick = { isEditing = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("编辑信息")
+                        }
+                        TextButton(onClick = { iconPicker.launch("image/*") }) {
+                            Icon(Icons.Default.InsertPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("更换图标")
+                        }
+                    }
+                }
             }
         }
 
+        // 最近构建
         item {
             CardSection(title = "最近构建") {
                 if (buildRecords.isEmpty()) {
                     Text("暂无构建记录", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     buildRecords.take(3).forEach { record ->
-                        BuildRecordRow(record = record, onClick = {})
+                        BuildRecordRow(record = record, onClick = {
+                            record.apkPath?.let { viewModel.installApk(File(it)) }
+                        })
                     }
                 }
             }
         }
 
-        // APK 分析结果
-        if (latestSuccessBuild != null) {
-            item {
-                CardSection(title = "APK 分析") {
-                    if (isAnalyzing) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(8.dp))
-                            Text("分析中...", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    } else if (apkAnalysis != null) {
-                        ApkAnalysisContent(analysis = apkAnalysis!!)
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("点击按钮分析 APK 详情", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.weight(1f))
-                            TextButton(onClick = {
-                                latestSuccessBuild.apkPath?.let { viewModel.analyzeApk(File(it)) }
-                            }) {
-                                Icon(Icons.Default.Analytics, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("分析APK")
-                            }
-                        }
-                    }
-                }
-            }
+        // 构建按钮
+        item {
+            ActionButtonFull(
+                text = "立即构建",
+                icon = Icons.Rounded.PlayArrow,
+                onClick = onStartBuild,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ActionButtonFull(
-                    text = "立即构建",
-                    icon = Icons.Rounded.PlayArrow,
-                    onClick = onStartBuild,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            Text(
+                "点击图标可更换应用图标；点击「编辑信息」可修改应用名称、包名和版本号",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
         }
     }
 }
 
 /**
- * APK 分析结果内容
+ * 保存图标到项目目录
  */
-@Composable
-private fun ApkAnalysisContent(analysis: ApkAnalyzer.ApkAnalysis) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // 基本信息
-        InfoRow("文件大小", formatSize(analysis.fileSize))
-        if (analysis.minSdkVersion > 0) InfoRow("最低 SDK", "API ${analysis.minSdkVersion}")
-        if (analysis.targetSdkVersion > 0) InfoRow("目标 SDK", "API ${analysis.targetSdkVersion}")
-
-        // 组件统计
-        HorizontalDivider()
-        Text("组件统计", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            StatChip("Activity", analysis.activityCount)
-            StatChip("Service", analysis.serviceCount)
-            StatChip("Receiver", analysis.receiverCount)
-            StatChip("Provider", analysis.providerCount)
-        }
-
-        // 文件统计
-        Spacer(Modifier.height(4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            StatChip("Dex", analysis.dexCount)
-            StatChip("Native库", analysis.nativeLibCount)
-            StatChip("资源", analysis.assetCount)
-        }
-
-        // 权限列表
-        if (analysis.permissions.isNotEmpty()) {
-            HorizontalDivider()
-            Text("权限列表 (${analysis.permissions.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            analysis.permissions.take(5).forEach { perm ->
-                Text(
-                    perm.removePrefix("android.permission."),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (analysis.permissions.size > 5) {
-                Text("等 ${analysis.permissions.size} 项权限", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+@Suppress("TooGenericExceptionCaught", "SwallowedException")
+private suspend fun saveIconToProject(context: android.content.Context, projectId: String, uri: Uri): String? {
+    return try {
+        val projectDir = File(context.filesDir, "packager/projects/$projectId")
+        val iconFile = File(projectDir, "icon.png")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            iconFile.outputStream().use { output ->
+                input.copyTo(output)
             }
         }
-
-        // 签名信息
-        if (analysis.isSigned) {
-            HorizontalDivider()
-            Text("签名信息", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            InfoRow("签名算法", analysis.signatureAlgorithm)
-            InfoRow("证书主体", analysis.certificateSubject.take(40) + if (analysis.certificateSubject.length > 40) "..." else "")
-            InfoRow("有效期至", analysis.certificateValidTo)
-        }
+        iconFile.absolutePath
+    } catch (e: Exception) {
+        null
     }
 }
 
 /**
- * 统计芯片
- */
-@Composable
-private fun StatChip(label: String, count: Int) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("$count", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-/**
- * 源文件 Tab（HTML 代码编辑器）
+ * 源文件 Tab（目录树 + 代码编辑器）
  */
 @Composable
 private fun SourceTab(
     project: Project,
-    viewModel: PackagerViewModel
+    viewModel: PackagerViewModel,
+    codeViewerViewModel: CodeViewerViewModel
 ) {
     val wwwDir = viewModel.getWwwDir(project.id)
-    val indexFile = File(wwwDir, "index.html")
-    var htmlContent by remember { mutableStateOf(if (indexFile.exists()) indexFile.readText() else DEFAULT_HTML) }
-    var isEditing by remember { mutableStateOf(false) }
-    var savedMessage by remember { mutableStateOf<String?>(null) }
+    var currentPath by remember { mutableStateOf(wwwDir) }
+    var selectedFile by remember { mutableStateOf<File?>(null) }
+    var pathStack by remember { mutableStateOf(listOf(wwwDir)) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
-        // 文件信息
-        CardSection(title = "www/index.html") {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("单文件 HTML 项目", style = MaterialTheme.typography.bodyMedium)
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (selectedFile != null) {
+            // 代码编辑器视图
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = {
+                    selectedFile = null
+                    currentPath = pathStack.lastOrNull() ?: wwwDir
+                }) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("返回文件列表")
+                }
                 Spacer(Modifier.weight(1f))
                 Text(
-                    if (isEditing) "编辑中" else "已保存",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (isEditing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    selectedFile!!.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        // 模板选择
-        CardSection(title = "快速模板") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TemplateButton("空白页") {
-                    htmlContent = DEFAULT_HTML
-                    isEditing = true
+            Box(modifier = Modifier.weight(1f)) {
+                CodeViewerScreen(
+                    path = selectedFile!!.absolutePath,
+                    viewModel = codeViewerViewModel,
+                    editable = true
+                )
+            }
+        } else {
+            // 目录树视图
+            // 面包屑
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = {
+                    pathStack = listOf(wwwDir)
+                    currentPath = wwwDir
+                }) {
+                    Text("www", fontWeight = FontWeight.Bold)
                 }
-                TemplateButton("欢迎页") {
-                    htmlContent = WELCOME_HTML
-                    isEditing = true
+                pathStack.drop(1).forEachIndexed { index, dir ->
+                    Text("/", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick = {
+                        pathStack = pathStack.take(index + 2)
+                        currentPath = dir
+                    }) {
+                        Text(dir.name)
+                    }
                 }
-                TemplateButton("待办清单") {
-                    htmlContent = TODO_HTML
-                    isEditing = true
+            }
+
+            // 文件列表
+            val files = currentPath.listFiles()?.sortedWith(
+                compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() }
+            ) ?: emptyList()
+
+            if (files.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.Folder,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text("空目录", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    items(files, key = { it.absolutePath }) { file ->
+                        val visual = fileIconVisual(name = file.name, isDir = file.isDirectory)
+                        val subtitle = if (file.isDirectory) {
+                            "${file.listFiles()?.size ?: 0} 项"
+                        } else {
+                            formatFileSize(file.length())
+                        }
+                        FileBrowserItem(
+                            name = file.name,
+                            subtitle = subtitle,
+                            icon = visual.icon,
+                            iconBg = visual.iconBg,
+                            iconFg = visual.iconFg,
+                            onClick = {
+                                if (file.isDirectory) {
+                                    pathStack = pathStack + file
+                                    currentPath = file
+                                } else {
+                                    selectedFile = file
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
-
-        Spacer(Modifier.height(12.dp))
-
-        // 代码编辑器
-        OutlinedTextField(
-            value = htmlContent,
-            onValueChange = {
-                htmlContent = it
-                isEditing = true
-                savedMessage = null
-            },
-            label = { Text("HTML 代码") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(400.dp),
-            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            maxLines = 50
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        // 操作按钮
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ActionButtonFull(
-                text = "保存",
-                icon = Icons.Default.CheckCircle,
-                onClick = {
-                    indexFile.writeText(htmlContent)
-                    isEditing = false
-                    savedMessage = "已保存到 ${indexFile.absolutePath}"
-                },
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        if (savedMessage != null) {
-            Spacer(Modifier.height(8.dp))
-            Text(savedMessage!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-        }
-
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "P0 阶段支持单 HTML 文件，后续版本将支持多文件/目录管理、CSS/JS 分离、实时预览",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-        )
     }
 }
 
@@ -505,36 +628,6 @@ private fun ConfigTab(
     }
 }
 
-/**
- * 构建记录 Tab
- */
-@Composable
-private fun BuildsTab(
-    buildRecords: List<BuildRecord>,
-    onInstall: (BuildRecord) -> Unit
-) {
-    if (buildRecords.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                Spacer(Modifier.height(12.dp))
-                Text("暂无构建记录", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        return
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(buildRecords, key = { it.id }) { record ->
-            BuildRecordRow(record = record, onClick = { onInstall(record) })
-        }
-    }
-}
-
 // ========== 通用组件 ==========
 
 @Composable
@@ -603,21 +696,6 @@ private fun PermissionGroup(
 }
 
 @Composable
-private fun TemplateButton(
-    text: String,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-    }
-}
-
-@Composable
 private fun ActionButtonFull(
     text: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -644,9 +722,9 @@ private fun BuildRecordRow(
     onClick: () -> Unit
 ) {
     val (icon, color) = when (record.status) {
-        com.mini.me_core.feature.packager.domain.model.BuildStatus.SUCCESS -> Icons.Default.CheckCircle to androidx.compose.ui.graphics.Color(0xFF4CAF50)
-        com.mini.me_core.feature.packager.domain.model.BuildStatus.FAILED -> Icons.Default.Error to androidx.compose.ui.graphics.Color(0xFFF44336)
-        com.mini.me_core.feature.packager.domain.model.BuildStatus.BUILDING -> Icons.Rounded.PlayArrow to MaterialTheme.colorScheme.primary
+        BuildStatus.SUCCESS -> Icons.Default.CheckCircle to androidx.compose.ui.graphics.Color(0xFF4CAF50)
+        BuildStatus.FAILED -> Icons.Default.Error to androidx.compose.ui.graphics.Color(0xFFF44336)
+        BuildStatus.BUILDING -> Icons.Rounded.PlayArrow to MaterialTheme.colorScheme.primary
     }
 
     Row(
@@ -666,14 +744,14 @@ private fun BuildRecordRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (record.status == com.mini.me_core.feature.packager.domain.model.BuildStatus.SUCCESS) {
+            if (record.status == BuildStatus.SUCCESS) {
                 Text("大小: ${record.formattedApkSize}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (record.status == com.mini.me_core.feature.packager.domain.model.BuildStatus.FAILED && record.errorMessage != null) {
+            if (record.status == BuildStatus.FAILED && record.errorMessage != null) {
                 Text(record.errorMessage, style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color(0xFFF44336), maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (record.status == com.mini.me_core.feature.packager.domain.model.BuildStatus.SUCCESS) {
+        if (record.status == BuildStatus.SUCCESS) {
             Icon(Icons.Default.FileDownload, contentDescription = "安装", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
         }
     }
@@ -682,7 +760,7 @@ private fun BuildRecordRow(
 private fun formatDateTime(timestamp: Long): String =
     SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))
 
-private fun formatSize(bytes: Long): String {
+private fun formatFileSize(bytes: Long): String {
     val kb = bytes / 1024.0
     val mb = kb / 1024.0
     return when {
@@ -691,77 +769,3 @@ private fun formatSize(bytes: Long): String {
         else -> "$bytes B"
     }
 }
-
-// ========== HTML 模板 ==========
-
-private const val DEFAULT_HTML = """<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的应用</title>
-</head>
-<body>
-    <h1>Hello World</h1>
-    <p>在这里开始编写你的 HTML 应用</p>
-</body>
-</html>"""
-
-private const val WELCOME_HTML = """<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>欢迎使用</title>
-    <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-        h1 { font-size: 2em; margin-bottom: 0.5em; }
-        p { opacity: 0.9; }
-    </style>
-</head>
-<body>
-    <h1>欢迎使用</h1>
-    <p>这是一个由 MiniMe 打包的 HTML 应用</p>
-</body>
-</html>"""
-
-private const val TODO_HTML = """<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>待办清单</title>
-    <style>
-        body { font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; }
-        h1 { color: #333; }
-        .input-row { display: flex; gap: 10px; margin-bottom: 20px; }
-        input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
-        button { padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        ul { list-style: none; padding: 0; }
-        li { padding: 12px; background: #f5f5f5; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; }
-        .done { text-decoration: line-through; opacity: 0.5; }
-        .delete { color: #e74c3c; cursor: pointer; }
-    </style>
-</head>
-<body>
-    <h1>待办清单</h1>
-    <div class="input-row">
-        <input type="text" id="taskInput" placeholder="输入新任务...">
-        <button onclick="addTask()">添加</button>
-    </div>
-    <ul id="taskList"></ul>
-    <script>
-        function addTask() {
-            const input = document.getElementById('taskInput');
-            const text = input.value.trim();
-            if (!text) return;
-            const li = document.createElement('li');
-            li.innerHTML = '<span onclick="toggleTask(this)">' + text + '</span><span class="delete" onclick="deleteTask(this)">删除</span>';
-            document.getElementById('taskList').appendChild(li);
-            input.value = '';
-        }
-        function toggleTask(el) { el.classList.toggle('done'); }
-        function deleteTask(el) { el.parentElement.remove(); }
-    </script>
-</body>
-</html>"""

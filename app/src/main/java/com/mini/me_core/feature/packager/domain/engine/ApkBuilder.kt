@@ -76,6 +76,7 @@ class ApkBuilder(
      * @param outputDir 输出目录
      * @param callback 进度回调
      */
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "CognitiveComplexMethod")
     suspend fun build(
         project: Project,
         outputDir: File,
@@ -124,6 +125,85 @@ class ApkBuilder(
             ApkModifier.replaceWwwAssets(extractedDir, wwwDir)
             log("网页资源替换完成，源目录: ${wwwDir.absolutePath}", callback, logWriter)
             callback.onStepComplete(BuildStep.REPLACE_WWW, 2, steps.size)
+
+            // Step 3.5: 替换应用图标（如果用户设置了自定义图标）
+            if (project.iconPath != null && File(project.iconPath).exists()) {
+                val iconFile = File(project.iconPath)
+                // 模版 APK 的图标资源为 res/BW.xml（自适应图标）
+                // 直接用用户的 PNG 覆盖该文件，APK 通过 resources.arsc 索引资源，扩展名不影响
+                val targetIcon = File(extractedDir, "res/BW.xml")
+                if (targetIcon.exists()) {
+                    iconFile.copyTo(targetIcon, overwrite = true)
+                    log("应用图标已替换: ${iconFile.name} (${iconFile.length()} bytes)", callback, logWriter)
+                } else {
+                    log("警告: 未找到模版图标资源 res/BW.xml，跳过图标替换", callback, logWriter)
+                }
+            }
+
+            // Step 3.6: 更新 assets/config.json（应用配置：权限、Bridge、显示、启动页等）
+            val configFile = File(extractedDir, "assets/config.json")
+            if (configFile.exists()) {
+                try {
+                    val config = org.json.JSONObject(configFile.readText())
+
+                    // 应用基本信息
+                    config.getJSONObject("app").apply {
+                        put("name", project.name)
+                        put("packageName", project.packageName)
+                        put("versionName", project.versionName)
+                        put("versionCode", project.versionCode)
+                    }
+
+                    // 显示设置
+                    config.getJSONObject("webview").apply {
+                        put("immersive", project.displaySettings.immersiveMode)
+                        put("orientation", project.displaySettings.screenOrientation)
+                        put("statusBarColor", project.displaySettings.statusBarColor)
+                        put("navigationBarColor", project.displaySettings.navigationBarColor)
+                    }
+
+                    // 权限配置
+                    config.getJSONObject("permissions").apply {
+                        put("internet", project.permissions.contains("android.permission.INTERNET"))
+                        put("storage", project.permissions.any { it.contains("STORAGE") })
+                        put("camera", project.permissions.contains("android.permission.CAMERA"))
+                        put("microphone", project.permissions.contains("android.permission.RECORD_AUDIO"))
+                        put("location", project.permissions.any { it.contains("LOCATION") })
+                        put("bluetooth", project.permissions.any { it.contains("BLUETOOTH") })
+                    }
+
+                    // Bridge 能力配置
+                    config.getJSONObject("bridge").apply {
+                        put("enabled", project.bridgeEnabled)
+                        val modules = mutableListOf<String>()
+                        if (project.bridgeCapabilities.ui) modules.add("ui")
+                        if (project.bridgeCapabilities.device) modules.add("device")
+                        if (project.bridgeCapabilities.file) modules.add("file")
+                        if (project.bridgeCapabilities.network) modules.add("connect")
+                        if (project.bridgeCapabilities.data) modules.add("data")
+                        put("modules", modules)
+                    }
+
+                    // 启动页设置
+                    config.getJSONObject("splash").apply {
+                        put("enabled", project.splashSettings.enabled)
+                        put("duration", project.splashSettings.delayMs)
+                    }
+
+                    configFile.writeText(config.toString(2))
+                    log(
+                        "assets/config.json 已更新: 权限=${project.permissions.size}项, " +
+                            "Bridge=${if (project.bridgeEnabled) "启用" else "禁用"}, " +
+                            "沉浸模式=${project.displaySettings.immersiveMode}",
+                        callback,
+                        logWriter
+                    )
+                } catch (e: Exception) {
+                    log("警告: 更新 config.json 失败: ${e.message}", callback, logWriter)
+                }
+            } else {
+                log("警告: assets/config.json 不存在，跳过配置更新", callback, logWriter)
+            }
 
             // Step 4: 修改 AndroidManifest.xml
             callback.onStepStart(BuildStep.MODIFY_MANIFEST, 3, steps.size)

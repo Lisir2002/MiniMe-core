@@ -308,6 +308,8 @@ class PackagerViewModel @Inject constructor(
                             projectStore.updateBuildStatus(project.id, BuildStatus.SUCCESS)
                             loadBuildRecords(project.id)
                         }
+                        // 构建成功后自动分析 APK
+                        analyzeApk(apkFile)
                     }
 
                     override fun onError(error: String) {

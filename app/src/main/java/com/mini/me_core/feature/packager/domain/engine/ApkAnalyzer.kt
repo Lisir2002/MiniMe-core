@@ -66,13 +66,13 @@ class ApkAnalyzer {
          */
         fun analyze(apkFile: File): ApkAnalysis {
             FileLogger.d(TAG, "开始分析 APK: ${apkFile.name} (${apkFile.length()} bytes)")
-            val analysis = ApkAnalysis(fileSize = apkFile.length())
+            var analysis = ApkAnalysis(fileSize = apkFile.length())
 
             // 解析 AndroidManifest.xml
             val manifestData = readEntryFromZip(apkFile, "AndroidManifest.xml")
             if (manifestData != null) {
                 val manifestInfo = parseBinaryManifest(manifestData)
-                analysis.copy(
+                analysis = analysis.copy(
                     packageName = manifestInfo.packageName,
                     appName = manifestInfo.appName,
                     versionName = manifestInfo.versionName,
@@ -89,7 +89,7 @@ class ApkAnalyzer {
 
             // 统计文件类型
             val fileCounts = countFileTypes(apkFile)
-            analysis.copy(
+            analysis = analysis.copy(
                 dexCount = fileCounts.dexCount,
                 nativeLibCount = fileCounts.nativeLibCount,
                 assetCount = fileCounts.assetCount
@@ -97,7 +97,7 @@ class ApkAnalyzer {
 
             // 解析签名信息
             val signatureInfo = parseSignature(apkFile)
-            analysis.copy(
+            analysis = analysis.copy(
                 isSigned = signatureInfo.isSigned,
                 signatureAlgorithm = signatureInfo.algorithm,
                 certificateSubject = signatureInfo.subject,
