@@ -126,6 +126,31 @@ class PackagerViewModel @Inject constructor(
     }
 
     /**
+     * 保存项目基本信息（应用名称 / 包名 / 版本号）。
+     *
+     * 以存储中的最新项目为基底合并这三个字段并派生 versionCode，
+     * 避免界面层传入的旧快照覆盖权限、配置等其他字段。
+     */
+    suspend fun saveBasicInfo(
+        projectId: String,
+        name: String,
+        packageName: String,
+        versionName: String
+    ) {
+        val current = projectStore.getProjectById(projectId) ?: return
+        val updated = current.copy(
+            name = name,
+            packageName = packageName,
+            versionName = versionName,
+            versionCode = Project.parseVersionCode(versionName),
+        )
+        val saved = projectStore.updateProject(updated)
+        if (_currentProject.value?.id == saved.id) {
+            _currentProject.value = saved
+        }
+    }
+
+    /**
      * 切换权限
      */
     fun togglePermission(projectId: String, permission: String, enabled: Boolean) {

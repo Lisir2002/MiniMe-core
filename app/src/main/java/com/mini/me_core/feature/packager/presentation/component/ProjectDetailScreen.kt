@@ -21,10 +21,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -62,7 +62,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -74,6 +73,7 @@ import com.mini.me_core.feature.packager.domain.model.BuildStatus
 import com.mini.me_core.feature.packager.domain.model.Project
 import com.mini.me_core.feature.packager.presentation.PackagerViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -184,7 +184,7 @@ fun ProjectDetailScreen(
 }
 
 /**
- * 概览 Tab（可编辑基本信息 + 更换图标 + 最近构建）
+ * 概览 Tab（基本信息内联编辑 + 更换图标 + 最近构建）
  */
 @Composable
 private fun OverviewTab(
@@ -194,33 +194,62 @@ private fun OverviewTab(
     onStartBuild: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    var isEditing by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
-    var editName by remember { mutableStateOf(project.name) }
-    var editVersion by remember { mutableStateOf(project.versionName) }
-    var editPackage by remember { mutableStateOf(project.packageName) }
+    var showSavedCheck by remember { mutableStateOf(false) }
+    // 仅在切换项目时用项目数据初始化输入框，之后以用户输入为准
+    var editName by remember(project.id) { mutableStateOf(project.name) }
+    var editPackage by remember(project.id) { mutableStateOf(project.packageName) }
+    var editVersion by remember(project.id) { mutableStateOf(project.versionName) }
 
-    // 实时校验
+    val trimmedName = editName.trim()
+    val trimmedPackage = editPackage.trim()
+    val trimmedVersion = editVersion.trim()
+
+    // 实时校验（只提示不阻断输入）
     val nameError = when {
         editName.isBlank() -> "应用名称不能为空"
         editName.length > 30 -> "应用名称不能超过 30 个字符"
         else -> null
     }
-    val packageError = when {
-        editPackage.isBlank() -> "包名不能为空"
-        !Project.isValidPackageName(editPackage) -> "包名不符合 Java 包名规范"
-        else -> null
+    val packageError =
+        if (!Project.isValidPackageName(editPackage)) "包名格式不正确" else null
+    val versionError =
+        if (!versionRegex.matches(trimmedVersion)) "版本号格式应为 x.y.z（如 1.0.0）" else null
+
+    val hasChanges = trimmedName != project.name ||
+        trimmedPackage != project.packageName ||
+        trimmedVersion != project.versionName
+    val allValid = nameError == null && packageError == null && versionError == null
+    val canSave = allValid && hasChanges && !isSaving
+
+    // 停止输入 500ms 后自动保存；每次键入都会取消上一次计时
+    LaunchedEffect(editName, editPackage, editVersion) {
+        delay(DEBOUNCE_SAVE_MS)
+        if (allValid && hasChanges) {
+            runCatching {
+                viewModel.saveBasicInfo(project.id, trimmedName, trimmedPackage, trimmedVersion)
+            }.onSuccess { showSavedCheck = true }
+        }
     }
-    val versionError = when {
-        editVersion.isBlank() -> "版本号不能为空"
-        !versionRegex.matches(editVersion.trim()) -> "版本号格式应为 x.y.z（如 1.0.0）"
-        else -> null
+
+    // 保存成功对勾 1 秒后自动消失
+    LaunchedEffect(showSavedCheck) {
+        if (showSavedCheck) {
+            delay(SAVED_CHECK_MS)
+            showSavedCheck = false
+        }
     }
-    val hasChanges = editName != project.name ||
-        editPackage != project.packageName ||
-        editVersion != project.versionName
-    val canSave = nameError == null && packageError == null && versionError == null && hasChanges && !isSaving
-    val derivedVersionCode = remember(editVersion) { Project.parseVersionCode(editVersion.trim()) }
+
+    fun manualSave() {
+        if (!canSave) return
+        isSaving = true
+        scope.launch {
+            runCatching {
+                viewModel.saveBasicInfo(project.id, trimmedName, trimmedPackage, trimmedVersion)
+            }.onSuccess { showSavedCheck = true }
+            isSaving = false
+        }
+    }
 
     // 图片选择器
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -234,6 +263,16 @@ private fun OverviewTab(
                     viewModel.updateProject(project.copy(iconPath = savedPath))
                 }
             }
+        }
+    }
+
+    // 图标预览：换图会覆盖同一路径文件，用 lastModified 变化驱动重新解码，
+    // 避免路径字符串不变导致 Bitmap 缓存不刷新
+    val iconFile = project.iconPath?.let { File(it) }.takeIf { it?.exists() == true }
+    val iconLastModified = iconFile?.lastModified() ?: 0L
+    val bitmap = remember(project.iconPath, iconLastModified) {
+        project.iconPath?.let { path ->
+            android.graphics.BitmapFactory.decodeFile(path)?.asImageBitmap()
         }
     }
 
@@ -255,25 +294,13 @@ private fun OverviewTab(
                             .clickable { iconPicker.launch("image/*") },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (project.iconPath != null && File(project.iconPath).exists()) {
-                            val bitmap = remember(project.iconPath) {
-                                android.graphics.BitmapFactory.decodeFile(project.iconPath)?.asImageBitmap()
-                            }
-                            if (bitmap != null) {
-                                androidx.compose.foundation.Image(
-                                    bitmap = bitmap,
-                                    contentDescription = "应用图标",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Default.InsertPhoto,
-                                    contentDescription = "更换图标",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
+                        if (bitmap != null) {
+                            androidx.compose.foundation.Image(
+                                bitmap = bitmap,
+                                contentDescription = "应用图标",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
                         } else {
                             Icon(
                                 Icons.Default.InsertPhoto,
@@ -285,50 +312,45 @@ private fun OverviewTab(
                     }
                     Spacer(Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        if (isEditing) {
-                            OutlinedTextField(
-                                value = editName,
-                                onValueChange = { editName = it },
-                                label = { Text("应用名称") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                isError = nameError != null,
-                                supportingText = nameError?.let { { Text(it) } },
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = editPackage,
-                                onValueChange = { editPackage = it },
-                                label = { Text("包名") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                isError = packageError != null,
-                                supportingText = packageError?.let { { Text(it) } },
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = editVersion,
-                                onValueChange = { editVersion = it },
-                                label = { Text("版本号") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                isError = versionError != null,
-                                supportingText = {
-                                    val msg = versionError
-                                    if (msg != null) {
-                                        Text(msg)
-                                    } else {
-                                        Text("versionCode: $derivedVersionCode")
-                                    }
-                                },
-                            )
-                        } else {
-                            InfoRow("应用名称", project.name)
-                            InfoRow("包名", project.packageName)
-                            InfoRow("版本", "v${project.versionName} (${project.versionCode})")
-                            InfoRow("类型", project.type.displayName)
-                        }
+                        OutlinedTextField(
+                            value = editName,
+                            onValueChange = { editName = it },
+                            label = { Text("应用名称") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = nameError != null,
+                            supportingText = nameError?.let { { Text(it) } },
+                            trailingIcon = { SavedCheckIcon(visible = showSavedCheck) },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = editPackage,
+                            onValueChange = { editPackage = it },
+                            label = { Text("包名") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = packageError != null,
+                            supportingText = packageError?.let { { Text(it) } },
+                            trailingIcon = { SavedCheckIcon(visible = showSavedCheck) },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = editVersion,
+                            onValueChange = { editVersion = it },
+                            label = { Text("版本号") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = versionError != null,
+                            supportingText = {
+                                val msg = versionError
+                                if (msg != null) {
+                                    Text(msg)
+                                } else {
+                                    Text("versionCode: ${Project.parseVersionCode(trimmedVersion)}")
+                                }
+                            },
+                            trailingIcon = { SavedCheckIcon(visible = showSavedCheck) },
+                        )
                     }
                 }
 
@@ -338,60 +360,22 @@ private fun OverviewTab(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (isEditing) {
-                        TextButton(
-                            onClick = {
-                                isSaving = true
-                                scope.launch {
-                                    viewModel.updateProject(
-                                        project.copy(
-                                            name = editName.trim(),
-                                            packageName = editPackage.trim(),
-                                            versionName = editVersion.trim(),
-                                            versionCode = Project.parseVersionCode(editVersion.trim()),
-                                        )
-                                    )
-                                    isSaving = false
-                                    isEditing = false
-                                }
-                            },
-                            enabled = canSave,
-                        ) {
-                            if (isSaving) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                )
-                            } else {
-                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
-                            }
-                            Spacer(Modifier.width(4.dp))
-                            Text("保存")
+                    TextButton(onClick = { iconPicker.launch("image/*") }) {
+                        Icon(Icons.Default.InsertPhoto, contentDescription = "更换图标", modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("更换图标")
+                    }
+                    TextButton(onClick = { manualSave() }, enabled = canSave) {
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                         }
-                        TextButton(onClick = {
-                            editName = project.name
-                            editPackage = project.packageName
-                            editVersion = project.versionName
-                            isEditing = false
-                        }) {
-                            Text("取消")
-                        }
-                    } else {
-                        TextButton(onClick = {
-                            editName = project.name
-                            editPackage = project.packageName
-                            editVersion = project.versionName
-                            isEditing = true
-                        }) {
-                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("编辑信息")
-                        }
-                        TextButton(onClick = { iconPicker.launch("image/*") }) {
-                            Icon(Icons.Default.InsertPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("更换图标")
-                        }
+                        Spacer(Modifier.width(4.dp))
+                        Text("保存")
                     }
                 }
             }
@@ -424,11 +408,26 @@ private fun OverviewTab(
 
         item {
             Text(
-                "点击图标可更换应用图标；点击「编辑信息」可修改应用名称、包名和版本号",
+                "点击图标可更换应用图标；直接修改上方信息后停止输入 0.5 秒自动保存",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
         }
+    }
+}
+
+/**
+ * 保存成功后显示在输入框尾部的小对勾（1 秒后由调用方状态驱动消失）
+ */
+@Composable
+private fun SavedCheckIcon(visible: Boolean) {
+    if (visible) {
+        Icon(
+            Icons.Default.Check,
+            contentDescription = "已保存",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
 
@@ -992,6 +991,12 @@ private fun formatDateTime(timestamp: Long): String =
     SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))
 
 private val versionRegex = Regex("""\d+\.\d+\.\d+""")
+
+/** 输入停止后延迟自动保存的时长 */
+private const val DEBOUNCE_SAVE_MS = 500L
+
+/** 保存成功对勾的展示时长 */
+private const val SAVED_CHECK_MS = 1000L
 
 private fun formatFileSize(bytes: Long): String {
     val kb = bytes / 1024.0

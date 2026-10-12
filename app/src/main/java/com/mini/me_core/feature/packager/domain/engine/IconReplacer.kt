@@ -254,21 +254,25 @@ class IconReplacer {
                 if (chunkSize <= 0 || pos + chunkSize > data.size) break
 
                 if (chunkType == RES_TABLE_TYPE_TYPE) {
+                    val headerSize = getShortLE(data, pos + 2)
                     val typeId = data[pos + 8].toInt() and 0xFF
                     val entryCount = getIntLE(data, pos + 12)
                     val entriesStart = getIntLE(data, pos + 16)
-                    // ResTable_config 紧随其后，density 是 config 内偏移 18 的 uint16
-                    val density = getShortLE(data, pos + 20 + 18)
+                    // ResTable_config 紧随其后（config 内偏移：size+0,mcc+4,mnc+6,language+8,
+                    // country+10,orientation+12,touchscreen+13,density+14,keyboard+16...）
+                    val density = getShortLE(data, pos + 20 + 14)
 
                     if (typeId == targetTypeId && density == 0 &&
                         targetEntryIdx in 0 until entryCount
                     ) {
-                        val entryArrayStart = pos + entriesStart
+                        // entry 索引数组紧跟 header 之后（pos + headerSize），
+                        // entriesStart 是 entry 数据区的起始偏移（索引数组之后）。
+                        val entryArrayStart = pos + headerSize
                         if (entryArrayStart + targetEntryIdx * 4 + 4 <= data.size) {
                             val entryOffset = getIntLE(data, entryArrayStart + targetEntryIdx * 4)
                             // 0xFFFFFFFF 表示该条目不存在
                             if (entryOffset != -1) {
-                                val entryPos = entryArrayStart + entryOffset
+                                val entryPos = pos + entriesStart + entryOffset
                                 if (entryPos + 16 <= data.size) {
                                     val flags = getShortLE(data, entryPos + 2)
                                     val keyIdx = getIntLE(data, entryPos + 4)

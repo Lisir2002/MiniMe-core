@@ -20,16 +20,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,9 +46,11 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -61,12 +67,13 @@ import com.mini.me_core.feature.packager.domain.engine.ApkAnalyzer
 import com.mini.me_core.feature.packager.domain.engine.ApkBuilder
 import com.mini.me_core.feature.packager.presentation.PackagerViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * 构建进度弹窗（流程式）。
  *
- * 布局：固定标题栏 + 进度条 + 步骤流程区 + 弹性日志区 + 底部结果区。
- * 日志区支持全部日志滚动、按内容着色、自动滚动开关与一键复制。
+ * 布局：固定标题栏 + 进度条 + 步骤流程区 + 日志区 + 底部结果区。
+ * 日志区支持平滑自动滚动、滚离底部时暂停并显示悬浮回到底部按钮、按级别着色。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,8 +89,20 @@ fun BuildProgressDialog(
     val steps = ApkBuilder.BuildStep.entries.toTypedArray()
     val logListState = rememberLazyListState()
     val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
 
     var autoScroll by remember { mutableStateOf(true) }
+
+    // 根据可视布局推导是否已经位于日志底部
+    val isAtBottom by remember {
+        derivedStateOf {
+            val info = logListState.layoutInfo
+            val total = info.totalItemsCount
+            if (total == 0) return@derivedStateOf true
+            val lastVisibleIndex = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisibleIndex >= total - 1
+        }
+    }
 
     // 实时时钟：用于构建中总耗时与当前步骤耗时
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -96,25 +115,22 @@ fun BuildProgressDialog(
         }
     }
 
-    // 用户手动滚动日志时：靠近底部视为自动滚动开启，否则暂停
+    // 用户向上滚离底部时暂停自动滚动；滚回底部时恢复
     LaunchedEffect(logListState) {
-        snapshotFlow { logListState.firstVisibleItemIndex }
-            .collect { idx ->
-                val total = buildState.logs.size
-                if (total > 0) {
-                    autoScroll = idx + 4 >= total
-                }
+        snapshotFlow { isAtBottom }
+            .collect { atBottom ->
+                autoScroll = atBottom
             }
     }
 
-    // 日志追加时若自动滚动开启则滚到底部
+    // 日志追加时若自动滚动开启则平滑滚动到底部
     LaunchedEffect(buildState.logs.size, autoScroll) {
         if (autoScroll && buildState.logs.isNotEmpty()) {
             logListState.animateScrollToItem(buildState.logs.size - 1)
         }
     }
 
-    // 失败时强制滚到日志末尾（错误通常在末尾）
+    // 构建失败时强制滚动到最后一行
     LaunchedEffect(buildState.error != null) {
         if (buildState.error != null && buildState.logs.isNotEmpty()) {
             autoScroll = true
@@ -122,11 +138,28 @@ fun BuildProgressDialog(
         }
     }
 
-    val titleText = when {
-        buildState.isBuilding -> "构建中..."
-        buildState.error != null -> "构建失败"
-        buildState.resultApk != null -> "构建成功"
-        else -> "构建完成"
+    // 标题文案、主题色与前置图标
+    val (titleText, titleColor, titleIcon) = when {
+        buildState.isBuilding -> Triple(
+            "构建中...",
+            MaterialTheme.colorScheme.primary,
+            null
+        )
+        buildState.error != null -> Triple(
+            "构建失败",
+            Color(0xFFF44336),
+            Icons.Default.Close
+        )
+        buildState.resultApk != null -> Triple(
+            "构建成功",
+            Color(0xFF4CAF50),
+            Icons.Default.Check
+        )
+        else -> Triple(
+            "构建完成",
+            MaterialTheme.colorScheme.onSurface,
+            null
+        )
     }
 
     val totalElapsed: Long = when {
@@ -150,10 +183,27 @@ fun BuildProgressDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (buildState.isBuilding) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = titleColor
+                    )
+                    Spacer(Modifier.width(8.dp))
+                } else if (titleIcon != null) {
+                    Icon(
+                        titleIcon,
+                        contentDescription = null,
+                        tint = titleColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
                 Text(
                     titleText,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = titleColor
                 )
                 Spacer(Modifier.weight(1f))
                 if (totalElapsed > 0L) {
@@ -173,7 +223,7 @@ fun BuildProgressDialog(
 
             Spacer(Modifier.height(8.dp))
 
-            // ===== 进度条 =====
+            // ===== 进度条（按状态着色）=====
             when {
                 buildState.isBuilding -> LinearProgressIndicator(
                     progress = {
@@ -183,7 +233,9 @@ fun BuildProgressDialog(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(4.dp)
+                        .height(4.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                 )
                 buildState.error != null -> Box(
                     modifier = Modifier
@@ -218,11 +270,11 @@ fun BuildProgressDialog(
                 Spacer(Modifier.height(6.dp))
             }
 
-            // ===== 步骤流程区（固定最大高度，可滚动）=====
+            // ===== 步骤流程区（最大高度 180dp，超出可滚动）=====
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 220.dp),
+                    .heightIn(max = 180.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 items(steps) { step ->
@@ -282,11 +334,12 @@ fun BuildProgressDialog(
 
             Spacer(Modifier.height(4.dp))
 
-            // ===== 日志区（弹性，填满剩余空间）=====
+            // ===== 日志区（最大高度 300dp，避免弹窗过高）=====
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .heightIn(max = 300.dp)
                     .background(Color(0xFF1A1A2E), RoundedCornerShape(8.dp))
                     .padding(8.dp)
             ) {
@@ -312,6 +365,27 @@ fun BuildProgressDialog(
                                 fontWeight = if (logEmphasis(log)) FontWeight.Bold else FontWeight.Normal
                             )
                         }
+                    }
+
+                    // 不在底部时显示悬浮回到底部按钮
+                    if (!isAtBottom) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowDownward,
+                            contentDescription = "滚动到底部",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .size(32.dp)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                .clickable {
+                                    autoScroll = true
+                                    scope.launch {
+                                        if (buildState.logs.isNotEmpty()) {
+                                            logListState.animateScrollToItem(buildState.logs.size - 1)
+                                        }
+                                    }
+                                }
+                        )
                     }
                 }
             }
@@ -348,7 +422,7 @@ fun BuildProgressDialog(
                                 Spacer(Modifier.height(6.dp))
                                 if (isAnalyzing) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        androidx.compose.material3.CircularProgressIndicator(
+                                        CircularProgressIndicator(
                                             modifier = Modifier.size(16.dp),
                                             strokeWidth = 2.dp
                                         )
@@ -384,17 +458,17 @@ private fun StepRow(
     durationMs: Long?,
     liveElapsedMs: Long?
 ) {
-    val (icon, color) = when {
-        isCurrent -> Icons.Default.HourglassEmpty to MaterialTheme.colorScheme.primary
-        isCompleted || isSuccess -> Icons.Default.CheckCircle to Color(0xFF4CAF50)
-        isFailed -> Icons.Default.Error to Color(0xFFF44336)
-        else -> Icons.Default.HourglassEmpty to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-    }
-
     val durationLabel = when {
         durationMs != null -> formatDuration(durationMs)
         liveElapsedMs != null -> "${formatDuration(liveElapsedMs)} ..."
         else -> ""
+    }
+
+    val textColor = when {
+        isCurrent -> MaterialTheme.colorScheme.primary
+        isFailed -> Color(0xFFF44336)
+        isCompleted || isSuccess -> Color(0xFF4CAF50)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     Row(
@@ -408,13 +482,37 @@ private fun StepRow(
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+        when {
+            isCurrent -> CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+            isCompleted || isSuccess -> Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = Color(0xFF4CAF50),
+                modifier = Modifier.size(16.dp)
+            )
+            isFailed -> Icon(
+                Icons.Default.Close,
+                contentDescription = null,
+                tint = Color(0xFFF44336),
+                modifier = Modifier.size(16.dp)
+            )
+            else -> Icon(
+                Icons.Default.RadioButtonUnchecked,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(16.dp)
+            )
+        }
         Spacer(Modifier.width(8.dp))
         Text(
             step.displayName,
             style = MaterialTheme.typography.bodySmall,
             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            color = textColor,
             modifier = Modifier.weight(1f)
         )
         if (durationLabel.isNotEmpty()) {
@@ -550,21 +648,28 @@ private fun StatChip(label: String, count: Int) {
 }
 
 /**
- * 日志行着色：错误红、警告橙、步骤/分隔线蓝加粗
+ * 日志行按级别着色：错误红、警告橙、成功绿、分隔线蓝加粗、普通灰色
  */
-private fun logColor(text: String): Color = when {
-    text.contains("失败") ||
-        text.contains("error", ignoreCase = true) ||
-        text.contains("exception", ignoreCase = true) -> Color(0xFFFF6B6B)
-    text.contains("警告") ||
-        text.contains("warning", ignoreCase = true) ||
-        text.contains("note", ignoreCase = true) -> Color(0xFFFFB74D)
-    text.contains("==========") || text.contains("步骤") -> Color(0xFF82AAFF)
-    else -> Color(0xFFB0B0C0)
+private fun logColor(text: String): Color {
+    val lower = text.lowercase()
+    return when {
+        lower.contains("error") ||
+            lower.contains("failure") ||
+            lower.contains("exception") ||
+            text.contains("失败") -> Color(0xFFFF6B6B)
+        lower.contains("warning") ||
+            lower.contains("note:") ||
+            text.contains("警告") -> Color(0xFFFFB74D)
+        lower.contains("success") ||
+            text.contains("完成") ||
+            text.contains("成功") -> Color(0xFF81C784)
+        text.contains("=====") || text.contains("---") -> Color(0xFF82AAFF)
+        else -> Color(0xFFB0B0C0)
+    }
 }
 
 private fun logEmphasis(text: String): Boolean =
-    text.contains("==========") || text.contains("步骤")
+    text.contains("=====") || text.contains("---")
 
 private fun formatSize(bytes: Long): String {
     val kb = bytes / 1024.0
