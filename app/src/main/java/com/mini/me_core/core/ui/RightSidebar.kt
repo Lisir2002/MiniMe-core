@@ -26,8 +26,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.Android
@@ -50,6 +50,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
+import com.mini.me_core.core.theme.LocalAnimationScale
+import com.mini.me_core.core.theme.Spacing
 
 /**
  * 右侧贴边工具抽屉。
@@ -59,7 +61,9 @@ import com.mini.me_core.R
  * 不新建、不删除任何功能页面。
  *
  * 设计要点：
- * - 宽屏（平板 / 横屏，屏宽 ≥ 600dp）按屏宽 0.32 折半并夹在 260–300dp；手机竖屏固定 280dp。
+ * - 面板宽度与左侧抽屉一致：手机竖屏 300dp；宽屏（≥600dp）按屏宽 0.32 折半并夹在 260–300dp。
+ * - 形状、底色、elevation 复用左侧 ModalDrawerSheet 的令牌：RectangleShape、surface、0dp。
+ * - 间距统一走 [Spacing]（md/lg/sm），动效时长乘 [LocalAnimationScale] 支持全局关闭/调慢。
  * - 半透明 scrim 点击收起；面板从右滑入/滑出，scrim 淡入淡出。
  * - 分组列表：工具 / 开发 / 其他，每组有小标题；颜色全部取自 [MaterialTheme.colorScheme]。
  * - 返回键由宿主（AppNavigation 里的 BackHandler）在展开时优先关闭本抽屉。
@@ -78,19 +82,23 @@ fun RightSidebar(
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        // 宽屏占比约 0.32 并设上下限；手机竖屏固定 280dp。
+        // 面板宽度与左侧抽屉一致：手机竖屏 300dp；宽屏按屏宽 0.32 折半并夹在 260–300dp。
         val panelWidth = if (maxWidth >= 600.dp) {
             (maxWidth * 0.32f).coerceIn(260.dp, 300.dp)
         } else {
-            280.dp
+            300.dp
         }
+
+        // 动效时长跟随全局动效缩放（用户可在设置中关闭/调慢动效）。
+        val animationScale = LocalAnimationScale.current
+        val motionDuration = (220 * animationScale).toInt().coerceAtLeast(0)
 
         // 半透明遮罩：点击收起，淡入淡出。
         AnimatedVisibility(
             visible = open,
             modifier = Modifier.matchParentSize(),
-            enter = fadeIn(animationSpec = tween(220)),
-            exit = fadeOut(animationSpec = tween(220)),
+            enter = fadeIn(animationSpec = tween(motionDuration)),
+            exit = fadeOut(animationSpec = tween(motionDuration)),
         ) {
             Box(
                 modifier = Modifier
@@ -104,41 +112,41 @@ fun RightSidebar(
             )
         }
 
-        // 右侧面板：从右滑入/滑出。
+        // 右侧面板：从右滑入/滑出；形状、底色、elevation 与左侧 ModalDrawerSheet 保持一致。
         AnimatedVisibility(
             visible = open,
             modifier = Modifier.align(Alignment.CenterEnd),
             enter = slideInHorizontally(
-                animationSpec = tween(220),
+                animationSpec = tween(motionDuration),
                 initialOffsetX = { fullWidth -> fullWidth },
-            ) + fadeIn(animationSpec = tween(220)),
+            ) + fadeIn(animationSpec = tween(motionDuration)),
             exit = slideOutHorizontally(
-                animationSpec = tween(220),
+                animationSpec = tween(motionDuration),
                 targetOffsetX = { fullWidth -> fullWidth },
-            ) + fadeOut(animationSpec = tween(220)),
+            ) + fadeOut(animationSpec = tween(motionDuration)),
         ) {
             Surface(
                 modifier = Modifier
                     .width(panelWidth)
                     .fillMaxHeight(),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 3.dp,
-                shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
+                tonalElevation = 0.dp,
+                shape = RectangleShape,
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .statusBarsPadding()
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = Spacing.md),
                 ) {
                     groups().forEach { group ->
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(Spacing.md))
                         Text(
                             text = stringResource(group.titleRes),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
                         )
                         group.entries.forEach { entry ->
                             SidebarItem(
@@ -167,9 +175,9 @@ private fun SidebarItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         Icon(
             imageVector = icon,
