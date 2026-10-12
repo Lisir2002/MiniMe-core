@@ -20,12 +20,15 @@ package com.mini.me_core.feature.packager.domain.model
  */
 data class SplashConfigPayload(
     val enabled: Boolean,
+    val mode: String,
     val durationMs: Int,
     val autoHide: Boolean,
     val backgroundColor: String,
     val image: String?,
     val transition: String,
-    val skipOnTap: Boolean
+    val skipOnTap: Boolean,
+    val showLoading: Boolean,
+    val htmlTimeoutMs: Int
 )
 
 /**
@@ -39,15 +42,22 @@ fun SplashSettings.toSplashConfigPayload(hasCustomImage: Boolean): SplashConfigP
         SplashSettings.SUPPORTED_TRANSITIONS.find { it == raw } ?: "fade"
     }
     val normalizedBg = backgroundColor.normalizedColorOrNull() ?: "#FFFFFF"
+    val clampedHtmlTimeout = htmlTimeoutMs.coerceIn(
+        SplashSettings.MIN_HTML_TIMEOUT_MS,
+        SplashSettings.MAX_HTML_TIMEOUT_MS
+    )
     return SplashConfigPayload(
         enabled = enabled,
+        mode = mode.name.lowercase(),
         durationMs = clampedDuration,
         autoHide = true,
         backgroundColor = normalizedBg,
         // 仅当确有自定义图时才指向 splash.png；无图时为 null，模板回退纯底色
         image = if (hasCustomImage) "splash.png" else null,
         transition = normalizedTransition,
-        skipOnTap = skipOnTap
+        skipOnTap = skipOnTap,
+        showLoading = showLoadingDots,
+        htmlTimeoutMs = clampedHtmlTimeout
     )
 }
 

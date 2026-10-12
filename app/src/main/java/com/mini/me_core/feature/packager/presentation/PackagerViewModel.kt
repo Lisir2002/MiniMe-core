@@ -45,6 +45,9 @@ class PackagerViewModel @Inject constructor(
     // ========== 项目列表 ==========
     val projects: StateFlow<List<Project>> = projectStore.projects
 
+    /** 旧配置迁入 .minime/ 后的一次性提示（UI 收集后消费） */
+    val migrationMessage: StateFlow<String?> = projectStore.migrationMessage
+
     // ========== 当前选中项目 ==========
     private val _currentProject = MutableStateFlow<Project?>(null)
     val currentProject: StateFlow<Project?> = _currentProject.asStateFlow()
@@ -92,6 +95,9 @@ class PackagerViewModel @Inject constructor(
     val isAnalyzing: StateFlow<Boolean> = _isAnalyzing.asStateFlow()
 
     private val apkBuilder = ApkBuilder(getApplication(), projectStore)
+
+    /** 消费一次性迁移提示 */
+    fun consumeMigrationMessage() = projectStore.consumeMigrationMessage()
 
     // ========== 项目列表操作 ==========
 

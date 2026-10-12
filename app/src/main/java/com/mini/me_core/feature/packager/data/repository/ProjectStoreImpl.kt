@@ -5,6 +5,7 @@ import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.packager.domain.model.BridgeCapabilities
 import com.mini.me_core.feature.packager.domain.model.BuildStatus
 import com.mini.me_core.feature.packager.domain.model.DisplaySettings
+import com.mini.me_core.feature.packager.domain.model.MinimeLayout
 import com.mini.me_core.feature.packager.domain.model.Project
 import com.mini.me_core.feature.packager.domain.model.ProjectConfig
 import com.mini.me_core.feature.packager.domain.model.ProjectType
@@ -66,6 +67,13 @@ class ProjectStoreImpl @Inject constructor(
     private val _projects = MutableStateFlow<List<Project>>(emptyList())
     override val projects: StateFlow<List<Project>> = _projects.asStateFlow()
 
+    private val _migrationMessage = MutableStateFlow<String?>(null)
+    override val migrationMessage: StateFlow<String?> = _migrationMessage.asStateFlow()
+
+    override fun consumeMigrationMessage() {
+        _migrationMessage.value = null
+    }
+
     /** 项目根目录 */
     private val projectsDir: File
         get() = File(context.filesDir, "packager/projects").apply { mkdirs() }
@@ -86,10 +94,13 @@ class ProjectStoreImpl @Inject constructor(
     /**
      * 加载所有项目。
      *
-     * 每个项目目录的解析优先级：
-     * 1. project.json —— 现行分组格式，直接解析；
-     * 2. config.json —— 旧扁平格式，解析后迁移为 project.json，旧文件重命名备份；
-     * 3. 两者都不存在 —— 跳过该目录。
+     * 配置统一存放于 .minime/project.json。每个项目目录的解析优先级：
+     * 1. .minime/project.json —— 现行布局，直接解析；
+     * 2. 根目录 project.json —— 旧布局，幂等迁入 .minime/project.json 后解析，根文件留档为 .bak；
+     * 3. 根目录 config.json —— 更早的扁平格式，解析后落到 .minime/project.json，旧文件重命名备份；
+     * 4. 都不存在 —— 跳过该目录。
+     *
+     * 迁移幂等：只要 .minime/project.json 已存在就不再移动根目录文件。
      */
     private fun loadAll() {
         val list = mutableListOf<Project>()
@@ -97,25 +108,38 @@ class ProjectStoreImpl @Inject constructor(
         var migrated = 0
         projectsDir.listFiles()?.forEach { dir ->
             if (!dir.isDirectory) return@forEach
-            val projectJson = File(dir, "project.json")
+            val minime = MinimeLayout.minimeDir(dir)
+            val canonical = File(minime, "project.json")
+            val rootProject = File(dir, "project.json")
             val legacyJson = File(dir, "config.json")
             runCatching {
                 when {
-                    projectJson.exists() -> {
-                        val config = json.decodeFromString<ProjectConfig>(projectJson.readText())
+                    // 旧布局：根目录 project.json -> .minime/project.json（幂等）
+                    canonical.exists() -> {
+                        val config = json.decodeFromString<ProjectConfig>(canonical.readText())
                         list.add(config.toProject(dir))
                     }
+                    rootProject.exists() -> {
+                        minime.mkdirs()
+                        rootProject.copyTo(canonical, overwrite = true)
+                        val bak = File(dir, "project.json.bak")
+                        if (bak.exists()) bak.delete()
+                        rootProject.renameTo(bak)
+                        migrated++
+                        val config = json.decodeFromString<ProjectConfig>(canonical.readText())
+                        list.add(config.toProject(dir))
+                        FileLogger.i(TAG, "迁移配置到 .minime/: ${dir.name}")
+                    }
                     legacyJson.exists() -> {
-                        // 旧格式迁移：扁平 StoredProject → Project → 分组 ProjectConfig
+                        // 旧扁平格式迁移：解析后落到 .minime/project.json
                         val stored = json.decodeFromString<LegacyStoredProject>(legacyJson.readText())
                         val project = stored.toProject()
                         writeProjectConfig(dir, ProjectConfig.fromProject(project))
-                        // 旧文件留档备份（已存在则覆盖）
                         val backup = File(dir, "config.legacy.json.bak")
                         if (backup.exists()) backup.delete()
                         legacyJson.renameTo(backup)
                         migrated++
-                        FileLogger.i(TAG, "迁移旧配置: ${project.name} (${project.id}) -> project.json")
+                        FileLogger.i(TAG, "迁移旧配置: ${project.name} (${project.id}) -> .minime/project.json")
                         list.add(project)
                     }
                     else -> {
@@ -130,6 +154,9 @@ class ProjectStoreImpl @Inject constructor(
         // 按更新时间降序排列
         list.sortByDescending { it.updatedAt }
         _projects.value = list
+        if (migrated > 0) {
+            _migrationMessage.value = "项目配置已迁移到 .minime/ 目录（$migrated 个项目）"
+        }
         FileLogger.d(
             TAG,
             "加载完成，共 ${list.size} 个项目" +
@@ -236,10 +263,10 @@ class ProjectStoreImpl @Inject constructor(
         File(projectsDir, "$projectId/www").apply { mkdirs() }
 
     /**
-     * 获取项目的构建目录
+     * 获取项目的构建目录（统一输出到 .minime/build/）
      */
     override fun getBuildsDir(projectId: String): File =
-        File(projectsDir, "$projectId/builds").apply { mkdirs() }
+        MinimeLayout.buildDir(File(projectsDir, projectId)).apply { mkdirs() }
 
     /**
      * 更新项目的最后构建状态
@@ -250,20 +277,20 @@ class ProjectStoreImpl @Inject constructor(
     }
 
     /**
-     * 原子写入 project.json：
+     * 原子写入 .minime/project.json：
      * 先序列化到同目录下的 project.json.tmp，再 rename 覆盖目标文件。
      * 同一文件系统内 rename(2) 是原子的，进程中断不会留下半截 JSON。
      */
     private fun writeProjectConfig(projectDir: File, config: ProjectConfig) {
-        projectDir.mkdirs()
-        val target = File(projectDir, "project.json")
-        val tmp = File(projectDir, "project.json.tmp")
+        val minime = MinimeLayout.minimeDir(projectDir).apply { mkdirs() }
+        val target = File(minime, "project.json")
+        val tmp = File(minime, "project.json.tmp")
         tmp.writeText(json.encodeToString(config), Charsets.UTF_8)
         if (!tmp.renameTo(target) && target.exists()) {
             // 兜底：目标已存在且首次 rename 被拒（跨设备等异常），删除后重试
             target.delete()
             if (!tmp.renameTo(target)) {
-                error("project.json 写入失败: ${target.absolutePath}")
+                error(".minime/project.json 写入失败: ${target.absolutePath}")
             }
         }
     }

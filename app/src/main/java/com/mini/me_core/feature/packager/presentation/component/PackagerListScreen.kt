@@ -35,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -73,8 +74,17 @@ fun PackagerListScreen(
     onOpenProject: (Project) -> Unit
 ) {
     val projects: List<Project> by viewModel.projects.collectAsState()
+    val migrationMessage: String? by viewModel.migrationMessage.collectAsState()
+    val snackbarHostState = androidx.compose.material3.SnackbarHostState()
     val colors = LocalAppTheme.current.colors
     val cornerRadius = LocalCornerRadius.current
+
+    LaunchedEffect(migrationMessage) {
+        migrationMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.consumeMigrationMessage()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -95,7 +105,8 @@ fun PackagerListScreen(
                 Icon(Icons.Rounded.Add, contentDescription = "新建项目")
             }
         },
-        containerColor = colors.surfacePage
+        containerColor = colors.surfacePage,
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) }
     ) { padding ->
         if (projects.isEmpty()) {
             EmptyState(modifier = Modifier.padding(padding))

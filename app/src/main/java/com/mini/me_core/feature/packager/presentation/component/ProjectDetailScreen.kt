@@ -32,6 +32,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.filled.InsertPhoto
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -44,6 +46,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -545,7 +550,30 @@ private fun SplashConfigCard(
 
         Spacer(Modifier.height(8.dp))
 
-        // 自定义启动图（可选）
+        // 模式选择：图片 / 纯色 / HTML
+        val modeOptions = listOf(
+            Triple(com.mini.me_core.feature.packager.domain.model.SplashMode.IMAGE, "图片", "用户启动图"),
+            Triple(com.mini.me_core.feature.packager.domain.model.SplashMode.COLOR, "纯色", "底色+加载点"),
+            Triple(com.mini.me_core.feature.packager.domain.model.SplashMode.HTML, "HTML", "自定义页面")
+        )
+        Text("启动模式", style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(4.dp))
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            modeOptions.forEachIndexed { index, (mode, label, _) ->
+                SegmentedButton(
+                    selected = splash.mode == mode,
+                    onClick = { persist(splash.copy(mode = mode)) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = modeOptions.size)
+                ) {
+                    Text(label)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // 自定义启动图（可选）：仅图片模式显示
+        if (splash.mode == com.mini.me_core.feature.packager.domain.model.SplashMode.IMAGE) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
@@ -590,6 +618,7 @@ private fun SplashConfigCard(
             if (splash.customImagePath != null) {
                 TextButton(onClick = { persist(splash.copy(customImagePath = null)) }) { Text("清除") }
             }
+        }
         }
 
         Spacer(Modifier.height(12.dp))
@@ -722,11 +751,16 @@ private fun SourceTab(
     // 删除确认
     var deleteTarget by remember { mutableStateOf<File?>(null) }
 
-    // 文件列表（读取 refreshKey 以触发刷新）
-    val files = remember(currentPath, refreshKey) {
-        currentPath.listFiles()?.sortedWith(
-            compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() }
-        ) ?: emptyList()
+    // 是否显示以 . 开头的隐藏文件/目录（默认隐藏，如 .minime/ 等）
+    var showHidden by remember { mutableStateOf(false) }
+
+    // 文件列表（读取 refreshKey / showHidden 以触发刷新）
+    val files = remember(currentPath, refreshKey, showHidden) {
+        currentPath.listFiles()
+            ?.filter { showHidden || !com.mini.me_core.feature.packager.domain.model.MinimeLayout.isHidden(it.name) }
+            ?.sortedWith(
+                compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() }
+            ) ?: emptyList()
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -753,6 +787,14 @@ private fun SourceTab(
                 }
             }
             Spacer(Modifier.weight(1f))
+            IconButton(onClick = { showHidden = !showHidden }) {
+                Icon(
+                    if (showHidden) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                    contentDescription = if (showHidden) "隐藏文件" else "显示隐藏文件",
+                    tint = if (showHidden) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             TextButton(onClick = {
                 newFileName = "index.html"
                 newFileError = null

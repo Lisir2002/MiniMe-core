@@ -43,10 +43,36 @@
   #splash.exit-zoom    { transition: opacity 300ms ease-in, transform 300ms ease-in; opacity: 0; transform: scale(1.08); }
   #splash.exit-slide   { transition: opacity 280ms ease-in, transform 280ms ease-in; opacity: 0; transform: translateY(-12%); }
   #splash.exit-dissolve{ transition: opacity 320ms ease-in, filter 320ms ease-in; opacity: 0; filter: blur(14px); }
+
+  /* COLOR 模式：居中三点跳动加载（默认隐藏，按 showLoading 显示） */
+  #dots {
+    position: fixed;
+    left: 50%;
+    bottom: 22%;
+    transform: translateX(-50%);
+    display: none;
+    gap: 10px;
+    align-items: center;
+  }
+  #dots.on { display: flex; }
+  #dots span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.85);
+    animation: dotBounce 1.1s infinite ease-in-out both;
+  }
+  #dots span:nth-child(2) { animation-delay: 0.16s; }
+  #dots span:nth-child(3) { animation-delay: 0.32s; }
+  @keyframes dotBounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
 </style>
 </head>
 <body>
 <div id="splash"></div>
+<div id="dots"><span></span><span></span><span></span></div>
 <script>
 (function () {
   'use strict';
@@ -57,6 +83,7 @@
   var EXIT_MS = 320;
 
   var splashEl = document.getElementById('splash');
+  var dotsEl = document.getElementById('dots');
   var finished = false;
   var config = null;
 
@@ -65,9 +92,14 @@
   function applyFirstFrame(cfg) {
     var sp = (cfg && cfg.splash) || {};
     var bg = (sp.backgroundColor && String(sp.backgroundColor)) || DEFAULT_BG;
+    var mode = String(sp.mode || 'image').toLowerCase();
     document.body.style.backgroundColor = bg;
     splashEl.style.backgroundColor = bg;
-    if (sp.image) {
+
+    // COLOR 模式：纯底色 + 可选三点加载；IMAGE 模式：同目录启动图
+    if (mode === 'color') {
+      if (sp.showLoading !== false && dotsEl) dotsEl.classList.add('on');
+    } else if (sp.image) {
       // 同目录下的启动图；加载失败时静默保留纯背景色（与原生兜底色一致，不会白屏）
       var img = new Image();
       img.onload = function () {
@@ -78,8 +110,8 @@
     }
     var transition = String(sp.transition || 'fade').toLowerCase();
     var enterClass = { zoom: 'enter-zoom', slide: 'enter-slide', dissolve: 'enter-dissolve' }[transition] || 'enter-fade';
-    // 强制首帧先以不透明背景色上屏，再启动入场动画，避免动画起始帧闪白
-    splashEl.style.opacity = 1;
+    // #splash 初始 CSS opacity:0，直接叠加 enter 动画（from opacity:0 to opacity:1）即可平滑淡入；
+    // 不要再用内联样式强制 opacity=1，否则内联样式与动画首帧叠加会闪一下。
     splashEl.classList.add(enterClass);
     return transition;
   }

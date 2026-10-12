@@ -193,6 +193,7 @@ class ApkBuilder(
                     val splashPayload = splash.toSplashConfigPayload(hasSplashImage)
                     config.getJSONObject("splash").apply {
                         put("enabled", splashPayload.enabled)
+                        put("mode", splashPayload.mode)
                         put("duration", splashPayload.durationMs)
                         put("autoHide", splashPayload.autoHide)
                         put("backgroundColor", splashPayload.backgroundColor)
@@ -204,6 +205,8 @@ class ApkBuilder(
                         }
                         put("transition", splashPayload.transition)
                         put("skipOnTap", splashPayload.skipOnTap)
+                        put("showLoading", splashPayload.showLoading)
+                        put("htmlTimeoutMs", splashPayload.htmlTimeoutMs)
                     }
 
                     configFile.writeText(config.toString(2))
@@ -233,16 +236,23 @@ class ApkBuilder(
                 val customImage = project.splashSettings.customImagePath
                     ?.let { File(it) }
                     ?.takeIf { it.isFile }
+                val userHtml = project.splashSettings.htmlSplashPath
+                    ?.let { File(it) }
+                    ?.takeIf { it.isFile }
                 val result = SplashInjector.inject(
                     extractedDir = extractedDir,
                     settings = project.splashSettings,
                     customImageFile = customImage,
-                    splashHtmlSource = splashHtmlSource
+                    splashHtmlSource = splashHtmlSource,
+                    userSplashHtmlFile = userHtml
                 )
                 if (result.windowImageOverwritten) {
                     log("冷启动窗地位图已覆盖（背景色=${project.splashSettings.backgroundColor}）", callback, logWriter)
                 } else {
                     log("警告: 模版不含 splash_img 位图，跳过冷启动窗地位图覆盖（前向兼容）", callback, logWriter)
+                }
+                if (result.windowBackgroundPatched) {
+                    log("原生主题 windowBackground 已按模式指向目标资源", callback, logWriter)
                 }
                 if (result.wwwSplashPngWritten) log("已写入 www/splash.png", callback, logWriter)
                 if (result.splashHtmlWritten) log("已写入 www/splash.html", callback, logWriter)

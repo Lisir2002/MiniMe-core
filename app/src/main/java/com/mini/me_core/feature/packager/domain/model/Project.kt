@@ -72,6 +72,25 @@ data class DisplaySettings(
 )
 
 /**
+ * 启动动画模式
+ *
+ * - IMAGE：用户选图，原生 windowBackground = 该图，H5 同图 + 入场/退出动画
+ * - COLOR：纯色，原生 windowBackground = backgroundColor（改 arsc 颜色值），H5 纯底色 + 可选三点加载
+ * - HTML：用户自定义 .minime/splash.html，原生层仅以 backgroundColor 兜底，H5 加载用户页并通过 bridge 跳转
+ */
+@Serializable
+enum class SplashMode {
+    IMAGE,
+    COLOR,
+    HTML;
+
+    companion object {
+        fun fromName(name: String?): SplashMode =
+            entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: IMAGE
+    }
+}
+
+/**
  * 启动页设置
  *
  * 与模板侧 assets/config.json 的 splash 段一一对应（见 [SplashConfigMapper]）。
@@ -79,22 +98,30 @@ data class DisplaySettings(
  * 无需破坏性迁移。
  *
  * @param enabled 启用启动页
+ * @param mode 启动动画模式（[SplashMode]，默认 IMAGE）
  * @param customImagePath 自定义启动页图片路径（绝对路径；null 表示仅用背景色）
  * @param delayMs 动画展示时长（毫秒），对外契约范围 500..5000，默认 1500
  * @param fullscreen 全屏启动页
  * @param transition 过渡效果（fade/zoom/slide/dissolve，默认 fade）
  * @param backgroundColor 启动页背景色（#RRGGBB，默认 #FFFFFF）
  * @param skipOnTap 点击启动页是否跳过
+ * @param showLoadingDots COLOR 模式下是否显示居中三点跳动加载
+ * @param htmlSplashPath 用户自定义启动 HTML 路径（HTML 模式；通常为 .minime/splash.html）
+ * @param htmlTimeoutMs HTML 模式兜底超时（毫秒），到时未调用 finish 自动跳主页
  */
 @Serializable
 data class SplashSettings(
     val enabled: Boolean = true,                // 启用启动页
+    val mode: SplashMode = SplashMode.IMAGE,      // 启动动画模式
     val customImagePath: String? = null,        // 自定义启动页图片路径
     val delayMs: Int = 1500,                    // 动画展示时长（毫秒）
     val fullscreen: Boolean = true,              // 全屏启动页
     val transition: String = "fade",             // 过渡效果：fade/zoom/slide/dissolve
     val backgroundColor: String = "#FFFFFF",     // 启动页背景色
-    val skipOnTap: Boolean = false               // 点击启动页跳过
+    val skipOnTap: Boolean = false,              // 点击启动页跳过
+    val showLoadingDots: Boolean = true,         // COLOR 模式三点加载
+    val htmlSplashPath: String? = null,         // HTML 模式自定义启动页
+    val htmlTimeoutMs: Int = 5000                // HTML 模式兜底超时（毫秒）
 ) {
     companion object {
         /** 时长下限（毫秒） */
@@ -105,6 +132,10 @@ data class SplashSettings(
 
         /** 支持的过渡效果 */
         val SUPPORTED_TRANSITIONS = listOf("fade", "zoom", "slide", "dissolve")
+
+        /** HTML 模式兜底超时下限/上限 */
+        const val MIN_HTML_TIMEOUT_MS = 1000
+        const val MAX_HTML_TIMEOUT_MS = 15000
     }
 }
 

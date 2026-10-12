@@ -14,11 +14,20 @@ interface ProjectStore {
 
     val projects: StateFlow<List<Project>>
 
+    /**
+     * 存量项目迁移提示：loadAll 中把旧根目录配置迁入 .minime/ 后，推送一次性消息供 UI 展示；
+     * 无迁移时为 null。
+     */
+    val migrationMessage: StateFlow<String?>
+
     /** 模版 APK 存储目录 */
     val templateDir: File
 
     /** 签名密钥存储目录 */
     val signatureDir: File
+
+    /** 消费并清空迁移提示 */
+    fun consumeMigrationMessage()
 
     /**
      * 创建新项目
