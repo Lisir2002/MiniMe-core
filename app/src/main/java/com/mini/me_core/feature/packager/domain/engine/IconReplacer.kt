@@ -42,6 +42,7 @@ class IconReplacer {
         // === arsc chunk 类型 ===
         private const val RES_TABLE_TYPE = 0x0002
         private const val RES_TABLE_PACKAGE_TYPE = 0x0200
+        private const val RES_TABLE_TYPE_TYPE = 0x0201
 
         // === 字符串池 flag ===
         private const val UTF8_FLAG = 0x100
@@ -73,13 +74,16 @@ class IconReplacer {
                 val bwXml = File(extractedDir, "res/BW.xml")
                 val resId = if (bwXml.isFile) parseForegroundDrawableResId(bwXml) else -1
 
-                // 2. 资源 ID -> 条目名 -> 实际位图文件
+                // 2. 资源 ID -> resources.arsc 中的实际文件路径（如 res/Qr.xml）
                 if (resId != -1) {
                     val arsc = File(extractedDir, "resources.arsc")
-                    val entryName = if (arsc.isFile) mapResIdToEntryName(arsc, resId) else null
-                    if (!entryName.isNullOrBlank()) {
-                        foregroundFile = pickDrawableFile(File(extractedDir, "res"), entryName)
-                        FileLogger.i(TAG, "前景资源: resId=0x${Integer.toHexString(resId)}, entry=$entryName, file=${foregroundFile?.name}")
+                    val foregroundPath = if (arsc.isFile) mapResIdToFilePath(arsc, resId) else null
+                    if (!foregroundPath.isNullOrBlank()) {
+                        foregroundFile = File(extractedDir, foregroundPath)
+                        FileLogger.i(
+                            TAG,
+                            "前景资源: resId=0x${Integer.toHexString(resId)} -> $foregroundPath"
+                        )
                     }
                 }
 
@@ -93,14 +97,19 @@ class IconReplacer {
                     }
                 }
 
-                // 4. 读取原前景位图尺寸作为画布尺寸
+                // 4. 读取原前景文件尺寸作为画布尺寸
+                //    若前景是 vector/shape drawable XML，BitmapFactory 无法解码，
+                //    使用自适应图标标准画布尺寸兜底
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeFile(foregroundFile!!.absolutePath, bounds)
                 canvasW = bounds.outWidth
                 canvasH = bounds.outHeight
                 if (canvasW <= 0 || canvasH <= 0) {
-                    FileLogger.e(TAG, "原前景位图尺寸无效: ${foregroundFile!!.name} ${canvasW}x${canvasH}")
-                    return false
+                    // vector/shape XML 前景：自适应图标前景层标准为 108dp，
+                    // 以 xxxhdpi(4x) 换算为 432px 作为画布，保证各密度清晰
+                    canvasW = 432
+                    canvasH = 432
+                    FileLogger.i(TAG, "前景为矢量/XML，使用标准画布 ${canvasW}x${canvasH}")
                 }
 
                 // 5. 解码用户图标并合成
@@ -203,46 +212,90 @@ class IconReplacer {
         // ==================== arsc 解析 ====================
 
         /**
-         * 把资源 ID（如 0x7f040006）映射为条目名（如 "pu"）。
+         * 把资源 ID（如 0x7f040006）映射为其在 APK 中的相对文件路径（如 "res/Qr.xml"）。
          *
-         * 资源 ID = 0xppttteeee：
-         *  - tt 为 type index（1-based），查 typeStrings[tt-1-typeIdOffset] 得类型名；
-         *  - eeee 为 entry index，查 keyStrings[eeee] 得条目名。
+         * 资源 ID = 0xppttteeee：tt 是类型 ID（1-based），eeee 是类型内条目索引。
+         * 不能直接用 keyStrings[eeee] 查条目名——keyStrings 的下标是 ResTable_entry
+         * 里的 keyIdx，不是条目数组下标。正确链路：
+         *  1. 解析全局字符串池（value strings，含 "res/Qr.xml" 这类文件路径）；
+         *  2. 在 package chunk 之后遍历 RES_TABLE_TYPE_TYPE(0x0201) chunk；
+         *  3. 找到 chunk.id == tt 且 density == 0（默认配置）的那个；
+         *  4. entry 数组第 eeee 项的偏移指向 ResTable_entry，其内联 Res_value
+         *     （flags==0 时）dataType==0x03(TYPE_STRING)，data 即全局字符串池索引；
+         *  5. 返回全局字符串池[data]。
          */
-        @Suppress("ReturnCount")
-        private fun mapResIdToEntryName(arsc: File, resId: Int): String? {
+        @Suppress("ReturnCount", "CyclomaticComplexMethod", "CognitiveComplexMethod", "NestedBlockDepth")
+        private fun mapResIdToFilePath(arsc: File, resId: Int): String? {
             val data = arsc.readBytes()
             if (data.size < 12 || getShortLE(data, 0) != RES_TABLE_TYPE) return null
+
+            // 全局字符串池在偏移 12，解析出文件路径字符串数组
+            val globalStrings = ArrayList<String>()
+            parseStringPool(data, 12, globalStrings)
 
             // 跳过全局字符串池，定位 package chunk
             val globalPoolSize = getIntLE(data, 12 + 4)
             val packageOffset = 12 + globalPoolSize
-            if (packageOffset + 288 > data.size) return null
+            if (packageOffset + 8 > data.size) return null
             if (getShortLE(data, packageOffset) != RES_TABLE_PACKAGE_TYPE) return null
 
-            val headerSize = getShortLE(data, packageOffset + 2)
-            // ResTable_package: header(8) + id(4) + name[128](256) + typeStrings(4) + ...
-            val typeStringsOff = getIntLE(data, packageOffset + 268)
-            val keyStringsOff = getIntLE(data, packageOffset + 276)
-            val typeIdOffset = if (headerSize >= 292) getIntLE(data, packageOffset + 284) else 0
+            val packageSize = getIntLE(data, packageOffset + 4)
+            val packageHeaderSize = getShortLE(data, packageOffset + 2)
 
-            val typeStrings = ArrayList<String>()
-            parseStringPool(data, packageOffset + typeStringsOff, typeStrings)
-            val keyStrings = ArrayList<String>()
-            parseStringPool(data, packageOffset + keyStringsOff, keyStrings)
+            val targetTypeId = (resId ushr 16) and 0xFF
+            val targetEntryIdx = resId and 0xFFFF
 
-            val typeIdx = ((resId ushr 16) and 0xFF) - 1 - typeIdOffset
-            val entryIdx = resId and 0xFFFF
+            // 遍历 package 内部的 type chunks
+            var pos = packageOffset + packageHeaderSize
+            val packageEnd = packageOffset + packageSize
+            while (pos + 20 <= data.size && pos + 8 <= packageEnd) {
+                val chunkType = getShortLE(data, pos)
+                val chunkSize = getIntLE(data, pos + 4)
+                if (chunkSize <= 0 || pos + chunkSize > data.size) break
 
-            if (typeIdx < 0 || typeIdx >= typeStrings.size) {
-                FileLogger.w(TAG, "type index 越界: $typeIdx / ${typeStrings.size}")
-                return null
+                if (chunkType == RES_TABLE_TYPE_TYPE) {
+                    val typeId = data[pos + 8].toInt() and 0xFF
+                    val entryCount = getIntLE(data, pos + 12)
+                    val entriesStart = getIntLE(data, pos + 16)
+                    // ResTable_config 紧随其后，density 是 config 内偏移 18 的 uint16
+                    val density = getShortLE(data, pos + 20 + 18)
+
+                    if (typeId == targetTypeId && density == 0 &&
+                        targetEntryIdx in 0 until entryCount
+                    ) {
+                        val entryArrayStart = pos + entriesStart
+                        if (entryArrayStart + targetEntryIdx * 4 + 4 <= data.size) {
+                            val entryOffset = getIntLE(data, entryArrayStart + targetEntryIdx * 4)
+                            // 0xFFFFFFFF 表示该条目不存在
+                            if (entryOffset != -1) {
+                                val entryPos = entryArrayStart + entryOffset
+                                if (entryPos + 16 <= data.size) {
+                                    val flags = getShortLE(data, entryPos + 2)
+                                    val keyIdx = getIntLE(data, entryPos + 4)
+                                    // Res_value 内联在 entry + 8：size(2) res0(1) dataType(1) data(4)
+                                    val valueDataType = data[entryPos + 11].toInt() and 0xFF
+                                    val valueData = getIntLE(data, entryPos + 12)
+                                    if (flags == 0 && valueDataType == 0x03 &&
+                                        valueData in globalStrings.indices
+                                    ) {
+                                        val path = globalStrings[valueData]
+                                        FileLogger.i(
+                                            TAG,
+                                            "arsc: type=$typeId entry=$targetEntryIdx " +
+                                                "keyIdx=$keyIdx -> $path"
+                                        )
+                                        return path
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                pos += chunkSize
             }
-            if (entryIdx < 0 || entryIdx >= keyStrings.size) {
-                FileLogger.w(TAG, "entry index 越界: $entryIdx / ${keyStrings.size}")
-                return null
-            }
-            return keyStrings[entryIdx]
+            FileLogger.w(TAG, "未在 arsc 中找到资源 0x${Integer.toHexString(resId)} 的文件路径")
+            return null
         }
 
         // ==================== 字符串池 ====================
@@ -298,25 +351,6 @@ class IconReplacer {
         }
 
         // ==================== 前景位图定位 ====================
-
-        /**
-         * 根据条目名在 res/ 下挑出实际位图文件。优先 .png，其次 .webp、.9.png、.jpg。
-         */
-        private fun pickDrawableFile(resDir: File, entryName: String): File? {
-            if (!resDir.isDirectory) return null
-            val candidates = listOf(
-                "$entryName.png",
-                "$entryName.webp",
-                "$entryName.9.png",
-                "$entryName.jpg",
-                "$entryName.jpeg"
-            )
-            for (name in candidates) {
-                val f = File(resDir, name)
-                if (f.isFile) return f
-            }
-            return null
-        }
 
         /**
          * 兜底：扫描 res/ 下所有 PNG，取面积最大的正方形那张作为前景图。

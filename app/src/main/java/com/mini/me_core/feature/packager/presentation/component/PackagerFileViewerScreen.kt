@@ -63,7 +63,7 @@ fun PackagerFileViewerScreen(
     val fileName = remember(filePath) { file.name.ifBlank { "file" } }
     val exists = remember(filePath) { file.exists() }
 
-    var isEditing by remember { mutableStateOf(false) }
+    var isEditing by remember { mutableStateOf(true) } // 默认进入编辑模式
     var hasUnsavedChanges by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var editorInstance by remember { mutableStateOf<CodeEditor?>(null) }

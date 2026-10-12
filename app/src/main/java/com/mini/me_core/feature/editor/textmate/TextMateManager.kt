@@ -205,7 +205,11 @@ object TextMateManager {
 
     /** 创建与当前主题绑定的 ColorScheme，用于设置到 CodeEditor。 */
     fun createColorScheme(): EditorColorScheme {
-        return TextMateColorScheme.create(ThemeRegistry.getInstance())
+        return TextMateColorScheme.create(ThemeRegistry.getInstance()).apply {
+            // 显式设置选中文本背景色：TextMate 主题可能未定义 selection，
+            // 或深色主题下与背景过于接近导致看不见。半透明蓝在深浅主题下均可见。
+            setColor(EditorColorScheme.SELECTED_TEXT_BACKGROUND, 0x663B82F6)
+        }
     }
 
     fun isInitialized(): Boolean = initialized
