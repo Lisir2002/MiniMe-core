@@ -1,5 +1,28 @@
 # MiniMe Template 更新日志
 
+## v0.0.0.11
+
+**新功能**
+
+- **可配置启动动画**：支持自定义启动图、展示时长（500-5000ms）、过渡效果（淡出/缩放/上滑/溶解）、背景色、点击跳过，由 assets/config.json 的 splash 段驱动。
+- **零白屏衔接**：主题 windowBackground 位图 + WebView 透明首帧 + splash.html 同图同色首帧三层像素级衔接，启动页播完或看门狗到时自动进入主页，预载主页资源。
+
+**改进**
+
+- **启动延迟修复**：修复冷启动纯紫屏约 5 秒问题。根因为 WebView/Chromium 首次冷启动重负载默认在主线程整块执行且 Safe Browsing 首启连外网超时；改为 Application 期后台线程预热内核、首帧上屏后再建 WebView、未声明网络时 blockNetworkLoads 断网。
+- **内核预热**：升级 androidx.webkit 至 1.16.0，使用 WebViewCompat.startUpWebView(shouldRunUiThreadStartUpTasks=false) 将重启动负载移至后台线程与进程启动并行，API27+ 预热 Safe Browsing，全部 try/catch 降级。
+- **启动时序**：先 setContentView 透明容器、OnPreDrawListener 首帧后再构建 WebView；撤启动屏以 postVisualStateCallback 首帧为准，onPageFinished 与看门狗双重兜底。
+- **渲染进程恢复**：实现 onRenderProcessGone，销毁旧 WebView 实例后重建，避免渲染进程崩溃后白屏不可用。
+- **资源直读**：网页文本与字体资源（html/js/css/json/svg/wasm/ttf/woff 等）在 APK 中以不压缩方式存储，AssetManager 可直接映射读取，省去运行时 inflate 开销。
+- **Bridge 健壮性**：callbackId/eventName 改用 JSONObject.quote 严格转义，防止特殊字符破坏回调协议；新增 Bridge 调用耗时埋点（TplBridge tag，debuggable 开关）；__bridge.js 响应后 clearTimeout 并上报 window.onerror/unhandledrejection。
+- **可观测性**：新增 StartUpTracer（TplStart tag），记录进程启动到首帧各环节毫秒耗时，可通过 adb logcat -s TplStart TplBridge 查看。
+
+**安全**
+
+- **CSP 注入**：shouldInterceptRequest 对 HTML 注入 Content-Security-Policy 响应头，允许 unsafe-inline 但禁止 unsafe-eval，connect-src 随联网权限动态收敛。
+- **文件访问收敛**：setAllowFileAccess/setAllowContentAccess/setAllowFileAccessFromFileURLs/setAllowUniversalAccessFromFileURLs 全部关闭，本地资源仅通过 WebViewAssetLoader 虚拟 HTTPS 域访问。
+- **SSL 显式处理**：onReceivedSslError 显式 cancel，不忽略证书错误；主框架 onReceivedError 提供兜底。
+
 ## v0.0.0.10
 
 **修复**

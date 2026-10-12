@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title></title>
+<style>
+  /* 首帧即与原生 windowBackground 像素级对齐：同一张 splash.png、cover 居中、同背景色。
+     在配置/图片尚未就绪时也用背景色铺满，杜绝白屏。 */
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #FFFFFF;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  #splash {
+    position: fixed;
+    inset: 0;
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: cover;
+    background-color: #FFFFFF;
+    opacity: 0;
+    will-change: opacity, transform, filter;
+    transform-origin: center center;
+  }
+  #splash.enter-fade   { animation: enterFade 320ms ease-out forwards; }
+  #splash.enter-zoom   { animation: enterZoom 420ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
+  #splash.enter-slide  { animation: enterFade 320ms ease-out forwards; }
+  #splash.enter-dissolve { animation: enterDissolve 420ms ease-in forwards; }
+
+  @keyframes enterFade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes enterZoom { from { opacity: 0; transform: scale(1.06); } to { opacity: 1; transform: scale(1); } }
+  @keyframes enterDissolve { from { opacity: 0; filter: blur(18px); } to { opacity: 1; filter: blur(0); } }
+
+  /* 退出过渡：动画结束后由 JS 触发，随后原生背景（同图）承接，再进入主页，全程不露白 */
+  #splash.exit-fade    { transition: opacity 260ms ease-in; opacity: 0; }
+  #splash.exit-zoom    { transition: opacity 300ms ease-in, transform 300ms ease-in; opacity: 0; transform: scale(1.08); }
+  #splash.exit-slide   { transition: opacity 280ms ease-in, transform 280ms ease-in; opacity: 0; transform: translateY(-12%); }
+  #splash.exit-dissolve{ transition: opacity 320ms ease-in, filter 320ms ease-in; opacity: 0; filter: blur(14px); }
+</style>
+</head>
+<body>
+<div id="splash"></div>
+<script>
+(function () {
+  'use strict';
+
+  var DEFAULT_BG = '#FFFFFF';
+  var DEFAULT_DURATION = 1500;
+  var DEFAULT_ENTRY = 'index.html';
+  var EXIT_MS = 320;
+
+  var splashEl = document.getElementById('splash');
+  var finished = false;
+  var config = null;
+
+  function clamp(n, lo, hi) { n = Number(n); if (isNaN(n)) return lo; return Math.max(lo, Math.min(hi, n)); }
+
+  function applyFirstFrame(cfg) {
+    var sp = (cfg && cfg.splash) || {};
+    var bg = (sp.backgroundColor && String(sp.backgroundColor)) || DEFAULT_BG;
+    document.body.style.backgroundColor = bg;
+    splashEl.style.backgroundColor = bg;
+    if (sp.image) {
+      // 同目录下的启动图；加载失败时静默保留纯背景色（与原生兜底色一致，不会白屏）
+      var img = new Image();
+      img.onload = function () {
+        splashEl.style.backgroundImage = 'url("' + sp.image + '")';
+      };
+      img.onerror = function () { /* 无图仅背景色 */ };
+      img.src = sp.image;
+    }
+    var transition = String(sp.transition || 'fade').toLowerCase();
+    var enterClass = { zoom: 'enter-zoom', slide: 'enter-slide', dissolve: 'enter-dissolve' }[transition] || 'enter-fade';
+    // 强制首帧先以不透明背景色上屏，再启动入场动画，避免动画起始帧闪白
+    splashEl.style.opacity = 1;
+    splashEl.classList.add(enterClass);
+    return transition;
+  }
+
+  function preload(cfg) {
+    var entry = (cfg && cfg.webview && cfg.webview.entry) || DEFAULT_ENTRY;
+    // 预热主页与桥接脚本（本地拦截即时返回），降低跳转瞬间的空窗
+    try {
+      if (window.fetch) {
+        fetch(entry, { cache: 'force-cache' }).catch(function () {});
+        fetch('__bridge.js', { cache: 'force-cache' }).catch(function () {});
+      }
+    } catch (e) { /* 预加载失败不影响正常跳转 */ }
+    return entry;
+  }
+
+  function finish(transition, entry) {
+    if (finished) return;
+    finished = true;
+    var exitClass = {
+      zoom: 'exit-zoom', slide: 'exit-slide', dissolve: 'exit-dissolve'
+    }[transition] || 'exit-fade';
+    splashEl.classList.remove('enter-fade', 'enter-zoom', 'enter-slide', 'enter-dissolve');
+    // 强制重绘后再加退出类，保证过渡生效
+    void splashEl.offsetWidth;
+    splashEl.classList.add(exitClass);
+    setTimeout(function () {
+      // 顶层窗口跳转，确保 JS Bridge 仅在主框架生效
+      window.location.replace(entry);
+    }, EXIT_MS);
+  }
+
+  function start(cfg) {
+    config = cfg;
+    var sp = (cfg && cfg.splash) || {};
+    var transition = applyFirstFrame(cfg);
+    var entry = preload(cfg);
+    var duration = clamp(sp.duration != null ? sp.duration : DEFAULT_DURATION, 500, 5000);
+
+    var done = function () { finish(transition, entry); };
+    var timer = setTimeout(done, duration);
+
+    if (sp.skipOnTap) {
+      var skip = function () { clearTimeout(timer); done(); };
+      document.addEventListener('pointerdown', function () { skip(); }, { once: true, passive: true });
+    }
+  }
+
+  // 读取构建期注入的配置；任何异常都用默认值兜底，保证启动动画永远不会卡死
+  var fallbackTimer = setTimeout(function () {
+    if (!finished) start(null);
+  }, 800);
+
+  try {
+    fetch('../config.json', { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (cfg) {
+        clearTimeout(fallbackTimer);
+        if (!finished) start(cfg || null);
+      })
+      .catch(function () {
+        clearTimeout(fallbackTimer);
+        if (!finished) start(null);
+      });
+  } catch (e) {
+    clearTimeout(fallbackTimer);
+    if (!finished) start(null);
+  }
+})();
+</script>
+</body>
+</html>

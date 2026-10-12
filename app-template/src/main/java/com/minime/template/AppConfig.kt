@@ -52,7 +52,10 @@ data class WebViewConfig(
     val hardwareAccelerated: Boolean = true,
     val cacheMode: String = "default",
     val debuggable: Boolean = false,
-    val spaFallback: Boolean = true
+    val spaFallback: Boolean = true,
+    // 内容安全策略：null/缺省=使用容器内置的本地安全策略；"off"=不注入；其他字符串=作为自定义 CSP 原样注入。
+    // 旧配置无此字段时按缺省策略处理，保持向前兼容。
+    val csp: String? = null
 )
 
 @Serializable
@@ -80,5 +83,11 @@ data class SplashConfig(
     val enabled: Boolean = true,
     val duration: Int = 1500,
     val autoHide: Boolean = true,
-    val backgroundColor: String = "#6750A4"
+    val backgroundColor: String = "#6750A4",
+    // 启动图文件名（相对 assets/www/，由打包器写入 splash.png）；null 时仅显示背景色
+    val image: String? = null,
+    // 过渡效果：fade 淡出 / zoom 缩放 / slide 上滑 / dissolve 溶解
+    val transition: String = "fade",
+    // 是否允许点击跳过启动动画
+    val skipOnTap: Boolean = false
 )

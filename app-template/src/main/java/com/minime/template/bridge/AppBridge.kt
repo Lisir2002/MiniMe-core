@@ -1,6 +1,8 @@
 package com.minime.template.bridge
 
 import android.content.Context
+import android.os.SystemClock
+import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import com.minime.template.ConfigManager
@@ -11,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import org.json.JSONObject
 
 /**
  * AppBridge 总入口
@@ -135,13 +138,41 @@ class AppBridge(
 
         // 异步执行，避免阻塞 JS 线程
         scope.launch(Dispatchers.IO) {
+            val start = SystemClock.elapsedRealtime()
             val result = try {
                 module.execute(method, args)
             } catch (e: Exception) {
                 BridgeResult.failure("执行异常: ${e.message}", "EXECUTION_ERROR")
             }
+            val cost = SystemClock.elapsedRealtime() - start
+            if (configManager.config.webview.debuggable || !result.success) {
+                Log.d(BRIDGE_TRACE_TAG, "调用 $moduleName.$method 耗时=${cost}ms 成功=${result.success}")
+            }
             invokeCallback(callbackId, result)
         }
+    }
+
+    /**
+     * JS 全局异常上报入口（window.onerror / unhandledrejection 调用）。
+     * 仅记录截断后的诊断信息，不回传任何敏感数据，便于定位线上白屏/脚本异常。
+     */
+    @JavascriptInterface
+    fun reportJsError(
+        message: String?,
+        source: String?,
+        line: Int,
+        column: Int,
+        stack: String?
+    ) {
+        val text = buildString {
+            append("JS异常: ")
+            append(message?.take(300))
+            append(" @")
+            append(source?.substringAfterLast('/')?.take(120))
+            append(":").append(line).append(":").append(column)
+            if (!stack.isNullOrBlank()) append(" | ").append(stack.take(400))
+        }
+        Log.e(BRIDGE_TRACE_TAG, text)
     }
 
     /**
@@ -156,7 +187,9 @@ class AppBridge(
      * 调用 JS 侧回调
      */
     private fun invokeCallback(callbackId: String, result: BridgeResult) {
-        val script = "if(window.__bridge_callback__){window.__bridge_callback__('$callbackId',${result.toJson()});}"
+        // callbackId 来自 JS，用 JSONObject.quote 做严格转义，避免引号/换行导致脚本断裂或注入
+        val safeId = JSONObject.quote(callbackId)
+        val script = "if(window.__bridge_callback__){window.__bridge_callback__($safeId,${result.toJson()});}"
         webView.post {
             webView.evaluateJavascript(script, null)
         }
@@ -167,7 +200,8 @@ class AppBridge(
      */
     fun emitEvent(eventName: String, data: JsonObject? = null) {
         val dataJson = data?.toString() ?: "{}"
-        val script = "if(window.__bridge_event__){window.__bridge_event__('$eventName',$dataJson);}"
+        val safeEvent = JSONObject.quote(eventName)
+        val script = "if(window.__bridge_event__){window.__bridge_event__($safeEvent,$dataJson);}"
         webView.post {
             webView.evaluateJavascript(script, null)
         }
@@ -176,5 +210,6 @@ class AppBridge(
     companion object {
         const val LOCAL_VIRTUAL_DOMAIN = "https://appassets.androidplatform.net/"
         const val BRIDGE_INTERFACE_NAME = "AppBridgeNative"
+        private const val BRIDGE_TRACE_TAG = "TplBridge"
     }
 }

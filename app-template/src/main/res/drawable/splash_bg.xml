@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  冷启动窗口背景（windowBackground）。
+  固定为 layer-list：底层兜底色 + 上层位图 splash_img。打包器在构建时只按同扩展名覆盖
+  res 下的 splash_img 位图（用户启动图与背景色已在打包阶段合成为全幅位图），无需改动已编译的
+  主题或资源表，即可让冷启动第一帧呈现用户自定义启动图，且与 HTML 启动页首帧保持一致。
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_background" />
+    <item>
+        <bitmap
+            android:src="@drawable/splash_img"
+            android:gravity="fill" />
+    </item>
+</layer-list>

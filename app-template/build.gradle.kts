@@ -44,8 +44,8 @@ android {
         targetSdk = 34
         // 版本号四段格式（与主应用规范一致）：0.0.0.10
         // versionCode = 10_000_000 + A*1_000_000_000 + B*10_000_000 + C*10_000 + D*10
-        versionCode = 10_000_100
-        versionName = "0.0.0.10"
+        versionCode = 10_000_110
+        versionName = "0.0.0.11"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -81,6 +81,16 @@ android {
         buildConfig = true
     }
 
+    // 网页文本与字体资源在 APK 中以不压缩方式存储：AssetManager 可直接读取/映射，
+    // 省去 WebView 首次加载本地资源时的运行时 inflate 开销。assets/www 体积很小（数十 KB 级），
+    // 以可忽略的体积换取更短的首屏读取路径。
+    androidResources {
+        noCompress += listOf(
+            "html", "htm", "js", "mjs", "css", "json", "svg", "wasm",
+            "ttf", "otf", "woff", "woff2"
+        )
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -104,7 +114,7 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.webkit:webkit:1.11.0")
+    implementation("androidx.webkit:webkit:1.16.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 }
 
