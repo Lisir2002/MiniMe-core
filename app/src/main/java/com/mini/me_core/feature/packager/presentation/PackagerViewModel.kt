@@ -37,6 +37,9 @@ class PackagerViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "PackagerViewModel"
+
+        /** 日志环形缓冲上限，避免长时间构建导致内存膨胀 */
+        private const val MAX_LOG_LINES = 5000
     }
 
     // ========== 项目列表 ==========
@@ -68,7 +71,11 @@ class PackagerViewModel @Inject constructor(
         val logs: List<String> = emptyList(),
         val resultApk: File? = null,
         val resultApkSize: Long = 0,
-        val error: String? = null
+        val error: String? = null,
+        val stepStartTimes: Map<ApkBuilder.BuildStep, Long> = emptyMap(),
+        val stepDurations: Map<ApkBuilder.BuildStep, Long> = emptyMap(),
+        val buildStartTime: Long = 0L,
+        val buildEndTime: Long = 0L
     )
 
     private val _buildState = MutableStateFlow(BuildState())
@@ -261,7 +268,7 @@ class PackagerViewModel @Inject constructor(
         if (_buildState.value.isBuilding) return
 
         FileLogger.i(TAG, "开始构建: ${project.name} (${project.packageName}) v${project.versionName}")
-        _buildState.value = BuildState(isBuilding = true)
+        _buildState.value = BuildState(isBuilding = true, buildStartTime = System.currentTimeMillis())
 
         viewModelScope.launch {
             val buildsDir = projectStore.getBuildsDir(project.id)
@@ -279,28 +286,43 @@ class PackagerViewModel @Inject constructor(
                 outputDir = buildDir,
                 callback = object : ApkBuilder.BuildProgressCallback {
                     override fun onStepStart(step: ApkBuilder.BuildStep, index: Int, total: Int) {
-                        _buildState.value = _buildState.value.copy(
+                        val now = System.currentTimeMillis()
+                        val current = _buildState.value
+                        // 上一步结束：若存在上一步且与新步骤不同，结算其耗时
+                        val prevStep = current.currentStep
+                        val prevStart = prevStep?.let { current.stepStartTimes[it] }
+                        val newDurations = if (prevStep != null && prevStart != null && prevStep != step) {
+                            current.stepDurations + (prevStep to (now - prevStart))
+                        } else {
+                            current.stepDurations
+                        }
+                        val newStartTimes = current.stepStartTimes + (step to now)
+                        _buildState.value = current.copy(
                             currentStep = step,
                             currentStepIndex = index,
-                            totalSteps = total
+                            totalSteps = total,
+                            stepDurations = newDurations,
+                            stepStartTimes = newStartTimes
                         )
                     }
 
                     override fun onStepComplete(step: ApkBuilder.BuildStep, index: Int, total: Int) {
-                        // 步骤完成不需要额外处理
+                        // 步骤完成不需要额外处理，耗时在 onStepStart 推进时结算
                     }
 
                     override fun onLog(message: String) {
-                        _buildState.value = _buildState.value.copy(
-                            logs = _buildState.value.logs + message
-                        )
+                        val current = _buildState.value
+                        val nextLogs = (current.logs + message).takeLast(MAX_LOG_LINES)
+                        _buildState.value = current.copy(logs = nextLogs)
                     }
 
                     override fun onSuccess(apkFile: File, apkSize: Long) {
-                        _buildState.value = _buildState.value.copy(
+                        val finalState = finalizeCurrentStep(_buildState.value)
+                        _buildState.value = finalState.copy(
                             isBuilding = false,
                             resultApk = apkFile,
-                            resultApkSize = apkSize
+                            resultApkSize = apkSize,
+                            buildEndTime = System.currentTimeMillis()
                         )
                         viewModelScope.launch {
                             val updated = buildRecord.markSuccess(apkFile.absolutePath, apkSize, buildStore.getLogFile(buildRecord).absolutePath)
@@ -313,9 +335,11 @@ class PackagerViewModel @Inject constructor(
                     }
 
                     override fun onError(error: String) {
-                        _buildState.value = _buildState.value.copy(
+                        val finalState = finalizeCurrentStep(_buildState.value)
+                        _buildState.value = finalState.copy(
                             isBuilding = false,
-                            error = error
+                            error = error,
+                            buildEndTime = System.currentTimeMillis()
                         )
                         viewModelScope.launch {
                             val updated = buildRecord.markFailed(error, buildStore.getLogFile(buildRecord).absolutePath)
@@ -334,6 +358,16 @@ class PackagerViewModel @Inject constructor(
      */
     fun resetBuildState() {
         _buildState.value = BuildState()
+    }
+
+    /**
+     * 结算当前正在执行步骤的耗时（成功或失败时调用）
+     */
+    private fun finalizeCurrentStep(state: BuildState): BuildState {
+        val current = state.currentStep ?: return state
+        val start = state.stepStartTimes[current] ?: return state
+        val duration = System.currentTimeMillis() - start
+        return state.copy(stepDurations = state.stepDurations + (current to duration))
     }
 
     /**

@@ -660,7 +660,18 @@ fun AppNavigation(
                 com.mini.me_core.feature.packager.presentation.component.ProjectDetailScreen(
                     projectId = projectId,
                     viewModel = packagerViewModel,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onOpenFile = { path ->
+                        navController.navigate("packager_file/$projectId/${Uri.encode(path)}")
+                    },
+                )
+            }
+            // 应用打包器 - 源文件独立查看/编辑页（filePath 由 NavController 自动 Uri.decode）
+            composable("packager_file/{projectId}/{filePath}") { entry ->
+                val filePath = entry.arguments?.getString("filePath") ?: ""
+                com.mini.me_core.feature.packager.presentation.component.PackagerFileViewerScreen(
+                    filePath = filePath,
+                    onNavigateBack = { navController.popBackStack() },
                 )
             }
             composable("capability_center") {

@@ -127,16 +127,16 @@ class ApkBuilder(
             callback.onStepComplete(BuildStep.REPLACE_WWW, 2, steps.size)
 
             // Step 3.5: 替换应用图标（如果用户设置了自定义图标）
+            // 模版图标为自适应图标：res/BW.xml 是二进制 XML，foreground 引用一张位图。
+            // 直接用 PNG 覆盖 BW.xml 会破坏二进制 XML，必须通过 IconReplacer 定位
+            // foreground 引用的位图资源并按安全区合成后写回。
             if (project.iconPath != null && File(project.iconPath).exists()) {
                 val iconFile = File(project.iconPath)
-                // 模版 APK 的图标资源为 res/BW.xml（自适应图标）
-                // 直接用用户的 PNG 覆盖该文件，APK 通过 resources.arsc 索引资源，扩展名不影响
-                val targetIcon = File(extractedDir, "res/BW.xml")
-                if (targetIcon.exists()) {
-                    iconFile.copyTo(targetIcon, overwrite = true)
+                val replaced = IconReplacer.replaceIcon(extractedDir, iconFile)
+                if (replaced) {
                     log("应用图标已替换: ${iconFile.name} (${iconFile.length()} bytes)", callback, logWriter)
                 } else {
-                    log("警告: 未找到模版图标资源 res/BW.xml，跳过图标替换", callback, logWriter)
+                    log("警告: 应用图标替换失败，保留模版默认图标", callback, logWriter)
                 }
             }
 

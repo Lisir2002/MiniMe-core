@@ -12,33 +12,46 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,17 +60,19 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.mini.me_core.feature.packager.domain.engine.ApkAnalyzer
 import com.mini.me_core.feature.packager.domain.engine.ApkBuilder
 import com.mini.me_core.feature.packager.presentation.PackagerViewModel
+import kotlinx.coroutines.delay
 
 /**
  * 构建进度弹窗（流程式）。
  *
- * 以底部弹窗形式展示构建全过程：步骤流程 + 实时日志 + 构建结果 + APK 分析。
- * 替代原独立的 BuildProgressScreen，避免页面跳转打断操作流。
+ * 布局：固定标题栏 + 进度条 + 步骤流程区 + 弹性日志区 + 底部结果区。
+ * 日志区支持全部日志滚动、按内容着色、自动滚动开关与一键复制。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BuildProgressDialog(
     onDismiss: () -> Unit,
+    onRetry: () -> Unit = {},
     viewModel: PackagerViewModel = hiltViewModel()
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -66,12 +81,58 @@ fun BuildProgressDialog(
     val isAnalyzing by viewModel.isAnalyzing.collectAsState()
     val steps = ApkBuilder.BuildStep.entries.toTypedArray()
     val logListState = rememberLazyListState()
+    val clipboard = LocalClipboardManager.current
 
-    // 日志自动滚动到底部
-    LaunchedEffect(buildState.logs.size) {
-        if (buildState.logs.isNotEmpty()) {
+    var autoScroll by remember { mutableStateOf(true) }
+
+    // 实时时钟：用于构建中总耗时与当前步骤耗时
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(buildState.isBuilding) {
+        if (buildState.isBuilding) {
+            while (true) {
+                now = System.currentTimeMillis()
+                delay(500)
+            }
+        }
+    }
+
+    // 用户手动滚动日志时：靠近底部视为自动滚动开启，否则暂停
+    LaunchedEffect(logListState) {
+        snapshotFlow { logListState.firstVisibleItemIndex }
+            .collect { idx ->
+                val total = buildState.logs.size
+                if (total > 0) {
+                    autoScroll = idx + 4 >= total
+                }
+            }
+    }
+
+    // 日志追加时若自动滚动开启则滚到底部
+    LaunchedEffect(buildState.logs.size, autoScroll) {
+        if (autoScroll && buildState.logs.isNotEmpty()) {
             logListState.animateScrollToItem(buildState.logs.size - 1)
         }
+    }
+
+    // 失败时强制滚到日志末尾（错误通常在末尾）
+    LaunchedEffect(buildState.error != null) {
+        if (buildState.error != null && buildState.logs.isNotEmpty()) {
+            autoScroll = true
+            logListState.animateScrollToItem(buildState.logs.size - 1)
+        }
+    }
+
+    val titleText = when {
+        buildState.isBuilding -> "构建中..."
+        buildState.error != null -> "构建失败"
+        buildState.resultApk != null -> "构建成功"
+        else -> "构建完成"
+    }
+
+    val totalElapsed: Long = when {
+        buildState.isBuilding && buildState.buildStartTime > 0 -> now - buildState.buildStartTime
+        buildState.buildEndTime > 0 && buildState.buildStartTime > 0 -> buildState.buildEndTime - buildState.buildStartTime
+        else -> 0L
     }
 
     ModalBottomSheet(
@@ -84,19 +145,25 @@ fun BuildProgressDialog(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
-            // 标题栏
+            // ===== 标题栏 =====
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    if (buildState.isBuilding) "构建中..."
-                    else if (buildState.error != null) "构建失败"
-                    else "构建完成",
+                    titleText,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.weight(1f))
+                if (totalElapsed > 0L) {
+                    Text(
+                        formatDuration(totalElapsed),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.width(12.dp))
+                }
                 if (!buildState.isBuilding) {
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.Close, contentDescription = "关闭")
@@ -106,9 +173,9 @@ fun BuildProgressDialog(
 
             Spacer(Modifier.height(8.dp))
 
-            // 进度条
-            if (buildState.isBuilding) {
-                LinearProgressIndicator(
+            // ===== 进度条 =====
+            when {
+                buildState.isBuilding -> LinearProgressIndicator(
                     progress = {
                         if (buildState.totalSteps > 0)
                             (buildState.currentStepIndex + 0.5f) / buildState.totalSteps
@@ -118,114 +185,187 @@ fun BuildProgressDialog(
                         .fillMaxWidth()
                         .height(4.dp)
                 )
-            } else if (buildState.error != null) {
-                Box(
+                buildState.error != null -> Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(4.dp)
-                        .background(androidx.compose.ui.graphics.Color(0xFFF44336))
+                        .background(Color(0xFFF44336))
                 )
-            } else if (buildState.resultApk != null) {
-                Box(
+                buildState.resultApk != null -> Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(4.dp)
-                        .background(androidx.compose.ui.graphics.Color(0xFF4CAF50))
+                        .background(Color(0xFF4CAF50))
                 )
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(6.dp))
 
-            // 内容区：步骤流程 + 日志/结果
+            // ===== 状态摘要行 =====
+            val summary = when {
+                buildState.isBuilding && buildState.totalSteps > 0 ->
+                    "步骤 ${(buildState.currentStepIndex + 1).coerceAtMost(buildState.totalSteps)}/${buildState.totalSteps}"
+                buildState.error != null -> "构建失败"
+                buildState.resultApk != null -> "构建成功"
+                else -> ""
+            }
+            if (summary.isNotEmpty()) {
+                Text(
+                    summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+
+            // ===== 步骤流程区（固定最大高度，可滚动）=====
             LazyColumn(
-                modifier = Modifier.weight(1f),
-                state = if (buildState.logs.isNotEmpty()) logListState else rememberLazyListState(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 220.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // 步骤流程
                 items(steps) { step ->
                     val index = steps.indexOf(step)
                     val isCurrent = buildState.currentStep == step && buildState.isBuilding
                     val isCompleted = buildState.isBuilding && index < buildState.currentStepIndex
                     val isSuccess = !buildState.isBuilding && buildState.error == null
                     val isFailed = !buildState.isBuilding && buildState.error != null && index >= buildState.currentStepIndex
+                    val durationMs = buildState.stepDurations[step]
+                    val liveElapsed = if (isCurrent) {
+                        buildState.stepStartTimes[step]?.let { now - it }
+                    } else null
 
                     StepRow(
                         step = step,
                         isCurrent = isCurrent,
                         isCompleted = isCompleted,
                         isSuccess = isSuccess,
-                        isFailed = isFailed
+                        isFailed = isFailed,
+                        durationMs = durationMs,
+                        liveElapsedMs = liveElapsed
                     )
                 }
+            }
 
-                // 构建结果
-                if (!buildState.isBuilding) {
-                    item {
-                        Spacer(Modifier.height(8.dp))
-                        val error = buildState.error
-                        val resultApk = buildState.resultApk
-                        if (error != null) {
-                            BuildErrorCard(error = error)
-                        } else if (resultApk != null) {
+            Spacer(Modifier.height(8.dp))
+
+            // ===== 日志工具栏 =====
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "日志 · ${buildState.logs.size} 行",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "自动滚动",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Switch(
+                    checked = autoScroll,
+                    onCheckedChange = { autoScroll = it }
+                )
+                IconButton(
+                    onClick = {
+                        clipboard.setText(AnnotatedString(buildState.logs.joinToString("\n")))
+                    },
+                    enabled = buildState.logs.isNotEmpty()
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = "复制全部日志")
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            // ===== 日志区（弹性，填满剩余空间）=====
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(Color(0xFF1A1A2E), RoundedCornerShape(8.dp))
+                    .padding(8.dp)
+            ) {
+                if (buildState.logs.isEmpty()) {
+                    Text(
+                        "等待日志输出...",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color(0xFF606070),
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                } else {
+                    LazyColumn(
+                        state = logListState,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(buildState.logs) { log ->
+                            Text(
+                                text = log,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = logColor(log),
+                                fontWeight = if (logEmphasis(log)) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ===== 结果区（构建结束后显示）=====
+            if (!buildState.isBuilding) {
+                Spacer(Modifier.height(8.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 220.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    val error = buildState.error
+                    val resultApk = buildState.resultApk
+                    when {
+                        error != null -> BuildErrorCard(
+                            error = error,
+                            onRetry = onRetry
+                        )
+                        resultApk != null -> {
                             BuildSuccessCard(
                                 apkPath = resultApk.absolutePath,
                                 apkSize = buildState.resultApkSize,
                                 onInstall = { viewModel.installApk(resultApk) }
                             )
-                        }
-                    }
-                }
-
-                // APK 分析结果（构建成功后自动分析）
-                if (!buildState.isBuilding && buildState.resultApk != null) {
-                    item {
-                        Spacer(Modifier.height(12.dp))
-                        Text("APK 分析", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(8.dp))
-                        if (isAnalyzing) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                androidx.compose.material3.CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp
+                            if (apkAnalysis != null || isAnalyzing) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "APK 分析",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
                                 )
-                                Spacer(Modifier.width(8.dp))
-                                Text("分析中...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        } else if (apkAnalysis != null) {
-                            ApkAnalysisSummary(analysis = apkAnalysis!!)
-                        }
-                    }
-                }
-
-                // 构建日志
-                if (buildState.logs.isNotEmpty()) {
-                    item {
-                        Spacer(Modifier.height(12.dp))
-                        Text("构建日志", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                                .background(androidx.compose.ui.graphics.Color(0xFF1A1A2E), RoundedCornerShape(8.dp))
-                                .padding(12.dp)
-                        ) {
-                            LazyColumn(state = logListState) {
-                                items(buildState.logs.takeLast(200)) { log ->
-                                    Text(
-                                        text = log,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = androidx.compose.ui.graphics.Color(0xFFB0B0C0)
-                                    )
+                                Spacer(Modifier.height(6.dp))
+                                if (isAnalyzing) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        androidx.compose.material3.CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            "分析中...",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                } else if (apkAnalysis != null) {
+                                    ApkAnalysisSummary(analysis = apkAnalysis!!)
                                 }
                             }
                         }
                     }
                 }
-
-                item { Spacer(Modifier.height(16.dp)) }
             }
         }
     }
@@ -240,13 +380,21 @@ private fun StepRow(
     isCurrent: Boolean,
     isCompleted: Boolean,
     isSuccess: Boolean,
-    isFailed: Boolean
+    isFailed: Boolean,
+    durationMs: Long?,
+    liveElapsedMs: Long?
 ) {
     val (icon, color) = when {
         isCurrent -> Icons.Default.HourglassEmpty to MaterialTheme.colorScheme.primary
-        isCompleted || isSuccess -> Icons.Default.CheckCircle to androidx.compose.ui.graphics.Color(0xFF4CAF50)
-        isFailed -> Icons.Default.Error to androidx.compose.ui.graphics.Color(0xFFF44336)
+        isCompleted || isSuccess -> Icons.Default.CheckCircle to Color(0xFF4CAF50)
+        isFailed -> Icons.Default.Error to Color(0xFFF44336)
         else -> Icons.Default.HourglassEmpty to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+    }
+
+    val durationLabel = when {
+        durationMs != null -> formatDuration(durationMs)
+        liveElapsedMs != null -> "${formatDuration(liveElapsedMs)} ..."
+        else -> ""
     }
 
     Row(
@@ -257,17 +405,25 @@ private fun StepRow(
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                 RoundedCornerShape(8.dp)
             )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(10.dp))
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(8.dp))
         Text(
             step.displayName,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
         )
+        if (durationLabel.isNotEmpty()) {
+            Text(
+                durationLabel,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -283,13 +439,13 @@ private fun BuildSuccessCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(androidx.compose.ui.graphics.Color(0xFF4CAF50).copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+            .background(Color(0xFF4CAF50).copy(alpha = 0.1f), RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFF4CAF50), modifier = Modifier.size(24.dp))
+            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(10.dp))
-            Text("构建成功", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFF4CAF50))
+            Text("构建成功", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
         }
         Spacer(Modifier.height(8.dp))
         Text("大小: ${formatSize(apkSize)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -310,9 +466,9 @@ private fun BuildSuccessCard(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.FileDownload, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.FileDownload, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text("安装 APK", style = MaterialTheme.typography.labelLarge, color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold)
+            Text("安装 APK", style = MaterialTheme.typography.labelLarge, color = Color.White, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -321,20 +477,37 @@ private fun BuildSuccessCard(
  * 构建失败卡片
  */
 @Composable
-private fun BuildErrorCard(error: String) {
+private fun BuildErrorCard(
+    error: String,
+    onRetry: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(androidx.compose.ui.graphics.Color(0xFFF44336).copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+            .background(Color(0xFFF44336).copy(alpha = 0.1f), RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Error, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFFF44336), modifier = Modifier.size(24.dp))
+            Icon(Icons.Default.Error, contentDescription = null, tint = Color(0xFFF44336), modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(10.dp))
-            Text("构建失败", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFFF44336))
+            Text("构建失败", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color(0xFFF44336))
         }
         Spacer(Modifier.height(8.dp))
         Text(error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                .clickable(onClick = onRetry)
+                .padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("重试", style = MaterialTheme.typography.labelLarge, color = Color.White, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
@@ -376,6 +549,23 @@ private fun StatChip(label: String, count: Int) {
     }
 }
 
+/**
+ * 日志行着色：错误红、警告橙、步骤/分隔线蓝加粗
+ */
+private fun logColor(text: String): Color = when {
+    text.contains("失败") ||
+        text.contains("error", ignoreCase = true) ||
+        text.contains("exception", ignoreCase = true) -> Color(0xFFFF6B6B)
+    text.contains("警告") ||
+        text.contains("warning", ignoreCase = true) ||
+        text.contains("note", ignoreCase = true) -> Color(0xFFFFB74D)
+    text.contains("==========") || text.contains("步骤") -> Color(0xFF82AAFF)
+    else -> Color(0xFFB0B0C0)
+}
+
+private fun logEmphasis(text: String): Boolean =
+    text.contains("==========") || text.contains("步骤")
+
 private fun formatSize(bytes: Long): String {
     val kb = bytes / 1024.0
     val mb = kb / 1024.0
@@ -384,4 +574,10 @@ private fun formatSize(bytes: Long): String {
         kb >= 1 -> String.format(java.util.Locale.US, "%.1f KB", kb)
         else -> "$bytes B"
     }
+}
+
+private fun formatDuration(ms: Long): String {
+    if (ms <= 0) return ""
+    val seconds = ms / 1000.0
+    return String.format(java.util.Locale.US, "%.1fs", seconds)
 }

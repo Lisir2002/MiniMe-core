@@ -6,6 +6,7 @@ import com.mini.me_core.feature.packager.domain.model.BridgeCapabilities
 import com.mini.me_core.feature.packager.domain.model.BuildStatus
 import com.mini.me_core.feature.packager.domain.model.DisplaySettings
 import com.mini.me_core.feature.packager.domain.model.Project
+import com.mini.me_core.feature.packager.domain.model.ProjectConfig
 import com.mini.me_core.feature.packager.domain.model.ProjectType
 import com.mini.me_core.feature.packager.domain.model.SplashSettings
 import com.mini.me_core.feature.packager.domain.model.WebViewSettings
@@ -28,6 +29,10 @@ import javax.inject.Singleton
  *
  * 负责项目配置的持久化（JSON 文件）和内存缓存。
  * 数据存储在应用私有目录 files/packager/projects/ 下。
+ *
+ * 持久化格式：项目目录下的 project.json（分组 schema，见 [ProjectConfig]）。
+ * 旧版扁平格式 config.json 在加载时自动迁移为 project.json，并将旧文件重命名为
+ * config.legacy.json.bak 留档；所有写入均采用「临时文件 + rename」原子替换。
  */
 @Suppress("ClassOrdering") // 行为保持搬迁：companion/属性顺序沿用原 domain 类，不重排
 @Singleton
@@ -54,6 +59,7 @@ class ProjectStoreImpl @Inject constructor(
 
     private val json = Json {
         prettyPrint = true
+        prettyPrintIndent = "  "
         ignoreUnknownKeys = true
     }
 
@@ -78,29 +84,58 @@ class ProjectStoreImpl @Inject constructor(
     }
 
     /**
-     * 加载所有项目
+     * 加载所有项目。
+     *
+     * 每个项目目录的解析优先级：
+     * 1. project.json —— 现行分组格式，直接解析；
+     * 2. config.json —— 旧扁平格式，解析后迁移为 project.json，旧文件重命名备份；
+     * 3. 两者都不存在 —— 跳过该目录。
      */
     private fun loadAll() {
         val list = mutableListOf<Project>()
         var failed = 0
+        var migrated = 0
         projectsDir.listFiles()?.forEach { dir ->
-            if (dir.isDirectory) {
-                val configFile = File(dir, "config.json")
-                if (configFile.exists()) {
-                    runCatching {
-                        val stored = json.decodeFromString<StoredProject>(configFile.readText())
-                        list.add(stored.toProject())
-                    }.onFailure {
-                        failed++
-                        FileLogger.w(TAG, "加载项目配置失败: ${configFile.absolutePath}", it)
+            if (!dir.isDirectory) return@forEach
+            val projectJson = File(dir, "project.json")
+            val legacyJson = File(dir, "config.json")
+            runCatching {
+                when {
+                    projectJson.exists() -> {
+                        val config = json.decodeFromString<ProjectConfig>(projectJson.readText())
+                        list.add(config.toProject(dir))
+                    }
+                    legacyJson.exists() -> {
+                        // 旧格式迁移：扁平 StoredProject → Project → 分组 ProjectConfig
+                        val stored = json.decodeFromString<LegacyStoredProject>(legacyJson.readText())
+                        val project = stored.toProject()
+                        writeProjectConfig(dir, ProjectConfig.fromProject(project))
+                        // 旧文件留档备份（已存在则覆盖）
+                        val backup = File(dir, "config.legacy.json.bak")
+                        if (backup.exists()) backup.delete()
+                        legacyJson.renameTo(backup)
+                        migrated++
+                        FileLogger.i(TAG, "迁移旧配置: ${project.name} (${project.id}) -> project.json")
+                        list.add(project)
+                    }
+                    else -> {
+                        FileLogger.w(TAG, "目录缺少配置文件，跳过: ${dir.absolutePath}", null)
                     }
                 }
+            }.onFailure {
+                failed++
+                FileLogger.w(TAG, "加载项目配置失败: ${dir.absolutePath}", it)
             }
         }
         // 按更新时间降序排列
         list.sortByDescending { it.updatedAt }
         _projects.value = list
-        FileLogger.d(TAG, "加载完成，共 ${list.size} 个项目" + if (failed > 0) "，$failed 个加载失败" else "")
+        FileLogger.d(
+            TAG,
+            "加载完成，共 ${list.size} 个项目" +
+                (if (failed > 0) "，$failed 个加载失败" else "") +
+                (if (migrated > 0) "，$migrated 个已迁移" else "")
+        )
     }
 
     override suspend fun createProject(
@@ -128,9 +163,8 @@ class ProjectStoreImpl @Inject constructor(
         // 创建项目目录
         val projectDir = File(projectsDir, id).apply { mkdirs() }
 
-        // 保存配置
-        val configFile = File(projectDir, "config.json")
-        configFile.writeText(json.encodeToString(StoredProject.fromProject(project)))
+        // 保存配置（project.json，原子写入）
+        writeProjectConfig(projectDir, ProjectConfig.fromProject(project))
 
         // 保存 HTML 内容（为空时使用默认模板）
         val wwwDir = File(projectDir, "www").apply { mkdirs() }
@@ -151,8 +185,7 @@ class ProjectStoreImpl @Inject constructor(
         val updated = project.copy(updatedAt = System.currentTimeMillis())
         val projectDir = File(projectsDir, updated.id)
         if (projectDir.exists()) {
-            val configFile = File(projectDir, "config.json")
-            configFile.writeText(json.encodeToString(StoredProject.fromProject(updated)))
+            writeProjectConfig(projectDir, ProjectConfig.fromProject(updated))
         }
         _projects.value = _projects.value.map { if (it.id == updated.id) updated else it }
         updated
@@ -217,10 +250,31 @@ class ProjectStoreImpl @Inject constructor(
     }
 
     /**
-     * 用于 JSON 序列化的项目存储格式
+     * 原子写入 project.json：
+     * 先序列化到同目录下的 project.json.tmp，再 rename 覆盖目标文件。
+     * 同一文件系统内 rename(2) 是原子的，进程中断不会留下半截 JSON。
+     */
+    private fun writeProjectConfig(projectDir: File, config: ProjectConfig) {
+        projectDir.mkdirs()
+        val target = File(projectDir, "project.json")
+        val tmp = File(projectDir, "project.json.tmp")
+        tmp.writeText(json.encodeToString(config), Charsets.UTF_8)
+        if (!tmp.renameTo(target) && target.exists()) {
+            // 兜底：目标已存在且首次 rename 被拒（跨设备等异常），删除后重试
+            target.delete()
+            if (!tmp.renameTo(target)) {
+                error("project.json 写入失败: ${target.absolutePath}")
+            }
+        }
+    }
+
+    /**
+     * 旧版扁平配置（config.json）的序列化格式。
+     *
+     * 仅用于加载时迁移读取，不再用于写入；新格式见 [ProjectConfig]。
      */
     @Serializable
-    private data class StoredProject(
+    private data class LegacyStoredProject(
         val id: String,
         val name: String,
         val packageName: String,
@@ -260,27 +314,5 @@ class ProjectStoreImpl @Inject constructor(
                 runCatching { BuildStatus.valueOf(it) }.getOrNull()
             }
         )
-
-        companion object {
-            fun fromProject(project: Project): StoredProject = StoredProject(
-                id = project.id,
-                name = project.name,
-                packageName = project.packageName,
-                versionName = project.versionName,
-                versionCode = project.versionCode,
-                type = project.type.name,
-                iconPath = project.iconPath,
-                bridgeEnabled = project.bridgeEnabled,
-                bridgeCapabilities = project.bridgeCapabilities,
-                permissions = project.permissions,
-                webViewSettings = project.webViewSettings,
-                displaySettings = project.displaySettings,
-                splashSettings = project.splashSettings,
-                createdAt = project.createdAt,
-                updatedAt = project.updatedAt,
-                lastBuildAt = project.lastBuildAt,
-                lastBuildStatus = project.lastBuildStatus?.name
-            )
-        }
     }
 }

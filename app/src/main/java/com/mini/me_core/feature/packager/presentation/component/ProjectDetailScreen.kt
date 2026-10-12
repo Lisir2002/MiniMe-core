@@ -24,13 +24,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.InsertPhoto
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -63,8 +69,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.components.FileBrowserItem
 import com.mini.me_core.core.theme.components.fileIconVisual
-import com.mini.me_core.core.viewer.code.CodeViewerScreen
-import com.mini.me_core.core.viewer.code.CodeViewerViewModel
 import com.mini.me_core.feature.packager.domain.model.BuildRecord
 import com.mini.me_core.feature.packager.domain.model.BuildStatus
 import com.mini.me_core.feature.packager.domain.model.Project
@@ -87,8 +91,8 @@ import java.util.Locale
 fun ProjectDetailScreen(
     projectId: String,
     viewModel: PackagerViewModel = hiltViewModel(),
-    codeViewerViewModel: CodeViewerViewModel = hiltViewModel(),
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onOpenFile: (String) -> Unit = {},
 ) {
     val projects by viewModel.projects.collectAsState()
     val project = projects.find { it.id == projectId }
@@ -157,7 +161,11 @@ fun ProjectDetailScreen(
                         viewModel.startBuild(currentProject)
                     }
                 )
-                1 -> SourceTab(project = currentProject, viewModel = viewModel, codeViewerViewModel = codeViewerViewModel)
+                1 -> SourceTab(
+                    project = currentProject,
+                    viewModel = viewModel,
+                    onOpenFile = onOpenFile,
+                )
                 2 -> ConfigTab(project = currentProject, viewModel = viewModel)
             }
         }
@@ -169,7 +177,8 @@ fun ProjectDetailScreen(
             onDismiss = {
                 showBuildDialog = false
                 viewModel.resetBuildState()
-            }
+            },
+            onRetry = { viewModel.startBuild(currentProject) }
         )
     }
 }
@@ -186,9 +195,32 @@ private fun OverviewTab(
 ) {
     val scope = rememberCoroutineScope()
     var isEditing by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
     var editName by remember { mutableStateOf(project.name) }
     var editVersion by remember { mutableStateOf(project.versionName) }
     var editPackage by remember { mutableStateOf(project.packageName) }
+
+    // 实时校验
+    val nameError = when {
+        editName.isBlank() -> "应用名称不能为空"
+        editName.length > 30 -> "应用名称不能超过 30 个字符"
+        else -> null
+    }
+    val packageError = when {
+        editPackage.isBlank() -> "包名不能为空"
+        !Project.isValidPackageName(editPackage) -> "包名不符合 Java 包名规范"
+        else -> null
+    }
+    val versionError = when {
+        editVersion.isBlank() -> "版本号不能为空"
+        !versionRegex.matches(editVersion.trim()) -> "版本号格式应为 x.y.z（如 1.0.0）"
+        else -> null
+    }
+    val hasChanges = editName != project.name ||
+        editPackage != project.packageName ||
+        editVersion != project.versionName
+    val canSave = nameError == null && packageError == null && versionError == null && hasChanges && !isSaving
+    val derivedVersionCode = remember(editVersion) { Project.parseVersionCode(editVersion.trim()) }
 
     // 图片选择器
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -259,7 +291,9 @@ private fun OverviewTab(
                                 onValueChange = { editName = it },
                                 label = { Text("应用名称") },
                                 modifier = Modifier.fillMaxWidth(),
-                                singleLine = true
+                                singleLine = true,
+                                isError = nameError != null,
+                                supportingText = nameError?.let { { Text(it) } },
                             )
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
@@ -268,7 +302,9 @@ private fun OverviewTab(
                                 label = { Text("包名") },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                isError = packageError != null,
+                                supportingText = packageError?.let { { Text(it) } },
                             )
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
@@ -276,7 +312,16 @@ private fun OverviewTab(
                                 onValueChange = { editVersion = it },
                                 label = { Text("版本号") },
                                 modifier = Modifier.fillMaxWidth(),
-                                singleLine = true
+                                singleLine = true,
+                                isError = versionError != null,
+                                supportingText = {
+                                    val msg = versionError
+                                    if (msg != null) {
+                                        Text(msg)
+                                    } else {
+                                        Text("versionCode: $derivedVersionCode")
+                                    }
+                                },
                             )
                         } else {
                             InfoRow("应用名称", project.name)
@@ -288,20 +333,38 @@ private fun OverviewTab(
                 }
 
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     if (isEditing) {
-                        TextButton(onClick = {
-                            viewModel.updateProject(
-                                project.copy(
-                                    name = editName,
-                                    packageName = editPackage,
-                                    versionName = editVersion,
-                                    versionCode = Project.parseVersionCode(editVersion)
+                        TextButton(
+                            onClick = {
+                                isSaving = true
+                                scope.launch {
+                                    viewModel.updateProject(
+                                        project.copy(
+                                            name = editName.trim(),
+                                            packageName = editPackage.trim(),
+                                            versionName = editVersion.trim(),
+                                            versionCode = Project.parseVersionCode(editVersion.trim()),
+                                        )
+                                    )
+                                    isSaving = false
+                                    isEditing = false
+                                }
+                            },
+                            enabled = canSave,
+                        ) {
+                            if (isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
                                 )
-                            )
-                            isEditing = false
-                        }) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                            } else {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
                             Spacer(Modifier.width(4.dp))
                             Text("保存")
                         }
@@ -314,7 +377,12 @@ private fun OverviewTab(
                             Text("取消")
                         }
                     } else {
-                        TextButton(onClick = { isEditing = true }) {
+                        TextButton(onClick = {
+                            editName = project.name
+                            editPackage = project.packageName
+                            editVersion = project.versionName
+                            isEditing = true
+                        }) {
                             Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("编辑信息")
@@ -384,128 +452,291 @@ private suspend fun saveIconToProject(context: android.content.Context, projectI
 }
 
 /**
- * 源文件 Tab（目录树 + 代码编辑器）
+ * 源文件 Tab（目录浏览 + 新建/重命名/删除；点击文件跳转独立代码页）
  */
 @Composable
 private fun SourceTab(
     project: Project,
     viewModel: PackagerViewModel,
-    codeViewerViewModel: CodeViewerViewModel
+    onOpenFile: (String) -> Unit,
 ) {
     val wwwDir = viewModel.getWwwDir(project.id)
     var currentPath by remember { mutableStateOf(wwwDir) }
-    var selectedFile by remember { mutableStateOf<File?>(null) }
     var pathStack by remember { mutableStateOf(listOf(wwwDir)) }
+    // 操作后通过 refreshKey 触发文件列表重组
+    var refreshKey by remember { mutableIntStateOf(0) }
+
+    // 新建文件对话框
+    var showNewDialog by remember { mutableStateOf(false) }
+    var newFileName by remember { mutableStateOf("index.html") }
+    var newFileError by remember { mutableStateOf<String?>(null) }
+
+    // 文件操作菜单（长按弹出）
+    var actionFile by remember { mutableStateOf<File?>(null) }
+    // 重命名对话框
+    var renameTarget by remember { mutableStateOf<File?>(null) }
+    var renameText by remember { mutableStateOf("") }
+    var renameError by remember { mutableStateOf<String?>(null) }
+    // 删除确认
+    var deleteTarget by remember { mutableStateOf<File?>(null) }
+
+    // 文件列表（读取 refreshKey 以触发刷新）
+    val files = remember(currentPath, refreshKey) {
+        currentPath.listFiles()?.sortedWith(
+            compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() }
+        ) ?: emptyList()
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        if (selectedFile != null) {
-            // 代码编辑器视图
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = {
-                    selectedFile = null
-                    currentPath = pathStack.lastOrNull() ?: wwwDir
-                }) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("返回文件列表")
-                }
-                Spacer(Modifier.weight(1f))
-                Text(
-                    selectedFile!!.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+        // 面包屑 + 新建按钮
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = {
+                pathStack = listOf(wwwDir)
+                currentPath = wwwDir
+            }) {
+                Text("www", fontWeight = FontWeight.Bold)
             }
-            Box(modifier = Modifier.weight(1f)) {
-                CodeViewerScreen(
-                    path = selectedFile!!.absolutePath,
-                    viewModel = codeViewerViewModel,
-                    editable = true
-                )
+            pathStack.drop(1).forEachIndexed { index, dir ->
+                Text("/", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = {
+                    pathStack = pathStack.take(index + 2)
+                    currentPath = dir
+                }) {
+                    Text(dir.name)
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = {
+                newFileName = "index.html"
+                newFileError = null
+                showNewDialog = true
+            }) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("新建文件")
+            }
+        }
+
+        if (files.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.Folder,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("空目录", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         } else {
-            // 目录树视图
-            // 面包屑
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                TextButton(onClick = {
-                    pathStack = listOf(wwwDir)
-                    currentPath = wwwDir
-                }) {
-                    Text("www", fontWeight = FontWeight.Bold)
-                }
-                pathStack.drop(1).forEachIndexed { index, dir ->
-                    Text("/", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick = {
-                        pathStack = pathStack.take(index + 2)
-                        currentPath = dir
-                    }) {
-                        Text(dir.name)
+                items(files, key = { it.absolutePath }) { file ->
+                    val visual = fileIconVisual(name = file.name, isDir = file.isDirectory)
+                    val subtitle = if (file.isDirectory) {
+                        "${file.listFiles()?.size ?: 0} 项"
+                    } else {
+                        formatFileSize(file.length())
                     }
-                }
-            }
-
-            // 文件列表
-            val files = currentPath.listFiles()?.sortedWith(
-                compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() }
-            ) ?: emptyList()
-
-            if (files.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Default.Folder,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Text("空目录", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    items(files, key = { it.absolutePath }) { file ->
-                        val visual = fileIconVisual(name = file.name, isDir = file.isDirectory)
-                        val subtitle = if (file.isDirectory) {
-                            "${file.listFiles()?.size ?: 0} 项"
-                        } else {
-                            formatFileSize(file.length())
-                        }
-                        FileBrowserItem(
-                            name = file.name,
-                            subtitle = subtitle,
-                            icon = visual.icon,
-                            iconBg = visual.iconBg,
-                            iconFg = visual.iconFg,
-                            onClick = {
-                                if (file.isDirectory) {
-                                    pathStack = pathStack + file
-                                    currentPath = file
-                                } else {
-                                    selectedFile = file
-                                }
+                    FileBrowserItem(
+                        name = file.name,
+                        subtitle = subtitle,
+                        icon = visual.icon,
+                        iconBg = visual.iconBg,
+                        iconFg = visual.iconFg,
+                        onClick = {
+                            if (file.isDirectory) {
+                                pathStack = pathStack + file
+                                currentPath = file
+                            } else {
+                                onOpenFile(file.absolutePath)
                             }
-                        )
-                    }
+                        },
+                        onLongClick = { actionFile = file },
+                        trailing = {
+                            IconButton(onClick = { actionFile = file }) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    contentDescription = "更多操作",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
+                    )
                 }
             }
         }
+    }
+
+    // 文件操作菜单（重命名 / 删除）
+    actionFile?.let { target ->
+        AlertDialog(
+            onDismissRequest = { actionFile = null },
+            title = { Text(target.name) },
+            text = {
+                Column {
+                    TextButton(onClick = {
+                        actionFile = null
+                        renameTarget = target
+                        renameText = target.name
+                        renameError = null
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("重命名")
+                    }
+                    TextButton(onClick = {
+                        actionFile = null
+                        deleteTarget = target
+                    }) {
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("删除", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { actionFile = null }) { Text("取消") }
+            },
+        )
+    }
+
+    // 新建文件对话框
+    if (showNewDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewDialog = false },
+            title = { Text("新建文件") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = newFileName,
+                        onValueChange = {
+                            newFileName = it
+                            newFileError = null
+                        },
+                        label = { Text("文件名") },
+                        singleLine = true,
+                        isError = newFileError != null,
+                        supportingText = newFileError?.let { { Text(it) } },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val name = newFileName.trim()
+                    if (name.isBlank() || name.contains("/") || name.contains("\\")) {
+                        newFileError = "文件名不合法"
+                        return@TextButton
+                    }
+                    val target = File(currentPath, name)
+                    if (target.exists()) {
+                        newFileError = "文件已存在"
+                        return@TextButton
+                    }
+                    val ok = runCatching {
+                        if (!target.name.contains(".")) {
+                            File(target.parentFile, "${target.name}.html").createNewFile()
+                        } else {
+                            target.createNewFile()
+                        }
+                    }.isSuccess
+                    if (ok) {
+                        showNewDialog = false
+                        refreshKey++
+                    } else {
+                        newFileError = "创建失败"
+                    }
+                }) { Text("创建") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewDialog = false }) { Text("取消") }
+            },
+        )
+    }
+
+    // 重命名对话框
+    renameTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { renameTarget = null },
+            title = { Text("重命名") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = {
+                        renameText = it
+                        renameError = null
+                    },
+                    label = { Text("新名称") },
+                    singleLine = true,
+                    isError = renameError != null,
+                    supportingText = renameError?.let { { Text(it) } },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val name = renameText.trim()
+                    if (name.isBlank() || name.contains("/") || name.contains("\\")) {
+                        renameError = "名称不合法"
+                        return@TextButton
+                    }
+                    val dest = File(target.parentFile, name)
+                    if (dest.exists()) {
+                        renameError = "目标已存在"
+                        return@TextButton
+                    }
+                    val ok = runCatching { target.renameTo(dest) }.getOrDefault(false)
+                    if (ok) {
+                        renameTarget = null
+                        refreshKey++
+                    } else {
+                        renameError = "重命名失败"
+                    }
+                }) { Text("确定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { renameTarget = null }) { Text("取消") }
+            },
+        )
+    }
+
+    // 删除确认对话框
+    deleteTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("删除") },
+            text = {
+                Text(
+                    if (target.isDirectory) "确定删除目录「${target.name}」及其全部内容？"
+                    else "确定删除文件「${target.name}」？"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    runCatching { target.deleteRecursively() }
+                    deleteTarget = null
+                    refreshKey++
+                }) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) { Text("取消") }
+            },
+        )
     }
 }
 
@@ -759,6 +990,8 @@ private fun BuildRecordRow(
 
 private fun formatDateTime(timestamp: Long): String =
     SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))
+
+private val versionRegex = Regex("""\d+\.\d+\.\d+""")
 
 private fun formatFileSize(bytes: Long): String {
     val kb = bytes / 1024.0
