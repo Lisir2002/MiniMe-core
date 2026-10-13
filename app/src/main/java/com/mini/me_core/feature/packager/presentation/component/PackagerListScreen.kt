@@ -398,6 +398,7 @@ private fun BuildStatusBadge(status: BuildStatus?) {
         BuildStatus.SUCCESS -> "成功" to colors.success
         BuildStatus.FAILED -> "失败" to colors.error
         BuildStatus.BUILDING -> "构建中" to colors.brandPrimary
+        BuildStatus.CANCELLED -> "已取消" to colors.textTertiary
     }
 
     Box(

@@ -17,9 +17,11 @@ import com.mini.me_core.feature.packager.domain.repository.ProjectStore
 import com.mini.me_core.feature.packager.util.PinyinUtil
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -78,6 +80,8 @@ class PackagerViewModel @Inject constructor(
         val resultApk: File? = null,
         val resultApkSize: Long = 0,
         val error: String? = null,
+        /** 是否被用户主动取消（与 error 互斥：取消不是失败） */
+        val cancelled: Boolean = false,
         val stepStartTimes: Map<ApkBuilder.BuildStep, Long> = emptyMap(),
         val stepDurations: Map<ApkBuilder.BuildStep, Long> = emptyMap(),
         val buildStartTime: Long = 0L,
@@ -86,6 +90,12 @@ class PackagerViewModel @Inject constructor(
 
     private val _buildState = MutableStateFlow(BuildState())
     val buildState: StateFlow<BuildState> = _buildState.asStateFlow()
+
+    /** 当前构建任务的 Job 句柄，取消构建用；null 表示没有进行中的构建 */
+    private var buildJob: Job? = null
+
+    /** 当前构建记录（取消时需要把它标记为 CANCELLED）；null 表示没有进行中的构建 */
+    private var currentBuildRecord: BuildRecord? = null
 
     // ========== 构建记录 ==========
     private val _buildRecords = MutableStateFlow<List<BuildRecord>>(emptyList())
@@ -305,7 +315,7 @@ class PackagerViewModel @Inject constructor(
         FileLogger.i(TAG, "开始构建: ${project.name} (${project.packageName}) v${project.versionName}")
         _buildState.value = BuildState(isBuilding = true, buildStartTime = System.currentTimeMillis())
 
-        viewModelScope.launch {
+        buildJob = viewModelScope.launch {
             val buildsDir = projectStore.getBuildsDir(project.id)
             val buildRecord = BuildRecord.createBuilding(
                 projectId = project.id,
@@ -313,6 +323,8 @@ class PackagerViewModel @Inject constructor(
                 versionCode = project.versionCode
             )
             buildStore.saveBuildRecord(buildRecord)
+            // 记录句柄供取消时标记 CANCELLED；置于 build 之前，保证取消竞态下也能找到记录
+            currentBuildRecord = buildRecord
 
             val buildDir = buildStore.getBuildDir(buildRecord)
 
@@ -352,13 +364,17 @@ class PackagerViewModel @Inject constructor(
                     }
 
                     override fun onSuccess(apkFile: File, apkSize: Long) {
+                        // 终态回调即事实来源：若此前用户点过取消但构建已抢先完成，以成功为准
                         val finalState = finalizeCurrentStep(_buildState.value)
                         _buildState.value = finalState.copy(
                             isBuilding = false,
+                            cancelled = false,
                             resultApk = apkFile,
                             resultApkSize = apkSize,
                             buildEndTime = System.currentTimeMillis()
                         )
+                        buildJob = null
+                        currentBuildRecord = null
                         viewModelScope.launch {
                             val updated = buildRecord.markSuccess(apkFile.absolutePath, apkSize, buildStore.getLogFile(buildRecord).absolutePath)
                             buildStore.saveBuildRecord(updated)
@@ -370,12 +386,16 @@ class PackagerViewModel @Inject constructor(
                     }
 
                     override fun onError(error: String) {
+                        // 终态回调即事实来源：若此前用户点过取消但构建已抢先失败，以失败为准
                         val finalState = finalizeCurrentStep(_buildState.value)
                         _buildState.value = finalState.copy(
                             isBuilding = false,
+                            cancelled = false,
                             error = error,
                             buildEndTime = System.currentTimeMillis()
                         )
+                        buildJob = null
+                        currentBuildRecord = null
                         viewModelScope.launch {
                             val updated = buildRecord.markFailed(error, buildStore.getLogFile(buildRecord).absolutePath)
                             buildStore.saveBuildRecord(updated)
@@ -393,6 +413,42 @@ class PackagerViewModel @Inject constructor(
      */
     fun resetBuildState() {
         _buildState.value = BuildState()
+    }
+
+    /**
+     * 取消当前构建
+     *
+     * 取消语义：
+     * - job.cancel() 后 ApkBuilder 在下一个取消检查点抛出 CancellationException 并原样重抛，
+     *   协程以“已取消”结束，不会误报 onError / 构建失败；
+     * - 本方法立即把 UI 状态切到 cancelled，并把构建记录与项目状态标记为 CANCELLED；
+     * - 若构建在取消生效前已抢先完成（isBuilding 已为 false），本次取消为空操作，保留真实终态。
+     */
+    fun cancelBuild() {
+        if (!_buildState.value.isBuilding) return
+        val job = buildJob
+        FileLogger.i(TAG, "用户取消构建")
+        job?.cancel()
+        // update 原子更新：若构建在读取后、更新前已完成，保留其真实终态
+        _buildState.update { state ->
+            if (!state.isBuilding) state
+            else state.copy(
+                isBuilding = false,
+                cancelled = true,
+                buildEndTime = System.currentTimeMillis()
+            )
+        }
+        val record = currentBuildRecord
+        currentBuildRecord = null
+        buildJob = null
+        if (record != null) {
+            viewModelScope.launch {
+                val updated = record.markCancelled(buildStore.getLogFile(record).absolutePath)
+                buildStore.saveBuildRecord(updated)
+                projectStore.updateBuildStatus(record.projectId, BuildStatus.CANCELLED)
+                loadBuildRecords(record.projectId)
+            }
+        }
     }
 
     /**

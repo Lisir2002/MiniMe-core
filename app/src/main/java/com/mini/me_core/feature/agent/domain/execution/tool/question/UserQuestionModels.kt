@@ -5,10 +5,14 @@ package com.mini.me_core.feature.agent.domain.execution.tool.question
  *
  * @param id 本次调用的唯一标识（对应 ToolCall.id），用于 resolve 时配对。
  * @param questions 本次要问用户的 1-4 个问题。
+ * @param sessionId 发起提问的 AI 会话 id。UI 只展示当前会话的待决问题，
+ *   切换/停止会话时按会话清理，避免「对话已结束仍弹出提问卡」（与
+ *   [com.mini.me_core.feature.agent.domain.execution.tool.PendingToolPermission.sessionId] 同构）。
  */
 data class PendingUserQuestion(
     val id: String,
-    val questions: List<QuestionItem>
+    val questions: List<QuestionItem>,
+    val sessionId: String? = null
 )
 
 /**

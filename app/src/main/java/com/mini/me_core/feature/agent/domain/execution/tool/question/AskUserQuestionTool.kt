@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.agent.domain.execution.tool.question
 
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolParameter
@@ -101,7 +102,14 @@ class AskUserQuestionTool @Inject constructor(
         )
     )
 
-    override suspend fun execute(args: Map<String, JsonElement>): ToolResult {
+    override suspend fun execute(args: Map<String, JsonElement>): ToolResult = executeInternal(args, null)
+
+    /** 优先走 executeWithContext 以获得会话 ID，使提问卡的归属/取消与当前会话连贯；无上下文时降级为 null。 */
+    override suspend fun executeWithContext(args: Map<String, JsonElement>, context: AgentContext): ToolResult {
+        return executeInternal(args, context.sessionId)
+    }
+
+    private suspend fun executeInternal(args: Map<String, JsonElement>, sessionId: String?): ToolResult {
         // Q-4：questions 必须是数组，容错解析，避免强转抛异常被上层吞成模糊错误
         val questionsJson = runCatching { args["questions"]?.jsonArray }.getOrNull()
         if (questionsJson == null || questionsJson.isEmpty()) {
@@ -193,12 +201,12 @@ class AskUserQuestionTool @Inject constructor(
         }
 
         val requestId = UUID.randomUUID().toString()
-        val pending = PendingUserQuestion(id = requestId, questions = questions)
+        val pending = PendingUserQuestion(id = requestId, questions = questions, sessionId = sessionId)
 
         FileLogger.d(TAG, "ask_user_question 发起: ${questions.size} 个问题，等待用户回答...")
 
         // 挂起，等待用户在 UI 做出选择
-        val answer = questionManager.awaitAnswer(pending)
+        val answer = questionManager.awaitAnswer(pending, sessionId)
 
         FileLogger.d(TAG, "ask_user_question 用户已回答: ${answer.answers.size} 条")
 

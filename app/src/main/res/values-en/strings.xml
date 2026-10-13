@@ -2862,6 +2862,9 @@
     <!-- Packager -->
     <string name="packager_project_delete_confirm_title">Delete project</string>
     <string name="packager_project_delete_confirm_message">Delete the project \"%1$s\"? Its configuration, signing settings and built artifacts will be removed. This action cannot be undone.</string>
+    <string name="packager_build_cancel">Cancel</string>
+    <string name="packager_build_cancelled">Build cancelled</string>
+    <string name="packager_build_cancelled_desc">The build was cancelled manually. Temporary files were cleaned up and no APK was produced.</string>
 
     <!-- Remote server -->
     <string name="remote_connection_delete_confirm_title">Delete connection</string>

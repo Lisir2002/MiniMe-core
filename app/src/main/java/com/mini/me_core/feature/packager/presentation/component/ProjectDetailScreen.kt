@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
@@ -1240,6 +1241,7 @@ private fun BuildRecordRow(
         BuildStatus.SUCCESS -> Icons.Default.CheckCircle to androidx.compose.ui.graphics.Color(0xFF4CAF50)
         BuildStatus.FAILED -> Icons.Default.Error to androidx.compose.ui.graphics.Color(0xFFF44336)
         BuildStatus.BUILDING -> Icons.Rounded.PlayArrow to MaterialTheme.colorScheme.primary
+        BuildStatus.CANCELLED -> Icons.Default.Close to MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     Row(

@@ -786,8 +786,9 @@ class AIAgentViewModel @Inject constructor(
     }
 
     private fun processNextInQueue(sessionId: String) {
-        // 进入下一条前，清理可能残留的权限确认请求，避免旧确认卡阻塞/残留。
+        // 进入下一条前，清理可能残留的权限确认/提问/计划审批请求，避免旧卡片阻塞/残留。
         permissionHub.cancelPending(sessionId)
+        permissionHub.cancelPendingInteractions(sessionId)
         val queue = _queuedRequests.value[sessionId] ?: return
         val next = queue.firstOrNull() ?: return
         _queuedRequests.value = _queuedRequests.value + (sessionId to queue.drop(1))
@@ -1237,6 +1238,8 @@ class AIAgentViewModel @Inject constructor(
         sessionJobs.clear()
         // 全停时清理任意会话的残留权限确认请求（传 null = 任意会话）。
         permissionHub.cancelPending(null)
+        // 提问/计划审批两类待决卡一并清理，避免全停后残留弹出。
+        permissionHub.cancelPendingInteractions(null)
         agentLoopRunner.clearPendingNotifications()
         _queuedRequests.value = emptyMap()
         _runningCommandSessions.value = emptySet()
@@ -1270,6 +1273,8 @@ class AIAgentViewModel @Inject constructor(
         job.cancel()
         // 停止会话时清理其残留的权限确认请求，避免确认卡继续弹出。
         permissionHub.cancelPending(sessionId)
+        // 提问/计划审批待决卡一并清理，避免停止后残留弹出。
+        permissionHub.cancelPendingInteractions(sessionId)
         agentLoopRunner.removePendingNotification(sessionId)
         setAgentState(sessionId, AgentUIState.Idle)
         _runningTools.value = _runningTools.value - sessionId

@@ -46,7 +46,7 @@ class PlanApprovalManager @Inject constructor(
         val decision = CompletableDeferred<PlanApprovalChoice>()
         currentDecision = decision
         currentSessionId = sessionId
-        _pendingApproval.value = PlanApprovalRequest(reason = reason)
+        _pendingApproval.value = PlanApprovalRequest(reason = reason, sessionId = sessionId)
 
         try {
             return decision.await()
@@ -65,20 +65,50 @@ class PlanApprovalManager @Inject constructor(
         if (choice == PlanApprovalChoice.REFINE) {
             val sid = currentSessionId
             if (sid != null) {
-                scope.launch {
-                    val session = getSession(sid)
-                    if (session != null && session.mode != "PLAN") {
-                        upsertMode(sid, session, "PLAN")
-                    }
-                }
+                scope.launch { rollbackModeToPlan(sid) }
             }
         }
 
         currentDecision?.complete(choice)
     }
+
+    /**
+     * 主动结束待决计划审批（对话停止 / 结束 / 切换会话时调用），防止审批卡残留。
+     *
+     * 语义与 [com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionManager.cancelPending] 一致：
+     * @param sessionId 要清理的会话 id；传 null 表示清理「任意会话」的待决审批
+     *   （例如 stopAllAgents 全停）。没有匹配的待决审批时为空操作。
+     * @param choice 以何种选择结束挂起的等待：默认 REFINE（留在 PLAN 模式，
+     *   与「用户拒绝计划」的落地语义一致，同时把数据库模式回滚到 PLAN）。
+     */
+    @Synchronized
+    fun cancelPending(sessionId: String?, choice: PlanApprovalChoice = PlanApprovalChoice.REFINE) {
+        val decision = currentDecision ?: return
+        if (sessionId != null && currentSessionId != null && currentSessionId != sessionId) return
+        val sid = currentSessionId
+        _pendingApproval.value = null
+        currentDecision = null
+        currentSessionId = null
+        if (choice == PlanApprovalChoice.REFINE && sid != null) {
+            scope.launch { rollbackModeToPlan(sid) }
+        }
+        decision.complete(choice)
+    }
+
+    /** 把会话模式回滚到 PLAN（SwitchModeTool 已写入 BUILD，需纠正）。 */
+    private suspend fun rollbackModeToPlan(sid: String) {
+        val session = getSession(sid)
+        if (session != null && session.mode != "PLAN") {
+            upsertMode(sid, session, "PLAN")
+        }
+    }
 }
 
-data class PlanApprovalRequest(val reason: String)
+data class PlanApprovalRequest(
+    val reason: String,
+    /** 发起审批的 AI 会话 id。UI 只展示当前会话的待决审批，切换/停止会话时按会话清理。 */
+    val sessionId: String? = null
+)
 
 enum class PlanApprovalChoice {
     /** 批准计划，切换到 BUILD 模式执行 */

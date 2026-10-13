@@ -42,6 +42,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -57,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +68,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.mini.me_core.feature.packager.domain.engine.ApkAnalyzer
 import com.mini.me_core.feature.packager.domain.engine.ApkBuilder
 import com.mini.me_core.feature.packager.presentation.PackagerViewModel
+import com.mini.me_core.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -74,13 +77,15 @@ import kotlinx.coroutines.launch
  *
  * 布局：固定标题栏 + 进度条 + 步骤流程区 + 日志区 + 底部结果区。
  * 日志区支持平滑自动滚动、滚离底部时暂停并显示悬浮回到底部按钮、按级别着色。
+ * 构建中可通过标题栏「取消」按钮中断构建；取消后展示中性色取消态与重试入口。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BuildProgressDialog(
     onDismiss: () -> Unit,
     onRetry: () -> Unit = {},
-    viewModel: PackagerViewModel = hiltViewModel()
+    viewModel: PackagerViewModel = hiltViewModel(),
+    onCancel: () -> Unit = { viewModel.cancelBuild() }
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val buildState by viewModel.buildState.collectAsState()
@@ -130,15 +135,17 @@ fun BuildProgressDialog(
         }
     }
 
-    // 构建失败时强制滚动到最后一行
-    LaunchedEffect(buildState.error != null) {
-        if (buildState.error != null && buildState.logs.isNotEmpty()) {
+    // 构建失败或取消时强制滚动到最后一行
+    LaunchedEffect(buildState.error != null || buildState.cancelled) {
+        if ((buildState.error != null || buildState.cancelled) && buildState.logs.isNotEmpty()) {
             autoScroll = true
             logListState.animateScrollToItem(buildState.logs.size - 1)
         }
     }
 
     // 标题文案、主题色与前置图标
+    // 优先级：构建中 > 失败 > 已取消 > 成功。error 与 cancelled 理论上互斥，
+    // 但取消与终态回调存在微秒级竞态，以构建器终态回调（失败/成功）为事实来源。
     val (titleText, titleColor, titleIcon) = when {
         buildState.isBuilding -> Triple(
             "构建中...",
@@ -148,6 +155,11 @@ fun BuildProgressDialog(
         buildState.error != null -> Triple(
             "构建失败",
             Color(0xFFF44336),
+            Icons.Default.Close
+        )
+        buildState.cancelled -> Triple(
+            stringResource(R.string.packager_build_cancelled),
+            MaterialTheme.colorScheme.onSurfaceVariant,
             Icons.Default.Close
         )
         buildState.resultApk != null -> Triple(
@@ -214,7 +226,12 @@ fun BuildProgressDialog(
                     )
                     Spacer(Modifier.width(12.dp))
                 }
-                if (!buildState.isBuilding) {
+                if (buildState.isBuilding) {
+                    // 构建中：提供明确的取消入口（下滑关闭手势在构建中被禁用，取消是唯一中断方式）
+                    TextButton(onClick = onCancel) {
+                        Text(stringResource(R.string.packager_build_cancel))
+                    }
+                } else {
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.Close, contentDescription = "关闭")
                     }
@@ -243,6 +260,12 @@ fun BuildProgressDialog(
                         .height(4.dp)
                         .background(Color(0xFFF44336))
                 )
+                buildState.cancelled -> Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                )
                 buildState.resultApk != null -> Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -258,6 +281,7 @@ fun BuildProgressDialog(
                 buildState.isBuilding && buildState.totalSteps > 0 ->
                     "步骤 ${(buildState.currentStepIndex + 1).coerceAtMost(buildState.totalSteps)}/${buildState.totalSteps}"
                 buildState.error != null -> "构建失败"
+                buildState.cancelled -> stringResource(R.string.packager_build_cancelled)
                 buildState.resultApk != null -> "构建成功"
                 else -> ""
             }
@@ -280,9 +304,13 @@ fun BuildProgressDialog(
                 items(steps) { step ->
                     val index = steps.indexOf(step)
                     val isCurrent = buildState.currentStep == step && buildState.isBuilding
-                    val isCompleted = buildState.isBuilding && index < buildState.currentStepIndex
-                    val isSuccess = !buildState.isBuilding && buildState.error == null
-                    val isFailed = !buildState.isBuilding && buildState.error != null && index >= buildState.currentStepIndex
+                    // 已终止（成功/失败/取消）时，终止点之前的步骤同样标记为已完成
+                    val isCompleted = index < buildState.currentStepIndex
+                    // 成功态下全部步骤视为完成；取消态不算成功（剩余步骤保持中性未执行态）
+                    val isSuccess = !buildState.isBuilding && buildState.error == null && !buildState.cancelled
+                    // 失败态下终止点及之后的步骤标记失败；尚未开始就失败（无当前步骤）时不误染全部步骤
+                    val isFailed = !buildState.isBuilding && buildState.error != null &&
+                        buildState.currentStep != null && index >= buildState.currentStepIndex
                     val durationMs = buildState.stepDurations[step]
                     val liveElapsed = if (isCurrent) {
                         buildState.stepStartTimes[step]?.let { now - it }
@@ -438,6 +466,7 @@ fun BuildProgressDialog(
                                 }
                             }
                         }
+                        buildState.cancelled -> BuildCancelledCard(onRetry = onRetry)
                     }
                 }
             }
@@ -592,6 +621,58 @@ private fun BuildErrorCard(
         }
         Spacer(Modifier.height(8.dp))
         Text(error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                .clickable(onClick = onRetry)
+                .padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("重试", style = MaterialTheme.typography.labelLarge, color = Color.White, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+/**
+ * 构建取消卡片（中性色，区别于失败的红色；取消不是错误）
+ */
+@Composable
+private fun BuildCancelledCard(
+    onRetry: () -> Unit
+) {
+    val neutralColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(neutralColor.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = null,
+                tint = neutralColor,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                stringResource(R.string.packager_build_cancelled),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = neutralColor
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(R.string.packager_build_cancelled_desc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = neutralColor
+        )
         Spacer(Modifier.height(12.dp))
         Row(
             modifier = Modifier

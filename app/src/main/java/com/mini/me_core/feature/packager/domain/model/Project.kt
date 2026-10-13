@@ -23,13 +23,15 @@ enum class ProjectType(val displayName: String) {
 enum class BuildStatus {
     SUCCESS,
     FAILED,
-    BUILDING;
+    BUILDING,
+    CANCELLED;
 
     val displayName: String
         get() = when (this) {
             SUCCESS -> "成功"
             FAILED -> "失败"
             BUILDING -> "构建中"
+            CANCELLED -> "已取消"
         }
 }
 

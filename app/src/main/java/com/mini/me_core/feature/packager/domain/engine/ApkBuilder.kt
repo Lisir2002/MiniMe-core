@@ -6,6 +6,8 @@ import com.mini.me_core.feature.packager.domain.model.Project
 import com.mini.me_core.feature.packager.domain.model.toSplashConfigPayload
 import com.mini.me_core.feature.packager.domain.repository.ProjectStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -108,6 +110,8 @@ class ApkBuilder(
             log("", callback, logWriter)
 
             // Step 1: 初始化
+            // 取消检查点：用户取消构建时在此即时抛出 CancellationException，不必等当前步骤跑完
+            coroutineContext.ensureActive()
             callback.onStepStart(BuildStep.INIT, 0, steps.size)
             tempDir.apply { mkdirs() }
             val templateApk = getTemplateApk()
@@ -116,6 +120,8 @@ class ApkBuilder(
             callback.onStepComplete(BuildStep.INIT, 0, steps.size)
 
             // Step 2: 解压
+            // 取消检查点：用户取消构建时在此即时抛出 CancellationException，不必等当前步骤跑完
+            coroutineContext.ensureActive()
             callback.onStepStart(BuildStep.EXTRACT, 1, steps.size)
             val extractedDir = File(tempDir, "extracted")
             ApkModifier.extractApk(templateApk, extractedDir)
@@ -123,6 +129,8 @@ class ApkBuilder(
             callback.onStepComplete(BuildStep.EXTRACT, 1, steps.size)
 
             // Step 3: 替换网页资源
+            // 取消检查点：用户取消构建时在此即时抛出 CancellationException，不必等当前步骤跑完
+            coroutineContext.ensureActive()
             callback.onStepStart(BuildStep.REPLACE_WWW, 2, steps.size)
             val wwwDir = projectStore.getWwwDir(project.id)
             ApkModifier.replaceWwwAssets(extractedDir, wwwDir)
@@ -218,6 +226,8 @@ class ApkBuilder(
                         callback,
                         logWriter
                     )
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     log("警告: 更新 config.json 失败: ${e.message}", callback, logWriter)
                 }
@@ -227,6 +237,8 @@ class ApkBuilder(
 
             // Step 3.7: 注入冷启动动画（合成启动位图、覆盖 splash_img、写入 www/splash.html|splash.png）
             // 必须在 replaceWwwAssets（Step3 会整盘重写 assets/www）之后执行；资源缺失时内部告警跳过，不中断构建。
+            // 取消检查点：用户取消构建时在此即时抛出 CancellationException，不必等当前步骤跑完
+            coroutineContext.ensureActive()
             callback.onStepStart(BuildStep.INJECT_SPLASH, 3, steps.size)
             runCatching {
                 // 主 App 运行时读不到 app-template 源码，splash.html 从自身 assets 拷出作注入来源
@@ -264,6 +276,8 @@ class ApkBuilder(
             callback.onStepComplete(BuildStep.INJECT_SPLASH, 3, steps.size)
 
             // Step 4: 修改 AndroidManifest.xml
+            // 取消检查点：用户取消构建时在此即时抛出 CancellationException，不必等当前步骤跑完
+            coroutineContext.ensureActive()
             callback.onStepStart(BuildStep.MODIFY_MANIFEST, 4, steps.size)
             val manifestFile = File(extractedDir, "AndroidManifest.xml")
             if (manifestFile.exists()) {
@@ -326,6 +340,8 @@ class ApkBuilder(
             }
 
             // Step 5: 重新打包
+            // 取消检查点：用户取消构建时在此即时抛出 CancellationException，不必等当前步骤跑完
+            coroutineContext.ensureActive()
             callback.onStepStart(BuildStep.REPACK, 5, steps.size)
             val unsignedApk = File(tempDir, "unsigned.apk")
             ApkModifier.repackApk(extractedDir, unsignedApk)
@@ -335,6 +351,8 @@ class ApkBuilder(
             // Step 6: ZIP 对齐
             // 所有未压缩（STORED）文件必须 4 字节对齐，否则部分设备（如 vivo）安装时
             // 会报「安装应用与当前系统有兼容性问题」。resources.arsc 尤其需要对齐。
+            // 取消检查点：用户取消构建时在此即时抛出 CancellationException，不必等当前步骤跑完
+            coroutineContext.ensureActive()
             callback.onStepStart(BuildStep.ALIGN, 6, steps.size)
             val alignedApk = File(tempDir, "aligned.apk")
             ZipAligner.align(unsignedApk, alignedApk)
@@ -342,6 +360,8 @@ class ApkBuilder(
             callback.onStepComplete(BuildStep.ALIGN, 6, steps.size)
 
             // Step 7: APK 签名
+            // 取消检查点：用户取消构建时在此即时抛出 CancellationException，不必等当前步骤跑完
+            coroutineContext.ensureActive()
             callback.onStepStart(BuildStep.SIGN, 7, steps.size)
             val signedApk = File(tempDir, "signed.apk")
             val keystoreFile = File(projectStore.signatureDir, "default.keystore")
@@ -350,6 +370,8 @@ class ApkBuilder(
             callback.onStepComplete(BuildStep.SIGN, 7, steps.size)
 
             // Step 8: 输出
+            // 取消检查点：用户取消构建时在此即时抛出 CancellationException，不必等当前步骤跑完
+            coroutineContext.ensureActive()
             callback.onStepStart(BuildStep.OUTPUT, 8, steps.size)
             val finalApkName = "${project.packageName.substringAfterLast('.')}-v${project.versionName}.apk"
             val finalApk = File(outputDir, finalApkName)
@@ -384,6 +406,16 @@ class ApkBuilder(
             callback.onStepComplete(BuildStep.OUTPUT, 8, steps.size)
             callback.onSuccess(finalApk, finalApk.length())
 
+        } catch (e: CancellationException) {
+            // 用户取消：CancellationException 必须原样重抛，否则协程不会进入取消状态、
+            // 取消会被误报为“构建失败”。先清理临时文件，再把取消语义交还调用方。
+            log("", callback, logWriter)
+            log("========== 构建已取消 ==========", callback, logWriter)
+            if (tempDir.exists()) {
+                tempDir.deleteRecursively()
+                log("临时文件已清理", callback, logWriter)
+            }
+            throw e
         } catch (e: Exception) {
             val errorMsg = "构建失败: ${e.javaClass.simpleName}: ${e.message}"
             FileLogger.e(TAG, errorMsg, e)
@@ -424,6 +456,8 @@ class ApkBuilder(
                     FileOutputStream(templateApk).use { output -> input.copyTo(output) }
                 }
                 null
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 "模版 APK 不存在且无法从 assets 复制: ${e.message}"
             }
@@ -465,6 +499,8 @@ class ApkBuilder(
                 return "APK 中缺少 V2 签名块"
             }
             null
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             "APK 格式验证失败: ${e.message}"
         }
@@ -505,6 +541,8 @@ class ApkBuilder(
                 }
             }
             found
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             FileLogger.w("ApkBuilder", "检查 V2 签名块失败: ${e.message}")
             false

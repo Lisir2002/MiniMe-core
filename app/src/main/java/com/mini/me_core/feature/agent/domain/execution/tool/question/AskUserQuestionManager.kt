@@ -38,17 +38,22 @@ class AskUserQuestionManager @Inject constructor() {
     val pendingQuestion: StateFlow<PendingUserQuestion?> = _pendingQuestion.asStateFlow()
 
     private var currentId: String? = null
+    private var currentSessionId: String? = null
     private var currentDecision: CompletableDeferred<UserQuestionAnswer>? = null
 
     /**
      * 工具侧调用：发起一个问题请求，挂起等待用户回答。
      * 同一时刻只允许一个请求（由 [requestMutex] 保证串行）。
+     *
+     * @param sessionId 发起提问的 AI 会话 id；记录到 pending question 供 UI 按会话过滤、
+     *   供 [cancelPending] 按会话清理，避免跨会话/对话结束后仍弹出提问卡。
      */
-    suspend fun awaitAnswer(question: PendingUserQuestion): UserQuestionAnswer = requestMutex.withLock {
+    suspend fun awaitAnswer(question: PendingUserQuestion, sessionId: String? = null): UserQuestionAnswer = requestMutex.withLock {
         val decision = CompletableDeferred<UserQuestionAnswer>()
         currentId = question.id
+        currentSessionId = sessionId
         currentDecision = decision
-        _pendingQuestion.value = question
+        _pendingQuestion.value = if (sessionId != null) question.copy(sessionId = sessionId) else question
 
         try {
             // Q-3：加超时，用户长时间未回答时放行，防止会话被无限挂起阻塞
@@ -59,6 +64,7 @@ class AskUserQuestionManager @Inject constructor() {
         } finally {
             if (currentId == question.id) {
                 currentId = null
+                currentSessionId = null
                 currentDecision = null
                 _pendingQuestion.value = null
             }
@@ -71,6 +77,23 @@ class AskUserQuestionManager @Inject constructor() {
     @Synchronized
     fun resolve(id: String, answer: UserQuestionAnswer) {
         if (currentId != id) return
+        _pendingQuestion.value = null
+        currentDecision?.complete(answer)
+    }
+
+    /**
+     * 主动结束待决提问（对话停止 / 结束 / 切换会话时调用），防止提问卡残留。
+     *
+     * 语义与 [com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionManager.cancelPending] 一致：
+     * @param sessionId 要清理的会话 id；传 null 表示清理「任意会话」的待决提问
+     *   （例如 stopAllAgents 全停）。没有匹配的待决提问时为空操作。
+     * @param answer 以何种结果结束挂起的等待：默认空答案（对应超时放行的语义，
+     *   工具侧按「用户未做选择」继续）。
+     */
+    @Synchronized
+    fun cancelPending(sessionId: String?, answer: UserQuestionAnswer = UserQuestionAnswer(answers = emptyList())) {
+        if (currentId == null) return
+        if (sessionId != null && currentSessionId != null && currentSessionId != sessionId) return
         _pendingQuestion.value = null
         currentDecision?.complete(answer)
     }

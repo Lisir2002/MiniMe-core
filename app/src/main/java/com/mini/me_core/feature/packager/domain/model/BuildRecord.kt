@@ -78,6 +78,23 @@ data class BuildRecord(
         )
     }
 
+    /**
+     * 标记构建已取消（用户主动中断）
+     *
+     * 与 [markFailed] 的区别：取消不是错误，不记录 errorMessage，
+     * 避免在构建记录里把用户主动取消误报为构建失败。
+     */
+    fun markCancelled(logPath: String?): BuildRecord {
+        val end = System.currentTimeMillis()
+        return copy(
+            status = BuildStatus.CANCELLED,
+            endTime = end,
+            durationMs = end - startTime,
+            logPath = logPath,
+            errorMessage = null
+        )
+    }
+
     /** 格式化耗时为可读字符串 */
     val formattedDuration: String
         get() {

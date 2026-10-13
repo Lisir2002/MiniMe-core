@@ -42,9 +42,19 @@ internal class PermissionApprovalHub(
         }
         .stateIn(scope, SharingStarted.Eagerly, null)
 
+    // 同上：ask_user_question 提问卡同样只暴露当前会话，防止旧会话残留提问卡弹出。
     val pendingUserQuestion: StateFlow<PendingUserQuestion?> = askUserQuestionManager.pendingQuestion
+        .combine(currentSessionId) { pending, currentSid ->
+            if (pending?.sessionId == null || pending.sessionId == currentSid) pending else null
+        }
+        .stateIn(scope, SharingStarted.Eagerly, null)
 
+    // 同上：计划审批卡同样只暴露当前会话。
     val pendingPlanApproval: StateFlow<PlanApprovalRequest?> = planApprovalManager.pendingApproval
+        .combine(currentSessionId) { pending, currentSid ->
+            if (pending?.sessionId == null || pending.sessionId == currentSid) pending else null
+        }
+        .stateIn(scope, SharingStarted.Eagerly, null)
 
     fun resolveToolPermission(id: String, choice: PermissionChoice) {
         toolPermissionManager.resolve(id, choice)
@@ -67,5 +77,15 @@ internal class PermissionApprovalHub(
     /** 清理残留的权限确认请求（sessionId 为 null 时表示任意会话）。仅转发，判定不变。 */
     fun cancelPending(sessionId: String?) {
         toolPermissionManager.cancelPending(sessionId)
+    }
+
+    /**
+     * 清理残留的提问与计划审批请求（sessionId 为 null 时表示任意会话）。
+     * 与 [cancelPending] 同批调用：权限/提问/审批三类待决卡在会话停止/切换时一并清理，
+     * 避免任一类型残留弹出。仅转发，判定不变。
+     */
+    fun cancelPendingInteractions(sessionId: String?) {
+        askUserQuestionManager.cancelPending(sessionId)
+        planApprovalManager.cancelPending(sessionId)
     }
 }
