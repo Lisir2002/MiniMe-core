@@ -99,6 +99,50 @@
 - **安全确认弹窗挂载位置**：SSH 首连指纹、FTP 局域网/明文风险三个确认弹窗当前挂在远程服务器设置页组合内；冷启动后早于打开该页发起的 SSH 会因确认回调未装配而 fail-closed 拒绝（安全但影响体验），后续将提升到远程页根节点
 - **PRoot 隔离**：PRoot 仅提供路径重映射，非完整 namespace/cgroups 容器隔离
 
+## 签名密钥历史泄露事件与轮换计划
+
+### 事件概述
+
+历史上，本项目的 release 签名 keystore 文件及其口令曾随公开仓库可被获取（口令以明文出现在源码/构建脚本中）。这意味着任何在该窗口期内获取过仓库的人，都具备构造"与官方同签名"APK 的能力。
+
+**密钥分类澄清**（两者不可混淆）：
+
+| 密钥 | 用途 | 存放 | 泄露状态 |
+|---|---|---|---|
+| **release 官方签名 keystore**（`minime.jks`） | 正式发版 APK 签名 | GitHub Secrets（`SIGNING_KEYSTORE_BASE64` 等） | **历史上泄露，且为兼容性未轮换** |
+| **packager 运行时签名 keystore**（`default.keystore`） | 应用内「打包」功能给生成的 APK 签名，设备上首次使用时生成 | 设备私有目录，口令经 `UnifiedKeyManager` 加密落盘 | 非泄露项；本次修复已把口令从源码硬编码改为随机生成 |
+
+### 已完成的缓解措施
+
+1. **口令不再出现在仓库**：构建脚本与 CI 工作流中无明文口令，全部由 GitHub Secrets 注入。
+2. **构建期 fail-closed**：涉及正式包的任务（名含 Release/Bundle 且非 Debug）在密钥缺失或证书 SHA-256 不在官方白名单时立即失败，不回退 debug 签名。
+3. **证书指纹白名单**：`UpdateSignatureWhitelist.kt` 提供官方指纹集合，更新包安装前校验（当前集合为空 → **维护者必须填入**，否则应用内更新将拒绝一切更新包）。
+4. **打包签名库口令随机化**：`PackagerKeystorePassword` 用 SecureRandom 生成 32 字节随机口令，经 Keystore 硬件 MasterKey 包裹的 DEK 加密后落盘；旧库（硬编码口令）自动迁移，迁移失败 fail-close 或降级告警。
+
+### 残留风险
+
+- 历史上拿到旧 keystore 的人，在**官方填入签名指纹白名单之前**仍存在伪造同签名包的理论风险（应用内更新链路依赖该白名单做校验）。
+- 轮换会让老用户无法覆盖安装（Android 要求同签名才能覆盖升级），这是"未轮换"的唯一技术原因。
+
+### 轮换决策路径
+
+| 方案 | 做法 | 代价 | 适用时机 |
+|---|---|---|---|
+| **A. 不轮换 + 白名单** | 保持现签名，尽快填满 `UpdateSignatureWhitelist` 官方指纹 | 零用户影响；伪造包仍需绕过白名单校验 | 短期（立即执行，与后续方案不冲突） |
+| **B. 轮换 + 强制卸载重装** | 生成新 keystore，公告用户卸载旧版再装新版 | 用户数据迁移成本最高，口碑风险大 | 仅在确认泄露被实际利用时 |
+| **C. 轮换 + 迁移过渡期** | 新版本用新签名发布，旧签名版本继续维护一段时间并内置"迁移引导"，过渡期结束后只发新签名 | 需双轨维护；绝大多数用户走应用内迁移流程 | 大版本（如 v1.0）时的推荐路径 |
+
+**当前建议**：先执行 A（本轮即可完成，唯一阻塞项是维护者填入指纹），把 B/C 的拍板放到下一个大版本规划。若出现"旧密钥被实际用于伪造分发"的证据，立即走 B。
+
+### 若决定轮换（方案 B/C）的执行清单
+
+1. 用 `keytool -genkeypair -keyalg RSA -keysize 2048 -validity 10000` 生成新 keystore，**离线保管**，绝不入库。
+2. 把 base64 与口令写入 GitHub Secrets（`SIGNING_KEYSTORE_BASE64`、`SIGNING_STORE_PASSWORD`、`SIGNING_KEY_PASSWORD`、`SIGNING_KEY_ALIAS`）。
+3. **同步更新** `UpdateSignatureWhitelist.kt` 的官方指纹为**新证书** SHA-256（否则新包会被自身校验拒绝）。
+4. 同步更新 `build.gradle.kts` 中 `EXPECTED_SIGNING_CERT_FINGERPRINT` 相关守卫。
+5. 发版公告：说明为何需要卸载重装（方案 B）或迁移路径（方案 C）。
+6. 轮换后重新跑一次 `android-release.yml`，确认产物签名指纹与新白名单一致。
+
 ## 安全开发规范
 
 - 所有密钥/凭据相关代码必须 fail-close，禁止静默降级
