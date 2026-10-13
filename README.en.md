@@ -40,7 +40,7 @@
 
 MiniMe-core is an AI-powered coding assistant that runs natively on Android. It integrates large language models with a local Linux development environment. The built-in Alpine Linux container and terminal emulator let the AI directly read/write files, execute shell commands, and run build tools. It also supports remote SSH servers as the execution backend, turning your phone into a mobile workstation for remote projects.
 
-**Latest Release**: [v0.0.0.24](https://github.com/Lisir2002/MiniMe-core/releases/tag/v0.0.0.24) — Operation audit refactor & advanced settings page
+**Latest Release**: [v0.0.1.1](https://github.com/Lisir2002/MiniMe-core/releases/latest) — Startup animation modes & unified .minime config directory
 
 ## Features
 

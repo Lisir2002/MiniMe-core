@@ -36,7 +36,7 @@
 - **落盘凭据文件权限**：`git-credentials` 及凭据临时响应文件收紧为 owner-only（0600，去执行位），令牌不写入日志、不出现在远程 URL 回显中
 
 ### 密钥管理
-- MasterKey 存储在 Android Keystore，alias 为 `minime_credential_masterkey`，不可导出
+- MasterKey 存储在 Android Keystore，alias 为 `minime_master_key`（AES-256-GCM，硬件 backing，密钥不出 Keystore），不可导出
 - per-DEK（32 字节 SecureRandom）经 MasterKey wrap 后存储在 SharedPreferences（Base64 密文）
 - CredentialEncryptor 使用独立 alias `minime_credential_key`
 - passphrase 使用后立即 `fill(0)` 擦除内存
