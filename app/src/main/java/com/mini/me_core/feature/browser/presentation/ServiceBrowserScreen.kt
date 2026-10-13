@@ -147,6 +147,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppConfirmDialog
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.browser.domain.AgentActionRecord
 import com.mini.me_core.feature.browser.domain.BrowserBookmark
@@ -250,6 +251,7 @@ fun ServiceBrowserScreen(
     var showBookmarks by remember { mutableStateOf(false) }
     var showDownloads by remember { mutableStateOf(false) }
     var showCredentials by remember { mutableStateOf(false) }
+    var pendingCredentialDelete by remember { mutableStateOf<String?>(null) }
     var showZoom by remember { mutableStateOf(false) }
     var showAiPanel by remember { mutableStateOf(false) }
     var aiPaused by remember { mutableStateOf(false) }
@@ -908,8 +910,24 @@ fun ServiceBrowserScreen(
                 browserController.autoFillCredentials(sp.username, sp.password)
                 showCredentials = false
             },
-            onDelete = { host -> passwordManager.delete(host) },
+            onDelete = { host -> pendingCredentialDelete = host },
             onDismiss = { showCredentials = false }
+        )
+    }
+
+    // ── 删除凭据二次确认（不可逆） ──
+    pendingCredentialDelete?.let { host ->
+        AppConfirmDialog(
+            title = stringResource(R.string.browser_credentials_delete),
+            message = stringResource(R.string.browser_credentials_delete_confirm, host),
+            confirmText = stringResource(R.string.common_confirm),
+            cancelText = stringResource(R.string.common_cancel),
+            isDestructive = true,
+            onConfirm = {
+                passwordManager.delete(host)
+                pendingCredentialDelete = null
+            },
+            onDismiss = { pendingCredentialDelete = null },
         )
     }
 

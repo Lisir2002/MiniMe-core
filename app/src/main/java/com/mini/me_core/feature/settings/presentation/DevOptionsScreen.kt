@@ -107,6 +107,7 @@ fun DevOptionsScreen(
     var anrDetail by remember {
         mutableStateOf<com.mini.me_core.core.performance.AnrMonitor.AnrRecord?>(null)
     }
+    var showClearAnrConfirm by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         com.mini.me_core.core.performance.AnrMonitor.start()
     }
@@ -215,8 +216,7 @@ fun DevOptionsScreen(
                 anrRecords = anrRecords,
                 onViewAnr = { anrDetail = it },
                 onClearAnr = {
-                    com.mini.me_core.core.performance.AnrMonitor.clear()
-                    anrRecords = emptyList()
+                    showClearAnrConfirm = true
                 },
             )
             3 -> DataTab(
@@ -369,6 +369,22 @@ fun DevOptionsScreen(
                 crashReports = emptyList()
             },
             onDismiss = { showClearCrashConfirm = false },
+        )
+    }
+
+    // 清空 ANR 确认
+    if (showClearAnrConfirm) {
+        AppConfirmDialog(
+            title = stringResource(R.string.anr_clear_confirm_title),
+            message = stringResource(R.string.anr_clear_confirm_message),
+            confirmText = stringResource(R.string.common_confirm),
+            cancelText = stringResource(R.string.common_cancel),
+            isDestructive = true,
+            onConfirm = {
+                com.mini.me_core.core.performance.AnrMonitor.clear()
+                anrRecords = emptyList()
+            },
+            onDismiss = { showClearAnrConfirm = false },
         )
     }
 }

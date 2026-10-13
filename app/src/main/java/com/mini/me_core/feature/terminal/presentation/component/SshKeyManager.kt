@@ -7,14 +7,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.AlertDialog
@@ -34,8 +38,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.mini.me_core.R
+import com.mini.me_core.core.theme.components.AppConfirmDialog
 import com.mini.me_core.feature.terminal.domain.SshKeyEntry
 import com.mini.me_core.feature.terminal.domain.SshKeyStore
 import kotlinx.coroutines.launch
@@ -55,6 +62,7 @@ fun SshKeyManager(
     val keys by store.keys.collectAsState(initial = emptyList())
     var showGen by remember { mutableStateOf(false) }
     var viewing by remember { mutableStateOf<SshKeyEntry?>(null) }
+    var pendingDelete by remember { mutableStateOf<SshKeyEntry?>(null) }
     val scope = rememberCoroutineScope()
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -73,7 +81,7 @@ fun SshKeyManager(
         LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             items(keys) { key ->
                 KeyRow(key = key, onViewPub = { viewing = key },
-                    onRename = { }, onDelete = { scope.launch { store.delete(key.id) } },
+                    onRename = { }, onDelete = { pendingDelete = key },
                     onSetDefault = { scope.launch { store.setDefault(key.id) } })
             }
         }
@@ -120,10 +128,28 @@ fun SshKeyManager(
             title = { Text("公钥 (${entry.name})") },
             text = {
                 Text(entry.publicKey, style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace)
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier
+                        .heightIn(max = 240.dp)
+                        .verticalScroll(rememberScrollState()))
             },
             confirmButton = { TextButton(onClick = { viewing = null }) { Text("关闭") } },
             dismissButton = {}
+        )
+    }
+
+    pendingDelete?.let { entry ->
+        AppConfirmDialog(
+            title = stringResource(R.string.ssh_key_delete_confirm_title),
+            message = stringResource(R.string.ssh_key_delete_confirm_message, entry.name),
+            confirmText = stringResource(R.string.common_confirm),
+            cancelText = stringResource(R.string.common_cancel),
+            isDestructive = true,
+            onConfirm = {
+                scope.launch { store.delete(entry.id) }
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null },
         )
     }
 }
@@ -159,6 +185,10 @@ private fun KeyRow(
         }
         IconButton(onClick = onViewPub) {
             Icon(Icons.Rounded.Visibility, "公钥", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Rounded.Delete, stringResource(R.string.common_delete),
+                tint = MaterialTheme.colorScheme.error)
         }
         IconButton(onClick = onSetDefault) {
             Text("设默认", style = MaterialTheme.typography.labelSmall,

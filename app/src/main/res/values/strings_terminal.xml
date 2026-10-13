@@ -59,6 +59,8 @@
     <string name="terminal_ssh_heartbeat">心跳间隔</string>
     <string name="terminal_ssh_hosts">SSH 主机管理</string>
     <string name="terminal_ssh_hosts_sub">新增/编辑/删除 SSH 主机和密钥</string>
+    <string name="ssh_key_delete_confirm_title">删除 SSH 密钥</string>
+    <string name="ssh_key_delete_confirm_message">确定删除密钥「%1$s」吗？删除后使用该密钥的主机将无法继续认证，此操作不可撤销。</string>
     <string name="terminal_restore_defaults">恢复默认设置</string>
     <string name="terminal_restore_defaults_confirm_title">恢复默认设置？</string>
     <string name="terminal_restore_defaults_confirm_msg">确定恢复所有终端设置为默认值吗？此操作将重置外观、键盘、行为与 SSH 偏好，不影响容器与已保存的 SSH 主机。</string>

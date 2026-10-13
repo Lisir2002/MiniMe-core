@@ -38,17 +38,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.mini.me_core.R
 import com.mini.me_core.core.theme.components.AppCard
+import com.mini.me_core.core.theme.components.AppConfirmDialog
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
@@ -75,6 +80,7 @@ fun PackagerListScreen(
 ) {
     val projects: List<Project> by viewModel.projects.collectAsState()
     val migrationMessage: String? by viewModel.migrationMessage.collectAsState()
+    var pendingDelete by remember { mutableStateOf<Project?>(null) }
     val snackbarHostState = androidx.compose.material3.SnackbarHostState()
     val colors = LocalAppTheme.current.colors
     val cornerRadius = LocalCornerRadius.current
@@ -126,11 +132,27 @@ fun PackagerListScreen(
                         project = project,
                         onClick = { onOpenProject(project) },
                         onBuild = { viewModel.startBuild(project) },
-                        onDelete = { viewModel.deleteProject(project.id) }
+                        onDelete = { pendingDelete = project }
                     )
                 }
             }
         }
+    }
+
+    // ── 删除项目二次确认（不可逆：项目配置与构建产物一并移除） ──
+    pendingDelete?.let { project ->
+        AppConfirmDialog(
+            title = stringResource(R.string.packager_project_delete_confirm_title),
+            message = stringResource(R.string.packager_project_delete_confirm_message, project.name),
+            confirmText = stringResource(R.string.common_confirm),
+            cancelText = stringResource(R.string.common_cancel),
+            isDestructive = true,
+            onConfirm = {
+                viewModel.deleteProject(project.id)
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null },
+        )
     }
 }
 

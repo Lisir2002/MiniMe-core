@@ -102,4 +102,8 @@
     <string name="remote_ftp_url_copied">地址已复制到剪贴板</string>
     <string name="remote_batch_connect_all">全部连接</string>
     <string name="remote_batch_disconnect_all">全部断开</string>
+    <string name="remote_connection_delete_confirm_title">删除连接</string>
+    <string name="remote_connection_delete_confirm_message">确定删除连接「%1$s」吗？依赖该连接的挂载将一同失效，此操作不可撤销。</string>
+    <string name="remote_mount_delete_confirm_title">删除挂载</string>
+    <string name="remote_mount_delete_confirm_message">确定删除挂载「%1$s」吗？仅移除本地挂载配置，不会删除远端文件，此操作不可撤销。</string>
 </resources>

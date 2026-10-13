@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 项目删除（不可逆操作二次确认） -->
+    <string name="packager_project_delete_confirm_title">删除项目</string>
+    <string name="packager_project_delete_confirm_message">确定删除项目「%1$s」吗？项目配置、签名设置与已生成的构建产物将一并移除，此操作不可撤销。</string>
+</resources>

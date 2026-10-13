@@ -2840,4 +2840,24 @@
     <string name="right_sidebar_capability">Capability Center</string>
     <string name="right_sidebar_about">About</string>
     <string name="right_sidebar_placeholder">This feature is coming soon; browse files from the left "Workspace" tab</string>
+
+    <!-- Crash & ANR monitor -->
+    <string name="crash_clear_confirm_title">Clear crash records</string>
+    <string name="crash_clear_confirm_message">Clear all crash reports? This action cannot be undone.</string>
+    <string name="anr_clear_confirm_title">Clear ANR records</string>
+    <string name="anr_clear_confirm_message">Clear all ANR monitor records? This action cannot be undone.</string>
+
+    <!-- SSH client keys -->
+    <string name="ssh_key_delete_confirm_title">Delete SSH key</string>
+    <string name="ssh_key_delete_confirm_message">Delete the key \"%1$s\"? Hosts authenticated with it will no longer be able to connect. This action cannot be undone.</string>
+
+    <!-- Packager -->
+    <string name="packager_project_delete_confirm_title">Delete project</string>
+    <string name="packager_project_delete_confirm_message">Delete the project \"%1$s\"? Its configuration, signing settings and built artifacts will be removed. This action cannot be undone.</string>
+
+    <!-- Remote server -->
+    <string name="remote_connection_delete_confirm_title">Delete connection</string>
+    <string name="remote_connection_delete_confirm_message">Delete the connection \"%1$s\"? Mounts depending on it will stop working. This action cannot be undone.</string>
+    <string name="remote_mount_delete_confirm_title">Delete mount</string>
+    <string name="remote_mount_delete_confirm_message">Delete the mount \"%1$s\"? Only the local mount configuration is removed; remote files are kept. This action cannot be undone.</string>
 </resources>

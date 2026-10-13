@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.components.AppSegmentedControl
+import com.mini.me_core.core.theme.components.AppConfirmDialog
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
 
@@ -36,6 +37,8 @@ fun RemoteServerScreen(
     var showAddMountDialog by remember { mutableStateOf(false) }
     var connectionToEdit by remember { mutableStateOf<RemoteConnection?>(null) }
     var mountToEdit by remember { mutableStateOf<RemoteMount?>(null) }
+    var connectionToDelete by remember { mutableStateOf<RemoteConnection?>(null) }
+    var mountToDelete by remember { mutableStateOf<RemoteMount?>(null) }
 
     val syncIgnoredPatterns by viewModel.syncIgnoredPatterns.collectAsStateWithLifecycle()
     val syncUseGitIgnore by viewModel.syncUseGitIgnore.collectAsStateWithLifecycle()
@@ -115,7 +118,7 @@ fun RemoteServerScreen(
                                     connectionToEdit = it
                                     showAddConnectionDialog = true
                                 },
-                                onDelete = { viewModel.deleteConnection(it.id) }
+                                onDelete = { connectionToDelete = it }
                             )
                         }
                     }
@@ -146,7 +149,7 @@ fun RemoteServerScreen(
                                     mountToEdit = it
                                     showAddMountDialog = true
                                 },
-                                onDelete = { viewModel.deleteMount(it.id) },
+                                onDelete = { mountToDelete = it },
                                 onUpload = { viewModel.forceUploadMount(it.id) },
                                 onDownload = { viewModel.forceDownloadMount(it.id) },
                                 onConnect = { viewModel.connectMount(it.id) },
@@ -293,6 +296,38 @@ fun RemoteServerScreen(
             ),
             onCancel = {},
             onDismiss = { viewModel.dismissDownloadResult() },
+        )
+    }
+
+    // ── 删除连接二次确认（不可逆：关联挂载将一同失效） ──
+    connectionToDelete?.let { conn ->
+        AppConfirmDialog(
+            title = stringResource(R.string.remote_connection_delete_confirm_title),
+            message = stringResource(R.string.remote_connection_delete_confirm_message, conn.name),
+            confirmText = stringResource(R.string.common_confirm),
+            cancelText = stringResource(R.string.common_cancel),
+            isDestructive = true,
+            onConfirm = {
+                viewModel.deleteConnection(conn.id)
+                connectionToDelete = null
+            },
+            onDismiss = { connectionToDelete = null },
+        )
+    }
+
+    // ── 删除挂载二次确认（不可逆：仅移除挂载配置，不动远端文件） ──
+    mountToDelete?.let { mount ->
+        AppConfirmDialog(
+            title = stringResource(R.string.remote_mount_delete_confirm_title),
+            message = stringResource(R.string.remote_mount_delete_confirm_message, mount.remotePath),
+            confirmText = stringResource(R.string.common_confirm),
+            cancelText = stringResource(R.string.common_cancel),
+            isDestructive = true,
+            onConfirm = {
+                viewModel.deleteMount(mount.id)
+                mountToDelete = null
+            },
+            onDismiss = { mountToDelete = null },
         )
     }
 

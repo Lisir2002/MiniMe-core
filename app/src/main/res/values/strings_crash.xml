@@ -15,4 +15,6 @@
     <string name="crash_export">导出</string>
     <string name="crash_clear_confirm_title">清空崩溃记录</string>
     <string name="crash_clear_confirm_message">确定要清空所有崩溃报告吗？此操作不可撤销。</string>
+    <string name="anr_clear_confirm_title">清空 ANR 记录</string>
+    <string name="anr_clear_confirm_message">确定要清空所有 ANR 监控记录吗？此操作不可撤销。</string>
 </resources>
