@@ -1,0 +1,40 @@
+version: 2
+
+updates:
+  # Gradle 依赖（版本目录 libs.versions.toml 由 Dependabot 直接管理）
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    # 安全相关小版本（补丁/次版本）合并阻力小；主版本升级需人工评估，单独限额
+    groups:
+      gradle-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "patch"
+          - "minor"
+
+  # GitHub Actions 版本
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "chore(ci)"

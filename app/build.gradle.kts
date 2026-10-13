@@ -13,6 +13,10 @@ plugins {
     id("com.google.devtools.ksp")
     id("app.cash.sqldelight")
     id("io.gitlab.arturbosch.detekt")
+    // OWASP Dependency-Check：依赖 CVE 扫描（版本在根 build.gradle.kts 以 apply false 声明）。
+    // 任务仅在 .github/workflows/dependency-check.yml（每周/手动）执行，不进主 CI 门禁，
+    // 避免 NVD 数据下载超时影响日常构建。
+    id("org.owasp.dependencycheck")
 }
 
 // 品牌 / 产物参数单一事实源（应用名、APK产物前缀、keystore 文件名、图标族名），定义见 branding.gradle.kts。
@@ -20,6 +24,21 @@ plugins {
 apply(from = file("branding.gradle.kts"))
 val brandAppName: String = extra["brandAppName"] as String
 val brandIconFamily: String = extra["brandIconFamily"] as String
+
+// OWASP Dependency-Check 配置（12.x 官方 Kotlin DSL 用法）。
+// - failBuildOnCVSS=7.0：仅 CVSS ≥ 7.0（高危/严重）失败，低分只报告，避免噪音阻断；
+// - 输出 HTML + JSON，由 dependency-check.yml 上传为 CI artifact；
+// - NVD API key 经仓库 Secret（NVD_API_KEY）的 env 注入，无 key 时限流 30 次/滚动窗口，
+//   已配 delay/maxRetryCount 兜底（见 workflow）。
+dependencyCheck {
+    failBuildOnCVSS = 7.0f
+    formats = listOf("HTML", "JSON")
+    nvd {
+        apiKey = System.getenv("NVD_API_KEY")
+        delay = 4000
+        maxRetryCount = 3
+    }
+}
 
 // 从本地 keystore.properties 读取 release 签名密钥（已 gitignore，不入库）。
 // CI 构建前从 GitHub Secrets 恢复为 app/minime.jks + app/keystore.properties；

@@ -1,0 +1,100 @@
+name: Dependency Check
+
+# 依赖 CVE 扫描（OWASP Dependency-Check，插件版本见 build.gradle.kts）。
+#
+# 背景（2026-10-13 审计 P1-2）：原 dependency-audit.yml 只列依赖清单、
+# 无真实漏洞扫描；本工作流补齐 SCA 门禁。
+#
+# 执行策略：
+#   - schedule 每周一 08:00（北京时间）+ 手动触发，**不进主 CI 门禁**——
+#     NVD 数据首次下载可达数百 MB，放日常 PR 链路会显著拖慢反馈；
+#   - failBuildOnCVSS=7.0（见 app/build.gradle.kts）：仅高危/严重失败；
+#   - 配置 NVD_API_KEY Secret（可选但强烈建议）：无 key 时限流 30req/滚动窗口，
+#     100+ 依赖的扫描可能超时，有 key 为 50req/30s。
+on:
+  schedule:
+    - cron: '0 0 * * 1'   # 周一 00:00 UTC = 周一 08:00 北京时间
+  workflow_dispatch:
+
+concurrency:
+  group: depcheck-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-check:
+    name: OWASP Dependency-Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK (minimal)
+        run: |
+          set -e
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          SDKMANAGER=$(find $ANDROID_HOME -name sdkmanager -type f 2>/dev/null | head -1)
+          if [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" || true
+          fi
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      - name: Grant execute permission
+        run: chmod +x ./gradlew
+
+      # 仅分析 release classpath：与用户实际运行的依赖集一致。
+      # releaseRuntimeClasspath 之外的配置（test/debug）不扫描，控制报告规模。
+      - name: Analyze dependencies (release)
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: ./gradlew :app:dependencyCheckAnalyze --stacktrace
+
+      - name: Upload dependency-check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: app/build/reports/dependency-check/
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## 🛡️ OWASP Dependency-Check 结果"
+            echo ""
+            if ls app/build/reports/dependency-check/dependency-check-report.json >/dev/null 2>&1; then
+              echo "报告已生成（见 artifact）。CVSS ≥ 7.0 的发现会导致本步骤失败。"
+              echo ""
+              echo '```json'
+              python3 -c "
+          import json
+          d = json.load(open('app/build/reports/dependency-check/dependency-check-report.json'))
+          deps = d.get('dependencies', [])
+          print(f'扫描依赖数: {len(deps)}')
+          for dep in deps:
+              for v in dep.get('vulnerabilities', []):
+                  sev = v.get('severity', '')
+                  if sev.upper() in ('CRITICAL', 'HIGH'):
+                      print(f\"[{sev}] {dep.get('fileName')} <- {v.get('name')}\")
+          " 2>/dev/null || echo "(JSON 解析失败，请查看 artifact)"
+              echo '```'
+            else
+              echo "⚠️ 未生成报告（分析可能失败），请查看日志。"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
