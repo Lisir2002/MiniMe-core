@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.components.AppSectionHeader
+import com.mini.me_core.core.theme.components.AppConfirmDialog
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
@@ -120,6 +121,8 @@ fun TerminalBundleManagerScreen(
 
     var selectedTab by remember { mutableStateOf(0) }
     var customInstallInput by remember { mutableStateOf("") }
+    var pendingUninstallBundle by remember { mutableStateOf<Pair<TerminalBundleId, String>?>(null) }
+    var pendingUninstallCustom by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
@@ -215,7 +218,7 @@ fun TerminalBundleManagerScreen(
                                 bundleState = bState,
                                 aggregate = agg.takeIf { inProgress },
                                 onInstallClick = { viewModel.installBundle(b.id) },
-                                onUninstallClick = { viewModel.uninstallBundle(b.id) },
+                                onUninstallClick = { pendingUninstallBundle = b.id to b.toUi().title },
                                 onOpenLogDialog = { openDialogFor = b.id },
                                 onCopyError = onCopyError,
                                 modifier = Modifier.padding(horizontal = Spacing.md),
@@ -331,7 +334,7 @@ fun TerminalBundleManagerScreen(
                                                         modifier = Modifier.weight(1f)
                                                     )
                                                     DangerTextButton(
-                                                        onClick = { viewModel.uninstallCustom(pkg) },
+                                                        onClick = { pendingUninstallCustom = pkg },
                                                         enabled = customInstallState == null,
                                                         icon = Icons.Rounded.Delete,
                                                         text = "卸载"
@@ -348,7 +351,39 @@ fun TerminalBundleManagerScreen(
             }
         }
     }
-}
+    }
+
+    // ── 卸载预设功能包二次确认（不可逆：容器内 apk 与数据一并移除） ──
+    pendingUninstallBundle?.let { (bundleId, title) ->
+        AppConfirmDialog(
+            title = stringResource(R.string.terminal_bundle_uninstall_confirm_title),
+            message = stringResource(R.string.terminal_bundle_uninstall_confirm_message, title),
+            confirmText = stringResource(R.string.common_confirm),
+            cancelText = stringResource(R.string.common_cancel),
+            isDestructive = true,
+            onConfirm = {
+                viewModel.uninstallBundle(bundleId)
+                pendingUninstallBundle = null
+            },
+            onDismiss = { pendingUninstallBundle = null },
+        )
+    }
+
+    // ── 卸载自定义包二次确认（不可逆：经包管理器从容器移除） ──
+    pendingUninstallCustom?.let { pkg ->
+        AppConfirmDialog(
+            title = stringResource(R.string.terminal_custom_pkg_uninstall_confirm_title),
+            message = stringResource(R.string.terminal_custom_pkg_uninstall_confirm_message, pkg),
+            confirmText = stringResource(R.string.common_confirm),
+            cancelText = stringResource(R.string.common_cancel),
+            isDestructive = true,
+            onConfirm = {
+                viewModel.uninstallCustom(pkg)
+                pendingUninstallCustom = null
+            },
+            onDismiss = { pendingUninstallCustom = null },
+        )
+    }
 }
 
 @Composable

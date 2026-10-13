@@ -95,6 +95,7 @@ import com.mini.me_core.core.theme.components.AppButton
 import com.mini.me_core.core.theme.components.AppButtonColor
 import com.mini.me_core.core.theme.components.AppButtonVariant
 import com.mini.me_core.core.theme.components.AppListItem
+import com.mini.me_core.core.theme.components.AppConfirmDialog
 import com.mini.me_core.core.theme.components.AppSectionGroup
 import com.mini.me_core.core.theme.components.AppSectionHeader
 import com.mini.me_core.core.theme.components.AppTopAppBar
@@ -184,6 +185,7 @@ fun TerminalContainerScreen(
     // ── UI 状态 ──
     var selectedTab by remember { mutableIntStateOf(0) }
     var showResetConfirm by remember { mutableStateOf(false) }
+    var showRestartConfirm by remember { mutableStateOf(false) }
     var showMirrorPicker by remember { mutableStateOf(false) }
     var showImagePicker by remember { mutableStateOf(false) }
     var showHeartbeatPicker by remember { mutableStateOf(false) }
@@ -329,7 +331,7 @@ fun TerminalContainerScreen(
                                 isRemoteMode = isRemoteMode,
                                 highlightedProfileId = highlightedProfileId,
                                 onInit = viewModel::ensureContainerInstalled,
-                                onRestart = viewModel::restartContainer,
+                                onRestart = { showRestartConfirm = true },
                                 onReset = { showResetConfirm = true },
                                 onPickMirror = { showMirrorPicker = true },
                                 onSwitchImage = { showImagePicker = true },
@@ -498,6 +500,26 @@ fun TerminalContainerScreen(
                     Text(stringResource(R.string.ui____625fb26b_3))
                 }
             }
+        )
+    }
+
+    // 重启容器确认（重启会终止运行中的终端会话；数据与已安装包不受影响）
+    if (showRestartConfirm) {
+        AppConfirmDialog(
+            title = stringResource(R.string.tc_restart_container),
+            message = if (runningSessionCount > 0) {
+                stringResource(R.string.tc_restart_confirm_message_sessions, runningSessionCount)
+            } else {
+                stringResource(R.string.tc_restart_confirm_message)
+            },
+            confirmText = stringResource(R.string.common_confirm),
+            cancelText = stringResource(R.string.common_cancel),
+            isDestructive = true,
+            onConfirm = {
+                viewModel.restartContainer()
+                showRestartConfirm = false
+            },
+            onDismiss = { showRestartConfirm = false },
         )
     }
 

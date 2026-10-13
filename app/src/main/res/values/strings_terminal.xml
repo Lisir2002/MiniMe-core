@@ -61,6 +61,10 @@
     <string name="terminal_ssh_hosts_sub">新增/编辑/删除 SSH 主机和密钥</string>
     <string name="ssh_key_delete_confirm_title">删除 SSH 密钥</string>
     <string name="ssh_key_delete_confirm_message">确定删除密钥「%1$s」吗？删除后使用该密钥的主机将无法继续认证，此操作不可撤销。</string>
+    <string name="terminal_bundle_uninstall_confirm_title">卸载功能包</string>
+    <string name="terminal_bundle_uninstall_confirm_message">确定卸载「%1$s」吗？将从容器中移除该功能包及其数据，此操作不可撤销。</string>
+    <string name="terminal_custom_pkg_uninstall_confirm_title">卸载自定义包</string>
+    <string name="terminal_custom_pkg_uninstall_confirm_message">确定卸载「%1$s」吗？将通过包管理器从容器中移除，此操作不可撤销。</string>
     <string name="terminal_restore_defaults">恢复默认设置</string>
     <string name="terminal_restore_defaults_confirm_title">恢复默认设置？</string>
     <string name="terminal_restore_defaults_confirm_msg">确定恢复所有终端设置为默认值吗？此操作将重置外观、键盘、行为与 SSH 偏好，不影响容器与已保存的 SSH 主机。</string>
@@ -74,6 +78,8 @@
     <string name="tc_status_restarting">重启中</string>
     <string name="tc_restart_container">重启容器</string>
     <string name="tc_restart_success">容器已重启</string>
+    <string name="tc_restart_confirm_message">重启将重新就绪容器，已安装的包与数据不受影响。是否继续？</string>
+    <string name="tc_restart_confirm_message_sessions">当前有 %1$d 个终端会话正在运行，重启将全部终止。已安装的包与数据不受影响。是否继续？</string>
     <string name="tc_switch_image">切换镜像</string>
     <string name="tc_mirror_source">镜像源</string>
     <string name="tc_init_container">初始化容器</string>

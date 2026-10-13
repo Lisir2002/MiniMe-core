@@ -2516,6 +2516,8 @@
     <string name="tc_status_running">Running</string>
     <string name="tc_status_error">Error</string>
     <string name="tc_restart_container">Restart Container</string>
+    <string name="tc_restart_confirm_message">Restarting re-readies the container; installed packages and data are unaffected. Continue?</string>
+    <string name="tc_restart_confirm_message_sessions">%1$d terminal session(s) are running and will all be terminated. Installed packages and data are unaffected. Continue?</string>
     <string name="tc_switch_image">Switch Image</string>
     <string name="tc_mirror_source">Mirror Source</string>
     <string name="tc_init_container">Initialize Container</string>
@@ -2850,6 +2852,12 @@
     <!-- SSH client keys -->
     <string name="ssh_key_delete_confirm_title">Delete SSH key</string>
     <string name="ssh_key_delete_confirm_message">Delete the key \"%1$s\"? Hosts authenticated with it will no longer be able to connect. This action cannot be undone.</string>
+
+    <!-- Terminal bundle uninstall -->
+    <string name="terminal_bundle_uninstall_confirm_title">Uninstall bundle</string>
+    <string name="terminal_bundle_uninstall_confirm_message">Uninstall \"%1$s\"? The bundle and its data will be removed from the container. This action cannot be undone.</string>
+    <string name="terminal_custom_pkg_uninstall_confirm_title">Uninstall package</string>
+    <string name="terminal_custom_pkg_uninstall_confirm_message">Uninstall \"%1$s\"? It will be removed from the container via the package manager. This action cannot be undone.</string>
 
     <!-- Packager -->
     <string name="packager_project_delete_confirm_title">Delete project</string>
