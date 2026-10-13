@@ -200,3 +200,69 @@ jobs:
       # 与 android-release.yml 的 Lint 步骤保持一致，提前在 CI 阶段发现问题。
       - name: Lint (release, baseline gate)
         run: ./gradlew --warning-mode=all :app:lintRelease --stacktrace
+
+      # detekt 静态分析（baseline 渐进式）：config/detekt/baseline.xml 记账存量问题，
+      # 只暴露本次改动引入的新问题。
+      #
+      # 首轮接入先设为 continue-on-error：本项目 Kotlin 为 2.2.21，而 detekt 1.23.x 系列
+      # 内置编译器为 2.0.x（1.23.8 → Kotlin 2.0.21），跨版本分析存在"能否稳定解析 2.2
+      # 元数据"的不确定性（升级到支持 Kotlin 2.2 的 detekt 2.0.0 需等其 GA）。
+      # 因此先观察：报告照常产出、归档、写入 job summary，确认基线稳定且无误报后再把
+      # continue-on-error 去掉转为硬门禁。
+      - name: detekt (baseline gate, non-blocking first round)
+        id: detekt
+        continue-on-error: true
+        run: ./gradlew --warning-mode=all :app:detekt --stacktrace
+
+      - name: Upload detekt report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: detekt-report
+          path: app/build/reports/detekt/
+          if-no-files-found: warn
+
+      - name: Summarize detekt findings
+        if: always()
+        run: |
+          set -e
+          XML="app/build/reports/detekt/detekt.xml"
+          if [ -f "$XML" ]; then
+            COUNT=$(grep -o '<error ' "$XML" | wc -l || echo 0)
+            echo "detekt findings (new, baseline suppressed): $COUNT"
+            echo "### detekt: $COUNT finding(s)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "::warning::detekt report not found at $XML"
+            echo "### detekt: 未产出报告（请先本地确认 detekt 可运行）" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # 覆盖率报告：仅统计 app 自身源码（已排除 R/Hilt/SQLDelight/Compose 生成类）。
+      # 与 detekt 同理，先只做报告+归档，不设阻断阈值：基线覆盖率尚未建立，
+      # 直接卡阈值会把正常合并全部堵死。稳定后启用 jacocoTestCoverageVerification 收紧。
+      - name: Coverage report (release unit tests)
+        id: coverage
+        continue-on-error: true
+        run: ./gradlew --warning-mode=all :app:jacocoTestReport --stacktrace
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: app/build/reports/jacoco/jacocoTestReport/
+          if-no-files-found: warn
+
+      - name: Summarize coverage
+        if: always()
+        run: |
+          set -e
+          XML="app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml"
+          if [ -f "$XML" ]; then
+            # 取 LINE 维度 counter（missed/covered）计算行覆盖率
+            LINE=$(python3 -c 'import xml.etree.ElementTree as ET,sys; r=ET.parse(sys.argv[1]).getroot(); n=[(int(c.get("missed",0)),int(c.get("covered",0))) for c in r.iter("counter") if c.get("type")=="LINE"]; m,cv=n[0] if n else (0,0); t=m+cv; print(f"{cv}/{t} ({(cv/t*100):.1f}%)" if t else "n/a")' "$XML")
+            echo "line coverage: $LINE"
+            echo "### 行覆盖率（release 单测）: $LINE" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "::warning::coverage report not found at $XML"
+            echo "### 覆盖率: 未产出报告" >> $GITHUB_STEP_SUMMARY
+          fi

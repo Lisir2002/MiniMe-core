@@ -39,13 +39,13 @@ highlights = "1.1.0"
 
 # SSH/FTP
 sshj = "0.38.0"
-bouncycastle = "1.75"
+bouncycastle = "1.78.1"
 commonsNet = "3.10.0"
 ftpserver = "1.2.0"
 
 # Utilities
 jsoup = "1.18.1"
-snakeyaml = "2.2"
+snakeyaml = "2.4"
 slf4j = "2.0.9"
 commonsCompress = "1.26.2"
 xz = "1.10"

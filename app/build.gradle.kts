@@ -13,6 +13,8 @@ plugins {
     id("com.google.devtools.ksp")
     id("app.cash.sqldelight")
     id("io.gitlab.arturbosch.detekt")
+    // JaCoCo：单元测试覆盖率采集（报告任务见文件末尾 jacocoTestReport）。
+    id("jacoco")
     // OWASP Dependency-Check：依赖 CVE 扫描（版本在根 build.gradle.kts 以 apply false 声明）。
     // 任务仅在 .github/workflows/dependency-check.yml（每周/手动）执行，不进主 CI 门禁，
     // 避免 NVD 数据下载超时影响日常构建。
@@ -649,4 +651,55 @@ detekt {
     parallel = true
     // 存量问题记账在 baseline（来自 main 基线），门禁只拦截本次改动引入的新问题。
     baseline = file("$rootDir/config/detekt/baseline.xml")
+    // 报告产物供 CI 归档（xml 便于机器解析，html 便于人看）。
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        sarif.required.set(false)
+        md.required.set(false)
+    }
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+/**
+ * 覆盖率报告（release 变体纯 JVM 单测）。
+ *
+ * 只统计 app 自身源码：排除 R/BuildConfig/Hilt 生成类、SQLDelight 生成代码与 Compose 编译产物，
+ * 否则覆盖率数字会被生成代码稀释到无参考价值。
+ *
+ * 当前 CI 只做「报告 + 归档」，不设阻断阈值——基线覆盖率尚未建立，硬阈值会一上来就把
+ * 所有合并堵死。等指标稳定后，可仿照本任务新增一个 JacocoCoverageVerification 任务
+ * （在 violationRules 里配 minimum，再挂到 CI 的 check 上）收紧为硬门禁。
+ */
+tasks.register<JacocoReport>("jacocoTestReport") {
+    group = "verification"
+    description = "Generates JaCoCo coverage report for release unit tests."
+    dependsOn("testReleaseUnitTest")
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+
+    val kotlinClasses = layout.buildDirectory.dir("tmp/kotlin-classes/release").get().asFile
+    sourceDirectories.setFrom(files("$projectDir/src/main/java", "$projectDir/src/main/kotlin"))
+    classDirectories.setFrom(
+        fileTree(kotlinClasses) {
+            exclude(
+                "**/R.class", "**/R\$*.class", "**/BuildConfig*", "**/Manifest*",
+                "**/*_Factory.class", "**/*_Provide*Factory.class", "**/*HiltModules*.class",
+                "**/*_MembersInjector.class", "**/*_Impl.class",
+                "**/com/mini/mecore/datalayer/**", // SQLDelight 生成代码
+                "**/*ComposableSingletons*", "**/*PreviewKt*",
+            )
+        }
+    )
+    executionData.setFrom(
+        fileTree(layout.buildDirectory.get().asFile) {
+            include("jacoco/testReleaseUnitTest.exec", "outputs/unit_test_code_coverage/**/*.exec")
+        }
+    )
 }
