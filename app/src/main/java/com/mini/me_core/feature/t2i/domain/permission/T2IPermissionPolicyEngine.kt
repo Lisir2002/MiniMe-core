@@ -18,7 +18,8 @@ import javax.inject.Singleton
  * 2. **P2 日额度耗尽**：今日 00:00 至今的 `sum(quotaDeductedTokens)` ≥ 全局日上限 → DENY。
  * 3. **P3 会话额度耗尽**：同 sessionId 的 `sum(quotaDeductedTokens)` ≥ 单会话上限 → DENY。
  * 4. **P4 月度供应商额度**：跨会话、跨天的「当月已扣 token + 本次将扣」> 供应商月度总额度 → DENY。
- *    （月度总额度读取自 DataStore `t2i_monthly_quota_tokens`，0 表示不限制）
+ *    （月度总额度读取自 DataStore `t2i_monthly_quota_tokens`，0 表示不限制；
+ *    当月已用量从 t2i_task 表按 `created_at_ms >= 本月1号` 聚合，与 P2 同源）
  * 5. **P5 渐进保护阈值**：当日已成功生成图数 `countSuccessfulImagesSince(dayStart)` ≥ 阈值 N →
  *    接下来的请求从「自动放行」升级为 ASK（渐进提醒用户“今天已经用了不少了”）。
  * 6. **P6 兜底策略**：所有前置阶段都没命中 → 根据 provider.costPerImageTokens 是否超过「单次 token 阈值」
@@ -118,14 +119,19 @@ class T2IPermissionPolicyEngine @Inject constructor(
             }
         }
 
-        // ── P4 月度供应商额度（简化实现：从 zthTierRepo 获取 tier 月度额度；
-        //    因 T2I 是 新增模块，配额月度计数器 DataStore 未存在时走 no-op（= 不限制），
-        //    后续 可在 T2I 仓储里加 `monthly_used_tokens` DataStore 持久化。）
+        // ── P4 月度供应商额度（跨会话、跨天；与 P2/P3 同源聚合 t2i_task）──
+        // 设计说明：不引入 DataStore `t2i_monthly_used_tokens_yyyyMM` 双写计数器，
+        // 而是复用 P2 的 sumDeductedTokensSince(monthStart) 从 t2i_task 聚合——
+        // 单一数据源、天然持久化（task 表随扣减落库），避免"计数器与任务表
+        // 不一致"的对账问题。修复前 P4 恒被跳过（月度额度形同虚设），见 issue #1。
         val monthlyQuota = effectiveMonthlyQuota(req)
         if (monthlyQuota > 0) {
-            // TODO: monthlyUsedTokens = 读 DataStore `t2i_monthly_used_tokens_${yyyyMM}`
-            //   目前暂时跳过 P4（相当于月度不限），避免引入 DataStore key 后又改命名。
-            //   仓储层 saveProvider 已经预留字段，后续补一行即可。跟踪见 #1。
+            val usedThisMonth = t2iRepository.sumDeductedTokensSince(monthStartMillis())
+            if (usedThisMonth + totalCost > monthlyQuota) {
+                val msg = "本月额度已用 $usedThisMonth/$monthlyQuota tokens，本次需 $totalCost，超出上限。"
+                FileLogger.w(TAG, "P4 命中：月度额度耗尽 — $msg")
+                return EvalResult(Verdict.DENY, totalCost, denyCode = "MONTHLY_QUOTA_EXCEEDED", denyMessage = msg)
+            }
         }
 
         // ── P5 渐进保护阈值 ──
@@ -206,6 +212,17 @@ class T2IPermissionPolicyEngine @Inject constructor(
     /** 返回「今日 00:00 本地时间」的毫秒时间戳（用于 P2/P5 的“当天”语义）。 */
     private fun todayStartMillis(): Long {
         val cal = java.util.Calendar.getInstance()
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        cal.set(java.util.Calendar.MINUTE, 0)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
+    }
+
+    /** 返回「本月 1 号 00:00 本地时间」的毫秒时间戳（用于 P4 的“当月”语义）。 */
+    private fun monthStartMillis(): Long {
+        val cal = java.util.Calendar.getInstance()
+        cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
         cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
         cal.set(java.util.Calendar.MINUTE, 0)
         cal.set(java.util.Calendar.SECOND, 0)

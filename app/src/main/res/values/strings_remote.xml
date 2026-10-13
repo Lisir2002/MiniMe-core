@@ -60,6 +60,7 @@
     <string name="remote_upload_all_success">全量上传成功！</string>
     <string name="remote_download_all_failed">全量下载失败: %1$s</string>
     <string name="remote_download_all_success">全量下载成功！</string>
+    <string name="remote_auto_sync_failed">自动同步失败: %1$s</string>
     <string name="remote_connect_success">连接成功！</string>
     <string name="remote_connect_failed">连接失败: %1$s</string>
     <string name="remote_unknown_error">未知错误</string>

@@ -1389,6 +1389,7 @@
     <string name="remote_upload_all_success">Full upload succeeded!</string>
     <string name="remote_download_all_failed">Full download failed: %1$s</string>
     <string name="remote_download_all_success">Full download succeeded!</string>
+    <string name="remote_auto_sync_failed">Auto sync failed: %1$s</string>
     <string name="remote_connect_success">Connected!</string>
     <string name="remote_connect_failed">Connection failed: %1$s</string>
     <string name="remote_unknown_error">Unknown error</string>

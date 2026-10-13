@@ -11,10 +11,13 @@ import com.mini.me_core.feature.workspace.domain.repository.RemoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import com.mini.me_core.R
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -51,6 +54,9 @@ class RemoteServerViewModel @Inject constructor(
     private val _mountSyncDirections = MutableStateFlow<Map<String, String>>(emptyMap())
     val mountSyncDirections: StateFlow<Map<String, String>> = _mountSyncDirections.asStateFlow()
 
+    /** 周期自动同步协程（setAutoSync 重启；App 重启后按持久化设置恢复，见 init）。 */
+    private var autoSyncJob: Job? = null
+
     /** 正在测试连通性的连接 id 集合（用于卡片 loading 态）。 */
     private val _testingConnectionIds = MutableStateFlow<Set<String>>(emptySet())
     val testingConnectionIds: StateFlow<Set<String>> = _testingConnectionIds.asStateFlow()
@@ -64,6 +70,8 @@ class RemoteServerViewModel @Inject constructor(
     init {
         loadData()
         loadMountSyncDirections()
+        // 恢复持久化的自动同步设置（App 重启后周期协程随设置重建）。
+        restartAutoSyncJob()
     }
 
     /** 用户对 SSH 首连指纹做出决策：本次信任 / 永久信任 / 拒绝。 */
@@ -90,7 +98,7 @@ class RemoteServerViewModel @Inject constructor(
 
     private fun loadMountSyncDirections() {
         viewModelScope.launch {
-            val entries = kv.getAll(REMOTE_MOUNT_PREFS_NS).associate { it.key to (it.stringVal ?: "bidirectional") }
+            val entries = kv.getAll(RemoteRepository.REMOTE_MOUNT_PREFS_NS).associate { it.key to (it.stringVal ?: "bidirectional") }
             _mountSyncDirections.value = entries
         }
     }
@@ -346,25 +354,50 @@ class RemoteServerViewModel @Inject constructor(
         }
     }
 
-    /** 设置单个挂载点的同步方向并持久化。 */
+    /** 设置单个挂载点的同步方向并持久化；已连接的挂载点热更新引擎行为（无需重连）。 */
     fun setSyncDirection(mountId: String, direction: String) {
         viewModelScope.launch {
-            kv.putString(REMOTE_MOUNT_PREFS_NS, "dir_$mountId", direction)
+            kv.putString(RemoteRepository.REMOTE_MOUNT_PREFS_NS, RemoteRepository.mountDirectionKey(mountId), direction)
             _mountSyncDirections.value = _mountSyncDirections.value + (mountId to direction)
-            // TODO: 将 direction 传入 SyncEngine，按方向限制 upload/download/watch 行为。跟踪见 #2。
+            // 热更新：未连接时持久化值在下次 connectMount 创建引擎时生效（issue #2 闭环）。
+            repository.setActiveEngineSyncDirection(mountId, direction)
         }
     }
 
-    /** 设置全局冲突处理策略并持久化。 */
+    /** 设置全局冲突处理策略并持久化。SyncEngine 经 provider lambda 热读，已连接引擎即时生效。 */
     fun setConflictStrategy(strategy: String) {
         syncSettingsRepository.setConflictStrategy(strategy)
-        // TODO: 将 strategy 传入 SyncEngine，解决冲突时按策略执行。跟踪见 #3。
     }
 
-    /** 设置自动同步开关与间隔（分钟，0 表示仅手动）并持久化。 */
+    /** 设置自动同步开关与间隔（分钟，0 表示仅手动）并持久化，并按需重启周期同步协程。 */
     fun setAutoSync(enabled: Boolean, intervalMinutes: Int) {
         syncSettingsRepository.setAutoSync(enabled, intervalMinutes)
-        // TODO: 按 intervalMinutes 启动/取消周期同步协程。跟踪见 #4。
+        restartAutoSyncJob()
+    }
+
+    /**
+     * 按持久化的 autoSyncEnabled / intervalMinutes 重建周期同步协程（issue #4 闭环）。
+     * 间隔 <= 0 或未启用时取消协程（仅手动同步）。协程挂在 viewModelScope，随 ViewModel 销毁。
+     */
+    private fun restartAutoSyncJob() {
+        autoSyncJob?.cancel()
+        val enabled = syncSettingsRepository.autoSyncEnabled.value
+        val intervalMinutes = syncSettingsRepository.autoSyncIntervalMinutes.value
+        if (!enabled || intervalMinutes <= 0) {
+            autoSyncJob = null
+            return
+        }
+        autoSyncJob = viewModelScope.launch {
+            while (isActive) {
+                delay(intervalMinutes * 60_000L)
+                val result = repository.syncActiveMounts()
+                if (result.isFailure) {
+                    _uiState.value = _uiState.value.copy(
+                        error = context.getString(R.string.remote_auto_sync_failed, result.exceptionOrNull()?.message)
+                    )
+                }
+            }
+        }
     }
 
     fun setSyncIgnoredPatterns(patterns: String) {
@@ -412,6 +445,3 @@ data class RemoteServerUiState(
     /** 下载完成/失败结果消息（非空时由进度弹窗显示）。 */
     val downloadResult: String? = null,
 )
-
-/** KVStore namespace：按 mountId 保存每挂载点的同步方向等偏好。 */
-private const val REMOTE_MOUNT_PREFS_NS = "remote_mount_prefs"

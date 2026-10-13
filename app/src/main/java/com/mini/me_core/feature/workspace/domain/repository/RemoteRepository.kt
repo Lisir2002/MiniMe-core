@@ -288,7 +288,12 @@ class RemoteRepository @Inject constructor(
                 syncClient = client,
                 ignoredPatternsStr = syncSettings.ignoredPatterns.value,
                 useGitIgnore = syncSettings.useGitIgnore.value,
-                maxSyncBatchSize = syncSettings.maxSyncBatchSize.value
+                maxSyncBatchSize = syncSettings.maxSyncBatchSize.value,
+                // 同步方向按 mountId 存 KVStore（设置页写入的同一份），DB 列不存在故回落模型默认值。
+                syncDirection = kv.getString(REMOTE_MOUNT_PREFS_NS, mountDirectionKey(mountId))
+                    ?: mount.syncDirection,
+                // 冲突策略用 provider lambda 热读：设置页改策略对已连接引擎即时生效。
+                conflictStrategyProvider = { syncSettings.conflictStrategy.value },
             )
             // 移除默认的全量下载以免覆盖本地修改，交由用户手动点击同步
             engine.startWatching()     // 增量监听
@@ -308,6 +313,31 @@ class RemoteRepository @Inject constructor(
         activeEngines[mountId]?.shutdown()
         activeEngines.remove(mountId)
         activeEngineIds.update { it - mountId }
+    }
+
+    /**
+     * 热更新已连接挂载点的同步方向（设置页切换方向时调用，无需重连）。
+     * 未连接时仅 KVStore 持久化生效，下次 connectMount 创建引擎时读取。
+     */
+    fun setActiveEngineSyncDirection(mountId: String, direction: String) {
+        activeEngines[mountId]?.setSyncDirection(direction)
+    }
+
+    /**
+     * 周期自动同步：对所有已连接挂载点依次执行 上传 + 下载。
+     * 方向约束（upload_only/download_only）由 SyncEngine 内部消化，无需在此判断。
+     * 单个挂载点失败不影响其余（内部已按操作 try/catch）。
+     */
+    suspend fun syncActiveMounts(): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            activeEngines.values.toList().forEach { engine ->
+                runCatching { engine.uploadWorkspace() }
+                runCatching { engine.downloadWorkspace() }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun forceUploadMount(mountId: String): Result<Unit> = withContext(Dispatchers.IO) {
@@ -455,8 +485,12 @@ class RemoteRepository @Inject constructor(
         else -> RemoteAuth.Password(decryptCredential(authData))
     }
 
-    private companion object {
+    companion object {
         const val FTP_CLEARTEXT_NS = "remote_ftp_cleartext"
         fun cleartextKey(host: String) = "ok_$host"
+
+        /** KVStore namespace：按 mountId 保存每挂载点的同步方向（与设置页写入方同源）。 */
+        const val REMOTE_MOUNT_PREFS_NS = "remote_mount_prefs"
+        fun mountDirectionKey(mountId: String) = "dir_$mountId"
     }
 }
