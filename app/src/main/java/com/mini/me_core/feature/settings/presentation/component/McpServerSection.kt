@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.mini.me_core.core.theme.components.AppDialog
+import com.mini.me_core.core.theme.components.AppDialogType
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -90,6 +91,7 @@ internal fun McpServerSection(
     var portText by remember(port) { mutableStateOf(port.toString()) }
     var tokenVisible by remember { mutableStateOf(false) }
     var showRegenerateConfirm by remember { mutableStateOf(false) }
+    var showStartConfirm by remember { mutableStateOf(false) }
 
     // 端口自动保存：输入停止 500ms 后自动生效（与开关行为一致）。
     LaunchedEffect(portText) {
@@ -199,7 +201,7 @@ internal fun McpServerSection(
                         }
                     } else {
                         Button(
-                            onClick = onToggleServer,
+                            onClick = { showStartConfirm = true },
                             contentPadding = PaddingValues(horizontal = Spacing.md, vertical = 8.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
@@ -377,6 +379,20 @@ internal fun McpServerSection(
             confirmText = stringResource(R.string.mcp_regenerate_confirm),
             onDismiss = { showRegenerateConfirm = false },
             onConfirm = { onRegenerateToken() },
+        )
+    }
+
+    // 开启远程暴露前的即时警示：顶部静态横幅易被忽略，启动动作本身必须显式确认
+    // （安全修复清单 3.1：仅限可信网络 / token 明文传输）。
+    if (showStartConfirm) {
+        AppDialog(
+            title = stringResource(R.string.mcp_start_confirm_title),
+            message = stringResource(R.string.mcp_start_confirm_message),
+            confirmText = stringResource(R.string.mcp_start_confirm),
+            cancelText = stringResource(R.string.mcp_start_cancel),
+            type = AppDialogType.Destructive,
+            onDismiss = { showStartConfirm = false },
+            onConfirm = { onToggleServer() },
         )
     }
 }

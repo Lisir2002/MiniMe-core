@@ -16,6 +16,10 @@
     <string name="mcp_regenerate_confirm_message">重新生成令牌会断开所有已连接客户端，确认继续？</string>
     <string name="mcp_regenerate_confirm">确认重新生成</string>
     <string name="mcp_security_banner">开放服务在局域网暴露工具，请勿在不可信网络使用</string>
+    <string name="mcp_start_confirm_title">开启开放服务</string>
+    <string name="mcp_start_confirm_message">开启后本机工具将通过 HTTP 在局域网暴露，令牌明文传输，仅限可信网络使用。公共 Wi-Fi 等不可信网络下请勿开启，建议同时开启「远程调用强制审批」。</string>
+    <string name="mcp_start_confirm">已知风险，开启</string>
+    <string name="mcp_start_cancel">取消</string>
     <string name="mcp_add">添加 MCP</string>
     <string name="mcp_edit">编辑 MCP</string>
     <string name="mcp_view_logs">查看此 MCP 日志</string>

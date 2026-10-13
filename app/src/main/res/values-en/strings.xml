@@ -1297,6 +1297,10 @@
     <string name="logs_export_action">Export logs to Downloads</string>
     <string name="logs_export_toast">Exported to Download/MiniMe-core/logs/, viewable in a file manager</string>
     <string name="logs_export_none">No log files to export</string>
+    <string name="logs_export_confirm_title">Export logs</string>
+    <string name="logs_export_confirm_message">The export is written to the public directory Download/MiniMe-core/logs/ and is readable by other apps. Logs are sanitized automatically but may still contain device and app information — review the content before sharing.</string>
+    <string name="logs_export_confirm">Export</string>
+    <string name="logs_export_cancel">Cancel</string>
     <string name="provider_no_models_hint">No models configured. Tap Edit to add.</string>
     <string name="provider_model_summary">Model: %1$s · %2$s total</string>
     <string name="provider_step_previous">Previous</string>

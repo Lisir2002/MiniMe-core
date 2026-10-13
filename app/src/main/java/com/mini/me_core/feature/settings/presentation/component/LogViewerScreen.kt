@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
+import com.mini.me_core.core.theme.components.AppDialog
 import com.mini.me_core.core.theme.components.AppStatusDot
 import com.mini.me_core.core.theme.components.AppStatusDotColor
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
@@ -72,6 +73,7 @@ fun LogViewerScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var showFilterSheet by remember { mutableStateOf(false) }
+    var showExportConfirm by remember { mutableStateOf(false) }
     val listState = rememberPersistentLazyListState("settings_logs")
 
     val isExpanded = LocalConfiguration.current.screenWidthDp >= 600
@@ -108,17 +110,7 @@ fun LogViewerScreen(
                 onPrevMatch = { viewModel.prevMatch() },
                 onNextMatch = { viewModel.nextMatch() },
                 onOpenFilter = { showFilterSheet = true },
-                onExport = {
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) {
-                            runCatching { com.mini.me_core.core.util.FileLogger.exportLogsToDownloads(context) }.getOrElse { emptyList() }
-                        }
-                        snackbarHostState.showSnackbar(
-                            if (result.isEmpty()) context.getString(R.string.logs_export_none)
-                            else context.getString(R.string.logs_export_toast)
-                        )
-                    }
-                },
+                onExport = { showExportConfirm = true },
             )
 
             if (isExpanded) {
@@ -199,6 +191,29 @@ fun LogViewerScreen(
                 onToggleLevel = { viewModel.toggleLevel(it) },
                 onToggleTag = { viewModel.toggleTag(it) },
                 onReset = { viewModel.resetFilters() },
+            )
+        }
+
+        // 导出前的敏感信息提示：日志虽已经 LogSanitizer 脱敏，
+        // 但导出文件写入公共 Download 目录，分享前仍需用户知情确认（安全修复清单 3.3）。
+        if (showExportConfirm) {
+            AppDialog(
+                title = stringResource(R.string.logs_export_confirm_title),
+                message = stringResource(R.string.logs_export_confirm_message),
+                confirmText = stringResource(R.string.logs_export_confirm),
+                cancelText = stringResource(R.string.logs_export_cancel),
+                onDismiss = { showExportConfirm = false },
+                onConfirm = {
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            runCatching { com.mini.me_core.core.util.FileLogger.exportLogsToDownloads(context) }.getOrElse { emptyList() }
+                        }
+                        snackbarHostState.showSnackbar(
+                            if (result.isEmpty()) context.getString(R.string.logs_export_none)
+                            else context.getString(R.string.logs_export_toast)
+                        )
+                    }
+                },
             )
         }
     }
