@@ -32,7 +32,8 @@ import java.util.Locale
  */
 class ApkBuilder(
     private val context: Context,
-    private val projectStore: ProjectStore
+    private val projectStore: ProjectStore,
+    private val keystorePassword: PackagerKeystorePassword
 ) {
     /** 构建步骤定义 */
     enum class BuildStep(val displayName: String) {
@@ -344,7 +345,7 @@ class ApkBuilder(
             callback.onStepStart(BuildStep.SIGN, 7, steps.size)
             val signedApk = File(tempDir, "signed.apk")
             val keystoreFile = File(projectStore.signatureDir, "default.keystore")
-            ApkSigner.signApk(alignedApk, signedApk, keystoreFile)
+            ApkSigner.signApk(alignedApk, signedApk, keystoreFile, keystorePassword)
             log("APK 签名完成: ${signedApk.length()} bytes", callback, logWriter)
             callback.onStepComplete(BuildStep.SIGN, 7, steps.size)
 

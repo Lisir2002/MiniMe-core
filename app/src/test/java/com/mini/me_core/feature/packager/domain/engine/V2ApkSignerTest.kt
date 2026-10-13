@@ -13,7 +13,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
- * 打包器 V2 签名端到端回归测试。
+ * 打包器 V2+V3 签名端到端回归测试。
  *
  * 构造最小未签名 APK，经 [V2ApkSigner] 签名后，用 Android SDK 的 apksigner
  * 做权威验证，守护「签名块格式必须被系统认可」这条底线。
@@ -21,9 +21,14 @@ import java.util.zip.ZipOutputStream
  * 证书用 JDK 自带 keytool 生成（PKCS12），不依赖 BouncyCastle，隔离测试环境
  * 依赖冲突；[V2ApkSigner.sign] 本身仅使用 java.security，可在纯 JVM 运行。
  *
- * 历史 bug：V2ApkSigner 的 ID-value pair 长度字段少算 4 字节（未含 ID 本身），
- * 且 V3 块错误复用 V2 signed_data 格式，导致 apksigner 报
- * "Malformed list of signers"、安装时提示「缺乏开发者证书」。
+ * 历史 bug 与结构约束（均为 apksigner 实测回归，勿改字节序）：
+ * 1. ID-value pair 长度字段必须含 4 字节 ID 本身，否则报 "Malformed list of signers"；
+ * 2. V3 signed-data 布局为 [digests][certificates][minSdk][maxSdk][attrs]——
+ *    minSdk/maxSdk 位于 additional_attributes **之前**（AOSP encodeSignedData 序），
+ *    放在其后会被误读为 SDK 参数；
+ * 3. V3 signer 布局为 [signedData][minSdk][maxSdk][signatures][publicKey]——
+ *    签名者级 SDK 字段缺失时，签名序列长度会被误读为 minSdk；
+ * 4. 两处 minSdk/maxSdk 必须同源同值，验证器交叉比对。
  */
 class V2ApkSignerTest {
 
@@ -97,7 +102,7 @@ class V2ApkSignerTest {
 
             val (privateKey, certificate) = generateTestKeystore(keystore, "testpass")
 
-            // 直接调用 V2 签名器（纯 java.security，无 BC 依赖）
+            // 直接调用 V2+V3 签名器（纯 java.security，无 BC 依赖）
             V2ApkSigner.sign(
                 unsignedApk = unsigned,
                 signedApk = signed,
@@ -120,11 +125,12 @@ class V2ApkSignerTest {
             val apksigner = findApksigner()
             if (apksigner == null) {
                 println("[跳过] 当前环境未找到 apksigner（需 ANDROID_HOME/build-tools），仅完成签名块存在性检查")
-                return
+                return@runBlocking
             }
 
             // 测试 APK 的 AndroidManifest.xml 为纯文本占位（非二进制 AXML），
-            // apksigner 无法从中解析 minSdkVersion，显式指定 26（项目 minSdk）。
+            // apksigner 无法从中解析 minSdkVersion，显式指定 26（项目 minSdk，
+            // 与 V2ApkSigner.DEFAULT_MIN_SDK 一致，保证 V3 signer 参与裁定）。
             // 诊断：保留签名后的 APK 供外部逐字段分析。
             val debugApk = File("/tmp/v2signer-debug-signed.apk")
             signed.copyTo(debugApk, overwrite = true)
@@ -142,6 +148,10 @@ class V2ApkSignerTest {
             assertTrue("apksigner verify 应退出 0，实际 $exit\n$output", exit == 0)
             assertFalse("输出不应包含 DOES NOT VERIFY\n$output", output.contains("DOES NOT VERIFY"))
             assertTrue("输出应表明使用 v2 签名验证通过\n$output", output.contains("Verified using v2"))
+            assertTrue(
+                "输出应表明使用 v3 签名验证通过（V2+V3 双 scheme 输出）\n$output",
+                output.contains("Verified using v3"),
+            )
         } finally {
             tmpDir.deleteRecursively()
         }
@@ -205,6 +215,10 @@ class V2ApkSignerTest {
             assertTrue("apksigner verify 应退出 0，实际 $exit\n$output", exit == 0)
             assertFalse("输出不应包含 DOES NOT VERIFY\n$output", output.contains("DOES NOT VERIFY"))
             assertTrue("输出应表明使用 v2 签名验证通过\n$output", output.contains("Verified using v2"))
+            assertTrue(
+                "输出应表明使用 v3 签名验证通过（V2+V3 双 scheme 输出）\n$output",
+                output.contains("Verified using v3"),
+            )
         } finally {
             tmpDir.deleteRecursively()
         }

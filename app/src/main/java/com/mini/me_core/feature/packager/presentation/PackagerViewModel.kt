@@ -4,8 +4,10 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.datalayer.encryption.UnifiedKeyManager
 import com.mini.me_core.feature.packager.domain.engine.ApkAnalyzer
 import com.mini.me_core.feature.packager.domain.engine.ApkBuilder
+import com.mini.me_core.feature.packager.domain.engine.PackagerKeystorePassword
 import com.mini.me_core.feature.packager.domain.model.BuildRecord
 import com.mini.me_core.feature.packager.domain.model.BuildStatus
 import com.mini.me_core.feature.packager.domain.model.Project
@@ -32,7 +34,8 @@ import javax.inject.Inject
 class PackagerViewModel @Inject constructor(
     application: Application,
     private val projectStore: ProjectStore,
-    private val buildStore: BuildStore
+    private val buildStore: BuildStore,
+    keyManager: UnifiedKeyManager
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -94,7 +97,8 @@ class PackagerViewModel @Inject constructor(
     private val _isAnalyzing = MutableStateFlow(false)
     val isAnalyzing: StateFlow<Boolean> = _isAnalyzing.asStateFlow()
 
-    private val apkBuilder = ApkBuilder(getApplication(), projectStore)
+    private val keystorePassword = PackagerKeystorePassword(keyManager)
+    private val apkBuilder = ApkBuilder(getApplication(), projectStore, keystorePassword)
 
     /** 消费一次性迁移提示 */
     fun consumeMigrationMessage() = projectStore.consumeMigrationMessage()

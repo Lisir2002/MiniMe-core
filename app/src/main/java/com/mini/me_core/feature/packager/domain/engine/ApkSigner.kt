@@ -21,16 +21,19 @@ import java.security.cert.X509Certificate
 import java.util.Date
 
 /**
- * APK 签名器（V2 手动实现方案）
+ * APK 签名器（V2+V3 手动实现方案）
  *
- * 完全不依赖 apksig 库，基于 AOSP 公开标准手动实现 APK Signature Scheme v2。
+ * 完全不依赖 apksig 库，基于 AOSP 公开标准手动实现 APK Signature Scheme v2 + v3。
  * 解决 apksig 库在 Android 环境下 "Failed to encode signature block" 的根本性兼容问题。
  *
- * 签名方案：
+ * 签名方案（每次签名同时输出两个 ID-value pair）：
  * - V2（APK Signature Scheme v2）：Android 7.0+，Android 11+ 强制要求
+ * - V3（APK Signature Scheme v3）：Android 9+ 优先使用，携带 minSdk/maxSdk，
+ *   为将来的密钥轮换（proof-of-rotation）演进预留结构；当前为单签名者自签名，
+ *   lineage 链按规范留空合法，详见 [V2ApkSigner] 类级 KDoc。
  *
- * V3（密钥轮换）暂未启用：V3 的 signed_data 含 minSdk/maxSdk/proof-of-rotation，
- * 与 V2 格式不同，需独立实现后再合并。自签名打包器无需密钥轮换，V2 已覆盖 minSdk 26+。
+ * 签名密钥库口令不硬编码：由 [PackagerKeystorePassword] 提供随机口令并经
+ * Android Keystore 硬件 MasterKey 包裹存储，历史硬编码口令密钥库自动迁移。
  *
  * 注意：当前实现不包含 V1（JAR 签名），最低支持 Android 7.0（API 24）。
  * 如需兼容 Android 6.0 及以下，需额外实现 V1 签名。
@@ -47,11 +50,8 @@ class ApkSigner {
             }
         }
 
-        /** 默认签名别名 */
-        private const val DEFAULT_ALIAS = "minime_packager"
-
-        /** 默认签名密码 */
-        private const val DEFAULT_PASSWORD = "minime_packager_2026"
+        /** 默认签名别名（[PackagerKeystorePassword] 的别名校验同样引用此常量） */
+        internal const val DEFAULT_ALIAS = "minime_packager"
 
         /**
          * 对 APK 进行 V2 + V3 签名
@@ -59,16 +59,18 @@ class ApkSigner {
          * @param unsignedApk 未签名的 APK
          * @param signedApk 签名后的 APK
          * @param keystoreFile 签名密钥库文件（如果不存在会自动生成）
+         * @param keystorePassword 口令提供者（随机口令 + 硬件包裹存储 + 旧库迁移）
          */
-        fun signApk(
+        suspend fun signApk(
             unsignedApk: File,
             signedApk: File,
-            keystoreFile: File
+            keystoreFile: File,
+            keystorePassword: PackagerKeystorePassword
         ) {
             FileLogger.d(TAG, "开始 APK V2+V3 签名: ${unsignedApk.name} (${unsignedApk.length()} bytes)")
 
             // 加载或生成签名密钥
-            val (privateKey, certificate) = loadOrGenerateKeystore(keystoreFile)
+            val (privateKey, certificate) = loadOrGenerateKeystore(keystoreFile, keystorePassword)
             FileLogger.d(TAG, "签名密钥加载完成: alias=$DEFAULT_ALIAS, cert=${certificate.subjectX500Principal.name}")
 
             // 确保输出目录存在
@@ -88,9 +90,16 @@ class ApkSigner {
 
         /**
          * 加载或生成签名密钥库
+         *
+         * 口令由 [keystorePassword] 提供：新库用随机口令创建，旧库（历史硬编码口令）
+         * 经其内部自动迁移。密钥库存在但口令失配时 [PackagerKeystorePassword.obtain]
+         * 会抛异常——不静默重建（重建 = 更换签名身份 = 已安装应用无法原地更新）。
          */
-        private fun loadOrGenerateKeystore(keystoreFile: File): Pair<PrivateKey, X509Certificate> {
-            val password = DEFAULT_PASSWORD.toCharArray()
+        private suspend fun loadOrGenerateKeystore(
+            keystoreFile: File,
+            keystorePassword: PackagerKeystorePassword
+        ): Pair<PrivateKey, X509Certificate> {
+            val password = keystorePassword.obtain(keystoreFile)
 
             return if (keystoreFile.exists()) {
                 // 加载已有密钥库
@@ -99,8 +108,15 @@ class ApkSigner {
                 FileInputStream(keystoreFile).use { fis ->
                     keystore.load(fis, password)
                 }
-                val privateKey = keystore.getKey(DEFAULT_ALIAS, password) as PrivateKey
-                val certificate = keystore.getCertificate(DEFAULT_ALIAS) as X509Certificate
+                val privateKey = keystore.getKey(DEFAULT_ALIAS, password) as? PrivateKey
+                    ?: throw IllegalStateException(
+                        "签名密钥库中不存在别名 $DEFAULT_ALIAS 的密钥条目: ${keystoreFile.name}。" +
+                            "请检查该文件是否由其它工具生成。"
+                    )
+                val certificate = keystore.getCertificate(DEFAULT_ALIAS) as? X509Certificate
+                    ?: throw IllegalStateException(
+                        "签名密钥库中不存在别名 $DEFAULT_ALIAS 的证书条目: ${keystoreFile.name}。"
+                    )
                 Pair(privateKey, certificate)
             } else {
                 // 生成新的密钥对和证书
@@ -108,7 +124,7 @@ class ApkSigner {
                 val keyPair = generateKeyPair()
                 val certificate = generateSelfSignedCertificate(keyPair)
 
-                // 保存到密钥库
+                // 保存到密钥库（口令由 keystorePassword 随机生成并已包裹存储）
                 val keystore = KeyStore.getInstance("PKCS12")
                 keystore.load(null, password)
                 keystore.setKeyEntry(
