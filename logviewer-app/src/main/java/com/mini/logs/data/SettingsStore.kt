@@ -38,12 +38,19 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("auto_tail", false)
         set(value) = prefs.edit().putBoolean("auto_tail", value).apply()
 
-    /** 日志来源：自动检测/仅外部公共存储/仅应用私有目录。 */
+    /**
+     * 日志来源：自动检测 / 下载目录 / 文档目录 / 应用私有目录。
+     *
+     * 解析必须兜底：老版本存的枚举名（EXTERNAL_PUBLIC）在新枚举里已不存在，
+     * 直接 valueOf 会抛 IllegalArgumentException 让设置页崩溃。
+     * 无法识别时一律回落自动检测（三个目录都扫，行为最稳）。
+     */
     var logSource: LogDirResolver.LogSource
-        get() = LogDirResolver.LogSource.valueOf(
-            prefs.getString("log_source", LogDirResolver.LogSource.AUTO.name)
-                ?: LogDirResolver.LogSource.AUTO.name
-        )
+        get() = runCatching {
+            LogDirResolver.LogSource.valueOf(
+                prefs.getString("log_source", null) ?: LogDirResolver.LogSource.AUTO.name
+            )
+        }.getOrDefault(LogDirResolver.LogSource.AUTO)
         set(value) = prefs.edit().putString("log_source", value.name).apply()
 
     var contextLines: Int

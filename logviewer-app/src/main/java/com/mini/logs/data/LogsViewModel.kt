@@ -45,7 +45,7 @@ class LogsViewModel(app: Application) : AndroidViewModel(app) {
         // 校验是否选了正确的主应用日志目录
         if (!safManager.isExpectedLogDir(uri)) {
             viewModelScope.launch {
-                _statusMessage.value = "未选择主应用日志目录，请选 Documents/MiniMe-core/logs/（当前目录已忽略）"
+                _statusMessage.value = "未选择主应用日志目录，请选 Download/MiniMe-core/logs/（当前目录已忽略）"
             }
             return
         }

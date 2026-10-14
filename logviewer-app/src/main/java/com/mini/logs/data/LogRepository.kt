@@ -18,11 +18,12 @@ import java.io.RandomAccessFile
  * 日志文件仓库。负责列出日志文件、读取并解析日志行。
  *
  * 日志目录由 LogDirResolver 动态计算，不写死路径。
- * 主应用日志可能写入两个位置：
- * 1. 公共外部存储：Documents/MiniMe-core/logs/（主应用有权限时）
- * 2. 外部私有目录：Android/data/com.mini.me_core/files/logs/（主应用无权限时回退）
+ * 主应用导出/补导出后的日志可能出现在三个位置：
+ * 1. 公共下载目录：Download/MiniMe-core/logs/（主应用当前的导出目标，自动检测时优先）
+ * 2. 公共文档目录：Documents/MiniMe-core/logs/（早期版本的导出位置，兼容扫描）
+ * 3. 外部私有目录：Android/data/com.mini.me_core/files/logs/（兼容扫描）
  *
- * 用户可在设置中选择日志来源（自动/仅外部/仅私有）。
+ * 用户可在设置中选择日志来源（自动/下载目录/文档目录/应用私有）。
  *
  * 文件名格式：log-yyyy-MM-dd.txt（含滚动文件 .1/.2）
  * 文件头：# MiniMe Log Format vN（读取时跳过 # 开头的行）

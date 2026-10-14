@@ -495,6 +495,7 @@ private fun DefaultFileMode.label(): String = when (this) {
 
 private fun LogDirResolver.LogSource.label(): String = when (this) {
     LogDirResolver.LogSource.AUTO -> "自动检测"
-    LogDirResolver.LogSource.EXTERNAL_PUBLIC -> "外部存储"
+    LogDirResolver.LogSource.DOWNLOAD -> "下载目录"
+    LogDirResolver.LogSource.DOCUMENTS -> "文档目录"
     LogDirResolver.LogSource.APP_PRIVATE -> "应用私有"
 }

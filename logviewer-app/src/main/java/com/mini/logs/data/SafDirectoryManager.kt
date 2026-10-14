@@ -41,7 +41,8 @@ class SafDirectoryManager(private val context: Context) {
     fun isExpectedLogDir(uri: Uri): Boolean {
         return try {
             val docId = DocumentsContract.getTreeDocumentId(uri)
-            // document id 形如 "primary:Documents/MiniMe-core/logs" 或 "primary:Android/data/com.mini.me_core/files/logs"
+            // document id 形如 "primary:Download/MiniMe-core/logs"（当前）或
+            // "primary:Documents/MiniMe-core/logs"（历史）、"primary:Android/data/com.mini.me_core/files/logs"
             val path = Uri.decode(docId)
             path.contains("MiniMe-core/logs", ignoreCase = true) ||
             path.contains("com.mini.me_core/files/logs", ignoreCase = true)
@@ -144,7 +145,14 @@ class SafDirectoryManager(private val context: Context) {
     companion object {
         private const val KEY_TREE_URI = "saf_tree_uri"
 
-        /** 构造选择目录的 Intent，预定位到主应用日志目录（Documents/MiniMe-core/）。 */
+        /**
+         * 构造选择目录的 Intent，预定位到主应用日志目录。
+         *
+         * 优先定位 Download/MiniMe-core/（主应用当前的导出目标），
+         * 该目录不存在时回退 Documents/MiniMe-core/（早期版本导出位置），
+         * 让用户一打开系统文件选择器就落在正确目录，不必自己翻找。
+         */
+        @Suppress("DEPRECATION")
         fun buildOpenTreeIntent(): Intent {
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
                 addFlags(
@@ -152,14 +160,16 @@ class SafDirectoryManager(private val context: Context) {
                     Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
                 )
             }
-            // 预定位到 Documents/MiniMe-core/，用户一打开就看到正确目录
-            val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val targetDir = File(docsDir, "MiniMe-core")
-            if (targetDir.exists()) {
-                // externalstorage provider 的 document id: primary:Documents/MiniMe-core
-                val docId = "primary:Documents/MiniMe-core"
+            val downloadBase = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val documentsBase = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            val initialDocId = when {
+                File(downloadBase, "MiniMe-core").exists() -> "primary:Download/MiniMe-core"
+                File(documentsBase, "MiniMe-core").exists() -> "primary:Documents/MiniMe-core"
+                else -> null
+            }
+            if (initialDocId != null) {
                 val initialUri = DocumentsContract.buildTreeDocumentUri(
-                    "com.android.externalstorage.documents", docId
+                    "com.android.externalstorage.documents", initialDocId
                 )
                 intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialUri)
             }
