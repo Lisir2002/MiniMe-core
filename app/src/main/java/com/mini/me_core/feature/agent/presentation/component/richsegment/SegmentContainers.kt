@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -386,6 +387,43 @@ private fun OrderedListCard(
 
 // ============ 代码块（含语言标签 + 复制 + 展开/收起） ============
 
+/** 折叠态最多渲染的行数：折叠容器高 260dp 且可垂直滚动，超出部分用户不会看到，展开时才全量渲染。 */
+private const val FOLD_VISIBLE_LINES = 80
+
+/**
+ * 生成代码块行号文本（每行一个数字，换行分隔）。
+ *
+ * 旧实现为每一行创建一个 `Text` Composable，数千行的代码块会产生数千个节点，
+ * 是长输出场景下 slot table 膨胀与布局耗时的主要来源；合并为单个 Text 后节点数恒为 1，
+ * 视觉表现（等宽右对齐、行高）保持不变。
+ */
+internal fun buildLineNumbers(lineCount: Int): String = buildString {
+    for (n in 1..lineCount) {
+        if (n > 1) append('\n')
+        append(n)
+    }
+}
+
+/**
+ * 取文本的前 [maxLines] 行（按换行符切分）。
+ *
+ * 用于折叠态裁剪渲染：只让可见部分进入组合与布局，避免数千行全部展开渲染。
+ * 实现上只做一次 substring，不产生中间集合。
+ */
+internal fun headLines(text: String, maxLines: Int): String {
+    if (maxLines <= 0) return ""
+    var seenLines = 1
+    var idx = 0
+    while (idx < text.length) {
+        if (text[idx] == '\n') {
+            if (seenLines == maxLines) return text.substring(0, idx)
+            seenLines++
+        }
+        idx++
+    }
+    return text
+}
+
 @Composable
 private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
     val clipboard = LocalClipboardManager.current
@@ -485,29 +523,38 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
                     lineHeight = 18.sp,
                     color = fg
                 )
-                val highlighted = syntaxLang?.let { highlightCode(seg.code, it) }
+                // 折叠态只渲染前若干行：折叠容器是 260dp 固定高 + 垂直滚动，后面的行
+                // 用户根本滚不到（展开后才是完整内容），全量渲染数千行纯属浪费。
+                val folded = !expanded && shouldCollapse
+                val renderedCode = if (folded) {
+                    remember(seg.code) { headLines(seg.code, FOLD_VISIBLE_LINES) }
+                } else {
+                    seg.code
+                }
+                val renderedLineCount = if (folded) minOf(lineCount, FOLD_VISIBLE_LINES) else lineCount
+                // 语法高亮按渲染文本缓存：流式期间每次文本变化都会重组，未缓存等于每段重算一遍。
+                val highlighted = remember(renderedCode, syntaxLang) {
+                    syntaxLang?.let { highlightCode(renderedCode, it) }
+                }
                 if (highlighted != null) {
                     // 水平滚动：避免窄屏上长行被截断
                     Row(Modifier.horizontalScroll(rememberScrollState())) {
-                        // 行号
-                        val gutterW = remember(lineCount) { (lineCount.toString().length * 8 + 10).dp }
-                        Column(
+                        // 行号：合并为单个 Text。旧实现每行一个 Text，数千行的代码块会产生
+                        // 数千个 Composable 节点，是长输出时 slot table 膨胀与布局耗时的主因。
+                        val gutterW = remember(renderedLineCount) {
+                            (renderedLineCount.toString().length * 8 + 10).dp
+                        }
+                        Text(
+                            text = remember(renderedLineCount) { buildLineNumbers(renderedLineCount) },
+                            style = rawStyle.copy(
+                                color = fg.copy(alpha = 0.42f),
+                                fontSize = 11.5.sp
+                            ),
+                            textAlign = TextAlign.End,
                             modifier = Modifier
                                 .width(gutterW)
-                                .fillMaxHeight(),
-                            horizontalAlignment = Alignment.End
-                        ) {
-                            (1..lineCount).forEach { n ->
-                                Text(
-                                    text = "$n",
-                                    style = rawStyle.copy(
-                                        color = fg.copy(alpha = 0.42f),
-                                        fontSize = 11.5.sp
-                                    ),
-                                    modifier = Modifier.padding(end = 8.dp)
-                                )
-                            }
-                        }
+                                .padding(end = 8.dp)
+                        )
                         Text(
                             text = highlighted,
                             style = rawStyle,
@@ -516,7 +563,7 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
                     }
                 } else {
                     Text(
-                        text = seg.code,
+                        text = renderedCode,
                         style = rawStyle
                     )
                 }
