@@ -58,8 +58,16 @@ class TerminalSessionManager @Inject constructor(
         const val DEFAULT_ROWS = 24
         /** 命令打印 `[command exited: N]` 后等待正常 onFinished 回调的缓冲（毫秒）。 */
         const val EXIT_MARKER_GRACE_MS = 1_500L
-        /** 完成兜底监控轮询屏幕缓冲的间隔（毫秒）。 */
-        const val EXIT_MARKER_POLL_MS = 200L
+        /**
+         * 完成兜底监控轮询屏幕缓冲的间隔（毫秒）。
+         *
+         * 长对话内存治理：每次轮询都会调用 `getTabOutput` → `transcriptText`，
+         * 即逐行拼接整个 2000 行 transcript（约 320KB/次）。原 200ms 间隔下，
+         * 一个后台长输出任务会持续产生约 1.6MB/s 的垃圾，命令不结束就永不停止。
+         * 退出标记检测本身不需要 200ms 级精度（已有 1.5s 确认缓冲），
+         * 放宽到 1000ms 后开销降为 1/5，行为对用户不可感知。
+         */
+        const val EXIT_MARKER_POLL_MS = 1_000L
         /** 匹配命令退出标记 `[command exited: N]`。 */
         val EXIT_MARKER_REGEX = Regex("\\[command exited: (\\d+)]")
     }

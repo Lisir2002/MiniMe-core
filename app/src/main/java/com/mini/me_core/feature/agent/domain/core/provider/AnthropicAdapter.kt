@@ -206,7 +206,9 @@ class AnthropicAdapter @Inject constructor(
         )
         AILogger.logRequest(logSessionId, "Anthropic", model, "POST", url, request)
         // 累积原始 SSE，整轮结束（或失败）后整体落盘，避免高频写盘。
-        val rawSse = StringBuilder()
+        // 长对话内存治理：改用带字符上限的缓冲（RawSseBuffer），避免长响应把原始 SSE
+        // 全量驻留在堆里（既推高内存峰值诱发 LMKD 杀进程，也会让崩溃时无日志可落）。
+        val rawSse = RawSseBuffer()
 
         // 首字节前失败可安全重试；一旦开始吐字（onProduced 已调用）再失败则上抛，避免重复文本。
         try {
@@ -244,7 +246,7 @@ class AnthropicAdapter @Inject constructor(
                         if (!line.startsWith("data:")) continue
                         val data = line.removePrefix("data:").trim()
                         if (data.isEmpty()) continue
-                        rawSse.append(line).append('\n')
+                        rawSse.appendLine(line)
                         // 定点字段抽取：JsonReader 流式逐 token 只取目标标量，不建整棵 JSON 树，
                         // 显著降低流式主路径的解析 CPU 与 GC（旧实现每行 parseString 建整树）。
                         val m = runCatching { SseFieldExtractor.extract(data, ANTHROPIC_STREAM_PATHS) }.getOrElse { emptyMap() }
@@ -337,7 +339,7 @@ class AnthropicAdapter @Inject constructor(
             throw enriched
         } finally {
             // 无论成功/失败/取消，把已收到的原始 SSE 落盘（重试时会从上次中断处续写）。
-            AILogger.logResponseStream(logSessionId, "Anthropic", rawSse.toString())
+            AILogger.logResponseStream(logSessionId, "Anthropic", rawSse.buildText())
         }
     }.flowOn(Dispatchers.IO)
 

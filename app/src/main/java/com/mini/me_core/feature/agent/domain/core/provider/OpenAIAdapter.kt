@@ -266,7 +266,6 @@ class OpenAIAdapter @Inject constructor(
             )
             reasoningEffort?.let { request["reasoning"] = mapOf("effort" to it) }
             AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
-            val rawSse = StringBuilder()
             try {
                 streamWithStaircaseRetry(attemptOnce = { onProduced ->
                     val textBuilder = StringBuilder()
@@ -297,7 +296,6 @@ class OpenAIAdapter @Inject constructor(
                                 if (!line.startsWith("data:")) continue
                                 val data = line.removePrefix("data:").trim()
                                 if (data.isEmpty()) continue
-                                rawSse.append(line).append('\n')
                                 if (data == "[DONE]") break
                                 // 定点字段抽取：热路径（response.output_text.delta）只取 type/delta 两个标量，不建整树。
                                 val m = runCatching { SseFieldExtractor.extract(data, OPENAI_RESPONSES_STREAM_PATHS) }.getOrElse { emptyMap() }
@@ -395,7 +393,10 @@ class OpenAIAdapter @Inject constructor(
         )
         AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
         // 累积原始 SSE，整轮结束（或失败）后整体落盘，避免高频写盘。
-        val rawSse = StringBuilder()
+        // 长对话内存治理：改用带字符上限的缓冲（RawSseBuffer），避免一次几十 MB 的
+        // 长响应把原始 SSE 全量驻留在堆里——那既推高内存峰值（诱发 LMKD 杀进程），
+        // 又会因为「还没到整轮结束」而在崩溃时一行都落不了盘。
+        val rawSse = RawSseBuffer()
 
         // 首字节前失败可安全重试；一旦开始吐字（onProduced 已调用）再失败则上抛，避免重复文本。
         try {
@@ -435,7 +436,7 @@ class OpenAIAdapter @Inject constructor(
                         if (!line.startsWith("data:")) continue
                         val data = line.removePrefix("data:").trim()
                         if (data.isEmpty()) continue
-                        rawSse.append(line).append('\n')
+                        rawSse.appendLine(line)
                         if (data == "[DONE]") break
                         // 定点字段抽取：JsonReader 流式逐 token 只取目标标量，不建整棵 JSON 树。
                         val m = runCatching { SseFieldExtractor.extract(data, OPENAI_CHAT_STREAM_PATHS) }.getOrElse { emptyMap() }
@@ -518,7 +519,7 @@ class OpenAIAdapter @Inject constructor(
             throw enriched
         } finally {
             // 无论成功/失败/取消，把已收到的原始 SSE 落盘（重试时会从上次中断处续写）。
-            AILogger.logResponseStream(logSessionId, "OpenAI", rawSse.toString())
+            AILogger.logResponseStream(logSessionId, "OpenAI", rawSse.buildText())
         }
     }.flowOn(Dispatchers.IO)
 
