@@ -265,6 +265,12 @@ android {
             packaging {
                 dex { useLegacyPackaging = false }
                 jniLibs { useLegacyPackaging = false }
+                // BouncyCastle 1.78.1 起 bcpkix/bcprov/bcutil 与 jspecify 的 jar 均含
+                // META-INF/versions/9/OSGI-INF/MANIFEST.MF（多发布 jar 的 OSGi 元数据），
+                // 合并 java 资源时路径重复冲突；该文件是 OSGi 捆绑元数据，Android 端不使用，排除。
+                resources {
+                    excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+                }
             }
         }
         release {
@@ -296,6 +302,10 @@ android {
             packaging {
                 jniLibs { useLegacyPackaging = false }
                 dex { useLegacyPackaging = false }
+                // 同 debug：排除 BC 1.78.1 / jspecify 多发布 jar 的 OSGi 元数据冲突路径。
+                resources {
+                    excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+                }
             }
         }
     }
