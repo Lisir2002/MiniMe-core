@@ -979,7 +979,7 @@ fun ConfirmActionDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.ui____625fb26b))
+                Text(stringResource(R.string.common_cancel))
             }
         }
     )
@@ -1010,7 +1010,7 @@ fun RenameTabDialog(
             TextButton(onClick = { onConfirm(input.trim().ifBlank { initial }) }) { Text(stringResource(R.string.ui____be5fbbe3)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui____625fb26b_2)) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         }
     )
 }

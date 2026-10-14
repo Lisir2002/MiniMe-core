@@ -9,10 +9,6 @@
     <string name="ui____38cf16f2">确定</string>
     <string name="ui____3dc27dd7">✗ 失败</string>
     <string name="ui____4403fca0">清除</string>
-    <string name="ui____625fb26b">取消</string>
-    <string name="ui____625fb26b_2">取消</string>
-    <string name="ui____625fb26b_3">取消</string>
-    <string name="ui____625fb26b_4">取消</string>
     <string name="ui____63c59813">完整</string>
     <string name="ui____66eeacd9">全选</string>
     <string name="ui____79d3abe9">复制</string>
@@ -34,7 +30,7 @@
     <string name="ui______3b73382e">字号增大</string>
     <string name="ui______6816da19">关闭其他</string>
     <string name="ui______6a988d97">完整键盘（开启中）</string>
-    <string name="ui______8415b836">重置容器？</string>
+    <string name="tc_reset_container_title">重置容器？</string>
     <string name="ui______9dd74977">字号减小</string>
     <string name="ui_______13de17e1">先点击开启，再按键盘上的字母发送 Alt+X</string>
     <string name="ui_______15dd3f3e">独立功能包</string>
@@ -388,7 +384,6 @@
     <string name="ui_med_b6334d78">LOW · 规则触发</string>
     <string name="ui_mihomo_8fdcce67">mihomo 代理（VPN）· 导入订阅 / 手动 YAML · 交给模型自理</string>
     <string name="ui_mixed_76b25e4d">当前未启用，启用后即可测速与切换节点</string>
-    <string name="ui____625fb26b_7">取消</string>
     <string name="ui______36d2d19a_2">❌ 拒绝计划</string>
     <string name="ui______45292500_2">稍后处理</string>
     <string name="ui______5f250b6b_4">阶跃星辰</string>

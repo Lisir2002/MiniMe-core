@@ -106,7 +106,7 @@ fun ZthConfirmationCardSheet(
                     onClick = { vm.onClickCancel() },
                     enabled = !ui.committing && payload.tier.tier <= 1
                 ) {
-                    Text(if (payload.tier.tier >= 2) stringResource(R.string.ui______6e2b79aa_2) else stringResource(R.string.ui____625fb26b_7))
+                    Text(if (payload.tier.tier >= 2) stringResource(R.string.ui______6e2b79aa_2) else stringResource(R.string.common_cancel))
                 }
             }
 

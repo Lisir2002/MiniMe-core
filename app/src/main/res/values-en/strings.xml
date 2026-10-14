@@ -1852,10 +1852,6 @@
     <string name="ui____38cf16f2">OK</string>
     <string name="ui____3dc27dd7">✗ Failed</string>
     <string name="ui____4403fca0">Clear</string>
-    <string name="ui____625fb26b">Cancel</string>
-    <string name="ui____625fb26b_2">Cancel</string>
-    <string name="ui____625fb26b_3">Cancel</string>
-    <string name="ui____625fb26b_4">Cancel</string>
     <string name="ui____63c59813">Full</string>
     <string name="ui____66eeacd9">Select all</string>
     <string name="ui____79d3abe9">Copy</string>
@@ -1877,7 +1873,7 @@
     <string name="ui______3b73382e">Increase font size</string>
     <string name="ui______6816da19">Close others</string>
     <string name="ui______6a988d97">Full keyboard (on)</string>
-    <string name="ui______8415b836">Reset container?</string>
+    <string name="tc_reset_container_title">Reset container?</string>
     <string name="ui______9dd74977">Decrease font size</string>
     <string name="ui_______13de17e1">Tap to enable, then press a letter on the keyboard to send Alt+X</string>
     <string name="ui_______15dd3f3e">Standalone bundles</string>
@@ -2274,7 +2270,6 @@
     <string name="ui_mihomo_8fdcce67">mihomo proxy (VPN) · import subscription / manual YAML · leave to the model</string>
     <string name="ui_mixed_76b25e4d">Currently disabled; enable it to test speed and switch nodes</string>
 
-    <string name="ui____625fb26b_7">Cancel</string>
     <string name="ui______36d2d19a_2">❌ Reject plan</string>
     <string name="ui______45292500_2">Later</string>
     <string name="ui______5f250b6b_4">StepFun</string>

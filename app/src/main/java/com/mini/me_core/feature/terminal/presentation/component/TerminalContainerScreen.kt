@@ -168,6 +168,16 @@ fun TerminalContainerScreen(
     var pendingResetBuiltin by remember { mutableStateOf<ContainerProfile?>(null) }
     var highlightedProfileId by remember { mutableStateOf<String?>(null) }
 
+    // 容器危险操作执行中（VM flag 驱动确认弹窗转圈；本地 flag 标记"本弹窗发起"，用于完成后自动收起）
+    val isResettingContainer by viewModel.isResettingContainer.collectAsStateWithLifecycle()
+    val isRestartingContainer by viewModel.isRestartingContainer.collectAsStateWithLifecycle()
+    val isResettingProfile by viewModel.isResettingProfile.collectAsStateWithLifecycle()
+    val isDeletingProfile by viewModel.isDeletingProfile.collectAsStateWithLifecycle()
+    var resetInFlight by remember { mutableStateOf(false) }
+    var restartInFlight by remember { mutableStateOf(false) }
+    var resetBuiltinInFlight by remember { mutableStateOf(false) }
+    var deleteProfileInFlight by remember { mutableStateOf(false) }
+
     // 容器文件预览
     var previewFile by remember { mutableStateOf<ContainerFileEntry?>(null) }
 
@@ -379,70 +389,84 @@ fun TerminalContainerScreen(
         )
     }
 
-    // 删除 Profile 确认
+    // 删除 Profile 确认（删除自定义 Profile 配置与其 rootfs 数据）
     deletingProfile?.let { deleting ->
         val isActiveDeleting = deleting.id == activeProfileId
         val freeSpaceText = if (deleting.mode == ExecutionMode.LOCAL_PROOT && !deleting.isBuiltin) {
             stringResource(R.string.tc_delete_free_space, storageUsedMb.toInt())
         } else ""
-        AlertDialog(
-            onDismissRequest = { deletingProfile = null },
-            title = { Text(stringResource(R.string.container_delete_config)) },
-            text = {
-                Column {
-                    Text(stringResource(R.string.container_delete_confirm, deleting.name, ""))
+        AppConfirmDialog(
+            title = stringResource(R.string.container_delete_config),
+            message = stringResource(R.string.container_delete_confirm, deleting.name, ""),
+            confirmText = stringResource(R.string.common_delete),
+            cancelText = stringResource(R.string.common_cancel),
+            isDestructive = true,
+            isConfirming = deleteProfileInFlight && isDeletingProfile,
+            dismissOnConfirm = false,
+            onConfirm = {
+                deleteProfileInFlight = true
+                viewModel.deleteCustomContainerProfile(deleting)
+            },
+            onDismiss = {
+                deleteProfileInFlight = false
+                deletingProfile = null
+            },
+            content = {
+                // 组件已在 message 与 content 之间留 Md 间距，此处只排两条附加说明
+                if (isActiveDeleting) {
+                    Text(
+                        stringResource(R.string.tc_delete_active_warning),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                if (freeSpaceText.isNotBlank()) {
                     if (isActiveDeleting) {
-                        Spacer(modifier = Modifier.height(Spacing.sm))
-                        Text(
-                            stringResource(R.string.tc_delete_active_warning),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    if (freeSpaceText.isNotBlank()) {
                         Spacer(modifier = Modifier.height(Spacing.xs))
-                        Text(freeSpaceText, style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    Text(
+                        freeSpaceText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.deleteCustomContainerProfile(deleting)
-                    deletingProfile = null
-                }) {
-                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { deletingProfile = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            }
         )
     }
+    // 删除 Profile 完成后自动收起确认弹窗
+    LaunchedEffect(isDeletingProfile) {
+        if (deleteProfileInFlight && !isDeletingProfile) {
+            deleteProfileInFlight = false
+            deletingProfile = null
+        }
+    }
 
-    // 重置容器确认
+    // 重置容器确认（不可逆：清除全部数据恢复镜像初始态）
     if (showResetConfirm) {
-        AlertDialog(
-            onDismissRequest = { showResetConfirm = false },
-            title = { Text(stringResource(R.string.ui______8415b836)) },
-            text = {
-                Text(stringResource(R.string.tc_reset_confirm_message))
+        AppConfirmDialog(
+            title = stringResource(R.string.tc_reset_container_title),
+            message = stringResource(R.string.tc_reset_confirm_message),
+            confirmText = stringResource(R.string.tc_reset_confirm_button),
+            cancelText = stringResource(R.string.common_cancel),
+            isDestructive = true,
+            isConfirming = resetInFlight && isResettingContainer,
+            dismissOnConfirm = false,
+            onConfirm = {
+                resetInFlight = true
+                viewModel.resetContainer { showResetConfirm = false }
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.resetContainer { showResetConfirm = false }
-                }) {
-                    Text(stringResource(R.string.tc_reset_confirm_button), color = MaterialTheme.colorScheme.error)
-                }
+            onDismiss = {
+                resetInFlight = false
+                showResetConfirm = false
             },
-            dismissButton = {
-                TextButton(onClick = { showResetConfirm = false }) {
-                    Text(stringResource(R.string.ui____625fb26b_3))
-                }
-            }
         )
+    }
+    // 重置完成/失败后自动收起确认弹窗（失败时可原地重试或取消）
+    LaunchedEffect(isResettingContainer) {
+        if (resetInFlight && !isResettingContainer) {
+            resetInFlight = false
+            showResetConfirm = false
+        }
     }
 
     // 重启容器确认（重启会终止运行中的终端会话；数据与已安装包不受影响）
@@ -457,34 +481,52 @@ fun TerminalContainerScreen(
             confirmText = stringResource(R.string.common_confirm),
             cancelText = stringResource(R.string.common_cancel),
             isDestructive = true,
+            isConfirming = restartInFlight && isRestartingContainer,
+            dismissOnConfirm = false,
             onConfirm = {
+                restartInFlight = true
                 viewModel.restartContainer()
+            },
+            onDismiss = {
+                restartInFlight = false
                 showRestartConfirm = false
             },
-            onDismiss = { showRestartConfirm = false },
         )
     }
+    // 重启完成后自动收起确认弹窗
+    LaunchedEffect(isRestartingContainer) {
+        if (restartInFlight && !isRestartingContainer) {
+            restartInFlight = false
+            showRestartConfirm = false
+        }
+    }
 
-    // 重置内置 Profile 确认
+    // 重置内置 Profile 确认（删除对应架构 rootfs，下次初始化重新解压）
     pendingResetBuiltin?.let { resetting ->
-        AlertDialog(
-            onDismissRequest = { pendingResetBuiltin = null },
-            title = { Text(stringResource(R.string.container_reset_builtin)) },
-            text = { Text(stringResource(R.string.container_reset_confirm, resetting.name)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.resetBuiltinContainer(resetting)
-                    pendingResetBuiltin = null
-                }) {
-                    Text(stringResource(R.string.container_reset), color = MaterialTheme.colorScheme.error)
-                }
+        AppConfirmDialog(
+            title = stringResource(R.string.container_reset_builtin),
+            message = stringResource(R.string.container_reset_confirm, resetting.name),
+            confirmText = stringResource(R.string.container_reset),
+            cancelText = stringResource(R.string.common_cancel),
+            isDestructive = true,
+            isConfirming = resetBuiltinInFlight && isResettingProfile,
+            dismissOnConfirm = false,
+            onConfirm = {
+                resetBuiltinInFlight = true
+                viewModel.resetBuiltinContainer(resetting)
             },
-            dismissButton = {
-                TextButton(onClick = { pendingResetBuiltin = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            }
+            onDismiss = {
+                resetBuiltinInFlight = false
+                pendingResetBuiltin = null
+            },
         )
+    }
+    // 重置内置 Profile 完成后自动收起确认弹窗
+    LaunchedEffect(isResettingProfile) {
+        if (resetBuiltinInFlight && !isResettingProfile) {
+            resetBuiltinInFlight = false
+            pendingResetBuiltin = null
+        }
     }
 
     // 镜像源选择
@@ -1078,7 +1120,7 @@ internal fun MirrorPickerDialogInternal(
                 Text(stringResource(R.string.ui____e83a256e))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui____625fb26b_4)) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     )
 }
 

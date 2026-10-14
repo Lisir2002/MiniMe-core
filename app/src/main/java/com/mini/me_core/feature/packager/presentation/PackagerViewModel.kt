@@ -53,6 +53,12 @@ class PackagerViewModel @Inject constructor(
     /** 旧配置迁入 .minime/ 后的一次性提示（UI 收集后消费） */
     val migrationMessage: StateFlow<String?> = projectStore.migrationMessage
 
+    /**
+     * 删除项目执行中（确认弹窗 isConfirming 用：删除涉及项目配置与构建产物落盘，防止重复触发）。
+     */
+    private val _isDeletingProject = MutableStateFlow(false)
+    val isDeletingProject: StateFlow<Boolean> = _isDeletingProject.asStateFlow()
+
     // ========== 当前选中项目 ==========
     private val _currentProject = MutableStateFlow<Project?>(null)
     val currentProject: StateFlow<Project?> = _currentProject.asStateFlow()
@@ -217,11 +223,17 @@ class PackagerViewModel @Inject constructor(
      * 删除项目
      */
     fun deleteProject(projectId: String) {
+        if (_isDeletingProject.value) return
+        _isDeletingProject.value = true
         FileLogger.i(TAG, "删除项目: $projectId")
         viewModelScope.launch {
-            projectStore.deleteProject(projectId)
-            if (_currentProject.value?.id == projectId) {
-                _currentProject.value = null
+            try {
+                projectStore.deleteProject(projectId)
+                if (_currentProject.value?.id == projectId) {
+                    _currentProject.value = null
+                }
+            } finally {
+                _isDeletingProject.value = false
             }
         }
     }

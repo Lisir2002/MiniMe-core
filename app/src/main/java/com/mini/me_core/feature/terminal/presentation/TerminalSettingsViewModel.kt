@@ -109,6 +109,19 @@ class TerminalSettingsViewModel @Inject constructor(
     fun consumeSuccessToast() { _successToast.value = null }
     private fun postSuccess(msg: String) { _successToast.value = msg }
 
+    // ── 容器危险操作执行中（确认弹窗 isConfirming 用：按钮转圈 + 防重复触发） ──
+    private val _isResettingContainer = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isResettingContainer: StateFlow<Boolean> = _isResettingContainer
+
+    private val _isRestartingContainer = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isRestartingContainer: StateFlow<Boolean> = _isRestartingContainer
+
+    private val _isResettingProfile = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isResettingProfile: StateFlow<Boolean> = _isResettingProfile
+
+    private val _isDeletingProfile = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isDeletingProfile: StateFlow<Boolean> = _isDeletingProfile
+
     // ── G1 外观 ───────────────────────────────────────────────────
     val fontSizeSp: StateFlow<Int> = settingsRepo.fontSizeFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, 12)
@@ -317,11 +330,17 @@ class TerminalSettingsViewModel @Inject constructor(
     }
 
     fun resetContainer(onConfirmSuccess: () -> Unit = {}) {
+        if (_isResettingContainer.value) return
+        _isResettingContainer.value = true
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            runCatching { containerEngine.resetContainer() }
-                .onFailure { postError(it.message ?: "重置容器失败") }
-                .onSuccess { onConfirmSuccess() }
-            refreshStorageUsed()
+            try {
+                runCatching { containerEngine.resetContainer() }
+                    .onFailure { postError(it.message ?: "重置容器失败") }
+                    .onSuccess { onConfirmSuccess() }
+                refreshStorageUsed()
+            } finally {
+                _isResettingContainer.value = false
+            }
         }
     }
 
@@ -416,25 +435,37 @@ class TerminalSettingsViewModel @Inject constructor(
 
     /** 删除自定义容器 Profile：删除 profile + rootfs，如果删的是当前激活的则切回内置 Alpine。 */
     fun deleteCustomContainerProfile(profile: ContainerProfile) {
+        if (_isDeletingProfile.value) return
+        _isDeletingProfile.value = true
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            containerInstaller.deleteCustomRootfs(profile)
-            containerSettingsRepository.deleteCustomProfile(profile.id)
-            // 如果删的是当前激活的，切回内置 Alpine
-            if (activeProfileId.value == profile.id) {
-                setActiveContainerProfile(ContainerProfile.BUILTIN_ID)
+            try {
+                containerInstaller.deleteCustomRootfs(profile)
+                containerSettingsRepository.deleteCustomProfile(profile.id)
+                // 如果删的是当前激活的，切回内置 Alpine
+                if (activeProfileId.value == profile.id) {
+                    setActiveContainerProfile(ContainerProfile.BUILTIN_ID)
+                }
+                refreshStorageUsed()
+            } finally {
+                _isDeletingProfile.value = false
             }
-            refreshStorageUsed()
         }
     }
 
     /** 重置内置容器（arm64 或 x86_64）：删除对应架构 rootfs，下次初始化重新解压 + provision。 */
     fun resetBuiltinContainer(profile: ContainerProfile) {
+        if (_isResettingProfile.value) return
+        _isResettingProfile.value = true
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            when (profile.arch) {
-                ContainerArch.X86_64 -> containerInstaller.resetBuiltinX86Rootfs()
-                else -> containerInstaller.resetBuiltinRootfs()
+            try {
+                when (profile.arch) {
+                    ContainerArch.X86_64 -> containerInstaller.resetBuiltinX86Rootfs()
+                    else -> containerInstaller.resetBuiltinRootfs()
+                }
+                refreshStorageUsed()
+            } finally {
+                _isResettingProfile.value = false
             }
-            refreshStorageUsed()
         }
     }
 
@@ -443,11 +474,17 @@ class TerminalSettingsViewModel @Inject constructor(
      * 不重新解压、不清空已安装的包）。与 [resetContainer]（清除全部数据恢复镜像初始态）明确区分。
      */
     fun restartContainer() {
+        if (_isRestartingContainer.value) return
+        _isRestartingContainer.value = true
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            runCatching { containerEngine.restartContainerKeepData() }
-                .onFailure { postError(it.message ?: "重启容器失败") }
-                .onSuccess { postSuccess(appContext.getString(R.string.tc_restart_success)) }
-            refreshStorageUsed()
+            try {
+                runCatching { containerEngine.restartContainerKeepData() }
+                    .onFailure { postError(it.message ?: "重启容器失败") }
+                    .onSuccess { postSuccess(appContext.getString(R.string.tc_restart_success)) }
+                refreshStorageUsed()
+            } finally {
+                _isRestartingContainer.value = false
+            }
         }
     }
 

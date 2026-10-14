@@ -159,7 +159,7 @@ fun SecurityEmergencyChannelSection(
                         size = com.mini.me_core.core.theme.components.AppButtonSize.Small,
                     )
                     AppButton(
-                        text = stringResource(R.string.ui____625fb26b_3),
+                        text = stringResource(R.string.common_cancel),
                         onClick = { showForm = false },
                         variant = com.mini.me_core.core.theme.components.AppButtonVariant.Text,
                         size = com.mini.me_core.core.theme.components.AppButtonSize.Small,
@@ -214,7 +214,7 @@ fun SecurityEmergencyChannelSection(
             title = stringResource(R.string.security_emergency_confirm_title),
             message = stringResource(R.string.security_emergency_confirm_message),
             confirmText = stringResource(R.string.security_emergency_confirm_action),
-            cancelText = stringResource(R.string.ui____625fb26b_3),
+            cancelText = stringResource(R.string.common_cancel),
             type = AppDialogType.Destructive,
             onDismiss = { showConfirm = false },
             onConfirm = {

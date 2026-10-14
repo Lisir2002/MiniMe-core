@@ -80,6 +80,9 @@ fun PackagerListScreen(
 ) {
     val projects: List<Project> by viewModel.projects.collectAsState()
     val migrationMessage: String? by viewModel.migrationMessage.collectAsState()
+    // 删除执行中（VM flag 驱动确认弹窗转圈；本地 flag 标记"本弹窗发起"，用于完成后自动收起）
+    val isDeletingProject by viewModel.isDeletingProject.collectAsState()
+    var deleteInFlight by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Project?>(null) }
     val snackbarHostState = androidx.compose.material3.SnackbarHostState()
     val colors = LocalAppTheme.current.colors
@@ -147,12 +150,24 @@ fun PackagerListScreen(
             confirmText = stringResource(R.string.common_confirm),
             cancelText = stringResource(R.string.common_cancel),
             isDestructive = true,
+            isConfirming = deleteInFlight && isDeletingProject,
+            dismissOnConfirm = false,
             onConfirm = {
+                deleteInFlight = true
                 viewModel.deleteProject(project.id)
+            },
+            onDismiss = {
+                deleteInFlight = false
                 pendingDelete = null
             },
-            onDismiss = { pendingDelete = null },
         )
+    }
+    // 删除完成后自动收起确认弹窗
+    LaunchedEffect(isDeletingProject) {
+        if (deleteInFlight && !isDeletingProject) {
+            deleteInFlight = false
+            pendingDelete = null
+        }
     }
 }
 
