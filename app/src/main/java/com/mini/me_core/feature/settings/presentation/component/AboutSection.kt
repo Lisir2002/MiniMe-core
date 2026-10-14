@@ -101,6 +101,7 @@ import com.mini.me_core.core.theme.components.AppBottomSheet
 import com.mini.me_core.core.theme.components.AppButton
 import com.mini.me_core.core.theme.components.AppButtonVariant
 import com.mini.me_core.core.theme.components.AppCard
+import com.mini.me_core.core.theme.components.AppInfoRow
 import com.mini.me_core.core.theme.components.AppSectionHeader
 import com.mini.me_core.core.theme.components.AppListItem
 import com.mini.me_core.core.theme.components.AppSheetHeader
@@ -955,7 +956,6 @@ private fun UpdateEntryCard(
 // 5. 设备与应用信息（新增）
 // ============================================================
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DeviceInfoSection(appInfo: AppInfo, webViewVersion: String, onVersionTap: () -> Unit) {
     val context = LocalContext.current
@@ -966,62 +966,48 @@ private fun DeviceInfoSection(appInfo: AppInfo, webViewVersion: String, onVersio
         }.getOrDefault(0L)
     }
 
-    fun copyText(label: String, value: String) {
-        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText(label, value))
-        Toast.makeText(context, R.string.about_device_copied, Toast.LENGTH_SHORT).show()
-    }
-
     Column(modifier = Modifier.padding(horizontal = Spacing.lg)) {
         AppSectionHeader(
             title = stringResource(R.string.about_device_info),
             subtitle = stringResource(R.string.about_device_long_press_copy),
         )
         AppCard {
-            DeviceRow(stringResource(R.string.about_device_android_version), Build.VERSION.RELEASE) { copyText("android", Build.VERSION.RELEASE) }
-            DeviceRow(stringResource(R.string.about_device_model), Build.MODEL) { copyText("model", Build.MODEL) }
-            DeviceRow(stringResource(R.string.about_device_storage), formatSize(freeStorageMb)) { copyText("storage", formatSize(freeStorageMb)) }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(start = Spacing.lg))
-            DeviceRow(
+            AppInfoRow(
+                label = stringResource(R.string.about_device_android_version),
+                value = Build.VERSION.RELEASE,
+                onLongClick = { copyToClipboard(context, "android", Build.VERSION.RELEASE) },
+            )
+            AppInfoRow(
+                label = stringResource(R.string.about_device_model),
+                value = Build.MODEL,
+                onLongClick = { copyToClipboard(context, "model", Build.MODEL) },
+            )
+            AppInfoRow(
+                label = stringResource(R.string.about_device_storage),
+                value = formatSize(freeStorageMb),
+                onLongClick = { copyToClipboard(context, "storage", formatSize(freeStorageMb)) },
+            )
+            AppInfoRow(
                 label = stringResource(R.string.about_version),
                 value = "v${appInfo.name}",
                 onClick = onVersionTap,
-            ) { copyText("version", appInfo.name) }
-            DeviceRow(stringResource(R.string.about_build_no), "#${appInfo.code}") { copyText("code", appInfo.code.toString()) }
-            DeviceRow(stringResource(R.string.about_package), appInfo.packageName) { copyText("pkg", appInfo.packageName) }
-            DeviceRow(stringResource(R.string.about_sdk_min), "API ${appInfo.minSdk}", showDivider = false) { copyText("sdk", appInfo.minSdk.toString()) }
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun DeviceRow(
-    label: String,
-    value: String,
-    showDivider: Boolean = true,
-    onClick: (() -> Unit)? = null,
-    onLongCopy: () -> Unit,
-) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(onClick = { onClick?.invoke() }, onLongClick = onLongCopy)
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-            }
-        }
-        if (showDivider) {
-            HorizontalDivider(
-                thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant,
-                modifier = Modifier.padding(start = Spacing.lg),
+                onLongClick = { copyToClipboard(context, "version", appInfo.name) },
+            )
+            AppInfoRow(
+                label = stringResource(R.string.about_build_no),
+                value = "#${appInfo.code}",
+                onLongClick = { copyToClipboard(context, "code", appInfo.code.toString()) },
+            )
+            AppInfoRow(
+                label = stringResource(R.string.about_package),
+                value = appInfo.packageName,
+                onLongClick = { copyToClipboard(context, "pkg", appInfo.packageName) },
+            )
+            AppInfoRow(
+                label = stringResource(R.string.about_sdk_min),
+                value = "API ${appInfo.minSdk}",
+                onLongClick = { copyToClipboard(context, "sdk", appInfo.minSdk.toString()) },
+                showDivider = false,
             )
         }
     }

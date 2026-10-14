@@ -22,6 +22,10 @@
     <string name="provider_full_url_on_desc">开启后 Base URL 即完整请求地址，不再拼接默认路径</string>
     <string name="provider_full_url_off_desc">关闭后自动拼接默认路径</string>
     <string name="provider_response_api">Response API (新版)</string>
+    <string name="provider_advanced_params">高级参数</string>
+    <string name="provider_custom_api_path">自定义 API Path</string>
+    <string name="provider_needs_proxy">需要代理</string>
+    <string name="provider_needs_proxy_desc">开启后 API 请求经本地代理出口；关闭则直连。海外模型建议开启，国内模型可关闭以降低延迟。</string>
     <string name="provider_models_count">模型（%1$s）</string>
     <string name="provider_fetch_models">拉取模型</string>
     <string name="provider_model_name">模型名称</string>

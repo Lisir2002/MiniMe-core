@@ -57,6 +57,7 @@ import com.mini.me_core.core.theme.components.AppBottomSheet
 import com.mini.me_core.core.theme.components.AppTextField
 import com.mini.me_core.core.theme.components.AppDialog
 import com.mini.me_core.core.theme.components.AppDialogType
+import com.mini.me_core.core.theme.components.AppExpandableSection
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ButtonDefaults
@@ -584,7 +585,7 @@ fun ProviderEditorScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("自定义 API Path", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Text(stringResource(R.string.provider_custom_api_path), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                             Text(
                                 when {
                                     useFullUrl -> "Full URL 模式下 Path 由 Base URL 决定"
@@ -654,177 +655,162 @@ fun ProviderEditorScreen(
                     // ── Section 3：高级参数折叠区（Response API + 能力判定策略 + 采样/超时/备用） ──
                     HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.sm))
                     var advancedExpanded by remember { mutableStateOf(false) }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { advancedExpanded = !advancedExpanded },
-                        verticalAlignment = Alignment.CenterVertically
+                    AppExpandableSection(
+                        title = stringResource(R.string.provider_advanced_params),
+                        expanded = advancedExpanded,
+                        onToggle = { advancedExpanded = it },
                     ) {
-                        Text(
-                            "高级参数",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(
-                            if (advancedExpanded) Icons.Outlined.KeyboardArrowDown else Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                            contentDescription = null
-                        )
-                    }
-                    if (advancedExpanded) {
-                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                            // ── Response API（仅 OpenAI）——从连接配置区移入高级参数 ──
-                            if (type == ProviderType.OPENAI) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(stringResource(R.string.provider_response_api))
-                                    Switch(
-                                        checked = useResponseApi,
-                                        onCheckedChange = { useResponseApi = it }
-                                    )
-                                }
-                            }
-
-                            // ── 需要代理出口──
-                            // 开启后该 Provider 的 API 请求走 proxyClient（挂载 proxySelector）；
-                            // 关闭后走 directClient 直连。海外官方模型默认开启，国内兼容端点可手动关闭。
+                        // ── Response API（仅 OpenAI）——从连接配置区移入高级参数 ──
+                        if (type == ProviderType.OPENAI) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("需要代理", style = MaterialTheme.typography.bodyMedium)
-                                    Text(
-                                        "开启后 API 请求经本地代理出口；关闭则直连。海外模型建议开启，国内模型可关闭以降低延迟。",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                                Text(stringResource(R.string.provider_response_api))
                                 Switch(
-                                    checked = needsProxy,
-                                    onCheckedChange = { needsProxy = it }
+                                    checked = useResponseApi,
+                                    onCheckedChange = { useResponseApi = it }
                                 )
                             }
+                        }
 
-                            // ── 能力判定策略子组（原独立区块移入高级参数） ──
-                            Text(
-                                text = "能力判定策略",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(top = Spacing.xs)
-                            )
-                            CompatibilityPolicyDropdown(
-                                currentPolicy = defaultPolicy,
-                                onPolicySelected = { viewModel.setCompatibilityDefaultPolicy(it) }
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("发送失败自动降级（识图兜底）", style = MaterialTheme.typography.bodyMedium)
-                                    Text(
-                                        "若当前聊天模型返回「不支持 image_url」，自动用识图模型生成文字摘要再重试。关闭后遇到此类错误将直接抛给用户（用于排查）。",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Switch(
-                                    checked = autoDowngrade,
-                                    onCheckedChange = { viewModel.setAutoDowngradeOnSendFailure(it) }
+                        // ── 需要代理出口──
+                        // 开启后该 Provider 的 API 请求走 proxyClient（挂载 proxySelector）；
+                        // 关闭后走 directClient 直连。海外官方模型默认开启，国内兼容端点可手动关闭。
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(stringResource(R.string.provider_needs_proxy), style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    stringResource(R.string.provider_needs_proxy_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            ViewImageGuardDropdown(
-                                current = viewImageGuard,
-                                onChange = { viewModel.setViewImageUnknownGuardPolicy(it) }
-                            )
-
-                            HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.xs))
-
-                            // ── Temperature ──
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Temperature（温度）")
-                                    Text("默认值，模型可单独覆盖", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                Text("%.1f".format(temperature), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Slider(
-                                value = temperature,
-                                onValueChange = { temperature = (it * 10).toInt() / 10f },
-                                valueRange = type.temperatureRange()
-                            )
-                            Text(
-                                "越高越随机，越低越确定（范围 0-${if (type == ProviderType.ANTHROPIC) "1" else "2"}）",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            // ── Top P ──
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Top P（核采样）")
-                                    Text("默认值，模型可单独覆盖", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                Text("%.1f".format(topP), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Slider(
-                                value = topP,
-                                onValueChange = { topP = (it * 10).toInt() / 10f },
-                                valueRange = 0f..1f
-                            )
-                            Text(
-                                "核采样，与温度二选一",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            // ── Max Tokens ──
-                            AppTextField(
-                                value = maxTokensText,
-                                onValueChange = { maxTokensText = it.filter { c -> c.isDigit() } },
-                                label = { Text("Max Tokens（最大输出）") },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                supportingText = { Text("默认值，模型可单独覆盖；最大输出 token 数，留空=不限制", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            // ── 请求超时 ──
-                            AppTextField(
-                                value = requestTimeoutText,
-                                onValueChange = { requestTimeoutText = it.filter { c -> c.isDigit() } },
-                                label = { Text("请求超时（秒）") },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                supportingText = { Text("请求超时时间（秒），范围 5-120", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            // ── 重试次数 ──
-                            AppTextField(
-                                value = retryCountText,
-                                onValueChange = { retryCountText = it.filter { c -> c.isDigit() } },
-                                label = { Text("重试次数") },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                supportingText = { Text("失败时自动重试次数，范围 0-5", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            // ── 备用供应商下拉 ──
-                            FallbackProviderDropdown(
-                                selectedId = fallbackProviderId,
-                                providers = allProviders.filter { it.id != providerId && it.isEnabled },
-                                onSelect = { fallbackProviderId = it }
+                            Switch(
+                                checked = needsProxy,
+                                onCheckedChange = { needsProxy = it }
                             )
                         }
+
+                        // ── 能力判定策略子组（原独立区块移入高级参数） ──
+                        Text(
+                            text = "能力判定策略",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(top = Spacing.xs)
+                        )
+                        CompatibilityPolicyDropdown(
+                            currentPolicy = defaultPolicy,
+                            onPolicySelected = { viewModel.setCompatibilityDefaultPolicy(it) }
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("发送失败自动降级（识图兜底）", style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    "若当前聊天模型返回「不支持 image_url」，自动用识图模型生成文字摘要再重试。关闭后遇到此类错误将直接抛给用户（用于排查）。",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = autoDowngrade,
+                                onCheckedChange = { viewModel.setAutoDowngradeOnSendFailure(it) }
+                            )
+                        }
+                        ViewImageGuardDropdown(
+                            current = viewImageGuard,
+                            onChange = { viewModel.setViewImageUnknownGuardPolicy(it) }
+                        )
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.xs))
+
+                        // ── Temperature ──
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Temperature（温度）")
+                                Text("默认值，模型可单独覆盖", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text("%.1f".format(temperature), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Slider(
+                            value = temperature,
+                            onValueChange = { temperature = (it * 10).toInt() / 10f },
+                            valueRange = type.temperatureRange()
+                        )
+                        Text(
+                            "越高越随机，越低越确定（范围 0-${if (type == ProviderType.ANTHROPIC) "1" else "2"}）",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        // ── Top P ──
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Top P（核采样）")
+                                Text("默认值，模型可单独覆盖", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text("%.1f".format(topP), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Slider(
+                            value = topP,
+                            onValueChange = { topP = (it * 10).toInt() / 10f },
+                            valueRange = 0f..1f
+                        )
+                        Text(
+                            "核采样，与温度二选一",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        // ── Max Tokens ──
+                        AppTextField(
+                            value = maxTokensText,
+                            onValueChange = { maxTokensText = it.filter { c -> c.isDigit() } },
+                            label = { Text("Max Tokens（最大输出）") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            supportingText = { Text("默认值，模型可单独覆盖；最大输出 token 数，留空=不限制", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        // ── 请求超时 ──
+                        AppTextField(
+                            value = requestTimeoutText,
+                            onValueChange = { requestTimeoutText = it.filter { c -> c.isDigit() } },
+                            label = { Text("请求超时（秒）") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            supportingText = { Text("请求超时时间（秒），范围 5-120", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        // ── 重试次数 ──
+                        AppTextField(
+                            value = retryCountText,
+                            onValueChange = { retryCountText = it.filter { c -> c.isDigit() } },
+                            label = { Text("重试次数") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            supportingText = { Text("失败时自动重试次数，范围 0-5", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        // ── 备用供应商下拉 ──
+                        FallbackProviderDropdown(
+                            selectedId = fallbackProviderId,
+                            providers = allProviders.filter { it.id != providerId && it.isEnabled },
+                            onSelect = { fallbackProviderId = it }
+                        )
                     }
                 }
             } else {

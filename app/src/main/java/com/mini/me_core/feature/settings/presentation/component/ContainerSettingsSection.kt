@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.TextButton
 import com.mini.me_core.core.theme.components.AppDialog
 import com.mini.me_core.core.theme.components.AppDialogType
+import com.mini.me_core.core.theme.components.AppSwitchRow
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,7 +40,6 @@ import com.mini.me_core.core.theme.components.AppTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -116,30 +116,13 @@ internal fun ContainerSection(
                     else MaterialTheme.colorScheme.outlineVariant
                 )
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(Spacing.lg),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.container_share_storage),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = stringResource(R.string.container_share_storage_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = Spacing.xs)
-                        )
-                    }
-                    Switch(
-                        checked = storageShareEnabled,
-                        onCheckedChange = onStorageShareChange
-                    )
-                }
+                AppSwitchRow(
+                    title = stringResource(R.string.container_share_storage),
+                    subtitle = stringResource(R.string.container_share_storage_desc),
+                    checked = storageShareEnabled,
+                    onCheckedChange = onStorageShareChange,
+                    showDivider = false,
+                )
             }
         }
 

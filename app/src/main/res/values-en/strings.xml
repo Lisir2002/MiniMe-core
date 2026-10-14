@@ -1267,6 +1267,10 @@
     <string name="provider_full_url_on_desc">When enabled, the Base URL is the complete request address without appending the default path</string>
     <string name="provider_full_url_off_desc">When disabled, the default path is appended automatically</string>
     <string name="provider_response_api">Response API (new)</string>
+    <string name="provider_advanced_params">Advanced Parameters</string>
+    <string name="provider_custom_api_path">Custom API Path</string>
+    <string name="provider_needs_proxy">Requires Proxy</string>
+    <string name="provider_needs_proxy_desc">When enabled, API requests go through the local proxy outlet; when disabled, they connect directly. Enable for overseas models; disable for domestic models to reduce latency.</string>
     <string name="provider_models_count">Models (%1$s)</string>
     <string name="provider_fetch_models">Fetch models</string>
     <string name="provider_model_name">Model name</string>

@@ -18,8 +18,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material3.Icon
@@ -28,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,16 +34,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
+import com.mini.me_core.core.theme.components.AppCopyAction
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
-import kotlinx.coroutines.delay
 
 /** 超过该行数时折叠，懒渲染（只渲染可见行），避免超长代码块一次性布局卡顿。 */
 private const val LAZY_RENDER_LINE_THRESHOLD = 100
@@ -68,10 +63,6 @@ fun MiniMeCodeBlock(
     modifier: Modifier = Modifier,
     showLineNumbers: Boolean = false,
 ) {
-    val clipboard = LocalClipboardManager.current
-    var copied by remember(code) { mutableStateOf(false) }
-    var expanded by remember(code) { mutableStateOf(false) }
-
     val colors = MaterialTheme.colorScheme
     val appColors = LocalAppTheme.current.colors
     val cornerShape = RoundedCornerShape(12.dp)
@@ -123,22 +114,10 @@ fun MiniMeCodeBlock(
                     color = colors.onSurfaceVariant,
                 )
                 Spacer(Modifier.weight(1f))
-                IconButton(
-                    onClick = {
-                        clipboard.setText(AnnotatedString(code))
-                        copied = true
-                    },
+                AppCopyAction(
+                    textToCopy = code,
                     modifier = Modifier.height(32.dp),
-                ) {
-                    Icon(
-                        imageVector = if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy,
-                        contentDescription = stringResource(
-                            if (copied) R.string.chat_copied else R.string.chat_copy
-                        ),
-                        tint = if (copied) appColors.success else colors.onSurfaceVariant,
-                        modifier = Modifier.padding(2.dp),
-                    )
-                }
+                )
             }
 
             // ── 代码主体：横向滚动 + 行号(可选) ──
@@ -221,13 +200,6 @@ fun MiniMeCodeBlock(
                     )
                 }
             }
-        }
-    }
-
-    LaunchedEffect(copied) {
-        if (copied) {
-            delay(1500)
-            copied = false
         }
     }
 }

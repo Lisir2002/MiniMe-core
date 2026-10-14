@@ -46,8 +46,6 @@ import com.mini.me_core.core.theme.components.AppDialogType
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
@@ -89,6 +87,7 @@ import com.mini.me_core.core.theme.components.AppChip
 import com.mini.me_core.core.theme.components.AppChipColor
 import com.mini.me_core.core.theme.components.AppChipVariant
 import com.mini.me_core.core.theme.components.AppSectionHeader
+import com.mini.me_core.core.theme.components.AppSliderRow
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
 import com.mini.me_core.core.theme.tokens.ThemeMode
 import com.mini.me_core.core.theme.tokens.ThemePreset
@@ -1128,7 +1127,7 @@ private fun DisplayPreferencesSection(
             }
 
             // 圆角半径滑块
-            SliderRow(
+            AppSliderRow(
                 label = stringResource(R.string.theme_corner_radius),
                 value = cornerRadius,
                 valueRange = 0f..24f,
@@ -1139,7 +1138,7 @@ private fun DisplayPreferencesSection(
             Spacer(Modifier.height(4.dp))
 
             // 字体大小滑块
-            SliderRow(
+            AppSliderRow(
                 label = stringResource(R.string.theme_font_size),
                 value = fontScale,
                 valueRange = 0.8f..1.4f,
@@ -1148,7 +1147,7 @@ private fun DisplayPreferencesSection(
             )
 
             // 动效强度滑块
-            SliderRow(
+            AppSliderRow(
                 label = stringResource(R.string.theme_animation_scale),
                 value = animationScale,
                 valueRange = 0f..1f,
@@ -1255,54 +1254,6 @@ private fun FactoryResetButton(
             text = stringResource(R.string.theme_factory_reset),
             fontWeight = FontWeight.Medium,
             fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
-        )
-    }
-}
-
-// ──────────────────────────────────────────────
-// 通用：滑块行
-// ──────────────────────────────────────────────
-
-@Composable
-private fun SliderRow(
-    label: String,
-    value: Float,
-    valueRange: ClosedFloatingPointRange<Float>,
-    onValueChange: (Float) -> Unit,
-    valueLabel: String,
-    enabled: Boolean = true,
-) {
-    val colors = LocalAppTheme.current.colors
-
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = label,
-                fontSize = LocalComponentTokens.current.text.bodyMediumFontSize,
-                color = if (enabled) colors.textPrimary else colors.textDisabled,
-            )
-            Text(
-                text = valueLabel,
-                fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
-                color = if (enabled) colors.textSecondary else colors.textDisabled,
-            )
-        }
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            enabled = enabled,
-            colors = SliderDefaults.colors(
-                thumbColor = colors.brandPrimary,
-                activeTrackColor = colors.brandPrimary,
-                inactiveTrackColor = colors.borderDefault.copy(alpha = 0.3f),
-                disabledThumbColor = colors.textDisabled,
-                disabledActiveTrackColor = colors.textDisabled.copy(alpha = 0.4f),
-                disabledInactiveTrackColor = colors.borderDefault.copy(alpha = 0.15f),
-            ),
         )
     }
 }
