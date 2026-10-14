@@ -1203,6 +1203,10 @@
     <string name="mcp_no_description">No description</string>
     <string name="mcp_needs_approval">Needs approval</string>
     <string name="mcp_delete_server">Delete this MCP server</string>
+    <string name="mcp_start_confirm_title">Enable Open Service</string>
+    <string name="mcp_start_confirm_message">Once enabled, this device\'s tools will be exposed on the local network over HTTP and the token will be sent in plain text; use only on trusted networks. Do not enable on public Wi-Fi or other untrusted networks. Enabling \"Force approval for remote calls\" as well is recommended.</string>
+    <string name="mcp_start_confirm">Risks understood, enable</string>
+    <string name="mcp_start_cancel">Cancel</string>
 
     <!-- MCP HTTP Fields -->
     <string name="mcp_server_url">Server URL</string>
