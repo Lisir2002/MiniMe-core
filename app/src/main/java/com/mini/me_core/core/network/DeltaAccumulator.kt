@@ -32,18 +32,32 @@ class DeltaAccumulator(
     sealed class NormalizedDelta {
         data class Append(val text: String) : NormalizedDelta()
         data class Duplicate(val count: Int) : NormalizedDelta()
+
+        /** 本次实际追加的字符数（Duplicate 表示被去重、未产生追加）。供流式 emit 节流统计。 */
+        fun appendedLength(): Int = when (this) {
+            is Append -> text.length
+            is Duplicate -> 0
+        }
     }
 
     private val buffer = StringBuilder()
-    /** AUTO_DETECT 判别的基准：上次真实累积后的全文（「上次完整快照」）。 */
-    private var lastFull = ""
+    /**
+     * 全量文本的缓存：避免同一 chunk 内多处读取重复 `toString()`（每次都是 O(n) 拷贝）。
+     * 内容变更（append / 截断 / reset）时置空失效。
+     */
+    private var cachedText: String? = null
     private var duplicateCountInternal = 0
     private var truncatedInternal = false
     /** 归一化前累计接收的原始字符数（观测埋点：与 [text] 长度对比可得「放大/折叠比率」）。 */
     private var rawCharsInternal = 0L
 
-    /** 归一化后的完整累积内容（已截断 / 折叠）。 */
-    val text: String get() = buffer.toString()
+    /**
+     * 归一化后的完整累积内容（已截断 / 折叠）。
+     *
+     * 首次读取或内容变更后才做一次 `toString()`，结果缓存给同一 chunk 内的后续读取复用。
+     */
+    val text: String
+        get() = cachedText ?: buffer.toString().also { cachedText = it }
 
     /** 是否因超过 [maxChars] 被截断。 */
     val isTruncated: Boolean get() = truncatedInternal
@@ -61,10 +75,16 @@ class DeltaAccumulator(
     fun accept(chunk: String): NormalizedDelta {
         if (chunk.isEmpty()) return NormalizedDelta.Append("")
         rawCharsInternal += chunk.length
-        // AUTO_DETECT：与「上次完整快照」比对，全量重发（相同）或回退到已有前缀 → 去重。
-        if (semantic == Semantic.AUTO_DETECT && lastFull.isNotEmpty()) {
-            val duplicated = chunk == lastFull ||
-                (chunk.length <= lastFull.length && lastFull.startsWith(chunk))
+        // AUTO_DETECT：与「当前累积全文」比对，全量重发（相同）或回退到已有前缀 → 去重。
+        //
+        // 性能要点（长对话内存治理）：这里一律用 CharSequence 零分配比较，不再维护
+        // 「上次完整快照」的字符串副本。旧实现每 chunk 都执行 buffer.toString()，
+        // 一次 20 万字符的回复会产生约 5 万次 O(n) 全量拷贝（累计数十 GB 分配），
+        // 是长输出被 LMKD 静默杀进程的主因之一。改用 contentEquals / startsWith 后
+        // 每个 chunk 的开销降为 O(chunk 长度)，整体从 O(n²) 变为 O(n)。
+        if (semantic == Semantic.AUTO_DETECT && buffer.isNotEmpty()) {
+            val duplicated = chunk.contentEquals(buffer) ||
+                (chunk.length <= buffer.length && startsWith(buffer, chunk))
             if (duplicated) {
                 duplicateCountInternal++
                 return NormalizedDelta.Duplicate(duplicateCountInternal)
@@ -77,19 +97,18 @@ class DeltaAccumulator(
                 chunk
             }
             Semantic.AUTO_DETECT -> {
-                // 新 chunk 扩展了上次完整快照 → 真增量，只取新增尾巴；否则为新段，整体追加。
-                if (lastFull.isNotEmpty() && chunk.length > lastFull.length && chunk.startsWith(lastFull)) {
-                    chunk.removePrefix(lastFull)
+                // 新 chunk 扩展了当前累积 → 真增量，只取新增尾巴；否则为新段，整体追加。
+                if (buffer.isNotEmpty() && chunk.length > buffer.length && startsWith(chunk, buffer)) {
+                    chunk.substring(buffer.length)
                 } else {
                     chunk
                 }
             }
         }
         buffer.append(if (foldBase64) foldBase64Segments(toAppend) else toAppend)
-        lastFull = buffer.toString()
+        cachedText = null
         if (buffer.length > maxChars) {
             buffer.setLength(maxChars)
-            lastFull = buffer.toString()
             truncatedInternal = true
         }
         return NormalizedDelta.Append(toAppend)
@@ -98,10 +117,24 @@ class DeltaAccumulator(
     /** 清空累积与统计（网络重试时调用，语义同 `StringBuilder.setLength(0)`）。 */
     fun reset() {
         buffer.setLength(0)
-        lastFull = ""
+        cachedText = null
         duplicateCountInternal = 0
         truncatedInternal = false
         rawCharsInternal = 0
+    }
+
+    /**
+     * 零分配的 CharSequence 前缀判断。
+     *
+     * String 自带的 startsWith 只接受 String 参数，若为了比较而 `toString()` 整个累积区，
+     * 就等于每个 chunk 拷贝一次全文；这里逐字符比较，只分配调用栈。
+     */
+    private fun startsWith(source: CharSequence, prefix: CharSequence): Boolean {
+        if (prefix.length > source.length) return false
+        for (i in 0 until prefix.length) {
+            if (source[i] != prefix[i]) return false
+        }
+        return true
     }
 
     private fun foldBase64Segments(input: String): String {

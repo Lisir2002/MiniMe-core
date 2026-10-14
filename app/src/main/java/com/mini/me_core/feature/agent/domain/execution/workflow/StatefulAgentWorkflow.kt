@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.agent.domain.execution.workflow
 
 import com.mini.me_core.core.network.DeltaAccumulator
+import com.mini.me_core.core.network.StreamingEmitThrottle
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.core.model.AgentImage
@@ -905,6 +906,12 @@ class StatefulAgentWorkflow @Inject constructor(
                         // 直接 append 会把"全量"当"增量"线性放大（base64 重复几百行 bug 根因）。
                         // DeltaAccumulator 负责去重、裸 base64 折叠与 200k 长度护栏。
                         val reasoningAcc = DeltaAccumulator()
+                        // 流式 emit 节流（长对话内存治理）：下游每收到一次 AssistantDelta 都要取一次
+                        // 全量累积文本，逐 token emit 会让长输出产生数万次全量拷贝、数十 GB 分配抖动，
+                        // 是长对话被 LMKD 静默杀进程的主因。合并为「时间窗口 + 字符兜底」级别后，
+                        // 同样的回复只 emit 数百次（详见 StreamingEmitThrottle）。
+                        val textThrottle = StreamingEmitThrottle()
+                        val reasoningThrottle = StreamingEmitThrottle()
                         var finalResponse: AIResponse? = null
 
                         // sendImages 提级到 try 外面：catch 块（备选方案②自动降级）需要访问它判断
@@ -927,21 +934,30 @@ class StatefulAgentWorkflow @Inject constructor(
                                     streamProvider.completeStream(effectiveSystemPrompt, messagesToSend, currentTools, reasoningEffortForRound).collect { chunk ->
                                         when (chunk) {
                                             is AIStreamChunk.TextDelta -> {
-                                                acc.accept(chunk.text)
-                                                send(AgentEvent.AssistantDelta(acc.text))
+                                                val appended = acc.accept(chunk.text).appendedLength()
+                                                if (textThrottle.shouldEmit(appended)) {
+                                                    send(AgentEvent.AssistantDelta(acc.text))
+                                                }
                                             }
                                             is AIStreamChunk.ReasoningDelta -> {
-                                                reasoningAcc.accept(chunk.text)
-                                                send(AgentEvent.ReasoningDelta(reasoningAcc.text))
+                                                val appended = reasoningAcc.accept(chunk.text).appendedLength()
+                                                if (reasoningThrottle.shouldEmit(appended)) {
+                                                    send(AgentEvent.ReasoningDelta(reasoningAcc.text))
+                                                }
                                             }
                                             is AIStreamChunk.Retrying -> {
                                                 acc.reset()
                                                 reasoningAcc.reset()
+                                                textThrottle.reset()
+                                                reasoningThrottle.reset()
                                                 send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries))
                                             }
                                             is AIStreamChunk.Final -> finalResponse = chunk.response
                                         }
                                     }
+                                    // 流正常结束：补发窗口内最后一次累积，避免尾部内容滞后于最终事件。
+                                    if (textThrottle.flush()) send(AgentEvent.AssistantDelta(acc.text))
+                                    if (reasoningThrottle.flush()) send(AgentEvent.ReasoningDelta(reasoningAcc.text))
                                     break
                                 } catch (e: CancellationException) {
                                     throw e
@@ -1085,25 +1101,37 @@ class StatefulAgentWorkflow @Inject constructor(
                                 // 正式走一次纯文本请求（不再包 try，失败就按原逻辑给 AgentEvent.Failed）
                                 val acc2 = DeltaAccumulator()
                                 val reasoning2 = DeltaAccumulator()
+                                // 与主路径同款节流（降级路径同样可能是长输出，不能留内存缺口）。
+                                val textThrottle2 = StreamingEmitThrottle()
+                                val reasoningThrottle2 = StreamingEmitThrottle()
                                 var final2: AIResponse? = null
                                 providerInUse.completeStream(effectiveSystemPrompt, textOnlyMessages, currentTools, reasoningEffortForRound).collect { chunk ->
                                     when (chunk) {
                                         is AIStreamChunk.TextDelta -> {
-                                            acc2.accept(chunk.text)
-                                            send(AgentEvent.AssistantDelta(acc2.text))
+                                            val appended = acc2.accept(chunk.text).appendedLength()
+                                            if (textThrottle2.shouldEmit(appended)) {
+                                                send(AgentEvent.AssistantDelta(acc2.text))
+                                            }
                                         }
                                         is AIStreamChunk.ReasoningDelta -> {
-                                            reasoning2.accept(chunk.text)
-                                            send(AgentEvent.ReasoningDelta(reasoning2.text))
+                                            val appended = reasoning2.accept(chunk.text).appendedLength()
+                                            if (reasoningThrottle2.shouldEmit(appended)) {
+                                                send(AgentEvent.ReasoningDelta(reasoning2.text))
+                                            }
                                         }
                                         is AIStreamChunk.Retrying -> {
                                             acc2.reset()
                                             reasoning2.reset()
+                                            textThrottle2.reset()
+                                            reasoningThrottle2.reset()
                                             send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries))
                                         }
                                         is AIStreamChunk.Final -> final2 = chunk.response
                                     }
                                 }
+                                // 补发窗口内最后一次累积，保证 UI 文本与最终 AssistantText 一致。
+                                if (textThrottle2.flush()) send(AgentEvent.AssistantDelta(acc2.text))
+                                if (reasoningThrottle2.flush()) send(AgentEvent.ReasoningDelta(reasoning2.text))
                                 val aiResp2 = (final2 ?: AIResponse(content = acc2.text)).let {
                                     if (reasoning2.text.isNotEmpty()) it.copy(reasoning = reasoning2.text) else it
                                 }
