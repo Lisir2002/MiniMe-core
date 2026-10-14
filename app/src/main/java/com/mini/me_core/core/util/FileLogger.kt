@@ -72,6 +72,25 @@ object FileLogger : Logger {
 
     private const val MAX_PENDING_LINES = 8192
 
+    /**
+     * 同步落盘（崩溃 / 退出路径）时最多从队列取出的行数。
+     *
+     * 崩溃处理器必须毫秒级返回，不能把 8192 行 × 6 条正则的脱敏全量做完，
+     * 因此只抢救最近的若干行——崩溃前最近的内容诊断价值最高。
+     */
+    private const val MAX_DRAIN_LINES_ON_SYNC = 512
+
+    /** 同步落盘时最多格式化的字符数（脱敏 + 写盘的预算上限）。 */
+    private const val MAX_DRAIN_CHARS_ON_SYNC = 128 * 1024
+
+    /**
+     * 每天保留的滚动日志文件份数上限（不含当天的活动文件）。
+     *
+     * 旧实现份数无上限：长对话场景下一天能堆出任意多个 5MB 文件，既没有容量配额，
+     * 每次轮转还要把全部历史文件 rename 一遍。钉死后磁盘占用恒定可控。
+     */
+    private const val MAX_ROTATED_FILES = 5
+
     /** 因队列满被丢弃的行数（供诊断）。 */
     private val droppedLines = java.util.concurrent.atomic.AtomicLong(0)
 
@@ -340,6 +359,14 @@ object FileLogger : Logger {
      */
     fun flushSync(level: String, tag: String, message: String, throwable: Throwable?) {
         val dir = logDir ?: return
+        // 0) 崩溃路径专属把内存队列里尚未落盘的行同步取出。
+        //    旧实现只写下面这一行 summary——队列中最多 8192 行「崩溃前最近的日志」会全部丢失，
+        //    这正是「闪退后查不到日志」的直接原因（崩溃前的上下文恰恰是最有价值的）。
+        //    这里设行数 / 字符双上限：崩溃处理器不做重 IO（见 MiniMeCore.installCrashHandler）。
+        val drained = drainPendingSync(
+            maxLines = MAX_DRAIN_LINES_ON_SYNC,
+            maxChars = MAX_DRAIN_CHARS_ON_SYNC,
+        )
         // 1) 先接管：同步关掉常驻 writer，避免与下面的写入并发同一个文件（单写者）。
         closeWriterSync()
         val now = Instant.now()
@@ -348,6 +375,8 @@ object FileLogger : Logger {
         val safeMessage = sanitizeText(message)
         val safeStack = throwable?.let { sanitizeText(stackTraceToString(it)) }
         val line = buildString {
+            // 队列内容在前，保持时间顺序（它们是崩溃发生之前的日志）。
+            append(drained)
             append(timestampFormat.format(now)).append(' ').append(level)
             append(" [").append(tag).append("]")
             append(" [thread:").append(threadName).append("] ").append(safeMessage)
@@ -423,7 +452,7 @@ object FileLogger : Logger {
     }
 
     /** 入队一行（供 ioExecutor 侧组装为最终文本）。 */
-    private class QueuedLine(
+    internal class QueuedLine(
         val level: String,
         val tag: String,
         val message: String,
@@ -445,6 +474,62 @@ object FileLogger : Logger {
                 }
             }
         }
+    }
+
+    /**
+     * 同步取出内存队列中尚未落盘的行并格式化（崩溃 / 退出路径专用）。
+     *
+     * 只 poll 队列 + 拼串 + 脱敏，**不触碰** currentWriter / currentFile / bufferedBytes——
+     * 那些是 ioExecutor 的单写者资源，崩溃线程若直接调用 [processQueue] 会并发写同一个文件，
+     * 违背本文件的「单写者」契约。
+     *
+     * @param maxLines 最多取出的行数
+     * @param maxChars 格式化字符总量上限（崩溃路径不做重 IO，必须设预算）
+     */
+    private fun drainPendingSync(maxLines: Int, maxChars: Int): String {
+        if (pending.isEmpty()) return ""
+        val lines = ArrayList<QueuedLine>(minOf(maxLines, MAX_PENDING_LINES))
+        while (lines.size < maxLines) {
+            lines.add(pending.poll() ?: break)
+        }
+        return formatPending(lines, maxChars, Thread.currentThread().name)
+    }
+
+    /**
+     * 把待落盘行格式化为可直接写入文件的文本。
+     *
+     * 纯函数：不读写任何写入器状态（currentWriter / bufferedBytes 一律不碰），
+     * 因此既能在 ioExecutor 侧复用，也能安全地用于崩溃线程，且便于单元测试。
+     *
+     * @param lines 已从队列取出的行（保持入队顺序）
+     * @param maxChars 字符总量上限，超出即停止
+     * @param threadName 写入时标注的线程名
+     */
+    internal fun formatPending(
+        lines: List<QueuedLine>,
+        maxChars: Int,
+        threadName: String = "file-logger",
+    ): String {
+        val sb = StringBuilder()
+        // 补一条丢弃汇总，让「丢日志」可见而非静默（与 processQueue 一致）。
+        val dropped = droppedLines.getAndSet(0)
+        val ts = timestampFormat.format(Instant.now())
+        if (dropped > 0) {
+            sb.append(ts)
+                .append(" WARN [FileLogger] [thread:").append(threadName)
+                .append("] 日志队列溢出，已丢弃 ").append(dropped).append(" 行\n")
+        }
+        for (q in lines) {
+            if (sb.length >= maxChars) break
+            val safeMessage = sanitizeText(q.message)
+            val safeStack = q.stack?.let { sanitizeText(it) }
+            sb.append(ts).append(' ').append(q.level)
+            sb.append(" [").append(q.tag).append("]")
+            sb.append(" [thread:").append(threadName).append("] ").append(safeMessage)
+            if (safeStack != null) sb.append('\n').append(safeStack)
+            sb.append('\n')
+        }
+        return sb.toString()
     }
 
     /** ioExecutor 侧：把队列里累积的行组装 + 脱敏后一次性写进常驻 BufferedWriter。 */
@@ -526,8 +611,15 @@ object FileLogger : Logger {
         // 找到当前已存在的最大滚动序号
         var maxIdx = 0
         while (File(dir, "log-$today.${maxIdx + 1}.txt").exists()) maxIdx++
-        // 从高到低顺延：.maxIdx -> .(maxIdx+1) ... .1 -> .2
-        for (i in maxIdx downTo 1) {
+        // 长对话内存治理（磁盘配额）：旧实现的滚动份数没有上限，长对话一天能堆出任意多个
+        // 5MB 文件（诊断目录无配额），且每次轮转都要把全部历史文件 rename 一遍。
+        // 这里钉死份数：超出配额的旧滚动文件直接删除，只保留最近 [MAX_ROTATED_FILES] 份。
+        for (i in maxIdx downTo MAX_ROTATED_FILES) {
+            runCatching { File(dir, "log-$today.$i.txt").delete() }
+        }
+        // 从高到低顺延：.highest -> .(highest+1) ... .1 -> .2
+        val highest = minOf(maxIdx, MAX_ROTATED_FILES - 1)
+        for (i in highest downTo 1) {
             File(dir, "log-$today.$i.txt")
                 .renameTo(File(dir, "log-$today.${i + 1}.txt"))
         }

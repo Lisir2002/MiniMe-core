@@ -581,6 +581,22 @@ class MiniMeCore : Application() {
         if (critical) {
             runCatching { browserController.onMemoryPressure() }
                 .onFailure { FileLogger.w(TAG, "低内存释放浏览器快照缓存失败（忽略）", it) }
+            // ④ 释放富文本渲染缓存（长对话内存治理）：缓存以「完整消息文本」为 key，
+            //    长对话下常驻可达数十 MB，是内存峰值的主要贡献者之一。释放后只是下次
+            //    重新分段一次，不影响正确性。
+            val clearedCaches = runCatching {
+                com.mini.me_core.feature.agent.presentation.component
+                    .richsegment.SegmentedRenderCache.clearAll()
+            }.getOrDefault(0)
+            // ⑤ 把内存队列里尚未落盘的日志异步刷到磁盘：LMKD 一旦动手，队列 + 缓冲区
+            //    全丢，这正是「闪退后查不到日志」的根因。
+            //    ⚠️ 这里是主线程回调，绝不能调 flushSync（同步写盘会阻塞主线程并触发 ANR）；
+            //    FileLogger.flush() 放到 IO 线程执行。
+            appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { FileLogger.flush() }
+                    .onFailure { FileLogger.w(TAG, "低内存刷盘日志失败（忽略）", it) }
+            }
+            FileLogger.w("Memory", "内存临界自愈：已释放渲染缓存 ${clearedCaches} 个实例，并异步刷盘日志")
             recordTrimCritical()
         }
     }
@@ -594,7 +610,10 @@ class MiniMeCore : Application() {
 
     /** 预防闸门（自诊断）：落「上次触发内存临界」时间戳标记，供下次启动 [diagnoseLastExit] 读取。 */
     private fun recordTrimCritical() {
-        diagPrefs().edit().putLong(KEY_LAST_TRIM_CRITICAL, System.currentTimeMillis()).apply()
+        // 用 commit() 同步落盘：这是「进程即将被 LMKD 杀死」的路径，
+        // apply() 只排入异步队列，进程可能在真正写盘前就被杀，标记永久丢失
+        // ——恰恰是最需要这条记录的场景。
+        diagPrefs().edit().putLong(KEY_LAST_TRIM_CRITICAL, System.currentTimeMillis()).commit()
     }
 
     /**
@@ -658,10 +677,12 @@ class MiniMeCore : Application() {
      * 下次启动由 [maybeExportLogsThrottled] 优先补导出（审计 E1）。
      */
     private fun markPendingExport(stamp: String, snapshot: String) {
+        // 同 recordTrimCritical：崩溃路径必须同步落盘（commit），
+        // apply() 的异步写入在进程被杀时会丢失，导致下次启动补不到崩溃快照。
         diagPrefs().edit()
             .putString(KEY_PENDING_CRASH_EXPORT_STAMP, stamp)
             .putString(KEY_PENDING_CRASH_EXPORT_BODY, snapshot)
-            .apply()
+            .commit()
     }
 
     private fun diagPrefs(): SharedPreferences = getSharedPreferences(DIAG_PREFS, MODE_PRIVATE)

@@ -36,6 +36,16 @@ object CrashReporter {
      */
     private const val MAX_THREADS_IN_REPORT = 24
 
+    /**
+     * 单份崩溃报告的字符上限（长对话内存治理）。
+     *
+     * 崩溃瞬间堆已接近上限，若报告本身很大（异常消息超长 / 堆栈深 / 线程多），
+     * `sb.toString()` + 脱敏 + `writeText` 会再造出数份全量拷贝，
+     * 反而可能让「记录崩溃」这件事自己触发 OOM。这里在脱敏前先截断，
+     * 保证报告体积恒定可控。
+     */
+    private const val MAX_REPORT_CHARS = 256 * 1024
+
     @Volatile
     private var appContext: Context? = null
 
@@ -82,7 +92,15 @@ object CrashReporter {
                 for (e in stack.take(8)) sb.appendLine("    at $e")
             }
             // D1：统一脱敏后再落盘（会被导出到公共目录）。
-            file.writeText(LogSanitizer.sanitize(sb.toString()))
+            // 先按上限截断：崩溃路径上每多一份全量拷贝都是 OOM 风险。
+            val raw = sb.toString()
+            val capped = if (raw.length > MAX_REPORT_CHARS) {
+                raw.substring(0, MAX_REPORT_CHARS) +
+                    "\n…（报告超出 ${MAX_REPORT_CHARS} 字符上限，已截断）\n"
+            } else {
+                raw
+            }
+            file.writeText(LogSanitizer.sanitize(capped))
             trimOld()
             file
         }.getOrNull()
