@@ -74,7 +74,31 @@ const val CURSOR_BLINK_KEY = "cursor_blink"
 const val SCROLLBACK_LINES_KEY = "scrollback_lines"
 const val EXIT_CONFIRM_KEY = "exit_confirm"
 
-/** 终端体验偏好：外观 / 键盘 & 交互 / 行为 / SSH 常用 4 分组，共 15+ 项。 */
+/**
+ * 「待接通」偏好键：已持久化但消费点尚未实现，设置页按 UI 审计结论暂不暴露
+ * （不給用户不生效的开关）。接通消费点后，把对应 Flow/保存方法接回
+ * TerminalSettingsViewModel 与设置页即可，无需迁移存量数据。
+ *
+ * 待接通清单（13 项，原设置页分组）：
+ * - G1 外观：show_tab_bar / cursor_style / cursor_blink
+ *   （cursor 有管道但 TerminalClients.getTerminalCursorStyle() 恒返回 null）
+ * - G2 键盘 & 交互：scale_gesture_persists / auto_pop_ime_on_switch / paste_as_plain_text
+ * - G3 行为：auto_new_tab_on_close_last / keep_session_when_leave / scrollback_lines / exit_confirm
+ * - G4 SSH：ssh_auto_reconnect / ssh_tcp_keepalive / ssh_heartbeat_seconds
+ *
+ * 另：last_cwd 为运行态键，当前既无读取方也无写入方（saveLastCwd 零调用），
+ * 预留给「恢复上次工作目录」类功能，接通时一并接上。
+ *
+ * 注意：ssh_keepalive 与设置页「后台保活」（KeepaliveSettingsRepository）是两个不同设置，
+ * 后者已生效；此处指终端 SSH 连接的 keepalive。
+ */
+
+/**
+ * 终端体验偏好：外观 / 键盘 & 交互 / 行为 / SSH 常用 4 分组。
+ *
+ * 其中 13 项为「待接通」偏好（仅持久化、设置页不暴露），见上方键常量区的说明；
+ * 其余偏好（字号/配色/全键盘/新输出指示）已接通消费点。
+ */
 @Singleton
 class TerminalSettingsRepository @Inject constructor(
     private val kv: KVStore
@@ -168,11 +192,6 @@ class TerminalSettingsRepository @Inject constructor(
     suspend fun readFullExtraKeys(): Boolean = fullExtraKeysFlow.first()
     suspend fun readNewOutputIndicator(): Boolean = newOutputIndicatorFlow.first()
     suspend fun readCtrlHintShown(): Boolean = ctrlHintShownFlow.first()
-    suspend fun readAutoPopImeOnSwitch(): Boolean = autoPopImeOnSwitchFlow.first()
-    suspend fun readAutoNewTabOnCloseLast(): Boolean = autoNewTabOnCloseLastFlow.first()
-    suspend fun readKeepSessionWhenLeave(): Boolean = keepSessionWhenLeaveFlow.first()
-    suspend fun readShowTabBar(): Boolean = showTabBarFlow.first()
-    suspend fun readSshHeartbeatSeconds(): Int = sshHeartbeatSecondsFlow.first()
 }
 
 object TerminalFontSizes {

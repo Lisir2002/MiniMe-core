@@ -14,7 +14,6 @@
     <string name="settings_search_hot_subtitle">大家常用的设置</string>
     <string name="settings_search_no_result_recommend">未找到相关设置，试试热门设置</string>
     <string name="settings_search_remove_content_desc">删除此条历史</string>
-    <string name="settings_category_appearance">外观</string>
     <string name="settings_category_ai_provider">AI 设置</string>
     <string name="settings_category_terminal">终端</string>
     <string name="settings_category_norm_flow">AGENT规范</string>

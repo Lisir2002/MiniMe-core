@@ -90,7 +90,7 @@ class TerminalViewModel @Inject constructor(
     val firstRunBannerDismissed: StateFlow<Boolean> = settingsRepo.firstRunBannerDismissedFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    /** Bundle 安装状态：由 TerminalSettingsScreen 与本页 Banner 共用。 */
+    /** Bundle 安装状态：由 TerminalContainerScreen 与本页 Banner 共用。 */
     val bundleStates: StateFlow<Map<TerminalBundleId, BundleInstallState>> = bundleRepo.states
 
     /** 容器是否已安装好（rootfs + proot），基于 containerInit 派生。 */

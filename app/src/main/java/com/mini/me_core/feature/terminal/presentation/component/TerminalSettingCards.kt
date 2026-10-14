@@ -63,7 +63,7 @@ import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId
 
 /**
  * 终端设置相关共享组件 + Tokens。
- * 两份页面（TerminalSettingsScreen / TerminalBundleManagerScreen）
+ * 两份页面（TerminalContainerScreen / TerminalBundleManagerScreen）
  * 统一从这里拿卡片与样式，保证一改全改。
  */
 

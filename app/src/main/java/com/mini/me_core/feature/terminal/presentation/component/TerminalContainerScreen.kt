@@ -21,29 +21,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.rounded.Archive
-import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.Dns
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Restore
-import androidx.compose.material.icons.rounded.SettingsEthernet
-import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.TextFields
-import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material.icons.rounded.ViewColumn
-import androidx.compose.material.icons.rounded.ZoomIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -56,7 +44,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarDuration
@@ -106,9 +93,6 @@ import com.mini.me_core.core.container.api.ContainerArch
 import com.mini.me_core.core.container.api.ContainerProfile
 import com.mini.me_core.core.container.api.DEFAULT_APK_MIRROR
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
-import com.mini.me_core.feature.terminal.data.repository.CursorStyle
-import com.mini.me_core.feature.terminal.data.repository.ScrollbackLines
-import com.mini.me_core.feature.terminal.data.repository.SshHeartbeatSeconds
 import com.mini.me_core.feature.terminal.data.repository.TerminalFontSizes
 import com.mini.me_core.feature.terminal.data.repository.TerminalTheme
 import com.mini.me_core.feature.terminal.domain.ContainerFileEntry
@@ -147,21 +131,8 @@ fun TerminalContainerScreen(
 
     val fontSizeSp by viewModel.fontSizeSp.collectAsStateWithLifecycle()
     val theme by viewModel.terminalTheme.collectAsStateWithLifecycle()
-    val cursorStyle by viewModel.cursorStyle.collectAsStateWithLifecycle()
-    val cursorBlink by viewModel.cursorBlink.collectAsStateWithLifecycle()
-    val showTabBar by viewModel.showTabBar.collectAsStateWithLifecycle()
     val fullExtraKeys by viewModel.fullExtraKeys.collectAsStateWithLifecycle()
-    val scalePersists by viewModel.scaleGesturePersists.collectAsStateWithLifecycle()
-    val autoPopIme by viewModel.autoPopImeOnSwitch.collectAsStateWithLifecycle()
-    val pasteAsPlain by viewModel.pasteAsPlainText.collectAsStateWithLifecycle()
     val newOutputIndicator by viewModel.newOutputIndicator.collectAsStateWithLifecycle()
-    val autoNewTabOnCloseLast by viewModel.autoNewTabOnCloseLast.collectAsStateWithLifecycle()
-    val keepSession by viewModel.keepSessionWhenLeave.collectAsStateWithLifecycle()
-    val scrollbackLines by viewModel.scrollbackLines.collectAsStateWithLifecycle()
-    val exitConfirm by viewModel.exitConfirm.collectAsStateWithLifecycle()
-    val sshAutoReconnect by viewModel.sshAutoReconnect.collectAsStateWithLifecycle()
-    val sshHeartbeat by viewModel.sshHeartbeatSeconds.collectAsStateWithLifecycle()
-    val sshKeepalive by viewModel.sshKeepalive.collectAsStateWithLifecycle()
 
     val errorToast by viewModel.errorToast.collectAsStateWithLifecycle()
     val successToast by viewModel.successToast.collectAsStateWithLifecycle()
@@ -188,10 +159,7 @@ fun TerminalContainerScreen(
     var showRestartConfirm by remember { mutableStateOf(false) }
     var showMirrorPicker by remember { mutableStateOf(false) }
     var showImagePicker by remember { mutableStateOf(false) }
-    var showHeartbeatPicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
-    var showCursorPicker by remember { mutableStateOf(false) }
-    var showScrollbackPicker by remember { mutableStateOf(false) }
     var showRestoreDefaultsConfirm by remember { mutableStateOf(false) }
     var showProfileSheet by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf<ContainerProfile?>(null) }
@@ -354,30 +322,11 @@ fun TerminalContainerScreen(
                         scrollState = terminalScrollState,
                         fontSizeSp = fontSizeSp,
                         theme = theme,
-                        cursorStyle = cursorStyle,
-                        cursorBlink = cursorBlink,
-                        showTabBar = showTabBar,
                         fullExtraKeys = fullExtraKeys,
-                        scalePersists = scalePersists,
-                        autoPopIme = autoPopIme,
-                        pasteAsPlain = pasteAsPlain,
                         newOutputIndicator = newOutputIndicator,
-                        autoNewTabOnCloseLast = autoNewTabOnCloseLast,
-                        keepSession = keepSession,
-                        scrollbackLines = scrollbackLines,
-                        exitConfirm = exitConfirm,
-                        sshAutoReconnect = sshAutoReconnect,
-                        sshHeartbeat = sshHeartbeat,
-                        sshKeepalive = sshKeepalive,
                         onFontSizeChange = viewModel::setFontSizeSp,
                         onThemeClick = { showThemePicker = true },
-                        onCursorStyleClick = { showCursorPicker = true },
-                        onCursorBlinkChange = viewModel::setCursorBlink,
-                        onShowTabBarChange = viewModel::setShowTabBar,
                         onFullExtraKeysChange = viewModel::setFullExtraKeys,
-                        onScalePersistsChange = viewModel::setScaleGesturePersists,
-                        onAutoPopImeChange = viewModel::setAutoPopImeOnSwitch,
-                        onPasteAsPlainChange = viewModel::setPasteAsPlainText,
                         onResetCtrlHint = {
                             viewModel.resetCtrlHint()
                             scope.launch {
@@ -388,13 +337,6 @@ fun TerminalContainerScreen(
                             }
                         },
                         onNewOutputIndicatorChange = viewModel::setNewOutputIndicator,
-                        onAutoNewTabChange = viewModel::setAutoNewTabOnCloseLast,
-                        onKeepSessionChange = viewModel::setKeepSessionWhenLeave,
-                        onScrollbackClick = { showScrollbackPicker = true },
-                        onExitConfirmChange = viewModel::setExitConfirm,
-                        onSshAutoReconnectChange = viewModel::setSshAutoReconnect,
-                        onSshKeepaliveChange = viewModel::setSshKeepalive,
-                        onHeartbeatClick = { showHeartbeatPicker = true },
                         onSshHostsClick = onNavigateToSshHosts,
                         onRestoreDefaultsClick = { showRestoreDefaultsConfirm = true },
                     )
@@ -601,42 +543,6 @@ fun TerminalContainerScreen(
         )
     }
 
-    // 心跳间隔选择
-    if (showHeartbeatPicker) {
-        HeartbeatPickerDialogInternal(
-            current = sshHeartbeat,
-            onDismiss = { showHeartbeatPicker = false },
-            onConfirm = { s ->
-                viewModel.setSshHeartbeatSeconds(s)
-                showHeartbeatPicker = false
-            }
-        )
-    }
-
-    // 光标样式选择
-    if (showCursorPicker) {
-        CursorStylePickerDialogInternal(
-            current = cursorStyle,
-            onDismiss = { showCursorPicker = false },
-            onConfirm = { s ->
-                viewModel.setCursorStyle(s)
-                showCursorPicker = false
-            }
-        )
-    }
-
-    // 滚动缓冲行数选择
-    if (showScrollbackPicker) {
-        ScrollbackPickerDialogInternal(
-            current = scrollbackLines,
-            onDismiss = { showScrollbackPicker = false },
-            onConfirm = { lines ->
-                viewModel.setScrollbackLines(lines)
-                showScrollbackPicker = false
-            }
-        )
-    }
-
     // 恢复默认终端设置确认
     if (showRestoreDefaultsConfirm) {
         AlertDialog(
@@ -826,46 +732,20 @@ private fun ContainerTabContent(
 }
 
 // ================================================================
-// 终端 Tab 内容（迁移自 TerminalSettingsScreen）
+// 终端 Tab 内容（迁移自已删除的旧独立设置页 TerminalSettingsScreen）
 // ================================================================
 @Composable
 private fun TerminalTabContent(
     scrollState: androidx.compose.foundation.ScrollState,
     fontSizeSp: Int,
     theme: TerminalTheme,
-    cursorStyle: CursorStyle,
-    cursorBlink: Boolean,
-    showTabBar: Boolean,
     fullExtraKeys: Boolean,
-    scalePersists: Boolean,
-    autoPopIme: Boolean,
-    pasteAsPlain: Boolean,
     newOutputIndicator: Boolean,
-    autoNewTabOnCloseLast: Boolean,
-    keepSession: Boolean,
-    scrollbackLines: Int,
-    exitConfirm: Boolean,
-    sshAutoReconnect: Boolean,
-    sshHeartbeat: Int,
-    sshKeepalive: Boolean,
     onFontSizeChange: (Int) -> Unit,
     onThemeClick: () -> Unit,
-    onCursorStyleClick: () -> Unit,
-    onCursorBlinkChange: (Boolean) -> Unit,
-    onShowTabBarChange: (Boolean) -> Unit,
     onFullExtraKeysChange: (Boolean) -> Unit,
-    onScalePersistsChange: (Boolean) -> Unit,
-    onAutoPopImeChange: (Boolean) -> Unit,
-    onPasteAsPlainChange: (Boolean) -> Unit,
     onResetCtrlHint: () -> Unit,
     onNewOutputIndicatorChange: (Boolean) -> Unit,
-    onAutoNewTabChange: (Boolean) -> Unit,
-    onKeepSessionChange: (Boolean) -> Unit,
-    onScrollbackClick: () -> Unit,
-    onExitConfirmChange: (Boolean) -> Unit,
-    onSshAutoReconnectChange: (Boolean) -> Unit,
-    onSshKeepaliveChange: (Boolean) -> Unit,
-    onHeartbeatClick: () -> Unit,
     onSshHostsClick: () -> Unit,
     onRestoreDefaultsClick: () -> Unit,
 ) {
@@ -891,29 +771,6 @@ private fun TerminalTabContent(
                 title = stringResource(R.string.terminal_color_scheme),
                 subtitle = themeLabel(theme),
                 onViewClick = onThemeClick,
-                showDivider = true
-            )
-            AppListItem(
-                icon = Icons.Rounded.Edit,
-                title = stringResource(R.string.terminal_cursor_style),
-                subtitle = cursorStyleLabel(cursorStyle),
-                onViewClick = onCursorStyleClick,
-                showDivider = true
-            )
-            AppListItem(
-                icon = Icons.Rounded.Visibility,
-                title = stringResource(R.string.terminal_cursor_blink),
-                subtitle = stringResource(R.string.terminal_cursor_blink_sub),
-                checked = cursorBlink,
-                onCheckedChange = onCursorBlinkChange,
-                showDivider = true
-            )
-            AppListItem(
-                icon = Icons.Rounded.ViewColumn,
-                title = stringResource(R.string.terminal_show_tab_bar),
-                subtitle = stringResource(R.string.terminal_show_tab_bar_sub),
-                checked = showTabBar,
-                onCheckedChange = onShowTabBarChange,
                 showDivider = false
             )
         }
@@ -927,30 +784,6 @@ private fun TerminalTabContent(
                 subtitle = stringResource(R.string.terminal_full_extra_keys_sub),
                 checked = fullExtraKeys,
                 onCheckedChange = onFullExtraKeysChange,
-                showDivider = true
-            )
-            AppListItem(
-                icon = Icons.Rounded.ZoomIn,
-                title = stringResource(R.string.terminal_scale_persists),
-                subtitle = stringResource(R.string.terminal_scale_persists_sub),
-                checked = scalePersists,
-                onCheckedChange = onScalePersistsChange,
-                showDivider = true
-            )
-            AppListItem(
-                icon = Icons.Rounded.Terminal,
-                title = stringResource(R.string.terminal_auto_pop_ime),
-                subtitle = stringResource(R.string.terminal_auto_pop_ime_sub),
-                checked = autoPopIme,
-                onCheckedChange = onAutoPopImeChange,
-                showDivider = true
-            )
-            AppListItem(
-                icon = Icons.Rounded.ContentPaste,
-                title = stringResource(R.string.terminal_paste_plain),
-                subtitle = stringResource(R.string.terminal_paste_plain_sub),
-                checked = pasteAsPlain,
-                onCheckedChange = onPasteAsPlainChange,
                 showDivider = false
             )
             // 重置 Ctrl 提示：独立 TonalButton，不与开关混排
@@ -974,37 +807,6 @@ private fun TerminalTabContent(
                 subtitle = stringResource(R.string.terminal_new_output_indicator_sub),
                 checked = newOutputIndicator,
                 onCheckedChange = onNewOutputIndicatorChange,
-                showDivider = true
-            )
-            AppListItem(
-                icon = Icons.Default.Add,
-                title = stringResource(R.string.terminal_auto_new_tab),
-                subtitle = stringResource(R.string.terminal_auto_new_tab_sub),
-                checked = autoNewTabOnCloseLast,
-                onCheckedChange = onAutoNewTabChange,
-                showDivider = true
-            )
-            AppListItem(
-                icon = Icons.Rounded.Archive,
-                title = stringResource(R.string.terminal_keep_session),
-                subtitle = stringResource(R.string.terminal_keep_session_sub),
-                checked = keepSession,
-                onCheckedChange = onKeepSessionChange,
-                showDivider = true
-            )
-            AppListItem(
-                icon = Icons.Rounded.History,
-                title = stringResource(R.string.terminal_scrollback),
-                subtitle = scrollbackLabel(scrollbackLines),
-                onViewClick = onScrollbackClick,
-                showDivider = true
-            )
-            AppListItem(
-                icon = Icons.AutoMirrored.Rounded.ExitToApp,
-                title = stringResource(R.string.terminal_exit_confirm),
-                subtitle = stringResource(R.string.terminal_exit_confirm_sub),
-                checked = exitConfirm,
-                onCheckedChange = onExitConfirmChange,
                 showDivider = false
             )
         }
@@ -1012,29 +814,6 @@ private fun TerminalTabContent(
         // G4 SSH 连接
         AppSectionHeader(title = stringResource(R.string.terminal_ssh_section))
         AppSectionGroup {
-            AppListItem(
-                icon = Icons.Rounded.Refresh,
-                title = stringResource(R.string.terminal_ssh_auto_reconnect),
-                subtitle = stringResource(R.string.terminal_ssh_auto_reconnect_sub),
-                checked = sshAutoReconnect,
-                onCheckedChange = onSshAutoReconnectChange,
-                showDivider = true
-            )
-            AppListItem(
-                icon = Icons.Rounded.SettingsEthernet,
-                title = stringResource(R.string.terminal_ssh_tcp_keepalive),
-                subtitle = stringResource(R.string.terminal_ssh_tcp_keepalive_sub),
-                checked = sshKeepalive,
-                onCheckedChange = onSshKeepaliveChange,
-                showDivider = true
-            )
-            AppListItem(
-                icon = Icons.Rounded.MonitorHeart,
-                title = stringResource(R.string.terminal_ssh_heartbeat),
-                subtitle = SshHeartbeatSeconds.fromSeconds(sshHeartbeat).display,
-                onViewClick = onHeartbeatClick,
-                showDivider = true
-            )
             AppListItem(
                 icon = Icons.Rounded.Dns,
                 title = stringResource(R.string.terminal_ssh_hosts),
@@ -1067,25 +846,6 @@ private fun themeLabel(theme: TerminalTheme): String = when (theme) {
     TerminalTheme.PURE_WHITE -> stringResource(R.string.terminal_color_pure_white)
     TerminalTheme.AMOLED_BLACK -> stringResource(R.string.terminal_color_amoled)
     else -> theme.stableKey
-}
-
-@Composable
-private fun cursorStyleLabel(style: CursorStyle): String = when (style) {
-    CursorStyle.BLOCK -> stringResource(R.string.terminal_cursor_block)
-    CursorStyle.UNDERLINE -> stringResource(R.string.terminal_cursor_underline)
-    CursorStyle.BAR -> stringResource(R.string.terminal_cursor_bar)
-}
-
-@Composable
-private fun scrollbackLabel(lines: Int): String =
-    if (lines == ScrollbackLines.UNLIMITED) stringResource(R.string.terminal_scrollback_unlimited)
-    else stringResource(R.string.terminal_scrollback_lines, lines)
-
-@Composable
-private fun cursorGlyph(style: CursorStyle): String = when (style) {
-    CursorStyle.BLOCK -> "█"
-    CursorStyle.UNDERLINE -> "_"
-    CursorStyle.BAR -> "|"
 }
 
 // ================================================================
@@ -1162,7 +922,7 @@ private fun FontSizeRow(
 }
 
 // ================================================================
-// Dialogs (internal, copied from TerminalSettingsScreen)
+// Dialogs (internal, copied from the deleted legacy TerminalSettingsScreen)
 // ================================================================
 
 @Composable
@@ -1402,109 +1162,3 @@ private fun ColorSwatch(theme: TerminalTheme) {
     }
 }
 
-@Composable
-internal fun CursorStylePickerDialogInternal(
-    current: CursorStyle,
-    onDismiss: () -> Unit,
-    onConfirm: (CursorStyle) -> Unit
-) {
-    var selected by remember { mutableStateOf(current) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.terminal_cursor_style)) },
-        text = {
-            Column {
-                CursorStyle.entries.forEach { s ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
-                            .clickable { selected = s }
-                            .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(selected = selected == s, onClick = { selected = s })
-                        Spacer(Modifier.width(Spacing.sm))
-                        Text(
-                            text = cursorGlyph(s),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.width(28.dp)
-                        )
-                        Text(
-                            text = cursorStyleLabel(s),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = { onConfirm(selected) }) { Text(stringResource(R.string.common_confirm)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
-    )
-}
-
-@Composable
-internal fun ScrollbackPickerDialogInternal(
-    current: Int,
-    onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit
-) {
-    var selected by remember { mutableStateOf(current) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.terminal_scrollback)) },
-        text = {
-            Column {
-                ScrollbackLines.OPTIONS.forEach { opt ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(LocalCornerRadius.current.md))
-                            .clickable { selected = opt }
-                            .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(selected = selected == opt, onClick = { selected = opt })
-                        Spacer(Modifier.width(Spacing.sm))
-                        Text(
-                            text = scrollbackLabel(opt),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = { onConfirm(selected) }) { Text(stringResource(R.string.common_confirm)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
-    )
-}
-
-@Composable
-internal fun HeartbeatPickerDialogInternal(
-    current: Int,
-    onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit
-) {
-    val options = SshHeartbeatSeconds.entries
-    var selected by remember { mutableStateOf(SshHeartbeatSeconds.fromSeconds(current)) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.ui_ssh_1fd07b48)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                options.forEach { o ->
-                    FilterChip(
-                        selected = selected == o,
-                        onClick = { selected = o },
-                        label = { Text(o.display) }
-                    )
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = { onConfirm(selected.seconds) }) { Text(stringResource(R.string.ui____e83a256e_3)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ui____625fb26b_6)) } }
-    )
-}

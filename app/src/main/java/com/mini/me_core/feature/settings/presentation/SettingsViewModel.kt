@@ -179,7 +179,7 @@ class SettingsViewModel @Inject constructor(
     // 跨屏幕设置页跳转的「待打开分区」信号。
     // - 背景：MainActivity 有两个地方会触发「跳转到 SSH 主机配置」：
     //     1) SettingsScreen 内部 onNavigateToSshHosts lambda（本就在 Settings 路由栈内）
-    //     2) TerminalSettingsScreen 的 SSH 菜单项（从 terminal_settings 路由先 pop 回 settings，
+    //     2) TerminalContainerScreen 的 SSH 菜单项（从 terminal_settings 路由先 pop 回 settings，
     //        再把 SettingsScreen 内部的 section 切到 RemoteServers —— 但 SettingsScreen 内部
     //        section 是它自己的 remember mutableState，外部调不到）
     // - 解决方案：复用 Activity 级单例 SettingsViewModel（本来 MainActivity L388 就复用了），
@@ -196,7 +196,7 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * 请求 SettingsScreen 切到指定二级分区。
-     * 通常用在：TerminalSettingsScreen 里点「管理 SSH 主机配置」时，需要 terminal_settings
+     * 通常用在：TerminalContainerScreen 里点「管理 SSH 主机配置」时，需要 terminal_settings
      * 先 popBackStack 回 settings，然后 SettingsScreen 自己在进入时收到信号 → 内部 section = Section。
      */
     fun openSection(section: SettingsSection) {

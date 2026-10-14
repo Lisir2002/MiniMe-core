@@ -25,7 +25,6 @@ import com.mini.me_core.feature.terminal.data.bundle.BundleInstallState
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundle
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundleId
 import com.mini.me_core.feature.terminal.data.bundle.TerminalBundles
-import com.mini.me_core.feature.terminal.data.repository.SshHeartbeatSeconds
 import com.mini.me_core.feature.terminal.data.repository.TerminalBundleRepository
 import com.mini.me_core.feature.terminal.data.repository.TerminalSettingsRepository
 import com.mini.me_core.feature.terminal.data.repository.TerminalTheme
@@ -51,7 +50,9 @@ import javax.inject.Inject
  * 终端设置页的 ViewModel。
  *
  * 职责：
- *  - 外观/键盘/行为/SSH 四分组开关：直接把 TerminalSettingsRepository 的 Flow 暴露成 StateFlow。
+ *  - 已生效的终端偏好（字号/配色/全键盘/新输出指示）：直接把 TerminalSettingsRepository
+ *    的 Flow 暴露成 StateFlow。其余 13 项历史偏好仅持久化未接通消费点，设置页暂不暴露
+ *    （见 TerminalSettingsRepository 中「待接通」标注），接通后在此补回对应 StateFlow。
  *  - 容器环境大卡片状态：读取 LinuxContainerEngine.initProgress 与 isContainerInstalled 快照。
  *  - Bundle 卡片状态：读取 TerminalBundleRepository 的 Map StateFlow。
  *  - 执行具体动作：初始化容器 / 重置 / 换源 / 安装 bundle / 卸载 bundle / 自定义包。
@@ -115,59 +116,16 @@ class TerminalSettingsViewModel @Inject constructor(
     val terminalTheme: StateFlow<TerminalTheme> = settingsRepo.themeFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, TerminalTheme.FOLLOW_APP)
 
-    val showTabBar: StateFlow<Boolean> = settingsRepo.showTabBarFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
     // ── G2 键盘 & 交互 ────────────────────────────────────────────
     val fullExtraKeys: StateFlow<Boolean> = settingsRepo.fullExtraKeysFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    val scaleGesturePersists: StateFlow<Boolean> = settingsRepo.scaleGesturePersistsFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    val autoPopImeOnSwitch: StateFlow<Boolean> = settingsRepo.autoPopImeOnSwitchFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     // ── G3 行为 ───────────────────────────────────────────────────
     val newOutputIndicator: StateFlow<Boolean> = settingsRepo.newOutputIndicatorFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
-    val autoNewTabOnCloseLast: StateFlow<Boolean> = settingsRepo.autoNewTabOnCloseLastFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
     // ── 深度进度：Level 2+3 聚合器 StateFlow（公开给 Bundle 卡片 + Dialog 用） ──
     val aggregateProgress: StateFlow<AggregateProgressState> = containerEngine.aggregateProgress
-
-    val keepSessionWhenLeave: StateFlow<Boolean> = settingsRepo.keepSessionWhenLeaveFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    val pasteAsPlainText: StateFlow<Boolean> = settingsRepo.pasteAsPlainTextFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    // ── G4 SSH 常用 ───────────────────────────────────────────────
-    val sshAutoReconnect: StateFlow<Boolean> = settingsRepo.sshAutoReconnectFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    val sshHeartbeatSeconds: StateFlow<Int> = settingsRepo.sshHeartbeatSecondsFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, SshHeartbeatSeconds.S60.seconds)
-
-    val sshKeepalive: StateFlow<Boolean> = settingsRepo.sshKeepaliveFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    // ── G1 外观新增 ───────────────────────────────────────────────
-    val cursorStyle: StateFlow<com.mini.me_core.feature.terminal.data.repository.CursorStyle> =
-        settingsRepo.cursorStyleFlow
-            .stateIn(viewModelScope, SharingStarted.Eagerly, com.mini.me_core.feature.terminal.data.repository.CursorStyle.BLOCK)
-
-    val cursorBlink: StateFlow<Boolean> = settingsRepo.cursorBlinkFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    // ── G3 行为新增 ───────────────────────────────────────────────
-    val scrollbackLines: StateFlow<Int> = settingsRepo.scrollbackLinesFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, com.mini.me_core.feature.terminal.data.repository.ScrollbackLines.DEFAULT)
-
-    val exitConfirm: StateFlow<Boolean> = settingsRepo.exitConfirmFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     // ── 容器环境卡片 ──────────────────────────────────────────────
     /** 容器初始化进度（与终端页 AppLoadingState 同源）。 */
@@ -569,27 +527,15 @@ class TerminalSettingsViewModel @Inject constructor(
 
     fun setFontSizeSp(sp: Int) { viewModelScope.launch { settingsRepo.saveFontSize(sp) } }
     fun setTheme(theme: TerminalTheme) { viewModelScope.launch { settingsRepo.saveTheme(theme) } }
-    fun setShowTabBar(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveShowTabBar(enabled) } }
-    fun setCursorStyle(style: com.mini.me_core.feature.terminal.data.repository.CursorStyle) {
-        viewModelScope.launch { settingsRepo.saveCursorStyle(style) }
-    }
-    fun setCursorBlink(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveCursorBlink(enabled) } }
 
     // ─────────── 动作：G2 键盘 & 交互 ─────────────────────────────
 
     fun setFullExtraKeys(full: Boolean) { viewModelScope.launch { settingsRepo.saveFullExtraKeys(full) } }
-    fun setScaleGesturePersists(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveScaleGesturePersists(enabled) } }
-    fun setAutoPopImeOnSwitch(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveAutoPopImeOnSwitch(enabled) } }
     fun resetCtrlHint() { viewModelScope.launch { settingsRepo.resetCtrlHint() } }
 
     // ─────────── 动作：G3 行为 ────────────────────────────────────
 
     fun setNewOutputIndicator(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveNewOutputIndicator(enabled) } }
-    fun setAutoNewTabOnCloseLast(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveAutoNewTabOnCloseLast(enabled) } }
-    fun setKeepSessionWhenLeave(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveKeepSessionWhenLeave(enabled) } }
-    fun setPasteAsPlainText(enabled: Boolean) { viewModelScope.launch { settingsRepo.savePasteAsPlainText(enabled) } }
-    fun setScrollbackLines(lines: Int) { viewModelScope.launch { settingsRepo.saveScrollbackLines(lines) } }
-    fun setExitConfirm(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveExitConfirm(enabled) } }
 
     // ─────────── 动作：恢复默认终端设置 ──────────────────────────
 
@@ -601,12 +547,6 @@ class TerminalSettingsViewModel @Inject constructor(
             onDone()
         }
     }
-
-    // ─────────── 动作：G4 SSH 常用 ────────────────────────────────
-
-    fun setSshAutoReconnect(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveSshAutoReconnect(enabled) } }
-    fun setSshHeartbeatSeconds(seconds: Int) { viewModelScope.launch { settingsRepo.saveSshHeartbeatSeconds(seconds) } }
-    fun setSshKeepalive(enabled: Boolean) { viewModelScope.launch { settingsRepo.saveSshKeepalive(enabled) } }
 
     // ─────────── 辅助：Bundle 元数据暴露给 UI ─────────────────────
 

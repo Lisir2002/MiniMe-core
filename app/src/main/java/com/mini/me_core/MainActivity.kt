@@ -70,7 +70,6 @@ import com.mini.me_core.feature.terminal.presentation.TerminalSettingsViewModel
 import com.mini.me_core.feature.terminal.presentation.TerminalViewModel
 import com.mini.me_core.feature.terminal.presentation.component.TerminalBundleManagerScreen
 import com.mini.me_core.feature.terminal.presentation.component.TerminalScreen
-import com.mini.me_core.feature.terminal.presentation.component.TerminalSettingsScreen
 import com.mini.me_core.feature.terminal.presentation.component.TerminalContainerScreen
 import com.mini.me_core.feature.workspace.presentation.FileReaderViewModel
 import com.mini.me_core.feature.workspace.presentation.WorkspaceFileViewModel
