@@ -176,7 +176,11 @@ fun BundleLogDialog(
                     actions = {
                         val ctx = LocalContext.current
                         IconButton(onClick = { copyAll(ctx, actualState) }) {
-                            Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.bundle_log_copy_all), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(
+                                Icons.Rounded.ContentCopy,
+                                contentDescription = stringResource(R.string.bundle_log_copy_all),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     },
                 )
@@ -199,7 +203,11 @@ fun BundleLogDialog(
                         leadingIcon = { Icon(Icons.Rounded.Radio, null, modifier = Modifier.size(12.dp)) },
                         label = {
                             Text(
-                                text = if (isCurrentSession) stringResource(R.string.bundle_log_current_session) else stringResource(R.string.bundle_log_live_empty),
+                                text = if (isCurrentSession) {
+                                    stringResource(R.string.bundle_log_current_session)
+                                } else {
+                                    stringResource(R.string.bundle_log_live_empty)
+                                },
                                 style = MaterialTheme.typography.labelSmall,
                                 softWrap = false,
                                 maxLines = 1,

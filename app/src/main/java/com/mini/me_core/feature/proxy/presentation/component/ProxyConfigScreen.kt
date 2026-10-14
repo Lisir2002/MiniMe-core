@@ -704,7 +704,11 @@ private fun ImportEditor(
             Spacer(Modifier.height(Spacing.sm))
 
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                ModeChip(stringResource(R.string.proxy_import_from_file), selected = mode == ImportMode.SUBSCRIPTION, enabled = !busy) { mode = ImportMode.SUBSCRIPTION }
+                ModeChip(
+                    stringResource(R.string.proxy_import_from_file),
+                    selected = mode == ImportMode.SUBSCRIPTION,
+                    enabled = !busy,
+                ) { mode = ImportMode.SUBSCRIPTION }
                 ModeChip(stringResource(R.string.proxy_import_from_file), selected = mode == ImportMode.MANUAL, enabled = !busy) { mode = ImportMode.MANUAL }
                 ModeChip("直接代理", selected = mode == ImportMode.DIRECT, enabled = !busy) { mode = ImportMode.DIRECT }
                 ModeChip(stringResource(R.string.proxy_import_from_file), selected = false, enabled = !busy) { filePicker.launch("*/*") }

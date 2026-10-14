@@ -1112,7 +1112,11 @@ fun BoxScope.TerminalSearchOverlay(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (matches.isEmpty()) stringResource(R.string.terminal_search_no_match) else "${matchIndex.coerceIn(0, max(0, matches.lastIndex)) + 1} / ${matches.size}",
+                        text = if (matches.isEmpty()) {
+                            stringResource(R.string.terminal_search_no_match)
+                        } else {
+                            "${matchIndex.coerceIn(0, max(0, matches.lastIndex)) + 1} / ${matches.size}"
+                        },
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

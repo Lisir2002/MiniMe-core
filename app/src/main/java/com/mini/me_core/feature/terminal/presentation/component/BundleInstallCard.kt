@@ -487,7 +487,12 @@ private fun FailedSummaryBoard(
             ElevatedAssistChip(
                 onClick = onRetry,
                 leadingIcon = { Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(14.dp)) },
-                label = { Text(stringResource(R.string.bundle_install_retry), style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)) },
+                label = {
+                    Text(
+                        stringResource(R.string.bundle_install_retry),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    )
+                },
                 colors = AssistChipDefaults.elevatedAssistChipColors(
                     containerColor = Color(0xFFFFF3E0),
                     labelColor = Color(0xFFE65100),

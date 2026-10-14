@@ -544,7 +544,12 @@ fun SettingsScreen(
                                                 },
                                             )
                                             DropdownMenuItem(
-                                                text = { Text(stringResource(R.string.settings_keyword_clean_expired), style = MaterialTheme.typography.bodyMedium) },
+                                                text = {
+                                                    Text(
+                                                        stringResource(R.string.settings_keyword_clean_expired),
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                    )
+                                                },
                                                 leadingIcon = { Icon(Icons.Rounded.DeleteSweep, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                                 onClick = {
                                                     auditMenuExpanded = false
@@ -1038,7 +1043,14 @@ internal fun SettingsMenu(
             icon = Icons.Rounded.Extension,
             iconBgLight = Color(0xFF00B4A8),
             iconBgDark = Color(0xFF0E6E68),
-            keywords = listOf("mcp", "server", stringResource(R.string.settings_keyword_tools), "function", stringResource(R.string.settings_keyword_tools), stringResource(R.string.settings_keyword_tools)),
+            keywords = listOf(
+                "mcp",
+                "server",
+                stringResource(R.string.settings_keyword_tools),
+                "function",
+                stringResource(R.string.settings_keyword_tools),
+                stringResource(R.string.settings_keyword_tools),
+            ),
             action = { onOpen(SettingsSection.McpCenter) }
         ),
         MenuItem(
@@ -1052,7 +1064,15 @@ internal fun SettingsMenu(
             icon = Icons.Rounded.Lock,
             iconBgLight = Color(0xFFFF9F43),
             iconBgDark = Color(0xFF9A5B1E),
-            keywords = listOf("perm", stringResource(R.string.settings_keyword_permissions), stringResource(R.string.settings_keyword_permissions), "permission", "allow", stringResource(R.string.settings_keyword_permissions), "tool"),
+            keywords = listOf(
+                "perm",
+                stringResource(R.string.settings_keyword_permissions),
+                stringResource(R.string.settings_keyword_permissions),
+                "permission",
+                "allow",
+                stringResource(R.string.settings_keyword_permissions),
+                "tool",
+            ),
             action = { onOpen(SettingsSection.Permissions) }
         ),
         // D1-7 规范流程统一开关（对齐 norm-chain §3.5）：总开关 + step_inject/tool_guard 子开关。
@@ -1092,7 +1112,20 @@ internal fun SettingsMenu(
             icon = Icons.Rounded.Terminal,
             iconBgLight = Color(0xFF22C55E),
             iconBgDark = Color(0xFF14693A),
-            keywords = listOf("terminal", stringResource(R.string.settings_keyword_terminal), "ssh", "shell", "bash", stringResource(R.string.settings_keyword_terminal), "container", stringResource(R.string.settings_keyword_image), stringResource(R.string.settings_keyword_image), "docker", "alpine", "proot"),
+            keywords = listOf(
+                "terminal",
+                stringResource(R.string.settings_keyword_terminal),
+                "ssh",
+                "shell",
+                "bash",
+                stringResource(R.string.settings_keyword_terminal),
+                "container",
+                stringResource(R.string.settings_keyword_image),
+                stringResource(R.string.settings_keyword_image),
+                "docker",
+                "alpine",
+                "proot",
+            ),
             action = onNavigateToTerminalSettings
         ),
         MenuItem(
@@ -1103,7 +1136,15 @@ internal fun SettingsMenu(
             icon = Icons.Rounded.Public,
             iconBgLight = Color(0xFF6366F1),
             iconBgDark = Color(0xFF4338CA),
-            keywords = listOf("proxy", stringResource(R.string.settings_keyword_proxy), "vpn", "clash", "mihomo", stringResource(R.string.settings_keyword_proxy), "network"),
+            keywords = listOf(
+                "proxy",
+                stringResource(R.string.settings_keyword_proxy),
+                "vpn",
+                "clash",
+                "mihomo",
+                stringResource(R.string.settings_keyword_proxy),
+                "network",
+            ),
             action = onNavigateToNetProxy
         ),
         MenuItem(
@@ -1114,7 +1155,15 @@ internal fun SettingsMenu(
             icon = Icons.Rounded.Lan,
             iconBgLight = Color(0xFF3B82F6),
             iconBgDark = Color(0xFF1E40AF),
-            keywords = listOf("remote", "ssh", "sftp", stringResource(R.string.settings_keyword_servers), stringResource(R.string.settings_keyword_servers), stringResource(R.string.settings_keyword_servers), stringResource(R.string.settings_keyword_servers)),
+            keywords = listOf(
+                "remote",
+                "ssh",
+                "sftp",
+                stringResource(R.string.settings_keyword_servers),
+                stringResource(R.string.settings_keyword_servers),
+                stringResource(R.string.settings_keyword_servers),
+                stringResource(R.string.settings_keyword_servers),
+            ),
             action = { onOpen(SettingsSection.RemoteServers) }
         ),
         MenuItem(
@@ -1125,7 +1174,15 @@ internal fun SettingsMenu(
             icon = Icons.Rounded.Archive,
             iconBgLight = Color(0xFFF59E0B),
             iconBgDark = Color(0xFF92400E),
-            keywords = listOf("backup", stringResource(R.string.settings_keyword_backup), stringResource(R.string.settings_keyword_backup), "export", stringResource(R.string.settings_keyword_backup), stringResource(R.string.settings_keyword_backup), stringResource(R.string.settings_keyword_backup)),
+            keywords = listOf(
+                "backup",
+                stringResource(R.string.settings_keyword_backup),
+                stringResource(R.string.settings_keyword_backup),
+                "export",
+                stringResource(R.string.settings_keyword_backup),
+                stringResource(R.string.settings_keyword_backup),
+                stringResource(R.string.settings_keyword_backup),
+            ),
             action = { onOpen(SettingsSection.Backup) }
         ),
         MenuItem(
@@ -1136,7 +1193,15 @@ internal fun SettingsMenu(
             icon = Icons.Rounded.Security,
             iconBgLight = Color(0xFFEF4444),
             iconBgDark = Color(0xFFB91C1C),
-            keywords = listOf("security", stringResource(R.string.settings_keyword_encryption), stringResource(R.string.settings_keyword_encryption), stringResource(R.string.settings_keyword_encryption), "password", stringResource(R.string.settings_keyword_encryption), "pin"),
+            keywords = listOf(
+                "security",
+                stringResource(R.string.settings_keyword_encryption),
+                stringResource(R.string.settings_keyword_encryption),
+                stringResource(R.string.settings_keyword_encryption),
+                "password",
+                stringResource(R.string.settings_keyword_encryption),
+                "pin",
+            ),
             action = { onOpen(SettingsSection.Security) }
         ),
         MenuItem(
@@ -1158,7 +1223,15 @@ internal fun SettingsMenu(
             icon = Icons.Rounded.Description,
             iconBgLight = Color(0xFF64748B),
             iconBgDark = Color(0xFF475569),
-            keywords = listOf("audit", stringResource(R.string.settings_keyword_audit), "log", stringResource(R.string.settings_keyword_audit), stringResource(R.string.settings_keyword_audit), "ssh", stringResource(R.string.settings_keyword_audit)),
+            keywords = listOf(
+                "audit",
+                stringResource(R.string.settings_keyword_audit),
+                "log",
+                stringResource(R.string.settings_keyword_audit),
+                stringResource(R.string.settings_keyword_audit),
+                "ssh",
+                stringResource(R.string.settings_keyword_audit),
+            ),
             action = { onOpen(SettingsSection.RemoteAuditLogs) }
         ),
         MenuItem(
@@ -1169,7 +1242,15 @@ internal fun SettingsMenu(
             icon = Icons.Rounded.DarkMode,
             iconBgLight = Color(0xFF8B5CF6),
             iconBgDark = Color(0xFF4C1D95),
-            keywords = listOf("theme", "appearance", stringResource(R.string.settings_keyword_appearance), stringResource(R.string.settings_keyword_appearance), stringResource(R.string.settings_keyword_appearance), stringResource(R.string.settings_keyword_appearance), stringResource(R.string.settings_keyword_appearance)),
+            keywords = listOf(
+                "theme",
+                "appearance",
+                stringResource(R.string.settings_keyword_appearance),
+                stringResource(R.string.settings_keyword_appearance),
+                stringResource(R.string.settings_keyword_appearance),
+                stringResource(R.string.settings_keyword_appearance),
+                stringResource(R.string.settings_keyword_appearance),
+            ),
             action = { onOpen(SettingsSection.Theme) }
         ),
         MenuItem(
@@ -1191,7 +1272,15 @@ internal fun SettingsMenu(
             icon = Icons.Rounded.Favorite,
             iconBgLight = Color(0xFF2DD4BF),
             iconBgDark = Color(0xFF115E59),
-            keywords = listOf("keepalive", stringResource(R.string.settings_keyword_keepalive), stringResource(R.string.settings_keyword_keepalive), "foreground", stringResource(R.string.settings_keyword_keepalive), stringResource(R.string.settings_keyword_keepalive), stringResource(R.string.settings_keyword_keepalive)),
+            keywords = listOf(
+                "keepalive",
+                stringResource(R.string.settings_keyword_keepalive),
+                stringResource(R.string.settings_keyword_keepalive),
+                "foreground",
+                stringResource(R.string.settings_keyword_keepalive),
+                stringResource(R.string.settings_keyword_keepalive),
+                stringResource(R.string.settings_keyword_keepalive),
+            ),
             action = { onToggleKeepalive(!keepaliveEnabled) },
             trailing = {
                 Switch(
@@ -1212,7 +1301,16 @@ internal fun SettingsMenu(
             icon = Icons.Rounded.Info,
             iconBgLight = Color(0xFF0EA5E9),
             iconBgDark = Color(0xFF0369A1),
-            keywords = listOf("about", stringResource(R.string.settings_keyword_about), "version", "release", stringResource(R.string.settings_keyword_about), stringResource(R.string.settings_keyword_about), "license", stringResource(R.string.settings_keyword_about)),
+            keywords = listOf(
+                "about",
+                stringResource(R.string.settings_keyword_about),
+                "version",
+                "release",
+                stringResource(R.string.settings_keyword_about),
+                stringResource(R.string.settings_keyword_about),
+                "license",
+                stringResource(R.string.settings_keyword_about),
+            ),
             action = { onOpen(SettingsSection.About) }
         )
     )
