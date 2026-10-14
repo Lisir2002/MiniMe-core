@@ -125,7 +125,7 @@ class V2ApkSignerTest {
             val apksigner = findApksigner()
             if (apksigner == null) {
                 println("[跳过] 当前环境未找到 apksigner（需 ANDROID_HOME/build-tools），仅完成签名块存在性检查")
-                return@runBlocking
+                return
             }
 
             // 测试 APK 的 AndroidManifest.xml 为纯文本占位（非二进制 AXML），
