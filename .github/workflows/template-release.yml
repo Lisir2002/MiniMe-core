@@ -34,7 +34,7 @@ jobs:
           packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # 统一签名策略：从 GitHub Secrets 恢复唯一官方密钥（app/minime.jks + app/keystore.properties）
       # expectedCertSha256 来自 EXPECTED_SIGNING_CERT_FINGERPRINT，作为构建期证书白名单

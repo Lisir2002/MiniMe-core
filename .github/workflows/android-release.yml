@@ -101,7 +101,7 @@ jobs:
           ls $ANDROID_HOME/platforms/
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           # 复用 Gradle 构建缓存，加速后续构建。
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}

@@ -161,7 +161,7 @@ jobs:
           ls $ANDROID_HOME/platforms/
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           # PR 用只读缓存，仅 main 的 push 写回缓存，避免被 PR 污染。
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
