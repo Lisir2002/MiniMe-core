@@ -106,7 +106,7 @@ fun ZthConfirmationCardSheet(
                     onClick = { vm.onClickCancel() },
                     enabled = !ui.committing && payload.tier.tier <= 1
                 ) {
-                    Text(if (payload.tier.tier >= 2) stringResource(R.string.ui______6e2b79aa_2) else stringResource(R.string.common_cancel))
+                    Text(if (payload.tier.tier >= 2) stringResource(R.string.zth_confirm_no_cancel) else stringResource(R.string.common_cancel))
                 }
             }
 
@@ -174,24 +174,24 @@ fun ZthConfirmationCardSheet(
                         onClick = { showEdit = true; vm.onClickModifyPlan() },
                         enabled = !ui.committing,
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                    ) { Text(stringResource(R.string.ui__________ea569350_2)) }
+                    ) { Text(stringResource(R.string.zth_confirm_modify_plan)) }
                 }
             } else {
-                Text(stringResource(R.string.ui______621aea14_2), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.zth_confirm_modify_plan_title), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = editText,
                     onValueChange = { editText = it },
                     modifier = Modifier.fillMaxWidth().height(120.dp),
-                    placeholder = { Text(stringResource(R.string.ui_________b19d3f5d_2)) }
+                    placeholder = { Text(stringResource(R.string.zth_confirm_modify_plan_desc)) }
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { showEdit = false; vm.onAbortEdit() }) { Text(stringResource(R.string.ui______cbb46593_2)) }
+                    TextButton(onClick = { showEdit = false; vm.onAbortEdit() }) { Text(stringResource(R.string.zth_confirm_cancel_edit)) }
                     Button(
                         onClick = { showEdit = false; vm.onDoneEdit(editText) },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
-                    ) { Text(stringResource(R.string.ui_________00433286_2)) }
+                    ) { Text(stringResource(R.string.zth_confirm_save_continue)) }
                 }
             }
 
@@ -209,10 +209,10 @@ fun ZthConfirmationCardSheet(
                     },
                     enabled = !ui.committing,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
-                ) { Text(stringResource(R.string.ui______36d2d19a_2)) }
+                ) { Text(stringResource(R.string.zth_confirm_reject_plan)) }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { vm.onClickCancel() }, enabled = !ui.committing && payload.tier.tier <= 1) {
-                    Text(if (payload.tier.tier >= 2) stringResource(R.string.ui_______e6f7b9c8_2) else stringResource(R.string.ui______45292500_2))
+                    Text(if (payload.tier.tier >= 2) stringResource(R.string.zth_confirm_cancel_unavailable) else stringResource(R.string.zth_confirm_later))
                 }
             }
             Spacer(Modifier.height(Spacing.sm))
@@ -221,7 +221,7 @@ fun ZthConfirmationCardSheet(
                 enabled = !ui.committing && payload.tier.tier <= 1 || (payload.tier.tier >= 2 && !ui.committing),
                 label = buildString {
                     append("滑动≥92% 确认执行（ZTH-0 幻觉零容忍）")
-                    if (ui.currentState == ZthConfirmationCardStateMachine.CardState.CONFIRMING_TX) append(stringResource(R.string.ui_link_24ee85e1_2))
+                    if (ui.currentState == ZthConfirmationCardStateMachine.CardState.CONFIRMING_TX) append(stringResource(R.string.zth_confirm_link_inv_pending))
                 },
                 onProgressChange = { pct -> vm.onSwipe(pct) },
                 onConfirmed = { if (ui.confirmButtonEnabled) vm.onClickConfirm() }
@@ -229,7 +229,7 @@ fun ZthConfirmationCardSheet(
             if (ui.committing) {
                 Spacer(Modifier.height(Spacing.xs))
                 Text(
-                    stringResource(R.string.ui_______e8de15ba_2),
+                    stringResource(R.string.zth_confirm_link_inv_committing),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -248,10 +248,10 @@ private fun RiskBadge(confidence: Float, tier: Int) {
     val tierBoost = tier * 0.05f
     val adjusted = (confidence + tierBoost).coerceIn(0f, 1f)
     val (bg, fg, text) = when {
-        adjusted >= 0.90f -> Triple(Color(0xFFB71C1C), Color.White, stringResource(R.string.ui_critical_b86271d9_2))
-        adjusted >= 0.60f -> Triple(Color(0xFFE65100), Color.White, stringResource(R.string.ui_high_821cf95f_2))
-        adjusted >= 0.30f -> Triple(Color(0xFFF9A825), Color.Black, stringResource(R.string.ui_med_b6334d78_2))
-        else -> Triple(Color(0xFF2E7D32), Color.White, stringResource(R.string.ui_low_44246029_2))
+        adjusted >= 0.90f -> Triple(Color(0xFFB71C1C), Color.White, stringResource(R.string.zth_risk_critical))
+        adjusted >= 0.60f -> Triple(Color(0xFFE65100), Color.White, stringResource(R.string.zth_risk_high))
+        adjusted >= 0.30f -> Triple(Color(0xFFF9A825), Color.Black, stringResource(R.string.zth_risk_medium))
+        else -> Triple(Color(0xFF2E7D32), Color.White, stringResource(R.string.zth_risk_low))
     }
     Box(
         Modifier

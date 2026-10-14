@@ -1282,7 +1282,7 @@ private fun CompatibilityPolicyDropdown(
             value = policyDisplayName(currentPolicy),
             onValueChange = { },
             readOnly = true,
-            label = { Text(stringResource(R.string.ui______d0034676)) },
+            label = { Text(stringResource(R.string.provider_compat_policy_title)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -1330,7 +1330,7 @@ private fun ViewImageGuardDropdown(
             value = viewImageGuardDisplayName(current),
             onValueChange = { },
             readOnly = true,
-            label = { Text(stringResource(R.string.ui_viewimage_1d14f381)) },
+            label = { Text(stringResource(R.string.provider_viewimage_guard_title)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()

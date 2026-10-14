@@ -2,6 +2,7 @@ package com.mini.me_core.feature.terminal.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.ScaledAnimation
 
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
 import android.content.ClipData
@@ -152,12 +153,12 @@ fun BundleLogDialog(
                         Column {
                             Text(
                                 text = buildString {
-                                    append(stringResource(R.string.ui______f2d2a5f3)).append(bundle.title)
+                                    append(stringResource(R.string.bundle_log_title)).append(bundle.title)
                                     append(
                                         when {
-                                            modeReal -> stringResource(R.string.ui____8371d7a6)
-                                            hasArchive -> stringResource(R.string.ui____f517bf4a)
-                                            else -> stringResource(R.string.ui___3479daf9)
+                                            modeReal -> stringResource(R.string.bundle_log_live_suffix)
+                                            hasArchive -> stringResource(R.string.bundle_log_archive_suffix)
+                                            else -> stringResource(R.string.bundle_log_empty_suffix)
                                         }
                                     )
                                 },
@@ -175,7 +176,7 @@ fun BundleLogDialog(
                     actions = {
                         val ctx = LocalContext.current
                         IconButton(onClick = { copyAll(ctx, actualState) }) {
-                            Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.ui______2733a243), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.bundle_log_copy_all), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     },
                 )
@@ -198,7 +199,7 @@ fun BundleLogDialog(
                         leadingIcon = { Icon(Icons.Rounded.Radio, null, modifier = Modifier.size(12.dp)) },
                         label = {
                             Text(
-                                text = if (isCurrentSession) stringResource(R.string.ui______00e43644) else stringResource(R.string.ui____12a64640),
+                                text = if (isCurrentSession) stringResource(R.string.bundle_log_current_session) else stringResource(R.string.bundle_log_live_empty),
                                 style = MaterialTheme.typography.labelSmall,
                                 softWrap = false,
                                 maxLines = 1,
@@ -220,7 +221,7 @@ fun BundleLogDialog(
                         leadingIcon = { Icon(Icons.Rounded.Archive, null, modifier = Modifier.size(12.dp)) },
                         label = {
                             Text(
-                                text = if (hasArchive) stringResource(R.string.ui______ed7db4af) else stringResource(R.string.ui_____3e090c84),
+                                text = if (hasArchive) stringResource(R.string.bundle_log_history_archive) else stringResource(R.string.bundle_log_no_archive),
                                 style = MaterialTheme.typography.labelSmall,
                                 softWrap = false,
                                 maxLines = 1,
@@ -239,7 +240,12 @@ fun BundleLogDialog(
                     if (archiveSnapshot?.isTerminal == true) {
                         archiveSnapshot.finishStats?.let { fs ->
                             Text(
-                                text = stringResource(R.string.ui_1fs_960c9b8d).format(fs.elapsedMs / 1000f, fs.packagesInstalled),
+                                text = pluralStringResource(
+                                    R.plurals.bundle_log_summary,
+                                    fs.packagesInstalled,
+                                    fs.elapsedMs / 1000f,
+                                    fs.packagesInstalled,
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFF2E7D32),
                                 modifier = Modifier
@@ -250,7 +256,7 @@ fun BundleLogDialog(
                         }
                         archiveSnapshot.failSummary?.let {
                             Text(
-                                text = stringResource(R.string.ui____3dc27dd7),
+                                text = stringResource(R.string.bundle_log_failed),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFFC62828),
                                 modifier = Modifier
@@ -304,7 +310,7 @@ fun BundleLogDialog(
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.md),
                     leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                    placeholder = { Text(stringResource(R.string.ui______362c323d)) },
+                    placeholder = { Text(stringResource(R.string.bundle_log_search_hint)) },
                     singleLine = true,
                 )
                 Spacer(Modifier.height(Spacing.xs))
@@ -817,7 +823,7 @@ private fun ErrorRowCard(line: LogLine, fg: Color, ctx: Context, modifier: Modif
                 ) {
                     Icon(
                         imageVector = if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = if (expanded) stringResource(R.string.ui____def9e98b) else stringResource(R.string.ui____e2edde5a),
+                        contentDescription = if (expanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.common_expand),
                         tint = fg,
                         modifier = Modifier.size(16.dp),
                     )

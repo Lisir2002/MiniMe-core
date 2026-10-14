@@ -100,4 +100,14 @@
     <string name="security_audit_clear_action">清空</string>
     <string name="security_zth_desc">越严格档位越频繁弹卡用户确认；幻觉触发（ToolOutput/Plan/Skill 正文）无论档位，都先弹卡绝不自我麻痹。</string>
     <string name="security_zth_swipe_hint">关闭仅允许 DISABLED / MINIMAL(0/1)；≥2 强制开。</string>
+    <string name="security_biometric_protect_credentials">生物识别保护凭据</string>
+    <string name="security_credential_key_rotation">凭据密钥轮换</string>
+    <string name="security_credential_rotating">轮换中…</string>
+    <string name="security_emergency_host">主机</string>
+    <string name="security_emergency_password">密码</string>
+    <string name="security_emergency_port">端口</string>
+    <string name="security_emergency_resetting">重置中…</string>
+    <string name="security_emergency_unlock_desc">输入任一有效 SSH 连接的认证信息验证身份，验证通过后系统将生成新主密钥，所有凭据需要重新录入。</string>
+    <string name="security_emergency_unlock_title">紧急解锁主密钥</string>
+    <string name="security_emergency_username">用户名</string>
 </resources>

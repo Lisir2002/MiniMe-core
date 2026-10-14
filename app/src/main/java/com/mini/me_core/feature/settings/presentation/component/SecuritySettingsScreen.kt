@@ -354,7 +354,7 @@ private fun RotationCard(
     AppCard {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
-                text = stringResource(R.string.ui________3b563f02),
+                text = stringResource(R.string.security_credential_key_rotation),
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(Modifier.height(Spacing.xs))
@@ -422,7 +422,7 @@ private fun RotationCard(
             }
             Spacer(Modifier.height(Spacing.sm))
             AppButton(
-                text = if (rotating) stringResource(R.string.ui_____6b53d706)
+                text = if (rotating) stringResource(R.string.security_credential_rotating)
                 else stringResource(R.string.security_rotate_action),
                 onClick = onRotate,
                 loading = rotating,
@@ -451,7 +451,7 @@ private fun BiometricCard(
         Column(modifier = Modifier.padding(Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = stringResource(R.string.ui__________5d343f60),
+                    text = stringResource(R.string.security_biometric_protect_credentials),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(Modifier.weight(1f))

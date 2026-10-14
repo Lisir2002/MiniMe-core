@@ -124,10 +124,10 @@ fun ProxyConfigScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             AppTopAppBar(
-                title = stringResource(R.string.ui______d3ec5010),
+                title = stringResource(R.string.proxy_title),
                 onNavigateBack = onNavigateBack,
                 navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
-                navigationContentDescription = stringResource(R.string.ui____5f411223)
+                navigationContentDescription = stringResource(R.string.common_back)
             )
         }
         ) { padding ->
@@ -389,7 +389,7 @@ private fun MasterToggle(
             Spacer(Modifier.width(Spacing.sm))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (enabled) stringResource(R.string.ui_______4d1f56d6) else stringResource(R.string.ui_______b5fb1ee7),
+                    text = if (enabled) stringResource(R.string.proxy_enabled) else stringResource(R.string.proxy_enabled),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -398,7 +398,7 @@ private fun MasterToggle(
                     text = if (!activeProfileName.isNullOrBlank()) {
                         "${activeProfileName} · 127.0.0.1:$port"
                     } else {
-                        stringResource(R.string.ui________ae157e74)
+                        stringResource(R.string.proxy_active_config)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -488,16 +488,16 @@ private fun NodesEntryCard(
             Spacer(Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.ui______b26d228a),
+                    text = stringResource(R.string.proxy_node_management),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = when {
-                        profileCount == 0 -> stringResource(R.string.ui_______98d7e010)
-                        enabled -> stringResource(R.string.ui____d934fb06)
-                        else -> stringResource(R.string.ui_______20fa5aa5)
+                        profileCount == 0 -> stringResource(R.string.proxy_disabled_hint)
+                        enabled -> stringResource(R.string.proxy_disabled_hint)
+                        else -> stringResource(R.string.proxy_disabled_hint)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -696,7 +696,7 @@ private fun ImportEditor(
                 .padding(Spacing.md)
         ) {
             Text(
-                text = stringResource(R.string.ui______04522145),
+                text = stringResource(R.string.proxy_import_config),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -704,10 +704,10 @@ private fun ImportEditor(
             Spacer(Modifier.height(Spacing.sm))
 
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                ModeChip(stringResource(R.string.ui____701515e9), selected = mode == ImportMode.SUBSCRIPTION, enabled = !busy) { mode = ImportMode.SUBSCRIPTION }
-                ModeChip(stringResource(R.string.ui____601a29b5), selected = mode == ImportMode.MANUAL, enabled = !busy) { mode = ImportMode.MANUAL }
+                ModeChip(stringResource(R.string.proxy_import_from_file), selected = mode == ImportMode.SUBSCRIPTION, enabled = !busy) { mode = ImportMode.SUBSCRIPTION }
+                ModeChip(stringResource(R.string.proxy_import_from_file), selected = mode == ImportMode.MANUAL, enabled = !busy) { mode = ImportMode.MANUAL }
                 ModeChip("直接代理", selected = mode == ImportMode.DIRECT, enabled = !busy) { mode = ImportMode.DIRECT }
-                ModeChip(stringResource(R.string.ui_______d9a6706f), selected = false, enabled = !busy) { filePicker.launch("*/*") }
+                ModeChip(stringResource(R.string.proxy_import_from_file), selected = false, enabled = !busy) { filePicker.launch("*/*") }
             }
 
             Spacer(Modifier.height(Spacing.sm))
@@ -715,7 +715,7 @@ private fun ImportEditor(
             OutlinedTextField(
                 value = nameField,
                 onValueChange = { nameField = it },
-                label = { Text(stringResource(R.string.ui____8d9d1723)) },
+                label = { Text(stringResource(R.string.proxy_import_name_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -727,7 +727,7 @@ private fun ImportEditor(
                     OutlinedTextField(
                         value = urlField,
                         onValueChange = { urlField = it },
-                        label = { Text(stringResource(R.string.ui____3208b62d)) },
+                        label = { Text(stringResource(R.string.proxy_import_url_label)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -735,14 +735,14 @@ private fun ImportEditor(
                     OutlinedButton(
                         onClick = { onPreview(urlField.trim(), null) },
                         enabled = urlField.isNotBlank() && !busy
-                    ) { Text(stringResource(R.string.ui____bb872a0c)) }
+                    ) { Text(stringResource(R.string.proxy_precheck)) }
                     SaveHint()
                 }
                 ImportMode.MANUAL -> {
                     OutlinedTextField(
                         value = yamlField,
                         onValueChange = { yamlField = it },
-                        label = { Text(stringResource(R.string.ui______f388b5eb)) },
+                        label = { Text(stringResource(R.string.proxy_manual_yaml)) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(160.dp)
@@ -751,12 +751,12 @@ private fun ImportEditor(
                     OutlinedButton(
                         onClick = { onPreview(null, yamlField) },
                         enabled = yamlField.isNotBlank() && !busy
-                    ) { Text(stringResource(R.string.ui____bb872a0c_2)) }
+                    ) { Text(stringResource(R.string.proxy_precheck)) }
                     SaveHint()
                 }
                 ImportMode.FILE -> {
                     Text(
-                        text = stringResource(R.string.ui_____24992b8d),
+                        text = stringResource(R.string.proxy_import_file_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -785,7 +785,7 @@ private fun ImportEditor(
                     OutlinedButton(
                         onClick = { onPreview(null, buildDirectYaml(dpProtocol, dpHost, dpPort, dpUser, dpPass)) },
                         enabled = dpHost.isNotBlank() && dpPort.toIntOrNull() != null && !busy
-                    ) { Text(stringResource(R.string.ui____bb872a0c_2)) }
+                    ) { Text(stringResource(R.string.proxy_precheck)) }
                     SaveHint()
                 }
             }
@@ -813,11 +813,11 @@ private fun ImportEditor(
                     OutlinedButton(
                         enabled = resolvedSource && !busy,
                         onClick = { onCommit(nameField, kind, secret, false) }
-                    ) { Text(stringResource(R.string.ui_____ee99388d)) }
+                    ) { Text(stringResource(R.string.proxy_save_only)) }
                     Button(
                         enabled = resolvedSource && !busy,
                         onClick = { onCommit(nameField, kind, secret, true) }
-                    ) { Text(stringResource(R.string.ui_______3eb4be1b)) }
+                    ) { Text(stringResource(R.string.proxy_save_enable)) }
                 }
             }
         }
@@ -843,7 +843,7 @@ private fun ModeChip(label: String, selected: Boolean, enabled: Boolean, onClick
 @Composable
 private fun SaveHint() {
     Text(
-        text = stringResource(R.string.ui___________717dcdaa),
+        text = stringResource(R.string.proxy_precheck_hint),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
         modifier = Modifier.fillMaxWidth()
@@ -907,7 +907,7 @@ private fun OverrideCard() {
                 }
                 Spacer(Modifier.width(Spacing.sm))
                 Text(
-                    text = stringResource(R.string.ui_______79cf38fa),
+                    text = stringResource(R.string.proxy_fixed_override_block),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -1035,7 +1035,7 @@ private fun ProfileRow(
                     if (isActive) {
                         Spacer(Modifier.width(Spacing.xs))
                         Text(
-                            text = stringResource(R.string.ui____fe32def4),
+                            text = stringResource(R.string.proxy_active),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
@@ -1045,8 +1045,8 @@ private fun ProfileRow(
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = when (profile.kind) {
-                        ProxySubscription.KIND_SUBSCRIPTION -> stringResource(R.string.ui____adfb869d)
-                        ProxySubscription.KIND_MANUAL -> stringResource(R.string.ui____9c4530f5)
+                        ProxySubscription.KIND_SUBSCRIPTION -> stringResource(R.string.proxy_source_manual_yaml)
+                        ProxySubscription.KIND_MANUAL -> stringResource(R.string.proxy_source_manual_yaml)
                         ProxySubscription.KIND_DIRECT -> "直接代理"
                         else -> "来源：${profile.kind}"
                     },
@@ -1072,8 +1072,8 @@ private fun ProfileRow(
                     modifier = Modifier.height(32.dp)
                 ) {
                     Text(
-                        if (isActive) stringResource(R.string.ui____fe32def4_2)
-                        else stringResource(R.string.ui______f67c4924),
+                        if (isActive) stringResource(R.string.proxy_active)
+                        else stringResource(R.string.proxy_active),
                         style = MaterialTheme.typography.labelSmall
                     )
                 }
@@ -1095,7 +1095,7 @@ private fun ProfileRow(
                             contentColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Text(stringResource(R.string.ui____2f4aaddd), style = MaterialTheme.typography.labelSmall)
+                        Text(stringResource(R.string.common_delete), style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }

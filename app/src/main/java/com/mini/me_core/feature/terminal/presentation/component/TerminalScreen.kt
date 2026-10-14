@@ -467,12 +467,12 @@ private fun TerminalFirstRunBanner(
     val showDismiss: Boolean
     when (banner) {
         TerminalViewModel.BannerType.ContainerNotInstalled -> {
-            title = stringResource(R.string.ui___________aac0fde9)
+            title = stringResource(R.string.terminal_local_not_initialized)
             desc = "容器未就绪时仅可使用手机原生 shell（命令较少）。\n点下方「初始化环境」解锁 Alpine Linux + PRoot 以及 Python / Node / Git 等 6 大功能包。"
             showDismiss = false
         }
         TerminalViewModel.BannerType.PythonMissing -> {
-            title = stringResource(R.string.ui_ai_8049975d)
+            title = stringResource(R.string.terminal_ai_needs_python)
             desc = "AI 的「Run Code / Search / git diff」依赖 Python 运行时。建议先一键安装 AI 推荐组合。"
             showDismiss = true
         }
@@ -525,7 +525,7 @@ private fun TerminalFirstRunBanner(
                         )
                     ) {
                         Text(
-                            stringResource(R.string.ui______c8c4516c),
+                            stringResource(R.string.terminal_not_now),
                             fontSize = ButtonSpec.TextFontSize,
                         )
                     }
@@ -544,24 +544,24 @@ private fun TerminalFirstRunBanner(
                         PrimaryButton(
                             onClick = onInitContainer,
                             icon = Icons.Rounded.Add,
-                            text = stringResource(R.string.ui_______30947f5e)
+                            text = stringResource(R.string.terminal_init_environment)
                         )
                         SecondaryButton(
                             onClick = onGoSettings,
                             icon = Icons.Rounded.Settings,
-                            text = stringResource(R.string.ui_______dc25a273)
+                            text = stringResource(R.string.terminal_go_to_settings)
                         )
                     }
                     TerminalViewModel.BannerType.PythonMissing -> {
                         PrimaryButton(
                             onClick = onInstallRecommended,
                             icon = Icons.Rounded.Memory,
-                            text = stringResource(R.string.ui_____ebd237c5)
+                            text = stringResource(R.string.terminal_go_to_settings)
                         )
                         SecondaryButton(
                             onClick = onGoSettings,
                             icon = Icons.Rounded.Settings,
-                            text = stringResource(R.string.ui_______dc25a273_2)
+                            text = stringResource(R.string.terminal_go_to_settings)
                         )
                     }
                 }

@@ -778,9 +778,9 @@ private fun TriStateCapabilityRow(
             label = {
                 Text(
                     text = when (overrideValue) {
-                        true -> stringResource(R.string.ui_______9188121c)
-                        false -> stringResource(R.string.ui_______73f7db5e)
-                        null -> stringResource(R.string.ui________be725ae0)
+                        true -> stringResource(R.string.provider_model_follow_auto)
+                        false -> stringResource(R.string.provider_model_follow_auto)
+                        null -> stringResource(R.string.provider_model_follow_auto)
                     }
                 )
             },
@@ -797,12 +797,12 @@ private fun TriStateCapabilityRow(
             Text(
                 text = buildString {
                     append(description)
-                    append(stringResource(R.string.ui______d8195afb))
-                    append(if (autoValue) stringResource(R.string.ui____5f15d40d) else stringResource(R.string.ui____127dc326))
+                    append(stringResource(R.string.provider_model_state_on))
+                    append(if (autoValue) stringResource(R.string.provider_model_state_on) else stringResource(R.string.provider_model_state_on))
                     append(
                         when (overrideValue) {
-                            true -> stringResource(R.string.ui________3eeb0c16)
-                            false -> stringResource(R.string.ui________b9cce01f)
+                            true -> stringResource(R.string.provider_model_manual_override_off)
+                            false -> stringResource(R.string.provider_model_manual_override_off)
                             null -> ""
                         }
                     )

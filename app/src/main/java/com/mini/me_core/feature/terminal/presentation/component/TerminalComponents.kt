@@ -636,7 +636,7 @@ private fun CompactFullSwitcher(full: Boolean, onClick: () -> Unit, skin: Termin
                 tint = if (full) skin.keyGroupDFg else skin.onSurfaceVariant
             )
             Text(
-                text = if (full) stringResource(R.string.ui____63c59813) else stringResource(R.string.ui____e7e07e58),
+                text = if (full) stringResource(R.string.terminal_mode_full) else stringResource(R.string.terminal_mode_compact),
                 fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                 color = if (full) skin.keyGroupDFg else skin.onSurface
             )
@@ -652,7 +652,7 @@ private fun CtrlChipWithTooltip(viewModel: TerminalViewModel, skin: TerminalSkin
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
         tooltip = {
             PlainTooltip {
-                Text(stringResource(R.string.ui_______35e60ae6))
+                Text(stringResource(R.string.terminal_ctrl_hint))
             }
         },
         state = state
@@ -675,7 +675,7 @@ private fun AltChipWithTooltip(viewModel: TerminalViewModel, skin: TerminalSkinS
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
         tooltip = {
             PlainTooltip {
-                Text(stringResource(R.string.ui_______13de17e1))
+                Text(stringResource(R.string.terminal_alt_hint))
             }
         },
         state = state
@@ -759,7 +759,7 @@ fun ReconnectDropdown(
             }
         )
         DropdownMenuItem(
-            text = { Text(stringResource(R.string.ui________1614f33f)) },
+            text = { Text(stringResource(R.string.terminal_reconnect_all_tabs)) },
             onClick = onReconnectAll,
             leadingIcon = {
                 Icon(Icons.Rounded.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -767,7 +767,7 @@ fun ReconnectDropdown(
         )
         HorizontalDivider(Modifier.padding(horizontal = Spacing.sm))
         DropdownMenuItem(
-            text = { Text(stringResource(R.string.ui______fbf624a8)) },
+            text = { Text(stringResource(R.string.tc_restart_container)) },
             onClick = onRestartContainer,
             leadingIcon = {
                 Icon(Icons.Rounded.Power, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -799,29 +799,29 @@ fun TerminalOperationsMenu(
 ) {
     val expanded = anchor != null
     AppDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(text = { Text(stringResource(R.string.ui____79d3abe9)) }, onClick = onCopy,
+        DropdownMenuItem(text = { Text(stringResource(R.string.terminal_copy)) }, onClick = onCopy,
             leadingIcon = { Icon(Icons.Rounded.ContentCopy, null, Modifier.size(18.dp)) })
-        DropdownMenuItem(text = { Text(stringResource(R.string.ui____eafbece1)) }, onClick = onPaste,
+        DropdownMenuItem(text = { Text(stringResource(R.string.terminal_paste)) }, onClick = onPaste,
             leadingIcon = { Icon(Icons.Rounded.ContentPaste, null, Modifier.size(18.dp)) })
-        DropdownMenuItem(text = { Text(stringResource(R.string.ui____66eeacd9)) }, onClick = onSelectAll,
+        DropdownMenuItem(text = { Text(stringResource(R.string.terminal_select_all)) }, onClick = onSelectAll,
             leadingIcon = { Icon(Icons.Rounded.TextFields, null, Modifier.size(18.dp)) })
         HorizontalDivider(Modifier.padding(horizontal = Spacing.sm))
-        DropdownMenuItem(text = { Text(stringResource(R.string.ui____91382d9c)) }, onClick = onClearScreen,
+        DropdownMenuItem(text = { Text(stringResource(R.string.terminal_clear_screen)) }, onClick = onClearScreen,
             leadingIcon = { Icon(Icons.Rounded.Delete, null, Modifier.size(18.dp)) })
-        DropdownMenuItem(text = { Text(stringResource(R.string.ui____e5f71fc3)) }, onClick = onSearch,
+        DropdownMenuItem(text = { Text(stringResource(R.string.terminal_search)) }, onClick = onSearch,
             leadingIcon = { Icon(Icons.Rounded.Search, null, Modifier.size(18.dp)) })
-        DropdownMenuItem(text = { Text(stringResource(R.string.ui_______a4986174)) }, onClick = onRenameTab,
+        DropdownMenuItem(text = { Text(stringResource(R.string.terminal_rename_tab)) }, onClick = onRenameTab,
             leadingIcon = { Icon(Icons.Rounded.Edit, null, Modifier.size(18.dp)) })
         if (allowSendToAI && onSendToAI != null) {
-            DropdownMenuItem(text = { Text(stringResource(R.string.ui______38154828)) }, onClick = onSendToAI,
+            DropdownMenuItem(text = { Text(stringResource(R.string.terminal_send_last_100_lines)) }, onClick = onSendToAI,
                 leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Send, null, Modifier.size(18.dp)) })
         }
         HorizontalDivider(Modifier.padding(horizontal = Spacing.sm))
-        DropdownMenuItem(text = { Text(if (fullExtraKeys) stringResource(R.string.ui______6a988d97) else stringResource(R.string.ui______1ae98d49)) }, onClick = onToggleFullKeys,
+        DropdownMenuItem(text = { Text(if (fullExtraKeys) stringResource(R.string.terminal_full_keyboard_on) else stringResource(R.string.terminal_full_keyboard_off)) }, onClick = onToggleFullKeys,
             leadingIcon = { Icon(Icons.Rounded.Dashboard, null, Modifier.size(18.dp)) })
-        DropdownMenuItem(text = { Text(stringResource(R.string.ui______3b73382e)) }, onClick = onFontSizeStepUp,
+        DropdownMenuItem(text = { Text(stringResource(R.string.terminal_font_increase)) }, onClick = onFontSizeStepUp,
             leadingIcon = { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)) })
-        DropdownMenuItem(text = { Text(stringResource(R.string.ui______9dd74977)) }, onClick = onFontSizeStepDown,
+        DropdownMenuItem(text = { Text(stringResource(R.string.terminal_font_decrease)) }, onClick = onFontSizeStepDown,
             leadingIcon = { Icon(Icons.Rounded.Remove, null, Modifier.size(18.dp)) })
     }
 }
@@ -872,13 +872,13 @@ fun TabLongPressDialog(
                     onClick = onTogglePin,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(if (tab.isPinned) stringResource(R.string.ui______a2b5d9e1) else stringResource(R.string.ui______cb33d371))
+                    Text(if (tab.isPinned) stringResource(R.string.terminal_unpin) else stringResource(R.string.terminal_pin_tab))
                 }
 
                 HorizontalDivider()
 
                 // 颜色标记选择
-                Text(stringResource(R.string.ui______aedaf872), fontSize = 13.sp)
+                Text(stringResource(R.string.terminal_color_marks), fontSize = 13.sp)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     verticalAlignment = Alignment.CenterVertically
@@ -905,7 +905,7 @@ fun TabLongPressDialog(
                         onClick = { onSetColorMarker(TabColorMarker.NONE) },
                         enabled = tab.colorMarker != TabColorMarker.NONE
                     ) {
-                        Text(stringResource(R.string.ui____4403fca0), fontSize = LocalComponentTokens.current.text.bodySmallFontSize)
+                        Text(stringResource(R.string.terminal_clear_mark), fontSize = LocalComponentTokens.current.text.bodySmallFontSize)
                     }
                 }
             }
@@ -914,7 +914,7 @@ fun TabLongPressDialog(
             TextButton(onClick = onClose) {
                 Icon(Icons.Rounded.Close, null, Modifier.size(16.dp))
                 Spacer(Modifier.size(Spacing.xs))
-                Text(stringResource(R.string.ui____b15d9127))
+                Text(stringResource(R.string.common_close))
             }
         },
         dismissButton = {
@@ -922,13 +922,13 @@ fun TabLongPressDialog(
                 TextButton(onClick = onRename) {
                     Icon(Icons.Rounded.Edit, null, Modifier.size(16.dp))
                     Spacer(Modifier.size(Spacing.xs))
-                    Text(stringResource(R.string.ui_____c8ce4b36))
+                    Text(stringResource(R.string.terminal_rename))
                 }
                 Spacer(Modifier.size(Spacing.sm))
                 TextButton(onClick = onCloseOthers) {
                     Icon(Icons.Rounded.Delete, null, Modifier.size(16.dp))
                     Spacer(Modifier.size(Spacing.xs))
-                    Text(stringResource(R.string.ui______6816da19))
+                    Text(stringResource(R.string.terminal_close_others))
                 }
             }
         }
@@ -946,16 +946,16 @@ fun ConfirmActionDialog(
 ) {
     val (title, text, isDestructive) = when (action) {
         is TerminalViewModel.ConfirmAction.CloseTab -> {
-            Triple("关闭标签「${action.title}」", stringResource(R.string.ui____________b8ee30bb), true)
+            Triple("关闭标签「${action.title}」", stringResource(R.string.terminal_close_tab_running_confirm), true)
         }
         is TerminalViewModel.ConfirmAction.CloseOtherTabs -> {
-            Triple(stringResource(R.string.ui________c65c616b), stringResource(R.string.ui______________9b871ba4), true)
+            Triple(stringResource(R.string.terminal_close_other_tabs), stringResource(R.string.terminal_close_others_confirm), true)
         }
         is TerminalViewModel.ConfirmAction.RestartContainer -> {
-            Triple(stringResource(R.string.ui______fbf624a8_2), stringResource(R.string.ui______________d8a0d499), true)
+            Triple(stringResource(R.string.tc_restart_container), stringResource(R.string.terminal_restart_container_confirm), true)
         }
         is TerminalViewModel.ConfirmAction.ReconnectAll -> {
-            Triple(stringResource(R.string.ui________1614f33f_2), stringResource(R.string.ui____________c8c18a50), false)
+            Triple(stringResource(R.string.terminal_reconnect_all_tabs), stringResource(R.string.terminal_reconnect_all_confirm), false)
         }
     }
 
@@ -974,7 +974,7 @@ fun ConfirmActionDialog(
                     androidx.compose.material3.ButtonDefaults.textButtonColors()
                 }
             ) {
-                Text(stringResource(R.string.ui____38cf16f2))
+                Text(stringResource(R.string.terminal_confirm))
             }
         },
         dismissButton = {
@@ -997,7 +997,7 @@ fun RenameTabDialog(
     var input by remember { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.ui_______a4986174_2)) },
+        title = { Text(stringResource(R.string.terminal_rename_tab)) },
         text = {
             OutlinedTextField(
                 value = input,
@@ -1007,7 +1007,7 @@ fun RenameTabDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(input.trim().ifBlank { initial }) }) { Text(stringResource(R.string.ui____be5fbbe3)) }
+            TextButton(onClick = { onConfirm(input.trim().ifBlank { initial }) }) { Text(stringResource(R.string.common_save)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
@@ -1089,7 +1089,7 @@ fun BoxScope.TerminalSearchOverlay(
                         value = query,
                         onValueChange = { query = it; matchIndex = 0 },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text(stringResource(R.string.ui________a7e95b4c)) },
+                        placeholder = { Text(stringResource(R.string.terminal_search_output_hint)) },
                         singleLine = true,
                         leadingIcon = {
                             Icon(Icons.Rounded.Search, null, Modifier.size(18.dp))
@@ -1112,7 +1112,7 @@ fun BoxScope.TerminalSearchOverlay(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (matches.isEmpty()) stringResource(R.string.ui_____b5738da7) else "${matchIndex.coerceIn(0, max(0, matches.lastIndex)) + 1} / ${matches.size}",
+                        text = if (matches.isEmpty()) stringResource(R.string.terminal_search_no_match) else "${matchIndex.coerceIn(0, max(0, matches.lastIndex)) + 1} / ${matches.size}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1163,11 +1163,11 @@ fun CtrlHintBubble(modifier: Modifier, onGotIt: () -> Unit) {
         ) {
             Icon(Icons.Rounded.Info, null, Modifier.size(18.dp))
             Text(
-                text = stringResource(R.string.ui____d59d86f6),
+                text = stringResource(R.string.terminal_ctrl_detail_hint),
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.weight(1f)
             )
-            TextButton(onClick = onGotIt) { Text(stringResource(R.string.ui_____ce26955a)) }
+            TextButton(onClick = onGotIt) { Text(stringResource(R.string.terminal_got_it)) }
         }
     }
 }

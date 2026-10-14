@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bundle_install">安装</string>
+    <string name="bundle_install_avg_speed">均速</string>
+    <string name="bundle_install_copy_error">复制错误详情</string>
+    <string name="bundle_install_download">下载</string>
+    <string name="bundle_install_downloading">下载中</string>
+    <string name="bundle_install_duration">耗时</string>
+    <string name="bundle_install_expand_logs">展开日志</string>
+    <string name="bundle_install_failed">失败</string>
+    <string name="bundle_install_failed_title">安装失败</string>
+    <string name="bundle_install_packages">包数</string>
+    <string name="bundle_install_post_script">后处理脚本…</string>
+    <string name="bundle_install_prefetch_failed">预取失败</string>
+    <string name="bundle_install_retry">一键重试</string>
+    <string name="bundle_install_stage">安装阶段…</string>
+    <string name="bundle_install_tap_to_start">点击「安装」开始</string>
+    <string name="bundle_install_view_full_logs">查看全量日志</string>
+    <string name="bundle_install_view_logs">查看日志</string>
+    <string name="bundle_log_archive_suffix"> · 档案</string>
+    <string name="bundle_log_copy_all">复制全部</string>
+    <string name="bundle_log_current_session">当前会话</string>
+    <string name="bundle_log_empty_suffix"> · 空</string>
+    <string name="bundle_log_failed">✗ 失败</string>
+    <string name="bundle_log_history_archive">历史档案</string>
+    <string name="bundle_log_live_empty">实时 (空)</string>
+    <string name="bundle_log_live_suffix"> · 实时</string>
+    <string name="bundle_log_no_archive">无存档</string>
+    <string name="bundle_log_search_hint">搜索包名/关键字…</string>
+    <plurals name="bundle_log_summary">
+        <item quantity="other">✨ %1$.1fs · %2$d 包</item>
+    </plurals>
+    <string name="bundle_log_title">安装日志 · </string>
+    <string name="bundle_manager_ai_combo">AI 推荐组合</string>
+    <string name="bundle_manager_custom_hint">包名空格分隔，如 htop neofetch openssh</string>
+    <string name="bundle_manager_custom_section">自定义功能包</string>
+    <string name="bundle_manager_not_initialized">容器未初始化，暂不可安装自定义包</string>
+    <string name="bundle_manager_one_click_desc">一键安装 Alpine 社区常用包。安装后会出现在「已安装自定义包」列表里。</string>
+    <string name="bundle_manager_preset_section">预设独立功能包</string>
+    <string name="bundle_manager_refresh_status">刷新安装状态</string>
+    <string name="bundle_manager_standalone">独立功能包</string>
+    <string name="bundle_manager_title">功能包管理</string>
+    <string name="bundle_processing">处理中…</string>
+    <string name="bundle_ready">已就绪</string>
+    <string name="bundle_retry">重试</string>
+    <string name="bundle_uninstall">卸载</string>
+    <string name="bundle_uninstalling">正在卸载…</string>
+</resources>

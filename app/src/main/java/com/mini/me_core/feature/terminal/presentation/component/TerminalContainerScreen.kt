@@ -1061,7 +1061,7 @@ internal fun MirrorPickerDialogInternal(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.ui____1d3311a8)) },
+        title = { Text(stringResource(R.string.tc_choose_apk_mirror)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 presets.forEach { (label, url) ->
@@ -1117,7 +1117,7 @@ internal fun MirrorPickerDialogInternal(
                 val value = if (selected == customTag) customUrl.trim() else selected
                 if (value.isNotBlank()) onConfirm(value)
             }) {
-                Text(stringResource(R.string.ui____e83a256e))
+                Text(stringResource(R.string.common_confirm))
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }

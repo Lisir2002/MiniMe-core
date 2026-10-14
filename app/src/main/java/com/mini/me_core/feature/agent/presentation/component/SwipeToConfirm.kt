@@ -50,7 +50,7 @@ import androidx.compose.ui.unit.dp
 fun SwipeToConfirm(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    label: String = stringResource(R.string.ui_________2c6d64d2),
+    label: String = stringResource(R.string.swipe_confirm_execute_hint),
     thumbSizeDp: Dp = 56.dp,
     trackHeightDp: Dp = 64.dp,
     cornerRadiusDp: Dp = 28.dp,
@@ -206,7 +206,7 @@ fun SwipeToConfirm(
 
         // 文字标签（始终显示；右半部分被滑快遮罩不影响，因为透明度低）
         Text(
-            text = if (confirmed) stringResource(R.string.ui_______98c64e35) else label,
+            text = if (confirmed) stringResource(R.string.swipe_confirm_verified) else label,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelLarge,

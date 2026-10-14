@@ -64,14 +64,14 @@ fun SecurityEmergencyChannelSection(
     AppCard {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
-                text = stringResource(R.string.ui_________e229ee7f),
+                text = stringResource(R.string.security_emergency_unlock_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.error
             )
             Spacer(Modifier.height(Spacing.xs))
-            // 修复：原先拼接 ui___6435a24f + ui________11361eb5 两个完全相同的字符串，改为只用一个。
+            // 修复：原先拼接两个完全相同的字符串，改为只用 security_emergency_unlock_desc 一个。
             Text(
-                text = stringResource(R.string.ui___6435a24f),
+                text = stringResource(R.string.security_emergency_unlock_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -87,7 +87,7 @@ fun SecurityEmergencyChannelSection(
             }
 
             AppButton(
-                text = if (isResetting) stringResource(R.string.ui_____9c56ac70)
+                text = if (isResetting) stringResource(R.string.security_emergency_resetting)
                 else stringResource(R.string.security_emergency_open_form),
                 onClick = { showForm = true },
                 buttonColor = AppButtonColor.Error,
@@ -100,7 +100,7 @@ fun SecurityEmergencyChannelSection(
                 AppTextField(
                     value = host,
                     onValueChange = { host = it; localError = null },
-                    label = { Text(stringResource(R.string.ui____65227369)) },
+                    label = { Text(stringResource(R.string.security_emergency_host)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -109,7 +109,7 @@ fun SecurityEmergencyChannelSection(
                     AppTextField(
                         value = portText,
                         onValueChange = { portText = it; localError = null },
-                        label = { Text(stringResource(R.string.ui____c76cfefe)) },
+                        label = { Text(stringResource(R.string.security_emergency_port)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -117,7 +117,7 @@ fun SecurityEmergencyChannelSection(
                     AppTextField(
                         value = username,
                         onValueChange = { username = it; localError = null },
-                        label = { Text(stringResource(R.string.ui_____819767ad)) },
+                        label = { Text(stringResource(R.string.security_emergency_username)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -126,7 +126,7 @@ fun SecurityEmergencyChannelSection(
                 AppTextField(
                     value = password,
                     onValueChange = { password = it; localError = null },
-                    label = { Text(stringResource(R.string.ui____a8105204)) },
+                    label = { Text(stringResource(R.string.security_emergency_password)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

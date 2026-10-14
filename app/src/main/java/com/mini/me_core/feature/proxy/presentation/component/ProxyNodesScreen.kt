@@ -133,10 +133,10 @@ fun ProxyNodesScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             AppTopAppBar(
-                title = stringResource(R.string.ui______b26d228a_2),
+                title = stringResource(R.string.proxy_node_management),
                 onNavigateBack = onNavigateBack,
                 navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
-                navigationContentDescription = stringResource(R.string.ui____5f411223_2),
+                navigationContentDescription = stringResource(R.string.common_back),
                 actions = {
                     IconButton(onClick = {
                         val id = activeProfileId ?: return@IconButton
@@ -145,7 +145,7 @@ fun ProxyNodesScreen(
                     }) {
                         Icon(
                             imageVector = Icons.Rounded.Refresh,
-                            contentDescription = stringResource(R.string.ui____694fc5ef),
+                            contentDescription = stringResource(R.string.proxy_nodes_refresh),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -156,13 +156,13 @@ fun ProxyNodesScreen(
         when {
             profiles.isEmpty() -> AppEmptyState(
                 icon = Icons.Rounded.Bolt,
-                title = stringResource(R.string.ui_________cf00a0da),
-                subtitle = stringResource(R.string.ui_____94418224)
+                title = stringResource(R.string.proxy_nodes_need_config),
+                subtitle = stringResource(R.string.proxy_nodes_need_config)
             )
             activeProfileId == null -> AppEmptyState(
                 icon = Icons.Rounded.Bolt,
-                title = stringResource(R.string.ui__________8e8c2508),
-                subtitle = stringResource(R.string.ui_____bab1bef4)
+                title = stringResource(R.string.proxy_nodes_need_active),
+                subtitle = stringResource(R.string.proxy_nodes_need_active)
             )
             else -> NodeManagerContent(
                 viewModel = viewModel,
@@ -455,7 +455,7 @@ private fun SegmentedControl(
             )
             .padding(Spacing.xs)
     ) {
-        listOf(stringResource(R.string.ui____829abe5a) to 0, stringResource(R.string.ui____3bf3c0a8) to 1).forEach { (label, idx) ->
+        listOf(stringResource(R.string.proxy_nodes_tab_groups) to 0, stringResource(R.string.proxy_nodes_tab_nodes) to 1).forEach { (label, idx) ->
             val selected = tab == idx
             Box(
                 modifier = Modifier
@@ -509,7 +509,7 @@ private fun NodeSearchBar(
             Box(modifier = Modifier.weight(1f)) {
                 if (!hasText) {
                     Text(
-                        text = stringResource(R.string.ui______2cf95afa),
+                        text = stringResource(R.string.proxy_nodes_search_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         maxLines = 1
@@ -559,7 +559,7 @@ private fun GroupsTab(
 
     val listState = rememberPersistentLazyListState("proxy_nodes")
     when {
-        groupsView?.loading == true -> AppLoadingState(stringResource(R.string.ui_______5f2b08e6))
+        groupsView?.loading == true -> AppLoadingState(stringResource(R.string.proxy_nodes_loading_groups))
         !enabled || !(groupsView?.running == true) -> Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -568,12 +568,12 @@ private fun GroupsTab(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = stringResource(R.string.ui_______82079093),
+                text = stringResource(R.string.proxy_nodes_disabled_warning),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(Spacing.md))
-            Button(onClick = { viewModel.toggleEnabled(true) }) { Text(stringResource(R.string.ui________fc797319)) }
+            Button(onClick = { viewModel.toggleEnabled(true) }) { Text(stringResource(R.string.proxy_nodes_enable_now)) }
         }
         groupsView?.error != null -> Text(
             text = groupsView.error!!,
@@ -582,7 +582,7 @@ private fun GroupsTab(
             modifier = Modifier.padding(Spacing.md)
         )
         groups.isEmpty() -> Text(
-            text = if (query.isNotBlank()) stringResource(R.string.ui_________cdfdedf4) else stringResource(R.string.ui___________b04bfd3c),
+            text = if (query.isNotBlank()) stringResource(R.string.proxy_nodes_no_matching_groups) else stringResource(R.string.proxy_nodes_no_matching_groups),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(Spacing.md)
@@ -728,7 +728,7 @@ private fun GroupMemberRow(
         )
         if (selected) {
             Text(
-                text = stringResource(R.string.ui____7bf54e28_2),
+                text = stringResource(R.string.proxy_nodes_selected),
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFF0984E3),
                 modifier = Modifier
@@ -752,7 +752,7 @@ private fun NodesTab(
     query: String
 ) {
     when {
-        loading -> AppLoadingState(stringResource(R.string.ui_______3fd48e2f_2))
+        loading -> AppLoadingState(stringResource(R.string.proxy_nodes_loading_nodes))
         error != null -> Text(
             text = error,
             style = MaterialTheme.typography.bodyMedium,
@@ -761,9 +761,9 @@ private fun NodesTab(
         )
         totalNodes == 0 -> Text(
             text = if (hasProviderNodes) {
-                stringResource(R.string.ui________1eb92978)
+                stringResource(R.string.proxy_nodes_provider_note)
             } else {
-                stringResource(R.string.ui_____________5831cb18)
+                stringResource(R.string.proxy_nodes_no_nodes)
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -807,9 +807,9 @@ private fun NodeStatsBar(total: Int, latencies: Map<String, Long?>) {
         modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
-        StatChip(label = stringResource(R.string.ui____3bf3c0a8_2), value = "$total")
-        StatChip(label = stringResource(R.string.ui____f7c02897), value = "$tested")
-        StatChip(label = stringResource(R.string.ui____33875c86), value = if (avg != null) "$avg ms" else "—")
+        StatChip(label = stringResource(R.string.proxy_nodes_average), value = "$total")
+        StatChip(label = stringResource(R.string.proxy_nodes_average), value = "$tested")
+        StatChip(label = stringResource(R.string.proxy_nodes_average), value = if (avg != null) "$avg ms" else "—")
     }
 }
 
@@ -877,8 +877,8 @@ private fun NodeRowItem(
 @Composable
 private fun LatencyPill(tested: Boolean, delayMs: Long?) {
     val (text, color) = when {
-        !tested -> stringResource(R.string.ui____21df949d_2) to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-        delayMs == null -> stringResource(R.string.ui____e944c7c9_2) to LatencyBad
+        !tested -> stringResource(R.string.proxy_nodes_timeout) to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        delayMs == null -> stringResource(R.string.proxy_nodes_timeout) to LatencyBad
         else -> "${delayMs} ms" to latencyColor(delayMs)
     }
     Text(

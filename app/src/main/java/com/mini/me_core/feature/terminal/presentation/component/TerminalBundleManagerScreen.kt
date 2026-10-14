@@ -129,7 +129,7 @@ fun TerminalBundleManagerScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             AppTopAppBar(
-                title = stringResource(R.string.ui_______dbda4e51),
+                title = stringResource(R.string.bundle_manager_title),
                 onNavigateBack = onNavigateBack,
                 navigationIcon = Icons.AutoMirrored.Rounded.ArrowBack,
                 navigationContentDescription = stringResource(R.string.common_back),
@@ -138,7 +138,7 @@ fun TerminalBundleManagerScreen(
                     IconButton(onClick = viewModel::refreshBundles) {
                         Icon(
                             imageVector = Icons.Rounded.Refresh,
-                            contentDescription = stringResource(R.string.ui________22653573),
+                            contentDescription = stringResource(R.string.bundle_manager_refresh_status),
                             tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
@@ -171,8 +171,8 @@ fun TerminalBundleManagerScreen(
             stickyHeader {
                 AppSegmentedControl(
                     tabs = listOf(
-                        stringResource(R.string.ui_________b6349a50),
-                        stringResource(R.string.ui________2d661dab)
+                        stringResource(R.string.bundle_manager_preset_section),
+                        stringResource(R.string.bundle_manager_custom_section)
                     ),
                     selectedIndex = selectedTab,
                     onSelect = { selectedTab = it },
@@ -184,14 +184,14 @@ fun TerminalBundleManagerScreen(
                 when (selectedTab) {
                 0 -> {
                     // ── Tab 1：预设独立功能包（原功能包管理页内容） ──────────
-                    AppSectionHeader(title = stringResource(R.string.ui_ai_5dcf4fe7))
+                    AppSectionHeader(title = stringResource(R.string.bundle_manager_ai_combo))
                     SharedAiRecommendationStrip(
                         allInstalled = aiAllInstalled,
                         containerReady = containerInstalled,
                         onInstallAll = viewModel::installAiRecommended
                     )
 
-                    AppSectionHeader(title = stringResource(R.string.ui_______15dd3f3e))
+                    AppSectionHeader(title = stringResource(R.string.bundle_manager_standalone))
                     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                         var openDialogFor by remember { mutableStateOf<TerminalBundleId?>(null) }
                         val agg by viewModel.aggregateProgress.collectAsStateWithLifecycle()
@@ -417,13 +417,13 @@ private fun CustomInstallCard(
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                    placeholder = { Text(stringResource(R.string.ui________02fc9934)) }
+                    placeholder = { Text(stringResource(R.string.bundle_manager_custom_hint)) }
                 )
                 PrimaryButton(
                     onClick = onInstallClick,
                     enabled = containerReady && customInstallInput.isNotBlank() && installIdle,
                     icon = Icons.Rounded.Add,
-                    text = stringResource(R.string.ui____e655a410)
+                    text = stringResource(R.string.bundle_install)
                 )
             }
             if (customInstallState is BundleInstallState.Installing) {
@@ -443,7 +443,7 @@ private fun CustomInstallCard(
             }
             if (!containerReady) {
                 Text(
-                    text = stringResource(R.string.ui________b9d9ca01),
+                    text = stringResource(R.string.bundle_manager_not_initialized),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -484,7 +484,7 @@ private fun QuickPacksChipRow(
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
-                stringResource(R.string.ui______d33d3880),
+                stringResource(R.string.bundle_manager_one_click_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

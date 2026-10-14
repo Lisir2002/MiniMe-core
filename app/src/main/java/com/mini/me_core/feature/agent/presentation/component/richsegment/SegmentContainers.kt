@@ -447,7 +447,7 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
             ) {
                 Icon(
                     Icons.Rounded.ContentCopy,
-                    contentDescription = stringResource(R.string.ui______224996c0),
+                    contentDescription = stringResource(R.string.chat_copy_code),
                     tint = Color.White.copy(alpha = 0.9f),
                     modifier = Modifier.size(15.dp)
                 )
@@ -459,7 +459,7 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
                 ) {
                     Icon(
                         if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = if (expanded) stringResource(R.string.ui____def9e98b) else stringResource(R.string.ui____e2edde5a),
+                        contentDescription = if (expanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.common_expand),
                         tint = Color.White.copy(alpha = 0.9f),
                         modifier = Modifier.size(15.dp)
                     )
@@ -602,7 +602,7 @@ private fun CommandCard(command: String, isDark: Boolean) {
         androidx.compose.material3.IconButton(onClick = { clipboard.setText(AnnotatedString(command)) }) {
             Icon(
                 Icons.Rounded.ContentCopy,
-                contentDescription = stringResource(R.string.ui______ee92cd5e),
+                contentDescription = stringResource(R.string.chat_copy_command),
                 tint = Color.White.copy(alpha = 0.8f),
                 modifier = Modifier.size(16.dp)
             )

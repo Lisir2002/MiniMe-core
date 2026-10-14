@@ -43,12 +43,12 @@ fun BackupEncryptOptionsSection(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.ui__________a9f97089),
+                    text = stringResource(R.string.backup_encrypt_with_password),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = stringResource(R.string.ui______________1084389e),
+                    text = stringResource(R.string.backup_encrypt_cross_device_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -68,7 +68,7 @@ fun BackupEncryptOptionsSection(
                     AppTextField(
                         value = password,
                         onValueChange = onPasswordChange,
-                        label = { Text(stringResource(R.string.ui______a1731a9b)) },
+                        label = { Text(stringResource(R.string.backup_password)) },
                         singleLine = true,
                         isError = passwordError != null,
                         supportingText = passwordError?.let { { Text(it) } },
@@ -78,7 +78,7 @@ fun BackupEncryptOptionsSection(
                     Spacer(Modifier.height(Spacing.sm))
 
                     Text(
-                        text = stringResource(R.string.ui______59590ca2),
+                        text = stringResource(R.string.backup_encrypt_scope_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

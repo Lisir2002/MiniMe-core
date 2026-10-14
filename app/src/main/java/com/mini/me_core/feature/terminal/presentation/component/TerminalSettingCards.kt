@@ -145,7 +145,7 @@ internal fun SharedContainerEnvCard(
 ) {
     val archLabel: String = when (profileArch) {
         ContainerArch.ARM64 -> "arm64-v8a · PRoot"
-        ContainerArch.X86_64 -> stringResource(R.string.ui_x86_64_a2f3daf8)
+        ContainerArch.X86_64 -> stringResource(R.string.tc_arch_x86_64)
     }
     val processingTextWhenReady: String? = run {
         // 安装/卸载功能包时，initProgress 会是 BundleInstalling / BundleUninstalling（而非 Ready），
@@ -161,20 +161,20 @@ internal fun SharedContainerEnvCard(
                 "正在安装${bundleId.stableKey}…"
             initProgress is ContainerInitState.BundleUninstalling && bundleId != null ->
                 "正在卸载${bundleId.stableKey}…"
-            customInstallState is BundleInstallState.Installing -> stringResource(R.string.ui__________0e1c26ee)
-            customInstallState is BundleInstallState.Uninstalling -> stringResource(R.string.ui__________b17be76a)
+            customInstallState is BundleInstallState.Installing -> stringResource(R.string.tc_installing_custom_packages)
+            customInstallState is BundleInstallState.Uninstalling -> stringResource(R.string.tc_uninstalling_custom_packages)
             else -> null
         }
     }
     val statusText = when (initProgress) {
-        is ContainerInitState.Idle -> stringResource(R.string.ui______aeade8e9)
-        is ContainerInitState.ExtractingRootfs -> stringResource(R.string.ui______c95456ed)
-        ContainerInitState.DeployingProot -> stringResource(R.string.ui______c5778ca3)
+        is ContainerInitState.Idle -> stringResource(R.string.tc_not_initialized)
+        is ContainerInitState.ExtractingRootfs -> stringResource(R.string.tc_extracting_rootfs)
+        ContainerInitState.DeployingProot -> stringResource(R.string.tc_deploying_proot)
         ContainerInitState.Restarting -> stringResource(R.string.tc_status_restarting)
-        is ContainerInitState.Ready -> processingTextWhenReady ?: stringResource(R.string.ui_____c30ecc7a)
+        is ContainerInitState.Ready -> processingTextWhenReady ?: stringResource(R.string.bundle_ready)
         is ContainerInitState.BundleInstalling ->
             "已就绪（正在安装${initProgress.bundleId?.stableKey ?: "功能包"}…）"
-        is ContainerInitState.BundleUninstalling -> stringResource(R.string.ui_____cc71b3ef)
+        is ContainerInitState.BundleUninstalling -> stringResource(R.string.tc_ready_uninstalling)
         is ContainerInitState.Failed -> "失败：${initProgress.reason.take(20)}…"
     }
     val dotColor: Color = when {
@@ -206,7 +206,7 @@ internal fun SharedContainerEnvCard(
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(modifier = Modifier.width(Spacing.sm))
-                Text(text = stringResource(R.string.ui________3eb03d3e), style = MaterialTheme.typography.titleMedium)
+                Text(text = stringResource(R.string.tc_local_environment), style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.weight(1f))
                 Box(
                     modifier = Modifier
@@ -224,7 +224,7 @@ internal fun SharedContainerEnvCard(
             Text(
                 text = when {
                     containerInstalled -> "占用 $storageUsedMb MB · Alpine 3.21 · $archLabel"
-                    else -> stringResource(R.string.ui_rootfs_602d203f)
+                    else -> stringResource(R.string.tc_rootfs_size_desc)
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -234,21 +234,21 @@ internal fun SharedContainerEnvCard(
                     Spacer(modifier = Modifier.height(Spacing.sm))
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         if (!containerInstalled) {
-                            PrimaryButton(onClick = onInit, icon = Icons.Rounded.Add, text = stringResource(R.string.ui_______30947f5e))
+                            PrimaryButton(onClick = onInit, icon = Icons.Rounded.Add, text = stringResource(R.string.terminal_init_environment))
                         }
                         if (containerInstalled) {
                             SecondaryButton(
                                 onClick = onPickMirror,
                                 icon = Icons.Rounded.Public,
-                                text = stringResource(R.string.ui_______52fffa6f)
+                                text = stringResource(R.string.tc_switch_mirror)
                             )
-                            DangerTextButton(onClick = onReset, icon = Icons.Rounded.Delete, text = stringResource(R.string.ui______fce7f40c))
+                            DangerTextButton(onClick = onReset, icon = Icons.Rounded.Delete, text = stringResource(R.string.tc_reset_environment))
                         }
                     }
                 }
                 ContainerCardMode.INIT_ONLY -> if (!containerInstalled) {
                     Spacer(modifier = Modifier.height(Spacing.sm))
-                    PrimaryButton(onClick = onInit, icon = Icons.Rounded.Add, text = stringResource(R.string.ui_______89a64382))
+                    PrimaryButton(onClick = onInit, icon = Icons.Rounded.Add, text = stringResource(R.string.tc_initialize_container))
                 }
                 ContainerCardMode.READ_ONLY -> Unit // no CTA
             }
@@ -290,14 +290,14 @@ internal fun SharedAiRecommendationStrip(
                 )
                 Spacer(modifier = Modifier.width(Spacing.sm))
                 Text(
-                    text = stringResource(R.string.ui_ai_b07ec14f),
+                    text = stringResource(R.string.tc_ai_combo_desc),
                     style = MaterialTheme.typography.titleSmall
                 )
             }
             Spacer(modifier = Modifier.height(Spacing.xs))
             Text(
                 text = if (allInstalled) "全部组件已就绪，AI 运行代码块/搜索/git 开箱即用。"
-                else stringResource(R.string.ui____2441ae83),
+                else stringResource(R.string.tc_ai_combo_size_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -308,7 +308,7 @@ internal fun SharedAiRecommendationStrip(
                     leadingIcon = {
                         Icon(Icons.Default.Check, null, modifier = Modifier.size(ButtonSpec.ChipIndicatorSize))
                     },
-                    label = { Text(stringResource(R.string.ui_____fad5222c), fontSize = ButtonSpec.TextFontSize) },
+                    label = { Text(stringResource(R.string.tc_completed), fontSize = ButtonSpec.TextFontSize) },
                     enabled = false
                 )
             } else {
@@ -316,7 +316,7 @@ internal fun SharedAiRecommendationStrip(
                     onClick = onInstallAll,
                     enabled = containerReady,
                     icon = Icons.Rounded.Add,
-                    text = stringResource(R.string.ui______04a0913e)
+                    text = stringResource(R.string.tc_one_click_install)
                 )
             }
         }
@@ -337,15 +337,15 @@ internal fun SharedBundleCard(
     data class Status(val text: String, val color: Color, val showProgress: Boolean)
     val status = when (state) {
         is BundleInstallState.NotInstalled ->
-            Status(stringResource(R.string.ui_____f45c4e65), MaterialTheme.colorScheme.onSurfaceVariant, false)
+            Status(stringResource(R.string.tc_not_installed), MaterialTheme.colorScheme.onSurfaceVariant, false)
         is BundleInstallState.Installing ->
             Status("安装中…${state.line?.take(30) ?: ""}", SemanticColors.InProgress, true)
         is BundleInstallState.Uninstalling ->
-            Status(stringResource(R.string.ui_____69827c2b), SemanticColors.InProgress, true)
+            Status(stringResource(R.string.tc_uninstalling), SemanticColors.InProgress, true)
         is BundleInstallState.Failed ->
             Status("失败：${state.reason.take(16)}", SemanticColors.Error, false)
         is BundleInstallState.Installed ->
-            Status(stringResource(R.string.ui_____9d5bf2a1), SemanticColors.Success, false)
+            Status(stringResource(R.string.tc_installed), SemanticColors.Success, false)
     }
 
     val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = TerminalCardsSpec.BorderAlpha)
@@ -396,7 +396,7 @@ internal fun SharedBundleCard(
                     is BundleInstallState.Installing -> "状态：${status.text.take(50)} …"
                     is BundleInstallState.Failed -> "状态：${status.text}"
                     is BundleInstallState.Installed -> "状态：已安装 · 配置版本 v${bundle.version}"
-                    is BundleInstallState.Uninstalling -> stringResource(R.string.ui____ef1eb44a)
+                    is BundleInstallState.Uninstalling -> stringResource(R.string.tc_status_uninstalling)
                     else -> "状态：${status.text}"
                 },
                 style = MaterialTheme.typography.bodySmall,
@@ -410,15 +410,15 @@ internal fun SharedBundleCard(
             Spacer(modifier = Modifier.height(Spacing.sm))
             when (state) {
                 is BundleInstallState.Installed ->
-                    DangerOutlinedButton(onClick = onUninstall, icon = Icons.Rounded.Delete, text = stringResource(R.string.ui____81824cff))
+                    DangerOutlinedButton(onClick = onUninstall, icon = Icons.Rounded.Delete, text = stringResource(R.string.bundle_uninstall))
                 is BundleInstallState.Installing, is BundleInstallState.Uninstalling ->
-                    ProgressPlaceholderButton(text = stringResource(R.string.ui_____cf978c02))
+                    ProgressPlaceholderButton(text = stringResource(R.string.bundle_processing))
                 else ->
                     PrimaryButton(
                         onClick = onInstall,
                         enabled = containerReady,
                         icon = Icons.Rounded.Add,
-                        text = stringResource(R.string.ui____e655a410_2)
+                        text = stringResource(R.string.bundle_install)
                     )
             }
         }

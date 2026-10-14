@@ -65,4 +65,9 @@
     <string name="provider_step_models_empty">暂无可用模型，请重试或切换自定义供应商</string>
     <string name="provider_step_custom_models_hint">可点击「拉取模型」从服务器获取，或手动输入模型名称添加</string>
     <string name="provider_step_custom_models_empty">暂无模型，请拉取或手动添加</string>
+    <string name="provider_compat_policy_title">兼容端点 · 能力判定默认策略</string>
+    <string name="provider_model_follow_auto">跟随自动推荐</string>
+    <string name="provider_model_manual_override_off"> · 你手动覆盖为：❌ 关闭</string>
+    <string name="provider_model_state_on">✅ 开启</string>
+    <string name="provider_viewimage_guard_title">viewImage 识图工具守卫策略</string>
 </resources>
