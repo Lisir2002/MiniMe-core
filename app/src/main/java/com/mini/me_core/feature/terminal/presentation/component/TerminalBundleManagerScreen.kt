@@ -218,7 +218,7 @@ fun TerminalBundleManagerScreen(
                                 bundleState = bState,
                                 aggregate = agg.takeIf { inProgress },
                                 onInstallClick = { viewModel.installBundle(b.id) },
-                                onUninstallClick = { pendingUninstallBundle = b.id to b.toUi().title },
+                                onUninstallClick = { pendingUninstallBundle = b.id to b.displayName },
                                 onOpenLogDialog = { openDialogFor = b.id },
                                 onCopyError = onCopyError,
                                 modifier = Modifier.padding(horizontal = Spacing.md),

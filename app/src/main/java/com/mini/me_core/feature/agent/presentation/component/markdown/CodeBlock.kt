@@ -63,6 +63,8 @@ fun MiniMeCodeBlock(
     modifier: Modifier = Modifier,
     showLineNumbers: Boolean = false,
 ) {
+    var expanded by remember(code) { mutableStateOf(false) }
+
     val colors = MaterialTheme.colorScheme
     val appColors = LocalAppTheme.current.colors
     val cornerShape = RoundedCornerShape(12.dp)
