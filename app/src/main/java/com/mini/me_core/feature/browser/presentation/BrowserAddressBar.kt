@@ -53,7 +53,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Article
+import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
@@ -363,7 +363,7 @@ internal fun BrowserMoreMenu(
         DropdownMenuItem(
             text = { Text(stringResource(R.string.browser_devtools_inspect)) },
             onClick = onInspect,
-            leadingIcon = { Icon(Icons.Rounded.Article, null) }
+            leadingIcon = { Icon(Icons.Rounded.Code, null) }
         )
         DropdownMenuItem(
             text = {
@@ -402,7 +402,9 @@ internal fun BrowserMoreMenu(
             onClick = onIncognito,
             leadingIcon = { Icon(Icons.Rounded.PrivacyTip, null) },
             trailingIcon = {
-                Switch(checked = incognito, onCheckedChange = { onIncognito() }, modifier = Modifier.size(32.dp))
+                // 开关保持 Material3 原生尺寸（52×32dp）：曾用 Modifier.size(32.dp) 压缩，
+                // 导致轨道被压扁、滑块比例失衡（与 AppSwitchRow/AppListItem 的用法一致）。
+                Switch(checked = incognito, onCheckedChange = { onIncognito() })
             }
         )
         DropdownMenuItem(
@@ -410,7 +412,7 @@ internal fun BrowserMoreMenu(
             onClick = onDesktopMode,
             leadingIcon = { Icon(Icons.Rounded.DesktopWindows, null) },
             trailingIcon = {
-                Switch(checked = desktopMode, onCheckedChange = { onDesktopMode() }, modifier = Modifier.size(32.dp))
+                Switch(checked = desktopMode, onCheckedChange = { onDesktopMode() })
             }
         )
         DropdownMenuItem(
