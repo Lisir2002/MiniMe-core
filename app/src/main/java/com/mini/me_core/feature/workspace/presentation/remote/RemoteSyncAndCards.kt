@@ -725,7 +725,6 @@ fun RemoteMountCard(
                     AppDropdownMenu(
                         expanded = directionMenuExpanded,
                         onDismissRequest = { directionMenuExpanded = false },
-                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                     ) {
                         listOf("bidirectional", "upload_only", "download_only").forEach { d ->
                             DropdownMenuItem(

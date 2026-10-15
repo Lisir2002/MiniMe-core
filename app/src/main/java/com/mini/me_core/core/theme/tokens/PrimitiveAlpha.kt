@@ -3,7 +3,7 @@ package com.mini.me_core.core.theme.tokens
 /**
  * Primitive 透明度 Token。
  *
- * 为背景图支持和毛玻璃效果准备的透明度层级。
+ * 为背景图支持、毛玻璃效果和浮层阴影准备的透明度层级。
  * 所有 surface 颜色在背景图模式下通过这些透明度值自动注入 alpha 通道。
  */
 object PrimitiveAlpha {
@@ -33,6 +33,9 @@ object PrimitiveAlpha {
 
     /** 几乎不透明（95%）：弹出层/Sheet，背景图模式下 */
     const val Overlay = 0.95f
+
+    /** 阴影浓度（20%）：浮层/弹窗阴影的透明度，纯黑全浓度边缘生硬，压低后柔和 */
+    const val Shadow = 0.20f
 
     /** 完全不透明 */
     const val Opaque = 1.0f

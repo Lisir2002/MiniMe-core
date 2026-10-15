@@ -36,8 +36,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -530,10 +528,6 @@ fun SettingsScreen(
                                         AppDropdownMenu(
                                             expanded = auditMenuExpanded,
                                             onDismissRequest = { auditMenuExpanded = false },
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(LocalCornerRadius.current.md))
-                                                .background(MaterialTheme.colorScheme.surface)
-                                                .shadow(elevation = 4.dp, shape = RoundedCornerShape(LocalCornerRadius.current.md)),
                                         ) {
                                             DropdownMenuItem(
                                                 text = { Text(stringResource(R.string.audit_export), style = MaterialTheme.typography.bodyMedium) },

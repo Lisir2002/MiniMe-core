@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
+import com.mini.me_core.core.theme.tokens.PrimitiveElevation
 
 /**
  * 统一应用下拉菜单组件。
@@ -23,10 +24,13 @@ import com.mini.me_core.core.theme.tokens.LocalCornerRadius
  * 封装 Material3 DropdownMenu，提供统一的视觉样式：
  * - 圆角裁剪（跟随全局圆角令牌）
  * - 卡片背景色
- * - 4dp 阴影
+ * - 柔和阴影（Z3 浮层层级 + 20% 浓度阴影色，避免纯黑生硬边缘）
  *
  * 使用方式与 Material3 DropdownMenu 完全一致，直接替换即可。
  * 触发按钮与菜单需放在同一 Box 中以确保弹出位置正确。
+ *
+ * 注意：背景/圆角/阴影已由本组件统一应用，调用方请勿再通过 modifier 重复叠加，
+ * 否则会出现双重背景、双重阴影（SettingsScreen 审计菜单曾出现此问题）。
  */
 @Composable
 fun AppDropdownMenu(
@@ -41,7 +45,12 @@ fun AppDropdownMenu(
         modifier = modifier
             .clip(RoundedCornerShape(LocalCornerRadius.current.md))
             .background(MaterialTheme.colorScheme.surface)
-            .shadow(elevation = 4.dp, shape = RoundedCornerShape(LocalCornerRadius.current.md)),
+            .shadow(
+                elevation = PrimitiveElevation.Z3,
+                shape = RoundedCornerShape(LocalCornerRadius.current.md),
+                ambientColor = PrimitiveElevation.ShadowColor,
+                spotColor = PrimitiveElevation.ShadowColor,
+            ),
         content = content,
     )
 }
