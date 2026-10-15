@@ -77,7 +77,7 @@ class OpenAIAdapter @Inject constructor(
     override var maxTokens: Int? = null
     override var apiPath = "/v1/chat/completions"
     override var requestTimeout = 30
-    override var retryCount = 0
+    override var retryCount = 2
     override var logSessionId: String? = null
 
     /** 构建带 requestTimeout 的超时 API 实例（非流式 complete 用）。流式仍用共享 120s client。 */
@@ -266,8 +266,10 @@ class OpenAIAdapter @Inject constructor(
             )
             reasoningEffort?.let { request["reasoning"] = mapOf("effort" to it) }
             AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
+            val watchdogFired = java.util.concurrent.atomic.AtomicBoolean(false)
             try {
                 streamWithStaircaseRetry(attemptOnce = { onProduced ->
+                    watchdogFired.set(false)
                     val textBuilder = StringBuilder()
                     val toolAccs = LinkedHashMap<Int, OpenAIToolAcc>()
                     var finishReason: String? = null
@@ -283,7 +285,7 @@ class OpenAIAdapter @Inject constructor(
                     body.use { rb ->
                         // 首字节超时 watchdog：60s 内未收到首个内容块则关闭流，触发可重试的 IOException。
                         val firstByteReceived = java.util.concurrent.atomic.AtomicBoolean(false)
-                        val watchdog = launchFirstByteWatchdog({ rb.close() }) { firstByteReceived.get() }
+                        val watchdog = launchFirstByteWatchdog({ watchdogFired.set(true); rb.close() }) { firstByteReceived.get() }
                         val closeHandle = coroutineContext[Job]?.invokeOnCompletion {
                             runCatching { rb.close() }
                         }
@@ -372,7 +374,8 @@ class OpenAIAdapter @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 coroutineContext.ensureActive()
-                val enriched = e.enrichWithHttpErrorBody()
+                val effective = wrapWatchdogFailure(e, watchdogFired.get())
+                val enriched = effective.enrichWithHttpErrorBody()
                 AILogger.logError(logSessionId, "OpenAI", enriched)
                 throw enriched
             }
@@ -397,11 +400,13 @@ class OpenAIAdapter @Inject constructor(
         // 长响应把原始 SSE 全量驻留在堆里——那既推高内存峰值（诱发 LMKD 杀进程），
         // 又会因为「还没到整轮结束」而在崩溃时一行都落不了盘。
         val rawSse = RawSseBuffer()
+        val watchdogFired = java.util.concurrent.atomic.AtomicBoolean(false)
 
         // 首字节前失败可安全重试；一旦开始吐字（onProduced 已调用）再失败则上抛，避免重复文本。
         try {
             streamWithStaircaseRetry(
                 attemptOnce = { onProduced ->
+            watchdogFired.set(false)
             val textBuilder = StringBuilder()
             // tool_call index -> 累积中的工具调用（保序）。
             val toolAccs = LinkedHashMap<Int, OpenAIToolAcc>()
@@ -419,7 +424,11 @@ class OpenAIAdapter @Inject constructor(
                 // 首字节超时 watchdog：requestTimeout 秒内未收到首个内容块则关闭流，触发可重试的 IOException。
                 // 非流式请求的超时由共享 OkHttp client 控制（120s），requestTimeout 主要影响流式首字节等待。
                 val firstByteReceived = java.util.concurrent.atomic.AtomicBoolean(false)
-                val watchdog = launchFirstByteWatchdog({ rb.close() }, timeoutMs = (requestTimeout * 1000L).coerceAtLeast(5000L)) { firstByteReceived.get() }
+                val watchdogTimeoutMs = (requestTimeout * 1000L).coerceAtLeast(MIN_FIRST_BYTE_TIMEOUT_MS)
+                val watchdog = launchFirstByteWatchdog(
+                    { watchdogFired.set(true); rb.close() },
+                    timeoutMs = watchdogTimeoutMs
+                ) { firstByteReceived.get() }
                 val closeHandle = coroutineContext[Job]?.invokeOnCompletion {
                     runCatching { rb.close() }
                 }
@@ -514,7 +523,8 @@ class OpenAIAdapter @Inject constructor(
             throw e
         } catch (e: Exception) {
             coroutineContext.ensureActive()
-            val enriched = e.enrichWithHttpErrorBody()
+            val effective = wrapWatchdogFailure(e, watchdogFired.get())
+            val enriched = effective.enrichWithHttpErrorBody()
             AILogger.logError(logSessionId, "OpenAI", enriched)
             throw enriched
         } finally {

@@ -69,7 +69,7 @@ class AnthropicAdapter @Inject constructor(
     override var maxTokens: Int? = null
     override var apiPath = "v1/messages"
     override var requestTimeout = 30
-    override var retryCount = 0
+    override var retryCount = 2
     override var logSessionId: String? = null
 
     /** 构建带 requestTimeout 的超时 API 实例（非流式 complete 用）。流式仍用共享 120s client。 */
@@ -209,11 +209,13 @@ class AnthropicAdapter @Inject constructor(
         // 长对话内存治理：改用带字符上限的缓冲（RawSseBuffer），避免长响应把原始 SSE
         // 全量驻留在堆里（既推高内存峰值诱发 LMKD 杀进程，也会让崩溃时无日志可落）。
         val rawSse = RawSseBuffer()
+        val watchdogFired = java.util.concurrent.atomic.AtomicBoolean(false)
 
         // 首字节前失败可安全重试；一旦开始吐字（onProduced 已调用）再失败则上抛，避免重复文本。
         try {
             streamWithStaircaseRetry(
                 attemptOnce = { onProduced ->
+            watchdogFired.set(false)
             val textBuilder = StringBuilder()
             // content block index -> 累积中的 tool_use（仅 tool_use 块建条目，保序）。
             val toolBlocks = LinkedHashMap<Int, ToolBlockAcc>()
@@ -229,7 +231,11 @@ class AnthropicAdapter @Inject constructor(
                 // 首字节超时 watchdog：requestTimeout 秒内未收到首个内容块则关闭流，触发可重试的 IOException。
                 // 非流式请求的超时由共享 OkHttp client 控制（120s），requestTimeout 主要影响流式首字节等待。
                 val firstByteReceived = java.util.concurrent.atomic.AtomicBoolean(false)
-                val watchdog = launchFirstByteWatchdog({ rb.close() }, timeoutMs = (requestTimeout * 1000L).coerceAtLeast(5000L)) { firstByteReceived.get() }
+                val watchdogTimeoutMs = (requestTimeout * 1000L).coerceAtLeast(MIN_FIRST_BYTE_TIMEOUT_MS)
+                val watchdog = launchFirstByteWatchdog(
+                    { watchdogFired.set(true); rb.close() },
+                    timeoutMs = watchdogTimeoutMs
+                ) { firstByteReceived.get() }
                 val closeHandle = coroutineContext[Job]?.invokeOnCompletion {
                     runCatching { rb.close() }
                 }
@@ -334,7 +340,8 @@ class AnthropicAdapter @Inject constructor(
             throw e
         } catch (e: Exception) {
             coroutineContext.ensureActive()
-            val enriched = e.enrichWithHttpErrorBody()
+            val effective = wrapWatchdogFailure(e, watchdogFired.get())
+            val enriched = effective.enrichWithHttpErrorBody()
             AILogger.logError(logSessionId, "Anthropic", enriched)
             throw enriched
         } finally {

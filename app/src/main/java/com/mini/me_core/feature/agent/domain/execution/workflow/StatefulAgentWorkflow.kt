@@ -21,6 +21,8 @@ import com.mini.me_core.feature.agent.domain.core.prompt.SystemPromptProvider
 import com.mini.me_core.feature.agent.domain.core.provider.AIProvider
 import com.mini.me_core.feature.agent.domain.core.provider.AIResponse
 import com.mini.me_core.feature.agent.domain.core.provider.AIStreamChunk
+import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorClassifier
+import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorKind
 import com.mini.me_core.feature.agent.domain.core.provider.isRetriableNetworkError
 import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
 import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillExecutionContext
@@ -155,7 +157,9 @@ class StatefulAgentWorkflow @Inject constructor(
     /** D2-3/5 运行轨迹服务：工具执行完成追加 tool 轨迹、turn 边界轻量标记；空转收敛/阶段总结/审计的数据源。 */
     private val trajectoryService: TrajectoryService,
     /** D5-8 Playbook 完成判定护栏：workflow 每轮按实质工具动作上报（recordSubstantiveAction / recordIdleRound）。 */
-    private val playbookExecutor: com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookExecutor
+    private val playbookExecutor: com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookExecutor,
+    /** P1 离线预检：CallLlm 入口判网络可用性，无网时不发起必然失败的请求（归类 OFFLINE 走友好文案）。 */
+    private val networkStatusChecker: com.mini.me_core.feature.agent.domain.core.provider.NetworkStatusChecker
 ) : AgentWorkflow {
 
     init {
@@ -268,6 +272,11 @@ class StatefulAgentWorkflow @Inject constructor(
         val isFinished: Boolean = false,
         val error: String? = null,
         /**
+         * LLM 失败归类：LlmError reducer 写入，主循环结束时随 AgentEvent.Failed 发出，
+         * UI 按类别展示友好文案（原文仍可展开查看）；null 表示无归类（展示原文）。
+         */
+        val errorKind: LlmErrorKind? = null,
+        /**
          * 连续截断续写计数：模型回复 isTruncated 且无 toolCalls 时递增，达到
          * [MAX_TRUNCATION_ROUNDS] 则强制结束，防止无限续写死循环。非截断轮清零。
          */
@@ -294,7 +303,7 @@ class StatefulAgentWorkflow @Inject constructor(
     sealed interface AgentAction {
         data class InitRequest(val initialMessages: List<AgentMessage>) : AgentAction
         data class LlmResponse(val response: AIResponse) : AgentAction
-        data class LlmError(val error: String) : AgentAction
+        data class LlmError(val error: String, val errorKind: LlmErrorKind? = null) : AgentAction
         data class PermissionEvaluated(
             val toolCall: ToolCall,
             val approved: Boolean,
@@ -438,7 +447,7 @@ class StatefulAgentWorkflow @Inject constructor(
                 }
             }
             is AgentAction.LlmError -> {
-                newState = state.copy(isFinished = true, error = action.error)
+                newState = state.copy(isFinished = true, error = action.error, errorKind = action.errorKind)
             }
             is AgentAction.PermissionEvaluated -> {
                 if (action.approved) {
@@ -758,6 +767,25 @@ class StatefulAgentWorkflow @Inject constructor(
             val action = actionQueue.removeFirst()
             val (newState, effects) = reduce(state, action)
             state = newState
+
+            // P1 离线预检：本轮回合要调 LLM 但系统无可用网络时，不发起必然失败的请求
+            // （失败形态是「发了一部分被 reset」，用户只看到难懂的
+            // "Software caused connection abort"）。判定异常按在线兜底（宁可放行）。
+            // message 置空串：UI 由 errorKind=OFFLINE 驱动友好文案
+            // （不在 domain 层硬编码用户可见中文，遵守 AGENTS.md）。
+            // 置 isFinished 后 continue：while 条件自然退出主循环，:1469 自动发 Failed。
+            if (effects.any { it is AgentSideEffect.CallLlm } && !networkStatusChecker.isOnline()) {
+                FileLogger.w(
+                    TAG,
+                    "离线预检：系统无可用网络，跳过本轮 LLM 调用 net=${networkStatusChecker.describe()}"
+                )
+                state = state.copy(
+                    isFinished = true,
+                    error = "",
+                    errorKind = com.mini.me_core.feature.agent.domain.core.provider.LlmErrorKind.OFFLINE
+                )
+                continue
+            }
 
             for (effect in effects) {
                 when (effect) {
@@ -1162,7 +1190,22 @@ class StatefulAgentWorkflow @Inject constructor(
                                 if (partial.isNotEmpty() || reasoning.isNotBlank()) {
                                     send(AgentEvent.AssistantText(partial, emptyList(), reasoning))
                                 }
-                                actionQueue.addLast(AgentAction.LlmError("LLM 调用失败: ${AgentErrorSanitizer.sanitize(e.message)}"))
+                                // 归类 + 全量日志：sanitize 后的原文仍可能面向开发者
+                                // （如 "Software caused connection abort"），分类结果供 UI 展示
+                                // 友好文案；此处落 provider/model/session/kind + 堆栈便于事后定位。
+                                val errorKind = LlmErrorClassifier.classify(e)
+                                FileLogger.e(
+                                    TAG,
+                                    "LLM 最终失败 provider=${activeConfig.name} model=${activeConfig.effectiveModel} " +
+                                        "session=${currentContext.sessionId} kind=$errorKind",
+                                    e
+                                )
+                                actionQueue.addLast(
+                                    AgentAction.LlmError(
+                                        "LLM 调用失败: ${AgentErrorSanitizer.sanitize(e.message)}",
+                                        errorKind
+                                    )
+                                )
                             }
                         } finally {
                             if (state.pendingVisionRound) state = state.copy(pendingVisionRound = false)
@@ -1444,7 +1487,7 @@ class StatefulAgentWorkflow @Inject constructor(
             )
         }
 
-        state.error?.let { send(AgentEvent.Failed(it)) }
+        state.error?.let { send(AgentEvent.Failed(it, state.errorKind)) }
         // D2-4 用量卡片：回合（一次 executeEvents = 一个 taskId 分组）结束时，从轨迹表聚合
         // 「本回合增量 + 会话累计」（仅 token 不估成本，对齐 norm-chain §3.8.4）；
         // 开关关闭 / 无会话 / 聚合失败时静默跳过，不阻断主流程。

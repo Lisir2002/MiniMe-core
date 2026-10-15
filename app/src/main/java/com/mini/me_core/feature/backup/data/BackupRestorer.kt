@@ -498,7 +498,7 @@ internal class BackupRestorer(
                     isEnabled = p.isEnabled, useFullUrl = p.useFullUrl, useResponseApi = p.useResponseApi,
                     temperature = 1.0, topP = 1.0, maxTokens = null,
                     apiPath = "/v1/chat/completions",
-                    requestTimeout = 30, retryCount = 0,
+                    requestTimeout = 30, retryCount = 2,
                     fallbackProviderId = null,
                     favoriteModels = "", modelOrder = "",
                 )

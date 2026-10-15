@@ -35,6 +35,15 @@ const val MAX_NETWORK_RETRIES = 6
 const val FIRST_BYTE_TIMEOUT_MS = 60_000L
 
 /**
+ * 首字节 watchdog 的时间下限：requestTimeout 配得再小，流式首字节等待也不低于此值。
+ *
+ * 几十万 token 的大上下文请求，供应商排队/慢启动经常超过 30s；watchdog 提前关流会把
+ * 「服务端还在思考」误杀成连接中断（底层表现为 Software caused connection abort）。
+ * 相邻数据块间隔仍由 OkHttp readTimeout（120s）兜底。
+ */
+const val MIN_FIRST_BYTE_TIMEOUT_MS = 60_000L
+
+/**
  * 启动首字节超时 watchdog（作为当前协程的子协程）：在 [FIRST_BYTE_TIMEOUT_MS] 后
  * 若 [isFirstByteReceived] 仍为 false，则调用 [close]（通常是关闭 ResponseBody），
  * 强制读取抛出 IOException 以被重试机制捕获。
@@ -51,6 +60,27 @@ suspend fun launchFirstByteWatchdog(
         runCatching { close() }
     }
 }
+
+/**
+ * 首字节 watchdog 主动关流导致的失败（区别于真实网络中断）。
+ *
+ * 继承 [IOException]：保持可重试语义（[streamWithStaircaseRetry] 视其为瞬时故障），
+ * 同时让上层分类器（[LlmErrorClassifier]）能识别出「服务端慢」而非「网络断」。
+ */
+class FirstByteTimeoutException(cause: Throwable) : IOException("首字节等待超时（watchdog 主动关流）", cause)
+
+/**
+ * 把 watchdog 关流导致的失败包装为 [FirstByteTimeoutException]；非 watchdog 失败原样返回。
+ *
+ * 幂等：已是 [FirstByteTimeoutException] 或取消类异常时不重复包装。
+ * 调用方在适配器最外层 catch 的入口调用，传入本次尝试是否被 watchdog 关流的标记。
+ */
+fun wrapWatchdogFailure(e: Throwable, fired: Boolean): Throwable =
+    if (fired && e !is FirstByteTimeoutException && e !is CancellationException) {
+        FirstByteTimeoutException(e)
+    } else {
+        e
+    }
 
 private val TRANSIENT_MESSAGES = listOf(
     "load failed",

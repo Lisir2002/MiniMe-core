@@ -182,7 +182,7 @@ fun ProviderEditorScreen(
     }
     var apiPathError by remember { mutableStateOf(false) }
     var requestTimeoutText by remember { mutableStateOf(initialProvider?.requestTimeout?.toString() ?: "30") }
-    var retryCountText by remember { mutableStateOf(initialProvider?.retryCount?.toString() ?: "0") }
+    var retryCountText by remember { mutableStateOf(initialProvider?.retryCount?.toString() ?: "2") }
     var fallbackProviderId by remember { mutableStateOf(initialProvider?.fallbackProviderId) }
     /** 本地收藏列表（编辑期即时更新；保存时写入 config，已有供应商同时由 ViewModel 持久化）。 */
     var localFavorites by remember { mutableStateOf<List<String>>(initialProvider?.favoriteModels ?: emptyList()) }
@@ -277,7 +277,7 @@ fun ProviderEditorScreen(
         maxTokens = maxTokensText.trim().toIntOrNull()?.takeIf { it > 0 },
         apiPath = if (useCustomApiPath) apiPath.trim() else defaultProviderApiPath(type),
         requestTimeout = requestTimeoutText.trim().toIntOrNull()?.coerceIn(5, 120) ?: 30,
-        retryCount = retryCountText.trim().toIntOrNull()?.coerceIn(0, 5) ?: 0,
+        retryCount = retryCountText.trim().toIntOrNull()?.coerceIn(0, 5) ?: 2,
         fallbackProviderId = fallbackProviderId?.takeIf { it.isNotBlank() && it != providerId },
         favoriteModels = localFavorites,
         modelOrder = initialProvider?.modelOrder ?: emptyList(),

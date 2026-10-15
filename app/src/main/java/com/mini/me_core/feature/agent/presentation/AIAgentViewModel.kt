@@ -1033,7 +1033,7 @@ class AIAgentViewModel @Inject constructor(
                     is AgentEvent.Failed -> {
                         failed = true
                         setCompacting(sessionId, false)
-                        setAgentState(sessionId, AgentUIState.Error(event.error))
+                        setAgentState(sessionId, AgentUIState.Error(event.error, event.errorKind))
                     }
                     AgentEvent.Completed -> {
                         setRetryState(sessionId, null)

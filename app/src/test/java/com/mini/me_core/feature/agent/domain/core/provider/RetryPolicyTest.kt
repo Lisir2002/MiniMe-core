@@ -94,4 +94,41 @@ class RetryPolicyTest {
         assertNull(extractRetryAfterMillis(IOException("io")))
         assertNull(extractRetryAfterMillis(RuntimeException("x")))
     }
+
+    // ──────────────────────── watchdog fired 标记 → FirstByteTimeoutException ────────────────────────
+
+    @Test
+    fun wrapWatchdogFailure_fired_wrapsIntoFirstByteTimeout() {
+        val raw = IOException("Software caused connection abort")
+        val wrapped = wrapWatchdogFailure(raw, fired = true)
+        assertTrue("watchdog 关流必须包装为 FirstByteTimeoutException", wrapped is FirstByteTimeoutException)
+        assertTrue("原异常应保留在 cause 链", wrapped.cause === raw)
+    }
+
+    @Test
+    fun wrapWatchdogFailure_notFired_passesThrough() {
+        val raw = IOException("Software caused connection abort")
+        val same = wrapWatchdogFailure(raw, fired = false)
+        assertTrue("非 watchdog 失败必须原样返回", same === raw)
+    }
+
+    @Test
+    fun wrapWatchdogFailure_alreadyWrapped_isIdempotent() {
+        val first = FirstByteTimeoutException(IOException("closed"))
+        val again = wrapWatchdogFailure(first, fired = true)
+        assertTrue("已包装过不得重复包装", again === first)
+    }
+
+    @Test
+    fun wrapWatchdogFailure_cancellation_isNeverWrapped() {
+        // 用户点停止导致的取消不得被包装成超时错误
+        val cancel = kotlinx.coroutines.CancellationException("stopped")
+        assertTrue(wrapWatchdogFailure(cancel, fired = true) === cancel)
+    }
+
+    @Test
+    fun minFirstByteTimeout_is60Seconds() {
+        // 钉住下限常量：watchdog 不得短于 60s（长上下文模型首字节可能超过 30s）
+        assertEquals(60_000L, MIN_FIRST_BYTE_TIMEOUT_MS)
+    }
 }

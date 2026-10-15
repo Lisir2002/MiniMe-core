@@ -506,7 +506,9 @@ object AgentModule {
         guardLogRepository: com.mini.me_core.feature.agent.domain.core.guard.GuardLogRepository,
         // ── 轨迹 / 剧本 ──
         trajectoryService: com.mini.me_core.feature.agent.domain.session.trajectory.TrajectoryService,
-        playbookExecutor: com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookExecutor
+        playbookExecutor: com.mini.me_core.feature.agent.domain.knowledge.playbook.PlaybookExecutor,
+        // ── P1 离线预检 ──
+        networkStatusChecker: com.mini.me_core.feature.agent.domain.core.provider.NetworkStatusChecker
     ): AgentWorkflow {
         return com.mini.me_core.feature.agent.domain.execution.workflow.StatefulAgentWorkflow(
             // ── 模型/供应商层 ──
@@ -536,7 +538,9 @@ object AgentModule {
             // ── 设置 / 护栏日志 ──
             normFlowSettingsRepository, guardLogRepository,
             // ── 轨迹 / 剧本 ──
-            trajectoryService, playbookExecutor
+            trajectoryService, playbookExecutor,
+            // ── P1 离线预检 ──
+            networkStatusChecker
         )
     }
 }

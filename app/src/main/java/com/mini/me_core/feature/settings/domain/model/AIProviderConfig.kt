@@ -20,7 +20,7 @@ data class AIProviderConfig(
     val maxTokens: Int? = null,
     val apiPath: String = "/v1/chat/completions",
     val requestTimeout: Int = 30,  // 秒
-    val retryCount: Int = 0,
+    val retryCount: Int = 2,
     val fallbackProviderId: String? = null,
     val favoriteModels: List<String> = emptyList(),
     val modelOrder: List<String> = emptyList(),

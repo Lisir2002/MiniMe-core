@@ -3,6 +3,7 @@ package com.mini.me_core.feature.agent.presentation
 import androidx.compose.runtime.Immutable
 import com.mini.me_core.feature.agent.domain.core.model.AgentImage
 import com.mini.me_core.feature.agent.domain.core.model.WorkflowStatus
+import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorKind
 import com.mini.me_core.feature.agent.presentation.component.EnvironmentComponentState
 import kotlinx.serialization.Serializable
 
@@ -12,7 +13,7 @@ sealed class AgentUIState {
     object Streaming : AgentUIState()
     data class Result(val status: WorkflowStatus) : AgentUIState()
     object Applied : AgentUIState()
-    data class Error(val message: String) : AgentUIState()
+    data class Error(val message: String, val errorKind: LlmErrorKind? = null) : AgentUIState()
 }
 
 /**

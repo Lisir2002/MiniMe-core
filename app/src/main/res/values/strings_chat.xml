@@ -107,6 +107,19 @@
     <string name="chat_context_compressed">上下文已压缩</string>
     <string name="chat_compressing_context">正在压缩上下文</string>
     <string name="chat_retrying">网络波动，正在重试 %1$s/%2$s</string>
+    <!-- LLM 失败归类横幅标题（kind → 友好文案；原文仍可在展开后查看） -->
+    <string name="llm_error_network_abort">网络连接中断，请检查网络后重试</string>
+    <string name="llm_error_network_reset">网络连接被重置，请检查网络后重试</string>
+    <string name="llm_error_dns">无法解析服务器地址，请检查网络或 DNS 设置</string>
+    <string name="llm_error_timeout">服务器响应超时，请稍后重试</string>
+    <string name="llm_error_ssl">安全连接失败（证书校验未通过）</string>
+    <string name="llm_error_connect_refused">无法连接服务器（连接被拒绝），请检查接口地址</string>
+    <string name="llm_error_http_auth">API Key 无效或无权限，请到设置中检查</string>
+    <string name="llm_error_http_429">请求过于频繁或额度不足，请稍后重试</string>
+    <string name="llm_error_http_5xx">服务器内部错误，请稍后重试</string>
+    <string name="llm_error_stream">模型服务返回错误，请稍后重试</string>
+    <string name="llm_error_first_byte_timeout">服务器响应太慢（等待超时），请稍后重试</string>
+    <string name="llm_error_offline">设备似乎已离线，请连接网络后重试</string>
     <string name="chat_thinking_process">思考过程</string>
     <string name="chat_expand_remaining">展开剩余 %1$s 行</string>
     <string name="chat_task_history">历史对话</string>

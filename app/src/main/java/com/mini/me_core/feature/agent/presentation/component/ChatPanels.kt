@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.agent.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.ScaledAnimation
+import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorKind
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -179,7 +180,7 @@ internal fun StatusBanner(state: AgentUIState) {
     ) {
         when (state) {
             is AgentUIState.Error -> ExpandableErrorBanner(
-                message = state.message,
+                message = llmErrorBannerText(state.message, state.errorKind),
                 container = MaterialTheme.colorScheme.errorContainer,
                 content = MaterialTheme.colorScheme.onErrorContainer,
                 icon = Icons.Rounded.Warning
@@ -195,6 +196,34 @@ internal fun StatusBanner(state: AgentUIState) {
             else -> {}
         }
     }
+}
+
+/** LLM 失败归类 → 横幅标题文案资源；UNKNOWN 无对应文案（调用方展示原文）。 */
+private fun LlmErrorKind.headlineRes(): Int = when (this) {
+    LlmErrorKind.NETWORK_ABORT -> R.string.llm_error_network_abort
+    LlmErrorKind.NETWORK_RESET -> R.string.llm_error_network_reset
+    LlmErrorKind.DNS -> R.string.llm_error_dns
+    LlmErrorKind.TIMEOUT -> R.string.llm_error_timeout
+    LlmErrorKind.SSL -> R.string.llm_error_ssl
+    LlmErrorKind.CONNECT_REFUSED -> R.string.llm_error_connect_refused
+    LlmErrorKind.HTTP_AUTH -> R.string.llm_error_http_auth
+    LlmErrorKind.HTTP_429 -> R.string.llm_error_http_429
+    LlmErrorKind.HTTP_5XX -> R.string.llm_error_http_5xx
+    LlmErrorKind.STREAM_ERROR -> R.string.llm_error_stream
+    LlmErrorKind.FIRST_BYTE_TIMEOUT -> R.string.llm_error_first_byte_timeout
+    LlmErrorKind.OFFLINE -> R.string.llm_error_offline
+    LlmErrorKind.UNKNOWN -> 0
+}
+
+/**
+ * LLM 失败横幅文本：kind 命中时首行拼友好标题（横幅折叠态只显示首行），
+ * 原文以空行分隔跟在后面（展开可见）；UNKNOWN / 无 kind 直接展示原文。
+ */
+@Composable
+private fun llmErrorBannerText(raw: String, kind: LlmErrorKind?): String {
+    if (kind == null || kind == LlmErrorKind.UNKNOWN) return raw
+    val headline = stringResource(kind.headlineRes())
+    return if (raw.isBlank()) headline else "$headline\n\n$raw"
 }
 
 /**

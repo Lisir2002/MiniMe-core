@@ -2,6 +2,7 @@ package com.mini.me_core.feature.agent.domain.execution.workflow
 
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.core.model.AgentMode
+import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorKind
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
 import kotlinx.coroutines.flow.Flow
@@ -55,7 +56,7 @@ sealed class AgentEvent {
     object CompactionFinished : AgentEvent()
 
     /** 整个流程因错误终止（如流式请求被网络中断、达到迭代上限）。与 [Completed] 区别：携带错误，UI 应展示错误而非成功。 */
-    data class Failed(val error: String) : AgentEvent()
+    data class Failed(val error: String, val errorKind: LlmErrorKind? = null) : AgentEvent()
 
     /** 整个流程结束。 */
     object Completed : AgentEvent()

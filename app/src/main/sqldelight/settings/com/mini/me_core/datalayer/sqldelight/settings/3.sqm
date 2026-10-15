@@ -1,0 +1,3 @@
+-- 3.sqm：流式请求默认重试次数 0 → 2（原默认一次失败即上抛，瞬时网络抖动直接成为用户可见错误）。
+-- 只迁移未显式改过的行（值为 0 的行）；用户显式设过其他值的行不受影响。
+UPDATE ai_providers SET retry_count = 2 WHERE retry_count = 0;
