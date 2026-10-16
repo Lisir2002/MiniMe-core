@@ -1141,12 +1141,15 @@ class AIAgentViewModel @Inject constructor(
 
             // 兜底落库：如果流式内容非空，说明正常落库未完成，执行一次 persist。
             // persist 内部已用 NonCancellable（方案B），即使协程已取消也能完成写入。
-            if (fallbackStreamingText.isNotEmpty() || !fallbackStreamingReasoning.isNullOrEmpty()) {
+            // 内容过 hasVisibleContent 归一化：只含空白/零宽/NBSP 的「假非空」文本
+            // 原样落库会漏出空气泡（与 AssistantText 路径同一把关）。
+            val normalizedFallback = fallbackStreamingText.takeIf { it.hasVisibleContent() } ?: ""
+            if (normalizedFallback.isNotEmpty() || !fallbackStreamingReasoning.isNullOrEmpty()) {
                 runCatching {
                     messagePersistenceUseCase.persist(
                         sessionId = sessionId,
                         role = MessageRole.ASSISTANT,
-                        content = fallbackStreamingText,
+                        content = normalizedFallback,
                         id = fallbackStreamingId ?: UUID.randomUUID().toString(),
                         taskId = fallbackTaskId,
                         reasoning = fallbackStreamingReasoning

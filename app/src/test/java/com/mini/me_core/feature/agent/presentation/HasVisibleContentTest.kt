@@ -75,8 +75,23 @@ class HasVisibleContentTest {
     }
 
     @Test
+    fun spaceSeparatorFamily_hasNoVisibleContent() {
+        // Zs 空白分隔符族：Java isWhitespace 排除非断行空格，类别又不是 FORMAT/CONTROL，
+        // 是 Hangul filler 修复后空气泡复发的形态（模型空转轮吐 NBSP 正文）。
+        assertFalse("\u00A0".hasVisibleContent()) // NBSP
+        assertFalse("\u2007".hasVisibleContent()) // Figure Space
+        assertFalse("\u202F".hasVisibleContent()) // Narrow NBSP
+        assertFalse("\u3000".hasVisibleContent()) // 表意空格（isWhitespace 已覆盖，双保险）
+        assertFalse("\u00A0\u2007\u202F".hasVisibleContent())
+        assertFalse(" \u00A0 ".hasVisibleContent())
+    }
+
+    @Test
     fun textWithWhitespaceAndVisible_hasVisibleContent() {
         assertTrue("  hello  ".hasVisibleContent())
         assertTrue("\n\ttest\n".hasVisibleContent())
+        // 含 NBSP 但另有可见字符：仍算有内容（NBSP 按空白渲染，不损失信息）
+        assertTrue("\u00A0hello".hasVisibleContent())
+        assertTrue("hello\u3000world".hasVisibleContent())
     }
 }

@@ -105,12 +105,19 @@ internal val BLANK_GLYPH_CODE_POINTS: Set<Char> = setOf(
  * 这是「是否渲染助手气泡」的唯一关门，持久化归一化与各渲染/过滤层共用它，改此一处即全链路生效。
  * 注意：保留代理对(emoji 等)与普通可见字符；零宽连接符 ZWJ 只在「整条文本是否为空」上当空，
  * 不会从展示文本里被剔除，故 emoji 连字序列不受影响。
+ *
+ * 空白分隔符族（Zs）整类排除：Java/Kotlin 的 isWhitespace 依 Unicode 定义把非断行空格
+ * U+00A0(NBSP)、U+2007(Figure Space)、U+202F(Narrow NBSP) 排除在 whitespace 之外，类别又是
+ * Zs 而非 FORMAT/CONTROL——部分模型在纯工具轮/空转轮吐只含 NBSP 的正文，会穿过本关门漏出
+ * 「有边框有操作图标但空白」的气泡（Hangul filler 修复后的复发形态）。Zs 渲染即空白，
+ * 连同真实可见字符的混合串不受影响（有可见字符即为 true）。
  */
 fun CharSequence.hasVisibleContent(): Boolean = any { ch ->
     !ch.isWhitespace() &&
         ch.category != CharCategory.FORMAT &&
         ch.category != CharCategory.CONTROL &&
         ch.category != CharCategory.SURROGATE &&
+        ch.category != CharCategory.SPACE_SEPARATOR &&
         ch !in BLANK_GLYPH_CODE_POINTS
 }
 
