@@ -1564,8 +1564,12 @@ class BrowserController @Inject constructor(
             allowContentAccess = false
             allowFileAccessFromFileURLs = false
             allowUniversalAccessFromFileURLs = false
-            // 禁止混合内容：HTTPS 页面不加载 HTTP 子资源。
-            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            // 混合内容策略对齐 Chrome：被动内容（图片/字体/音视频等「optionally blockable」）
+            // 允许加载，主动内容（脚本等「blockable」）仍阻断。
+            // 曾用 NEVER_ALLOW 无条件阻断 HTTPS 页面的 HTTP 子资源——本地部署页面
+            // （如 https 代理下的 http 图片、混合内容页面）背景图整体缺失，即
+            // 「其他浏览器显示正常、内置浏览器不显示」的根因之一。
+            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             loadsImagesAutomatically = true
             // F4.8 双指捏合缩放 + 双击缩放（系统默认手势）
             builtInZoomControls = true

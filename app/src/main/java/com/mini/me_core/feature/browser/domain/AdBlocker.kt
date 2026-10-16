@@ -68,11 +68,19 @@ class AdBlocker @Inject constructor(
     /**
      * 判断请求 URL 是否应被拦截。在 shouldInterceptRequest 后台线程调用。
      * 白名单优先；自定义黑名单优先于内置规则。
+     *
+     * 本地/私有部署地址（localhost、.local、回环与私网段）一律放行：
+     * 用户在自己部署的页面上引用任何资源（背景图、字体、接口）都不应被
+     * 公共广告名单裁决——这类误杀表现为「其他浏览器显示正常、内置浏览器
+     * 资源缺失」，且本地页面本无广告投放动机。
      */
     fun shouldBlock(url: String): Boolean {
         val host = runCatching {
             android.net.Uri.parse(url).host?.lowercase()
         }.getOrNull() ?: return false
+
+        // 本地/私有部署地址免拦截
+        if (isLocalOrPrivateHost(host)) return false
 
         // 白名单放行
         if (customWhitelist.any { host == it || host.endsWith(".$it") }) return false
@@ -133,10 +141,52 @@ class AdBlocker @Inject constructor(
             "amplitude.com", "sentry.io", "bugsnag.com", "fullstory.com", "mouseflow.com",
             "plausible.io", "fathom.site", "umami.is", "count.ly", "matomo.cloud",
             "newrelic.com", "nr-data.net", "branch.io", "app.link", "adjust.com",
-            "kochava.com", "appsflyer.com", "onesignal.com", "clarity.ms", "bing.com/clarity",
+            "kochava.com", "appsflyer.com", "onesignal.com", "clarity.ms",
             "scorecardresearch.com", "quantserve.com", "agkn.com", "navegg.com", "rfihub.com",
             "tapad.com", "mediavine.com", "evgnet.com", "dpm.demdex.net", "demdex.net",
             "id5-sync.com", "adserver.adtechus.com", "eu1.adserver.adtechus.com"
         )
+
+        /**
+         * 判断 host 是否为本地/私有部署地址（放行，不进广告名单裁决）：
+         * - `localhost` / `*.localhost` / `*.local`（mDNS）
+         * - IPv4 回环 127.0.0.0/8、私网 10.0.0.0/8 与 172.16.0.0/12、
+         *   192.168.0.0/16、链路本地 169.254.0.0/16、未指定 0.0.0.0
+         * - IPv6 回环 `::1`、链路本地 `fe80::/10`
+         *
+         * 纯字符串函数（不依赖 android.net.Uri），可在 JVM 单测直接验证。
+         */
+        fun isLocalOrPrivateHost(host: String): Boolean {
+            val h = host.trim().lowercase()
+            if (h.isEmpty()) return false
+            return isLocalHostname(h) || isLocalIpv6(h) || isLocalIpv4(h)
+        }
+
+        private fun isLocalHostname(h: String): Boolean =
+            h == "localhost" || h.endsWith(".localhost") || h.endsWith(".local")
+
+        /** IPv6 字面量（可带方括号，如 `[::1]`）中的回环 / 链路本地地址。 */
+        private fun isLocalIpv6(h: String): Boolean {
+            val v6 = if (h.startsWith("[") && h.endsWith("]")) h.substring(1, h.length - 1) else h
+            return v6 == "::1" || v6 == "0:0:0:0:0:0:0:1" || v6.startsWith("fe80:")
+        }
+
+        /** IPv4 字面量中的回环 / 私网 / 链路本地段（四段全数字才判定，域名不漏判）。 */
+        private fun isLocalIpv4(h: String): Boolean {
+            val parts = h.split(".")
+            if (parts.size != 4 || parts.any { it.isEmpty() || it.any { c -> !c.isDigit() } }) {
+                return false
+            }
+            val a = parts[0].toIntOrNull() ?: return false
+            val b = parts[1].toIntOrNull() ?: return false
+            return when (a) {
+                0, 127 -> true // 未指定 / 回环 127.0.0.0/8
+                10 -> true // 10.0.0.0/8
+                172 -> b in 16..31 // 172.16.0.0/12
+                192 -> b == 168 // 192.168.0.0/16
+                169 -> b == 254 // 169.254.0.0/16
+                else -> false
+            }
+        }
     }
 }

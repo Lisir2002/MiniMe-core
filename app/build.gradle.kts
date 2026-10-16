@@ -324,6 +324,9 @@ android {
     testOptions {
         // 让 android.util.Log 等桩方法返回默认值而非抛「not mocked」，便于被测代码间接调用日志不崩。
         unitTests.isReturnDefaultValues = true
+        // 注意：不要开启 unitTests.isIncludeAndroidResources —— Robolectric 会因此加载合并
+        // 清单并初始化真实 Application（Hilt + 数据库 + 密钥链），该链路在 JVM 测试环境
+        // 必然失败（DEK 无法解密）。Robolectric 测试按需用 @Config(application=...) 覆盖。
         unitTests.all {
             it.testLogging {
                 showStandardStreams = true
