@@ -126,6 +126,13 @@ internal fun ToolMessageBody(
         return
     }
 
+    // AI 浏览器操作：专用富交互卡片（动作 + 目标 + 结果摘要；takeover 额外展示接管说明与状态），
+    // 不再渲染为通用工具气泡的原始 JSON。
+    if (message.toolName == "browser") {
+        BrowserToolCallCard(message = message, running = running)
+        return
+    }
+
     // 旁路环境探测快照：构建/环境变更命令执行后自动探测，绑定到触发它的 Bash 工具气泡底部。
     val envSnapshot = environmentSnapshots[message.id]
 

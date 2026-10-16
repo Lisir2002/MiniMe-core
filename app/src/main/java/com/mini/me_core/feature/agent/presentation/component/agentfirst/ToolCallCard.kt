@@ -60,6 +60,7 @@ import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.EnvironmentSnapshot
 import com.mini.me_core.feature.agent.presentation.RunningToolOutput
+import com.mini.me_core.feature.agent.presentation.component.BrowserToolCallCard
 import com.mini.me_core.feature.agent.presentation.component.DiffView
 import com.mini.me_core.feature.agent.presentation.component.EnvironmentStatusStrip
 import com.mini.me_core.feature.agent.presentation.component.formatToolResult
@@ -116,6 +117,16 @@ fun ToolCallCard(
     // check_environment 走现有紧凑环境状态条分支（与旧实现一致），不走通用卡片
     if (toolType == ToolType.ENV) {
         EnvironmentStatusStrip(message = message)
+        return
+    }
+
+    // browser 工具走专用富交互卡片（与旧 ToolMessageBody 路径一致）：
+    // 动作 + 目标 + 结果摘要，takeover 额外展示接管说明与状态。
+    if (message.toolName == "browser") {
+        BrowserToolCallCard(
+            message = message,
+            running = state == ToolCallState.RUNNING
+        )
         return
     }
 
