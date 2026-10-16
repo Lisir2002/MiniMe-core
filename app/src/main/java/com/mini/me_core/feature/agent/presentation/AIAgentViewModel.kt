@@ -1334,6 +1334,13 @@ class AIAgentViewModel @Inject constructor(
     /** 新建会话；若当前会话还是空的则直接复用，避免堆积空会话。（委托 [sessionController]） */
     fun newSession() = sessionController.newSession()
 
+    /**
+     * 新建会话并显式绑定指定 provider/model（F2.5「清空上下文并切换模型」）。
+     * 绑定随会话一次落库，不读默认模型设置，消除两步走的协程竞态与旧默认模型串用。
+     */
+    fun newSessionWithModel(providerId: String, model: String) =
+        sessionController.newSessionWithModel(providerId, model)
+
     fun setCurrentSessionId(id: String) = sessionController.setCurrentSessionId(id)
 
     fun setSessionMode(mode: AgentMode) = sessionController.setSessionMode(mode)

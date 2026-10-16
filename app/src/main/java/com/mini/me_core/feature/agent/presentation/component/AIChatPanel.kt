@@ -829,8 +829,11 @@ fun AIChatPanel(
                                 pendingModelSwitch = null
                             }) { Text(stringResource(R.string.model_switch_keep)) }
                             TextButton(onClick = {
-                                viewModel.setSessionProviderModel(p, m)
-                                viewModel.newSession()
+                                // 清空上下文：新会话显式绑定用户所选模型。
+                                // 旧实现 setSessionProviderModel + newSession 两步走存在竞态：
+                                // 非空会话时 setSessionProviderModel 不写默认模型，
+                                // 新会话仍读旧默认模型，用户选的模型丢失。
+                                viewModel.newSessionWithModel(p, m)
                                 pendingModelSwitch = null
                             }) { Text(stringResource(R.string.model_switch_clear)) }
                             TextButton(onClick = { pendingModelSwitch = null }) {

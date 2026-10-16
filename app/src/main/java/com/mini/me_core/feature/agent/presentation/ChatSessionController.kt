@@ -64,6 +64,31 @@ internal class ChatSessionController(
         currentSessionId.value = s.id
     }
 
+    /**
+     * 新建会话并显式绑定指定 provider/model（F2.5「清空上下文并切换模型」入口）。
+     *
+     * 与「setSessionProviderModel + newSession」两步走的区别：
+     * 1. 不依赖默认模型设置（DefaultModelSettingsRepository），消除两个协程间的写入竞态；
+     * 2. 非空会话场景下旧实现只更新当前会话行，新建会话仍读**旧**默认模型，用户选的模型丢失；
+     * 3. 绑定随 session 对象一次落库，不依赖 UPDATE 时序。
+     *
+     * 当前会话为空时同样复用（仅改绑模型），避免堆积空会话；为空视为「新会话默认模型」，
+     * 同步写回默认设置，与 [setSessionProviderModel] 的既有语义保持一致。
+     */
+    fun newSessionWithModel(providerId: String, model: String) = scope.launch {
+        if (currentWorkspace.value.isBlank()) return@launch
+        val curId = currentSessionId.value
+        if (curId != null && sessionUseCase.isSessionEmpty(curId)) {
+            onResetSessionState(curId)
+            sessionUseCase.updateProviderModel(curId, providerId, model)
+            defaultModelSettingsRepository.setDefaultModel(providerId, model)
+            return@launch
+        }
+        val s = sessionUseCase.newSession("").copy(provider_id = providerId, model = model)
+        sessionUseCase.upsertSession(s)
+        currentSessionId.value = s.id
+    }
+
     fun setCurrentSessionId(id: String) {
         if (currentSessionId.value == id) return
         currentSessionId.value = id
@@ -208,7 +233,11 @@ internal class ChatSessionController(
         val providerId = defaultModelSettingsRepository.getDefaultProviderId()
         val model = defaultModelSettingsRepository.getDefaultModel()
         if (providerId.isNotBlank() && model.isNotBlank()) {
-            sessionUseCase.updateProviderModel(s.id, providerId, model)
+            // 绑定必须随 session 对象一起落库：旧实现在 upsertSession 之前调
+            // updateProviderModel（UPDATE 打在不存在的行上 = no-op）再返回，调用方随后
+            // upsertSession 插入 provider_id=null，新会话永远丢失默认模型绑定，
+            // 请求时静默回退全局 active provider——「新会话用的不是默认模型」的根因。
+            return s.copy(provider_id = providerId, model = model)
         }
         return s
     }

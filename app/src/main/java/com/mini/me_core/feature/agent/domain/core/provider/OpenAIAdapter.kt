@@ -548,7 +548,7 @@ class OpenAIAdapter @Inject constructor(
         return runCatching { Json.parseToJsonElement(trimmed).jsonObject }.getOrElse { JsonObject(emptyMap()) }
     }
 
-    private fun convertToOpenAIMessages(
+    internal fun convertToOpenAIMessages(
         messages: List<AgentMessage>,
         useResponsesContentParts: Boolean
     ): MutableList<OpenAIChatMessage> {
@@ -564,10 +564,13 @@ class OpenAIAdapter @Inject constructor(
                     } else null
                     // DeepSeek 思考模式要求 assistant 消息的 reasoning_content 字段必须存在
                     // （即使是空串也要带上），否则工具调用轮回传时 API 报 400。
+                    // 非 deepseek 模型一律不回放：历史 reasoning 可能由其他供应商/模型产生
+                    // （如从 Claude/Gemini/DeepSeek 切来），原样回放会被严格校验的上游
+                    // （vLLM 等）以 400 拒绝——「对话中切换模型后发消息必失败」的根因。
                     val reasoningContent = if (model.contains("deepseek", ignoreCase = true)) {
                         message.reasoning
                     } else {
-                        message.reasoning.ifEmpty { null }
+                        null
                     }
                     OpenAIChatMessage(
                         role = "assistant",
@@ -579,7 +582,7 @@ class OpenAIAdapter @Inject constructor(
                 is AgentMessage.ToolResultMessage -> OpenAIChatMessage(
                     role = "tool",
                     content = message.result,
-                    tool_call_id = message.id
+                    tool_call_id = sanitizeToolCallId(message.id)
                 )
             }
         }
@@ -771,7 +774,7 @@ class OpenAIAdapter @Inject constructor(
 
     private fun convertToOpenAIToolCall(toolCall: ToolCall): OpenAIToolCall {
         return OpenAIToolCall(
-            id = toolCall.id,
+            id = sanitizeToolCallId(toolCall.id),
             type = "function",
             function = com.mini.me_core.feature.agent.data.remote.openai.OpenAIFunctionCall(
                 name = toolCall.name,
@@ -779,4 +782,13 @@ class OpenAIAdapter @Inject constructor(
             )
         )
     }
+
+    /**
+     * 跨协议回放护栏：把历史 tool_call_id 规范为字母数字字符集。
+     * Gemini 等非 OpenAI 协议产生的 tool_call id = 函数名（含下划线），原样回放到
+     * OpenAI 兼容端点可能被严格上游 400 拒绝；配对不受影响——assistant.tool_calls[].id
+     * 与 tool.tool_call_id 走同一函数，两边结果一致（见 [convertToOpenAIMessages]）。
+     */
+    private fun sanitizeToolCallId(id: String): String =
+        id.filter { it.isLetterOrDigit() }.ifEmpty { "toolcall" }
 }
