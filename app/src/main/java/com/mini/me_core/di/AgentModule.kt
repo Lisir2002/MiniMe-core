@@ -300,6 +300,7 @@ object AgentModule {
         playbookStatusTool: com.mini.me_core.feature.agent.domain.execution.tool.playbook.PlaybookStatusTool,
         playbookAbortTool: com.mini.me_core.feature.agent.domain.execution.tool.playbook.PlaybookAbortTool,
         gitOpsTool: com.mini.me_core.feature.agent.domain.execution.tool.git.GitOpsTool,
+        gitRemoteTool: com.mini.me_core.feature.agent.domain.execution.tool.git.GitRemoteTool,
         resultTypeRegistry: com.mini.me_core.feature.agent.domain.execution.tool.ToolResultTypeRegistry
     ): ToolRegistry {
         return ToolRegistry().apply {
@@ -372,6 +373,8 @@ object AgentModule {
             registerTool("playbook_abort", playbookAbortTool)
             // ══ GitOps 工程化工具：提交规范校验/建议、hooks 状态、发版前体检/打 Tag、版本日志生成
             registerTool("gitops", gitOpsTool)
+            // ══ 远端仓库操作工具：remote 管理、fetch/pull/push/push_tag/clone，内建推送纪律（ASK 审批）
+            registerTool("git_remote", gitRemoteTool)
 
             // ══ D2-3 轨迹摘要提取器登记（norm-chain §3.8.2：规则表挂 ToolResultTypeRegistry，
             //    仅少数工具定制，其余走通用截断）。提取器签名 (args, resultData) → 一行摘要。

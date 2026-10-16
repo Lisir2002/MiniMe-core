@@ -33,13 +33,14 @@ import javax.inject.Inject
  *   - changelog(prevTag)     从 git log 自动生成版本日志草稿
  *
  * 经验来源（零重写，全复用）：
- *   - 提交规范：.githooks/commit-msg 的 type/scope 枚举与正则
+ *   - 提交规范：.githooks/commit-msg 的 type/scope 枚举与正则（纪律内核见 [GitDiscipline]）
  *   - 发版流程：AGENTS.md「发版流程（RC 判定）」 + docs/ci-release.md
  *   - 版本日志：CHANGELOG.md 六类分类约定（Keep a Changelog）
  *   - 命令安全：GitRepository 的 shellQuote 注入防护 + 读/写分离错误语义
  *
- * 推送说明：release_tag 仅在本地创建 tag，推送（git push origin <tag>）交给外部 Bash，
- *   凭据由 credential.helper=store 统一注入。本工具不重复实现推送鉴权。
+ * 推送说明：release_tag 仅在本地创建 tag，推送（git push origin <tag>）由姊妹工具
+ *   [GitRemoteTool]（git_remote action=push_tag）承担，凭据由 credential.helper=store 统一注入。
+ *   本工具不重复实现推送鉴权。
  */
 class GitOpsTool @Inject constructor(
     private val gitRepository: GitRepository,
@@ -50,36 +51,8 @@ class GitOpsTool @Inject constructor(
     private companion object {
         const val TAG = "GitOpsTool"
 
-        /** Conventional Commits 允许的 type，对齐 .githooks/commit-msg。 */
-        private val TYPES = listOf(
-            "feat", "fix", "refactor", "docs", "style",
-            "chore", "ci", "build", "perf", "test"
-        )
-
-        /** 建议 scope（与 AGENTS.md 提交规范对齐）。 */
-        private val RECOMMENDED_SCOPES = listOf(
-            "agent", "settings", "terminal", "workspace",
-            "git", "ui", "mcp", "db", "core", "docs", "build", "deps"
-        )
-
-        /** Conventional Commits 正则：^<type>(<scope>)?[!]?: <subject>，:后至少一个非空字符。 */
-        private val COMMIT_REGEX = Regex("^(${TYPES.joinToString("|")})(\\([A-Za-z0-9._-]+\\))?!?: .+")
-
         /** 自动生成的提交信息中，title 最大长度（subject 建议 <= 72）。 */
         private const val MAX_SUGGEST_SUBJECT_LENGTH = 72
-
-        /** tag 名必须匹配 vX.Y.Z 或 vX.Y.Z-rcN/-beta/-alpha/-dev 语义化版本。 */
-        private val TAG_REGEX = Regex("""^v\d+\.\d+\.\d+(?:-(?:rc|beta|alpha|dev)\d+)?$""")
-
-        /** CHANGELOG.md 六类分类。 */
-        private val CHANGELOG_SECTIONS = listOf(
-            "Added（新增）",
-            "Improved（改进）",
-            "Fixed（修复）",
-            "Changed（变更）",
-            "Removed（删除）",
-            "Adjusted（调整）"
-        )
     }
 
     override val name = "gitops"
@@ -163,10 +136,10 @@ class GitOpsTool @Inject constructor(
             )
         }
 
-        val matched = COMMIT_REGEX.matches(firstLine)
+        val matched = GitDiscipline.COMMIT_REGEX.matches(firstLine)
         val type = firstLine.substringBefore("(", firstLine.substringBefore(":"))
             .let { if (it.contains("(")) it.substringBefore("(") else it }
-            .takeIf { it in TYPES }
+            .takeIf { it in GitDiscipline.TYPES }
         val subject = firstLine.substringAfter(":", "").trim()
         val subjectOk = subject.isNotEmpty()
 
@@ -176,8 +149,8 @@ class GitOpsTool @Inject constructor(
                 put("first_line", JsonPrimitive(firstLine))
                 put("matched", JsonPrimitive(matched))
                 put("type", JsonPrimitive(type ?: ""))
-                put("allowed_types", JsonArray(TYPES.map { JsonPrimitive(it) }))
-                put("recommended_scopes", JsonArray(RECOMMENDED_SCOPES.map { JsonPrimitive(it) }))
+                put("allowed_types", JsonArray(GitDiscipline.TYPES.map { JsonPrimitive(it) }))
+                put("recommended_scopes", JsonArray(GitDiscipline.RECOMMENDED_SCOPES.map { JsonPrimitive(it) }))
                 if (!matched) {
                     put(
                         "hint",
@@ -332,7 +305,7 @@ class GitOpsTool @Inject constructor(
         }
         val version = args["version"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("release_check 缺少 version（如 v1.2.3）", "MISSING_VERSION")
-        if (!TAG_REGEX.matches(version)) {
+        if (!GitDiscipline.TAG_REGEX.matches(version)) {
             return errorResult(
                 "version 格式不符（需 vX.Y.Z 或 vX.Y.Z-rcN/-beta/-alpha/-dev）：$version",
                 "INVALID_VERSION"
@@ -351,7 +324,7 @@ class GitOpsTool @Inject constructor(
         // 变更条数
         val changeCount = runCatching {
             commandEngine.runCommandSync(
-                "git rev-list --count ${shellQuote(prevTag)}..HEAD",
+                "git rev-list --count ${GitDiscipline.shellQuote(prevTag)}..HEAD",
                 workspaceRepository.currentPath()
             ).trim().toIntOrNull() ?: 0
         }.getOrDefault(0)
@@ -359,7 +332,7 @@ class GitOpsTool @Inject constructor(
         // 改动面判定：是否触碰启动/容器/构建链路
         val diffNames = runCatching {
             commandEngine.runCommandSync(
-                "git diff --name-only ${shellQuote(prevTag)}..HEAD",
+                "git diff --name-only ${GitDiscipline.shellQuote(prevTag)}..HEAD",
                 workspaceRepository.currentPath()
             ).lines().filter { it.isNotBlank() }
         }.getOrDefault(emptyList())
@@ -461,7 +434,7 @@ class GitOpsTool @Inject constructor(
         }
         val version = args["version"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("release_tag 缺少 version（如 v1.2.3）", "MISSING_VERSION")
-        if (!TAG_REGEX.matches(version)) {
+        if (!GitDiscipline.TAG_REGEX.matches(version)) {
             return errorResult(
                 "version 格式不符（需 vX.Y.Z 或 vX.Y.Z-rcN/-beta/-alpha/-dev）：$version",
                 "INVALID_VERSION"
@@ -524,7 +497,7 @@ class GitOpsTool @Inject constructor(
         // 拉提交
         val logRaw = if (prevTag != null) {
             commandEngine.runCommandSync(
-                "git log ${shellQuote(prevTag)}..HEAD --pretty=format:%H|%s",
+                "git log ${GitDiscipline.shellQuote(prevTag)}..HEAD --pretty=format:%H|%s",
                 workspaceRepository.currentPath()
             )
         } else {
@@ -633,14 +606,4 @@ class GitOpsTool @Inject constructor(
     private fun success(obj: JsonObject): ToolResult = ToolResult.Success(obj)
     private fun errorResult(message: String, code: String): ToolResult =
         ToolResult.Error(message, code)
-
-    /**
-     * 对单个 shell 参数做单引号转义，对齐 GitRepository.shellQuote。
-     * 仅用于本工具内部拼接 `git log <ref>..HEAD` 等命令，复用相同的安全策略。
-     */
-    private fun shellQuote(arg: String): String {
-        if (arg.isEmpty()) return "''"
-        if (arg.all { it.isLetterOrDigit() || it in "_.@/:=+,-" }) return arg
-        return "'" + arg.replace("'", "'\\''") + "'"
-    }
 }
