@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -117,35 +118,41 @@ class BrowserPreviewManager @Inject constructor(
      *
      * 在后台线程截取 WebView 画面，压缩为 JPEG 后更新 [previewState]。
      * 如果 WebView 不可用或宽高为 0，静默跳过。
+     *
+     * **线程纪律**：[WebView.draw] 及 width/height 读取必须在其创建线程（主线程）执行，
+     * 与 [BrowserController] 的全部 WebView 访问一致。历史上本方法直接在 IO 协程里 draw，
+     * 跨线程调用被 catch 静默吞掉 → [previewState] 永远为 null → 预览面板只剩空底色，
+     * 表现为「AI 接管浏览器后悬浮预览每次空白」。
      */
-    fun captureNow(webView: WebView) {
+    suspend fun captureNow(webView: WebView) {
         try {
-            val width = webView.width
-            val height = webView.height
-            if (width <= 0 || height <= 0) return
+            val frame = withContext(Dispatchers.Main.immediate) {
+                val width = webView.width
+                val height = webView.height
+                if (width <= 0 || height <= 0) return@withContext null
 
-            // 按最大宽度等比缩放，避免大图占用过多内存
-            val scale = MAX_WIDTH_PX.toFloat() / width
-            val scaledWidth = MAX_WIDTH_PX
-            val scaledHeight = (height * scale).toInt()
+                // 按最大宽度等比缩放，避免大图占用过多内存
+                val scale = MAX_WIDTH_PX.toFloat() / width
+                val bitmap = Bitmap.createScaledBitmap(
+                    captureWebViewBitmap(webView, width, height),
+                    MAX_WIDTH_PX,
+                    (height * scale).toInt(),
+                    true
+                )
 
-            val bitmap = Bitmap.createScaledBitmap(
-                captureWebViewBitmap(webView, width, height),
-                scaledWidth,
-                scaledHeight,
-                true
-            )
+                val baos = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, baos)
+                bitmap.recycle()
 
-            val baos = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, baos)
-            val bytes = baos.toByteArray()
-            bitmap.recycle()
-
-            _previewState.value = PreviewFrame(
-                jpegBytes = bytes,
-                url = webView.url ?: "",
-                title = webView.title ?: ""
-            )
+                PreviewFrame(
+                    jpegBytes = baos.toByteArray(),
+                    url = webView.url ?: "",
+                    title = webView.title ?: ""
+                )
+            }
+            if (frame != null) {
+                _previewState.value = frame
+            }
         } catch (e: Exception) {
             FileLogger.w(TAG, "预览截图失败: ${e.message}")
         }
