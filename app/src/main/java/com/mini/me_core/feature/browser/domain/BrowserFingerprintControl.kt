@@ -10,6 +10,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import java.io.ByteArrayInputStream
+import java.util.regex.Matcher
 
 /**
  * 指纹反检测注入（行为保持自 [BrowserController] 原样搬迁）。
@@ -59,17 +60,33 @@ internal class BrowserFingerprintControl(
             response.close()
             return null
         }
+        // 压缩编码护栏：OkHttp 的透明 gzip 会剥掉 Content-Encoding 头；走到这里仍有
+        // 非 identity 编码（br/deflate 等服务端强发），说明 body 是压缩字节。
+        // 此时把压缩字节当 HTML 改写会产出乱码页面，且改写头仍带原编码——与「背景图
+        // 不显示」同属「响应元数据与改写体不匹配」家族。放弃注入，走正常加载。
+        val contentEncoding = response.header("Content-Encoding")
+        if (contentEncoding != null && !contentEncoding.equals("identity", ignoreCase = true)) {
+            body.close()
+            response.close()
+            return null
+        }
 
         val originalHtml = body.string()
         val script = FingerprintInjector.generateScript(profile)
         val injectTag = "<script>$script</script>"
 
-        // 在 <head> 首行注入；若无 <head> 则在 <html> 后注入；都没有则在开头注入
+        // 在 <head> 首行注入；若无 <head> 则在 <html> 后注入；都没有则在开头注入。
+        // 指纹脚本含 `$` 字符，字符串替换形式会把替换内容里的 `$` 当作分组引用，
+        // 抛 Illegal group reference / 静默串改内容，导致注入整体失败
+        // （主框架回退为无指纹加载）。必须对注入内容做 quoteReplacement 转义。
+        val headRegex = Regex("<head[^>]*>", RegexOption.IGNORE_CASE)
+        val htmlRegex = Regex("<html[^>]*>", RegexOption.IGNORE_CASE)
+        val safeInject = Matcher.quoteReplacement(injectTag)
         val modifiedHtml = when {
             originalHtml.contains("<head>", ignoreCase = true) ->
-                originalHtml.replaceFirst(Regex("<head[^>]*>", RegexOption.IGNORE_CASE), "$0$injectTag")
+                originalHtml.replaceFirst(headRegex, "$0$safeInject")
             originalHtml.contains("<html>", ignoreCase = true) ->
-                originalHtml.replaceFirst(Regex("<html[^>]*>", RegexOption.IGNORE_CASE), "$0$injectTag")
+                originalHtml.replaceFirst(htmlRegex, "$0$safeInject")
             else -> injectTag + originalHtml
         }
 
@@ -79,9 +96,10 @@ internal class BrowserFingerprintControl(
             response.header("Content-Encoding", "utf-8"),
             ByteArrayInputStream(modifiedHtml.toByteArray())
         )
-        // 复制响应头
+        // 复制响应头（剔除 Content-Length：改写后长度必变，过期值会截断注入后的 HTML）
         val responseHeaders = mutableMapOf<String, String>()
         response.headers.names().forEach { name ->
+            if (name.equals("Content-Length", ignoreCase = true)) return@forEach
             response.header(name)?.let { responseHeaders[name] = it }
         }
         newResponse.responseHeaders = responseHeaders

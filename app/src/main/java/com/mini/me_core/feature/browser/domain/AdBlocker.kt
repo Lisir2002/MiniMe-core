@@ -152,7 +152,8 @@ class AdBlocker @Inject constructor(
          * - `localhost` / `*.localhost` / `*.local`（mDNS）
          * - IPv4 回环 127.0.0.0/8、私网 10.0.0.0/8 与 172.16.0.0/12、
          *   192.168.0.0/16、链路本地 169.254.0.0/16、未指定 0.0.0.0
-         * - IPv6 回环 `::1`、链路本地 `fe80::/10`
+         * - IPv6 回环 `::1`/`::`、链路本地 `fe80::/10`、唯一本地地址 `fc00::/7`（ULA）、
+         *   IPv4-mapped `::ffff:a.b.c.d`（按内嵌 IPv4 判定）
          *
          * 纯字符串函数（不依赖 android.net.Uri），可在 JVM 单测直接验证。
          */
@@ -165,10 +166,34 @@ class AdBlocker @Inject constructor(
         private fun isLocalHostname(h: String): Boolean =
             h == "localhost" || h.endsWith(".localhost") || h.endsWith(".local")
 
-        /** IPv6 字面量（可带方括号，如 `[::1]`）中的回环 / 链路本地地址。 */
+        /** IPv6 字面量（可带方括号，如 `[::1]`）中的回环 / 链路本地 / 私网地址。 */
         private fun isLocalIpv6(h: String): Boolean {
             val v6 = if (h.startsWith("[") && h.endsWith("]")) h.substring(1, h.length - 1) else h
-            return v6 == "::1" || v6 == "0:0:0:0:0:0:0:1" || v6.startsWith("fe80:")
+            if (v6.isEmpty()) return false
+            if (isLoopbackV6(v6) || isLinkLocalV6(v6)) return true
+            return isUniqueLocalV6(v6) || isIpv4MappedLocalV6(v6)
+        }
+
+        /** 回环 `::1`（含全写形式）与未指定 `::`。 */
+        private fun isLoopbackV6(v6: String): Boolean =
+            v6 == "::1" || v6 == "0:0:0:0:0:0:0:1" || v6 == "::"
+
+        /** 链路本地 `fe80::/10`。 */
+        private fun isLinkLocalV6(v6: String): Boolean = v6.startsWith("fe80:")
+
+        /**
+         * 唯一本地地址 `fc00::/7`（ULA，IPv6 私网）。
+         * 必须含冒号，防止 "fcbook.com" 这类以 fc/fd 开头的公网域名被误判。
+         */
+        private fun isUniqueLocalV6(v6: String): Boolean {
+            val firstGroup = v6.substringBefore(':')
+            return v6.contains(':') && (firstGroup.startsWith("fc") || firstGroup.startsWith("fd"))
+        }
+
+        /** IPv4-mapped（`::ffff:a.b.c.d`）按内嵌 IPv4 判定。 */
+        private fun isIpv4MappedLocalV6(v6: String): Boolean {
+            val mapped = v6.removePrefix("::ffff:")
+            return mapped != v6 && isLocalIpv4(mapped)
         }
 
         /** IPv4 字面量中的回环 / 私网 / 链路本地段（四段全数字才判定，域名不漏判）。 */
