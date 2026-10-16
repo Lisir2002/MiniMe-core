@@ -1,5 +1,4 @@
 package com.mini.me_core.feature.browser.presentation
-import com.mini.me_core.core.theme.components.AppDropdownMenu
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.AnimationScaleHolder
 import com.mini.me_core.core.theme.ScaledAnimation
@@ -99,8 +98,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -138,6 +135,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.FilterChip
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -205,7 +203,9 @@ internal fun BrowserAddressBar(
     onIncognito: () -> Unit,
     onDesktopMode: () -> Unit,
     onZoom: () -> Unit,
-    onInspect: () -> Unit
+    onInspect: () -> Unit,
+    blockedCount: Int,
+    onPrivacy: () -> Unit
 ) {
     Column {
         Row(
@@ -312,7 +312,9 @@ internal fun BrowserAddressBar(
                     onIncognito = onIncognito,
                     onDesktopMode = onDesktopMode,
                     onZoom = onZoom,
-                    onInspect = onInspect
+                    onInspect = onInspect,
+                    blockedCount = blockedCount,
+                    onPrivacy = onPrivacy
                 )
             }
         }
@@ -332,9 +334,17 @@ internal fun BrowserAddressBar(
     }
 }
 
-// ===== 更多菜单（精简为 8 项） =====
+// ===== 更多菜单（底部弹窗） =====
 
-/** 地址栏「更多」下拉菜单：页内查找 / 收藏本页 / 凭据 / 分享 / 复制链接 / 无痕 / 桌面版 / 缩放 / 地址栏位置。 */
+/**
+ * 地址栏「更多」底部弹窗菜单。
+ *
+ * 0.0.1.5 起由下拉菜单重构为 ModalBottomSheet：底部弹窗更适配单手操作，
+ * 布局与设计令牌（Spacing / LocalCornerRadius / colorScheme）与应用主体统一。
+ * 菜单项：页内查找 / 检查元素 / 收藏本页 / 凭据 / 分享 / 复制链接 /
+ * 无痕(开关) / 桌面版(开关) / 缩放 / 隐私与安全 / 地址栏位置。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun BrowserMoreMenu(
     expanded: Boolean,
@@ -352,88 +362,226 @@ internal fun BrowserMoreMenu(
     onIncognito: () -> Unit,
     onDesktopMode: () -> Unit,
     onZoom: () -> Unit,
-    onInspect: () -> Unit
+    onInspect: () -> Unit,
+    blockedCount: Int,
+    onPrivacy: () -> Unit
 ) {
-    AppDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_find)) },
-            onClick = onFind,
-            leadingIcon = { Icon(Icons.Rounded.Search, null) }
+    if (!expanded) return
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface,
+        // 顶部圆角沿用全局 CornerScale.Xl（Sheet 档），与应用其他底部弹窗一致
+        shape = RoundedCornerShape(
+            topStart = LocalCornerRadius.current.xl,
+            topEnd = LocalCornerRadius.current.xl
         )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_devtools_inspect)) },
-            onClick = onInspect,
-            leadingIcon = { Icon(Icons.Rounded.Code, null) }
+    ) {
+        Text(
+            text = stringResource(R.string.browser_more),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.sm)
         )
-        DropdownMenuItem(
-            text = {
-                Text(
-                    if (bookmarked) stringResource(R.string.browser_remove_bookmark)
-                    else stringResource(R.string.browser_add_bookmark)
-                )
-            },
-            onClick = onToggleBookmark,
-            leadingIcon = {
-                Icon(
-                    if (bookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                    null
-                )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Column(modifier = Modifier.padding(vertical = Spacing.xs)) {
+            BrowserSheetMenuActions(
+                bookmarked = bookmarked,
+                onFind = onFind,
+                onToggleBookmark = onToggleBookmark,
+                onCredentials = onCredentials,
+                onShare = onShare,
+                onCopyLink = onCopyLink,
+                onInspect = onInspect,
+                onDismiss = onDismiss
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = Spacing.xs),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            BrowserSheetMenuToggles(
+                incognito = incognito,
+                desktopMode = desktopMode,
+                onIncognito = onIncognito,
+                onDesktopMode = onDesktopMode,
+                onZoom = { onZoom(); onDismiss() }
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = Spacing.xs),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            BrowserSheetMenuPrivacy(
+                blockedCount = blockedCount,
+                addressBarAtBottom = addressBarAtBottom,
+                onPrivacy = { onPrivacy(); onDismiss() },
+                onToggleAddressBar = { onToggleAddressBar(); onDismiss() }
+            )
+        }
+    }
+}
+
+/** 更多弹窗·常用动作组：页内查找 / 检查元素 / 收藏本页 / 凭据 / 分享 / 复制链接。 */
+@Composable
+private fun BrowserSheetMenuActions(
+    bookmarked: Boolean,
+    onFind: () -> Unit,
+    onToggleBookmark: () -> Unit,
+    onCredentials: () -> Unit,
+    onShare: () -> Unit,
+    onCopyLink: () -> Unit,
+    onInspect: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    BrowserSheetMenuItem(
+        icon = Icons.Rounded.Search,
+        label = stringResource(R.string.browser_find),
+        onClick = { onFind(); onDismiss() }
+    )
+    BrowserSheetMenuItem(
+        icon = Icons.Rounded.Code,
+        label = stringResource(R.string.browser_devtools_inspect),
+        onClick = { onInspect(); onDismiss() }
+    )
+    BrowserSheetMenuItem(
+        icon = if (bookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+        label = stringResource(
+            if (bookmarked) R.string.browser_remove_bookmark
+            else R.string.browser_add_bookmark
+        ),
+        onClick = { onToggleBookmark(); onDismiss() }
+    )
+    BrowserSheetMenuItem(
+        icon = Icons.Rounded.Key,
+        label = stringResource(R.string.browser_credentials),
+        onClick = { onCredentials(); onDismiss() }
+    )
+    BrowserSheetMenuItem(
+        icon = Icons.Rounded.Share,
+        label = stringResource(R.string.browser_share),
+        onClick = { onShare(); onDismiss() }
+    )
+    BrowserSheetMenuItem(
+        icon = Icons.Rounded.ContentCopy,
+        label = stringResource(R.string.browser_copy_link),
+        onClick = { onCopyLink(); onDismiss() }
+    )
+}
+
+/** 更多弹窗·开关组：无痕(开关) / 桌面版(开关) / 缩放。 */
+@Composable
+private fun BrowserSheetMenuToggles(
+    incognito: Boolean,
+    desktopMode: Boolean,
+    onIncognito: () -> Unit,
+    onDesktopMode: () -> Unit,
+    onZoom: () -> Unit
+) {
+    BrowserSheetMenuItem(
+        icon = Icons.Rounded.PrivacyTip,
+        label = stringResource(R.string.browser_incognito),
+        onClick = onIncognito,
+        // 开关保持 Material3 原生尺寸（52×32dp）：曾用 Modifier.size(32.dp) 压缩，
+        // 导致轨道被压扁、滑块比例失衡（与 AppSwitchRow/AppListItem 的用法一致）。
+        trailing = { Switch(checked = incognito, onCheckedChange = { onIncognito() }) }
+    )
+    BrowserSheetMenuItem(
+        icon = Icons.Rounded.DesktopWindows,
+        label = stringResource(R.string.browser_desktop_mode),
+        onClick = onDesktopMode,
+        trailing = { Switch(checked = desktopMode, onCheckedChange = { onDesktopMode() }) }
+    )
+    BrowserSheetMenuItem(
+        icon = Icons.Rounded.ZoomIn,
+        label = stringResource(R.string.browser_zoom),
+        onClick = onZoom
+    )
+}
+
+/**
+ * 更多弹窗·隐私与显示组：隐私与安全 / 地址栏位置。
+ * 隐私与安全 0.0.1.5 起从 WebView 右上角悬浮盾牌移入此处——
+ * 悬浮按钮会遮挡网页内容（用户报告），弹窗内还可展示拦截计数。
+ */
+@Composable
+private fun BrowserSheetMenuPrivacy(
+    blockedCount: Int,
+    addressBarAtBottom: Boolean,
+    onPrivacy: () -> Unit,
+    onToggleAddressBar: () -> Unit
+) {
+    BrowserSheetMenuItem(
+        icon = Icons.Rounded.Shield,
+        label = stringResource(R.string.browser_privacy_title),
+        badgeCount = blockedCount,
+        onClick = onPrivacy
+    )
+    BrowserSheetMenuItem(
+        icon = Icons.Rounded.SwapVert,
+        label = stringResource(R.string.browser_address_bar_position),
+        onClick = onToggleAddressBar,
+        trailing = {
+            Text(
+                text = stringResource(
+                    if (addressBarAtBottom) R.string.browser_address_bar_bottom
+                    else R.string.browser_address_bar_top
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    )
+}
+
+/**
+ * 底部弹窗菜单行：leading 图标（可带计数角标）+ 文字 + 可选 trailing 控件。
+ * 行高 52dp 起、点击区铺满，与应用主体列表行（AppListItem）的规格对齐。
+ */
+@Composable
+private fun BrowserSheetMenuItem(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    badgeCount: Int = 0,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md)
+    ) {
+        Box(contentAlignment = Alignment.TopEnd) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+            if (badgeCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (badgeCount > 99) "99+" else badgeCount.toString(),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
             }
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
         )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_credentials)) },
-            onClick = onCredentials,
-            leadingIcon = { Icon(Icons.Rounded.Key, null) }
-        )
-        HorizontalDivider()
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_share)) },
-            onClick = onShare,
-            leadingIcon = { Icon(Icons.Rounded.Share, null) }
-        )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_copy_link)) },
-            onClick = onCopyLink,
-            leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) }
-        )
-        HorizontalDivider()
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_incognito)) },
-            onClick = onIncognito,
-            leadingIcon = { Icon(Icons.Rounded.PrivacyTip, null) },
-            trailingIcon = {
-                // 开关保持 Material3 原生尺寸（52×32dp）：曾用 Modifier.size(32.dp) 压缩，
-                // 导致轨道被压扁、滑块比例失衡（与 AppSwitchRow/AppListItem 的用法一致）。
-                Switch(checked = incognito, onCheckedChange = { onIncognito() })
-            }
-        )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_desktop_mode)) },
-            onClick = onDesktopMode,
-            leadingIcon = { Icon(Icons.Rounded.DesktopWindows, null) },
-            trailingIcon = {
-                Switch(checked = desktopMode, onCheckedChange = { onDesktopMode() })
-            }
-        )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_zoom)) },
-            onClick = onZoom,
-            leadingIcon = { Icon(Icons.Rounded.ZoomIn, null) }
-        )
-        HorizontalDivider()
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.browser_address_bar_position)) },
-            onClick = onToggleAddressBar,
-            leadingIcon = { Icon(Icons.Rounded.SwapVert, null) },
-            trailingIcon = {
-                Text(
-                    if (addressBarAtBottom) stringResource(R.string.browser_address_bar_bottom)
-                    else stringResource(R.string.browser_address_bar_top),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        )
+        trailing?.invoke()
     }
 }
 

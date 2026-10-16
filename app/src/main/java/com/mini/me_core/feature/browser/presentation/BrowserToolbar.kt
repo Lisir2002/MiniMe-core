@@ -180,7 +180,11 @@ internal fun BrowserBottomToolbar(
     onDownloads: () -> Unit,
     onAi: () -> Unit
 ) {
-    Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+    Column(
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.surface)
+            .navigationBarsPadding()
+    ) {
         HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
         Row(
             modifier = Modifier

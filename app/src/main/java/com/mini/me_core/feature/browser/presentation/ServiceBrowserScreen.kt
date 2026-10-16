@@ -81,7 +81,6 @@ import androidx.compose.material.icons.rounded.OpenInBrowser
 import androidx.compose.material.icons.rounded.OpenWith
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PrivacyTip
-import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Replay
@@ -402,6 +401,53 @@ fun ServiceBrowserScreen(
     }
 
     // ===== 顶部栏（标签栏 + 地址栏） =====
+    // 地址栏公共渲染：顶部模式置于 topBar（标签栏下方），底部模式置于 bottomBar（工具栏上方）。
+    // 0.0.1.5 修复：此前仅有 topBar 承载，切到「底部」后顶部栏被动画隐藏、
+    // 底部无渲染点，导致地址栏整体消失（用户报告的严重 bug）。
+    val renderAddressBar: @Composable () -> Unit = {
+        BrowserAddressBar(
+            canGoBack = uiState.canGoBack,
+            canGoForward = uiState.canGoForward,
+            currentUrl = uiState.currentUrl,
+            isLoading = uiState.isLoading,
+            progress = uiState.progress,
+            addressText = addressText,
+            onAddressTextChange = { addressText = it },
+            onNavigate = { navigate() },
+            onGoBack = { browserController.goBack() },
+            onNavigateBack = { onNavigateBack() },
+            onGoForward = { browserController.goForward() },
+            onStopLoading = { browserController.stopLoading() },
+            onReload = { browserController.reload() },
+            showMore = showMore,
+            onShowMoreChange = { showMore = it },
+            bookmarked = uiState.currentUrl.isNotBlank() && browserController.isBookmarked(uiState.currentUrl),
+            incognito = uiState.incognito,
+            desktopMode = uiState.desktopMode,
+            addressBarAtBottom = addressBarAtBottom,
+            onToggleAddressBar = { toggleAddressBarPosition() },
+            onFind = { showMore = false; findVisible = true; findText = "" },
+            onToggleBookmark = {
+                showMore = false
+                if (uiState.currentUrl.isNotBlank()) {
+                    if (browserController.isBookmarked(uiState.currentUrl)) {
+                        browserController.removeBookmark(uiState.currentUrl)
+                    } else {
+                        browserController.addBookmark()
+                    }
+                }
+            },
+            onCredentials = { showMore = false; showCredentials = true },
+            onShare = { showMore = false; shareCurrent() },
+            onCopyLink = { showMore = false; copyCurrentLink() },
+            onIncognito = { browserController.setIncognito(!uiState.incognito) },
+            onDesktopMode = { browserController.toggleDesktopMode() },
+            onZoom = { showMore = false; showZoom = true },
+            onInspect = { showMore = false; showDevTools = true },
+            blockedCount = blockedCount,
+            onPrivacy = { showMore = false; showPrivacy = true }
+        )
+    }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -426,52 +472,13 @@ fun ServiceBrowserScreen(
                     onNewTab = { newTab() },
                     onOpenManager = { showTabManager = true }
                 )
-                // 地址栏：顶部模式时显示在标签栏下方，底部模式时隐藏（移至 bottomBar）
+                // 地址栏：顶部模式时显示在标签栏下方，底部模式时隐藏（由 bottomBar 承载）
                 AnimatedVisibility(
                     visible = !addressBarAtBottom,
                     enter = slideInVertically { -it } + fadeIn(),
                     exit = slideOutVertically { -it } + fadeOut()
                 ) {
-                    BrowserAddressBar(
-                        canGoBack = uiState.canGoBack,
-                        canGoForward = uiState.canGoForward,
-                        currentUrl = uiState.currentUrl,
-                        isLoading = uiState.isLoading,
-                        progress = uiState.progress,
-                        addressText = addressText,
-                        onAddressTextChange = { addressText = it },
-                        onNavigate = { navigate() },
-                        onGoBack = { browserController.goBack() },
-                        onNavigateBack = { onNavigateBack() },
-                        onGoForward = { browserController.goForward() },
-                        onStopLoading = { browserController.stopLoading() },
-                        onReload = { browserController.reload() },
-                        showMore = showMore,
-                        onShowMoreChange = { showMore = it },
-                        bookmarked = uiState.currentUrl.isNotBlank() && browserController.isBookmarked(uiState.currentUrl),
-                        incognito = uiState.incognito,
-                        desktopMode = uiState.desktopMode,
-                        addressBarAtBottom = addressBarAtBottom,
-                        onToggleAddressBar = { toggleAddressBarPosition() },
-                        onFind = { showMore = false; findVisible = true; findText = "" },
-                        onToggleBookmark = {
-                            showMore = false
-                            if (uiState.currentUrl.isNotBlank()) {
-                                if (browserController.isBookmarked(uiState.currentUrl)) {
-                                    browserController.removeBookmark(uiState.currentUrl)
-                                } else {
-                                    browserController.addBookmark()
-                                }
-                            }
-                        },
-                        onCredentials = { showMore = false; showCredentials = true },
-                        onShare = { showMore = false; shareCurrent() },
-                        onCopyLink = { showMore = false; copyCurrentLink() },
-                        onIncognito = { browserController.setIncognito(!uiState.incognito) },
-                        onDesktopMode = { browserController.toggleDesktopMode() },
-                        onZoom = { showMore = false; showZoom = true },
-                        onInspect = { showMore = false; showDevTools = true }
-                    )
+                    renderAddressBar()
                 }
                 // 页内查找条：始终在顶部区域，动画展开/收起
                 AnimatedVisibility(visible = findVisible, enter = fadeIn(), exit = fadeOut()) {
@@ -542,6 +549,26 @@ fun ServiceBrowserScreen(
                 }
             }
         },
+        bottomBar = {
+            // 地址栏底部模式：地址栏 + 底部工具栏（主页/书签/历史/下载/AI）。
+            // 修复前此处缺失：切到「底部」后地址栏无任何渲染点而整体消失。
+            if (addressBarAtBottom) {
+                Surface(color = MaterialTheme.colorScheme.surface) {
+                    Column {
+                        renderAddressBar()
+                        BrowserBottomToolbar(
+                            agentActive = agentStatus.active,
+                            activeDownloadCount = activeDownloadCount,
+                            onHome = { newTab() },
+                            onBookmarks = { showBookmarks = true },
+                            onHistory = { showHistory = true },
+                            onDownloads = { showDownloads = true },
+                            onAi = { showAiPanel = true }
+                        )
+                    }
+                }
+            }
+        },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -592,45 +619,8 @@ fun ServiceBrowserScreen(
                                 }
                             }
                         }
-                        // F4.4 阅读模式入口 + F4.5 隐私盾牌（右上角悬浮）
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(Spacing.sm),
-                            horizontalAlignment = Alignment.End
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surface,
-                                shadowElevation = 4.dp,
-                                modifier = Modifier
-                            ) {
-                                Box(contentAlignment = Alignment.TopEnd) {
-                                    IconButton(onClick = { showPrivacy = true }) {
-                                        Icon(
-                                            Icons.Rounded.Shield,
-                                            contentDescription = stringResource(R.string.browser_privacy_title),
-                                            tint = if (blockedCount > 0) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(22.dp)
-                                        )
-                                    }
-                                    if (blockedCount > 0) {
-                                        Text(
-                                            text = blockedCount.toString(),
-                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                            modifier = Modifier
-                                                .padding(top = 4.dp, end = 4.dp)
-                                                .background(MaterialTheme.colorScheme.primary, CircleShape)
-                                                .padding(horizontal = 3.dp, vertical = 1.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
                     }
-                    // 新标签页主页：当前标签尚无 URL 时展示搜索/快捷方式/最近访问
+                        // 新标签页主页：当前标签尚无 URL 时展示搜索/快捷方式/最近访问
                     if (uiState.currentUrl.isBlank()) {
                         BrowserHomePage(
                             addressText = addressText,
