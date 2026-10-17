@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.sp
+import com.mini.me_core.feature.agent.presentation.component.richsegment.MarkdownRenderOptions
 import com.mini.me_core.feature.agent.presentation.component.richsegment.SegmentedContent
 import com.mini.me_core.feature.agent.presentation.component.richsegment.SegmentedRenderCache
 
@@ -49,7 +50,7 @@ internal fun MarkdownContent(
     color: Color,
     modifier: Modifier = Modifier,
     cache: MarkdownRenderCache? = null,
-    compact: Boolean = false,
+    options: MarkdownRenderOptions = MarkdownRenderOptions(),
     onOpenUrl: ((url: String) -> Unit)? = null,
     onOpenFilePath: ((path: String) -> Unit)? = null
 ) {
@@ -58,7 +59,7 @@ internal fun MarkdownContent(
         color = color,
         modifier = modifier,
         cache = cache,
-        compact = compact,
+        options = options,
         onOpenUrl = onOpenUrl,
         onOpenFilePath = onOpenFilePath
     )

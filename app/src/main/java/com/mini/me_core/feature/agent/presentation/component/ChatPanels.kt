@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorKind
@@ -252,7 +253,7 @@ private fun ExpandableErrorBanner(
             modifier = Modifier.padding(Spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, contentDescription = null, tint = Brand.IconGray, modifier = Modifier.size(18.dp))
+            Icon(icon, contentDescription = null, tint = Brand.IconGray, modifier = Modifier.size(IconSizeTokens.medium))
             Spacer(Modifier.width(Spacing.sm))
             Text(
                 text = message,
@@ -269,7 +270,7 @@ private fun ExpandableErrorBanner(
                     if (expanded) R.string.common_collapse else R.string.common_expand
                 ),
                 tint = content,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(IconSizeTokens.medium)
             )
         }
     }
@@ -293,7 +294,7 @@ internal fun InfoBanner(
             modifier = Modifier.padding(Spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, contentDescription = null, tint = Brand.IconGray, modifier = Modifier.size(18.dp))
+            Icon(icon, contentDescription = null, tint = Brand.IconGray, modifier = Modifier.size(IconSizeTokens.medium))
             Spacer(Modifier.width(Spacing.sm))
             Text(text, color = content, style = MaterialTheme.typography.bodyMedium)
         }

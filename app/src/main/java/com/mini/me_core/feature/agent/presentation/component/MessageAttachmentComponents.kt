@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.content.Context
@@ -160,7 +161,7 @@ private fun MessageImagePreview(attachment: AgentAttachment) {
                 Icons.Rounded.Image,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(IconSizeTokens.medium)
             )
         }
     }
@@ -179,7 +180,7 @@ private fun MessageFilePreview(attachment: AgentAttachment) {
             Icons.Rounded.Description,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(IconSizeTokens.medium)
         )
         Spacer(Modifier.height(4.dp))
         // 过长文件名横向滚动展示，不再用省略号截断

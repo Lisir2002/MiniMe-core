@@ -12,126 +12,27 @@ package com.mini.me_core.feature.agent.presentation.component.richsegment
  */
 object RichTextSegmenter {
 
-    /** 分隔块：一行或多行文本 + 该块的类型。仅用于分词阶段的中间结构。 */
-    private sealed interface BlockLine {
-        val lines: List<String>
-    }
+    /** 块级解析结果：一段 segment（为空表示「本行已消费但不产出内容」）+ 下一行起始下标。 */
+    private data class BlockResult(val segment: RichSegment?, val nextIndex: Int)
 
-    /** 对整段文本做块级分段。 */
-    fun segment(text: String): List<RichSegment> {
+    /**
+     * 对整段文本做块级分段。
+     *
+     * @param streaming 文本是否仍在流式增长。为 true 时，行内分词器对「位于文本末尾
+     *   且尚未出现终止符的 URL」不做链接判定（见 [InlineTokenizer.parse]），
+     *   避免半截 URL 每个 delta 都重排一次。
+     */
+    fun segment(text: String, streaming: Boolean = false): List<RichSegment> {
         if (text.isBlank()) return emptyList()
         val lines = text.lines()
         val result = mutableListOf<RichSegment>()
         var i = 0
 
         while (i < lines.size) {
-            val line = lines[i]
-
-            when {
-                // 围栏代码块：``` 或 ~~~
-                isCodeFence(line) -> {
-                    val fenceChar = line.trimStart().take(1)
-                    val language = line.trim().removePrefix(fenceChar.repeat(3)).trim().takeIf { it.isNotEmpty() }
-                    val codeLines = mutableListOf<String>()
-                    i++
-                    var closed = false
-                    while (i < lines.size) {
-                        val l = lines[i]
-                        if (l.trim().startsWith(fenceChar.repeat(3))) {
-                            closed = true
-                            i++
-                            break
-                        }
-                        codeLines.add(l)
-                        i++
-                    }
-                    result.add(RichSegment.CodeBlock(language, codeLines.joinToString("\n")))
-                    if (!closed && i >= lines.size) {
-                        // 未闭合：codeLines 已含余下全部内容，继续即可（i 已越界）
-                    }
-                }
-
-                // 表格：连续 | 开头的行（至少表头 + 分隔行）
-                isTableStart(line) && hasTableContinuation(lines, i) -> {
-                    val table = parseTable(lines, i)
-                    result.add(table.segment)
-                    i = table.nextIndex
-                }
-
-                // 标题：# 空格
-                isHeading(line) -> {
-                    val trimmed = line.trimStart()
-                    val level = trimmed.takeWhile { it == '#' }.length
-                    val headingText = trimmed.drop(level).trim()
-                    result.add(RichSegment.Heading(level, InlineTokenizer.parse(headingText)))
-                    i++
-                }
-
-                // 引用块：连续 > 行
-                isQuote(line) -> {
-                    val quoteLines = mutableListOf<String>()
-                    while (i < lines.size && isQuote(lines[i])) {
-                        quoteLines.add(lines[i].substringAfter('>').trimStart())
-                        i++
-                    }
-                    result.add(RichSegment.Quote(quoteLines))
-                }
-
-                // 命令：$ 前缀
-                isCommand(line) -> {
-                    result.add(RichSegment.Command(line.trimStart().removePrefix("$").trim()))
-                    i++
-                }
-
-                // 无序列表：- / * / + （连续）
-                isBulletItem(line) -> {
-                    val items = mutableListOf<List<Inline>>()
-                    while (i < lines.size && isBulletItem(lines[i])) {
-                        val markerRemoved = lines[i].substringAfter(' ').trim()
-                        items.add(InlineTokenizer.parse(markerRemoved))
-                        i++
-                    }
-                    result.add(RichSegment.BulletList(items))
-                }
-
-                // 有序列表：数字. / 数字) （连续）
-                isOrderedItem(line) -> {
-                    val items = mutableListOf<List<Inline>>()
-                    var start = 1
-                    while (i < lines.size && isOrderedItem(lines[i])) {
-                        val trimmed = lines[i].trimStart()
-                        if (items.isEmpty()) {
-                            start = trimmed.takeWhile { it.isDigit() }.toIntOrNull() ?: 1
-                        }
-                        val afterMarker = trimmed.substringAfter('.').substringAfter(')').trim()
-                        // 针对 "1." 与 "1)"，统一取分隔符后内容
-                        val content = trimmed.removePrefix(trimmed.takeWhile { it.isDigit() })
-                            .removePrefix(".").removePrefix(")").trim()
-                        items.add(InlineTokenizer.parse(content.ifBlank { afterMarker }))
-                        i++
-                    }
-                    result.add(RichSegment.OrderedList(items, start))
-                }
-
-                // 空行
-                line.isBlank() -> {
-                    result.add(RichSegment.Blank)
-                    i++
-                }
-
-                // 段落：连续非空普通行（合并，段内换行保留）
-                else -> {
-                    val paraLines = mutableListOf<String>()
-                    while (i < lines.size && isPlainContentLine(lines[i])) {
-                        paraLines.add(lines[i])
-                        i++
-                    }
-                    val paraText = paraLines.joinToString("\n").trim()
-                    if (paraText.isNotEmpty()) {
-                        result.add(RichSegment.Paragraph(InlineTokenizer.parse(paraText)))
-                    }
-                }
-            }
+            val parsed = parseBlockAt(lines, i, streaming)
+            if (parsed.segment != null) result.add(parsed.segment)
+            // 进度保证：parseBlockAt 契约要求 nextIndex > i，否则这里会原地打转死循环。
+            i = parsed.nextIndex
         }
         // 问题7c修复：去掉开头的空行 segment（流式文本常以 \n 开头，导致首行永远空行）
         while (result.isNotEmpty() && result.first() is RichSegment.Blank) {
@@ -198,11 +99,162 @@ object RichTextSegmenter {
             !isTableStart(line)
     }
 
+    // ---- 块级解析（各自负责「吃掉」自己那段行并返回下一行下标） ----
+
+    /**
+     * 按起始行类型分发到对应块解析器（顺序即优先级，不可随意调整：
+     * 表格判断依赖「下一行是分隔行」，必须排在段落兜底之前）。
+     *
+     * 契约：返回的 [BlockResult.nextIndex] 必须大于 [start]，保证调用方必定前进。
+     */
+    private fun parseBlockAt(lines: List<String>, start: Int, streaming: Boolean): BlockResult {
+        val line = lines[start]
+        return when {
+            // 围栏代码块：``` 或 ~~~
+            isCodeFence(line) -> parseCodeBlock(lines, start)
+            // 表格：连续 | 开头的行（至少表头 + 分隔行）
+            isTableStart(line) && hasTableContinuation(lines, start) -> parseTable(lines, start, streaming)
+            // 标题：# 空格
+            isHeading(line) -> BlockResult(parseHeading(line, streaming), start + 1)
+            // 引用块：连续 > 行
+            isQuote(line) -> parseQuote(lines, start)
+            // 命令：$ 前缀
+            isCommand(line) -> BlockResult(
+                RichSegment.Command(HtmlEntities.decode(line.trimStart().removePrefix("$").trim())),
+                start + 1
+            )
+            // 无序列表：- / * / + （连续）
+            isBulletItem(line) -> parseBulletList(lines, start, streaming)
+            // 有序列表：数字. / 数字) （连续）
+            isOrderedItem(line) -> parseOrderedList(lines, start, streaming)
+            // 空行
+            line.isBlank() -> BlockResult(RichSegment.Blank, start + 1)
+            // 段落：连续非空普通行（合并，段内换行保留）
+            else -> parseParagraph(lines, start, streaming)
+        }
+    }
+
+    /**
+     * 解析围栏代码块（``` / ~~~）。
+     *
+     * 围栏状态机关键一步：未闭合时，末行若只是「半截闭合围栏」（流式中正在写入的 ``` ，
+     * 或尾随换行产生的空行），它不是代码内容，必须剔除——否则闭合围栏一到，
+     * 这行会从代码区凭空消失，造成整块重排跳变。
+     */
+    private fun parseCodeBlock(lines: List<String>, start: Int): BlockResult {
+        val line = lines[start]
+        val fenceChar = line.trimStart().take(1)
+        val fenceToken = fenceChar.repeat(3)
+        val language = line.trim().removePrefix(fenceToken).trim().takeIf { it.isNotEmpty() }
+        val codeLines = mutableListOf<String>()
+        var i = start + 1
+        var closed = false
+        while (i < lines.size) {
+            val l = lines[i]
+            if (l.trim().startsWith(fenceToken)) {
+                closed = true
+                i++
+                break
+            }
+            codeLines.add(l)
+            i++
+        }
+        if (!closed && codeLines.isNotEmpty()) {
+            val last = codeLines.last()
+            // last 为空行，或 last 是 fenceToken 的前缀（正在逐字符写入的 ``` ）
+            if (last.isEmpty() || fenceToken.startsWith(last)) {
+                codeLines.removeAt(codeLines.size - 1)
+            }
+        }
+        return BlockResult(
+            RichSegment.CodeBlock(language, codeLines.joinToString("\n"), closed),
+            i
+        )
+    }
+
+    /** 解析标题：# 后紧跟空格，取 # 数量作为层级。 */
+    private fun parseHeading(line: String, streaming: Boolean): RichSegment.Heading {
+        val trimmed = line.trimStart()
+        val level = trimmed.takeWhile { it == '#' }.length
+        val headingText = trimmed.drop(level).trim()
+        return RichSegment.Heading(level, InlineTokenizer.parse(headingText, streaming))
+    }
+
+    /** 解析引用块：连续 > 行，去掉标记后解码实体。 */
+    private fun parseQuote(lines: List<String>, start: Int): BlockResult {
+        val quoteLines = mutableListOf<String>()
+        var i = start
+        while (i < lines.size && isQuote(lines[i])) {
+            quoteLines.add(HtmlEntities.decode(lines[i].substringAfter('>').trimStart()))
+            i++
+        }
+        return BlockResult(RichSegment.Quote(quoteLines), i)
+    }
+
+    /** 解析无序列表：连续 - / * / + 行。 */
+    private fun parseBulletList(lines: List<String>, start: Int, streaming: Boolean): BlockResult {
+        val items = mutableListOf<List<Inline>>()
+        var i = start
+        while (i < lines.size && isBulletItem(lines[i])) {
+            val markerRemoved = lines[i].substringAfter(' ').trim()
+            items.add(InlineTokenizer.parse(markerRemoved, streaming))
+            i++
+        }
+        return BlockResult(RichSegment.BulletList(items), i)
+    }
+
+    /** 解析有序列表：连续 `数字.` / `数字)` 行，记录起始序号。 */
+    private fun parseOrderedList(lines: List<String>, start: Int, streaming: Boolean): BlockResult {
+        val items = mutableListOf<List<Inline>>()
+        var i = start
+        var startNumber = 1
+        while (i < lines.size && isOrderedItem(lines[i])) {
+            val trimmed = lines[i].trimStart()
+            if (items.isEmpty()) {
+                startNumber = trimmed.takeWhile { it.isDigit() }.toIntOrNull() ?: 1
+            }
+            val afterMarker = trimmed.substringAfter('.').substringAfter(')').trim()
+            // 针对 "1." 与 "1)"，统一取分隔符后内容
+            val content = trimmed.removePrefix(trimmed.takeWhile { it.isDigit() })
+                .removePrefix(".").removePrefix(")").trim()
+            items.add(InlineTokenizer.parse(content.ifBlank { afterMarker }, streaming))
+            i++
+        }
+        return BlockResult(RichSegment.OrderedList(items, startNumber), i)
+    }
+
+    /**
+     * 解析段落：连续非空普通行（合并，段内换行保留）。
+     *
+     * 兜底：起始行若不是「普通内容行」（例如缺少分隔行的单行表格 `| a |`——
+     * 表格分支因无分隔行而不匹配），这里必须强行吃掉一行，
+     * 否则外层 while 下标原地不动 → 主线程死循环（ANR）。
+     */
+    private fun parseParagraph(lines: List<String>, start: Int, streaming: Boolean): BlockResult {
+        val paraLines = mutableListOf<String>()
+        var i = start
+        while (i < lines.size && isPlainContentLine(lines[i])) {
+            paraLines.add(lines[i])
+            i++
+        }
+        if (i == start) {
+            paraLines.add(lines[start])
+            i++
+        }
+        val paraText = paraLines.joinToString("\n").trim()
+        return BlockResult(
+            if (paraText.isEmpty()) {
+                null
+            } else {
+                RichSegment.Paragraph(InlineTokenizer.parse(paraText, streaming))
+            },
+            i
+        )
+    }
+
     // ---- 表格解析 ----
 
-    private data class TableParseResult(val segment: RichSegment.Table, val nextIndex: Int)
-
-    private fun parseTable(lines: List<String>, start: Int): TableParseResult {
+    private fun parseTable(lines: List<String>, start: Int, streaming: Boolean): BlockResult {
         var i = start
         val rawRows = mutableListOf<String>()
         while (i < lines.size && lines[i].trim().startsWith("|")) {
@@ -212,16 +264,16 @@ object RichTextSegmenter {
         val cells = rawRows.map { row -> splitTableRow(row).map { it.trim() } }
 
         // 跳过第二行分隔行（纯 --- 结构行）
-        val header = cells.getOrNull(0)?.map { InlineTokenizer.parse(it) } ?: emptyList()
+        val header = cells.getOrNull(0)?.map { InlineTokenizer.parse(it, streaming) } ?: emptyList()
         val dataRows = mutableListOf<List<List<Inline>>>()
         for (r in 2 until cells.size) {
             val rowCells = cells[r]
-            val parsed = rowCells.map { InlineTokenizer.parse(it) }
+            val parsed = rowCells.map { InlineTokenizer.parse(it, streaming) }
             // 对齐列数：不足补空，多余丢弃，保证矩形
             val aligned = (0 until header.size).map { col -> parsed.getOrElse(col) { emptyList() } }
             dataRows.add(aligned)
         }
-        return TableParseResult(RichSegment.Table(header, dataRows), i)
+        return BlockResult(RichSegment.Table(header, dataRows), i)
     }
 
     private fun splitTableRow(row: String): List<String> {
@@ -274,21 +326,37 @@ object InlineTokenizer {
     // 注意：这里不剥 ASCII ) ]，因为括号配对逻辑已保证尾部若有 ) ] 必然是成对合法的（例如 Wiki (operating_system)）。
     private val URL_TRAILING_PUNCT_P2 = Regex("[.,;:!?…—－]+$")
 
-    fun parse(text: String): List<Inline> {
+    /**
+     * 行内分词。
+     *
+     * @param streaming 文本仍在流式增长。此时若 URL 匹配一路延伸到文本末尾（后面没有任何
+     *   字符），说明它可能还没写完——按纯文本渲染，等真正的终止符（空白/行尾/标点）到达
+     *   后再升级为链接。这把「半截 URL 每个 delta 重排一次」变成「只在完成时切换一次」。
+     *   非流式文本不受影响：结尾 URL 依然是合法链接。
+     */
+    fun parse(text: String, streaming: Boolean = false): List<Inline> {
         if (text.isBlank()) return emptyList()
         val result = mutableListOf<Inline>()
         var lastEnd = 0
         var m = INLINE_TOKEN.find(text)
         while (m != null) {
             if (m.range.first > lastEnd) {
-                result.add(Inline.Plain(text.substring(lastEnd, m.range.first)))
+                result.add(Inline.Plain(HtmlEntities.decode(text.substring(lastEnd, m.range.first))))
             }
-            result.add(parseToken(m.value))
+            val token = m.value
+            val isUrl = token.startsWith("http://") || token.startsWith("https://")
+            // 流式中且 URL 顶到文本末尾：判定为「尚未写完」，按纯文本渲染
+            val unterminatedUrl = streaming && isUrl && m.range.last == text.length - 1
+            if (unterminatedUrl) {
+                result.add(Inline.Plain(HtmlEntities.decode(token)))
+            } else {
+                result.add(parseToken(token))
+            }
             lastEnd = m.range.last + 1
             m = INLINE_TOKEN.find(text, lastEnd)
         }
         if (lastEnd < text.length) {
-            result.add(Inline.Plain(text.substring(lastEnd)))
+            result.add(Inline.Plain(HtmlEntities.decode(text.substring(lastEnd))))
         }
         return result
     }

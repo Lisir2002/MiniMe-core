@@ -1,6 +1,7 @@
 @file:Suppress("FunctionNaming", "LongMethod", "LongParameterList") // Compose 命名/长组件约定；仅 ConnectionState 移包改引用，UI 行为保持
 
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.background
@@ -222,7 +223,7 @@ internal fun RemoteConnectingPlaceholder(
         ) {
             if (state == com.mini.me_core.core.container.api.ConnectionState.CONNECTING) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(IconSizeTokens.large),
                     strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

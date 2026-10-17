@@ -24,8 +24,20 @@ sealed interface RichSegment {
     /** 有序列表，[start] 为起始序号。 */
     data class OrderedList(val items: List<List<Inline>>, val start: Int) : RichSegment
 
-    /** 围栏代码块（``` 包裹），[language] 为围栏后标注的语言标识（可能为 null）。 */
-    data class CodeBlock(val language: String?, val code: String) : RichSegment
+    /**
+     * 围栏代码块（``` 包裹），[language] 为围栏后标注的语言标识（可能为 null）。
+     *
+     * [closed] 为围栏状态机的显式出口：false 表示流式期间尚未收到闭合围栏。
+     * 渲染侧据此做两件关键优化——
+     *  1) 只高亮「已稳定的完整行」，末行（可能仍在写入）按纯文本渲染，
+     *     避免每个 delta 全量重跑语法高亮（O(n²) 掉帧主因）；
+     *  2) 闭合到达时 stable 区与最终内容一致，不触发整块重排跳变。
+     */
+    data class CodeBlock(
+        val language: String?,
+        val code: String,
+        val closed: Boolean = true
+    ) : RichSegment
 
     /** Markdown 表格。 */
     data class Table(

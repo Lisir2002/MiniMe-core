@@ -319,4 +319,176 @@ class RichTextSegmenterTest {
         assertEquals(1, fps.size)
         assertEquals("/workspace/app/src/main/AndroidManifest.xml", fps[0].path)
     }
+
+    // ---- 围栏状态机（fence state machine）----
+
+    /** 流式中：未闭合围栏的块必须标记 closed=false，供渲染侧只高亮稳定行。 */
+    @Test
+    fun unclosedFenceIsMarkedNotClosed() {
+        val segs = RichTextSegmenter.segment("```kotlin\nval x = 1")
+        val block = segs.filterIsInstance<RichSegment.CodeBlock>().single()
+        assertEquals(false, block.closed)
+        assertEquals("kotlin", block.language)
+        assertEquals("val x = 1", block.code)
+    }
+
+    /** 流式中：尾随换行产生的空行不得进入代码内容（否则闭合时该行消失造成跳变）。 */
+    @Test
+    fun trailingNewlineIsNotCodeContentWhileStreaming() {
+        val segs = RichTextSegmenter.segment("```kotlin\nval x = 1\n")
+        val block = segs.filterIsInstance<RichSegment.CodeBlock>().single()
+        assertEquals("val x = 1", block.code)
+        assertEquals(false, block.closed)
+    }
+
+    /** 流式中：正在写入的半截闭合围栏（`` ）不是代码内容，须剔除。 */
+    @Test
+    fun partialClosingFenceIsStrippedWhileStreaming() {
+        val segs = RichTextSegmenter.segment("```kotlin\nval x = 1\n``")
+        val block = segs.filterIsInstance<RichSegment.CodeBlock>().single()
+        assertEquals("val x = 1", block.code)
+        assertEquals(false, block.closed)
+    }
+
+    /** 闭合瞬间：内容与流式期间的稳定区一致，仅 closed 翻转，不引入内容跳变。 */
+    @Test
+    fun closingFenceFlipsClosedWithoutChangingStableCode() {
+        val streaming = RichTextSegmenter.segment("```kotlin\nval x = 1")
+            .filterIsInstance<RichSegment.CodeBlock>().single()
+        val closed = RichTextSegmenter.segment("```kotlin\nval x = 1\n```")
+            .filterIsInstance<RichSegment.CodeBlock>().single()
+        assertEquals(streaming.code, closed.code)
+        assertEquals(true, closed.closed)
+    }
+
+    /** 代码中间的空行是真实内容，必须保留（只剔除「末行」的半截围栏/空行）。 */
+    @Test
+    fun innerBlankLineInsideCodeIsPreserved() {
+        val segs = RichTextSegmenter.segment("```\na\n\nb")
+        val block = segs.filterIsInstance<RichSegment.CodeBlock>().single()
+        assertEquals("a\n\nb", block.code)
+    }
+
+    /** 未闭合围栏内的闭合字符若不属于围栏字符（如 ~~~ 块里的 ```），不得误判为闭合。 */
+    @Test
+    fun mismatchedFenceCharDoesNotCloseBlock() {
+        val segs = RichTextSegmenter.segment("~~~\nval x = 1\n```")
+        val block = segs.filterIsInstance<RichSegment.CodeBlock>().single()
+        assertEquals(false, block.closed)
+        assertEquals("val x = 1\n```", block.code)
+    }
+
+    // ---- 半截 URL 终止符判定（P2-12）----
+
+    /** 流式中：URL 顶到文本末尾（无终止符）→ 按纯文本，不当链接。 */
+    @Test
+    fun unterminatedTrailingUrlIsPlainWhileStreaming() {
+        val segs = RichTextSegmenter.segment("详见 https://developer.android.com/guide", streaming = true)
+        val urls = segs.filterIsInstance<RichSegment.Paragraph>()
+            .flatMap { it.inlines.filterIsInstance<Inline.Url>() }
+        assertTrue("流式半截 URL 不应被判定为链接", urls.isEmpty())
+    }
+
+    /** 流式中：URL 后出现终止符（空格+正文）→ 正常升级为链接。 */
+    @Test
+    fun terminatedUrlBecomesLinkWhileStreaming() {
+        val segs = RichTextSegmenter.segment("详见 https://a.com 后续内容", streaming = true)
+        val urls = segs.filterIsInstance<RichSegment.Paragraph>()
+            .flatMap { it.inlines.filterIsInstance<Inline.Url>() }
+        assertEquals(1, urls.size)
+        assertEquals("https://a.com", urls[0].url)
+    }
+
+    /** 非流式：结尾 URL 依然是合法链接（不因本次改动回归）。 */
+    @Test
+    fun trailingUrlIsLinkWhenNotStreaming() {
+        val segs = RichTextSegmenter.segment("详见 https://developer.android.com/guide")
+        val urls = segs.filterIsInstance<RichSegment.Paragraph>()
+            .flatMap { it.inlines.filterIsInstance<Inline.Url>() }
+        assertEquals(1, urls.size)
+    }
+
+    /** 流式中：URL 后紧跟换行也构成终止（下一行已有内容）。 */
+    @Test
+    fun urlFollowedByNewlineIsLinkWhileStreaming() {
+        val segs = RichTextSegmenter.segment("https://a.com\n第二行", streaming = true)
+        val urls = segs.filterIsInstance<RichSegment.Paragraph>()
+            .flatMap { it.inlines.filterIsInstance<Inline.Url>() }
+        assertEquals(1, urls.size)
+        assertEquals("https://a.com", urls[0].url)
+    }
+
+    // ---- HTML 实体解码（P2-14）----
+
+    @Test
+    fun htmlEntitiesInPlainTextAreDecoded() {
+        val segs = RichTextSegmenter.segment("参数 a=1 &amp; b=2 就绪")
+        val para = segs.filterIsInstance<RichSegment.Paragraph>().single()
+        assertEquals("参数 a=1 & b=2 就绪", para.inlines.joinToString("") {
+            if (it is Inline.Plain) it.text else ""
+        })
+    }
+
+    /** 代码块内的实体必须原样保留（代码是逐字内容）。 */
+    @Test
+    fun htmlEntitiesInsideCodeBlockAreNotDecoded() {
+        val segs = RichTextSegmenter.segment("```xml\n<a> &amp; </a>\n```")
+        val block = segs.filterIsInstance<RichSegment.CodeBlock>().single()
+        assertEquals("<a> &amp; </a>", block.code)
+    }
+
+    /** 行内代码同样原样保留。 */
+    @Test
+    fun htmlEntitiesInsideInlineCodeAreNotDecoded() {
+        val segs = RichTextSegmenter.segment("用 `&amp;` 转义")
+        val para = segs.filterIsInstance<RichSegment.Paragraph>().single()
+        val codes = para.inlines.filterIsInstance<Inline.Code>()
+        assertEquals(1, codes.size)
+        assertEquals("&amp;", codes[0].code)
+    }
+
+    // ---- 块级解析进度护栏（P2 分段管线加固）----
+
+    /**
+     * 单行表格（无分隔行）不得让分段器原地打转。
+     *
+     * `| a |` 是 table start，但因缺少 `| --- |` 分隔行而不走表格分支，
+     * 落到段落兜底；而 isPlainContentLine 又排除 table start，
+     * 若兜底不强行吃掉这一行，外层 while 下标不动 → 主线程死循环（ANR）。
+     */
+    @Test
+    fun loneTableLineDoesNotHangSegmenter() {
+        val segs = RichTextSegmenter.segment("| a |\n正文")
+        assertTrue("必须产出段落而不是空转", segs.any { it is RichSegment.Paragraph })
+        assertTrue("原样保留该行文本", segs.filterIsInstance<RichSegment.Paragraph>()
+            .any { it.inlines.joinToString("").contains("| a |") })
+    }
+
+    /** 有分隔行的表格仍按表格解析，不能被上面的兜底吃掉。 */
+    @Test
+    fun validTableStillParsedAsTable() {
+        val segs = RichTextSegmenter.segment("| h1 | h2 |\n| --- | --- |\n| c1 | c2 |")
+        assertEquals(1, segs.filterIsInstance<RichSegment.Table>().size)
+    }
+
+    /**
+     * 未闭合围栏的末行若是「半截闭合围栏」，必须剔除——
+     * 否则闭合围栏一到，这行会从代码区凭空消失，造成整块重排跳变。
+     */
+    @Test
+    fun incompleteClosingFenceIsNotRenderedAsCode() {
+        val segs = RichTextSegmenter.segment("```kt\nval a = 1\n``")
+        val block = segs.filterIsInstance<RichSegment.CodeBlock>().single()
+        assertEquals(false, block.closed)
+        assertEquals("val a = 1", block.code)
+    }
+
+    /** 完整的闭合围栏：闭合到达后内容不变，closed=true。 */
+    @Test
+    fun completeFenceKeepsCodeAndMarksClosed() {
+        val segs = RichTextSegmenter.segment("```kt\nval a = 1\n```")
+        val block = segs.filterIsInstance<RichSegment.CodeBlock>().single()
+        assertEquals(true, block.closed)
+        assertEquals("val a = 1", block.code)
+    }
 }

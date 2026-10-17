@@ -29,16 +29,34 @@ import kotlinx.coroutines.withContext
  *  - 每类片段各自专属的美观容器（色条、角标、复制、展开收起、行号、主题渐变）；
  *  - URL 点击进内置浏览器（有 Controller 时）或系统浏览器兜底，路径点击打开文件预览或复制路径兜底。
  */
+/**
+ * 富文本渲染选项：影响分段与排版，但不属于文本内容本身。
+ *
+ * 打包成对象而非散落成多个布尔参数，是为了让 [SegmentedContent] / MarkdownContent
+ * 的签名保持在 LongParameterList 阈值内，并让调用点一眼看清所处渲染模式。
+ *
+ * @param compact 紧凑排版（更小的间距与字号），用于气泡/下拉等空间受限场景。
+ * @param streaming 文本仍在流式增长：启用「半截 URL 先按纯文本渲染」等流式特化逻辑，
+ *   避免每个 delta 都因链接边界变化而重排。
+ */
+@Immutable
+data class MarkdownRenderOptions(
+    val compact: Boolean = false,
+    val streaming: Boolean = false
+)
+
 @Composable
 internal fun SegmentedContent(
     text: String,
     color: Color,
     modifier: Modifier = Modifier,
     cache: SegmentedRenderCache? = null,
-    compact: Boolean = false,
+    options: MarkdownRenderOptions = MarkdownRenderOptions(),
     onOpenUrl: ((url: String) -> Unit)? = null,
     onOpenFilePath: ((path: String) -> Unit)? = null
 ) {
+    val compact = options.compact
+    val streaming = options.streaming
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
@@ -53,13 +71,16 @@ internal fun SegmentedContent(
     val segments by produceState(
         initialValue = cache?.get(text) ?: emptyList<RichSegment>(),
         text,
+        streaming,
         cache,
     ) {
         val hit = cache?.get(text)
         if (hit != null) {
             value = hit
         } else {
-            val result = withContext(Dispatchers.Default) { RichTextSegmenter.segment(text) }
+            // 注意 key 必须含 streaming：流式→落库切换时若不重新分段，
+            // 末尾 URL 会停留在「纯文本」态不升级为链接。
+            val result = withContext(Dispatchers.Default) { RichTextSegmenter.segment(text, streaming) }
             value = result
             cache?.put(text, result)
         }

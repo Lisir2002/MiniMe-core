@@ -1,7 +1,9 @@
 package com.mini.me_core.feature.browser.domain
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
+import android.content.MutableContextWrapper
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
@@ -48,6 +50,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -135,6 +138,21 @@ class BrowserController @Inject constructor(
      */
     @Volatile
     private var webViewProxyApplied: Boolean? = null
+
+    /**
+     * 当前宿主 Activity（浏览器页可见时非空，离开页面置空）。
+     *
+     * WebView 的 `<select>` 下拉、日期/时间选择器等 Chromium 原生弹层，是用 WebView
+     * 自身 context 创建的系统对话框：Application context 没有窗口令牌、也没有 Activity
+     * 主题，弹层会静默失败（表现为「点 <select> 毫无反应」）。
+     * 因此每个 WebView 都包一层 [MutableContextWrapper]——宿主可见时 base 指向
+     * Activity，不可见时回退 Application context（供 Agent 后台浏览/截图，不需要弹层）。
+     */
+    @Volatile
+    private var hostActivity: Activity? = null
+
+    /** 已创建的 WebView context 包装器：宿主附着状态变化时统一换 base（含惰性创建的标签）。 */
+    private val webViewContexts = CopyOnWriteArrayList<MutableContextWrapper>()
 
     // 代理开关变化时，让已存在的 WebView 也跟上 mihomo 代理（新标签/导航天然生效）。
     // 只对 enabled 边沿触发（distinctUntilChanged），避免 controllerReachable / recovering /
@@ -336,6 +354,47 @@ class BrowserController @Inject constructor(
         }
     }
 
+    // ─────────────────────── 宿主 Activity 附着（原生弹层所需 context） ───────────────────────
+
+    /**
+     * 新建 WebView 用的 context。
+     *
+     * 宿主 Activity 可见 → base 为 Activity（原生弹层可显示）；
+     * 仅 Agent 后台使用 → base 为 Application context（无 UI 窗口需求）。
+     */
+    private fun newWebViewContext(): MutableContextWrapper {
+        val wrapper = MutableContextWrapper(hostActivity ?: context)
+        webViewContexts.add(wrapper)
+        return wrapper
+    }
+
+    /**
+     * 浏览器页附着宿主 Activity 时调用（Compose DisposableEffect）。
+     *
+     * 把全部已存在 WebView 的 context base 换成 Activity，历史标签的 `<select>`
+     * 也一并恢复——只换新建标签是不够的。
+     */
+    fun attachHost(activity: Activity) {
+        hostActivity = activity
+        refreshWebViewContexts()
+    }
+
+    /**
+     * 浏览器页卸载时调用。
+     *
+     * base 回退 Application context：既避免 wrapper 持有已销毁的 Activity（泄漏），
+     * 也保证 Agent 后台继续可用（后台无窗口，本就不需要弹层）。
+     */
+    fun detachHost() {
+        hostActivity = null
+        refreshWebViewContexts()
+    }
+
+    private fun refreshWebViewContexts() {
+        val base: Context = hostActivity ?: context
+        webViewContexts.forEach { it.baseContext = base }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     fun bind(): WebView {
         ensureActiveTab()
@@ -383,6 +442,7 @@ class BrowserController @Inject constructor(
             tabs.forEach { detachAndDestroy(it.webView) }
             tabs.clear()
             activeTabId = null
+            webViewContexts.clear()
             _tabsState.value = emptyList()
         }
     }
@@ -1552,7 +1612,10 @@ class BrowserController @Inject constructor(
     /** 配置一个全新的 WebView（主线程），回调按标签 id 分派。 */
     @SuppressLint("SetJavaScriptEnabled")
     private fun createWebView(tabId: String): WebView {
-        val wv = WebView(context)
+        // 必须包 MutableContextWrapper：直接用注入的 Application context 创建 WebView，
+        // <select> 等 Chromium 原生弹层（用 WebView context 创建的系统对话框）会因缺少
+        // 窗口令牌而静默失败。宿主 Activity 由 attachHost/detachHost 动态换 base。
+        val wv = WebView(newWebViewContext())
         wv.settings.apply {
             // 本浏览器需要执行自动化脚本，JS 按需保持开启；其余危险能力一律关闭。
             javaScriptEnabled = true

@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.richsegment
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.ScaledAnimation
@@ -39,15 +40,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -58,6 +63,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mini.me_core.core.theme.LocalAppDarkMode
@@ -427,7 +434,9 @@ internal fun headLines(text: String, maxLines: Int): String {
 @Composable
 private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
     val clipboard = LocalClipboardManager.current
-    var expanded by remember(seg) { mutableStateOf(true) }
+    // 注意：不能用 remember(seg) 做 key——seg 是 data class，流式期间每个 delta 都变化，
+    // 会导致用户手动收起的代码块在下一个 delta 被强制重新展开。
+    var expanded by remember { mutableStateOf(true) }
     val syntaxLang = seg.language?.let { inferByLabel(it) }
     val lineCount = seg.code.count { it == '\n' } + 1
     val shouldCollapse = lineCount > 30
@@ -466,7 +475,7 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
                 Icons.Rounded.InsertDriveFile,
                 contentDescription = null,
                 tint = Color.White.copy(alpha = 0.9f),
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(IconSizeTokens.small)
             )
             Spacer(Modifier.width(6.dp))
             Text(
@@ -480,26 +489,26 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
             Spacer(Modifier.weight(1f))
             val plainText = seg.code
             androidx.compose.material3.IconButton(
-                modifier = Modifier.size(30.dp),
+                modifier = Modifier.size(IconSizeTokens.large),
                 onClick = { clipboard.setText(AnnotatedString(plainText)) }
             ) {
                 Icon(
                     Icons.Rounded.ContentCopy,
                     contentDescription = stringResource(R.string.chat_copy_code),
                     tint = Color.White.copy(alpha = 0.9f),
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(IconSizeTokens.small)
                 )
             }
             if (shouldCollapse) {
                 androidx.compose.material3.IconButton(
-                    modifier = Modifier.size(30.dp),
+                    modifier = Modifier.size(IconSizeTokens.large),
                     onClick = { expanded = !expanded }
                 ) {
                     Icon(
                         if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                         contentDescription = if (expanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.common_expand),
                         tint = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.size(15.dp)
+                        modifier = Modifier.size(IconSizeTokens.small)
                     )
                 }
             }
@@ -521,45 +530,73 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
                     // 混合模式：代码块 12sp 等宽，行高 18sp
                     fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
                     lineHeight = 18.sp,
-                    color = fg
+                    color = fg,
+                    // 代码是逐字内容：RTL 语言（阿拉伯语/希伯来语）环境下若跟随布局方向
+                    // 做 Bidi 解析，代码里的括号、运算符、数字串会被重排，肉眼可见错位。
+                    // 强制 LTR，让代码在任何系统语言下都按源码顺序渲染。
+                    textDirection = TextDirection.Ltr
                 )
                 // 折叠态只渲染前若干行：折叠容器是 260dp 固定高 + 垂直滚动，后面的行
                 // 用户根本滚不到（展开后才是完整内容），全量渲染数千行纯属浪费。
                 val folded = !expanded && shouldCollapse
-                val renderedCode = if (folded) {
-                    remember(seg.code) { headLines(seg.code, FOLD_VISIBLE_LINES) }
-                } else {
-                    seg.code
+                // Tab 展开必须在进入语法高亮之前统一做：高亮 span 按字符索引定位，
+                // 事后对 AnnotatedString 做字符串替换会让所有 span 整体错位。
+                // 复制按钮仍复制未展开的 seg.code 原文。
+                val renderedCode = remember(seg.code, folded) {
+                    val base = if (folded) headLines(seg.code, FOLD_VISIBLE_LINES) else seg.code
+                    base.expandTabsForRender()
                 }
                 val renderedLineCount = if (folded) minOf(lineCount, FOLD_VISIBLE_LINES) else lineCount
-                // 语法高亮按渲染文本缓存：流式期间每次文本变化都会重组，未缓存等于每段重算一遍。
-                val highlighted = remember(renderedCode, syntaxLang) {
-                    syntaxLang?.let { highlightCode(renderedCode, it) }
+                // 流式增量高亮：未闭合块只高亮「已稳定的完整行」，末行（仍在写入）按纯文本追加。
+                // 每个 delta 只重排一行，而不是全量重跑语法高亮（原实现每字符一次全量高亮，O(n²)）。
+                // 闭合到达时 stable 区 === 最终内容，视觉上无缝过渡。
+                val stableCode = if (seg.closed) renderedCode else stablePrefixOf(renderedCode)
+                val tailCode = if (seg.closed) "" else renderedCode.removePrefix(stableCode)
+                // 语法高亮放后台线程：长代码块在主线程同步高亮会直接掉帧。
+                // produceState 在 key 变化期间保留上一次结果，不会出现「空一帧」。
+                val highlighted by produceState<AnnotatedString?>(
+                    initialValue = null,
+                    key1 = stableCode,
+                    key2 = syntaxLang
+                ) {
+                    value = if (syntaxLang == null || stableCode.isBlank()) {
+                        null
+                    } else {
+                        withContext(Dispatchers.Default) { highlightCode(stableCode, syntaxLang) }
+                    }
                 }
-                if (highlighted != null) {
-                    // 水平滚动：避免窄屏上长行被截断
-                    Row(Modifier.horizontalScroll(rememberScrollState())) {
-                        // 行号：合并为单个 Text。旧实现每行一个 Text，数千行的代码块会产生
-                        // 数千个 Composable 节点，是长输出时 slot table 膨胀与布局耗时的主因。
-                        val gutterW = remember(renderedLineCount) {
-                            (renderedLineCount.toString().length * 8 + 10).dp
+                // 高亮未就绪（首帧/切换语言）时先按纯文本渲染，绝不留空。
+                val display: AnnotatedString = highlighted
+                    ?.let { if (tailCode.isEmpty()) it else it + AnnotatedString(tailCode) }
+                    ?: AnnotatedString(renderedCode)
+                if (highlighted != null || syntaxLang == null) {
+                    // 整块强制 LTR：水平滚动容器同样按 LTR 排（RTL 语言下默认从右起滚，
+                    // 行号会被甩到代码右侧），保证行号列始终在左、代码始终按源码方向铺开。
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        // 水平滚动：避免窄屏上长行被截断
+                        Row(Modifier.horizontalScroll(rememberScrollState())) {
+                            // 行号：合并为单个 Text。旧实现每行一个 Text，数千行的代码块会产生
+                            // 数千个 Composable 节点，是长输出时 slot table 膨胀与布局耗时的主因。
+                            val gutterW = remember(renderedLineCount) {
+                                (renderedLineCount.toString().length * 8 + 10).dp
+                            }
+                            Text(
+                                text = remember(renderedLineCount) { buildLineNumbers(renderedLineCount) },
+                                style = rawStyle.copy(
+                                    color = fg.copy(alpha = 0.42f),
+                                    fontSize = 11.5.sp
+                                ),
+                                textAlign = TextAlign.End,
+                                modifier = Modifier
+                                    .width(gutterW)
+                                    .padding(end = 8.dp)
+                            )
+                            Text(
+                                text = display,
+                                style = rawStyle,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
                         }
-                        Text(
-                            text = remember(renderedLineCount) { buildLineNumbers(renderedLineCount) },
-                            style = rawStyle.copy(
-                                color = fg.copy(alpha = 0.42f),
-                                fontSize = 11.5.sp
-                            ),
-                            textAlign = TextAlign.End,
-                            modifier = Modifier
-                                .width(gutterW)
-                                .padding(end = 8.dp)
-                        )
-                        Text(
-                            text = highlighted,
-                            style = rawStyle,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
                     }
                 } else {
                     Text(
@@ -570,6 +607,17 @@ private fun CodeBlockCard(seg: RichSegment.CodeBlock, isDark: Boolean) {
             }
         }
     }
+}
+
+/**
+ * 取代码的「稳定前缀」：到最后一个换行为止的全部完整行。
+ *
+ * 流式期间末行仍可能被继续写入，对它做语法高亮是纯浪费（下一字符就整体失效）；
+ * 只高亮稳定区，末行按纯文本渲染，可将每个 delta 的高亮开销从 O(全量) 降到 O(稳定区)。
+ */
+private fun stablePrefixOf(code: String): String {
+    val lastNewline = code.lastIndexOf('\n')
+    return if (lastNewline < 0) "" else code.substring(0, lastNewline + 1)
 }
 
 private fun inferByLabel(label: String): SyntaxLanguage? {

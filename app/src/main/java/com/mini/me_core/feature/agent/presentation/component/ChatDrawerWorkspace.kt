@@ -67,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
@@ -134,7 +135,7 @@ internal fun WorkspaceDirPanel(
                 Icon(
                     Icons.Rounded.CreateNewFolder,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(IconSizeTokens.medium)
                 )
                 Spacer(Modifier.width(Spacing.xs))
                 Text(stringResource(R.string.workspace_new))
@@ -373,7 +374,7 @@ private fun CurrentWorkspacePanel(
             IconButton(
                 onClick = viewModel::goUp,
                 enabled = dirStack.isNotEmpty(),
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(IconSizeTokens.large)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
@@ -383,7 +384,7 @@ private fun CurrentWorkspacePanel(
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     },
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(IconSizeTokens.medium)
                 )
             }
             Text(
@@ -638,7 +639,7 @@ private fun WorkspaceDirRow(
                 Icons.Rounded.ExpandMore,
                 contentDescription = stringResource(R.string.workspace_menu),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(IconSizeTokens.medium)
             )
         }
 
@@ -737,7 +738,7 @@ internal fun MoreConfigPlaceholder(modifier: Modifier = Modifier) {
                 Icons.Rounded.Tune,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(IconSizeTokens.xLarge)
             )
             Spacer(Modifier.height(Spacing.md))
             Text(
@@ -786,7 +787,7 @@ internal fun MoreConfigPanel(
                         Icons.Rounded.Link,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(IconSizeTokens.medium)
                     )
                     Spacer(Modifier.width(Spacing.sm))
                     Text(
@@ -919,7 +920,7 @@ private fun WorkspaceBindRow(
             Icons.Rounded.Link,
             contentDescription = stringResource(R.string.workspace_bind_action),
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(IconSizeTokens.medium)
         )
     }
 }

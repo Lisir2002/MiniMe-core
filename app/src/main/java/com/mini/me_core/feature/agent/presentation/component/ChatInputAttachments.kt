@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import android.graphics.BitmapFactory
@@ -118,13 +119,13 @@ internal fun QueuedRequestPanel(
                         )
                         IconButton(
                             onClick = { onRemoveQueued(req.id) },
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(IconSizeTokens.large)
                         ) {
                             Icon(
                                 Icons.Rounded.Close,
                                 contentDescription = stringResource(R.string.chat_queue_remove),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(IconSizeTokens.small)
                             )
                         }
                     }
@@ -191,7 +192,7 @@ private fun PendingAttachmentPreviewItem(
                         Icons.Rounded.Close,
                         contentDescription = stringResource(R.string.chat_remove_attachment),
                         tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(IconSizeTokens.small)
                     )
                 }
             }
@@ -202,7 +203,7 @@ private fun PendingAttachmentPreviewItem(
 @Composable
 private fun ImageThumbnail(
     attachment: PendingUploadAttachment,
-    modifier: Modifier = Modifier.size(44.dp)
+    modifier: Modifier = Modifier.size(IconSizeTokens.xLarge)
 ) {
     val base64Data = attachment.image?.base64Data.orEmpty()
     val bitmap = remember(base64Data) {
@@ -256,7 +257,7 @@ private fun FileAttachmentPreview(attachment: PendingUploadAttachment) {
             Icons.Rounded.Description,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(IconSizeTokens.medium)
         )
         Spacer(Modifier.height(4.dp))
         Text(

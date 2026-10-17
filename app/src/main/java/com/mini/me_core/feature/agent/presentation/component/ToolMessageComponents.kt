@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
@@ -159,7 +160,16 @@ internal fun ToolMessageBody(
             || (todoData != null && todoData.items.isNotEmpty()) || webSearchData != null)
     var expanded by remember(message.id) { mutableStateOf(initiallyExpanded && (edit != null || todoData != null)) }
 
-    val toolLabel = if (edit != null) edit.path.substringAfterLast('/') else (message.toolName ?: stringResource(R.string.common_tool))
+    // 人话摘要（P2-16）：文件编辑类已有专属的文件名标签，不重复套摘要
+    val humanLabel = if (edit != null) null else ToolDisplayNames.humanLabel(message.toolName)
+    val toolLabel = when {
+        edit != null -> edit.path.substringAfterLast('/')
+        humanLabel != null -> humanLabel
+        else -> message.toolName ?: stringResource(R.string.common_tool)
+    }
+    // 原始工具名以等宽小字附带的场景：有人话摘要、且摘要与原始名不同
+    val rawToolNameSuffix =
+        if (ToolDisplayNames.showRawName(message.toolName, humanLabel)) message.toolName else null
 
     // 安装进度：Bash 安装命令运行时，在工具气泡内实时显示进度与状态（进度条 + 当前阶段 + ETA）
     val installProgress = if (streaming && (message.toolName == "Bash" || message.toolName.isNullOrEmpty())) {
@@ -182,7 +192,8 @@ internal fun ToolMessageBody(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 工具名（过长横向滚动，不再用省略号截断）
+                // 工具名：人话摘要为主（未登记工具回退原始名），原始名以等宽小字附带，
+                // 与代码块语言角标的等宽规范保持一致（审计 P2-16）。
                 HorizontalScrollableText(
                     text = toolLabel,
                     // 混合模式：工具头部 12sp 弱化色
@@ -193,6 +204,17 @@ internal fun ToolMessageBody(
                     ),
                     modifier = Modifier.weight(1f, fill = false)
                 )
+                if (edit == null && rawToolNameSuffix != null) {
+                    Spacer(Modifier.width(Spacing.xs))
+                    HorizontalScrollableText(
+                        text = rawToolNameSuffix,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace
+                        ),
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
                 if (edit == null && !argHint.isNullOrBlank()) {
                     Spacer(Modifier.width(Spacing.sm))
                     // 过长参数摘要横向滚动展示，不再用省略号截断
@@ -225,7 +247,7 @@ internal fun ToolMessageBody(
                     if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                     contentDescription = if (expanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.common_expand),
                     tint = Brand.IconGray,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(IconSizeTokens.medium)
                 )
             }
         }
@@ -343,13 +365,24 @@ internal fun ToolCallGroup(
                     tint = if (LocalAppDarkMode.current) Color(0xFFFBBF24) else Color(0xFFD97706),
                     modifier = Modifier.size(16.dp)
                 )
-                // 工具名（过长横向滚动，不再用省略号截断）
+                // 工具名：人话摘要为主，原始名等宽小字附带（P2-16）
                 HorizontalScrollableText(
-                    text = toolName,
+                    text = ToolDisplayNames.humanLabel(toolName) ?: toolName,
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f, fill = false)
                 )
+                if (ToolDisplayNames.showRawName(toolName, ToolDisplayNames.humanLabel(toolName))) {
+                    Spacer(Modifier.width(Spacing.xs))
+                    HorizontalScrollableText(
+                        text = toolName,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace
+                        ),
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
                 // 调用次数
                 Text(
                     text = "×${messages.size}",
@@ -378,7 +411,7 @@ internal fun ToolCallGroup(
                     imageVector = if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                     contentDescription = if (expanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.common_expand),
                     tint = Brand.IconGray,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(IconSizeTokens.medium)
                 )
             }
             // 聚合面板内容：每个调用一行（默认折叠）
@@ -888,7 +921,7 @@ internal fun EnvironmentStatusStrip(
             ) {
                 if (running) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(14.dp),
+                        modifier = Modifier.size(IconSizeTokens.small),
                         strokeWidth = 2.dp,
                         color = statusColor
                     )
@@ -897,7 +930,7 @@ internal fun EnvironmentStatusStrip(
                         imageVector = statusIcon,
                         contentDescription = null,
                         tint = statusColor,
-                        modifier = Modifier.size(15.dp)
+                        modifier = Modifier.size(IconSizeTokens.small)
                     )
                 }
                 // 过长摘要横向滚动展示，不再用省略号截断

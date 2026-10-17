@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,14 +35,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.components.AppCopyAction
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
+import com.mini.me_core.feature.agent.presentation.component.richsegment.expandTabsForRender
 
 /** 超过该行数时折叠，懒渲染（只渲染可见行），避免超长代码块一次性布局卡顿。 */
 private const val LAZY_RENDER_LINE_THRESHOLD = 100
@@ -69,7 +74,9 @@ fun MiniMeCodeBlock(
     val appColors = LocalAppTheme.current.colors
     val cornerShape = RoundedCornerShape(12.dp)
 
-    val rawLines = remember(code) { code.split("\n") }
+    // Tab 展开为 4 空格：等宽字体下 Tab 推进宽度由渲染器决定，行号列与代码列会对不齐；
+    // 且必须在 tokenize/高亮之前展开（span 按字符索引）。复制仍用未展开原文。
+    val rawLines = remember(code) { code.split("\n").map { it.expandTabsForRender() } }
     val totalLines = rawLines.size
     val shouldCollapse = totalLines > LAZY_RENDER_LINE_THRESHOLD
     val visibleLines = remember(rawLines, shouldCollapse, expanded) {
@@ -132,44 +139,51 @@ fun MiniMeCodeBlock(
                             else Modifier
                         )
                 ) {
-                    Row(Modifier.horizontalScroll(rememberScrollState())) {
-                        if (showLineNumbers) {
-                            val gutterWidth = remember(totalLines) {
-                                (totalLines.toString().length * 8 + 12).dp
-                            }
-                            Column(
-                                modifier = Modifier
-                                    .width(gutterWidth)
-                                    .padding(start = 12.dp, end = 8.dp),
-                                horizontalAlignment = Alignment.End,
-                            ) {
-                                visibleLines.indices.forEach { idx ->
-                                    Text(
-                                        text = "${idx + 1}",
-                                        style = TextStyle(
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 13.sp,
-                                            lineHeight = 19.5.sp,
-                                            color = colors.onSurfaceVariant.copy(alpha = 0.4f),
-                                        ),
-                                    )
+                    // 整块强制 LTR：代码是逐字内容，RTL 语言（阿拉伯语/希伯来语）环境下
+                    // 若跟随布局方向做 Bidi 解析，括号、运算符、数字串会被重排错位；
+                    // 滚动方向也随之固定为从左起滚，行号列始终在左。
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        Row(Modifier.horizontalScroll(rememberScrollState())) {
+                            if (showLineNumbers) {
+                                val gutterWidth = remember(totalLines) {
+                                    (totalLines.toString().length * 8 + 12).dp
+                                }
+                                Column(
+                                    modifier = Modifier
+                                        .width(gutterWidth)
+                                        .padding(start = 12.dp, end = 8.dp),
+                                    horizontalAlignment = Alignment.End,
+                                ) {
+                                    visibleLines.indices.forEach { idx ->
+                                        Text(
+                                            text = "${idx + 1}",
+                                            style = TextStyle(
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 13.sp,
+                                                lineHeight = 19.5.sp,
+                                                color = colors.onSurfaceVariant.copy(alpha = 0.4f),
+                                                textDirection = TextDirection.Ltr,
+                                            ),
+                                        )
+                                    }
                                 }
                             }
+                            Text(
+                                text = highlighted,
+                                style = TextStyle(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 13.sp,
+                                    lineHeight = 19.5.sp, // 行高 1.5
+                                    color = colors.onSurface,
+                                    textDirection = TextDirection.Ltr,
+                                ),
+                                modifier = Modifier.padding(
+                                    start = if (showLineNumbers) 0.dp else 12.dp,
+                                    end = 12.dp,
+                                    bottom = 12.dp,
+                                ),
+                            )
                         }
-                        Text(
-                            text = highlighted,
-                            style = TextStyle(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 13.sp,
-                                lineHeight = 19.5.sp, // 行高 1.5
-                                color = colors.onSurface,
-                            ),
-                            modifier = Modifier.padding(
-                                start = if (showLineNumbers) 0.dp else 12.dp,
-                                end = 12.dp,
-                                bottom = 12.dp,
-                            ),
-                        )
                     }
                 }
             }

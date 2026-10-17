@@ -25,11 +25,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -60,6 +59,7 @@ import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
+import com.mini.me_core.core.theme.tokens.PrimitiveTouchTarget
 import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AgentUIMessage
 import com.mini.me_core.feature.agent.presentation.EnvironmentSnapshot
@@ -294,6 +294,7 @@ internal fun AgentMessageItem(
                     // 混合模式：AI 回复操作行撑满宽度，使 token 统计可右对齐
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
                         modifier = if (isAssistant) Modifier.fillMaxWidth() else Modifier
                     ) {
                         val iconTint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -430,14 +431,18 @@ private fun MessageActionIconButton(
     tint: Color,
     onClick: () -> Unit
 ) {
-    IconButton(
-        onClick = onClick,
-        // v2 混合模式：按钮 20dp（16dp 图标 + 2dp 两侧 padding），图标间间距 4dp
-        modifier = Modifier.size(20.dp),
-        colors = IconButtonDefaults.iconButtonColors(contentColor = tint),
+    // 触控区 40dp（原 20dp）：Material 建议的最小触控目标为 48dp，但消息操作行是横向
+    // 紧凑排列的图标带，直接放到 48dp 会把每条消息的行高撑高近一倍、视觉密度骤降。
+    // 取 40dp 是「可点性翻倍」与「保持紧凑」的平衡点；图标仍是 16dp，视觉完全不变。
+    // 若后续要严格满足 48dp，需先重做操作行布局（如改为纵向菜单或浮层）。
+    Box(
+        modifier = Modifier
+            .size(PrimitiveTouchTarget.compactButton)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        // 混合模式：图标 16dp 弱化色
-        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(16.dp))
+        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(16.dp))
     }
 }
 

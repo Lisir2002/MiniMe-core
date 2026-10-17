@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.LocalAnimationScale
 import com.mini.me_core.core.theme.LocalAppDarkMode
@@ -162,7 +163,7 @@ private fun SheetActionRow(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(IconSizeTokens.medium),
                     tint = Color.White
                 )
             }
@@ -387,7 +388,7 @@ private fun SwipeableSessionRow(
                             imageVector = Icons.Rounded.Edit,
                             contentDescription = stringResource(R.string.common_rename),
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(IconSizeTokens.medium)
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
@@ -429,7 +430,7 @@ private fun SwipeableSessionRow(
                             imageVector = Icons.Rounded.Delete,
                             contentDescription = stringResource(R.string.common_delete),
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(IconSizeTokens.medium)
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(

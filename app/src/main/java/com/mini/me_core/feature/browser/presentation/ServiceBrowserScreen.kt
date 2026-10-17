@@ -3,7 +3,9 @@ import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.AnimationScaleHolder
 import com.mini.me_core.core.theme.ScaledAnimation
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.webkit.MimeTypeMap
 import android.widget.Toast
@@ -290,7 +292,13 @@ fun ServiceBrowserScreen(
 
     // 卸载时解除绑定（保留 WebView 与登录态）
     DisposableEffect(Unit) {
+        // WebView 的 <select> 等原生弹层由 Chromium 用 WebView 自身 context 创建：
+        // BrowserController 注入的是 Application context，没有窗口令牌与 Activity 主题，
+        // 弹层会静默失败。页面可见期间把 context base 指向宿主 Activity，卸载时回退
+        // （既恢复弹层，又避免持有已销毁的 Activity）。
+        context.findActivity()?.let { browserController.attachHost(it) }
         onDispose {
+            browserController.detachHost()
             browserController.unbind()
             previewManager.stopCapturing()
         }
@@ -934,4 +942,19 @@ fun ServiceBrowserScreen(
 }
 
 // ===== 顶部标签栏（第1层） =====
+
+/**
+ * 沿 ContextWrapper 链找出宿主 Activity。
+ *
+ * Compose 的 `LocalContext.current` 不保证直接是 Activity（可能是 ContextThemeWrapper
+ * 等包装），而 WebView 原生弹层（`<select>` 下拉等）必须拿到真正的 Activity context。
+ */
+private fun Context.findActivity(): Activity? {
+    var ctx: Context? = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
+}
 

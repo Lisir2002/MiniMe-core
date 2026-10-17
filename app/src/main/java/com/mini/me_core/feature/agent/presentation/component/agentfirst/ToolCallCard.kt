@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component.agentfirst
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
@@ -202,7 +203,7 @@ fun ToolCallCard(
                 imageVector = if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                 contentDescription = null,
                 tint = Brand.IconGray,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(IconSizeTokens.medium)
             )
         }
 
@@ -281,7 +282,7 @@ private fun ToolTypeIcon(type: ToolType) {
             imageVector = icon,
             contentDescription = null,
             tint = tint,
-            modifier = Modifier.size(14.dp)
+            modifier = Modifier.size(IconSizeTokens.small)
         )
     }
 }

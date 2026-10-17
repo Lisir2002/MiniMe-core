@@ -31,7 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
@@ -92,7 +92,7 @@ internal fun TaskSubGroupRenderer(
                 imageVector = subGroupTypeIcon(subGroup.type),
                 contentDescription = null,
                 tint = visual,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(IconSizeTokens.small)
             )
             Spacer(Modifier.width(Spacing.xs))
             Text(
@@ -112,7 +112,7 @@ internal fun TaskSubGroupRenderer(
                 else Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
                 tint = visual.copy(alpha = 0.5f),
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(IconSizeTokens.small)
             )
         }
 

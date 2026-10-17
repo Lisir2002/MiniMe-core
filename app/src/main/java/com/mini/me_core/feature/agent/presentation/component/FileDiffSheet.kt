@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.BorderStroke
@@ -277,7 +278,7 @@ private fun ToolLogRow(log: ToolLogEntry) {
                     imageVector = if (log.isError) Icons.Rounded.Warning else Icons.Rounded.CheckCircle,
                     contentDescription = null,
                     tint = accent,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(IconSizeTokens.small)
                 )
                 Text(
                     text = log.toolName ?: stringResource(R.string.common_tool),
@@ -329,7 +330,7 @@ private fun EmptyHint(text: String) {
             imageVector = Icons.Rounded.Construction,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(IconSizeTokens.large)
         )
         Spacer(Modifier.height(Spacing.sm))
         Text(

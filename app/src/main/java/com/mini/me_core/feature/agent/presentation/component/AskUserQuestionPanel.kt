@@ -53,6 +53,7 @@ import com.mini.me_core.feature.agent.domain.execution.tool.question.SingleAnswe
 import com.mini.me_core.feature.agent.domain.execution.tool.question.UserQuestionAnswer
 import androidx.compose.ui.res.stringResource
 import com.mini.me_core.R
+import com.mini.me_core.feature.agent.presentation.component.richsegment.MarkdownRenderOptions
 
 
 /** 「其他」选项的固定 label，不与 AI 传入的选项重复。 */
@@ -213,7 +214,7 @@ private fun QuestionCard(
                 text = item.question,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
-                compact = true
+                options = MarkdownRenderOptions(compact = true)
             )
         }
 
@@ -305,7 +306,7 @@ private fun QuestionCard(
                         MarkdownContent(
                             text = description,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            compact = true
+                            options = MarkdownRenderOptions(compact = true)
                         )
                     }
                 }

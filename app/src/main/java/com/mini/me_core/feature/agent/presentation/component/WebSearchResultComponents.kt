@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.BorderStroke
@@ -153,7 +154,7 @@ private fun WebSearchSummary(result: ParsedWebSearchResult) {
                 Icons.Rounded.Search,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(17.dp)
+                modifier = Modifier.size(IconSizeTokens.small)
             )
         }
         Spacer(Modifier.width(Spacing.sm))
@@ -219,7 +220,7 @@ private fun WebSearchResultItem(index: Int, item: ParsedWebSearchItem) {
                             Icons.Rounded.OpenInNew,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(IconSizeTokens.small)
                         )
                     }
                     Spacer(Modifier.height(2.dp))

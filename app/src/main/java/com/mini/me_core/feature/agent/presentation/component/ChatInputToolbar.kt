@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.PrimitiveAlpha
@@ -155,7 +156,7 @@ internal fun ChatInputToolbar(
             // 收纳开关：展开/收起思考强度与技能
             IconButton(
                 onClick = { showMore = !showMore },
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(IconSizeTokens.xLarge)
             ) {
                 Icon(
                     Icons.Rounded.MoreHoriz,
@@ -250,7 +251,7 @@ internal fun UploadIconButton(
     IconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.size(36.dp)
+        modifier = Modifier.size(IconSizeTokens.xLarge)
     ) {
         Icon(
             icon,
@@ -279,7 +280,7 @@ internal fun SendButton(canSend: Boolean, isBusy: Boolean, tokenProgress: Float,
         contentAlignment = Alignment.Center
     ) {
         if (clampedProgress > 0f) {
-            androidx.compose.foundation.Canvas(modifier = Modifier.size(44.dp)) {
+            androidx.compose.foundation.Canvas(modifier = Modifier.size(IconSizeTokens.xLarge)) {
                 val stroke = 3.dp.toPx()
                 val arcSize = size.minDimension - stroke
                 val topLeft = androidx.compose.ui.geometry.Offset(stroke / 2f, stroke / 2f)

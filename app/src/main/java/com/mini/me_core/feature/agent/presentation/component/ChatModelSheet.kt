@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.clickable
@@ -59,7 +60,7 @@ internal fun ModelIconButton(
 ) {
     var showSheet by remember { mutableStateOf(false) }
 
-    IconButton(onClick = { showSheet = true }, modifier = Modifier.size(36.dp)) {
+    IconButton(onClick = { showSheet = true }, modifier = Modifier.size(IconSizeTokens.xLarge)) {
         ModelLogoIcon(modelName = provider?.effectiveModel.orEmpty(), size = 20.dp)
     }
 
@@ -96,7 +97,7 @@ internal fun ReasoningEffortSelector(
         IconButton(
             onClick = { showSheet = true },
             enabled = enabled,
-            modifier = Modifier.size(36.dp)
+            modifier = Modifier.size(IconSizeTokens.xLarge)
         ) {
             Icon(
                 Icons.Rounded.Psychology,

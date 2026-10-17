@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
@@ -57,6 +58,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Star
+import com.mini.me_core.feature.agent.presentation.component.richsegment.MarkdownRenderOptions
 
 @Composable
 internal fun ThinkingBubble() {
@@ -156,7 +158,10 @@ internal fun StreamingBubble(text: String) {
             Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs)) {
                 MarkdownContent(
                     text = text,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    // 流式中：半截 URL 先按纯文本渲染，等终止符到达再升级为链接，
+                    // 避免每个 delta 都因链接边界变化而重排（审计 P2-12）。
+                    options = MarkdownRenderOptions(streaming = true)
                 )
                 Spacer(Modifier.height(Spacing.xs))
                 // F2.4：末尾闪烁打字光标「|」，primary 色，500ms 周期
@@ -255,7 +260,7 @@ internal fun ReasoningBubble(
                         contentDescription = null,
                         // 思考条弱化色：跟随语义色 onSurfaceVariant
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(IconSizeTokens.small)
                     )
                     Spacer(Modifier.width(Spacing.sm))
                     Text(
@@ -281,7 +286,7 @@ internal fun ReasoningBubble(
                         text = text,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         cache = cache,
-                        compact = true,
+                        options = MarkdownRenderOptions(compact = true),
                         modifier = Modifier.pointerInput(text) {
                             detectTapGestures(
                                 onDoubleTap = {

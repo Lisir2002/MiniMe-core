@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.tokens.LocalComponentTokens
 
 import androidx.compose.foundation.layout.Arrangement
@@ -139,7 +140,7 @@ internal fun ChatInputField(
             if (isOverflowing) {
                 IconButton(
                     onClick = onExpandClick,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(IconSizeTokens.xLarge)
                 ) {
                     Icon(
                         Icons.Rounded.Fullscreen,

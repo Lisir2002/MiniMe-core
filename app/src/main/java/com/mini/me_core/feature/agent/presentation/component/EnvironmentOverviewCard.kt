@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 
 import androidx.compose.foundation.layout.Arrangement
@@ -229,7 +230,7 @@ internal fun EnvironmentComponentRow(component: EnvironmentComponentState) {
             imageVector = badge.icon,
             contentDescription = null,
             tint = badge.iconColor,
-            modifier = Modifier.size(14.dp)
+            modifier = Modifier.size(IconSizeTokens.small)
         )
         // 过长组件名横向滚动展示，不再用省略号截断
         HorizontalScrollableText(

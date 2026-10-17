@@ -1,4 +1,5 @@
 package com.mini.me_core.feature.agent.presentation.component
+import com.mini.me_core.core.theme.tokens.IconSizeTokens
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.ScaledAnimation
 import com.mini.me_core.core.util.FileLogger
@@ -987,7 +988,7 @@ private fun EditingMessageBanner(
                 imageVector = Icons.Rounded.Edit,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(IconSizeTokens.small)
             )
             Text(
                 text = stringResource(R.string.chat_editing_banner, snippet),
@@ -1007,7 +1008,7 @@ private fun EditingMessageBanner(
                     imageVector = Icons.Rounded.Close,
                     contentDescription = stringResource(R.string.chat_edit_cancel),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(IconSizeTokens.small)
                 )
             }
         }
