@@ -741,6 +741,11 @@
     <string name="browser_agent_working">The model is operating the browser…</string>
     <string name="browser_dialog_alert">Page Alert</string>
     <string name="browser_dialog_confirm_title">Page Confirmation</string>
+    <string name="browser_dialog_prompt_title">Page Prompt</string>
+    <string name="browser_http_auth_title">%1$s requires authentication</string>
+    <string name="browser_http_auth_username">Username</string>
+    <string name="browser_http_auth_password">Password</string>
+    <string name="browser_error_title">Can&#8217;t open this page</string>
     <string name="browser_login_title">Login Required</string>
     <string name="browser_login_hint">The model needs to log in to %1$s to continue. Enter the login credentials for this site (they will be encrypted and auto-filled next time).</string>
     <string name="browser_login_password">Password</string>

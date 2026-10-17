@@ -154,7 +154,14 @@ data class BrowserUiState(
     /** 桌面版网页（R1.3）：UA override 切换，桌面 UA 渲染。 */
     val desktopMode: Boolean = false,
     /** 页面缩放（R1.3）：WebSettings.textZoom 百分比，100 为默认。 */
-    val textZoom: Int = 100
+    val textZoom: Int = 100,
+    /**
+     * 主框架加载失败的错误描述（非 null 时 UI 呈现错误页 + 重试）。
+     *
+     * WebView 的 onReceivedError 默认只走日志，用户看到的是永久白屏——
+     * 与 `<select>` 同类的宿主侧静默失效。这里显式升级为可见状态。
+     */
+    val loadError: String? = null
 )
 
 /** 模型操作状态（浏览器页底部状态条）。 */
@@ -184,7 +191,21 @@ data class AgentActionRecord(
 data class PendingBrowserDialog(
     val id: String,
     val type: String,       // alert / confirm / prompt
-    val message: String
+    val message: String,
+    /** prompt 输入框的初始值（网页传入的 defaultValue），非 prompt 类型为 null。 */
+    val defaultValue: String? = null
+)
+
+/**
+ * HTTP 认证请求（401 Basic/Digest）。
+ *
+ * WebView 默认实现静默取消该请求，页面表现为「输入网址后一片空白」——
+ * 与 `<select>` 同属宿主侧静默失效。这里显式接管，弹窗收集凭据后回传。
+ */
+data class PendingHttpAuth(
+    val id: String,
+    val host: String?,
+    val realm: String?
 )
 
 /** 登录凭据提示（模型需要用户提供某站点凭据）。 */

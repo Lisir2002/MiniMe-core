@@ -141,6 +141,8 @@ internal class BrowserToolInspect(
 
     suspend fun doHandleDialog(args: Map<String, JsonElement>): ToolResult {
         val accept = runCatching { args["accept"]?.jsonPrimitive?.contentOrNull?.toBoolean() }.getOrNull() ?: true
+        // prompt 对话框：模型可直接提供输入文本；不提供则用网页 defaultValue（控制器已预填）
+        args["input"]?.jsonPrimitive?.contentOrNull?.let { browserController.setPromptInput(it) }
         val handled = browserController.handleDialog(accept)
         return env.envelope(
             action = "handle_dialog",

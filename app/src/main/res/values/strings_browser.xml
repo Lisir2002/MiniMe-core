@@ -12,6 +12,11 @@
     <string name="browser_agent_working">模型正在操作浏览器…</string>
     <string name="browser_dialog_alert">网页提示</string>
     <string name="browser_dialog_confirm_title">网页确认</string>
+    <string name="browser_dialog_prompt_title">网页输入</string>
+    <string name="browser_http_auth_title">%1$s 需要登录验证</string>
+    <string name="browser_http_auth_username">用户名</string>
+    <string name="browser_http_auth_password">密码</string>
+    <string name="browser_error_title">网页无法打开</string>
     <string name="browser_login_title">需要登录</string>
     <string name="browser_login_hint">模型需要登录 %1$s 以继续操作，请输入该站点的登录凭据（将加密保存，下次自动代填）。</string>
     <string name="browser_login_password">密码</string>

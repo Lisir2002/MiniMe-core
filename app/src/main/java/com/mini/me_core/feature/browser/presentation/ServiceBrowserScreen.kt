@@ -7,8 +7,10 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.view.View
 import android.webkit.MimeTypeMap
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -126,6 +128,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -134,10 +137,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.FilterChip
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -216,6 +222,20 @@ fun ServiceBrowserScreen(
     val agentStatus by browserController.agentStatus.collectAsStateWithLifecycle()
     val agentHistory by browserController.agentActionHistory.collectAsStateWithLifecycle()
     val pendingDialog by browserController.pendingDialog.collectAsStateWithLifecycle()
+    val pendingHttpAuth by browserController.pendingHttpAuth.collectAsStateWithLifecycle()
+
+    // 网页全屏（视频/游戏）：页面经 onShowCustomView 请求全屏时，控制器持有全屏 View，
+    // 这里把它渲染到独立 Dialog 窗口；返回键优先退出网页全屏而非直接退出浏览器页。
+    var fullscreenView by remember { mutableStateOf<View?>(null) }
+    DisposableEffect(browserController) {
+        browserController.onFullscreenChange = { entering ->
+            fullscreenView = if (entering) browserController.fullscreenView else null
+        }
+        onDispose { browserController.onFullscreenChange = null }
+    }
+    BackHandler(enabled = fullscreenView != null) {
+        browserController.exitFullscreen()
+    }
     val pendingLoginPrompt by loginPromptManager.pendingPrompt.collectAsStateWithLifecycle()
     val pendingTakeover by takeoverManager.pending.collectAsStateWithLifecycle()
     val downloads by browserController.downloads.collectAsStateWithLifecycle()
@@ -639,6 +659,37 @@ fun ServiceBrowserScreen(
                             onOpen = { openUrl(it) }
                         )
                     }
+                    // 主框架加载失败：呈现错误页 + 重试。
+                    // 默认实现只写日志，用户看到的是永久白屏（与 <select> 同类的静默失效）。
+                    uiState.loadError?.let { err ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(Spacing.xl)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.browser_error_title),
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Spacer(modifier = Modifier.height(Spacing.sm))
+                                Text(
+                                    text = err,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(Spacing.lg))
+                                Button(onClick = { browserController.reload() }) {
+                                    Text(stringResource(R.string.browser_retry))
+                                }
+                            }
+                        }
+                    }
                     // 实时浏览器预览面板：模型操作时右下角悬浮显示当前页面截图
                     if (agentStatus.active && previewVisible) {
                         BrowserPreviewPanel(
@@ -654,12 +705,47 @@ fun ServiceBrowserScreen(
         }
     }
 
-    // ── 页面 alert/confirm 对话框 ──
+    // ── 页面 alert/confirm/prompt 对话框 ──
+    // prompt 必须带输入框：默认实现丢弃 prompt 时 JS 侧永远拿不到输入值，
+    // 页面表现为「点了没反应」，与 <select> 属同一类宿主侧静默失效。
     pendingDialog?.let { d ->
+        var promptText by remember(d.id) { mutableStateOf(d.defaultValue ?: "") }
         AlertDialog(
-            onDismissRequest = { },
-            title = { Text(if (d.type == "alert") stringResource(R.string.browser_dialog_alert) else stringResource(R.string.browser_dialog_confirm_title)) },
-            text = { Text(d.message) },
+            // 返回键 = 取消（对齐 Chrome）：alert 只有「确定」一个出口，保持不可绕过的
+            // 模态；confirm/prompt 允许返回取消。
+            onDismissRequest = {
+                if (d.type != "alert") {
+                    scope.launch { browserController.handleDialog(false) }
+                }
+            },
+            title = {
+                Text(
+                    when (d.type) {
+                        "prompt" -> stringResource(R.string.browser_dialog_prompt_title)
+                        "alert" -> stringResource(R.string.browser_dialog_alert)
+                        else -> stringResource(R.string.browser_dialog_confirm_title)
+                    }
+                )
+            },
+            text = {
+                if (d.type == "prompt") {
+                    Column {
+                        Text(d.message)
+                        Spacer(modifier = Modifier.height(Spacing.sm))
+                        OutlinedTextField(
+                            value = promptText,
+                            onValueChange = {
+                                promptText = it
+                                browserController.setPromptInput(it)
+                            },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                } else {
+                    Text(d.message)
+                }
+            },
             confirmButton = {
                 TextButton(onClick = { scope.launch { browserController.handleDialog(true) } }) {
                     Text(stringResource(R.string.workspace_confirm))
@@ -670,6 +756,73 @@ fun ServiceBrowserScreen(
                     TextButton(onClick = { scope.launch { browserController.handleDialog(false) } }) {
                         Text(stringResource(R.string.common_cancel))
                     }
+                }
+            }
+        )
+    }
+
+    // ── 网页全屏渲染（视频全屏 / 游戏全屏） ──
+    // 不接管时全屏请求被静默丢弃，页面表现为「点了全屏没反应」。
+    fullscreenView?.let { fsView ->
+        Dialog(
+            // 全屏窗口内的返回键 = 退出网页全屏（Dialog 窗口会先消费返回键，
+            // 不接这条路径用户按返回毫无反应）。
+            onDismissRequest = { browserController.exitFullscreen() },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            AndroidView(
+                factory = { fsView },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            )
+        }
+    }
+
+    // ── HTTP 认证对话框（401 Basic/Digest） ──
+    // 不接管时 WebView 静默取消认证，页面表现为「输入网址后一片空白」。
+    pendingHttpAuth?.let { auth ->
+        var authUser by remember(auth.id) { mutableStateOf("") }
+        var authPass by remember(auth.id) { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { browserController.resolveHttpAuth(false) },
+            title = { Text(stringResource(R.string.browser_http_auth_title, auth.host ?: "")) },
+            text = {
+                Column {
+                    if (!auth.realm.isNullOrBlank()) {
+                        Text(auth.realm)
+                        Spacer(modifier = Modifier.height(Spacing.sm))
+                    }
+                    OutlinedTextField(
+                        value = authUser,
+                        onValueChange = { authUser = it },
+                        label = { Text(stringResource(R.string.browser_http_auth_username)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.sm))
+                    OutlinedTextField(
+                        value = authPass,
+                        onValueChange = { authPass = it },
+                        label = { Text(stringResource(R.string.browser_http_auth_password)) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { browserController.resolveHttpAuth(true, authUser, authPass) }) {
+                    Text(stringResource(R.string.workspace_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { browserController.resolveHttpAuth(false) }) {
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         )

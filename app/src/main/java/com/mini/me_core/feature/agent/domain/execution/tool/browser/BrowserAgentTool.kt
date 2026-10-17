@@ -58,7 +58,7 @@ import javax.inject.Inject
  *  - wait_for_change()      事件驱动等待页面变化（替代轮询 snapshot）
  *  - history()              查询最近动作历史
  *  - get_attribute(id,attr) 读元素属性
- *  - handle_dialog(accept)  处理页面 alert/confirm
+ *  - handle_dialog(accept[, input])  处理页面 alert/confirm/prompt
  *  - login()                登录当前站点（从加密凭据库取账号密码自动代填；无则请用户输入）
  *
  * 统一返回 envelope（R2.3 干净替换）：所有动作返回
@@ -333,6 +333,12 @@ class BrowserAgentTool @Inject constructor(
             name = "accept",
             type = ParameterType.BOOLEAN,
             description = "handle_dialog 时必填：true=确认，false=取消",
+            required = false
+        ),
+        "input" to ToolParameter(
+            name = "input",
+            type = ParameterType.STRING,
+            description = "handle_dialog 时可选：prompt 对话框要回传给网页的输入文本（不传则用网页默认值）",
             required = false
         ),
         "js" to ToolParameter(

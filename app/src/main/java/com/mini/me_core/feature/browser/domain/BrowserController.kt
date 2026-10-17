@@ -3,17 +3,25 @@ package com.mini.me_core.feature.browser.domain
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.MutableContextWrapper
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
+import android.net.http.SslError
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.Message
 import android.util.Base64
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.GeolocationPermissions
+import android.webkit.HttpAuthHandler
+import android.webkit.JsPromptResult
 import android.webkit.JsResult
+import android.webkit.PermissionRequest
+import android.webkit.SslErrorHandler
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -119,7 +127,8 @@ class BrowserController @Inject constructor(
     /** 内部标签：id + WebView + 标题/URL 缓存。 */
     private class BrowserTab(
         val id: String,
-        val webView: WebView,
+        // 可替换：渲染进程崩溃（onRenderProcessGone）后原地重建，标签位与 URL 不变。
+        var webView: WebView,
         var title: String = "",
         var url: String = ""
     )
@@ -153,6 +162,9 @@ class BrowserController @Inject constructor(
 
     /** 已创建的 WebView context 包装器：宿主附着状态变化时统一换 base（含惰性创建的标签）。 */
     private val webViewContexts = CopyOnWriteArrayList<MutableContextWrapper>()
+
+    /** 交给系统应用处理的浏览器标准 scheme（WebView 自身加载必然 ERR_UNKNOWN_URL_SCHEME）。 */
+    private val systemHandledSchemes = setOf("tel", "sms", "smsto", "mms", "mailto", "geo", "market")
 
     // 代理开关变化时，让已存在的 WebView 也跟上 mihomo 代理（新标签/导航天然生效）。
     // 只对 enabled 边沿触发（distinctUntilChanged），避免 controllerReachable / recovering /
@@ -306,8 +318,28 @@ class BrowserController @Inject constructor(
     private val _pendingDialog = MutableStateFlow<PendingBrowserDialog?>(null)
     val pendingDialog: StateFlow<PendingBrowserDialog?> = _pendingDialog.asStateFlow()
 
+    /** 待确认的 HTTP 认证请求（401 Basic/Digest），由 UI 弹窗收集凭据。 */
+    private val _pendingHttpAuth = MutableStateFlow<PendingHttpAuth?>(null)
+    val pendingHttpAuth: StateFlow<PendingHttpAuth?> = _pendingHttpAuth.asStateFlow()
+    private var httpAuthHandler: HttpAuthHandler? = null
+
     private var dialogResult: JsResult? = null
     private var dialogDeferred: CompletableDeferred<Boolean>? = null
+    /** prompt 对话框的输入内容：由 UI 在确认前写入，确认时回传给 JS。 */
+    @Volatile
+    private var promptInput: String = ""
+
+    /**
+     * 网页全屏状态：非 null 表示当前有网页处于全屏（视频全屏 / 游戏全屏等）。
+     * 由 UI 层读取并在合适位置渲染，退出时通过 [fullscreenCallback] 回执。
+     */
+    @Volatile
+    var fullscreenView: View? = null
+        private set
+    /** 网页全屏变化回调（true = 进入全屏）。 */
+    @Volatile
+    var onFullscreenChange: ((Boolean) -> Unit)? = null
+    private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
 
     /** upload_file：模型请求上传时暂存目标文件；onShowFileChooser 触发时用 FileProvider Uri 回填。 */
     @Volatile
@@ -339,6 +371,16 @@ class BrowserController @Inject constructor(
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** 主动退出网页全屏（返回键拦截 / 用户点击）。 */
+    fun exitFullscreen(): Boolean {
+        val cb = fullscreenCallback ?: return false
+        cb.onCustomViewHidden()
+        fullscreenView = null
+        fullscreenCallback = null
+        onFullscreenChange?.invoke(false)
+        return true
+    }
+
     // ─────────────────────────── UI 绑定 ───────────────────────────
 
     /**
@@ -355,6 +397,32 @@ class BrowserController @Inject constructor(
     }
 
     // ─────────────────────── 宿主 Activity 附着（原生弹层所需 context） ───────────────────────
+
+    /**
+     * 把浏览器标准 scheme 的导航交给系统应用（拨号 / 邮件 / 短信 / 地图 / 应用市场）。
+     *
+     * @return true = 已接管（无论系统应用是否可用，都不再交给 WebView）；
+     *         false = 非系统 scheme，继续走 WebView 加载。
+     */
+    private fun dispatchToSystemApp(request: WebResourceRequest): Boolean {
+        val uri = request.url
+        val scheme = uri.scheme?.lowercase() ?: return false
+        if (scheme !in systemHandledSchemes && scheme != "intent") return false
+        // intent:// 携带完整隐式启动参数（可拉起任意 Activity），
+        // 仅在有真实用户手势时放行，对齐 Chrome 的安全策略。
+        if (scheme == "intent" && !request.hasGesture()) return false
+        val opened = runCatching {
+            val intent = when (scheme) {
+                "mailto", "sms", "smsto", "mms" -> Intent(Intent.ACTION_SENDTO, uri)
+                "intent" -> Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME)
+                else -> Intent(Intent.ACTION_VIEW, uri)
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        }.isSuccess
+        FileLogger.i(TAG, "scheme 转交系统应用: $uri ${if (opened) "成功" else "失败（无可用应用）"}")
+        return true
+    }
 
     /**
      * 新建 WebView 用的 context。
@@ -1148,6 +1216,30 @@ class BrowserController @Inject constructor(
         resolved
     }
 
+    /**
+     * UI 层在确认 prompt 对话框前写入用户输入，确认时由 [registerPendingDialog]
+     * 的回调通过 `JsPromptResult.confirm(promptInput)` 回传给 JS。
+     */
+    fun setPromptInput(text: String) {
+        promptInput = text
+    }
+
+    /**
+     * 处理 HTTP 认证对话框（401 Basic/Digest）。
+     *
+     * accept = true 用给定凭据 [HttpAuthHandler.proceed]，否则 cancel。
+     * proceed/cancel 必须在主线程调用，故经 [mainHandler] 投递。
+     */
+    fun resolveHttpAuth(accept: Boolean, username: String = "", password: String = ""): Boolean {
+        val handler = httpAuthHandler ?: return false
+        httpAuthHandler = null
+        mainHandler.post {
+            if (accept) handler.proceed(username, password) else handler.cancel()
+        }
+        _pendingHttpAuth.value = null
+        return true
+    }
+
     /** 等待元素出现或加载完成。selector 为 CSS 选择器（匹配则视为满足）。 */
     suspend fun waitFor(selector: String?, timeoutMs: Long): BrowserPageSnapshot = mutex.withLock {
         _agentStatus.value = AgentBrowserStatus("等待页面元素", true)
@@ -1610,129 +1702,14 @@ class BrowserController @Inject constructor(
     }
 
     /** 配置一个全新的 WebView（主线程），回调按标签 id 分派。 */
-    @SuppressLint("SetJavaScriptEnabled")
     private fun createWebView(tabId: String): WebView {
         // 必须包 MutableContextWrapper：直接用注入的 Application context 创建 WebView，
         // <select> 等 Chromium 原生弹层（用 WebView context 创建的系统对话框）会因缺少
         // 窗口令牌而静默失败。宿主 Activity 由 attachHost/detachHost 动态换 base。
         val wv = WebView(newWebViewContext())
-        wv.settings.apply {
-            // 本浏览器需要执行自动化脚本，JS 按需保持开启；其余危险能力一律关闭。
-            javaScriptEnabled = true
-            javaScriptCanOpenWindowsAutomatically = false
-            domStorageEnabled = true
-            databaseEnabled = true
-            // 安全加固：禁止本地文件 / 内容访问，防止任意页面读取本地资源。
-            allowFileAccess = false
-            allowContentAccess = false
-            allowFileAccessFromFileURLs = false
-            allowUniversalAccessFromFileURLs = false
-            // 混合内容策略对齐 Chrome：被动内容（图片/字体/音视频等「optionally blockable」）
-            // 允许加载，主动内容（脚本等「blockable」）仍阻断。
-            // 曾用 NEVER_ALLOW 无条件阻断 HTTPS 页面的 HTTP 子资源——本地部署页面
-            // （如 https 代理下的 http 图片、混合内容页面）背景图整体缺失，即
-            // 「其他浏览器显示正常、内置浏览器不显示」的根因之一。
-            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-            loadsImagesAutomatically = true
-            // F4.8 双指捏合缩放 + 双击缩放（系统默认手势）
-            builtInZoomControls = true
-            displayZoomControls = false
-            setSupportZoom(true)
-            // 首次创建时记录原始移动 UA（去 wv 标记），供桌面版切换关闭后恢复
-            if (originalUserAgent == null) originalUserAgent = userAgentString.replaceFirst("; wv", "")
-            userAgentString = if (_uiState.value.desktopMode) DESKTOP_UA else (originalUserAgent ?: userAgentString.replaceFirst("; wv", ""))
-        }
-        wv.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                val target = request.url.toString()
-                // 敏感域名 / 危险 scheme 黑名单校验，命中则阻断导航。
-                if (BrowserUrlSecurity.isBlocked(target)) {
-                    FileLogger.w(TAG, "导航被安全策略阻断: $target")
-                    return true
-                }
-                BrowserUrlSecurity.logNavigation(target)
-                view.loadUrl(target)
-                return true
-            }
-            override fun shouldInterceptRequest(
-                view: WebView?,
-                request: WebResourceRequest?
-            ): android.webkit.WebResourceResponse? {
-                val url = request?.url?.toString() ?: return null
-                // 广告/跟踪器拦截优先处理
-                if (adBlocker.shouldBlock(url)) {
-                    return android.webkit.WebResourceResponse("text/plain", "utf-8", null)
-                }
-                // 指纹注入：仅拦截主框架 HTML GET 请求，在 <head> 首行注入指纹伪装脚本
-                if (request.isForMainFrame && request.method.equals("GET", ignoreCase = true) &&
-                    (url.startsWith("http://") || url.startsWith("https://"))
-                ) {
-                    try {
-                        return fingerprintControl.injectFingerprintIntoHtml(url, request)
-                    } catch (e: Exception) {
-                        FileLogger.w(TAG, "指纹注入失败，降级为正常加载: $url", e)
-                    }
-                }
-                return null
-            }
-            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                adBlocker.reset()
-                onTabLoading(tabId, true)
-                // document-start 拦截失败时的兜底：页面开始加载即注入指纹 JS，尽量早于页面脚本执行
-                if (view != null) fingerprintControl.injectFingerprintScript(view)
-            }
-            override fun onPageFinished(view: WebView?, url: String?) {
-                onTabFinished(tabId, view, url)
-            }
-            @Deprecated("Deprecated in Java")
-            override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
-                FileLogger.w(TAG, "页面加载错误 code=$errorCode url=$failingUrl: $description")
-            }
-            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                FileLogger.w(TAG, "页面加载错误: ${error?.errorCode} ${error?.description} ${request?.url}")
-            }
-        }
-        wv.webChromeClient = object : WebChromeClient() {
-            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                onTabProgress(tabId, newProgress)
-            }
-            override fun onReceivedTitle(view: WebView?, title: String?) {
-                onTabTitle(tabId, title)
-            }
-            override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage): Boolean {
-                val line = "[${consoleMessage.messageLevel()}] ${consoleMessage.sourceId()}:${consoleMessage.lineNumber()} ${consoleMessage.message()}"
-                _consoleLogs.update { (it + line).takeLast(200) }
-                return true
-            }
-            override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
-                BrowserUrlSecurity.logJsDialog("alert", message)
-                handleDialog("alert", message ?: "", result)
-                return true
-            }
-            override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
-                BrowserUrlSecurity.logJsDialog("confirm", message)
-                handleDialog("confirm", message ?: "", result)
-                return true
-            }
-            override fun onShowFileChooser(
-                view: WebView?,
-                filePathCallback: ValueCallback<Array<Uri>>?,
-                fileChooserParams: WebChromeClient.FileChooserParams?
-            ): Boolean {
-                val file = pendingUploadFile
-                if (file != null && filePathCallback != null && file.exists() && file.isFile) {
-                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                    filePathCallback.onReceiveValue(arrayOf(uri))
-                    pendingUploadFile = null
-                    pendingUploadDone?.complete(true)
-                    pendingUploadDone = null
-                    FileLogger.i(TAG, "已自动回填上传文件: ${file.absolutePath}")
-                    return true
-                }
-                // 无自动上传目标：走系统默认文件选择器（配合 takeover，用户手动选择）
-                return false
-            }
-        }
+        configureWebSettings(wv)
+        wv.webViewClient = buildWebViewClient(tabId)
+        wv.webChromeClient = buildWebChromeClient(tabId)
         // 下载监听：F4.2 委托给 BrowserDownloadManager（进度/暂停/续传/通知）
         wv.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
             BrowserUrlSecurity.logDownload(url, mimetype)
@@ -1764,6 +1741,325 @@ class BrowserController @Inject constructor(
         return wv
     }
 
+    /**
+     * WebSettings 对齐 Chrome 默认 + 本浏览器的隐私策略下发（创建时一次性配置）。
+     *
+     * 独立成函数：createWebView 还需挂载 client 监听与 document-start 插桩，
+     * 混在一起会把认知复杂度推过门禁。
+     */
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun configureWebSettings(wv: WebView) {
+        wv.settings.apply {
+            // 本浏览器需要执行自动化脚本，JS 按需保持开启；其余危险能力一律关闭。
+            javaScriptEnabled = true
+            // 浏览器默认允许 window.open / <a target=_blank>；WebView 默认两处均为关闭，
+            // 导致「点了新窗口链接毫无反应」。开启后由 onCreateWindow 接管为新标签页，
+            // 并尊重「阻止弹窗」开关拦截无用户手势的窗口。
+            javaScriptCanOpenWindowsAutomatically = true
+            setSupportMultipleWindows(true)
+            domStorageEnabled = true
+            databaseEnabled = true
+            // 对齐 Chrome 默认：自动播放需用户手势，避免网页静音自动播视频/音频。
+            mediaPlaybackRequiresUserGesture = true
+            // 恶意站点拦截（Chrome 默认开启；WebView 侧需显式打开）。
+            safeBrowsingEnabled = true
+            // 定位能力开关：不打开时 onGeolocationPermissionsShowPrompt 永远不会触发，
+            // 网页请求定位表现为「点了没反应」。开启后由权限回调按「仅本次允许」处理。
+            setGeolocationEnabled(true)
+            // viewport 对齐 Chrome：响应式页面按设备宽度布局。WebView 默认两处均关闭，
+            // 非响应式站点会整体缩成一小片——「其他浏览器显示正常、这里显示异常」的
+            // 另一处根因。
+            useWideViewPort = true
+            loadWithOverviewMode = true
+            // 安全加固：禁止本地文件 / 内容访问，防止任意页面读取本地资源。
+            allowFileAccess = false
+            allowContentAccess = false
+            allowFileAccessFromFileURLs = false
+            allowUniversalAccessFromFileURLs = false
+            // 混合内容策略对齐 Chrome：被动内容（图片/字体/音视频等「optionally blockable」）
+            // 允许加载，主动内容（脚本等「blockable」）仍阻断。
+            // 曾用 NEVER_ALLOW 无条件阻断 HTTPS 页面的 HTTP 子资源——本地部署页面
+            // （如 https 代理下的 http 图片、混合内容页面）背景图整体缺失，即
+            // 「其他浏览器显示正常、内置浏览器不显示」的根因之一。
+            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            loadsImagesAutomatically = true
+            // F4.8 双指捏合缩放 + 双击缩放（系统默认手势）
+            builtInZoomControls = true
+            displayZoomControls = false
+            setSupportZoom(true)
+            // 首次创建时记录原始移动 UA（去 wv 标记），供桌面版切换关闭后恢复
+            if (originalUserAgent == null) originalUserAgent = userAgentString.replaceFirst("; wv", "")
+            userAgentString = if (_uiState.value.desktopMode) DESKTOP_UA else (originalUserAgent ?: userAgentString.replaceFirst("; wv", ""))
+        }
+        // 第三方 Cookie：WebView 默认**全部拒绝**，与 Chrome 不同，会让 SSO / 第三方登录 /
+        // 嵌入式 iframe 会话静默失效。这里按用户的「阻止第三方 Cookie」开关显式下发。
+        runCatching {
+            CookieManager.getInstance()
+                .setAcceptThirdPartyCookies(wv, !adBlocker.blockThirdPartyCookies)
+        }.onFailure {
+            FileLogger.w(TAG, "设置第三方 Cookie 策略失败（降级为系统默认）", it)
+        }
+        // 表单自动填充：让登录框能走系统 Autofill（Chrome 行为）。WebView 默认不声明。
+        wv.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_YES
+    }
+
+    private fun buildWebViewClient(tabId: String): WebViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val target = request.url.toString()
+                // 敏感域名 / 危险 scheme 黑名单校验，命中则阻断导航。
+                if (BrowserUrlSecurity.isBlocked(target)) {
+                    FileLogger.w(TAG, "导航被安全策略阻断: $target")
+                    return true
+                }
+                // 浏览器标准 scheme（tel/mailto/sms/geo/market 等）交给系统应用：
+                // WebView 直接 loadUrl 只会得到 ERR_UNKNOWN_URL_SCHEME，
+                // 页面表现为「点了电话/邮箱链接没反应」，而其他浏览器会唤起对应 App。
+                if (dispatchToSystemApp(request)) return true
+                BrowserUrlSecurity.logNavigation(target)
+                view.loadUrl(target)
+                return true
+            }
+            override fun shouldInterceptRequest(
+                view: WebView?,
+                request: WebResourceRequest?
+            ): android.webkit.WebResourceResponse? {
+                val url = request?.url?.toString() ?: return null
+                // 广告/跟踪器拦截优先处理
+                if (adBlocker.shouldBlock(url)) {
+                    return android.webkit.WebResourceResponse("text/plain", "utf-8", null)
+                }
+                // 指纹注入：仅拦截主框架 HTML GET 请求，在 <head> 首行注入指纹伪装脚本
+                if (request.isForMainFrame && request.method.equals("GET", ignoreCase = true) &&
+                    (url.startsWith("http://") || url.startsWith("https://"))
+                ) {
+                    try {
+                        return fingerprintControl.injectFingerprintIntoHtml(url, request)
+                    } catch (e: Exception) {
+                        FileLogger.w(TAG, "指纹注入失败，降级为正常加载: $url", e)
+                    }
+                }
+                return null
+            }
+            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                adBlocker.reset()
+                onTabLoading(tabId, true)
+                // 新导航开始：清除上一页的加载错误态（重试的成功路径）
+                if (activeTabId == tabId && _uiState.value.loadError != null) {
+                    _uiState.value = _uiState.value.copy(loadError = null)
+                }
+                // document-start 拦截失败时的兜底：页面开始加载即注入指纹 JS，尽量早于页面脚本执行
+                if (view != null) fingerprintControl.injectFingerprintScript(view)
+            }
+            override fun onPageFinished(view: WebView?, url: String?) {
+                onTabFinished(tabId, view, url)
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
+                FileLogger.w(TAG, "页面加载错误 code=$errorCode url=$failingUrl: $description")
+            }
+            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                FileLogger.w(TAG, "页面加载错误: ${error?.errorCode} ${error?.description} ${request?.url}")
+                // 仅主框架失败才升级为页面级错误页（子资源失败不应让整页报错），
+                // 且只影响当前激活标签。默认实现只有日志，用户看到永久白屏。
+                if (request?.isForMainFrame == true && activeTabId == tabId) {
+                    _uiState.value = _uiState.value.copy(
+                        loadError = error?.description?.toString() ?: "未知错误"
+                    )
+                }
+            }
+            /**
+             * SSL 错误：默认实现静默取消，用户只看到空白页而不知道原因。
+             * 安全上保持取消（不提供「继续浏览」绕过入口），但显式记录便于排障。
+             */
+            override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
+                FileLogger.w(TAG, "SSL 错误，已阻止加载: url=${error?.url} primary=${error?.primaryError}")
+                handler?.cancel()
+            }
+            /**
+             * HTTP 认证（401 Basic/Digest）：默认实现静默取消，页面表现为
+             * 「输入网址后一片空白」。这里登记待处理认证，由 UI 弹窗收集凭据后
+             * 经 [resolveHttpAuth] 回传。
+             */
+            override fun onReceivedHttpAuthRequest(
+                view: WebView?,
+                handler: HttpAuthHandler?,
+                host: String?,
+                realm: String?
+            ) {
+                httpAuthHandler?.cancel()
+                if (handler == null) return
+                httpAuthHandler = handler
+                _pendingHttpAuth.value = PendingHttpAuth(UUID.randomUUID().toString(), host, realm)
+                FileLogger.i(TAG, "HTTP 认证请求: host=$host realm=$realm")
+            }
+            /**
+             * 渲染进程崩溃：必须返回 true，否则系统会连带杀掉整个 App 进程。
+             *
+             * 这里原地重建该标签的 WebView 并重载原 URL——对齐 Chrome 崩溃后自动恢复的行为，
+             * 避免页面永久白屏且无任何提示（与 `<select>` 同类的宿主侧静默失效）。
+             */
+            override fun onRenderProcessGone(
+                view: WebView?,
+                detail: android.webkit.RenderProcessGoneDetail?
+            ): Boolean {
+                FileLogger.w(
+                    TAG,
+                    "WebView 渲染进程崩溃，重建标签页: didCrash=${detail?.didCrash()}, " +
+                        "priority=${detail?.rendererPriorityAtExit()}"
+                )
+                tabs.firstOrNull { it.webView === view }?.let { tab ->
+                    val url = tab.url
+                    detachAndDestroy(tab.webView)
+                    tab.webView = createWebView(tab.id)
+                    if (url.isNotBlank()) tab.webView.loadUrl(url)
+                    if (activeTabId == tab.id) applyActiveTab(tab)
+                }
+                return true
+            }
+        }
+    private fun buildWebChromeClient(tabId: String): WebChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                onTabProgress(tabId, newProgress)
+            }
+            override fun onReceivedTitle(view: WebView?, title: String?) {
+                onTabTitle(tabId, title)
+            }
+            override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage): Boolean {
+                val line = "[${consoleMessage.messageLevel()}] ${consoleMessage.sourceId()}:${consoleMessage.lineNumber()} ${consoleMessage.message()}"
+                _consoleLogs.update { (it + line).takeLast(200) }
+                return true
+            }
+            override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
+                BrowserUrlSecurity.logJsDialog("alert", message)
+                registerPendingDialog("alert", message ?: "", result)
+                return true
+            }
+            override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
+                BrowserUrlSecurity.logJsDialog("confirm", message)
+                registerPendingDialog("confirm", message ?: "", result)
+                return true
+            }
+            /**
+             * prompt() 必须显式处理：默认实现返回 false 会让 JS 侧的 prompt 直接拿不到
+             * 输入框（表现为「点了没反应」），与 `<select>` 属同一类宿主侧静默失效。
+             */
+            override fun onJsPrompt(
+                view: WebView?,
+                url: String?,
+                message: String?,
+                defaultValue: String?,
+                result: JsPromptResult?
+            ): Boolean {
+                BrowserUrlSecurity.logJsDialog("prompt", message)
+                registerPendingDialog("prompt", message ?: "", result, defaultValue)
+                return true
+            }
+            /**
+             * 网页请求新窗口（window.open / `<a target=_blank>`）→ 开一个新标签页。
+             *
+             * 未重写时 WebView 会丢弃该请求，用户点「在新标签打开」毫无反应；
+             * 这里创建新标签并切过去，同时在「阻止弹窗」开启且非用户手势时拦截。
+             */
+            override fun onCreateWindow(
+                view: WebView?,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: Message?
+            ): Boolean {
+                val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
+                if (adBlocker.popupBlockEnabled && !isUserGesture) {
+                    transport.webView = null
+                    resultMsg.sendToTarget()
+                    FileLogger.i(TAG, "已拦截非用户手势触发的弹窗窗口")
+                    return true
+                }
+                val tab = createTab(null)
+                transport.webView = tab.webView
+                resultMsg.sendToTarget()
+                switchToTab(tab.id)
+                return true
+            }
+            /** 网页调用 window.close() → 关掉对应标签（至少保留一个）。 */
+            override fun onCloseWindow(window: WebView?) {
+                val target = tabs.firstOrNull { it.webView === window }
+                if (target != null && tabs.size > 1) {
+                    val idx = tabs.indexOf(target)
+                    tabs.removeAt(idx)
+                    detachAndDestroy(target.webView)
+                    if (activeTabId == target.id) {
+                        val next = tabs.getOrNull(idx) ?: tabs.lastOrNull()
+                        activeTabId = next?.id
+                        next?.let(::applyActiveTab)
+                    }
+                    publishTabs()
+                }
+            }
+            /**
+             * 网页全屏（视频/游戏等）：未接管时全屏请求被丢弃，页面表现为「点了全屏没反应」。
+             *
+             * 这里把全屏 View 与退出回调交给 UI 层（[onFullscreenChange] 由屏幕侧渲染），
+             * 与 `<select>` 同属宿主必须显式接管的浏览器能力。
+             */
+            override fun onShowCustomView(view: View?, callback: WebChromeClient.CustomViewCallback?) {
+                fullscreenCallback?.onCustomViewHidden()
+                fullscreenView = view
+                fullscreenCallback = callback
+                onFullscreenChange?.invoke(view != null)
+            }
+            /** 退出网页全屏。 */
+            override fun onHideCustomView() {
+                fullscreenCallback?.onCustomViewHidden()
+                fullscreenView = null
+                fullscreenCallback = null
+                onFullscreenChange?.invoke(false)
+            }
+            /**
+             * 网页权限请求（相机 / 麦克风等）。
+             *
+             * 默认实现直接拒绝且不给任何反馈，页面表现为「点了没反应」。
+             * 这里显式授予受保护媒体资源类请求，其余一律拒绝，并记录日志便于排障。
+             */
+            override fun onPermissionRequest(request: PermissionRequest?) {
+                val wanted = request?.resources
+                val grantable = wanted?.filter {
+                    it == PermissionRequest.RESOURCE_PROTECTED_MEDIA_ID ||
+                        it == PermissionRequest.RESOURCE_MIDI_SYSEX
+                }.orEmpty()
+                if (grantable.isEmpty()) {
+                    FileLogger.i(TAG, "已拒绝网页权限请求：${wanted?.joinToString()}")
+                    request?.deny()
+                } else {
+                    FileLogger.i(TAG, "已授予网页权限：${grantable.joinToString()}")
+                    request?.grant(grantable.toTypedArray())
+                }
+            }
+            /** 网页定位权限：按「仅本次允许」处理（不持久化），对齐 Chrome 的临时授权。 */
+            override fun onGeolocationPermissionsShowPrompt(
+                origin: String?,
+                callback: GeolocationPermissions.Callback?
+            ) {
+                callback?.invoke(origin, true, false)
+            }
+            override fun onShowFileChooser(
+                view: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: WebChromeClient.FileChooserParams?
+            ): Boolean {
+                val file = pendingUploadFile
+                if (file != null && filePathCallback != null && file.exists() && file.isFile) {
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                    filePathCallback.onReceiveValue(arrayOf(uri))
+                    pendingUploadFile = null
+                    pendingUploadDone?.complete(true)
+                    pendingUploadDone = null
+                    FileLogger.i(TAG, "已自动回填上传文件: ${file.absolutePath}")
+                    return true
+                }
+                // 无自动上传目标：走系统默认文件选择器（配合 takeover，用户手动选择）
+                return false
+            }
+        }
+
     private fun onTabLoading(tabId: String, isLoading: Boolean) {
         if (activeTabId != tabId) return
         _uiState.value = _uiState.value.copy(isLoading = isLoading, progress = if (isLoading) 10 else _uiState.value.progress)
@@ -1787,7 +2083,8 @@ class BrowserController @Inject constructor(
                 currentUrl = url ?: _uiState.value.currentUrl,
                 canGoBack = view?.canGoBack() ?: false,
                 canGoForward = view?.canGoForward() ?: false,
-                title = tab?.title ?: _uiState.value.title
+                title = tab?.title ?: _uiState.value.title,
+                loadError = null
             )
             detectReaderAvailable()
             // F4.6 检测页面语言
@@ -1882,6 +2179,9 @@ class BrowserController @Inject constructor(
     private fun detachAndDestroy(wv: WebView) {
         detachFromParent(wv)
         wv.destroy()
+        // 同步摘除 context wrapper：否则关闭的标签 / 崩溃重建的旧实例会一直留在
+        // webViewContexts 里累积（每次 attach/detachHost 还会被无意义地遍历）。
+        (wv.context as? MutableContextWrapper)?.let { webViewContexts.remove(it) }
     }
 
     /**
@@ -1963,12 +2263,24 @@ class BrowserController @Inject constructor(
         }
     }
 
-    /** WebChromeClient 对话框回调：登记待处理对话框，等待工具侧处理。 */
-    private fun handleDialog(type: String, message: String, result: JsResult?) {
+    /**
+     * WebChromeClient 对话框回调：登记待处理对话框，等待工具侧处理。
+     *
+     * 与上方公开的 `handleDialog(accept: Boolean)` 不同，这里只负责登记——
+     * 结果（含 prompt 的输入文本）在工具侧确认后回传给 JS。
+     */
+    private fun registerPendingDialog(
+        type: String,
+        message: String,
+        result: JsResult?,
+        defaultValue: String? = null
+    ) {
         dialogResult?.cancel()
         val id = UUID.randomUUID().toString()
-        _pendingDialog.value = PendingBrowserDialog(id, type, message)
+        _pendingDialog.value = PendingBrowserDialog(id, type, message, defaultValue)
         dialogResult = result
+        // prompt 初始输入 = 网页传入的 defaultValue，用户未改动时原样回传
+        promptInput = defaultValue ?: ""
         val deferred = CompletableDeferred<Boolean>()
         dialogDeferred = deferred
         scope.launch {
@@ -1976,7 +2288,11 @@ class BrowserController @Inject constructor(
             mainHandler.post {
                 val r = dialogResult
                 if (r != null) {
-                    if (accept) r.confirm() else r.cancel()
+                    if (accept) {
+                        // prompt 必须把输入框内容回传给 JS，否则页面拿到 null；
+                        // 其余类型只需 confirm() 表示「确定」。
+                        if (r is JsPromptResult) r.confirm(promptInput) else r.confirm()
+                    } else r.cancel()
                 }
                 if (_pendingDialog.value?.id == id) _pendingDialog.value = null
                 if (dialogResult === r) dialogResult = null
