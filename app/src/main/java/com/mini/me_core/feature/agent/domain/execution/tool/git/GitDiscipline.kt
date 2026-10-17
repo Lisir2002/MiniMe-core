@@ -33,6 +33,34 @@ internal object GitDiscipline {
     /** 远端 URL 允许的协议头（ssh 形态 git@host:path 单独判定）。 */
     private val URL_PROTOCOLS = listOf("https://", "http://", "ssh://", "git://")
 
+    /**
+     * credential.helper=store 认的 URL 行格式：`scheme://user:token@host` 单行一条。
+     * helper 协议格式（protocol=/host=/username=/password= 多行）不匹配，store 会静默失效。
+     */
+    private val CREDENTIAL_URL_LINE_REGEX =
+        Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://[^/\\s]+@\\S+$")
+
+    /**
+     * git 凭据类失败的输出标记（小写匹配）。核心是
+     * `could not read Username ... No such device or address`——无 TTY 环境下 git
+     * 回退交互询问失败的表现，真实根因通常是凭据缺失或文件格式错误。
+     */
+    private val CREDENTIAL_FAILURE_MARKERS = listOf(
+        "could not read username",
+        "could not read password",
+        "no such device or address",
+        "authentication failed",
+        "terminal prompts disabled",
+        "permission denied (publickey",
+        "could not read from remote repository"
+    )
+
+    /** repo_dir 段数上限：防深路径滥用；工作区一层发现已覆盖常见场景。 */
+    private const val MAX_REPO_DIR_SEGMENTS = 4
+
+    /** push 前测试建议的规则出处（AGENTS.md），让模型与用户知道规则来源而非工具臆造。 */
+    private const val PRE_TEST_ADVICE_SOURCE = "（出处：AGENTS.md「Always：任何 git push 前先跑测试套件且全部通过」）"
+
     /** 远端 URL 协议/形态白名单外的拒绝原因（null 表示合法）。 */
     fun remoteUrlRejectionReason(url: String): String? {
         val u = url.trim()
@@ -94,5 +122,140 @@ internal object GitDiscipline {
             else -> "需符合 <type>(<scope>): <subject>；可用 type 见上方枚举，scope 建议 ${RECOMMENDED_SCOPES.joinToString("/")}"
         }
         return hint
+    }
+
+    // ─────────────────────── repo_dir 治理（作用域指定） ───────────────────────
+
+    /**
+     * repo_dir（仓库相对工作区根的目录）合法性校验。
+     * 规则：必须相对路径（禁绝对 / ~）、禁 .. 段与空段、每段仅字母数字与 . _ -、≤4 层。
+     * @return null 合法；非 null 为拒绝原因。已知限制：workspace 内 symlink 指向外部
+     *   无法纯字符串防御，风险接受并在工具 KDoc 注明。
+     */
+    fun repoDirRejectionReason(dir: String): String? {
+        val d = dir.trim().trimEnd('/')
+        val segments = d.split('/')
+        return when {
+            d.isBlank() -> "repo_dir 为空"
+            d.startsWith("/") -> "repo_dir 必须是相对路径（禁止绝对路径）：$d"
+            d.startsWith("~") -> "repo_dir 必须是相对路径（禁止 ~ 家目录展开）：$d"
+            segments.any { it == ".." } -> "repo_dir 禁止 .. 段（防逃逸出工作区）：$d"
+            segments.any { it.isBlank() } -> "repo_dir 含空路径段（a//b 形态）：$d"
+            segments.size > MAX_REPO_DIR_SEGMENTS -> "repo_dir 层级超过 $MAX_REPO_DIR_SEGMENTS 层：$d"
+            segments.any { !isValidRemoteName(it) } -> "repo_dir 每段仅允许字母数字与 . _ -：$d"
+            else -> null
+        }
+    }
+
+    /**
+     * 根目录非 git 仓库时的报错文案：附当前执行目录、工作区根下一层发现的仓库
+     * （如有）与 repo_dir 用法，替代干瘪的「不是 git 仓库」——把排查方向直接给对。
+     */
+    fun notARepoMessage(cwd: String, discovered: List<String>): String = buildString {
+        append("当前执行目录（$cwd）不是 git 仓库。")
+        if (discovered.isNotEmpty()) {
+            append("在工作区根下一层发现 ${discovered.size} 个 git 仓库：${discovered.joinToString("、")}。")
+            append("请用 repo_dir 参数指定仓库目录后重试，如 {\"action\":\"push\",\"repo_dir\":\"${discovered.first()}\"}。")
+        } else {
+            append("工作区根下一层也未发现 .git。若仓库就在工作区内，")
+            append("请用 repo_dir 指定其相对路径（如 repo_dir=\"sub/repo\"）。")
+        }
+    }
+
+    /** 从远端 URL 解析 host（小写，可带端口）；无法解析返回 null。ssh 短写 git@host:path 单独判定。 */
+    fun remoteUrlHost(url: String): String? {
+        val u = url.trim().lowercase()
+        if (u.startsWith("git@")) {
+            return u.removePrefix("git@").substringBefore(':').ifBlank { null }
+        }
+        if (!u.contains("://")) return null
+        return u.substringAfter("://")
+            .substringBefore('/')
+            .substringAfterLast('@')
+            .ifBlank { null }
+    }
+
+    // ─────────────────────── 凭据链诊断（问题C：kv 格式静默失效） ───────────────────────
+
+    /**
+     * 判定凭据文件内容是否符合 URL 行格式。
+     * @return null 合规；非 null 为问题描述（含行号与形态，指出疑似 helper 协议格式）。
+     *   安全：不回显行内容原文——凭据行含 token，禁止经错误消息/日志外泄。
+     */
+    fun credentialFileFormatIssue(content: String): String? {
+        val lines = content.lines().filter { it.isNotBlank() }
+        if (lines.isEmpty()) return "凭据文件为空（没有任何条目）"
+        lines.forEachIndexed { index, line ->
+            if (!CREDENTIAL_URL_LINE_REGEX.matches(line.trim())) {
+                return "第 ${index + 1} 行不是 URL 行格式（应形如 https://<user>:<token>@<host> 单行一条）" +
+                    "——疑似 git-credential-store 的 helper 协议格式" +
+                    "（protocol=/host=/username=/password= 多行），该格式 store helper 不识别，会静默失效"
+            }
+        }
+        return null
+    }
+
+    /**
+     * git 失败输出是否疑似凭据类问题（大小写不敏感）。
+     * 命中后才触发完整凭据链诊断，正常冲突/快进失败不误报。
+     */
+    fun looksLikeCredentialFailure(gitOutput: String): Boolean {
+        val lower = gitOutput.lowercase()
+        return CREDENTIAL_FAILURE_MARKERS.any { lower.contains(it) }
+    }
+
+    /**
+     * 从 credential.helper 条目解析 store 的文件路径。
+     * `store --file=<path>` → path；裸 `store` → null（用默认 ~/.git-credentials）；
+     * 非 store 条目（cache/osxkeychain 等）→ null。
+     */
+    fun storeFilePath(helperEntry: String): String? {
+        val entry = helperEntry.trim()
+        if (!entry.startsWith("store")) return null
+        return entry.split(Regex("\\s+"))
+            .firstOrNull { it.startsWith("--file=") }
+            ?.removePrefix("--file=")
+            ?.ifBlank { null }
+    }
+
+    /**
+     * 凭据修复的标准命令（只给命令供用户在容器终端/App 凭据管理执行，
+     * 工具本身不写凭据文件——凭据不落工具层）。
+     */
+    fun credentialStoreFixAdvice(host: String?, filePath: String): List<String> {
+        val hostSuffix = host?.let { "@$it" } ?: "@github.com"
+        return listOf(
+            "git config --global credential.helper \"store --file=${shellQuote(filePath)}\"",
+            "printf 'https://<user>:<token>$hostSuffix\\n' > ${shellQuote(filePath)} && chmod 600 ${shellQuote(filePath)}",
+            "容器重建后凭据文件会丢失，请在 App「凭据管理」中重新添加 Git 凭据"
+        )
+    }
+
+    // ─────────────────────── push 前测试建议（技术栈守卫） ───────────────────────
+
+    /**
+     * 按工作区实际技术栈生成 push 前测试建议，杜绝「非 Gradle 工程被建议跑 gradlew」。
+     * 文案恒带 AGENTS.md 出处；检测不到已知构建文件时给通用建议并说明降级。
+     * @param workspaceEntries 工作区根条目名（ls -A 输出）
+     */
+    fun pushPreTestAdvice(workspaceEntries: List<String>): String {
+        val gradlew = workspaceEntries.any { it == "gradlew" || it == "gradlew.bat" }
+        return when {
+            gradlew -> "push 前先跑 ./gradlew :app:testReleaseUnitTest 且全部通过 $PRE_TEST_ADVICE_SOURCE"
+            workspaceEntries.any { it == "package.json" } ->
+                "未检测到 gradlew，当前工作区不是 Gradle 工程；push 前请按实际技术栈跑测试" +
+                    "（检测到 package.json，建议 npm test）$PRE_TEST_ADVICE_SOURCE"
+            workspaceEntries.any { it == "pom.xml" } ->
+                "未检测到 gradlew，当前工作区不是 Gradle 工程；push 前请按实际技术栈跑测试" +
+                    "（检测到 pom.xml，建议 mvn test）$PRE_TEST_ADVICE_SOURCE"
+            workspaceEntries.any { it == "Makefile" } ->
+                "未检测到 gradlew，当前工作区不是 Gradle 工程；push 前请按实际技术栈跑测试" +
+                    "（检测到 Makefile，建议 make test）$PRE_TEST_ADVICE_SOURCE"
+            workspaceEntries.any { it == "pyproject.toml" || it == "setup.py" } ->
+                "未检测到 gradlew，当前工作区不是 Gradle 工程；push 前请按实际技术栈跑测试" +
+                    "（检测到 Python 工程，建议 pytest）$PRE_TEST_ADVICE_SOURCE"
+            else ->
+                "未检测到已知构建文件，push 前请按项目实际测试命令执行并全部通过 $PRE_TEST_ADVICE_SOURCE"
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.mini.me_core.feature.agent.domain.execution.tool.git
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -87,5 +88,120 @@ class GitDisciplineTest {
         assertEquals("'it'\\''s'", GitDiscipline.shellQuote("it's"))
         assertEquals("'$(whoami)'", GitDiscipline.shellQuote("$(whoami)"))
         assertEquals("'; rm -rf /'", GitDiscipline.shellQuote("; rm -rf /"))
+    }
+
+    // ───────────── repo_dir 治理（新增） ─────────────
+
+    @Test
+    fun repoDir_validForms() {
+        assertNull(GitDiscipline.repoDirRejectionReason("sub"))
+        assertNull(GitDiscipline.repoDirRejectionReason("sub/repo"))
+        assertNull(GitDiscipline.repoDirRejectionReason("a/b/c/d")) // 4 段恰好为上限
+    }
+
+    @Test
+    fun repoDir_rejections() {
+        assertTrue(GitDiscipline.repoDirRejectionReason("/abs")!!.contains("相对路径"))
+        assertTrue(GitDiscipline.repoDirRejectionReason("~/x")!!.contains("相对路径"))
+        assertTrue(GitDiscipline.repoDirRejectionReason("a/../b")!!.contains(".."))
+        assertTrue(GitDiscipline.repoDirRejectionReason("a//b")!!.contains("空路径段"))
+        assertTrue(GitDiscipline.repoDirRejectionReason("a/b/c/d/e")!!.contains("4 层"))
+        assertTrue(GitDiscipline.repoDirRejectionReason("a b")!!.contains("字母数字"))
+    }
+
+    @Test
+    fun notARepoMessage_withDiscovery() {
+        val msg = GitDiscipline.notARepoMessage("/workspace", listOf("repo1", "repo2"))
+        assertTrue(msg.contains("repo1"))
+        assertTrue(msg.contains("repo_dir"))
+    }
+
+    @Test
+    fun notARepoMessage_noDiscovery() {
+        val msg = GitDiscipline.notARepoMessage("/workspace", emptyList())
+        assertTrue(msg.contains("不是 git 仓库"))
+    }
+
+    @Test
+    fun remoteUrlHost_variants() {
+        assertEquals("github.com", GitDiscipline.remoteUrlHost("https://user@github.com/org/repo.git"))
+        assertEquals("github.com", GitDiscipline.remoteUrlHost("git@github.com:org/repo.git"))
+        assertEquals("host:22", GitDiscipline.remoteUrlHost("ssh://git@host:22/org/repo.git"))
+        assertNull(GitDiscipline.remoteUrlHost("not-a-url"))
+    }
+
+    @Test
+    fun credentialFileFormat_valid() {
+        assertNull(GitDiscipline.credentialFileFormatIssue("https://user:token@github.com\nhttps://u:t@gitlab.com"))
+    }
+
+    @Test
+    fun credentialFileFormat_kvInvalid() {
+        val issue = GitDiscipline.credentialFileFormatIssue("protocol=https\nhost=github.com\nusername=u\npassword=p")
+        assertNotNull(issue)
+        assertTrue(issue!!.contains("URL 行格式") || issue.contains("helper 协议"))
+    }
+
+    @Test
+    fun credentialFileFormat_mixed() {
+        val issue = GitDiscipline.credentialFileFormatIssue("https://user:token@github.com\nprotocol=https\nhost=github.com")
+        assertNotNull(issue)
+    }
+
+    @Test
+    fun credentialFileFormat_empty() {
+        assertNotNull(GitDiscipline.credentialFileFormatIssue(""))
+        assertNotNull(GitDiscipline.credentialFileFormatIssue("   \n  "))
+    }
+
+    @Test
+    fun looksLikeCredentialFailure_trueCases() {
+        assertTrue(GitDiscipline.looksLikeCredentialFailure("fatal: could not read Username for 'https://...': No such device or address"))
+        assertTrue(GitDiscipline.looksLikeCredentialFailure("could not read password"))
+        assertTrue(GitDiscipline.looksLikeCredentialFailure("Authentication failed"))
+        assertTrue(GitDiscipline.looksLikeCredentialFailure("terminal prompts disabled"))
+        assertTrue(GitDiscipline.looksLikeCredentialFailure("Permission denied (publickey)"))
+        assertTrue(GitDiscipline.looksLikeCredentialFailure("could not read from remote repository"))
+    }
+
+    @Test
+    fun looksLikeCredentialFailure_falseCases() {
+        assertFalse(GitDiscipline.looksLikeCredentialFailure("Everything up-to-date"))
+        assertFalse(GitDiscipline.looksLikeCredentialFailure("error: failed to push some refs"))
+        assertFalse(GitDiscipline.looksLikeCredentialFailure("Merge conflict in file.txt"))
+    }
+
+    @Test
+    fun storeFilePath_variants() {
+        assertNull(GitDiscipline.storeFilePath("store"))
+        assertEquals("/root/.git-credentials", GitDiscipline.storeFilePath("store --file=/root/.git-credentials"))
+        assertNull(GitDiscipline.storeFilePath("cache"))
+        assertNull(GitDiscipline.storeFilePath("osxkeychain"))
+    }
+
+    @Test
+    fun credentialStoreFixAdvice_containsChmodAndHelper() {
+        val joined = GitDiscipline.credentialStoreFixAdvice("github.com", "/root/.git-credentials").joinToString("\n")
+        assertTrue(joined.contains("chmod 600"))
+        assertTrue(joined.contains("store --file="))
+    }
+
+    @Test
+    fun pushPreTestAdvice_gradlew() {
+        val advice = GitDiscipline.pushPreTestAdvice(listOf("gradlew", "src", "build.gradle.kts"))
+        assertTrue(advice.contains("./gradlew :app:testReleaseUnitTest"))
+        assertTrue(advice.contains("AGENTS.md"))
+    }
+
+    @Test
+    fun pushPreTestAdvice_packageJson() {
+        val advice = GitDiscipline.pushPreTestAdvice(listOf("package.json", "src"))
+        assertTrue(advice.contains("npm test"))
+    }
+
+    @Test
+    fun pushPreTestAdvice_genericFallback() {
+        val advice = GitDiscipline.pushPreTestAdvice(listOf("readme.txt"))
+        assertTrue(advice.contains("AGENTS.md"))
     }
 }

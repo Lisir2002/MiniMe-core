@@ -12,7 +12,7 @@ import javax.inject.Inject
  * 对齐 AGENTS.md 纪律：当 Bash 执行 `git commit` / `git push` 时，静态检查命令文本：
  * - `git commit`：提交信息是否符合 Conventional Commits（`type(scope): subject`，
  *   type ∈ feat|fix|refactor|docs|style|chore|ci|build|perf|test，见 AGENTS.md「Git 提交规范」）；
- * - `git push`：提醒 push 前需确认 `./gradlew :app:testReleaseUnitTest` 通过（AGENTS.md「推送到远端前必跑单元测试」）。
+ * - `git push`：提醒 push 前需按项目技术栈运行测试套件且全部通过（Gradle 工程：`./gradlew :app:testReleaseUnitTest`，见 AGENTS.md「推送到远端前必跑单元测试」）。
  *
  * R02 接入：审查发现（notes 非空）经 [WakeQueueManager.enqueueAsync] 写入统一唤醒队列，
  * 下一轮会话开始前由 workflow 注入 system-reminder 唤醒（align design 11.3 asyncRewake 下轮注入）。
@@ -64,7 +64,8 @@ class CommitDisciplineHook @Inject constructor(
                     "feat|fix|refactor|docs|style|chore|ci|build|perf|test），见 AGENTS.md「Git 提交规范」。")
             }
             if (isPush) {
-                add("push 前需确认 ./gradlew :app:testReleaseUnitTest 全部通过，见 AGENTS.md「推送到远端前必跑单元测试」。")
+                add("push 前需按项目技术栈运行测试套件（Gradle 工程：./gradlew :app:testReleaseUnitTest）且全部通过，" +
+                    "见 AGENTS.md「推送到远端前必跑单元测试」。非 Gradle 工程请按实际构建命令跑测试。")
             }
         }
         return CommitDisciplineReport(isCommit, isPush, message, conforms, notes)

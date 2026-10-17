@@ -215,6 +215,8 @@ class GitOpsTool @Inject constructor(
             put("summary", JsonPrimitive(changeSummary))
         }
 
+        // 按工作区实际技术栈给出 push 前测试建议（技术栈守卫：不再把 gradlew 写成唯一命令）
+        val entries = workspaceEntries()
         return success(
             buildJsonObject {
                 put("ok", JsonPrimitive(true))
@@ -222,13 +224,24 @@ class GitOpsTool @Inject constructor(
                 put("suggested_scope", JsonPrimitive(scope))
                 put("suggested", JsonPrimitive(suggested))
                 put("status", statusSummary)
-                put("next_steps", JsonArray(listOf(
-                    JsonPrimitive("1. 校验建议提交信息：gitops check_commit --message '$suggested'"),
-                    JsonPrimitive("2. 按需要调整 type/scope/subject 后执行 git commit -m '<msg>'"),
-                    JsonPrimitive("3. 推送前跑单测：./gradlew :app:testReleaseUnitTest")
-                )))
+                put("next_steps", JsonArray(buildSuggestNextSteps(suggested, entries)))
             }
         )
+    }
+
+    /** suggest_commit 的 next_steps：第 3 步按工作区技术栈给出 push 前测试建议（带出处与降级）。 */
+    private fun buildSuggestNextSteps(suggested: String, workspaceEntries: List<String>): List<JsonPrimitive> {
+        return listOf(
+            JsonPrimitive("1. 校验建议提交信息：gitops check_commit --message '$suggested'"),
+            JsonPrimitive("2. 按需要调整 type/scope/subject 后执行 git commit -m '<msg>'"),
+            JsonPrimitive("3. ${GitDiscipline.pushPreTestAdvice(workspaceEntries)}")
+        )
+    }
+
+    /** 工作区根条目（ls -A），供 push 前测试建议按实际构建文件降级到对应技术栈。 */
+    private suspend fun workspaceEntries(): List<String> {
+        val listing = commandEngine.runCommandSync("ls -A", workspaceRepository.currentPath(), 10_000L)
+        return listing.lines().map { it.removeSuffix("\r").trim() }.filter { it.isNotBlank() }
     }
 
     /**
@@ -282,7 +295,7 @@ class GitOpsTool @Inject constructor(
                     },
                     buildJsonObject {
                         put("name", JsonPrimitive("pre-commit"))
-                        put("purpose", JsonPrimitive("feature ↔ 模块文档同步 + Spec 规范驱动预检"))
+                        put("purpose", JsonPrimitive("已停用校验，直接通过（docs/modules 删除后不再做模块文档同步；Conventional Commits 校验仍由 commit-msg hook 负责）"))
                         put("enabled", JsonPrimitive(enabled))
                     }
                 )))
