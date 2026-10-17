@@ -515,7 +515,7 @@ jobs:
           echo "--- 硬校验完成 ---"
 
       - name: Create GitHub Release & Upload assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         id: gh_release
         with:
           tag_name: ${{ steps.release.outputs.tag }}
