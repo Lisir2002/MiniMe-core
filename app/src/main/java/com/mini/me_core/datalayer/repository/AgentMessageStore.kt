@@ -23,6 +23,7 @@ internal class AgentMessageStore(private val db: AgentDb) {
             e.tool_calls_json, e.tool_call_id, e.tool_name, e.tool_args, e.is_error,
             e.reasoning, e.signature, e.attachments_json, e.is_compacted, e.is_context_summary,
             e.is_compaction_marker, e.input_tokens, e.output_tokens, e.chunk_group_id, e.chunk_index,
+            e.provider_id,
         )
     }
 
@@ -39,7 +40,7 @@ internal class AgentMessageStore(private val db: AgentDb) {
                     e.tool_calls_json, e.tool_call_id, e.tool_name, e.tool_args, e.is_error,
                     e.reasoning, e.signature, e.attachments_json, e.is_compacted,
                     e.is_context_summary, e.is_compaction_marker, e.input_tokens, e.output_tokens,
-                    e.chunk_group_id, e.chunk_index,
+                    e.chunk_group_id, e.chunk_index, e.provider_id,
                 )
             }
         }

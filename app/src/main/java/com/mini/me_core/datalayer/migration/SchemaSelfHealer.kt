@@ -32,7 +32,7 @@ object SchemaSelfHealer {
         "tool_calls_json", "tool_call_id", "tool_name", "tool_args", "is_error",
         "reasoning", "signature", "attachments_json", "is_compacted",
         "is_context_summary", "is_compaction_marker", "input_tokens", "output_tokens",
-        "chunk_group_id", "chunk_index"
+        "chunk_group_id", "chunk_index", "provider_id"
     )
 
     private val AGENT_MESSAGE_CREATE = """
@@ -59,6 +59,7 @@ object SchemaSelfHealer {
           output_tokens        INTEGER NOT NULL DEFAULT 0,
           chunk_group_id       TEXT    NOT NULL DEFAULT '',
           chunk_index          INTEGER NOT NULL DEFAULT 0,
+          provider_id          TEXT    NOT NULL DEFAULT '',
           FOREIGN KEY (session_id) REFERENCES agent_session(id)
         );
     """.trimIndent()

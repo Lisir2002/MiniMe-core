@@ -880,7 +880,14 @@ class AIAgentViewModel @Inject constructor(
             val taskId = UUID.randomUUID().toString()
             currentTaskIdBySession[sessionId] = taskId
             // 必须在插入本次用户消息之前读取历史：workflow 会自己 add(userRequest)，避免重复。
-            val history = messagePersistenceUseCase.buildHistory(sessionId, SessionUseCase.PENDING_TOOL_MARKER)
+            // currentProviderId：Anthropic signature 跨账号回放防护——本会话当前 provider
+            // 与历史消息产生时的 provider 不一致时，回放剥离旧签名（见 SignatureReplayPolicy）。
+            // 提前读取 sessionDomain：buildHistory 与下方流式 persist 都要用其 providerId。
+            val sessionDomain = sessionUseCase.getSessionById(sessionId)?.toChatSession()
+            val currentProviderId = sessionDomain?.providerId ?: ""
+            val history = messagePersistenceUseCase.buildHistory(
+                sessionId, SessionUseCase.PENDING_TOOL_MARKER, currentProviderId
+            )
             val isFirst = history.isEmpty()
 
             if (!isAutoTrigger) {
@@ -895,7 +902,6 @@ class AIAgentViewModel @Inject constructor(
             }
             sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
 
-            val sessionDomain = sessionUseCase.getSessionById(sessionId)?.toChatSession()
             val mode = sessionDomain?.mode ?: AgentMode.BUILD
 
             val agentContext = AgentContext(
@@ -967,7 +973,10 @@ class AIAgentViewModel @Inject constructor(
                             reasoning = reasoning,
                             signature = event.signature.ifEmpty { null },
                             inputTokens = event.inputTokens,
-                            outputTokens = event.outputTokens
+                            outputTokens = event.outputTokens,
+                            // signature 与产生它的 provider 绑定：记下本条消息的 provider id，
+                            // 供 buildHistory 跨账号回放时比对剥离（见 SignatureReplayPolicy）。
+                            providerId = currentProviderId
                         )
                         usageStats.recordAssistantTokens(sessionId, event.inputTokens, event.outputTokens)
                         setStreamingReasoning(sessionId, null)

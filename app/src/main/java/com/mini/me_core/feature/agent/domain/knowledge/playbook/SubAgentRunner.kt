@@ -310,8 +310,15 @@ class SubAgentRunner @Inject constructor(
             listOf(AgentMessage.UserMessage(content = stagePrompt))
         } else {
             // fork：继承主会话最近 N 条消息 + 阶段目标（§3.6.8）。
+            // currentProviderId：子代理实际使用的激活 provider；与历史消息产生时的 provider
+            // 不一致时回放剥离 signature（跨账号回放会被 Anthropic 拒绝，见 SignatureReplayPolicy）。
             val inherited = if (sessionId != null) {
-                runCatching { messagePersistenceUseCase.buildHistory(sessionId, "__playbook_fork__") }
+                runCatching {
+                    messagePersistenceUseCase.buildHistory(
+                        sessionId, "__playbook_fork__",
+                        currentProviderId = aiProviderRepository.getActiveProviderSync()?.id ?: ""
+                    )
+                }
                     .getOrElse { emptyList() }
                     .takeLast(FORK_INHERIT_MESSAGES)
             } else {

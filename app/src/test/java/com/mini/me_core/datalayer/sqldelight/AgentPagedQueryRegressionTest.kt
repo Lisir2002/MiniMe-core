@@ -69,13 +69,14 @@ class AgentPagedQueryRegressionTest {
             output_tokens = 0L,
             chunk_group_id = "",
             chunk_index = 0L,
+            provider_id = "",
         )
         agentQueries.insertMessage(
             e.id, e.session_id, e.role, e.seq, e.created_at, e.task_id, e.content,
             e.tool_calls_json, e.tool_call_id, e.tool_name, e.tool_args, e.is_error,
             e.reasoning, e.signature, e.attachments_json, e.is_compacted,
             e.is_context_summary, e.is_compaction_marker, e.input_tokens, e.output_tokens,
-            e.chunk_group_id, e.chunk_index,
+            e.chunk_group_id, e.chunk_index, e.provider_id,
         )
     }
 

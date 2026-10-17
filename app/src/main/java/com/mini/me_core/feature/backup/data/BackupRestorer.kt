@@ -607,7 +607,8 @@ internal class BackupRestorer(
         is_context_summary = if (isContextSummary) 1L else 0L,
         is_compaction_marker = if (isCompactionMarker) 1L else 0L,
         input_tokens = 0L, output_tokens = 0L,
-        chunk_group_id = chunkGroupId, chunk_index = chunkIndex.toLong()
+        chunk_group_id = chunkGroupId, chunk_index = chunkIndex.toLong(),
+        provider_id = providerId
     )
 
     private fun TodoItemDto.toV2() = V2TodoItem(

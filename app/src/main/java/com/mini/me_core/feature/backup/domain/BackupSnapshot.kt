@@ -164,7 +164,9 @@ data class AgentMessageDto(
     val isContextSummary: Boolean = false,
     val isCompactionMarker: Boolean = false,
     val chunkGroupId: String = "",
-    val chunkIndex: Int = 0
+    val chunkIndex: Int = 0,
+    /** 消息产生时所用的 provider id（signature 跨账号回放防护）。旧备份缺省为空串（未知）。 */
+    val providerId: String = ""
 )
 
 @Serializable

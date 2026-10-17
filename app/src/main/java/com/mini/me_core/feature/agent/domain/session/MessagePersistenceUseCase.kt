@@ -52,7 +52,8 @@ class MessagePersistenceUseCase @Inject constructor(
         attachments: List<AgentAttachment> = emptyList(),
         inputTokens: Int = 0,
         outputTokens: Int = 0,
-        isCompacted: Boolean = false
+        isCompacted: Boolean = false,
+        providerId: String = ""
     ) {
         withContext(NonCancellable + Dispatchers.IO) {
             // 先剥离内嵌 base64 图片（不截断），避免超大 data URL 直接进 content。
@@ -64,25 +65,13 @@ class MessagePersistenceUseCase @Inject constructor(
 
             if (clean.length <= CHUNK_SIZE) {
                 val entity = buildEntity(
-                    id = id,
-                    sessionId = sessionId,
-                    taskId = taskId,
-                    role = role,
-                    content = clean,
-                    timestamp = nextTimestamp(),
-                    chunkGroupId = "",
-                    chunkIndex = 0,
-                    toolCallsJson = toolCallsJson,
-                    toolCallId = toolCallId,
-                    toolName = toolName,
-                    toolArgs = toolArgs,
-                    isError = isError,
-                    reasoning = cleanReasoning,
-                    signature = signature,
-                    attachmentsJson = attachmentsJson,
-                    inputTokens = inputTokens,
-                    outputTokens = outputTokens,
-                    isCompacted = isCompacted
+                    id = id, sessionId = sessionId, taskId = taskId, role = role,
+                    content = clean, timestamp = nextTimestamp(), chunkGroupId = "", chunkIndex = 0,
+                    toolCallsJson = toolCallsJson, toolCallId = toolCallId, toolName = toolName,
+                    toolArgs = toolArgs, isError = isError, reasoning = cleanReasoning,
+                    signature = signature, attachmentsJson = attachmentsJson,
+                    inputTokens = inputTokens, outputTokens = outputTokens,
+                    isCompacted = isCompacted, providerId = providerId
                 )
                 v2Agent.insertMessage(entity)
             } else {
@@ -112,7 +101,9 @@ class MessagePersistenceUseCase @Inject constructor(
                         attachmentsJson = if (i == 0) attachmentsJson else null,
                         inputTokens = if (i == 0) inputTokens else 0,
                         outputTokens = if (i == 0) outputTokens else 0,
-                        isCompacted = isCompacted
+                        isCompacted = isCompacted,
+                        // provider_id 是行级属性：主行与全部续块都写，避免读侧按主行取值漏块。
+                        providerId = providerId
                     )
                 }
                 v2Agent.insertAllMessages(rows)
@@ -139,7 +130,8 @@ class MessagePersistenceUseCase @Inject constructor(
         attachmentsJson: String?,
         inputTokens: Int,
         outputTokens: Int,
-        isCompacted: Boolean
+        isCompacted: Boolean,
+        providerId: String
     ): V2AgentMessage = V2AgentMessage(
         id = id,
         session_id = sessionId,
@@ -162,7 +154,8 @@ class MessagePersistenceUseCase @Inject constructor(
         input_tokens = inputTokens.toLong(),
         output_tokens = outputTokens.toLong(),
         chunk_group_id = chunkGroupId,
-        chunk_index = chunkIndex.toLong()
+        chunk_index = chunkIndex.toLong(),
+        provider_id = providerId
     )
 
     suspend fun updateContent(messageId: String, newContent: String) {
@@ -263,8 +256,17 @@ class MessagePersistenceUseCase @Inject constructor(
      * 关键：只保留「assistant 的 tool_call」与「tool 结果」能配对成功的部分，
      * 丢弃任何一方缺失的悬挂项，避免回放出现孤儿 tool_use / tool_result 违反 API 约束。
      * 已被上下文压缩标记的消息（isCompacted=true）不参与回放。
+     *
+     * @param currentProviderId 当前会话生效的 provider id。ASSISTANT 消息的 signature
+     *   在「消息 provider_id 与当前 provider_id 均非空且不一致」时剥离
+     *   （Anthropic signature 跨账号回放会被 API 拒绝，见 [SignatureReplayPolicy]）；
+     *   任一侧为空视为未知，保持旧行为。
      */
-    suspend fun buildHistory(sessionId: String, pendingToolMarker: String): List<AgentMessage> {
+    suspend fun buildHistory(
+        sessionId: String,
+        pendingToolMarker: String,
+        currentProviderId: String = ""
+    ): List<AgentMessage> {
         // 先按 chunk_index 拼接分块消息（chunk 行共享 timestamp，压缩标记也是全组一致），再过滤已压缩行。
         val raw = v2Agent.getMessagesBySessionOnce(sessionId)
         val entities = mergeChunks(raw).filter { it.is_compacted == 0L }
@@ -347,7 +349,12 @@ class MessagePersistenceUseCase @Inject constructor(
                                 content = e.content.removePrefix(CONTEXT_SUMMARY_LEGACY_PREFIX).trimStart(),
                                 toolCalls = toolCalls,
                                 reasoning = e.reasoning ?: "",
-                                signature = e.signature ?: ""
+                                // 跨账号消息剥掉 signature：convertToAnthropicMessages 的
+                                // `signature.isNotEmpty()` 不成立，thinking block 整体不回传。
+                                signature = if (SignatureReplayPolicy.shouldStripSignature(
+                                        e.provider_id, currentProviderId
+                                    )
+                                ) "" else e.signature ?: ""
                             )
                         )
                     }

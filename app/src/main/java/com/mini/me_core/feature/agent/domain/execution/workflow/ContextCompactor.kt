@@ -160,7 +160,9 @@ class ContextCompactor @Inject constructor(
                     input_tokens = 0L,
                     output_tokens = 0L,
                     chunk_group_id = "",
-                    chunk_index = 0L
+                    chunk_index = 0L,
+                    // 压缩产生的 marker/summary 无 signature，provider_id 记空（未知，不触发剥离）
+                    provider_id = ""
                 )
                 val summaryMessage = V2AgentMessage(
                     id = compactedId,
@@ -184,7 +186,9 @@ class ContextCompactor @Inject constructor(
                     input_tokens = 0L,
                     output_tokens = 0L,
                     chunk_group_id = "",
-                    chunk_index = 0L
+                    chunk_index = 0L,
+                    // 压缩摘要无 signature，provider_id 记空（未知，不触发剥离）
+                    provider_id = ""
                 )
                 v2Agent.insertMessage(markerMessage)
                 v2Agent.insertMessage(summaryMessage)

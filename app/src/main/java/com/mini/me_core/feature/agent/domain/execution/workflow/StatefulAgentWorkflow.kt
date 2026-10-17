@@ -362,7 +362,11 @@ class StatefulAgentWorkflow @Inject constructor(
         if (config.apiKey.isBlank()) throw IllegalStateException("「${config.name}」未填写 API Key")
         if (config.effectiveModel.isBlank()) throw IllegalStateException("「${config.name}」未选择模型")
         val provider = modelCallRouter.createStandaloneProvider(config, sessionId)
-        val history = messagePersistenceUseCase.buildHistory(sessionId, "__manual_compress__")
+        // currentProviderId：压缩请求实际使用的 provider；历史消息若产生于其他 provider，
+        // 回放时剥离其 signature（跨账号回放会被 Anthropic 拒绝，见 SignatureReplayPolicy）。
+        val history = messagePersistenceUseCase.buildHistory(
+            sessionId, "__manual_compress__", currentProviderId = config.id
+        )
         if (history.size <= 2) return false
         val compactionProvider = modelCallRouter.resolveCompactionFallbackProvider() ?: provider
         // 非流式故障转移：压缩请求失败且错误可重试、且配置了备用 provider 时，切到备用 provider 重试一次。

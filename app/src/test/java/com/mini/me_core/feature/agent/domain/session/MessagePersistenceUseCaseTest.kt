@@ -145,7 +145,8 @@ class MessagePersistenceUseCaseTest {
         taskId: String = "",
         role: String = "ASSISTANT",
         reasoning: String? = null,
-        toolCallsJson: String? = null
+        toolCallsJson: String? = null,
+        providerId: String = ""
     ) = V2AgentMessage(
         id = id,
         session_id = sessionId,
@@ -168,6 +169,7 @@ class MessagePersistenceUseCaseTest {
         input_tokens = 0L,
         output_tokens = 0L,
         chunk_group_id = chunkGroupId,
-        chunk_index = chunkIndex
+        chunk_index = chunkIndex,
+        provider_id = providerId
     )
 }

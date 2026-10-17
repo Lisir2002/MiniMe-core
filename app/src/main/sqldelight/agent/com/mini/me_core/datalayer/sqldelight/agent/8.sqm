@@ -1,0 +1,12 @@
+-- v8 → v9 迁移（Anthropic signature 跨账号回放防护：agent_message 增加 provider_id）
+--
+-- 背景：Anthropic extended thinking 的 signature 与产生它的账号（provider）绑定，
+-- 跨账号回放会被 API 拒绝（400 invalid_request）。原设计仅在 agent_session 级记录
+-- provider_id，切换账号后旧消息的 signature 仍会被 buildHistory 回放 → 400。
+--
+-- 修复：消息级记录 provider_id。buildHistory 回放时比对「消息 provider_id」与
+-- 「当前 provider_id」，均非空且不一致则剥离 signature（不回传 thinking block）。
+--
+-- 存量消息回填为空串（'未知'）：视为未知来源保持旧行为（回传），只有新写入的
+-- 消息才带 provider_id，随使用逐步收敛。
+ALTER TABLE agent_message ADD COLUMN provider_id TEXT NOT NULL DEFAULT '';

@@ -348,7 +348,7 @@ internal class BackupExporter(
     private fun V2AgentMessage.toDto() = AgentMessageDto(
         id, session_id, task_id, role, content, created_at, tool_calls_json, tool_call_id, tool_name, tool_args,
         is_error != 0L, reasoning, signature, attachments_json, is_compacted != 0L, is_context_summary != 0L, is_compaction_marker != 0L,
-        chunk_group_id, chunk_index.toInt()
+        chunk_group_id, chunk_index.toInt(), provider_id
     )
 
     // ── V2（SQLDelight）↔ DTO 映射（导出方向）──────────────────────────
