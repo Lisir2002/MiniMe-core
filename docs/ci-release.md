@@ -46,19 +46,21 @@ curl -s -u "<owner>:<token>" \
 4. **SHA256** → `sha256sum <apk>` 记录指纹
 5. **Release 页面** → https://github.com/Lisir2002/MiniMe-core/releases/tag/<tag>
 
-## 签名策略（唯一官方密钥，已入库）
+## 签名策略（唯一官方密钥，GitHub Secrets 注入）
 
-> **2026-09 变更**：正式签名密钥已按维护者决定**入库**，**不再依赖 CI Secrets**。
-> 旧策略（从 `AICODE_KEYSTORE_*` 4 个 secrets 恢复 keystore / 生成 keystore.properties）已废弃并移除。
+> **历史沿革**：正式签名密钥曾短期随仓库分发，后按安全审计结论（见 `docs/risk-audit-v0.0.0.46.md`）从仓库移除，改为 **GitHub Secrets 注入**；`SECURITY.md` 记录了密钥历史暴露、为兼容性未轮换的残余风险。
 
-正式 release 一律使用**唯一官方 keystore**，本地与 CI 每一次构建加载同一把密钥，签名指纹恒定：
+正式 release 一律使用**唯一官方 keystore**（`app/minime.jks`，别名 `minime`）。密钥**不入库**（`.gitignore` 第 14-18 行排除 `app/minime.jks` 与 `app/keystore.properties`），由 CI 在构建前从 GitHub Secrets 恢复，保证本地与 CI 每一次 release 加载同一把密钥、签名指纹恒定：
 
-| 文件 | 路径 | 说明 |
-|---|---|---|
-| `minime.jks` | `app/minime.jks` | 唯一官方 keystore（已入库，随 checkout 自带） |
-| `keystore.properties` | `app/keystore.properties` | storeFile / storePassword / keyAlias（minime）/ keyPassword（已入库） |
+| Secret | 用途 |
+|---|---|
+| `SIGNING_KEYSTORE_BASE64` | `minime.jks` 的 base64 编码 |
+| `SIGNING_STORE_PASSWORD` | keystore 的 storePassword |
+| `SIGNING_KEY_PASSWORD` | key 的 keyPassword |
+| `SIGNING_KEY_ALIAS` | 签名别名（`minime`） |
+| `EXPECTED_SIGNING_CERT_FINGERPRINT` | 证书 SHA-256 白名单，用于 fail-closed 比对 |
 
-- **强制约束**：`app/build.gradle.kts` 的 `signingConfigs.release` 用 `require(keystorePropertiesFile.exists())` 强制——缺少 `app/keystore.properties` 即构建失败，**不存在「回退到 debug keystore 当正式签名」**。
-- CI 工作流 `android-release.yml` 直接读取随仓库自带的 `app/minime.jks` + `app/keystore.properties` 签名，无需额外步骤。
-- **⚠️ 安全提示（维护者已知情并授权入库）**：私钥随仓库公开，能读仓库者即可冒充该签名；若未来对公开分发敏感，应撤销本入库决定并改回 CI Secrets 持有密钥。
+- **CI 流程**：`android-release.yml` 第 4 步「Restore signing keystore from GitHub Secrets」将 base64 解码为 `app/minime.jks` 并生成 `app/keystore.properties`；**任一 Secret 缺失即 `::error::` 失败**（fail-closed），不存在无签名产出的可能。
+- **本地构建**：`app/minime.jks` 与 `app/keystore.properties` 被 `.gitignore` 排除，需维护者从 CI 产物或其他维护者处本地放置；`app/build.gradle.kts` 的 release signingConfig 与 taskGraph 守卫保证缺失即构建失败，**不存在「回退到 debug keystore 当正式签名」**。
+- **⚠️ 安全提示（残余风险，维护者已知情）**：该 keystore 与口令历史上曾随公开仓库可获取，为保证老用户覆盖升级**未轮换证书**；当前私钥已不在仓库中，但历史获取者仍有伪造同签名包的理论风险，密钥轮换评估见 `SECURITY.md`。
 - **产物签名校验**：`keytool -printcert -jarfile <apk>` → Owner 应为 `CN=MiniMe-core, OU=Mobile, O=MiniMe, L=Beijing, ST=Beijing, C=CN`（密钥 SHA256 = `05:93:2E:DB:4D:94:BB:45:FB:81:9B:BA:D9:9F:70:01:0C:23:D8:82:CA:86:BF:D5:73:F0:0D:D7:03:80:24:03`），非 `CN=Android Debug`。

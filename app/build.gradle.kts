@@ -165,7 +165,8 @@ android {
 
     signingConfigs {
         // 签名策略（唯一官方密钥，见 branding.gradle.kts「签名策略」）：
-        //   release = 唯一官方 keystore（app/minime.jks + keystore.properties，已入库）。
+        //   release = 唯一官方 keystore（app/minime.jks + keystore.properties，**不入库**，
+        //     CI 从 GitHub Secrets 恢复，本地构建需维护者自备）。
         //   每次构建都使用这一把密钥，缺失即报错，**禁止静默回退 debug keystore 当正式签名**。
         //   debug = 固定 debug keystore（仅用于开发期调试安装，data 与 release 隔离）。
         val customDebugKeystore = file("/root/Android/Sdk/debug.keystore")

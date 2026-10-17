@@ -29,13 +29,14 @@ val ICON_FAMILY = "ic_launcher"
 
 // ── 签名策略（SIGNING POLICY，唯一官方密钥）───────────────────────────────
 // 正式发布（release）一律使用**唯一官方 keystore**：app/<KEYSTORE_FILE>（= minime.jks）。
-// 按维护者决定，该 keystore 与 app/keystore.properties **已入库**（见 .gitignore），
-// 保证本地与 CI 每一次 release 都加载同一把密钥、签名指纹恒定。
+// 密钥**不入库**（.gitignore 第 14-18 行排除 app/minime.jks 与 app/keystore.properties）：
+//   CI 构建前从 GitHub Secrets 恢复（SIGNING_KEYSTORE_BASE64 等 5 个 secrets，缺失即失败）；
+//   本地 release 构建需维护者自备这两个文件。本地与 CI 加载同一把密钥，签名指纹恒定。
 // 构建/发版强制约束：app/build.gradle.kts 的 release signingConfig require——
 //   打 release 包前必须存在 app/keystore.properties（storeFile/storePassword/keyAlias/keyPassword），
 //   缺失即构建失败，**不再静默回退 debug keystore 当正式签名**。
-// ⚠️ 安全提示（维护者已知情并授权）：私钥随仓库公开，等同于任何能读仓库者都可冒充该签名；
-//   如未来上架/对公开分发敏感，建议改用 CI secrets 持有密钥并撤销本入库决定。
+// ⚠️ 安全提示（残余风险，维护者已知情）：该 keystore 历史上曾随公开仓库可获取，为保证老用户
+//   覆盖升级未轮换证书；当前私钥已不在仓库中，轮换评估见 docs/SECURITY.md。
 
 /** release 唯一官方 keystore 别名（与 app/keystore.properties 的 keyAlias / 证书一致）。 */
 val SIGNATURE_ALIAS = "minime"

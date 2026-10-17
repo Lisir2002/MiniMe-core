@@ -5,6 +5,7 @@
 - **审计基线 CI Run**：`Android Release` #37011040580（tag `v0.0.0.46`，审计时处于 `in_progress`）
 - **仓库可见性**：**Public（公开）** — 经 GitHub API 核实 `private: false`
 - **审计方法**：直接读取仓库源码 / 工作流 / 配置文件 + GitHub REST API（分支保护、Dependabot、仓库元信息），未修改任何项目文件
+- **时效声明**：本文为 tag `v0.0.0.46`（2026-10-02）时期的历史快照，正文中所有「现行」均指**审计当时**的状态；现行签名策略（GitHub Secrets 注入、密钥不入库）以 `docs/ci-release.md` 为准
 - **硬性规则复核**：① 主应用不发 rc 版；② 版本号四段式 `x.x.x.x`，D 段单调递增
 
 ---
