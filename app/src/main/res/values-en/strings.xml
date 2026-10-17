@@ -953,6 +953,8 @@
     <string name="chat_no_models_hint">No models available. Add one under \"Manage\".</string>
     <string name="chat_stop">Stop</string>
     <string name="chat_send">Send</string>
+    <string name="chat_scroll_to_bottom">Scroll to bottom</string>
+    <string name="chat_jump_to_user_message">Jump to previous message</string>
     <string name="chat_perm_single_use_desc">Contains command substitution/pipes/redirection, cannot be remembered; one-time approval only</string>
     <string name="chat_perm_always_tool_desc">\"Always allow\" will remember in this project: all calls of this tool</string>
     <string name="chat_perm_always_prefix">\"Always allow\" will remember in this project:</string>

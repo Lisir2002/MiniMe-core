@@ -36,7 +36,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -63,11 +62,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mini.me_core.R
@@ -78,6 +80,7 @@ import com.mini.me_core.feature.agent.presentation.AgentUIState
 import com.mini.me_core.feature.agent.presentation.AIAgentViewModel
 import com.mini.me_core.feature.agent.presentation.ConversationSkillsViewModel
 import com.mini.me_core.feature.agent.presentation.MessageRole
+import com.mini.me_core.feature.agent.presentation.TaskSubGroupType
 import com.mini.me_core.feature.agent.presentation.hasVisibleContent
 import com.mini.me_core.feature.agent.presentation.component.agentfirst.AgentFirstFeatureFlags
 import com.mini.me_core.feature.agent.presentation.component.agentfirst.TaskCard
@@ -315,15 +318,6 @@ fun AIChatPanel(
     // 自动滚动跟随
     var positionedSession by remember { mutableStateOf<String?>(null) }
     var followBottom by remember { mutableStateOf(true) }
-    // 用户阅读位置基线：拖拽停止或 fling 结束时记录当前最后可见项索引，
-    // 用于精确计算未读消息数（不再仅在拖拽开始时记录，避免 fling 后计数不准）
-    var readBaselineIndex by remember { mutableStateOf(0) }
-    val unreadCount by remember(followBottom, messages.size, readBaselineIndex) {
-        derivedStateOf {
-            if (followBottom) 0
-            else (messages.size - 1 - readBaselineIndex).coerceAtLeast(0)
-        }
-    }
 
     // 是否在底部：主判断用 canScrollForward（更稳定），辅以末项位置校验，
     // 阈值 16dp 避免滚动中频繁切换状态
@@ -356,6 +350,34 @@ fun AIChatPanel(
         }
     }
 
+    // 「跳到上一条用户消息」：向上按钮可见性 + 点击行为。
+    // 语义完全无状态（可预测）：目标 = 视口顶部之上最近的一个用户消息组；
+    // 视口顶正落在某用户消息组上时，再点击天然跳到上一条；上方无用户消息
+    // （已位于最顶的用户消息处）时返回 null，按钮隐藏消失。
+    // derivedStateOf 直接读 taskGroups / listState 状态，不缓存中间量，避免闭包捕获旧值。
+    val userMessageGroupIndices: () -> List<Int> = {
+        taskGroups.mapIndexedNotNull { index, group ->
+            index.takeIf { group.subGroups.any { it.type == TaskSubGroupType.USER } }
+        }
+    }
+    val showJumpToUserMessage by remember {
+        derivedStateOf {
+            if (taskGroups.isEmpty()) return@derivedStateOf false
+            val top = listState.firstVisibleItemIndex.coerceAtMost(taskGroups.size - 1)
+            previousUserMessageGroupIndex(userMessageGroupIndices(), top) != null
+        }
+    }
+    val jumpToUserMessage: () -> Unit = {
+        scope.launch {
+            if (taskGroups.isEmpty()) return@launch
+            val top = listState.firstVisibleItemIndex.coerceIn(0, taskGroups.size - 1)
+            val dest = previousUserMessageGroupIndex(userMessageGroupIndices(), top) ?: return@launch
+            // 跳转即离开底部：停止流式贴底跟随，「回到底部」按钮随之出现
+            followBottom = false
+            listState.animateScrollToItem(dest)
+        }
+    }
+
     val autoScrollSignal by rememberUpdatedState(
         AutoScrollSignal(
             streamingTextLength = streamingText?.length ?: 0,
@@ -369,8 +391,7 @@ fun AIChatPanel(
         )
     )
 
-    // 用户开始拖拽：停止跟随，记录当前阅读位置基线。
-    // 拖拽停止时若已到底则恢复跟随，否则更新阅读基线为当前最后可见项。
+    // 用户开始拖拽：停止跟随；拖拽停止时若已到底则恢复跟随。
     // 额外：流式输出时内容持续增长，用户可能松手后又被「顶」离底部——
     // 用 snapshotFlow { isAtBottom } 持续监测，只要滑到底部就恢复跟随。
     LaunchedEffect(listState) {
@@ -384,23 +405,10 @@ fun AIChatPanel(
                     withFrameNanos { }
                     if (isAtBottom) {
                         followBottom = true
-                    } else {
-                        // 更新阅读基线为当前最后可见项索引，用于精确未读计数
-                        readBaselineIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                     }
                 }
             }
         }
-    }
-    // 滚动停止（fling 结束）时，如果不在底部，更新阅读基线
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress }
-            .distinctUntilChanged()
-            .collect { scrolling ->
-                if (!scrolling && !isAtBottom && !followBottom) {
-                    readBaselineIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                }
-            }
     }
     LaunchedEffect(listState) {
         snapshotFlow { isAtBottom }.collect { atBottom ->
@@ -647,19 +655,57 @@ fun AIChatPanel(
                     }
                 }
 
-                // 「回到底部」浮动按钮：入场出场动画、药丸/圆形自适应、点击缩放反馈、无障碍增强
-                ScrollToBottomButton(
-                    visible = showScrollToBottom,
-                    unreadCount = unreadCount,
-                    onClick = {
-                        scope.launch {
-                            val targetIndex = listState.layoutInfo.totalItemsCount - 1
-                            snapToBottom(targetIndex)
-                            if (isAtBottom) followBottom = true
-                        }
-                    },
-                    modifier = Modifier.align(Alignment.BottomEnd)
-                )
+                // 浮动按钮组（右下角纵向两枚，独立显隐）：
+                //  - 上箭头：跳到上一条用户消息（视口顶部之上无用户消息时隐藏消失）；
+                //  - 下箭头：回到底部（贴底时隐藏）。取消原未读计数药丸——纯圆形图标按钮。
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = Spacing.md, bottom = Spacing.sm),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    AnimatedVisibility(
+                        visible = showJumpToUserMessage,
+                        enter = fadeIn(tween(200)) +
+                            slideInVertically(tween(200)) { it / 2 } +
+                            scaleIn(tween(200)),
+                        exit = fadeOut(tween(150)) +
+                            slideOutVertically(tween(150)) { it / 3 } +
+                            scaleOut(tween(150))
+                    ) {
+                        ChatFloatingActionButton(
+                            icon = Icons.Rounded.KeyboardArrowUp,
+                            contentDescription = stringResource(R.string.chat_jump_to_user_message),
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            onClick = jumpToUserMessage
+                        )
+                    }
+                    AnimatedVisibility(
+                        visible = showScrollToBottom,
+                        enter = fadeIn(tween(200)) +
+                            slideInVertically(tween(200)) { it / 2 } +
+                            scaleIn(tween(200)),
+                        exit = fadeOut(tween(150)) +
+                            slideOutVertically(tween(150)) { it / 3 } +
+                            scaleOut(tween(150))
+                    ) {
+                        ChatFloatingActionButton(
+                            icon = Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.chat_scroll_to_bottom),
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            onClick = {
+                                scope.launch {
+                                    val targetIndex = listState.layoutInfo.totalItemsCount - 1
+                                    snapToBottom(targetIndex)
+                                    if (isAtBottom) followBottom = true
+                                }
+                            }
+                        )
+                    }
+                }
             }
 
             AnimatedVisibility(
@@ -908,87 +954,46 @@ private fun EditingMessageBanner(
 }
 
 /**
- * 回到底部浮动按钮。
+ * 聊天页浮动圆形操作按钮：48dp 触控目标、按压 0.92x 回弹、4dp 阴影。
  *
- * 特性：
- * - 入场：淡入 + 从底部上滑 + 缩放；出场：淡出 + 下滑 + 缩放
- * - 有未读消息时：药丸形状，显示「↓ N条新消息」；无未读时：48dp 圆形仅箭头
- * - 点击缩放反馈（0.92x），Surface 背景带 4dp 阴影
- * - 无障碍描述含未读数量，触控目标 ≥48dp
+ * 「回到底部」（主色实底）与「跳到上一条用户消息」（secondaryContainer 浅底）
+ * 共用同一组件，仅配色区分主次；原未读计数药丸形态已取消（计数不实用也不美观，
+ * 未读状态由「回到底部」按钮本身的存在表达）。
  */
 @Composable
-private fun ScrollToBottomButton(
-    visible: Boolean,
-    unreadCount: Int,
+private fun ChatFloatingActionButton(
+    icon: ImageVector,
+    contentDescription: String,
+    containerColor: Color,
+    contentColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier.padding(end = Spacing.md, bottom = Spacing.sm)
+    val pressBounce = rememberPressBounce()
+    Surface(
+        modifier = modifier.scale(pressBounce.scale),
+        shape = CircleShape,
+        color = containerColor,
+        tonalElevation = 4.dp,
+        shadowElevation = 4.dp
     ) {
-        AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn(tween(200)) +
-                slideInVertically(tween(200)) { it / 2 } +
-                scaleIn(tween(200)),
-            exit = fadeOut(tween(150)) +
-                slideOutVertically(tween(150)) { it / 3 } +
-                scaleOut(tween(150))
-        ) {
-            val pressBounce = rememberPressBounce()
-            val hasUnread = unreadCount > 0
-            val unreadText = if (unreadCount > 99) "99+" else unreadCount.toString()
-            val contentDesc = if (hasUnread) {
-                "回到底部，有$unreadCount 条新消息"
-            } else {
-                stringResource(R.string.chat_scroll_to_bottom)
-            }
-
-            Surface(
-                modifier = Modifier.scale(pressBounce.scale),
-                shape = if (hasUnread) RoundedCornerShape(20.dp) else CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                tonalElevation = 4.dp,
-                shadowElevation = 4.dp
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clickable(
-                            onClick = {
-                                pressBounce.trigger()
-                                onClick()
-                            }
-                        )
-                        .then(
-                            if (hasUnread) {
-                                Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                            } else {
-                                Modifier.size(48.dp)
-                            }
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = contentDesc,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        if (hasUnread) {
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = "$unreadText 条新消息",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        }
+        Box(
+            modifier = Modifier
+                .clickable(
+                    onClick = {
+                        pressBounce.trigger()
+                        onClick()
                     }
-                }
-            }
+                )
+                .size(48.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = contentColor,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
