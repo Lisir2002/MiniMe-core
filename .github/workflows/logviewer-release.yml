@@ -34,7 +34,7 @@ jobs:
           packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # P1-04：logviewer 复用主应用唯一官方密钥。原硬编码口令已从 logviewer-app/build.gradle.kts 移除，
       # 改为从 GitHub Secrets 恢复 app/minime.jks + app/keystore.properties（含 expectedCertSha256）。
