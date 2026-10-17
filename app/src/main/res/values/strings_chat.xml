@@ -145,12 +145,8 @@
     <string name="right_sidebar_terminal">终端</string>
     <string name="right_sidebar_browser">内置浏览器</string>
     <string name="right_sidebar_packager">应用打包器</string>
-    <string name="right_sidebar_git">版本控制</string>
-    <string name="right_sidebar_files">文件管理</string>
+    <string name="right_sidebar_git">Git 管理</string>
     <string name="right_sidebar_settings">设置</string>
-    <string name="right_sidebar_capability">能力中心</string>
-    <string name="right_sidebar_about">关于</string>
-    <string name="right_sidebar_placeholder">该功能即将支持，可从左侧「工作目录」浏览文件</string>
     <string name="chat_copy_code">复制代码</string>
     <string name="chat_copy_command">复制命令</string>
     <string name="chat_message_background_task_prefix">后台任务「</string>

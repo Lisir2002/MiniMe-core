@@ -1,19 +1,16 @@
 @file:Suppress("FunctionNaming", "LongMethod") // Compose @Composable PascalCase 命名约定；长 Composable 逐字搬迁，行为保持
 package com.mini.me_core.feature.agent.presentation.component
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,15 +22,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.mini.me_core.R
-import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.Spacing
+import com.mini.me_core.core.theme.components.AppNavIcon
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import androidx.compose.ui.res.stringResource
 
 /**
  * 侧边栏导航图标块：彩色圆角背景 + 白色图标，日夜间背景色随主题切换。
+ *
+ * 实现已抽取为设计系统组件 [AppNavIcon]（core/theme/components），
+ * 左侧抽屉与右侧工具抽屉共用同一组件，保证两个侧边栏图标视觉一致。
  */
 @Composable
 internal fun DrawerNavIcon(
@@ -41,20 +40,11 @@ internal fun DrawerNavIcon(
     iconBgLight: Color,
     iconBgDark: Color
 ) {
-    Box(
-        modifier = Modifier
-            .size(36.dp)
-            .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
-            .background(if (LocalAppDarkMode.current) iconBgDark else iconBgLight),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(20.dp)
-        )
-    }
+    AppNavIcon(
+        icon = icon,
+        iconBgLight = iconBgLight,
+        iconBgDark = iconBgDark,
+    )
 }
 
 /**

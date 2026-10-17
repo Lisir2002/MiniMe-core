@@ -812,21 +812,13 @@ fun AppNavigation(
             }
         }
         } // Scaffold content lambda 闭合
-        // 右侧工具抽屉：复用现有 route navigate，占位项 Toast 提示且保持展开。
-        val placeholderText = stringResource(R.string.right_sidebar_placeholder)
+        // 右侧工具抽屉：复用现有 route navigate（任务 C 后所有条目均有独立页面，无占位项）。
         com.mini.me_core.core.ui.RightSidebar(
             open = rightSidebarOpen,
             onDismissRequest = { rightSidebarOpen = false },
             onNavigate = { route ->
                 rightSidebarOpen = false
                 navController.navigate(route)
-            },
-            onPlaceholder = {
-                Toast.makeText(
-                    context,
-                    placeholderText,
-                    Toast.LENGTH_SHORT,
-                ).show()
             },
         )
         } // Box 闭合
