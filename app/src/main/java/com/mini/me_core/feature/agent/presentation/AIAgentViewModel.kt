@@ -715,6 +715,13 @@ class AIAgentViewModel @Inject constructor(
             // 冷启动收尾：上次进程被杀时若有工具正在执行，其占位行会永久显示「执行中」。
             // 这些工具不可能还在跑，统一回填为「已中断」。放在设置会话之前完成，使首帧不再闪转圈。
             sessionUseCase.initColdStartCleanup()
+            // 任务 B：上次进程被系统回收时，正在流式生成的助手消息停在中途且无中断标记，
+            // 给其补记「生成被中断」提示。只有标记 pid 与当前进程不一致才判定为进程死亡残留——
+            // 同进程的 Activity/ViewModel 重建 pid 必然相同，不会误判。
+            sessionUseCase.recoverInterruptedGeneration(
+                currentPid = android.os.Process.myPid(),
+                interruptedNotice = context.getString(R.string.agent_generation_interrupted),
+            )
 
             _currentWorkspace.collectLatest { path ->
                 if (path.isBlank()) return@collectLatest
@@ -856,6 +863,11 @@ class AIAgentViewModel @Inject constructor(
         }
         coroutineContext[Job]?.let { sessionJobs[sessionId] = it }
         setAgentState(sessionId, AgentUIState.Streaming)
+        // 任务 B：写入流式生成活跃标记（携带进程 pid）。finally 中清除；
+        // 进程被杀时清除不会执行，标记得以留存，冷启动据此识别「停在中途」的会话。
+        // 标记失败不影响本次生成（仅丢失一条恢复线索），记 warn 后继续。
+        runCatching { sessionUseCase.markGenerationActive(sessionId, android.os.Process.myPid()) }
+            .onFailure { FileLogger.w(TAG, "写入流式生成活跃标记失败（不影响本次生成）", it) }
 
         // 本轮流式的最新累积正文和思考（方案A：定期落库用 / 方案C：finally 兜底用）。
         // 声明在 try 外以便 finally 块访问。
@@ -1136,6 +1148,9 @@ class AIAgentViewModel @Inject constructor(
             setCompacting(sessionId, false)
             setRetryState(sessionId, null)
             periodicPersistStates.remove(sessionId)
+            // 任务 B：清除流式生成活跃标记（同步 KV，finally 中安全）。
+            // 进程被杀时本行不会执行——这正是标记留存、冷启动能判定中断的原因。
+            sessionUseCase.clearGenerationActive(sessionId)
             latestStreamingContent = ""
             latestStreamingReasoning = null
 

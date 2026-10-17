@@ -208,6 +208,17 @@ UPDATE agent_message SET content = ? WHERE id = ?;
 updateMessageContentAndReasoning:
 UPDATE agent_message SET content = ?, reasoning = ? WHERE id = ?;
 
+-- 冷启动恢复（任务 B）：进程被杀时正在流式生成的助手消息内容停在中途，
+-- 需在原内容末尾补记「生成被中断」提示。分块安全追加：
+-- 子查询命中主行（未分块消息 chunk_group_id=''，仅 id 命中）
+-- 或最大 chunk_index 的末块（分块消息主行与全部续块都匹配 chunk_group_id），
+-- 保证提示落在整条消息末尾，而不是某一块中间把原文切断。
+-- 注意：子查询无需别名——外层是 UPDATE 不存在 `SELECT *` 列展开问题
+-- （对比 selectMessagesBySessionPaged 的 rc8 注释，那里是外层 SELECT * 才需要）。
+appendToLastChunkOfMessage:
+UPDATE agent_message SET content = content || ?
+WHERE id = (SELECT id FROM agent_message WHERE id = ? OR chunk_group_id = ? ORDER BY chunk_index DESC LIMIT 1);
+
 deleteMessageById:
 DELETE FROM agent_message WHERE id = ?;
 

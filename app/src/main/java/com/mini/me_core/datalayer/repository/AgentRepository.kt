@@ -168,6 +168,10 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
     suspend fun updateMessageContentAndReasoning(id: String, content: String, reasoning: String?) =
         messages.updateMessageContentAndReasoning(id, content, reasoning)
 
+    /** 分块安全追加（冷启动恢复中断生成提示用）：suffix 拼到消息主行或末块末尾。 */
+    suspend fun appendToMessage(id: String, suffix: String) =
+        messages.appendToLastChunkOfMessage(id, suffix)
+
     suspend fun deleteMessageById(id: String) = messages.deleteMessageById(id)
 
     suspend fun markPendingToolsInterrupted(

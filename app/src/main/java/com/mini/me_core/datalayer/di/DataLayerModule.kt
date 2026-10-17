@@ -34,7 +34,9 @@ import com.mini.mecore.datalayer.sqldelight.T2iDb
 import com.mini.mecore.datalayer.sqldelight.WorkspaceDb
 import com.mini.me_core.datalayer.store.BlobStore
 import com.mini.me_core.datalayer.store.DocumentStore
+import com.mini.me_core.datalayer.store.GenerationMarkerStore
 import com.mini.me_core.datalayer.store.KVStore
+import com.mini.me_core.datalayer.store.KvGenerationMarkerStore
 import com.mini.me_core.datalayer.store.Queue
 import com.mini.me_core.datalayer.store.TimeSeries
 import dagger.Module
@@ -277,6 +279,11 @@ object DataLayerModule {
     @Provides
     @Singleton
     fun provideKVStore(db: InfraDb): KVStore = KVStore(db)
+
+    @Provides
+    @Singleton
+    fun provideGenerationMarkerStore(kv: KVStore): GenerationMarkerStore =
+        KvGenerationMarkerStore(kv)
 
     @Provides
     @Singleton

@@ -493,6 +493,7 @@
 
     <!-- Agent Status -->
     <string name="agent_stopped_by_user">Stopped by user</string>
+    <string name="agent_generation_interrupted">Generation interrupted (the app was reclaimed by the system in the background; the reply may be incomplete)</string>
     <string name="agent_tool_executing">%1$s executing…</string>
     <string name="agent_goal_status_active">Goal in progress</string>
     <string name="agent_goal_status_done">Goal completed</string>

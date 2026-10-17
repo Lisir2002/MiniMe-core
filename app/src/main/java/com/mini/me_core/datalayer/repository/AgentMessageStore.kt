@@ -68,6 +68,14 @@ internal class AgentMessageStore(private val db: AgentDb) {
     suspend fun updateMessageContentAndReasoning(id: String, content: String, reasoning: String?) =
         withContext(Dispatchers.IO) { q.updateMessageContentAndReasoning(content, reasoning, id) }
 
+    /**
+     * 分块安全追加：把 [suffix] 拼到消息末尾——未分块消息命中主行，
+     * 分块消息命中 chunk_index 最大的末块（SQL 子查询内部解析，见 agent.sq 注释）。
+     * 冷启动恢复给「停在中途的流式助手消息」补记中断提示用。
+     */
+    suspend fun appendToLastChunkOfMessage(id: String, suffix: String) =
+        withContext(Dispatchers.IO) { q.appendToLastChunkOfMessage(suffix, id, id) }
+
     suspend fun deleteMessageById(id: String) =
         withContext(Dispatchers.IO) { q.deleteMessageById(id) }
 

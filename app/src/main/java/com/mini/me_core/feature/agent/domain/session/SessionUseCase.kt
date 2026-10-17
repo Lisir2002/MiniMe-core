@@ -2,6 +2,7 @@ package com.mini.me_core.feature.agent.domain.session
 
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
+import com.mini.me_core.datalayer.store.GenerationMarkerStore
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
 import com.mini.me_core.feature.agent.presentation.MessageRole
 import java.util.UUID
@@ -11,6 +12,7 @@ import javax.inject.Singleton
 @Singleton
 class SessionUseCase @Inject constructor(
     private val v2Agent: V2AgentRepository,
+    private val generationMarkerStore: GenerationMarkerStore,
 ) {
     companion object {
         private const val TAG = "SessionUseCase"
@@ -33,6 +35,64 @@ class SessionUseCase @Inject constructor(
             }
             if (n > 0) FileLogger.i(TAG, "冷启动收尾 $n 条残留「执行中」工具行已中断")
         }.onFailure { FileLogger.e(TAG, "回收残留执行中工具行失败", it) }
+    }
+
+    // ── 流式生成中断恢复（任务 B） ──────────────────────────────────────
+
+    /**
+     * 流式生成开始：写入活跃标记，值携带进程 pid。
+     * 生成正常结束（含失败/用户停止）必须调 [clearGenerationActive] 清除；
+     * 进程被杀时清除不会执行，标记得以留存，成为冷启动识别中断的证据。
+     */
+    fun markGenerationActive(sessionId: String, pid: Int) {
+        generationMarkerStore.markActive(sessionId, pid)
+    }
+
+    /** 生成结束：清除活跃标记（同步 KV 操作，可安全用于协程 finally）。 */
+    fun clearGenerationActive(sessionId: String) {
+        generationMarkerStore.clearActive(sessionId)
+    }
+
+    /**
+     * 冷启动恢复：上次进程被系统回收时，正在流式生成的助手消息内容停在中途，
+     * 且没有任何中断标记（finally 未执行），用户下次打开只看到半截回复。
+     *
+     * 判定：标记 pid 与 [currentPid] 不一致 → 写入标记的进程已死；
+     * 对该会话最后一条 ASSISTANT 消息（分块安全）追加 [interruptedNotice]。
+     * 与 [initColdStartCleanup] 分工：后者处理 TOOL 占位行，本方法处理助手正文。
+     *
+     * 判定逻辑在 [InterruptedGenerationPolicy]（纯函数，可单测），本方法只做 IO 编排。
+     */
+    suspend fun recoverInterruptedGeneration(currentPid: Int, interruptedNotice: String) {
+        runCatching {
+            val staleMarkers = generationMarkerStore.activeMarkers().filterValues { it != currentPid }
+            if (staleMarkers.isEmpty()) return@runCatching
+            staleMarkers.forEach { (sessionId, markerPid) ->
+                val last = MessagePersistenceUseCase.mergeChunks(
+                    v2Agent.getMessagesBySessionOnce(sessionId)
+                ).lastOrNull()
+                val lastView = last?.let {
+                    InterruptedGenerationPolicy.LastMessage(
+                        id = it.id,
+                        role = MessageRole.valueOf(it.role),
+                        content = it.content,
+                    )
+                }
+                val targetId = InterruptedGenerationPolicy.resolveTargetMessageId(
+                    markerPid = markerPid,
+                    currentPid = currentPid,
+                    lastMessage = lastView,
+                    notice = interruptedNotice,
+                )
+                if (targetId != null) {
+                    v2Agent.appendToMessage(targetId, "\n\n$interruptedNotice")
+                    FileLogger.i(TAG, "会话 $sessionId 流式生成随进程 $markerPid 被回收，已补记中断提示")
+                }
+                // 无论是否补记都清除标记：重复恢复的幂等由文案 contains 把关，
+                // 残留标记只会让后续每次冷启动重复比对。
+                generationMarkerStore.clearActive(sessionId)
+            }
+        }.onFailure { FileLogger.e(TAG, "恢复被中断的流式生成失败", it) }
     }
 
     fun newSession(workspacePath: String): V2AgentSession {
