@@ -1,7 +1,11 @@
 package com.mini.me_core.feature.agent.presentation.component
 import com.mini.me_core.core.theme.tokens.LocalCornerRadius
 import com.mini.me_core.core.theme.ScaledAnimation
+import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.feature.agent.presentation.util.MessageSpeechReader
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -49,6 +53,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -98,6 +104,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.debounce
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 
 /**
  * 品牌渐变色 Brush。读取当前主题的 primary 色，构造 primary → primary(alpha=0.6f) 的渐变。
@@ -142,6 +149,7 @@ fun AIChatPanel(
     selectedCode: String? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val agentState by viewModel.agentState.collectAsStateWithLifecycle()
     val messagesState by viewModel.messagesState.collectAsStateWithLifecycle()
     val messages = messagesState.messages
@@ -209,11 +217,34 @@ fun AIChatPanel(
     // F2.1：MiniMe 自研 Markdown 渲染器的解析缓存（LRU 50 条，按内容 hash）
     val miniMeMarkdownCache = remember { com.mini.me_core.feature.agent.presentation.component.markdown.MiniMeMarkdownCache() }
 
+    // 消息朗读（TTS）：引擎随组合生命周期创建/释放，isSpeaking 驱动菜单里的「停止朗读」态。
+    val speechReader = remember { MessageSpeechReader(context) }
+    var isSpeaking by remember { mutableStateOf(false) }
+    DisposableEffect(Unit) {
+        onDispose { speechReader.release() }
+    }
+    val messageActionBus = MessageActionBus(
+        onRegenerate = { messageId -> viewModel.regenerateMessage(messageId) },
+        onDelete = { messageId -> viewModel.deleteMessage(messageId) },
+        onShare = { text -> shareMessageText(context, text) },
+        onReadAloud = { text ->
+            speechReader.speak(
+                text,
+                onStart = { isSpeaking = true },
+                onDone = { isSpeaking = false }
+            )
+        },
+        isSpeaking = isSpeaking,
+        onStopSpeaking = {
+            speechReader.stop()
+            isSpeaking = false
+        }
+    )
+
     // F2.5：待确认的模型切换 (providerId, modelName)
     var pendingModelSwitch by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
@@ -342,8 +373,14 @@ fun AIChatPanel(
     // 显示防抖：离开底部 200ms 后才显示（避免 fling 过程中闪烁），
     // 到达底部 100ms 后再隐藏
     var showScrollToBottomRaw by remember { mutableStateOf(false) }
+    // derivedStateOf 的计算 lambda 只在首次组合时创建并被永久记住，若直接闭包捕获
+    // messages / messagesReady 这类「每次重组都会重新赋值的局部 val」，会锁定首帧的空列表，
+    // 导致「回到底部」按钮永不显示。用 rememberUpdatedState 包装成稳定 State 引用后再读，
+    // 即可每次读取都拿到最新值，同时保留 derivedStateOf 的去重组收益。
+    val messagesSnapshot by rememberUpdatedState(messages)
+    val messagesReadySnapshot by rememberUpdatedState(messagesReady)
     val showScrollToBottom by remember {
-        derivedStateOf { messagesReady && messages.isNotEmpty() && showScrollToBottomRaw }
+        derivedStateOf { messagesReadySnapshot && messagesSnapshot.isNotEmpty() && showScrollToBottomRaw }
     }
     LaunchedEffect(isAtBottom, messagesReady) {
         if (!isAtBottom && messagesReady && messages.isNotEmpty()) {
@@ -359,23 +396,25 @@ fun AIChatPanel(
     // 语义完全无状态（可预测）：目标 = 视口顶部之上最近的一个用户消息组；
     // 视口顶正落在某用户消息组上时，再点击天然跳到上一条；上方无用户消息
     // （已位于最顶的用户消息处）时返回 null，按钮隐藏消失。
-    // derivedStateOf 直接读 taskGroups / listState 状态，不缓存中间量，避免闭包捕获旧值。
+    // 同上：taskGroups 每帧重建，必须经 rememberUpdatedState 包装后再被 derivedStateOf / 闭包读取，
+    // 否则锁定首帧空分组，上箭头永不显示。
+    val taskGroupsSnapshot by rememberUpdatedState(taskGroups)
     val userMessageGroupIndices: () -> List<Int> = {
-        taskGroups.mapIndexedNotNull { index, group ->
+        taskGroupsSnapshot.mapIndexedNotNull { index, group ->
             index.takeIf { group.subGroups.any { it.type == TaskSubGroupType.USER } }
         }
     }
     val showJumpToUserMessage by remember {
         derivedStateOf {
-            if (taskGroups.isEmpty()) return@derivedStateOf false
-            val top = listState.firstVisibleItemIndex.coerceAtMost(taskGroups.size - 1)
+            if (taskGroupsSnapshot.isEmpty()) return@derivedStateOf false
+            val top = listState.firstVisibleItemIndex.coerceAtMost(taskGroupsSnapshot.size - 1)
             previousUserMessageGroupIndex(userMessageGroupIndices(), top) != null
         }
     }
     val jumpToUserMessage: () -> Unit = {
         scope.launch {
-            if (taskGroups.isEmpty()) return@launch
-            val top = listState.firstVisibleItemIndex.coerceIn(0, taskGroups.size - 1)
+            if (taskGroupsSnapshot.isEmpty()) return@launch
+            val top = listState.firstVisibleItemIndex.coerceIn(0, taskGroupsSnapshot.size - 1)
             val dest = previousUserMessageGroupIndex(userMessageGroupIndices(), top) ?: return@launch
             // 跳转即离开底部：停止流式贴底跟随，「回到底部」按钮随之出现
             followBottom = false
@@ -530,10 +569,39 @@ fun AIChatPanel(
     }
 
     val firstVisibleItemIndex by remember { derivedStateOf { listState.firstVisibleItemIndex } }
+
+    // 长对话分页：向上加载更早消息时必须保持视口。
+    // 旧消息插入列表头部会把原有内容整体下移，若不做补偿，LazyColumn 以 anchor 为基线
+    // 会让用户看到画面跳变（长对话最典型的「翻历史时画面乱跳」缺陷）。
+    // 做法：触发前记下当前锚点 item 的 **key**（稳定标识，不随插入而变）与其相对视口顶部的
+    // 像素偏移；新数据到达后按 key 重新定位并补偿新增 item 数，使同一消息回到原屏幕位置。
+    var pendingAnchor by remember { mutableStateOf<String?>(null) }
+    var pendingAnchorOffset by remember { mutableIntStateOf(0) }
+    // 上一次已还原的 item 总数，用于算出本次分页新增了多少 item。
+    var previousTotalItems by remember { mutableIntStateOf(0) }
     LaunchedEffect(firstVisibleItemIndex, messagesReady, messagesState.hasMore, messagesState.isLoadingMore) {
         if (messagesReady && firstVisibleItemIndex <= 3 && messagesState.hasMore && !messagesState.isLoadingMore) {
+            val layout = listState.layoutInfo
+            val anchor = layout.visibleItemsInfo.firstOrNull()
+            if (anchor != null) {
+                pendingAnchor = anchor.key?.toString()
+                // 记录锚点顶边相对视口顶边的距离（含被裁掉的负值），补偿后据此还原。
+                pendingAnchorOffset = anchor.offset
+            }
             viewModel.loadMoreMessages()
         }
+    }
+    // 消息集合变化后执行一次视口还原：把锚点 item 滚回「原位置 - 新增 item 数」。
+    LaunchedEffect(taskGroups.size) {
+        val anchorKey = pendingAnchor ?: return@LaunchedEffect
+        val layout = listState.layoutInfo
+        val info = layout.visibleItemsInfo.firstOrNull { it.key?.toString() == anchorKey }
+        val added = (layout.totalItemsCount - previousTotalItems)
+        if (info != null && added > 0) {
+            listState.scrollToItem(info.index + added, pendingAnchorOffset)
+        }
+        previousTotalItems = layout.totalItemsCount
+        pendingAnchor = null
     }
 
     val executionMode = settingsViewModel?.executionMode?.collectAsStateWithLifecycle()?.value
@@ -587,6 +655,8 @@ fun AIChatPanel(
                         verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                     ) {
                         items(taskGroups, key = { it.taskId }, contentType = { "task" }) { group ->
+                          // 消息长按快捷操作总线：重新生成 / 删除 / 分享 / 朗读
+                          CompositionLocalProvider(LocalMessageActionBus provides messageActionBus) {
                             if (AgentFirstFeatureFlags.isTaskCardEnabled()) {
                                 TaskCard(
                                     group = group,
@@ -617,6 +687,7 @@ fun AIChatPanel(
                                     agentState = agentState
                                 )
                             }
+                          }
                         }
                         val reasoning = streamingReasoning
                         val showReasoning = reasoning != null && reasoning.isNotEmpty()
@@ -1122,3 +1193,21 @@ private data class PressBounceState(
     val trigger: () -> Unit
 )
 
+
+/**
+ * 分享消息正文：走系统 ACTION_SEND，由用户选择目标应用。
+ * 无可处理分享的 Activity 时静默忽略（不弹 Toast，避免打断对话流）。
+ */
+private fun shareMessageText(context: Context, text: String) {
+    if (text.isBlank()) return
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    val chooser = Intent.createChooser(intent, null)
+    if (chooser.resolveActivity(context.packageManager) != null) {
+        context.startActivity(chooser)
+    } else {
+        FileLogger.e("AIChatPanel", "无可用的分享目标应用")
+    }
+}

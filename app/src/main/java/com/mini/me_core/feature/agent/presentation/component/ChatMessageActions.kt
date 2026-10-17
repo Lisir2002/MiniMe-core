@@ -10,12 +10,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,7 +38,7 @@ import com.mini.me_core.feature.agent.presentation.MessageRole
  *
  * 长按消息弹出 ModalBottomSheet：
  *  - 顶部消息摘要（前 50 字，12sp onSurfaceVariant）；
- *  - AI 消息：复制全文 / 复制代码块(多块子列表) / 重新生成 / 编辑并重发 / 收藏 / 分享 / 朗读；
+ *  - AI 消息：复制全文 / 复制代码块(多块子列表) / 重新生成 / 编辑并重发 / 分享 / 朗读；
  *  - 用户消息：复制 / 编辑并重发 / 删除（危险操作 error 色，外部弹确认框）；
  *  - 每项高 48dp，图标 24dp + 文字 14sp。
  */
@@ -49,12 +49,8 @@ fun ChatMessageActionsSheet(
     onDismiss: () -> Unit,
     onCopyText: () -> Unit,
     onCopyCodeBlock: (String) -> Unit,
-    onRegenerate: () -> Unit = {},
     onEditResend: () -> Unit = {},
-    onBookmark: () -> Unit = {},
-    onShare: () -> Unit = {},
-    onReadAloud: () -> Unit = {},
-    onDelete: () -> Unit = {},
+    actions: MessageActionBus = MessageActionBus(),
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val isUser = message.role == MessageRole.USER
@@ -85,20 +81,27 @@ fun ChatMessageActionsSheet(
                 }
             }
             if (!isUser) {
-                ActionRow(Icons.Rounded.Refresh, stringResource(R.string.chat_action_regenerate), onDismiss, onRegenerate)
+                ActionRow(Icons.Rounded.Refresh, stringResource(R.string.chat_action_regenerate), onDismiss, { actions.onRegenerate(message.id) })
             }
             ActionRow(Icons.Rounded.Edit, stringResource(R.string.chat_action_edit_resend), onDismiss, onEditResend)
             if (!isUser) {
-                ActionRow(Icons.Rounded.Bookmark, stringResource(R.string.chat_action_bookmark), onDismiss, onBookmark)
-                ActionRow(Icons.Rounded.Share, stringResource(R.string.chat_action_share), onDismiss, onShare)
-                ActionRow(Icons.Rounded.VolumeUp, stringResource(R.string.chat_action_read_aloud), onDismiss, onReadAloud)
+                ActionRow(Icons.Rounded.Share, stringResource(R.string.chat_action_share), onDismiss, { actions.onShare(message.content) })
+                ActionRow(
+                    if (actions.isSpeaking) Icons.Rounded.Stop else Icons.Rounded.VolumeUp,
+                    stringResource(
+                        if (actions.isSpeaking) R.string.chat_action_stop_reading
+                        else R.string.chat_action_read_aloud
+                    ),
+                    onDismiss,
+                    { actions.onReadAloud(message.content) }
+                )
             }
             // 用户消息删除（危险操作，error 色）
             if (isUser) {
                 ActionRow(
                     icon = Icons.Rounded.Delete,
                     label = stringResource(R.string.chat_action_delete),
-                    onClick = { onDismiss(); onDelete() },
+                    onClick = { onDismiss(); actions.onDelete(message.id) },
                     danger = true,
                 )
             }

@@ -994,9 +994,9 @@
     <string name="chat_action_copy_code_item">Code block %1$d</string>
     <string name="chat_action_regenerate">Regenerate</string>
     <string name="chat_action_edit_resend">Edit &amp; resend</string>
-    <string name="chat_action_bookmark">Bookmark</string>
     <string name="chat_action_share">Share</string>
     <string name="chat_action_read_aloud">Read aloud</string>
+    <string name="chat_action_stop_reading">Stop reading</string>
     <string name="chat_action_delete">Delete message</string>
     <string name="chat_action_delete_title">Delete this message?</string>
     <string name="chat_action_delete_text">This message and all replies after it will be deleted. This cannot be undone.</string>

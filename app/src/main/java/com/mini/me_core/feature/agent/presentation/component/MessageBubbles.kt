@@ -26,12 +26,14 @@ import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -131,8 +133,12 @@ internal fun AgentMessageItem(
     var copied by remember { mutableStateOf(false) }
     // F2.3：长按弹出快捷操作面板
     var showActions by remember { mutableStateOf(false) }
+    // 删除为不可撤销操作，需二次确认：记录待删 id，确认后才真正执行
+    var pendingDeleteId by remember { mutableStateOf<String?>(null) }
     val clipboard = LocalClipboard.current
     val copyScope = rememberCoroutineScope()
+    // 快捷操作总线（在 AIChatPanel 顶层 Provide），见 MessageActionBus
+    val actionBus = LocalMessageActionBus.current
 
     Column(
         modifier = Modifier
@@ -374,9 +380,45 @@ internal fun AgentMessageItem(
                 copyScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("message", code))) }
                 copied = true
             },
-            onRegenerate = { onRegenerate?.invoke(message) },
             onEditResend = { onEditClick?.invoke(message) },
-            onDelete = { onDeleteMessage?.invoke(message) },
+            // 外部回调优先（保留既有 AgentMessageItem 参数语义），否则走总线
+            actions = actionBus.copy(
+                onRegenerate = { id ->
+                    val cb = onRegenerate
+                    if (cb != null) cb(message) else actionBus.onRegenerate(id)
+                },
+                onReadAloud = { text ->
+                    if (actionBus.isSpeaking) actionBus.onStopSpeaking() else actionBus.onReadAloud(text)
+                },
+                onDelete = { id ->
+                    val cb = onDeleteMessage
+                    // 删除不可撤销 → 需二次确认
+                    if (cb != null) cb(message) else pendingDeleteId = id
+                }
+            ),
+        )
+    }
+
+    // 删除二次确认
+    if (pendingDeleteId != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDeleteId = null },
+            title = { Text(stringResource(R.string.chat_action_delete_title)) },
+            text = { Text(stringResource(R.string.chat_action_delete_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDeleteId?.let { actionBus.onDelete(it) }
+                    pendingDeleteId = null
+                }) { Text(
+                    stringResource(R.string.chat_action_delete),
+                    color = MaterialTheme.colorScheme.error
+                ) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteId = null }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
         )
     }
 }

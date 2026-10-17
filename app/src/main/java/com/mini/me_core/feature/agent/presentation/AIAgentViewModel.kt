@@ -183,14 +183,44 @@ class AIAgentViewModel @Inject constructor(
     private val _messageLimit = MutableStateFlow<Map<String, Int>>(emptyMap())
     private val defaultLimit = 30
 
+    /**
+     * 分页加载中的会话集合：做 in-flight 去重。
+     * 此前 isLoadingMore 恒为 false，导致上滑时 LaunchedEffect 可在加载完成前反复触发，
+     * limit 被连续累加跳变。本次改为按会话真实标记加载中状态。
+     */
+    private val _loadingMoreSessions = MutableStateFlow<Set<String>>(emptySet())
+
     val inputDraft: StateFlow<String> = composer.inputDraft
     fun updateInputDraft(text: String) { composer.updateInputDraft(text) }
     fun clearInputDraft() { composer.clearInputDraft() }
 
+    /**
+     * 加载更早的历史消息。按会话去重：已在加载中则直接返回，避免重复触发。
+     * 加载完成后 [loadingMore] 回到 false，UI 侧守卫方可再次触发。
+     */
     fun loadMoreMessages() {
         val sid = _currentSessionId.value ?: return
+        if (sid in _loadingMoreSessions.value) return
         val currentLimit = _messageLimit.value[sid] ?: defaultLimit
+        _loadingMoreSessions.value = _loadingMoreSessions.value + sid
         _messageLimit.value = _messageLimit.value + (sid to (currentLimit + 30))
+    }
+
+    /** 分页加载是否在进行中（供 UI 守卫用）。 */
+    val loadingMore: StateFlow<Boolean> = _currentSessionId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(false) else _loadingMoreSessions.map { it.contains(id) }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /**
+     * 分页数据落库完成后解除该会话的加载中标记。
+     * 由 messagesState 的收集侧调用（见 init 区域对 messagesState 的订阅）。
+     */
+    private fun markLoadingMoreDone(sessionId: String) {
+        if (sessionId in _loadingMoreSessions.value) {
+            _loadingMoreSessions.value = _loadingMoreSessions.value - sessionId
+        }
     }
 
     /** 容器初始化实时进度（解压/部署/装包），AI 页底部气泡展示。 */
@@ -307,25 +337,28 @@ class AIAgentViewModel @Inject constructor(
      */
     val messagesState: StateFlow<ChatMessagesState> = combine(
         _currentSessionId,
-        _messageLimit
-    ) { id, limitMap -> id to (limitMap[id] ?: defaultLimit) }
-        .flatMapLatest { (id, limit) ->
+        _messageLimit,
+        _loadingMoreSessions
+    ) { id, limitMap, loadingSet -> Triple(id, limitMap[id] ?: defaultLimit, loadingSet) }
+        .flatMapLatest { (id, limit, loadingSet) ->
             if (id == null) flowOf(ChatMessagesState(null, emptyList(), loaded = false))
             else v2Agent.observeMessagesBySessionPaged(id, limit.toLong()).map { list ->
+                // 数据已按新 limit 发射 → 本次分页完成，解除加载中标记（否则守卫会永久拦住后续分页）。
+                markLoadingMoreDone(id)
+                val merged = MessagePersistenceUseCase.mergeChunks(list).asSequence()
+                    .filterNot { it.is_context_summary != 0L }
+                    .filterNot {
+                        it.role == MessageRole.ASSISTANT.name &&
+                            !it.content.hasVisibleContent() &&
+                            it.reasoning.isNullOrEmpty()
+                    }
+                    .map { entity -> entity.toUIMessage() }
+                    .toList()
                 ChatMessagesState(
                     sessionId = id,
-                    messages = MessagePersistenceUseCase.mergeChunks(list).asSequence()
-                        .filterNot { it.is_context_summary != 0L }
-                        .filterNot {
-                            it.role == MessageRole.ASSISTANT.name &&
-                                !it.content.hasVisibleContent() &&
-                                it.reasoning.isNullOrEmpty()
-                        }
-                        .map { entity -> entity.toUIMessage() }
-                        .toList(),
-                    loaded = true,
+                    messages = merged,                    loaded = true,
                     hasMore = list.size >= limit,
-                    isLoadingMore = false
+                    isLoadingMore = loadingSet.contains(id)
                 )
             }
         }
@@ -337,6 +370,25 @@ class AIAgentViewModel @Inject constructor(
     private val _expandedSubGroups = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     // 当前正在流式生成的任务（按会话）：sessionId -> taskId。用于任务手风琴头部脉冲指示。
     private val _streamingTaskBySession = MutableStateFlow<Map<String, String>>(emptyMap())
+    // 流式期间定期持久化跟踪（方案A）：每个会话当前正在流式的 assistant 消息 ID。
+    // AssistantDelta 首次到达时生成 UUID 并 INSERT，后续定期 UPDATE；AssistantText 到达时用同 ID 做最终替换。
+    // 用 StateFlow 承载而非普通 map：进行中消息需被 taskGroups 响应式排除（见 streamingMessageId /
+    // buildTaskGroups），避免流式思考气泡与 tail 实时气泡重复渲染同一段文本。
+    private val _streamingMessageIds = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    /**
+     * 当前会话「正在流式落库」的 assistant 消息 id；null 表示当前没有进行中的落库消息。
+     *
+     * 该消息的正文与思考内容在流式期间已实时进入 [messagesState]，若同时进入 task 组被渲染，
+     * 会与 AIChatPanel 尾部的 `__reasoning__` / `__active__` 实时气泡重复显示同一内容
+     * （表现为「两个一模一样的思考过程气泡」）。因此 taskGroups 构建时按此 id 排除进行中消息，
+     * 由尾部实时气泡独占流式显示；AssistantText 终帧移除此 id 后，消息照常并入任务组。
+     */
+    val streamingMessageId: StateFlow<String?> = _currentSessionId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(null) else _streamingMessageIds.map { it[id] }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /**
      * 任务分组列表：把扁平消息列表按 taskId 分组为一级手风琴（任务），
@@ -347,13 +399,15 @@ class AIAgentViewModel @Inject constructor(
         messagesState,
         _expandedTasks,
         _expandedSubGroups,
-        _streamingTaskBySession
-    ) { state, expandedTasks, expandedSubGroups, streamingTasks ->
+        _streamingTaskBySession,
+        streamingMessageId
+    ) { state, expandedTasks, expandedSubGroups, streamingTasks, inFlightMessageId ->
         buildTaskGroups(
             state.messages,
             expandedTasks,
             expandedSubGroups,
-            streamingTaskId = streamingTasks[state.sessionId]
+            streamingTaskId = streamingTasks[state.sessionId],
+            inFlightMessageId = inFlightMessageId
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -373,10 +427,19 @@ class AIAgentViewModel @Inject constructor(
         messages: List<AgentUIMessage>,
         expandedTasks: Map<String, Boolean>,
         expandedSubGroups: Map<String, Boolean>,
-        streamingTaskId: String?
+        streamingTaskId: String?,
+        inFlightMessageId: String?
     ): List<TaskGroup> {
-        val historical = messages.filter { it.taskId.isBlank() }
-        val tasked = messages.filter { it.taskId.isNotBlank() }
+        // 排除「正在流式落库」的那条 assistant 消息：其 reasoning/content 已随分块实时进入
+        // messagesState，若在此渲染会与 AIChatPanel 尾部实时气泡（__reasoning__ / __active__）
+        // 重复显示同一内容。终帧移除该 id 后，消息自然并入任务组。
+        val visible = if (inFlightMessageId == null) {
+            messages
+        } else {
+            messages.filterNot { it.id == inFlightMessageId }
+        }
+        val historical = visible.filter { it.taskId.isBlank() }
+        val tasked = visible.filter { it.taskId.isNotBlank() }
         val result = mutableListOf<TaskGroup>()
 
         // 历史对话（升级前 / 斜杠命令 / 压缩锚点等无 taskId 的消息）：顶部扁平组，默认折叠。
@@ -593,12 +656,12 @@ class AIAgentViewModel @Inject constructor(
     ) {
         if (content.isEmpty() && reasoning.isNullOrEmpty()) return
         val now = System.currentTimeMillis()
-        val existingId = streamingMessageIds[sessionId]
+        val existingId = streamingMessageIdOf(sessionId)
 
         if (existingId == null) {
             // 首次定期落库：INSERT
             val newId = UUID.randomUUID().toString()
-            streamingMessageIds[sessionId] = newId
+            setStreamingMessageId(sessionId, newId)
             messagePersistenceUseCase.persist(
                 sessionId = sessionId,
                 role = MessageRole.ASSISTANT,
@@ -669,9 +732,18 @@ class AIAgentViewModel @Inject constructor(
     // （用户消息 / 助手回复 / 工具调用 / 思考过程）都归入同一任务分组。
     private val currentTaskIdBySession = mutableMapOf<String, String>()
 
-    // 流式期间定期持久化跟踪（方案A）：每个会话当前正在流式的 assistant 消息 ID。
-    // AssistantDelta 首次到达时生成 UUID 并 INSERT，后续定期 UPDATE；AssistantText 到达时用同 ID 做最终替换。
-    private val streamingMessageIds = mutableMapOf<String, String>()
+
+    /** 取指定会话当前进行中的流式消息 id（内部同步读取，不触发重组）。 */
+    private fun streamingMessageIdOf(sessionId: String): String? = _streamingMessageIds.value[sessionId]
+
+    /** 登记/清除指定会话进行中的流式消息 id。 */
+    private fun setStreamingMessageId(sessionId: String, messageId: String?) {
+        _streamingMessageIds.value = if (messageId == null) {
+            _streamingMessageIds.value - sessionId
+        } else {
+            _streamingMessageIds.value + (sessionId to messageId)
+        }
+    }
 
     // 定期落库的节流状态：记录每个会话上次落库的时间戳和内容长度。
     // 触发条件：新增 ≥ PERIODIC_PERSIST_CHAR_THRESHOLD 字符 或 距上次落库 ≥ PERIODIC_PERSIST_TIME_MS，取先到者。
@@ -945,7 +1017,7 @@ class AIAgentViewModel @Inject constructor(
                         setStreamingText(sessionId, null)
                         setStreamingReasoning(sessionId, null)
                         // 方案A：压缩打断流式，清理流式消息 ID
-                        streamingMessageIds.remove(sessionId)
+                        setStreamingMessageId(sessionId, null)
                         periodicPersistStates.remove(sessionId)
                         latestStreamingContent = ""
                         latestStreamingReasoning = null
@@ -959,7 +1031,7 @@ class AIAgentViewModel @Inject constructor(
                         val reasoning = event.reasoning.takeIf { it.hasVisibleContent() }
                         // 方案A：如果流式期间已定期落库，用同一个 ID 做最终替换（INSERT OR REPLACE）；
                         // 否则正常 INSERT（随机 UUID）。
-                        val existingStreamingId = streamingMessageIds.remove(sessionId)
+                        val existingStreamingId = streamingMessageIdOf(sessionId).also { setStreamingMessageId(sessionId, null) }
                         periodicPersistStates.remove(sessionId)
                         latestStreamingContent = ""
                         latestStreamingReasoning = null
@@ -986,7 +1058,7 @@ class AIAgentViewModel @Inject constructor(
                         val msgId = "tool_${event.id}"
                         setStreamingText(sessionId, null)
                         // 方案A：助手文本回合结束，清理流式消息 ID 和定期落库状态
-                        streamingMessageIds.remove(sessionId)
+                        setStreamingMessageId(sessionId, null)
                         periodicPersistStates.remove(sessionId)
                         latestStreamingContent = ""
                         latestStreamingReasoning = null
@@ -1068,7 +1140,7 @@ class AIAgentViewModel @Inject constructor(
                         // 会话任务目标变更：与消息同日志，落库为工具卡片，让用户「看见」目标被设定/更新/完成。
                         setStreamingText(sessionId, null)
                         setStreamingReasoning(sessionId, null)
-                        streamingMessageIds.remove(sessionId)
+                        setStreamingMessageId(sessionId, null)
                         periodicPersistStates.remove(sessionId)
                         latestStreamingContent = ""
                         latestStreamingReasoning = null
@@ -1096,7 +1168,7 @@ class AIAgentViewModel @Inject constructor(
                         // 技能输出已随首轮模型上下文以【系统·自动触发技能…】注入，这里仅用于 UI 渲染，不重复进模型上下文。
                         setStreamingText(sessionId, null)
                         setStreamingReasoning(sessionId, null)
-                        streamingMessageIds.remove(sessionId)
+                        setStreamingMessageId(sessionId, null)
                         periodicPersistStates.remove(sessionId)
                         latestStreamingContent = ""
                         latestStreamingReasoning = null
@@ -1144,7 +1216,7 @@ class AIAgentViewModel @Inject constructor(
             // stopAgent() 也会先清空 streamingText 再 cancel，此处同样为空，不与 stopAgent 的部分结果落库冲突。
             val fallbackStreamingText = latestStreamingContent
             val fallbackStreamingReasoning = latestStreamingReasoning
-            val fallbackStreamingId = streamingMessageIds.remove(sessionId)
+            val fallbackStreamingId = streamingMessageIdOf(sessionId).also { setStreamingMessageId(sessionId, null) }
             val fallbackTaskId = currentTaskIdBySession[sessionId] ?: ""
 
             if (sessionJobs[sessionId] == coroutineContext[Job]) {
@@ -1276,7 +1348,7 @@ class AIAgentViewModel @Inject constructor(
         _runningTools.value = emptyMap()
         _retryStates.value = emptyMap()
         currentTaskIdBySession.clear()
-        streamingMessageIds.clear()
+        _streamingMessageIds.value = emptyMap()
         periodicPersistStates.clear()
         // D5-8 中断/恢复：会话停止时把各会话 RUNNING playbook 运行置 INTERRUPTED（可 playbook_resume 继续）。
         viewModelScope.launch {
@@ -1295,7 +1367,7 @@ class AIAgentViewModel @Inject constructor(
         // 同步捕获本轮 taskId：job.cancel() 后 finally 会清理 map，这里先取走避免竞态。
         val stoppedTaskId = currentTaskIdBySession[sessionId] ?: ""
         // 方案A：同步捕获流式消息 ID，用于部分结果落库时复用同 ID，避免重复消息。
-        val stoppedStreamingId = streamingMessageIds.remove(sessionId)
+        val stoppedStreamingId = streamingMessageIdOf(sessionId).also { setStreamingMessageId(sessionId, null) }
         periodicPersistStates.remove(sessionId)
         job.cancel()
         // 停止会话时清理其残留的权限确认请求，避免确认卡继续弹出。
@@ -1330,7 +1402,10 @@ class AIAgentViewModel @Inject constructor(
                     )
                     toolArgsByMsgId.remove(running.messageId)
                 }
-            } else if (!streamingText.isNullOrEmpty() || !streamingReasoning.isNullOrEmpty()) {
+            }
+            // 流式正文独立落库：不能与上面的工具落库互斥（else if）。此前「同时有运行中工具 +
+            // 流式正文」时正文分支被跳过，用户已读到的内容永久丢失——属底线级数据丢失缺陷。
+            if (!streamingText.isNullOrEmpty() || !streamingReasoning.isNullOrEmpty()) {
                 val partial = (streamingText ?: "").trimEnd()
                 val content = if (partial.isNotEmpty()) "$partial\n\n$stoppedText" else stoppedText
                 val reasoning = streamingReasoning?.takeIf { it.hasVisibleContent() }
@@ -1776,6 +1851,41 @@ class AIAgentViewModel @Inject constructor(
             )
         } catch (e: Exception) {
             FileLogger.e(TAG, "编辑并重发失败", e)
+        }
+    }
+
+    /**
+     * 重新生成：针对一条助手回复，回溯到它前面最近的一条用户消息，
+     * 把「该用户消息及其之后」标记为已截断（保留 UI 可见性），再用原请求内容重新跑一轮。
+     * 与 [editAndResend] 的区别是不改动用户消息文本。
+     */
+    fun regenerateMessage(messageId: String) = viewModelScope.launch {
+        try {
+            val sid = _currentSessionId.value ?: return@launch
+            val all = messagesState.value.messages
+            val idx = all.indexOfFirst { it.id == messageId }
+            if (idx < 0) return@launch
+            // 回溯最近的用户消息作为重跑请求
+            val userMsg = all.take(idx).lastOrNull { it.role == MessageRole.USER } ?: return@launch
+            val msg = v2Agent.getMessageById(userMsg.id) ?: return@launch
+            v2Agent.markMessagesCompactedInclusiveFromTimestamp(msg.session_id, msg.created_at)
+            enqueueAgentRequest(
+                request = userMsg.content,
+                modelRequest = userMsg.content,
+                projectRoot = _currentWorkspace.value,
+                targetSessionId = msg.session_id
+            )
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "重新生成失败", e)
+        }
+    }
+
+    /** 删除单条消息（含其分块），删除后由 messagesState 的 DB 观察流自动刷新 UI。 */
+    fun deleteMessage(messageId: String) = viewModelScope.launch {
+        try {
+            v2Agent.deleteMessageById(messageId)
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "删除消息失败", e)
         }
     }
 

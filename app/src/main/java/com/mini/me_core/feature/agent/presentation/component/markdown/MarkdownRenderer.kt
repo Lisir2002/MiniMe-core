@@ -1,5 +1,9 @@
 package com.mini.me_core.feature.agent.presentation.component.markdown
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +37,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -423,10 +430,30 @@ internal fun LinkableInlines(
             }
         }
     }
+    // 宿主未提供回调时走系统 Intent 兜底；无应用可处理时复制到剪贴板并提示，
+    // 绝不能静默无响应（此前 onOpenUrl?.invoke 在 null 时即吞掉点击）。
+    // 注意：ClickableText 的 onClick 不是 @Composable 上下文，Local* 必须在此之前取出。
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     ClickableText(text = annotated, style = baseStyle, modifier = modifier) { offset ->
         annotated.getStringAnnotations("URL", offset, offset).firstOrNull()?.let { ann ->
-            onOpenUrl?.invoke(ann.item)
+            val url = ann.item
+            if (onOpenUrl != null) onOpenUrl(url) else openUrlExternally(context, clipboard, url)
         }
+    }
+}
+
+/**
+ * 链接点击兜底：优先系统 Intent 打开；无可处理应用时复制到剪贴板并提示。
+ * 绝不能静默无响应（此前 onOpenUrl?.invoke 在 null 时即吞掉点击）。
+ */
+private fun openUrlExternally(context: Context, clipboard: ClipboardManager, url: String) {
+    val launched = runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }.isSuccess
+    if (!launched) {
+        clipboard.setText(AnnotatedString(url))
+        Toast.makeText(context, "已复制链接：$url", Toast.LENGTH_SHORT).show()
     }
 }
 

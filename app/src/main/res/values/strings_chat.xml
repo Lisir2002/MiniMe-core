@@ -93,9 +93,9 @@
     <string name="chat_action_copy_code_item">代码块 %1$d</string>
     <string name="chat_action_regenerate">重新生成</string>
     <string name="chat_action_edit_resend">编辑并重发</string>
-    <string name="chat_action_bookmark">收藏</string>
     <string name="chat_action_share">分享</string>
     <string name="chat_action_read_aloud">朗读</string>
+    <string name="chat_action_stop_reading">停止朗读</string>
     <string name="chat_action_delete">删除消息</string>
     <string name="chat_action_delete_title">删除这条消息？</string>
     <string name="chat_action_delete_text">将删除该消息及其之后的所有回复，此操作不可撤销。</string>
