@@ -201,17 +201,13 @@ jobs:
       - name: Lint (release, baseline gate)
         run: ./gradlew --warning-mode=all :app:lintRelease --stacktrace
 
-      # detekt 静态分析（baseline 渐进式）：config/detekt/baseline.xml 记账存量问题，
-      # 只暴露本次改动引入的新问题。
-      #
-      # 首轮接入先设为 continue-on-error：本项目 Kotlin 为 2.2.21，而 detekt 1.23.x 系列
-      # 内置编译器为 2.0.x（1.23.8 → Kotlin 2.0.21），跨版本分析存在"能否稳定解析 2.2
-      # 元数据"的不确定性（升级到支持 Kotlin 2.2 的 detekt 2.0.0 需等其 GA）。
-      # 因此先观察：报告照常产出、归档、写入 job summary，确认基线稳定且无误报后再把
-      # continue-on-error 去掉转为硬门禁。
-      - name: detekt (baseline gate, non-blocking first round)
+      # detekt 静态分析（硬门禁，baseline 渐进式）：config/detekt/baseline.xml 记账存量问题，
+      # 只暴露本次改动引入的新问题；任何新增 finding 都会让本步骤失败、阻断合并。
+      # 说明：首轮接入时曾因 Kotlin 2.2.21 与 detekt 1.23.x（内置 Kotlin 2.0.21 编译器）的
+      # 跨版本不确定性设为 continue-on-error 观察；经多轮验证解析稳定、基线无误报后，
+      # 已转为硬门禁（与 compile/test/lint 同级阻断）。
+      - name: detekt (baseline gate)
         id: detekt
-        continue-on-error: true
         run: ./gradlew --warning-mode=all :app:detekt --stacktrace
 
       - name: Upload detekt report
