@@ -1823,7 +1823,8 @@
     <ID>EmptyFunctionBlock:RemoteTerminalSessionManager.kt$RemoteTerminalSessionManager.AppRemoteSessionClient${}</ID>
     <ID>EmptyFunctionBlock:TerminalClients.kt$AppTerminalSessionClient${}</ID>
     <ID>EmptyFunctionBlock:TerminalClients.kt$AppTerminalViewClient${}</ID>
-    <ID>FunctionNaming:AIChatPanel.kt$@Composable private fun ChatFloatingActionButton( icon: ImageVector, contentDescription: String, containerColor: Color, contentColor: Color, onClick: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>FunctionNaming:AIChatPanel.kt$@Composable private fun ChatScrollFabPill( showUp: Boolean, showDown: Boolean, onUp: () -&gt; Unit, onDown: () -&gt; Unit, onInteract: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>FunctionNaming:AIChatPanel.kt$@Composable private fun PillIconButton( icon: ImageVector, contentDescription: String, onClick: () -&gt; Unit, onInteract: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
     <ID>FunctionNaming:AIChatPanel.kt$@Composable private fun EditingMessageBanner( snippet: String, onCancel: () -&gt; Unit )</ID>
     <ID>FunctionNaming:AIChatPanel.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AIChatPanel( viewModel: AIAgentViewModel, onNavigateToSettings: () -&gt; Unit, onNavigateToNormFlow: () -&gt; Unit = {}, onOpenRightSidebar: () -&gt; Unit = {}, settingsViewModel: SettingsViewModel? = null, workspaceViewModel: WorkspaceViewModel? = null, drawerState: DrawerState, currentFile: String? = null, selectedCode: String? = null, modifier: Modifier = Modifier )</ID>
     <ID>FunctionNaming:AboutSection.kt$@Composable internal fun AboutSection( onNavigateBack: () -&gt; Unit = {}, onOpenDevOptions: () -&gt; Unit = {}, onOpenUpdate: () -&gt; Unit = {}, onOpenContainerSettings: () -&gt; Unit = {}, onOpenProxySettings: () -&gt; Unit = {}, )</ID>

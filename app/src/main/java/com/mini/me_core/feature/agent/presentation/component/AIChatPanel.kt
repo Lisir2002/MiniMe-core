@@ -16,7 +16,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -35,16 +34,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -93,6 +95,9 @@ import java.io.File
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.debounce
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 
 /**
  * 品牌渐变色 Brush。读取当前主题的 primary 色，构造 primary → primary(alpha=0.6f) 的渐变。
@@ -655,18 +660,20 @@ fun AIChatPanel(
                     }
                 }
 
-                // 浮动按钮组（右下角纵向两枚，独立显隐）：
-                //  - 上箭头：跳到上一条用户消息（视口顶部之上无用户消息时隐藏消失）；
-                //  - 下箭头：回到底部（贴底时隐藏）。取消原未读计数药丸——纯圆形图标按钮。
+                // 浮动按钮组（右下角贴边半透明胶囊，两图标 + 分隔线）：
+                //  - 上箭头：跳到上一条用户消息（上方无用户消息时隐藏）；
+                //  - 下箭头：回到底部（贴底时隐藏）。
+                // 显隐由 fabReveal 统一管控：仅当用户主动上滑、滚动累计超约 0.4 屏才显示，
+                // 停止交互 3 秒后自动隐藏；流式输出也照此规则（不特判常显）。
+                val fabReveal = rememberScrollFabRevealState(listState) { isAtBottom }
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = Spacing.md, bottom = Spacing.sm),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        .padding(end = Spacing.sm, bottom = Spacing.sm),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     AnimatedVisibility(
-                        visible = showJumpToUserMessage,
+                        visible = fabReveal.revealed.value && (showJumpToUserMessage || showScrollToBottom),
                         enter = fadeIn(tween(200)) +
                             slideInVertically(tween(200)) { it / 2 } +
                             scaleIn(tween(200)),
@@ -674,35 +681,18 @@ fun AIChatPanel(
                             slideOutVertically(tween(150)) { it / 3 } +
                             scaleOut(tween(150))
                     ) {
-                        ChatFloatingActionButton(
-                            icon = Icons.Rounded.KeyboardArrowUp,
-                            contentDescription = stringResource(R.string.chat_jump_to_user_message),
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            onClick = jumpToUserMessage
-                        )
-                    }
-                    AnimatedVisibility(
-                        visible = showScrollToBottom,
-                        enter = fadeIn(tween(200)) +
-                            slideInVertically(tween(200)) { it / 2 } +
-                            scaleIn(tween(200)),
-                        exit = fadeOut(tween(150)) +
-                            slideOutVertically(tween(150)) { it / 3 } +
-                            scaleOut(tween(150))
-                    ) {
-                        ChatFloatingActionButton(
-                            icon = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = stringResource(R.string.chat_scroll_to_bottom),
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                            onClick = {
+                        ChatScrollFabPill(
+                            showUp = showJumpToUserMessage,
+                            showDown = showScrollToBottom,
+                            onUp = jumpToUserMessage,
+                            onDown = {
                                 scope.launch {
                                     val targetIndex = listState.layoutInfo.totalItemsCount - 1
                                     snapToBottom(targetIndex)
                                     if (isAtBottom) followBottom = true
                                 }
-                            }
+                            },
+                            onInteract = fabReveal.notifyInteraction
                         )
                     }
                 }
@@ -954,47 +944,151 @@ private fun EditingMessageBanner(
 }
 
 /**
- * 聊天页浮动圆形操作按钮：48dp 触控目标、按压 0.92x 回弹、4dp 阴影。
- *
- * 「回到底部」（主色实底）与「跳到上一条用户消息」（secondaryContainer 浅底）
- * 共用同一组件，仅配色区分主次；原未读计数药丸形态已取消（计数不实用也不美观，
- * 未读状态由「回到底部」按钮本身的存在表达）。
+ * 滚动按钮组显隐状态机：
+ * - 仅当用户主动离开底部、向上浏览并使滚动累计位移超过约 [FAB_SCROLL_REVEAL_RATIO] 屏时才显示；
+ * - 程序自动贴底滚动（isAtBottom 为 true）不累计，避免误触发；
+ * - 任意一次滚动都会刷新最近交互时间；停止交互超过 [FAB_IDLE_HIDE_MS] 后自动隐藏。
+ * notifyInteraction 供按钮点击时调用，避免点击后随即被闲置计时收起。
+ */
+private const val FAB_IDLE_HIDE_MS = 3000L
+private const val FAB_SCROLL_REVEAL_RATIO = 0.4f
+
+private data class ScrollFabRevealState(
+    val revealed: androidx.compose.runtime.MutableState<Boolean>,
+    val notifyInteraction: () -> Unit
+)
+
+@Composable
+private fun rememberScrollFabRevealState(
+    listState: LazyListState,
+    isAtBottom: () -> Boolean
+): ScrollFabRevealState {
+    val revealed = remember { mutableStateOf(false) }
+    var lastInteractionAt by remember { mutableLongStateOf(0L) }
+    var scrollAccum by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(listState) {
+        var prevIndex = listState.firstVisibleItemIndex
+        var prevOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow {
+            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        }.collect { (idx, off) ->
+            val delta = kotlin.math.abs((idx - prevIndex) * 100_000f + (off - prevOffset))
+            prevIndex = idx
+            prevOffset = off
+            if (!isAtBottom()) {
+                scrollAccum += delta
+                lastInteractionAt = System.currentTimeMillis()
+                val threshold = (listState.layoutInfo.viewportEndOffset * FAB_SCROLL_REVEAL_RATIO)
+                    .coerceAtLeast(120f)
+                if (scrollAccum >= threshold) {
+                    revealed.value = true
+                    scrollAccum = 0f
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        snapshotFlow { lastInteractionAt }
+            .debounce(FAB_IDLE_HIDE_MS)
+            .collect { revealed.value = false }
+    }
+
+    return ScrollFabRevealState(
+        revealed = revealed,
+        notifyInteraction = { lastInteractionAt = System.currentTimeMillis() }
+    )
+}
+
+/**
+ * 右下角贴边半透明胶囊：上箭头（跳到上一条用户消息）+ 下箭头（回到底部），
+ * 中间分隔线仅在两枚同时可见时出现。取代原两枚独立圆形 FAB，弱化视觉重量、减少遮挡。
  */
 @Composable
-private fun ChatFloatingActionButton(
+private fun ChatScrollFabPill(
+    showUp: Boolean,
+    showDown: Boolean,
+    onUp: () -> Unit,
+    onDown: () -> Unit,
+    onInteract: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+        shadowElevation = 2.dp,
+        tonalElevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 4.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            AnimatedVisibility(
+                visible = showUp,
+                enter = fadeIn(tween(200)) + scaleIn(tween(200)),
+                exit = fadeOut(tween(150)) + scaleOut(tween(150))
+            ) {
+                PillIconButton(
+                    icon = Icons.Rounded.KeyboardArrowUp,
+                    contentDescription = stringResource(R.string.chat_jump_to_user_message),
+                    onClick = onUp,
+                    onInteract = onInteract
+                )
+            }
+            if (showUp && showDown) {
+                HorizontalDivider(
+                    modifier = Modifier.width(20.dp),
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+                )
+            }
+            AnimatedVisibility(
+                visible = showDown,
+                enter = fadeIn(tween(200)) + scaleIn(tween(200)),
+                exit = fadeOut(tween(150)) + scaleOut(tween(150))
+            ) {
+                PillIconButton(
+                    icon = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.chat_scroll_to_bottom),
+                    onClick = onDown,
+                    onInteract = onInteract
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PillIconButton(
     icon: ImageVector,
     contentDescription: String,
-    containerColor: Color,
-    contentColor: Color,
     onClick: () -> Unit,
+    onInteract: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val pressBounce = rememberPressBounce()
-    Surface(
-        modifier = modifier.scale(pressBounce.scale),
-        shape = CircleShape,
-        color = containerColor,
-        tonalElevation = 4.dp,
-        shadowElevation = 4.dp
+    IconButton(
+        onClick = {
+            pressBounce.trigger()
+            onInteract()
+            onClick()
+        },
+        modifier = modifier
+            .size(40.dp)
+            .scale(pressBounce.scale),
+        colors = IconButtonDefaults.iconButtonColors(
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     ) {
-        Box(
-            modifier = Modifier
-                .clickable(
-                    onClick = {
-                        pressBounce.trigger()
-                        onClick()
-                    }
-                )
-                .size(48.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = contentColor,
-                modifier = Modifier.size(20.dp)
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
