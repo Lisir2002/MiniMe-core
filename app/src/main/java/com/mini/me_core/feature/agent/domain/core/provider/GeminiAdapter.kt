@@ -91,7 +91,8 @@ class GeminiAdapter @Inject constructor(
         systemPrompt: String,
         messages: List<AgentMessage>,
         tools: List<AgentTool>,
-        reasoningEffort: String?
+        reasoningEffort: String?,
+        systemSegments: List<SystemPromptSegment>?
     ): AIResponse {
         val geminiContents = convertToGeminiContents(messages)
         val toolDefs = tools.takeIf { it.isNotEmpty() }?.map { tool ->
@@ -187,7 +188,8 @@ class GeminiAdapter @Inject constructor(
         systemPrompt: String,
         messages: List<AgentMessage>,
         tools: List<AgentTool>,
-        reasoningEffort: String?
+        reasoningEffort: String?,
+        systemSegments: List<SystemPromptSegment>?
     ): Flow<AIStreamChunk> = flow {
         val geminiContents = convertToGeminiContents(messages)
         val toolDefs = tools.takeIf { it.isNotEmpty() }?.map { tool ->

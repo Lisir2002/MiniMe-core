@@ -47,7 +47,7 @@ class StorageTool @Inject constructor(
     private val externalRoot: File get() = Environment.getExternalStorageDirectory()
 
     override val name = "device_storage"
-    override val description = "访问设备外存储（/storage/emulated/0 及共享目录）的结构化工具。action ∈ {list, read, write, delete}；path 必须是设备外存储内绝对路径。示例：{\"action\":\"read\",\"path\":\"/storage/emulated/0/Download/a.txt\"}。所有操作都会请求用户确认。"
+    override val description = "读写设备外存储（/storage/emulated/0 等共享目录）：列目录、读、写、删。path 须为外存储内绝对路径，操作需用户确认。"
     override val permissionPolicy = ToolPermissionPolicy.ASK
     override val capabilities = setOf(ToolCapability.ACCESS_DEVICE_STORAGE)
 

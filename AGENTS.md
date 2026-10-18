@@ -383,6 +383,16 @@ python3 scripts/gitops/check-release-format.py --tag logviewer-v0.0.8 --app logv
 
 AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。可用工具包括文件操作（`FileTools.kt`）、Shell 执行（`ExecuteCommandTool.kt`）、终端管理、网页搜索、询问用户等。工具经 `ToolRegistry` 注册管理。工具执行权限（如 Shell 命令）由 `ToolPermissionManager` 和 `ToolPermissionPolicyEngine` 治理。
 
+#### 工具命名规约（强制约束）
+
+工具名直接进入每轮 system/tools 前缀，是 prompt 缓存与 token 成本的固定组成部分，改名即缓存失效。以下规则对新增/改名工具强制生效：
+
+1. **格式**：统一 `snake_case`，全小写，禁止空格与驼峰（历史工具如 `Bash`、`Write`、`Edit`、`Read` 保留现名，靠别名兼容，见下条）。
+2. **能力域前缀**：按能力域加前缀降低模型选择成本——`browser_*`（网页）、`git_*`（版本控制）、`job_*`（定时任务）、`terminal_*`（终端会话）、`file_*`（文件）。无域工具（`Bash`、`AskUserQuestion`）不加。
+3. **描述即菜单**：description 首句必须是「何时用我」的选择判据，不写示例 JSON、不写实现细节；单工具描述控制在 ~100 字符内（A3 批次已完成存量瘦身）。
+4. **改名/历史名迁移**：旧名通过 `AgentTool.aliases`（`override val aliases = setOf("bash")`）登记，`ToolRegistry` 查找时自动回查别名；别名只参与路由，不进入 `getToolNames()`/工具定义列表。迁移期内权限记忆、playbook 引用旧名不破。**别名与既有正式名冲突时拒绝登记**（防遮蔽）。
+5. **改名即破缓存**：正式名变更会让 Anthropic prompt 缓存前缀失效（tools 数组参与缓存），非必要不改名；确需改名必须走 aliases 过渡，并同步 `docs/tool-orchestration-optimization.md` 的度量基线。
+
 ### MCP（Model Context Protocol）
 
 - **客户端（已实施）**：应用实现了 MCP 客户端（`feature/agent/domain/mcp/`），可连接远程 HTTP / 本地 stdio 服务器并动态注册其提供的工具（`McpManager` / `McpClient` / `McpTool`）。

@@ -23,6 +23,7 @@ import com.mini.me_core.feature.agent.domain.core.provider.AIResponse
 import com.mini.me_core.feature.agent.domain.core.provider.AIStreamChunk
 import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorClassifier
 import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorKind
+import com.mini.me_core.feature.agent.domain.core.provider.SystemPromptSegment
 import com.mini.me_core.feature.agent.domain.core.provider.isRetriableNetworkError
 import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
 import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillExecutionContext
@@ -670,11 +671,29 @@ class StatefulAgentWorkflow @Inject constructor(
         // 并行化首轮准备：prompt 构建（含文件 IO / Room 同步查询）与 provider 解析（含多次 DB 查询）
         // 互不依赖，放到 IO 线程并行执行，避免在收集线程上串行阻塞、拖慢首字节反馈。
         val prepared = coroutineScope {
-            val systemPromptDeferred = async(Dispatchers.IO) { promptProvider.build(currentContext) }
+            val systemPromptDeferred = async(Dispatchers.IO) { promptProvider.buildSegmented(currentContext) }
             val providerDeferred = async(Dispatchers.IO) { modelCallRouter.getActiveProviderWithConfig(currentContext.sessionId) }
             systemPromptDeferred.await() to providerDeferred.await()
         }
-        var systemPrompt = prepared.first
+        // A2 分段 system prompt：稳定段（静态规则/技能/记忆/项目规则，可打 prompt cache 断点）
+        // 与易变段（工作区/时间/每轮 step 注入）分离，避免易变内容稀释缓存前缀。
+        var stablePrompt: String = prepared.first.stable
+        var volatilePrompt: String = prepared.first.volatile
+        fun applyPromptParts(parts: SystemPromptProvider.SystemPromptParts) {
+            stablePrompt = parts.stable
+            volatilePrompt = parts.volatile
+        }
+        var systemPrompt: String = if (stablePrompt.isBlank() && volatilePrompt.isBlank()) {
+            ""
+        } else {
+            buildString {
+                append(stablePrompt)
+                if (volatilePrompt.isNotBlank()) {
+                    append("\n\n")
+                    append(volatilePrompt)
+                }
+            }
+        }
         val aiProvider = prepared.second.first
         /** 当前主 provider 的完整配置（含 fallbackProviderId 等），供供应商故障转移使用。 */
         val activeConfig = prepared.second.second
@@ -716,7 +735,16 @@ class StatefulAgentWorkflow @Inject constructor(
                 "3. 缺失项全部补完后，再加载记忆、读模块文档、拆解步骤（用 Todo 登记）、写验收标准、纪律自检。\n" +
                 "4. 只有在以上全部完成后，才开始处理【本次用户请求】的代码改动/页面编写等业务开发。\n" +
                 "5. 若确有无法落实的规则项（如环境无法满足），必须先向用户说明原因并请求确认，不得静默跳过。"
-            systemPrompt = (systemPrompt?.takeIf { it.isNotBlank() }?.plus("\n\n$authorityHint")) ?: authorityHint
+            // authorityHint 属每任务变化内容，归入易变段（不参与缓存前缀）。
+            val hint = if (volatilePrompt.isNotBlank()) "$volatilePrompt\n\n$authorityHint" else authorityHint
+            volatilePrompt = hint
+            systemPrompt = buildString {
+                append(stablePrompt)
+                if (volatilePrompt.isNotBlank()) {
+                    append("\n\n")
+                    append(volatilePrompt)
+                }
+            }
         }
         var userRequestContent = if (autoTriggerResults.isEmpty()) {
             effectiveRequest
@@ -904,8 +932,23 @@ class StatefulAgentWorkflow @Inject constructor(
                         val effectiveSystemPrompt = if (stepInjection.isNullOrBlank()) {
                             systemPrompt
                         } else {
-                            systemPrompt?.let { "$it\n\n$stepInjection" } ?: stepInjection
+                            "$systemPrompt\n\n$stepInjection"
                         }
+                        // A2 分段下发：稳定段打缓存断点，易变段（含本轮 step 注入）随后。
+                        // 稳定段内容同一会话内逐字节不变，否则缓存持续未命中。
+                        val effectiveVolatile = if (stepInjection.isNullOrBlank()) {
+                            volatilePrompt
+                        } else {
+                            if (volatilePrompt.isBlank()) stepInjection else "$volatilePrompt\n\n$stepInjection"
+                        }
+                        val systemSegments = buildList {
+                            if (stablePrompt.isNotBlank()) {
+                                add(SystemPromptSegment(stablePrompt, cacheable = true))
+                            }
+                            if (effectiveVolatile.isNotBlank()) {
+                                add(SystemPromptSegment(effectiveVolatile, cacheable = false))
+                            }
+                        }.takeIf { it.isNotEmpty() }
                         // 识图轮：若当前聊天模型无 vision，使用独立识图模型发送
                         val visionProvider = if (state.pendingVisionRound) modelCallRouter.resolveVisionFallbackProvider(currentContext.sessionId) else null
                         val providerInUse = visionProvider ?: aiProvider
@@ -963,7 +1006,13 @@ class StatefulAgentWorkflow @Inject constructor(
                             var fallbackUsed = false
                             while (true) {
                                 try {
-                                    streamProvider.completeStream(effectiveSystemPrompt, messagesToSend, currentTools, reasoningEffortForRound).collect { chunk ->
+                                    streamProvider.completeStream(
+                                        effectiveSystemPrompt,
+                                        messagesToSend,
+                                        currentTools,
+                                        reasoningEffortForRound,
+                                        systemSegments
+                                    ).collect { chunk ->
                                         when (chunk) {
                                             is AIStreamChunk.TextDelta -> {
                                                 val appended = acc.accept(chunk.text).appendedLength()
@@ -1137,7 +1186,13 @@ class StatefulAgentWorkflow @Inject constructor(
                                 val textThrottle2 = StreamingEmitThrottle()
                                 val reasoningThrottle2 = StreamingEmitThrottle()
                                 var final2: AIResponse? = null
-                                providerInUse.completeStream(effectiveSystemPrompt, textOnlyMessages, currentTools, reasoningEffortForRound).collect { chunk ->
+                                providerInUse.completeStream(
+                                    effectiveSystemPrompt,
+                                    textOnlyMessages,
+                                    currentTools,
+                                    reasoningEffortForRound,
+                                    systemSegments
+                                ).collect { chunk ->
                                     when (chunk) {
                                         is AIStreamChunk.TextDelta -> {
                                             val appended = acc2.accept(chunk.text).appendedLength()
@@ -1369,17 +1424,38 @@ class StatefulAgentWorkflow @Inject constructor(
                                     val choice = planApprovalManager.awaitApproval(reason, currentContext.sessionId)
                                     if (choice == PlanApprovalChoice.APPROVE) {
                                         currentContext = newCtx
-                                        systemPrompt = promptProvider.build(currentContext)
+                                        applyPromptParts(promptProvider.buildSegmented(currentContext))
+                                        systemPrompt = buildString {
+                                            append(stablePrompt)
+                                            if (volatilePrompt.isNotBlank()) {
+                                                append("\n\n")
+                                                append(volatilePrompt)
+                                            }
+                                        }
                                     } else {
                                         // 用户选择继续反馈，回滚到 PLAN 模式，修正工具结果让 AI 知道切换被取消
                                         currentContext = currentContext.copy(mode = AgentMode.PLAN)
-                                        systemPrompt = promptProvider.build(currentContext)
+                                        applyPromptParts(promptProvider.buildSegmented(currentContext))
+                                        systemPrompt = buildString {
+                                            append(stablePrompt)
+                                            if (volatilePrompt.isNotBlank()) {
+                                                append("\n\n")
+                                                append(volatilePrompt)
+                                            }
+                                        }
                                         rawResult = ToolResult.Error("用户拒绝了模式切换请求，请继续在 PLAN 模式下完善方案，待用户认可后再次申请切换。", "MODE_SWITCH_REJECTED").toTransportString()
                                         isError = true
                                     }
                                 } else {
                                     currentContext = newCtx
-                                    systemPrompt = promptProvider.build(currentContext)
+                                    applyPromptParts(promptProvider.buildSegmented(currentContext))
+                                        systemPrompt = buildString {
+                                            append(stablePrompt)
+                                            if (volatilePrompt.isNotBlank()) {
+                                                append("\n\n")
+                                                append(volatilePrompt)
+                                            }
+                                        }
                                 }
                             }
                             batchResults.add(ToolBatchResult(toolCall.id, toolCall.name, rawResult, isError, runResult.images, runResult.attachments))

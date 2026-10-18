@@ -8,16 +8,31 @@ import javax.inject.Singleton
 class ToolRegistry {
     private val tools = ConcurrentHashMap<String, AgentTool>()
 
+    /**
+     * 别名 -> 正式名 的映射，用于历史工具名迁移期兼容（见 [AgentTool.aliases]）。
+     * 仅参与查找回退，不作为工具定义暴露给 AI。
+     */
+    private val aliasMap = ConcurrentHashMap<String, String>()
+
     fun register(name: String, tool: AgentTool) {
         tools[name] = tool
+        tool.aliases.forEach { alias ->
+            // 别名不得与既有正式名冲突（防遮蔽），也不得抢占已被其他工具登记的别名（防劫持）
+            if (!tools.containsKey(alias) && !aliasMap.containsKey(alias)) {
+                aliasMap[alias] = name
+            }
+        }
     }
 
     fun getTool(name: String): AgentTool? {
-        return tools[name]
+        return tools[name] ?: aliasMap[name]?.let { canonical -> tools[canonical] }
     }
 
     fun unregister(name: String) {
-        tools.remove(name)
+        val removed = tools.remove(name) ?: aliasMap.remove(name)?.let { canonical -> tools.remove(canonical) }
+        if (removed != null) {
+            removed.aliases.forEach { aliasMap.remove(it) }
+        }
     }
 
     fun getToolNames(): Set<String> {
@@ -38,7 +53,7 @@ class ToolRegistry {
     }
 
     fun hasTool(name: String): Boolean {
-        return tools.containsKey(name)
+        return tools.containsKey(name) || aliasMap.containsKey(name)
     }
 
     fun getAllToolDefinitions(): List<ToolDefinition> {

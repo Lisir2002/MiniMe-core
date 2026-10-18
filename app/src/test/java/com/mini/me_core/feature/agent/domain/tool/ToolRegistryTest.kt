@@ -17,7 +17,8 @@ class ToolRegistryTest {
     private class FakeAgentTool(
         override val name: String,
         override val description: String = "Test tool description",
-        override val parameters: Map<String, ToolParameter> = emptyMap()
+        override val parameters: Map<String, ToolParameter> = emptyMap(),
+        override val aliases: Set<String> = emptySet()
     ) : AgentTool() {
         override suspend fun execute(args: Map<String, JsonElement>): ToolResult {
             return ToolResult.Success(JsonPrimitive("Fake tool executed"))
@@ -92,5 +93,96 @@ class ToolRegistryTest {
         assertEquals(1, definitions.size)
         assertEquals("search_tool", definitions.first().name)
         assertEquals("Searches codebase", definitions.first().description)
+    }
+
+    @Test
+    fun getTool_viaAlias_routesToCanonicalTool() {
+        val tool = FakeAgentTool(name = "Bash", aliases = setOf("bash"))
+        registry.register("Bash", tool)
+
+        // 正式名直查
+        assertEquals(tool, registry.getTool("Bash"))
+        // 别名回查路由到同一实例
+        assertEquals(tool, registry.getTool("bash"))
+        assertTrue(registry.hasTool("bash"))
+    }
+
+    @Test
+    fun aliases_notExposedAsToolNamesOrDefinitions() {
+        val tool = FakeAgentTool(name = "Bash", aliases = setOf("bash", "sh"))
+        registry.register("Bash", tool)
+
+        // 别名只参与查找回退，不进入工具名集合与定义列表（避免重复暴露给 AI）
+        assertEquals(setOf("Bash"), registry.getToolNames())
+        assertEquals(1, registry.getAllToolDefinitions().size)
+    }
+
+    @Test
+    fun unregister_removesAliasMappings() {
+        val tool = FakeAgentTool(name = "Bash", aliases = setOf("bash"))
+        registry.register("Bash", tool)
+
+        registry.unregister("Bash")
+
+        assertNull(registry.getTool("bash"))
+        assertFalse(registry.hasTool("bash"))
+        assertNull(registry.getTool("Bash"))
+    }
+
+    @Test
+    fun unregister_viaAliasName_removesCanonicalTool() {
+        val tool = FakeAgentTool(name = "Bash", aliases = setOf("bash"))
+        registry.register("Bash", tool)
+
+        registry.unregister("bash")
+
+        assertNull(registry.getTool("Bash"))
+        assertFalse(registry.hasTool("bash"))
+        assertTrue(registry.getToolNames().isEmpty())
+    }
+
+    @Test
+    fun alias_shadowingExistingCanonicalName_notRegistered() {
+        val bash = FakeAgentTool(name = "Bash")
+        val shadow = FakeAgentTool(name = "shadow_tool", aliases = setOf("Bash"))
+        registry.register("Bash", bash)
+        registry.register("shadow_tool", shadow)
+
+        // 别名与既有正式名冲突时不登记，避免遮蔽已有工具
+        assertEquals(bash, registry.getTool("Bash"))
+    }
+
+    @Test
+    fun alias_conflictingWithExistingAlias_notOverwritten() {
+        val first = FakeAgentTool(name = "Bash", aliases = setOf("bash"))
+        val second = FakeAgentTool(name = "shell", aliases = setOf("bash"))
+        registry.register("Bash", first)
+        registry.register("shell", second)
+
+        // 别名已被先行工具占用，后来的同名别名不劫持
+        assertEquals(first, registry.getTool("bash"))
+        assertEquals(second, registry.getTool("shell"))
+    }
+
+    @Test
+    fun canonicalName_registeredAfterAlias_takesPriorityOverAlias() {
+        val bash = FakeAgentTool(name = "Bash", aliases = setOf("bash"))
+        registry.register("Bash", bash)
+
+        // 后注册的正式名与既有别名同名：正式名直查优先，别名不遮蔽正式名
+        val lowercase = FakeAgentTool(name = "bash")
+        registry.register("bash", lowercase)
+
+        assertEquals(lowercase, registry.getTool("bash"))
+        assertEquals(bash, registry.getTool("Bash"))
+    }
+
+    @Test
+    fun getTool_unknownAlias_returnsNull() {
+        val tool = FakeAgentTool(name = "Bash", aliases = setOf("bash"))
+        registry.register("Bash", tool)
+
+        assertNull(registry.getTool("nonexistent"))
+        assertFalse(registry.hasTool("nonexistent"))
     }
 }

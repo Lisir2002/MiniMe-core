@@ -21,11 +21,29 @@ data class AIResponse(
     /** 本轮输入 token 数（来自 API 返回的 usage）。取不到时为 0。 */
     val inputTokens: Int = 0,
     /** 本轮输出 token 数（来自 API 返回的 usage）。取不到时为 0。 */
-    val outputTokens: Int = 0
+    val outputTokens: Int = 0,
+    /** 本轮命中 prompt cache 的输入 token 数（cache_read）。仅 Anthropic 等支持显式缓存的服务商上报，其余为 0。 */
+    val cachedInputTokens: Int = 0,
+    /** 本轮新写入缓存的输入 token 数（cache_creation）。仅 Anthropic 上报，其余为 0。 */
+    val cacheCreationInputTokens: Int = 0
 ) {
     val isTruncated: Boolean
         get() = stopReason == "max_tokens" || stopReason == "length"
 }
+
+/**
+ * system prompt 分段（prompt caching 基础设施）：
+ * 稳定段（静态规则、项目规则、技能清单等逐字节不变的内容）在前，
+ * 易变段（当前时间、工作区路径、goal 提示等每轮变化的内容）在后。
+ * 适配器可对稳定段末尾打缓存断点；分段后置的易变内容不会稀释缓存前缀。
+ *
+ * 为 null/空时调用方退化为单段 system（无缓存打点，保持历史行为）。
+ */
+data class SystemPromptSegment(
+    val text: String,
+    /** 是否可缓存：仅稳定段为 true；同一会话内稳定段内容必须逐字节一致，否则缓存持续未命中。 */
+    val cacheable: Boolean = false
+)
 
 /**
  * 流式补全过程中向上游推送的分块。
@@ -73,25 +91,30 @@ interface AIProvider {
      * 模型若决定调用工具，结果会出现在返回的 [AIResponse.toolCalls] 中。
      * [reasoningEffort] 为思考强度（"low"/"medium"/"high"），仅 OpenAI 系生效；
      * Anthropic/Gemini 与不支持该参数的模型忽略。
+     * [systemSegments] 为 system prompt 分段（见 [SystemPromptSegment]）；
+     * 非空且含 cacheable 段时，Anthropic 适配器会对稳定段打 prompt cache 断点，
+     * OpenAI/Gemini 依赖其自动前缀缓存（分段本身即帮助其前缀稳定）。为 null 时行为不变。
      */
     suspend fun complete(
         systemPrompt: String,
         messages: List<AgentMessage>,
         tools: List<AgentTool> = emptyList(),
-        reasoningEffort: String? = null
+        reasoningEffort: String? = null,
+        systemSegments: List<SystemPromptSegment>? = null
     ): AIResponse
 
     /**
      * 流式单轮补全：以 SSE 逐字接收模型回复。文字以 [AIStreamChunk.TextDelta] 增量推送，
      * 本轮结束时以 [AIStreamChunk.Final] 给出聚合后的完整 [AIResponse]（含工具调用）。
      * 工具调用的 function-calling 语义与 [complete] 一致。
-     * [reasoningEffort] 同 [complete]。
+     * [reasoningEffort] 同 [complete]。[systemSegments] 同 [complete]。
      */
     fun completeStream(
         systemPrompt: String,
         messages: List<AgentMessage>,
         tools: List<AgentTool> = emptyList(),
-        reasoningEffort: String? = null
+        reasoningEffort: String? = null,
+        systemSegments: List<SystemPromptSegment>? = null
     ): Flow<AIStreamChunk>
 }
 

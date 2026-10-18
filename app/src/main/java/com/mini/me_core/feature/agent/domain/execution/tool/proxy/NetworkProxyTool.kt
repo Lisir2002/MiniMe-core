@@ -80,7 +80,7 @@ class NetworkProxyTool @Inject constructor(
     )
 
     override val name = "network_proxy"
-    override val description = "管理容器内网络代理（mihomo，VPN 形态）。action ∈ {status, use, release, keepalive, on, off, test, select, list_subscriptions, list_proxies, latency, diagnose, traffic, health, auto_fix}。use=一键开启+测速选优+返回代理地址（推荐）；release=标记使用结束启动空闲倒计时；keepalive=重置空闲计时器续命；on/off=手动开关；select 切节点（node=auto 最快，node=smart 按目标地区智能选优）或 mode；latency 测速（结果缓存60秒）；status 返回 auto_close_in 剩余秒数。代理默认5分钟无活动自动关闭。所有会改出口的操作都会请求用户确认。"
+    override val description = "管理容器内网络代理：开关、测速选优、切换节点、查看状态与流量。use 为一键开启并测速选优；会改出口的操作需用户确认，默认5分钟无活动自动关闭。"
     override val permissionPolicy = ToolPermissionPolicy.ASK
     override val capabilities = setOf(ToolCapability.MODIFY_NETWORK, ToolCapability.NETWORK_READ)
 

@@ -163,6 +163,13 @@ abstract class AgentTool {
     abstract val name: String
     abstract val description: String
     abstract val parameters: Map<String, ToolParameter>
+
+    /**
+     * 历史名/别名（A4 命名规约迁移用）：模型、权限记忆、playbook 引用旧名时仍可路由到本工具。
+     * 新工具命名规约见 AGENTS.md「工具命名规约」：统一 snake_case，按能力域加前缀（如 browser_、git_、job_ 等）。
+     */
+    open val aliases: Set<String> = emptySet()
+
     open val permissionPolicy: ToolPermissionPolicy = ToolPermissionPolicy.AUTO_APPROVE
     open val capabilities: Set<ToolCapability> = emptySet()
 

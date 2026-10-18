@@ -117,7 +117,8 @@ class OpenAIAdapter @Inject constructor(
         systemPrompt: String,
         messages: List<AgentMessage>,
         tools: List<AgentTool>,
-        reasoningEffort: String?
+        reasoningEffort: String?,
+        systemSegments: List<SystemPromptSegment>?
     ): AIResponse {
         val openAIMessages = buildList {
             if (systemPrompt.isNotBlank()) {
@@ -233,7 +234,8 @@ class OpenAIAdapter @Inject constructor(
         systemPrompt: String,
         messages: List<AgentMessage>,
         tools: List<AgentTool>,
-        reasoningEffort: String?
+        reasoningEffort: String?,
+        systemSegments: List<SystemPromptSegment>?
     ): Flow<AIStreamChunk> = flow {
         val openAIMessages = buildList {
             if (systemPrompt.isNotBlank()) {

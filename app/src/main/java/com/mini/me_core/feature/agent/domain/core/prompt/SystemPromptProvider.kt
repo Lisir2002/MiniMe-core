@@ -318,20 +318,48 @@ class SystemPromptProvider @Inject constructor(
     fun getLastInjectionContent(): String? = _lastInjectionContent
     fun getLastBudgetUsed(): Int = _lastBudgetUsed
 
+    /**
+     * system prompt 分段产出（prompt caching 基础设施，A2）：
+     * - [stable]：稳定段——静态规则 + 技能清单 + 记忆清单 + 项目规则。同一会话内逐字节不变，
+     *   由 provider 适配器对其打 prompt cache 断点；
+     * - [volatile]：易变段——工作区上下文 + 当前时间 + 每轮 step 注入（goal/阶段/问判等）。
+     *    每轮变化，置于稳定段之后，不稀释缓存前缀。
+     */
+    data class SystemPromptParts(
+        val stable: String,
+        val volatile: String
+    )
+
     fun build(agentContext: AgentContext): String {
+        val parts = buildSegmented(agentContext)
+        return buildString {
+            append(parts.stable)
+            if (parts.volatile.isNotBlank()) {
+                append("\n\n")
+                append(parts.volatile)
+            }
+        }
+    }
+
+    /**
+     * 分段组装（A2）：稳定段 = 静态规则 + 技能 + 记忆 + 项目规则（低频变化，可缓存）；
+     * 易变段 = 工作区上下文 + 当前时间（每轮/每任务变化，不缓存）。
+     * step 前注入块由 [buildStepInjections] 单独产出，调用方追加在易变段末尾。
+     */
+    fun buildSegmented(agentContext: AgentContext): SystemPromptParts {
         // 1. 获取各个 Source 的基线快照。
         // PLAN/AUTO 模式提示词由 StaticRuleSource 按 mode 字段注入（R04 起），紧随静态规则之后，确保模型优先注意到模式约束
         val staticContent = if (staticRulesEnabled) staticRuleSource.build(agentContext) else ""
         val skillsContent = activeSkillsSource.build(agentContext)
         val memoriesContent = memoryListSource.build(agentContext)
         val projectRules = if (projectAgentsEnabled) projectRuleSource.build(agentContext) else null
-        
+
         // 2. 增量 Diff 处理 (仅针对高频变化的 Workspace)
         val currentWorkspaceContext = workspaceSource.build(agentContext)
         val sessionId = agentContext.sessionId ?: "default"
-        
+
         val snapshot = sessionSnapshots[sessionId] ?: SessionSnapshot()
-        
+
         val effectiveWorkspaceContent = if (snapshot.lastWorkspaceContext == currentWorkspaceContext) {
             // 没有变化，维持基线不变，仅向大模型注入极简指令，大幅降低重复 Token 处理
             "当前上下文: [未发生变化，请参考之前的会话记忆]"
@@ -341,9 +369,8 @@ class SystemPromptProvider @Inject constructor(
             currentWorkspaceContext
         }
 
-        // 3. 组装最终提示词：把稳定不变的重头基线放最前面（享受 KV Cache），变化部分放末尾
-        // PLAN/AUTO 模式约束已并入静态规则（R04 起按 mode 字段注入），无需单独追加
-        return buildString {
+        // 3. 稳定段：重头基线（享受 prompt cache 前缀）；易变段：工作区 + 时间（每轮变化）
+        val stable = buildString {
             append(staticContent)
 
             skillsContent?.let {
@@ -360,12 +387,15 @@ class SystemPromptProvider @Inject constructor(
                 append("\n\n")
                 append(it)
             }
+        }
 
-            append("\n\n")
+        val volatileSection = buildString {
             append(effectiveWorkspaceContent)
             append("\n\n")
             append(currentTimeSource.build(agentContext))
         }
+
+        return SystemPromptParts(stable = stable, volatile = volatileSection)
     }
 
     // ════════════════════════════════════════════════════════════════════

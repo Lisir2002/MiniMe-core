@@ -49,7 +49,7 @@ class SwitchContainerArchTool @Inject constructor(
     }
 
     override val name = "switch_container_arch"
-    override val description = "切换本地 Linux 容器的 CPU 架构：arm64（aarch64 原生执行，快）或 x86_64（经 QEMU 静态转译执行，兼容官方只发 x86_64 的 Android SDK Build-Tools / aapt2 / zipalign 等工具链）。切换持久化保存、按需自动安装对应架构的 rootfs，返回后新容器立即可用。适合在构建 Android 项目遇到架构不兼容报错时切换。"
+    override val description = "切换本地容器 CPU 架构：arm64 原生执行快，x86_64 转译兼容官方 Android 工具链。构建遇到架构不兼容报错时切换，自动安装对应 rootfs。"
     override val permissionPolicy = ToolPermissionPolicy.ASK
     override val capabilities = setOf(ToolCapability.MODIFY_CONTAINER_ENV)
 

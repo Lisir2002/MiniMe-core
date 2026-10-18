@@ -43,7 +43,7 @@ class LoadSkillTool @Inject constructor(
     override val name = "loadSkill"
     override val capabilities = setOf(ToolCapability.READ_AGENT_CONFIG)
     override val description =
-        "加载指定技能的 SKILL.md 指令正文（PROMPT/SCRIPT 均可，仅返回正文供阅读参考、绝不执行任何脚本），含 PROMPT 依赖的指令拼接。当系统提示「可用技能」清单中的技能适用于当前任务、需要了解其完整指令或使用说明时调用；其中 SCRIPT 脚本技能如需实际执行，请改用 runSkillScript。"
+        "加载指定技能的指令正文供阅读（不执行）。「可用技能」清单中的技能适用当前任务时调用；脚本类技能要执行请用 runSkillScript。"
 
     /** L3 结构化结果协议：产出 state.skill.loaded 类型（技能加载后广播，触发工具定义与上下文刷新）。 */
     override val provides = setOf("state.skill.loaded")

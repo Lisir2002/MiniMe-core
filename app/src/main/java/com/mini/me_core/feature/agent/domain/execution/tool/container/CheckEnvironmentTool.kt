@@ -323,7 +323,7 @@ class CheckEnvironmentTool @Inject constructor(
     }
 
     override val name = "check_environment"
-    override val description = "检查当前执行环境（本地 Linux 容器或远程 SSH 服务器）中已安装的开发/构建组件（Java、Gradle、Android SDK、Python、Node、Git 等），返回结构化 JSON 列表（组件名、状态 installed/missing、路径、版本）。适合在安装依赖前后调用，确认环境状态。"
+    override val description = "检查执行环境已安装的开发组件（Java、Gradle、Android SDK、Python、Node、Git）及版本。安装依赖前后调用，确认环境状态。"
     override val permissionPolicy = ToolPermissionPolicy.AUTO_APPROVE
     override val capabilities = setOf(ToolCapability.READ_AGENT_CONFIG)
 

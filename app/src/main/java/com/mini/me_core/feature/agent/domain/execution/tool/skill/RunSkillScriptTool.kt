@@ -44,7 +44,7 @@ class RunSkillScriptTool @Inject constructor(
     override val name = "runSkillScript"
     override val capabilities = setOf(ToolCapability.EXECUTE_COMMANDS)
     override val description =
-        "执行指定脚本技能（SkillType=SCRIPT）：在容器沙箱内运行其入口脚本（执行前需用户确认）。当系统提示「可用技能」清单中的技能为脚本类（SCRIPT）且需要实际执行其入口脚本时调用；指令类（PROMPT）技能请用 loadSkill 获取正文。"
+        "执行脚本类（SCRIPT）技能的入口脚本，执行前需用户确认。指令类（PROMPT）技能请用 loadSkill 读正文。"
 
     override val parameters: Map<String, ToolParameter> = mapOf(
         "skill_name" to ToolParameter(

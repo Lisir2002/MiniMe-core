@@ -4,6 +4,7 @@ import com.mini.me_core.feature.agent.data.remote.anthropic.AnthropicApi
 import com.mini.me_core.feature.agent.data.remote.anthropic.AnthropicMessageRequest
 import com.mini.me_core.feature.agent.data.remote.anthropic.AnthropicMessage
 import com.mini.me_core.feature.agent.data.remote.anthropic.AnthropicContentBlock
+import com.mini.me_core.feature.agent.data.remote.anthropic.AnthropicSystemBlock
 import com.mini.me_core.feature.agent.data.remote.anthropic.AnthropicThinkingConfig
 import com.mini.me_core.feature.agent.data.remote.anthropic.AnthropicToolDefinition
 import com.mini.me_core.core.network.DeltaAccumulator
@@ -41,6 +42,8 @@ private val ANTHROPIC_STREAM_PATHS: List<List<String>> = listOf(
     listOf("error", "type"),
     listOf("error", "message"),
     listOf("message", "usage", "input_tokens"),
+    listOf("message", "usage", "cache_creation_input_tokens"),
+    listOf("message", "usage", "cache_read_input_tokens"),
     listOf("index"),
     listOf("content_block", "type"),
     listOf("content_block", "id"),
@@ -108,24 +111,20 @@ class AnthropicAdapter @Inject constructor(
         systemPrompt: String,
         messages: List<AgentMessage>,
         tools: List<AgentTool>,
-        reasoningEffort: String?
+        reasoningEffort: String?,
+        systemSegments: List<SystemPromptSegment>?
     ): AIResponse {
         val anthropicMessages = convertToAnthropicMessages(messages)
 
-        val toolDefs = tools.takeIf { it.isNotEmpty() }?.map { tool ->
-            AnthropicToolDefinition(
-                name = tool.name,
-                description = tool.description,
-                input_schema = tool.toJsonSchema()
-            )
-        }
+        val cacheable = hasCacheableSegment(systemSegments)
+        val toolDefs = buildToolDefs(tools, withCacheBreakpoint = cacheable)
 
         val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, apiPath)
         val thinking = buildThinkingConfig(reasoningEffort)
         val request = AnthropicMessageRequest(
             model = model,
             messages = anthropicMessages,
-            system = systemPrompt.ifBlank { null },
+            system = buildSystemPayload(systemPrompt, systemSegments),
             max_tokens = this@AnthropicAdapter.maxTokens ?: DEFAULT_ANTHROPIC_MAX_TOKENS,
             temperature = if (thinking != null) null else this@AnthropicAdapter.temperature,
             top_p = this@AnthropicAdapter.topP.takeIf { it != 1.0f },
@@ -173,30 +172,37 @@ class AnthropicAdapter @Inject constructor(
             }
         }
 
-        return AIResponse(content = contentText, toolCalls = toolCalls, stopReason = response.stop_reason, reasoning = thinkingText.ifEmpty { null }, signature = signature, inputTokens = response.usage.input_tokens, outputTokens = response.usage.output_tokens)
+        return AIResponse(
+            content = contentText,
+            toolCalls = toolCalls,
+            stopReason = response.stop_reason,
+            reasoning = thinkingText.ifEmpty { null },
+            signature = signature,
+            inputTokens = response.usage.input_tokens,
+            outputTokens = response.usage.output_tokens,
+            cachedInputTokens = response.usage.cache_read_input_tokens,
+            cacheCreationInputTokens = response.usage.cache_creation_input_tokens
+        )
     }
 
     override fun completeStream(
         systemPrompt: String,
         messages: List<AgentMessage>,
         tools: List<AgentTool>,
-        reasoningEffort: String?
+        reasoningEffort: String?,
+        systemSegments: List<SystemPromptSegment>?
     ): Flow<AIStreamChunk> = flow {
         val anthropicMessages = convertToAnthropicMessages(messages)
-        val toolDefs = tools.takeIf { it.isNotEmpty() }?.map { tool ->
-            AnthropicToolDefinition(
-                name = tool.name,
-                description = tool.description,
-                input_schema = tool.toJsonSchema()
-            )
-        }
+
+        val cacheable = hasCacheableSegment(systemSegments)
+        val toolDefs = buildToolDefs(tools, withCacheBreakpoint = cacheable)
 
         val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, apiPath)
         val thinking = buildThinkingConfig(reasoningEffort)
         val request = AnthropicMessageRequest(
             model = model,
             messages = anthropicMessages,
-            system = systemPrompt.ifBlank { null },
+            system = buildSystemPayload(systemPrompt, systemSegments),
             max_tokens = this@AnthropicAdapter.maxTokens ?: DEFAULT_ANTHROPIC_MAX_TOKENS,
             temperature = if (thinking != null) null else this@AnthropicAdapter.temperature,
             top_p = this@AnthropicAdapter.topP.takeIf { it != 1.0f },
@@ -222,6 +228,8 @@ class AnthropicAdapter @Inject constructor(
             var stopReason: String? = null
             var streamInputTokens = 0
             var streamOutputTokens = 0
+            var streamCacheCreationTokens = 0
+            var streamCacheReadTokens = 0
             // thinking block 的加密签名（signature_delta 事件携带），随 Final 上抛供工具循环回传。
             var signature: String? = null
 
@@ -268,6 +276,8 @@ class AnthropicAdapter @Inject constructor(
                                 }
                                 "message_start" -> {
                                     streamInputTokens = m["message.usage.input_tokens"]?.toIntOrNull() ?: 0
+                                    streamCacheCreationTokens = m["message.usage.cache_creation_input_tokens"]?.toIntOrNull() ?: 0
+                                    streamCacheReadTokens = m["message.usage.cache_read_input_tokens"]?.toIntOrNull() ?: 0
                                 }
                                 "content_block_start" -> {
                                     val index = m["index"]?.toIntOrNull() ?: continue
@@ -331,7 +341,20 @@ class AnthropicAdapter @Inject constructor(
                 ToolCall(id = acc.id, name = acc.name, arguments = parseArgs(acc.args.text))
             }
             onProduced()
-            emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = stopReason, signature = signature, inputTokens = streamInputTokens, outputTokens = streamOutputTokens)))
+            emit(
+                AIStreamChunk.Final(
+                    AIResponse(
+                        content = textBuilder.toString(),
+                        toolCalls = toolCalls,
+                        stopReason = stopReason,
+                        signature = signature,
+                        inputTokens = streamInputTokens,
+                        outputTokens = streamOutputTokens,
+                        cachedInputTokens = streamCacheReadTokens,
+                        cacheCreationInputTokens = streamCacheCreationTokens
+                    )
+                )
+            )
                 },
                 onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) },
                 maxRetries = retryCount.coerceAtLeast(0)
@@ -498,5 +521,62 @@ class AnthropicAdapter @Inject constructor(
 
     companion object {
         private const val DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
+
+        /**
+         * prompt cache 断点：置于 system 稳定段末尾 / tools 数组末尾元素上，
+         * 使「system 稳定段 + tools」构成可跨轮复用的缓存前缀。
+         */
+        private val CACHE_BREAKPOINT = mapOf("type" to "ephemeral")
+
+        /**
+         * 组装 system 载荷：
+         * - 分段且含 cacheable 段 → block 列表，断点打在最后一个稳定段末尾（其后为易变段，不参与缓存）；
+         * - 否则退化为单字符串（历史行为，无缓存打点）。
+         */
+        internal fun buildSystemPayload(
+            systemPrompt: String,
+            systemSegments: List<SystemPromptSegment>?
+        ): Any? {
+            val segments = systemSegments
+                ?.filter { it.text.isNotBlank() }
+                ?.takeIf { it.isNotEmpty() }
+                ?: return systemPrompt.ifBlank { null }
+            if (segments.none { it.cacheable }) return systemPrompt.ifBlank { null }
+            val blocks = ArrayList<AnthropicSystemBlock>(segments.size)
+            segments.forEachIndexed { i, seg ->
+                val lastCacheable = seg.cacheable && segments.drop(i + 1).none { it.cacheable }
+                blocks += AnthropicSystemBlock(
+                    text = seg.text,
+                    cache_control = if (lastCacheable) CACHE_BREAKPOINT else null
+                )
+            }
+            return blocks
+        }
+
+        /**
+         * 组装 tools 定义。[withCacheBreakpoint] 为真时在末尾元素打缓存断点
+         * （调用方保证仅在 system 稳定段存在时传入，使缓存前缀覆盖 system+tools）。
+         */
+        internal fun buildToolDefs(
+            tools: List<AgentTool>,
+            withCacheBreakpoint: Boolean
+        ): List<AnthropicToolDefinition>? {
+            if (tools.isEmpty()) return null
+            val defs = tools.mapTo(ArrayList(tools.size)) { tool ->
+                AnthropicToolDefinition(
+                    name = tool.name,
+                    description = tool.description,
+                    input_schema = tool.toJsonSchema()
+                )
+            }
+            if (withCacheBreakpoint) {
+                defs[defs.lastIndex] = defs.last().copy(cache_control = CACHE_BREAKPOINT)
+            }
+            return defs
+        }
+
+        /** 是否存在可缓存的稳定段（决定 tools 断点是否追加）。 */
+        internal fun hasCacheableSegment(systemSegments: List<SystemPromptSegment>?): Boolean =
+            systemSegments?.any { it.cacheable && it.text.isNotBlank() } == true
     }
 }
