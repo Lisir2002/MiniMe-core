@@ -581,8 +581,15 @@ private fun StatusPill(status: McpServerStatus) {
     )
 }
 
+/**
+ * 通用小胶囊徽章。
+ *
+ * G4 起不再是本文件私有：分组详情页的 prompts / resources 页要用同一枚视觉令牌，
+ * 复制一份过去等于给「徽章长什么样」开了第二个真源。放在这里被两边共用，
+ * 比各自 private 一份更省事也更不容易跑偏。
+ */
 @Composable
-private fun Pill(text: String, tint: Color) {
+fun Pill(text: String, tint: Color) {
     Box(
         modifier = Modifier
             .background(tint.copy(alpha = 0.12f), RoundedCornerShape(Radius.sm))

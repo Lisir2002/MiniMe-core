@@ -89,29 +89,49 @@ class McpClient(
      * **不支持时返回空列表而非抛异常**——prompts 是可选能力，让它拖垮整个
      * `connect()` 显然不合理。这与 `tools/list` 不同：后者是协议核心能力，
      * 失败必须抛出让上层把该 server 标为 FAILED。
+     *
+     * 需要区分「不支持」与「请求失败」的调用方请用 [listPromptsDetailed]；
+     * 本方法刻意丢掉这个区别，因为对带着过期 assumptions 的核心路径而言它就是「没有」。
      */
-    suspend fun listPrompts(): List<McpPromptDescriptor> {
-        if (!supportsPrompts()) return emptyList()
+    suspend fun listPrompts(): List<McpPromptDescriptor> = listPromptsDetailed().itemsOrEmpty()
+
+    /** 枚举该 server 暴露的 resources；语义与 [listPrompts] 相同。 */
+    suspend fun listResources(): List<McpResourceDescriptor> = listResourcesDetailed().itemsOrEmpty()
+
+    /**
+     * 枚举 prompts 的完整结果。
+     *
+     * 与 [listPrompts] 的差别只在于**保留** 了「为什么没有」：后者把三种空原因
+     * （未声明能力 / 请求失败 / 真的没有）压成同一个空列表。对核心路径来说这种压缩
+     * 是对的（早退即可），但对 UI 是信息丢失——用户看到「没有 prompts」时无法判断
+     * 该不该重试。故多给一层，让调用方按需取精度。
+     */
+    suspend fun listPromptsDetailed(): OptionalCapability<McpPromptDescriptor> {
+        if (!supportsPrompts()) return OptionalCapability.Unsupported
         return runCatching {
-            val result = transport.request("prompts/list").result ?: return@runCatching emptyList()
-            json.decodeFromJsonElement(McpPromptsListResult.serializer(), result).prompts
+            val result = transport.request("prompts/list").result
+                ?: return@runCatching OptionalCapability.Listed(emptyList())
+            val prompts = json.decodeFromJsonElement(McpPromptsListResult.serializer(), result).prompts
+            OptionalCapability.Listed(prompts)
         }.getOrElse { e ->
             // 协议错误码（如 -32601 方法不存在）说明该 server 实际不支持 prompts，
             // 按「空」处理并记日志，不当作连接失败。
             FileLogger.w(TAG, "[$serverName] 枚举 prompts 失败，按不支持处理: ${e.message}")
-            emptyList()
+            OptionalCapability.Failed(e.message.orEmpty())
         }
     }
 
-    /** 枚举该 server 暴露的 resources；语义与 [listPrompts] 相同。 */
-    suspend fun listResources(): List<McpResourceDescriptor> {
-        if (!supportsResources()) return emptyList()
+    /** 枚举 resources 的完整结果；语义与 [listPromptsDetailed] 相同。 */
+    suspend fun listResourcesDetailed(): OptionalCapability<McpResourceDescriptor> {
+        if (!supportsResources()) return OptionalCapability.Unsupported
         return runCatching {
-            val result = transport.request("resources/list").result ?: return@runCatching emptyList()
-            json.decodeFromJsonElement(McpResourcesListResult.serializer(), result).resources
+            val result = transport.request("resources/list").result
+                ?: return@runCatching OptionalCapability.Listed(emptyList())
+            val resources = json.decodeFromJsonElement(McpResourcesListResult.serializer(), result).resources
+            OptionalCapability.Listed(resources)
         }.getOrElse { e ->
             FileLogger.w(TAG, "[$serverName] 枚举 resources 失败，按不支持处理: ${e.message}")
-            emptyList()
+            OptionalCapability.Failed(e.message.orEmpty())
         }
     }
 

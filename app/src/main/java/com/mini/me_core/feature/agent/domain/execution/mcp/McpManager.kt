@@ -290,15 +290,31 @@ class McpManager @Inject constructor(
      * server 未声明该能力或枚举失败时返回空列表（见 [McpClient.listPrompts]），
      * 故调用方不必区分「不支持」与「没有」。
      */
-    suspend fun listServerPrompts(serverName: String): List<McpPromptDescriptor> {
-        val client = synchronized(activeClients) { activeClients[serverName] }
-        return client?.listPrompts().orEmpty()
-    }
+    suspend fun listServerPrompts(serverName: String): List<McpPromptDescriptor> =
+        listServerPromptsDetailed(serverName).itemsOrEmpty()
 
     /** 某 server 暴露的 resources，语义与 [listServerPrompts] 相同。 */
-    suspend fun listServerResources(serverName: String): List<McpResourceDescriptor> {
+    suspend fun listServerResources(serverName: String): List<McpResourceDescriptor> =
+        listServerResourcesDetailed(serverName).itemsOrEmpty()
+
+    /**
+     * 同 [listServerPrompts]，但保留「为什么没有」——见 [OptionalCapability]。
+     *
+     * server 未连接时**不是** 失败而是 [OptionalCapability.Unsupported]：没连上就等于
+     * 此刻拿不到任何东西，这个判断会随连接状态变化，重试即可；把它当错误会让 UI 把
+     * 「server 关着」显示成「出错了」。
+     */
+    suspend fun listServerPromptsDetailed(serverName: String): OptionalCapability<McpPromptDescriptor> {
         val client = synchronized(activeClients) { activeClients[serverName] }
-        return client?.listResources().orEmpty()
+            ?: return OptionalCapability.Unsupported
+        return client.listPromptsDetailed()
+    }
+
+    /** 某 server 暴露的 resources 完整结果；语义与 [listServerPromptsDetailed] 相同。 */
+    suspend fun listServerResourcesDetailed(serverName: String): OptionalCapability<McpResourceDescriptor> {
+        val client = synchronized(activeClients) { activeClients[serverName] }
+            ?: return OptionalCapability.Unsupported
+        return client.listResourcesDetailed()
     }
 
     /**
