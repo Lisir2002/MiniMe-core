@@ -11,7 +11,8 @@ import org.junit.Test
  *
  * 三组集合（黑名单 / 白名单 / 灰名单）的语义必须**互不混淆**。历史上最容易出错的
  * 两点是：
- * 1. 白名单与黑名单同时命中时到底谁优先（约定：白名单优先，见 [ServerPolicy]）；
+ * 1. 白名单与黑名单同时命中时到底谁优先（约定：**黑名单优先**，见 [ServerPolicy]
+ *    类注释中联网核实的生态依据）；
  * 2. 「空集合」被当成「白名单为空」而把该 server 的工具全部隐藏——空集必须解释为
  *    「未启用白名单」。这两点都用真值表钉死。
  */
@@ -186,15 +187,26 @@ class ServerPolicyTest {
 
     @Test
     fun `policy is a value type`() {
-        assertEquals(ServerPolicy(setOf("a"), setOf("a", "b"), setOf("b")), ServerPolicy.from(
-            McpServerConfig(
-                name = "s",
-                url = "u",
+        // G2：kind/enabled 也参与值语义，故期望值必须写全——
+        // 只写三组集合会漏掉新字段，让「值类型」这条守卫形同虚设。
+        assertEquals(
+            ServerPolicy(
                 disabledTools = setOf("a"),
                 enabledTools = setOf("a", "b"),
-                requireApprovalTools = setOf("b")
+                requireApprovalTools = setOf("b"),
+                kind = ServerKind.REMOTE_HTTP,
+                enabled = true
+            ),
+            ServerPolicy.from(
+                McpServerConfig(
+                    name = "s",
+                    url = "u",
+                    disabledTools = setOf("a"),
+                    enabledTools = setOf("a", "b"),
+                    requireApprovalTools = setOf("b")
+                )
             )
-        ))
+        )
     }
 
     /**
@@ -241,5 +253,110 @@ class ServerPolicyTest {
             configSetFields,
             policySetFields
         )
+    }
+
+    // ── G2：server 级字段 ─────────────────────────────────────────
+
+    @Test
+    fun `禁用 server 的工具一律不可见`() {
+        // 生态通行约定（联网核实 2026-10）：VS Code「禁用即不启动、工具不进对话」、
+        // Codex「enabled=false 避免连接该server」、Gemini CLI「禁用即不连接」。
+        val policy = ServerPolicy(enabled = false)
+        assertFalse(policy.isToolEnabled("anything"))
+    }
+
+    @Test
+    fun `禁用 server 时白名单也救不回工具`() {
+        val policy = ServerPolicy(enabled = false, enabledTools = setOf("a"))
+        assertFalse(policy.isToolEnabled("a"))
+    }
+
+    @Test
+    fun `禁用 server 时工具不需审批`() {
+        val policy = ServerPolicy(enabled = false, requireApprovalTools = setOf("a"))
+        assertFalse(policy.requiresApproval("a"))
+    }
+
+    @Test
+    fun `启用 server 不改变原有判定语义`() {
+        val policy = ServerPolicy(enabled = true, disabledTools = setOf("x"))
+        assertFalse(policy.isToolEnabled("x"))
+        assertTrue(policy.isToolEnabled("y"))
+    }
+
+    @Test
+    fun `kind 由配置派生且优先级为内置大于 stdio 大于 HTTP`() {
+        assertEquals(ServerKind.BUILTIN, ServerKind.derive(McpServerConfig(name = "b", builtinGroup = BuiltinGroup.CORE)))
+        assertEquals(ServerKind.REMOTE_STDIO, ServerKind.derive(McpServerConfig(name = "s", command = "python mcp.py")))
+        assertEquals(ServerKind.REMOTE_HTTP, ServerKind.derive(McpServerConfig(name = "h", url = "https://x/mcp")))
+    }
+
+    @Test
+    fun `内置优先于传输字段`() {
+        // 畸形配置：builtinGroup 与 url 同时存在。内置语义更具体，以其为准。
+        val cfg = McpServerConfig(name = "weird", builtinGroup = BuiltinGroup.DATA, url = "https://x/mcp")
+        assertEquals(ServerKind.BUILTIN, ServerKind.derive(cfg))
+    }
+
+    @Test
+    fun `stdio 优先于 HTTP`() {
+        // 同时带 command 与 url 时，command 是实际被执行的连接方式。
+        val cfg = McpServerConfig(name = "both", command = "python mcp.py", url = "https://x/mcp")
+        assertEquals(ServerKind.REMOTE_STDIO, ServerKind.derive(cfg))
+    }
+
+    @Test
+    fun `空白 command 视为非 stdio`() {
+        val cfg = McpServerConfig(name = "blank", command = "   ", url = "https://x/mcp")
+        assertEquals(ServerKind.REMOTE_HTTP, ServerKind.derive(cfg))
+    }
+
+    @Test
+    fun `from 映射 kind 与 enabled`() {
+        val cfg = McpServerConfig(
+            name = "s",
+            url = "u",
+            enabled = false,
+            disabledTools = setOf("D")
+        )
+        val policy = ServerPolicy.from(cfg)
+        assertEquals(ServerKind.REMOTE_HTTP, policy.kind)
+        assertFalse(policy.enabled)
+        assertFalse(policy.isToolEnabled("anything"))
+    }
+
+    @Test
+    fun `内置策略的 isBuiltin 为真`() {
+        assertTrue(ServerPolicy(kind = ServerKind.BUILTIN).isBuiltin)
+        assertFalse(ServerPolicy(kind = ServerKind.REMOTE_HTTP).isBuiltin)
+    }
+
+    @Test
+    fun `Unrestricted 恒为启用的内置策略`() {
+        assertTrue(ServerPolicy.Unrestricted.enabled)
+        assertEquals(ServerKind.BUILTIN, ServerPolicy.Unrestricted.kind)
+    }
+
+    @Test
+    fun `kind 计入值语义`() {
+        // 漏掉任一字段都会让「不同 server 的策略被误判为相同」，故单独立一条。
+        assertEquals(
+            ServerPolicy(kind = ServerKind.REMOTE_HTTP),
+            ServerPolicy(kind = ServerKind.REMOTE_HTTP)
+        )
+        assertFalse(ServerPolicy(kind = ServerKind.REMOTE_HTTP) == ServerPolicy(kind = ServerKind.REMOTE_STDIO))
+    }
+
+    @Test
+    fun `enabled 计入值语义`() {
+        assertEquals(ServerPolicy(enabled = true), ServerPolicy(enabled = true))
+        assertFalse(ServerPolicy(enabled = true) == ServerPolicy(enabled = false))
+    }
+
+    @Test
+    fun `toString 含 kind 与 enabled 便于日志排查`() {
+        val text = ServerPolicy(kind = ServerKind.REMOTE_STDIO, enabled = false).toString()
+        assertTrue(text.contains("REMOTE_STDIO"))
+        assertTrue(text.contains("enabled=false"))
     }
 }

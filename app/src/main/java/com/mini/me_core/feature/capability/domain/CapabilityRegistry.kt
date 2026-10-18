@@ -5,6 +5,7 @@ import com.mini.me_core.feature.agent.domain.execution.mcp.McpManager
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerConfig
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerStatus
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpTool
+import com.mini.me_core.feature.agent.domain.execution.mcp.ServerKind
 import com.mini.me_core.feature.agent.domain.execution.mcp.server.asPromptOrNull
 import com.mini.me_core.feature.agent.domain.execution.mcp.server.asResourceOrNull
 import com.mini.me_core.feature.agent.domain.execution.permission.PermissionRulesRepository
@@ -74,7 +75,17 @@ data class CapabilityGroupCard(
     /** 内置分组为 true，远端 server 为 false。 */
     val isBuiltin: Boolean,
     /** 是否允许被外部 MCP 客户端触达。 */
-    val remotelyExposed: Boolean
+    val remotelyExposed: Boolean,
+    /**
+     * G2：server 形态。徽章与日志据此区分「进程内内置 / 本地子进程 / 远端 HTTP」，
+     * 判据走 `ServerKind.derive` 唯一实现，不在 UI 侧重判`builtinGroup`/`command`。
+     */
+    val kind: ServerKind = ServerKind.BUILTIN,
+    /**
+     * G2：该 server 是否已启用。为 false 时 UI 显式标注「已禁用」，
+     * 免得用户对着一个连不上的 server 反复点进详情找原因。
+     */
+    val enabled: Boolean = true
 )
 
 /** 顶部全局状态卡的五个展示位（D4：原「Agent」Tab 升格）。 */
@@ -261,7 +272,9 @@ class CapabilityRegistry @Inject constructor(
                 tools = tools,
                 status = null,
                 isBuiltin = true,
-                remotelyExposed = group.remotelyExposedByDefault
+                remotelyExposed = group.remotelyExposedByDefault,
+                kind = ServerKind.BUILTIN,
+                enabled = true
             )
         }
 
@@ -278,7 +291,9 @@ class CapabilityRegistry @Inject constructor(
                     tools = tools,
                     status = statusByName[cfg.name],
                     isBuiltin = false,
-                    remotelyExposed = cfg.remotelyExposed
+                    remotelyExposed = cfg.remotelyExposed,
+                    kind = ServerKind.derive(cfg),
+                    enabled = cfg.enabled
                 )
             }
 

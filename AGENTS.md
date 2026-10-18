@@ -476,6 +476,31 @@ AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。�
    （本批已踩过一次：mock 后 4 例假失败，根因是把「被测方法」也桩掉了）。
    正确做法是把判定抽成纯函数直接测，或用真实对象 + 假 KV。
 
+#### server 形态与启用态必须收进治理模型（强制约束，G2 批次）
+
+规划 §5 里的 `ServerPolicy` 写的是 `name` / `kind` / `enabled` / 三组名单 / `remotelyExposed`，
+实现此前只有三组名单——形态靠调用方各自判`builtinGroup != null` / `isStdio`，
+启用态只看 `McpManager` 的连接过滤。**同一件事在两处各判一次，漂移即出最难排查的偏差**
+（「策略认为是内置、传输层却按 HTTP 连出去」）。
+
+1. **形态判定只有一个入口**：任何需要判断 server 形态的地方都必须走
+   `ServerKind.derive(cfg)`，不得就地重写 `builtinGroup`/`command` 的判断。
+   `McpManager.createTransport` 与 `ServerPolicy.from` 已统一改走该入口。
+2. **形态优先级固定为内置 > stdio > HTTP**：内置语义最具体；`command` 与 `url`
+   同时存在的畸形配置里，`command` 是实际被执行的连接方式，故以其为准。
+3. **不定义无实现的枚举值**：规划曾列`HOST`，但本仓没有任何承载它的实现
+   （宿主形态工具直接注册进 `ToolRegistry`，不走 `McpServerConfig`）。
+   加一个永不出现的枚举值等于给后来者留一个会误用的空壳，故不定义。
+4. **`enabled=false` 时工具一律不可见**，且**先于**三组名单判定。这与生态一致
+   （联网核实 2026-10：VS Code「禁用即不启动、工具不进对话」、Codex
+   `enabled=false` 避免连接、Gemini CLI 禁用即不提供工具），也是与
+   `McpManager` 连接过滤的双保险：那一层保证不连接，这一层保证「已连接后被禁用，
+   已构造的工具也不可用」。
+5. **新增 `ServerPolicy` 字段必须计入 `equals`/`hashCode`**：漏掉会让不同 server 的
+   策略被误判为相同。`ServerPolicyTest` 已对 `kind` 与 `enabled` 分别立断言。
+6. **UI 侧形态标签走穷尽 `when` + 字符串资源**（`kindLabel`），不直接印枚举名——
+   枚举新增取值时编译期就暴露缺字符串，不会静默把 `REMOTE_STDIO` 印给用户。
+
 #### 技能归 MCP 能力规约（强制约束，F4 批次）
 
 技能此前只有 App 内消费路径（`load_skill` 工具 / 技能中心 UI），在协议层完全不可见——外部 MCP 客户端无法发现「这台设备会写文档、会跑构建」。F4 把技能接入 MCP 的 `prompts` / `resources` 两个原生方法。
