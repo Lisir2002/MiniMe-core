@@ -19,7 +19,9 @@ import javax.inject.Singleton
 @Singleton
 class ContextCompactor @Inject constructor(
     private val v2Agent: V2AgentRepository,
-    private val modelMetadataService: ModelMetadataService
+    private val modelMetadataService: ModelMetadataService,
+    /** D2 压缩冷却窗口：压缩后短时间内抑制自动压缩，避免连续击穿缓存前缀。 */
+    private val compactionCooldown: CompactionCooldown
 ) {
 
     private companion object {
@@ -54,7 +56,16 @@ class ContextCompactor @Inject constructor(
         val effectiveInputLimit = metadata.inputTokens?.takeIf { it > 0 } ?: modelContextLimit
         val contextLimit = minOf(modelContextLimit, effectiveInputLimit)
         val triggerThreshold = (contextLimit * 0.9f).toInt()
-        if (messages.size <= 2 || (!force && totalTokens < triggerThreshold)) {
+        // 守卫条件合并为单一返回点（控制 ReturnCount）：消息过少 / 冷却窗口 / 未达阈值均原样返回。
+        val tooFewMessages = messages.size <= 2
+        val belowThreshold = !force && totalTokens < triggerThreshold
+        // D2 冷却窗口：刚压缩过的会话在窗口内跳过自动压缩（手动 force 不受限），
+        // 避免压缩后几分钟内再次压缩造成缓存前缀连续击穿。
+        val inCooldown = !force && compactionCooldown.shouldSuppress(sessionId)
+        if (inCooldown) {
+            FileLogger.i(TAG, "会话 $sessionId 处于压缩冷却窗口（${CompactionCooldown.WINDOW_MS / 60000} 分钟），跳过本次自动压缩。")
+        }
+        if (tooFewMessages || belowThreshold || inCooldown) {
             return messages.toList()
         }
 
@@ -113,6 +124,8 @@ class ContextCompactor @Inject constructor(
         }
 
         FileLogger.i(TAG, "上下文压缩完成，摘要长度：${summaryResponse.length}")
+        // D2：压缩已实际发生（无论持久化成败），进入冷却窗口。
+        compactionCooldown.markCompacted(sessionId)
 
         val markerId = UUID.randomUUID().toString()
         val compactedId = UUID.randomUUID().toString()

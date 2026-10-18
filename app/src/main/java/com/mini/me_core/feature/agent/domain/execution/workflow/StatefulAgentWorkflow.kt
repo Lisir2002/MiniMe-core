@@ -114,6 +114,8 @@ class StatefulAgentWorkflow @Inject constructor(
     private val permissionManager: ToolPermissionManager,
     private val policyEngine: ToolPermissionPolicyEngine,
     private val contextCompactor: ContextCompactor,
+    /** D1 Observation Masking：发送前把旧轮次工具输出占位符化（不落库的请求视图）。 */
+    private val observationMasker: ObservationMasker,
     private val planApprovalManager: PlanApprovalManager,
     private val toolOutputStore: ToolOutputStore,
     private val modelMetadataService: ModelMetadataService,
@@ -1038,6 +1040,11 @@ class StatefulAgentWorkflow @Inject constructor(
                             state = state.copy(messages = compactedMessages)
                         }
 
+                        // D1 masking：本轮请求视图——旧轮次工具输出占位符化（tool_use/推理骨架保留）。
+                        // 仅作用于发送给模型的消息，不写回 state/DB：完整输出留在历史里可按需取回。
+                        // system+tools 前缀（A1/A2 缓存断点所在）不受本变换影响，缓存稳定性保持。
+                        val requestMessages = observationMasker.mask(compactedMessages)
+
                         // 正文累积同样走流式归一化（AUTO_DETECT）：防御兼容网关全量重发 content 导致的
                         // 正文线性放大，并附带裸 base64 折叠 + 200k 长度护栏。
                         val acc = DeltaAccumulator()
@@ -1063,7 +1070,7 @@ class StatefulAgentWorkflow @Inject constructor(
                             // 注意：这里用 shouldSendImages 而不是 activeModelSupportsVision，
                             // 是为了避免把 source=INFERRED 的自定义多模态模型误当成纯文本模型，
                             // 发送前剥离图片导致模型「图都收不到还怎么识别」。
-                            val messagesToSend = resultSanitizer.sanitizeImagesForModel(compactedMessages, sendImages)
+                            val messagesToSend = resultSanitizer.sanitizeImagesForModel(requestMessages, sendImages)
                             // 供应商故障转移：主 provider 首字节前失败时，切到备用 provider 重试一次。
                             // 一旦已输出 TextDelta（acc/reasoningAcc 非空）则不切换，避免重复文本。
                             var streamProvider: AIProvider = providerInUse
@@ -1197,7 +1204,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                     else append("未配置「识图专用模型」，已自动去掉图片并转为纯文本发送；若需要识别图片内容，请在设置中指定一个支持「多模态识图（Vision）」能力的模型，或在当前模型的能力覆盖中手动开启「多模态识图（Vision）」。")
                                 }
                                 // 构造去 images 的消息 + 前置系统提示 UserMessage
-                                val textOnlyMessages = resultSanitizer.sanitizeImagesForModel(compactedMessages, supportsVision = false).toMutableList()
+                                val textOnlyMessages = resultSanitizer.sanitizeImagesForModel(requestMessages, supportsVision = false).toMutableList()
                                 val firstUserIndex = textOnlyMessages.indexOfFirst { it is AgentMessage.UserMessage }
                                 if (firstUserIndex >= 0) {
                                     val origin = textOnlyMessages[firstUserIndex] as AgentMessage.UserMessage

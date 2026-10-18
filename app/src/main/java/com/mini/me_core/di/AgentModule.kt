@@ -474,6 +474,7 @@ object AgentModule {
         policyEngine: ToolPermissionPolicyEngine,
         // ── 上下文压缩 ──
         contextCompactor: com.mini.me_core.feature.agent.domain.execution.workflow.ContextCompactor,
+        observationMasker: com.mini.me_core.feature.agent.domain.execution.workflow.ObservationMasker,
         // ── 计划审批 ──
         planApprovalManager: com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalManager,
         // ── 工具产物 ──
@@ -521,7 +522,7 @@ object AgentModule {
             // ── 提示词 / 权限 / 审批 ──
             promptProvider, permissionManager, policyEngine,
             // ── 上下文压缩 ──
-            contextCompactor,
+            contextCompactor, observationMasker,
             // ── 计划审批 ──
             planApprovalManager,
             // ── 工具产物 ──
