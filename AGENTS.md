@@ -403,10 +403,31 @@ AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。�
 4. **灰度开关**：`NormFlowSettingsRepository.deferred_tool_loading_enabled`（默认 false）。关闭时 `ToolLoadingPolicy` 原样返回全量清单，存量行为逐字节不变；开启后 CORE 规范序在前、已展开 DEFERRED 追加尾部（只增尾不重排）。
 5. **SubAgent 收窄**：`SubAgentRunner` 白名单取 CORE + catalog（`assembleCoreTools`），其 catalog 命中/调用记录进主会话展开集，发现惠及主代理。
 
+#### 内置能力 MCP 化规约（强制约束，F1 批次）
+
+本地工具/Agent/Skill 与远端 MCP 服务器能力**统一由 MCP 协议面治理**：App 自身在协议层是三个真实 MCP server（`BuiltinGroup` 三分组），远端 server 是另外三个，四者在 MCP Center 同一张列表里管理。落地方式是 `BuiltinTransport`（进程内 JSON-RPC 文本往返）把 `McpClient` 直连内置 `McpServerSession`，**无网络、无子进程**。
+
+1. **新增内置工具必须声明 `builtinGroup`**：`ToolRegistry.register(name, tool, builtinGroup)` 的 `builtinGroup` 缺省为 `null`（表示「远端/未分组」），因此漏标注不会被编译器拦下——`AgentModule` 的局部 `registerTool` **强制**要求分组参数，`BuiltinGroupTest` 用源码扫描断言每个 `registerTool` 都声明了分组、分组总数恰为 43。漏标注会在门禁阶段被拦下。
+2. **三分组清单（改分组需同步本表 + 测试）**：
+
+   | 组 | server 名 | 展示名 | 默认对外暴露 | 工具（数） |
+   |---|---|---|---|---|
+   | `CORE` | `MiniMe-Core` | 工作区与执行 | 是 | `readFile` `writeFile` `editFile` `list` `search` `Bash` `run_code` `terminal` `sendFile` `viewImage` `check_environment` `ensure_android_env` `switch_container_arch`（13） |
+   | `CHAT` | `MiniMe-Chat` | 会话协作与编排 | 否 | `askUserQuestion` `switchMode` `todo` `plan` `goal` `memory` `loadSkill` `runSkillScript` `load_rule` `loadSop` `intent_analyze` `manageMcp` `tool_catalog` `playbook_start` `playbook_advance` `playbook_status` `playbook_abort` `job_start` `job_status` `job_kill` `job_log` `schedule`（22） |
+   | `DATA` | `MiniMe-Data` | 外部世界与工程 | 否 | `websearch` `webfetch` `browser` `generateImage` `device_storage` `network_proxy` `gitops` `git_remote`（8） |
+
+3. **内置 server 只枚举、不注册**：`McpManager.connectOne` 对 `cfg.isBuiltin` **跳过** `toolRegistry.register`。否则 43 个 `mcp__minime_core__*` 会污染模型可见面、破坏批次 B 的 CORE 规范序、让历史会话与 system prompt 引用全部失效。新增内置 server 时不得改回注册。
+4. **工具名不做命名空间化**：内置 server 走协议面（对外与管理），执行面（Agent 循环）仍由 `ToolRegistry` 直连。`McpTool.buildNamespacedName` 的 `mcp__<server>__<tool>` 前缀**只用于远端 server**，内置 server 的 `tools/list` 必须返回原名。
+5. **黑名单与分组过滤职责分离**：`McpServerSecurity` 黑名单语义是「不得被远程客户端触达」，而内置 `tools/list` 服务于 App 内分组展示，故内置 server 构造 `AgentToolMcpAdapter(respectRemoteBlacklist = false)`；外部可达性改由 `BuiltinGroup.remotelyExposedByDefault` 在 `HostServer` 侧裁决。两者不可混用。
+6. **分组隔离不可绕过**：`AgentToolMcpAdapter.callTool` 先查 `toolRegistry.getBuiltinGroup(name) != builtinGroup` → 返回 `TOOL_NOT_IN_GROUP`，跨组调用必须在协议层被拒。
+7. **MCP 注解不可信**：`annotations`（`readOnlyHint` / `destructiveHint` / `idempotentHint` / `openWorldHint`）按 MCP 规范属**不可信提示**，默认值为 `destructiveHint=true` / `openWorldHint=true`。审批与安全判定必须按「假定最坏」处理，不得因工具声明了 `readOnlyHint` 就跳过审批。
+8. **灰度开关**：`NormFlowSettingsRepository.builtin_as_mcp_enabled`（默认 false）。该开关**刻意不挂 normFlow 总闸**——内置 MCP 化是协议层能力而非「规范流程」实验，挂上会语义混淆。关闭时 `McpManager` 不装载内置 server，存量行为逐字节不变。
+
 ### MCP（Model Context Protocol）
 
 - **客户端（已实施）**：应用实现了 MCP 客户端（`feature/agent/domain/mcp/`），可连接远程 HTTP / 本地 stdio 服务器并动态注册其提供的工具（`McpManager` / `McpClient` / `McpTool`）。
 - **服务器（已实施）**：内置 MCP 服务器（`feature/agent/domain/mcp/server/`）使应用成为「客户端 + 服务器」双角色：`McpServerManager` 管理开关/端口/token/审批，`McpHttpServer` 用 Ktor CIO 起 Streamable HTTP 端点（`POST/GET/DELETE /mcp`，Bearer 鉴权 + SSE），`McpServerSession` 解析 JSON-RPC（initialize / tools/list / tools/call / ping），`AgentToolMcpAdapter` 把 `ToolRegistry` 中允许暴露的 `AgentTool` 映射为 MCP 工具并复用 `ToolPermissionManager` 审批，把 App 能力开放给外部 MCP 客户端（手机当开发后端）。
+- **内置能力 MCP 化（F1，见上节规约）**：`BuiltinMcpServerFactory` 把 43 个内置工具经**真实 MCP 往返**暴露为三个 server（`MiniMe-Core` / `MiniMe-Chat` / `MiniMe-Data`），与远端 server 在 MCP Center 同表管理。开关关闭时零行为变更。
 
 ### 依赖注入
 

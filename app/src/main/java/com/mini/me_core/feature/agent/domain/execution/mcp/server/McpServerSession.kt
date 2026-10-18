@@ -2,6 +2,7 @@ package com.mini.me_core.feature.agent.domain.execution.mcp.server
 
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpProtocol
+import com.mini.me_core.feature.agent.domain.execution.tool.BuiltinGroup
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -25,9 +26,19 @@ import kotlinx.serialization.json.putJsonObject
  *
  * 响应以 [JsonObject] 直出（完整 JSON-RPC 报文），id 原样回显（支持数字/字符串），
  * 便于与外部客户端（Claude Desktop / Trae / Cursor）互通。
+ *
+ * F1：本类同时被两条链路复用：
+ * - 对外服务：[McpHttpServer] 经 HTTP 暴露（单台，server 名取 [McpProtocol.SERVER_NAME]）；
+ * - 进程内：[com.mini.me_core.feature.agent.domain.execution.mcp.BuiltinTransport] 经
+ *   [BuiltinMcpSession] 直调同一 [handle]，使本地能力在协议层成为真正的 MCP server。
+ * 因此 [serverName] 改为构造参数，内置三分组各报自己的名字。
  */
 class McpServerSession(
     private val adapter: AgentToolMcpAdapter,
+    /** F1：本会话对外声明的 server 名（内置分组各一台，如 MiniMe-Core）。 */
+    private val serverName: String = McpProtocol.SERVER_NAME,
+    /** F1：本会话服务的能力分组（null = 全量，即 HostServer 的既有行为）。 */
+    private val builtinGroup: BuiltinGroup? = null,
     private val json: Json = Json { ignoreUnknownKeys = true }
 ) {
     private companion object {
@@ -78,12 +89,16 @@ class McpServerSession(
             putJsonObject("tools") { }
         }
         putJsonObject("serverInfo") {
-            put("name", McpProtocol.SERVER_NAME)
+            put("name", serverName)
             put("version", McpProtocol.SERVER_VERSION)
         }
         put(
             "instructions",
-            "MiniMe-core 内置 MCP 服务器：把设备的 Linux 编码后端（容器/文件/git/搜索/AI 工具）开放给外部 MCP 客户端。"
+            if (builtinGroup != null) {
+                "MiniMe-core 内置 MCP 服务器（${builtinGroup.displayName}）：本组能力在协议层可用，可被任意 MCP 客户端发现与调用。"
+            } else {
+                "MiniMe-core 内置 MCP 服务器：把设备的 Linux 编码后端（容器/文件/git/搜索/AI 工具）开放给外部 MCP 客户端。"
+            }
         )
     }
 

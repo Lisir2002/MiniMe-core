@@ -43,6 +43,8 @@ class NormFlowSettingsRepository @Inject constructor(
         const val USAGE_CARD_ITEMS_KEY = "usage_card_items"
         // B2 工具延迟加载（Deferred Loading）灰度开关（默认关：存量全量行为不变）
         const val DEFERRED_TOOL_LOADING_ENABLED_KEY = "deferred_tool_loading_enabled"
+        // F1 内置能力 MCP 化灰度开关（默认关：关闭时只装载远端 server，存量行为不变）
+        const val BUILTIN_AS_MCP_ENABLED_KEY = "builtin_as_mcp_enabled"
     }
 
     val normFlowEnabledFlow: Flow<Boolean> = kv.observeBool(NS, NORM_FLOW_ENABLED_KEY).map { it ?: true }
@@ -74,8 +76,11 @@ class NormFlowSettingsRepository @Inject constructor(
     val usageCardItemsFlow: Flow<Set<String>> = kv.observeString(NS, USAGE_CARD_ITEMS_KEY).map { raw ->
         raw?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet() ?: setOf("token")
     }
-    // B2 工具延迟加载灰度开关（默认 false：关闭时每轮下发全量工具清单，与存量行为一致）
+        // B2 工具延迟加载（Deferred Loading）灰度开关（默认关：存量全量行为不变）
     val deferredToolLoadingEnabledFlow: Flow<Boolean> = kv.observeBool(NS, DEFERRED_TOOL_LOADING_ENABLED_KEY).map { it ?: false }
+
+    // F1 内置能力 MCP 化（默认 false：关闭时 McpManager 只装载远端 server，存量行为不变）
+    val builtinAsMcpEnabledFlow: Flow<Boolean> = kv.observeBool(NS, BUILTIN_AS_MCP_ENABLED_KEY).map { it ?: false }
 
     suspend fun setNormFlowEnabled(enabled: Boolean) { kv.putBool(NS, NORM_FLOW_ENABLED_KEY, enabled) }
     suspend fun setStepInjectEnabled(enabled: Boolean) { kv.putBool(NS, STEP_INJECT_ENABLED_KEY, enabled) }
@@ -96,8 +101,11 @@ class NormFlowSettingsRepository @Inject constructor(
     suspend fun setGuardPathBoundaryEnabled(enabled: Boolean) { kv.putBool(NS, GUARD_PATH_BOUNDARY_ENABLED_KEY, enabled) }
     // 用量卡片显示项
     suspend fun setUsageCardItems(items: Set<String>) { kv.putString(NS, USAGE_CARD_ITEMS_KEY, items.joinToString(",")) }
-    // B2 工具延迟加载灰度开关
+        // B2 工具延迟加载（Deferred Loading）灰度开关（默认关：存量全量行为不变）
     suspend fun setDeferredToolLoadingEnabled(enabled: Boolean) { kv.putBool(NS, DEFERRED_TOOL_LOADING_ENABLED_KEY, enabled) }
+
+    // F1 内置能力 MCP 化开关
+    suspend fun setBuiltinAsMcpEnabled(enabled: Boolean) { kv.putBool(NS, BUILTIN_AS_MCP_ENABLED_KEY, enabled) }
     suspend fun getUsageCardItems(): Set<String> = usageCardItemsFlow.first()
     // 推理预算强度
     suspend fun setReasoningBudgetLevel(level: String) { kv.putString(NS, REASONING_BUDGET_LEVEL_KEY, level) }
@@ -197,8 +205,17 @@ class NormFlowSettingsRepository @Inject constructor(
     suspend fun isGuardDangerousCommandActive(): Boolean = isToolGuardActive() && guardDangerousCommandEnabledFlow.first()
     suspend fun isGuardLargeFileActive(): Boolean = isToolGuardActive() && guardLargeFileEnabledFlow.first()
     suspend fun isGuardPathBoundaryActive(): Boolean = isToolGuardActive() && guardPathBoundaryEnabledFlow.first()
-    // B2 工具延迟加载（总开关 && 自身开关；关闭时全量下发，存量行为不变）
+        // B2 工具延迟加载（Deferred Loading）灰度开关（默认关：存量全量行为不变）
+    // B2 工具延迟加载（Deferred Loading）灰度开关（默认关：存量全量行为不变）
     suspend fun isDeferredToolLoadingActive(): Boolean = normFlowEnabledFlow.first() && deferredToolLoadingEnabledFlow.first()
+
+    /**
+     * F1：内置能力是否以 MCP server 形态装载。
+     *
+     * 刻意**不挂 normFlow 总闸**：内置 MCP 化是协议层能力，不是「规范流程」实验的一部分；
+     * 若挂上，关闭 normFlow 会连带让内置分组无法枚举，语义混淆。
+     */
+    suspend fun isBuiltinAsMcpActive(): Boolean = builtinAsMcpEnabledFlow.first()
 
     // 配置导出/导入（手动 JSON 构造）
     fun exportConfig(): String {
@@ -224,6 +241,7 @@ class NormFlowSettingsRepository @Inject constructor(
         kv.getInt(NS, IDLE_CONVERGE_ROUNDS_KEY)?.let { entries.add("\"idle_converge_rounds\":$it") }
         kv.getBool(NS, PLAYBOOK_AUTO_ENABLED_KEY)?.let { entries.add("\"playbook_auto_enabled\":$it") }
         kv.getBool(NS, DEFERRED_TOOL_LOADING_ENABLED_KEY)?.let { entries.add("\"deferred_tool_loading_enabled\":$it") }
+        kv.getBool(NS, BUILTIN_AS_MCP_ENABLED_KEY)?.let { entries.add("\"builtin_as_mcp_enabled\":$it") }
         kv.getString(NS, ACTIVE_PRESET_KEY)?.let { entries.add("\"active_preset\":\"$it\"") }
         sb.append(entries.joinToString(","))
         sb.append("}")
@@ -259,6 +277,7 @@ class NormFlowSettingsRepository @Inject constructor(
                         "idle_converge_rounds" -> kv.putInt(NS, IDLE_CONVERGE_ROUNDS_KEY, value.toLong())
                         "playbook_auto_enabled" -> kv.putBool(NS, PLAYBOOK_AUTO_ENABLED_KEY, value.toBoolean())
                         "deferred_tool_loading_enabled" -> kv.putBool(NS, DEFERRED_TOOL_LOADING_ENABLED_KEY, value.toBoolean())
+                        "builtin_as_mcp_enabled" -> kv.putBool(NS, BUILTIN_AS_MCP_ENABLED_KEY, value.toBoolean())
                     }
                 }
             }
