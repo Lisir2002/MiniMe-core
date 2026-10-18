@@ -5,6 +5,8 @@ import com.mini.me_core.feature.agent.domain.execution.mcp.McpManager
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerConfig
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerStatus
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpTool
+import com.mini.me_core.feature.agent.domain.execution.mcp.server.asPromptOrNull
+import com.mini.me_core.feature.agent.domain.execution.mcp.server.asResourceOrNull
 import com.mini.me_core.feature.agent.domain.execution.permission.PermissionRulesRepository
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
 import com.mini.me_core.feature.agent.domain.execution.tool.BuiltinGroup
@@ -14,6 +16,7 @@ import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionPolicy
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolRegistry
 import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
 import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillStateRepository
+import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillType
 import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.data.repository.ExecutionModeHolder
 import com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository
@@ -85,7 +88,25 @@ data class CapabilityStatusCard(
 )
 
 /**
- * F2 统一能力页的聚合状态。
+ * F4：技能分组卡。
+ *
+ * 技能在协议层已归入 MCP（`PROMPT` → `prompts`、`SCRIPT` → `resources`），因此它在
+ * 统一页里可以和其它分组一样用「一张卡片 + 展开管理」呈现，而不必内嵌完整管理页。
+ *
+ * [mcpAliasCount] 是 `SkillType.MCP` 的数量：这类技能**不被 MCP 暴露**（它是能力的
+ * 消费方——调用某个已连MCP 工具），而是映射为对那个工具的别名。把这个数字显式摆出来，
+ * 是为了让用户明白「为什么这类技能没有出现在 prompts/resources 里」。
+ */
+data class CapabilitySkillGroupCard(
+    val total: Int,
+    val promptCount: Int,
+    val scriptCount: Int,
+    val mcpAliasCount: Int,
+    /** 是否有技能真正经 MCP 对外暴露（prompts/resources 至少一条非空）。 */
+    val exposedViaMcp: Boolean
+)
+
+/** F2 统一能力页的聚合状态。
  *
  * [groups] 把内置三分组与远端 server 拍平成**同一个列表**（这就是「页面合并」的数据形态），
  * 顺序稳定：内置分组按 [BuiltinGroup] 声明序，远端 server 按名称排序——保证重组不抖动。
@@ -93,6 +114,8 @@ data class CapabilityStatusCard(
 data class CapabilityOverview(
     val groups: List<CapabilityGroupCard> = emptyList(),
     val skills: List<Skill> = emptyList(),
+    /** F4：技能分组卡（与 [groups] 同构呈现）。 */
+    val skillGroup: CapabilitySkillGroupCard = CapabilitySkillGroupCard(0, 0, 0, 0, false),
     val statusCard: CapabilityStatusCard? = null,
     /** `unified_capability_page_enabled` 灰度开关；false 时页面回退到旧三Tab 形态。 */
     val unifiedPageEnabled: Boolean = false
@@ -167,7 +190,12 @@ class CapabilityRegistry @Inject constructor(
             skillStateRepository.skillsFlow,
             normFlowSettingsRepository.unifiedCapabilityPageEnabledFlow
         ) { groups, skills, unified ->
-            CapabilityOverview(groups = groups, skills = skills, unifiedPageEnabled = unified)
+            CapabilityOverview(
+                groups = groups,
+                skills = skills,
+                skillGroup = buildSkillGroupCard(skills),
+                unifiedPageEnabled = unified
+            )
         }.let { base ->
             combine(
                 base,
@@ -256,6 +284,36 @@ class CapabilityRegistry @Inject constructor(
 
         return builtinCards + remoteCards
     }
+
+    private fun buildSkillGroupCard(skills: List<Skill>): CapabilitySkillGroupCard =
+        buildCapabilitySkillGroupCard(skills)
+}
+
+/**
+ * F4：由技能列表推导技能分组卡。
+ *
+ * 抽成顶层函数而非留在聚合器里，是为了让「UI 计数与协议暴露同口径」这条不变量
+ * 可被纯 JVM 单测直接验证——它是 F4 最容易被后续改动悄悄破坏的一点。
+ *
+ * [CapabilitySkillGroupCard.promptCount] / [CapabilitySkillGroupCard.scriptCount] 走
+ * **服务端同一对分派谓词**（`asPromptOrNull` / `asResourceOrNull`），而不是重写一遍
+ * `type == PROMPT` 判断：两处口径一旦分叉，UI 就会显示「3 个 prompt」而
+ * `prompts/list` 实际只返回 2 条——这类「数字对不上」最难排查。
+ *
+ * [CapabilitySkillGroupCard.mcpAliasCount] 刻意只按 type 计数、不看 enabled：
+ * 用户需要知道「一共有几个技能是远端工具别名」，含未启用的——那是它的资产属性，
+ * 而非对外暴露状态。
+ */
+internal fun buildCapabilitySkillGroupCard(skills: List<Skill>): CapabilitySkillGroupCard {
+    val prompts = skills.count { it.asPromptOrNull() != null }
+    val resources = skills.count { it.asResourceOrNull() != null }
+    return CapabilitySkillGroupCard(
+        total = skills.size,
+        promptCount = prompts,
+        scriptCount = resources,
+        mcpAliasCount = skills.count { it.type == SkillType.MCP },
+        exposedViaMcp = prompts > 0 || resources > 0
+    )
 }
 
 /** 工具是否需要用户审批方可执行。 */

@@ -15,6 +15,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -164,14 +165,34 @@ class BuiltinMcpServerTest {
     @Test
     fun `unknown rpc method surfaces as McpException with code`() = runBlocking {
         val transport = factory.createTransport(BuiltinGroup.CORE)
-        val e = runCatching { transport.request("resources/list") }.exceptionOrNull()
+        // F4 注意：不可再用 `resources/list` 当「未知方法」的例子——F4 已把它实现为
+        // 真实方法（但内置分组 server 刻意不接技能，故恒返回空列表而非 -32601）。
+        // 这里用协议里确实不存在的方法名，否则该测试会在 F4 落地后误报失败。
+        val e = runCatching { transport.request("resources/subscribe") }.exceptionOrNull()
         assertTrue("未知方法应抛 McpException，实际: $e", e is McpException)
         assertEquals(-32601, (e as McpException).rpcCode)
     }
 
+    /**
+     * F4：内置分组 server 刻意不接技能，故 prompts / resources 四个方法**存在但恒空**，
+     * 而不是回 -32601。理由：方法存在性与能力声明一致（initialize 也不会声明
+     * prompts/resources），客户端不会因「方法不存在」而反复重试或报错。
+     */
     @Test
-    fun `request after close is rejected`() = runBlocking {
+    fun `builtin group server answers prompts and resources with empty lists`() = runBlocking {
         val transport = factory.createTransport(BuiltinGroup.CORE)
+
+        // error 非空时 transport 已抛异常，故能返回即成功。
+        val prompts = transport.request("prompts/list", null).result
+        assertTrue("prompts/list 应回 prompts 数组", prompts!!.containsKey("prompts"))
+        assertEquals(0, (prompts["prompts"] as JsonArray).size)
+        val resources = transport.request("resources/list", null).result
+        assertTrue("resources/list 应回 resources 数组", resources!!.containsKey("resources"))
+        assertEquals(0, (resources["resources"] as JsonArray).size)
+    }
+
+    @Test
+    fun `request after close is rejected`() = runBlocking {        val transport = factory.createTransport(BuiltinGroup.CORE)
         transport.close()
         val e = runCatching { transport.request("tools/list") }.exceptionOrNull()
         assertTrue("关闭后请求应失败，实际: $e", e is IllegalStateException)

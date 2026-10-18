@@ -383,6 +383,11 @@ private fun SkillCard(
                 if (skill.autoTrigger) {
                     InfoChip(stringResource(R.string.skill_auto_trigger), Color(0xFFFFB300))
                 }
+                // F4：MCP 型技能是「已连 MCP 工具的别名」，显式写出它指向哪个工具——
+                // 用户在能力页看到「别名 N」时，需要能在这里对上号。
+                if (skill.type == SkillType.MCP && !skill.mcpTool.isNullOrBlank()) {
+                    InfoChip(skill.mcpTool, Color(0xFF2196F3))
+                }
                 InfoChip(
                     label = when (skill.scope) {
                         SkillScope.GLOBAL -> stringResource(R.string.skill_scope_global)

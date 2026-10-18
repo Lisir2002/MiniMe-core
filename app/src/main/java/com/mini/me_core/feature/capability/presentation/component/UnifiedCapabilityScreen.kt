@@ -32,6 +32,8 @@ import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material3.Card
@@ -42,6 +44,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -60,6 +65,7 @@ import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerStatus
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionPolicy
 import com.mini.me_core.feature.capability.domain.CapabilityGroupCard
+import com.mini.me_core.feature.capability.domain.CapabilitySkillGroupCard
 import com.mini.me_core.feature.capability.domain.CapabilityStatusCard
 import com.mini.me_core.feature.capability.domain.CapabilityToolCard
 import com.mini.me_core.feature.capability.presentation.UnifiedCapabilityViewModel
@@ -86,6 +92,8 @@ fun UnifiedCapabilityScreen(
 ) {
     val overview by viewModel.overview.collectAsStateWithLifecycle()
     val listState = rememberPersistentLazyListState("unified_capability")
+    // F4：技能分组默认折叠——技能是用户维度资产，不该在「看能力清单」时占掉半屏。
+    var skillGroupExpanded by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -130,7 +138,9 @@ fun UnifiedCapabilityScreen(
             builtinSection(builtin, onOpenGroupDetail)
             remoteSection(remote, onOpenGroupDetail)
             skillSection(
-                skillCount = overview.skills.size,
+                card = overview.skillGroup,
+                expanded = skillGroupExpanded,
+                onToggleExpanded = { skillGroupExpanded = !skillGroupExpanded },
                 onOpenSkillDetail = onOpenSkillDetail,
                 onEditSkill = onEditSkill
             )
@@ -177,26 +187,180 @@ private fun LazyListScope.remoteSection(
 }
 
 /**
- * 技能区。
+ * F4：技能区。
  *
- * F4 前技能尚未经 MCP 暴露（`SkillPromptAdapter` / `SkillResourceAdapter` 未落地），
- * 故此处暂作独立分组；F4 完成后技能在协议层与工具同源，届时可与其它分组共用卡片渲染。
+ * 形态从 F2 的「内嵌完整 `SkillsScreen`」改为**与其它分组同构的折叠卡片**：
+ * 折叠时只占一张卡（名称 + 计数 + MCP 映射徽章），点开才展开完整管理界面。
+ *
+ * 为什么不彻底退化成「跳转入口」：技能管理有搜索、三类筛选、导入导出、删除确认，
+ * 做成跳转会让用户在「能力页 → 技能页」之间来回跳，比合并前更绕——那就违背了
+ * 页面合并的初衷。折叠卡片是折中：默认不占屏，需要时**原地**展开。
+ *
+ * 徽章显式写出 `PROMPT → prompts` / `SCRIPT → resources` / `MCP → 别名`，
+ * 让「技能为什么没出现在 prompts 里」在 UI 上可自解释，而不是靠文档。
  */
 private fun LazyListScope.skillSection(
-    skillCount: Int,
+    card: CapabilitySkillGroupCard,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
     onOpenSkillDetail: (String) -> Unit,
     onEditSkill: (String) -> Unit
 ) {
     item(key = "h_skill") {
         SectionHeader(stringResource(R.string.capability_group_section_skill))
     }
-    item(key = "skills_body") {
-        SkillGroupBody(
-            count = skillCount,
-            onOpenSkillDetail = onOpenSkillDetail,
-            onEditSkill = onEditSkill
+    item(key = "skill_card") {
+        // 卡片壳在这里而非 SkillGroupCard 内：让 SkillGroupCard 保持纯内容布局，
+        // 与 [GroupCard] 的「壳 + 内容」拆分方式一致。
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(Radius.lg),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(modifier = Modifier.padding(Spacing.lg)) {
+                SkillGroupCard(
+                    card = card,
+                    expanded = expanded,
+                    onToggleExpanded = onToggleExpanded,
+                    onOpenSkillDetail = onOpenSkillDetail,
+                    onEditSkill = onEditSkill
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 技能分组卡：折叠态是分组摘要，展开态原地内嵌完整技能管理界面。
+ *
+ * 卡片壳与 [GroupCard] 同形（同圆角、同内边距、同箭头语义），使技能在视觉上
+ * 与内置分组/远端 server 读起来是同一种东西——这是「统一管理」的形式要求。
+ */
+@Composable
+private fun SkillGroupCard(
+    card: CapabilitySkillGroupCard,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onOpenSkillDetail: (String) -> Unit,
+    onEditSkill: (String) -> Unit
+) {
+    Column {
+        SkillGroupCardHeader(card = card, expanded = expanded, onToggle = onToggleExpanded)
+        Spacer(Modifier.height(Spacing.sm))
+        SkillMcpMappingRow(card)
+        if (!card.exposedViaMcp) {
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                text = stringResource(R.string.capability_skill_no_mcp_exposure),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (expanded) {
+            Spacer(Modifier.height(Spacing.sm))
+            SkillGroupBody(
+                onOpenSkillDetail = onOpenSkillDetail,
+                onEditSkill = onEditSkill
+            )
+        }
+    }
+}
+
+/** 技能分组卡的标题行：名称 + 计数 + 「管理」提示 + 折叠箭头（整行可点）。 */
+@Composable
+private fun SkillGroupCardHeader(
+    card: CapabilitySkillGroupCard,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Extension,
+            contentDescription = null,
+            tint = colors.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.capability_skill_group_name),
+                style = MaterialTheme.typography.titleSmall,
+                color = colors.onSurface
+            )
+            Text(
+                text = stringResource(R.string.capability_group_tool_count, card.total),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant
+            )
+        }
+        Pill(text = stringResource(R.string.capability_skill_group_manage), tint = colors.primary)
+        Spacer(Modifier.width(Spacing.xs))
+        Icon(
+            imageVector = if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+            contentDescription = stringResource(
+                if (expanded) {
+                    R.string.capability_skill_group_collapse
+                } else {
+                    R.string.capability_skill_group_expand
+                }
+            ),
+            tint = colors.onSurfaceVariant
         )
     }
+}
+
+/**
+ * 技能 → MCP 的映射徽章行。
+ *
+ * 把 `prompts N` / `resources N` / `别名 N` 直接写在卡片上，是为了让「技能为什么没
+ * 出现在 prompts列表里」在 UI 上自解释——MCP 型技能是远端工具的别名，天然不被暴露。
+ */
+@Composable
+private fun SkillMcpMappingRow(card: CapabilitySkillGroupCard) {
+    val colors = MaterialTheme.colorScheme
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Pill(
+            text = stringResource(R.string.capability_skill_map_prompts) + " " + card.promptCount,
+            tint = colors.tertiary
+        )
+        Pill(
+            text = stringResource(R.string.capability_skill_map_resources) + " " + card.scriptCount,
+            tint = colors.tertiary
+        )
+        if (card.mcpAliasCount > 0) {
+            Pill(
+                text = stringResource(R.string.capability_skill_map_alias) + " " + card.mcpAliasCount,
+                tint = colors.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * 技能分组体（展开态）：内嵌完整技能管理界面。
+ *
+ * 保留 [SkillsScreen] 原样而非重写卡片——技能管理有筛选/搜索/导入导出/删除确认，
+ * 重写一遍等于制造第二套技能 UI 实现，后续必然与设置页那份分叉。
+ */
+@Composable
+private fun SkillGroupBody(
+    onOpenSkillDetail: (String) -> Unit,
+    onEditSkill: (String) -> Unit
+) {
+    val skillsViewModel: SkillsViewModel = hiltViewModel()
+    SkillsScreen(
+        viewModel = skillsViewModel,
+        onOpenSkillDetail = onOpenSkillDetail,
+        onEditSkill = onEditSkill
+    )
 }
 
 // ──────────────────────────────────────────────
@@ -442,36 +606,4 @@ private fun SectionHeader(title: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = Spacing.md, bottom = Spacing.xs)
     )
-}
-
-/**
- * 技能分组体。
- *
- * F4 之前技能尚未经 MCP 暴露（`SkillPromptAdapter` / `SkillResourceAdapter` 未落地），
- * 故此处**内嵌完整的 `SkillsScreen`** 而非一个跳转入口：技能管理有筛选、搜索、导入导出、
- * 删除确认等交互，做成入口跳转会让用户在「能力页→技能页」之间来回跳，比合并前更绕。
- *
- * F4 落地后，PROMPT 型 Skill 映射为 MCP prompts、SCRIPT 型映射为 resources，
- * 技能在协议层与工具同源，届时可与其它分组共用同一套卡片渲染，本函数退化为分组壳。
- */
-@Composable
-private fun SkillGroupBody(
-    count: Int,
-    onOpenSkillDetail: (String) -> Unit,
-    onEditSkill: (String) -> Unit
-) {
-    val skillsViewModel: SkillsViewModel = hiltViewModel()
-    Column {
-        Text(
-            text = stringResource(R.string.capability_group_tool_count, count),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(vertical = Spacing.xs)
-        )
-        SkillsScreen(
-            viewModel = skillsViewModel,
-            onOpenSkillDetail = onOpenSkillDetail,
-            onEditSkill = onEditSkill
-        )
-    }
 }

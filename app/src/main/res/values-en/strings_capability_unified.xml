@@ -25,4 +25,13 @@
     <string name="capability_detail_tool_count">Tool count</string>
     <string name="capability_detail_status">Connection status</string>
     <string name="capability_detail_group_missing">This group no longer exists</string>
+    <!-- F4 skills via MCP -->
+    <string name="capability_skill_group_name">Skills (MCP prompts / resources)</string>
+    <string name="capability_skill_group_manage">Manage</string>
+    <string name="capability_skill_group_expand">Expand skill management</string>
+    <string name="capability_skill_group_collapse">Collapse skill management</string>
+    <string name="capability_skill_map_prompts">prompts</string>
+    <string name="capability_skill_map_resources">resources</string>
+    <string name="capability_skill_map_alias">alias</string>
+    <string name="capability_skill_no_mcp_exposure">No skill is currently exposed over MCP (needs to be a prompt or script skill and enabled).</string>
 </resources>
