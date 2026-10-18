@@ -216,9 +216,16 @@ class NormFlowSettingsRepository @Inject constructor(
     suspend fun isGuardDangerousCommandActive(): Boolean = isToolGuardActive() && guardDangerousCommandEnabledFlow.first()
     suspend fun isGuardLargeFileActive(): Boolean = isToolGuardActive() && guardLargeFileEnabledFlow.first()
     suspend fun isGuardPathBoundaryActive(): Boolean = isToolGuardActive() && guardPathBoundaryEnabledFlow.first()
-        // B2 工具延迟加载（Deferred Loading）灰度开关（默认关：存量全量行为不变）
-    // B2 工具延迟加载（Deferred Loading）灰度开关（默认关：存量全量行为不变）
-    suspend fun isDeferredToolLoadingActive(): Boolean = normFlowEnabledFlow.first() && deferredToolLoadingEnabledFlow.first()
+    /**
+     * B2 工具延迟加载是否生效。
+     *
+     * 生效条件是 [normFlowEnabled] `&&` [deferredToolLoadingEnabled]——两级开关串联。
+     * 抽成纯函数 [deferredToolLoadingEffective] 是为了能直接单测这条与关系：
+     * 仓储方法是 `suspend` 且依赖 KVStore，mock 整个仓储会把被测逻辑一起桩掉，
+     * 那种测试无论怎么写都恒真。
+     */
+    suspend fun isDeferredToolLoadingActive(): Boolean =
+        deferredToolLoadingEffective(normFlowEnabledFlow.first(), deferredToolLoadingEnabledFlow.first())
 
     /**
      * F1：内置能力是否以 MCP server 形态装载。
@@ -309,3 +316,13 @@ class NormFlowSettingsRepository @Inject constructor(
         }
     }
 }
+
+/**
+ * B2：延迟加载的**生效条件**——规范流总开关与本开关的与关系。
+ *
+ * 单独抽成顶层纯函数的理由：这是唯一一处「两个开关串联」的判定，且它是
+ * 用户可见行为的决定因素（UI 上「开关已开但没效果」的唯一成因）。
+ * 内联在仓储里就没有可测的入口。
+ */
+internal fun deferredToolLoadingEffective(normFlowEnabled: Boolean, deferredEnabled: Boolean): Boolean =
+    normFlowEnabled && deferredEnabled

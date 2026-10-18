@@ -1,3 +1,9 @@
+// Compose 约定：@Composable 用大驼峰命名（与仓库既有页面一致，见 UnifiedCapabilityScreen
+// 同款处理）。本文件已有大量既存 @Composable 因签名变更导致 baseline 逐条失配——
+// 新增 Composable 时不再往 baseline 里塞（那只会静默膨胀且看不出豁免理由），
+// 改为文件级豁免 FunctionNaming。
+@file:Suppress("FunctionNaming")
+
 package com.mini.me_core.feature.settings.presentation
 
 import android.app.Activity
@@ -23,6 +29,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Dashboard
+import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Lightbulb
@@ -87,6 +96,7 @@ fun DevOptionsScreen(
 ) {
     val context = LocalContext.current
     val toggles by viewModel.toggles.collectAsStateWithLifecycle()
+    val featureToggles by viewModel.featureToggles.collectAsStateWithLifecycle()
     val kvEntries by viewModel.kvEntries.collectAsStateWithLifecycle()
     val memory by viewModel.memory.collectAsStateWithLifecycle()
 
@@ -189,11 +199,7 @@ fun DevOptionsScreen(
                 startupStages = startupStages,
             )
             1 -> DebugTab(
-                toggles = toggles,
-                onSetKeepScreenOn = viewModel::setKeepScreenOn,
-                onSetComposeLayoutInspector = viewModel::setComposeLayoutInspector,
-                onSetStrictMode = viewModel::setStrictMode,
-                onSetWebViewDebug = viewModel::setWebViewDebug,
+                viewModel = viewModel,
                 onOpenLogViewer = onOpenLogViewer,
             )
             2 -> MonitorTab(
@@ -629,15 +635,67 @@ private fun PerfMetric(
 // 调试 Tab
 // ══════════════════════════════════════════════
 
+/**
+ * G1：能力治理灰度开关分组。
+ *
+ * 放在开发者选项而非普通设置：三个开关都会改变对外行为（哪些工具进模型上下文、
+ * 哪些能力对外可达、页面形态切换），属于需要用户明确知情的高影响开关。
+ */
+@Composable
+private fun FeatureGateSection(
+    featureToggles: DevOptionsViewModel.FeatureToggles,
+    viewModel: DevOptionsViewModel
+) {
+    AppSectionHeader(
+        title = stringResource(R.string.dev_feature_gate_group),
+        icon = Icons.Rounded.Extension,
+    )
+    AppCard {
+        AppListItem(
+            icon = Icons.Rounded.Bolt,
+            title = stringResource(R.string.dev_feature_gate_deferred),
+            // 生效条件是「规范流总开关 && 本开关」，故总开关关闭时直接说明，
+            // 不让用户对着一个「已开但不生效」的开关纳闷。
+            subtitle = if (featureToggles.normFlowEnabled) {
+                stringResource(R.string.dev_feature_gate_deferred_sub)
+            } else {
+                stringResource(R.string.dev_feature_gate_deferred_sub_blocked)
+            },
+            checked = featureToggles.deferredToolLoadingEnabled,
+            onCheckedChange = viewModel::setDeferredToolLoadingEnabled,
+        )
+        AppListItem(
+            icon = Icons.Rounded.Extension,
+            title = stringResource(R.string.dev_feature_gate_builtin_mcp),
+            subtitle = stringResource(R.string.dev_feature_gate_builtin_mcp_sub),
+            checked = featureToggles.builtinAsMcpEnabled,
+            onCheckedChange = viewModel::setBuiltinAsMcpEnabled,
+        )
+        AppListItem(
+            icon = Icons.Rounded.Dashboard,
+            title = stringResource(R.string.dev_feature_gate_unified_page),
+            subtitle = stringResource(R.string.dev_feature_gate_unified_page_sub),
+            checked = featureToggles.unifiedCapabilityPageEnabled,
+            onCheckedChange = viewModel::setUnifiedCapabilityPageEnabled,
+            showDivider = false,
+        )
+    }
+}
+
+/**
+ * 调试 Tab。
+ *
+ * **直接收 ViewModel 而非逐个回调**：全部状态与写回动作都来自同一个
+ * [DevOptionsViewModel]，逐个传既触发 `LongParameterList`，也让调用点与函数体
+ * 两处都要跟着改。函数内自行 `collectAsStateWithLifecycle`。
+ */
 @Composable
 private fun DebugTab(
-    toggles: DevOptionsViewModel.DevToggles,
-    onSetKeepScreenOn: (Boolean) -> Unit,
-    onSetComposeLayoutInspector: (Boolean) -> Unit,
-    onSetStrictMode: (Boolean) -> Unit,
-    onSetWebViewDebug: (Boolean) -> Unit,
+    viewModel: DevOptionsViewModel,
     onOpenLogViewer: () -> Unit,
 ) {
+    val toggles by viewModel.toggles.collectAsStateWithLifecycle()
+    val featureToggles by viewModel.featureToggles.collectAsStateWithLifecycle()
     val listState = rememberPersistentLazyListState("settings_dev_debug")
     LazyColumn(
         state = listState,
@@ -645,82 +703,102 @@ private fun DebugTab(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        // 系统类
-        item {
-            AppSectionHeader(
-                title = stringResource(R.string.dev_debug_system_group),
-                icon = Icons.Rounded.Build,
-            )
-            AppCard {
-                AppListItem(
-                    icon = Icons.Rounded.Lightbulb,
-                    title = stringResource(R.string.dev_options_keep_screen_on),
-                    subtitle = stringResource(R.string.dev_keep_screen_on_subtitle),
-                    checked = toggles.keepScreenOn,
-                    onCheckedChange = onSetKeepScreenOn,
-                )
-                AppListItem(
-                    icon = Icons.Rounded.Build,
-                    title = stringResource(R.string.dev_debug_strict_mode),
-                    subtitle = stringResource(R.string.dev_debug_strict_mode_subtitle),
-                    checked = toggles.strictMode,
-                    onCheckedChange = onSetStrictMode,
-                    showDivider = false,
-                )
-            }
-        }
+        item { DebugSystemSection(toggles = toggles, viewModel = viewModel) }
+        item { DebugDisplaySection(toggles = toggles, viewModel = viewModel) }
+        item { DebugNetworkSection(toggles = toggles, viewModel = viewModel) }
+        // G1：能力治理灰度开关
+        item { FeatureGateSection(featureToggles = featureToggles, viewModel = viewModel) }
+        item { DebugLogViewerSection(onOpenLogViewer = onOpenLogViewer) }
+    }
+}
 
-        // 显示类
-        item {
-            AppSectionHeader(
-                title = stringResource(R.string.dev_debug_display_group),
-                icon = Icons.Rounded.Memory,
-            )
-            AppCard {
-                AppListItem(
-                    icon = Icons.Rounded.Memory,
-                    title = stringResource(R.string.dev_debug_compose_layout),
-                    subtitle = stringResource(R.string.dev_debug_compose_layout_subtitle),
-                    checked = toggles.composeLayoutInspector,
-                    onCheckedChange = onSetComposeLayoutInspector,
-                    showDivider = false,
-                )
-            }
-        }
+/** 系统类调试开关：常亮与 StrictMode。 */
+@Composable
+private fun DebugSystemSection(
+    toggles: DevOptionsViewModel.DevToggles,
+    viewModel: DevOptionsViewModel
+) {
+    AppSectionHeader(
+        title = stringResource(R.string.dev_debug_system_group),
+        icon = Icons.Rounded.Build,
+    )
+    AppCard {
+        AppListItem(
+            icon = Icons.Rounded.Lightbulb,
+            title = stringResource(R.string.dev_options_keep_screen_on),
+            subtitle = stringResource(R.string.dev_keep_screen_on_subtitle),
+            checked = toggles.keepScreenOn,
+            onCheckedChange = viewModel::setKeepScreenOn,
+        )
+        AppListItem(
+            icon = Icons.Rounded.Build,
+            title = stringResource(R.string.dev_debug_strict_mode),
+            subtitle = stringResource(R.string.dev_debug_strict_mode_subtitle),
+            checked = toggles.strictMode,
+            onCheckedChange = viewModel::setStrictMode,
+            showDivider = false,
+        )
+    }
+}
 
-        // 网络类
-        item {
-            AppSectionHeader(
-                title = stringResource(R.string.dev_debug_network_group),
-                icon = Icons.Rounded.Wifi,
-            )
-            AppCard {
-                AppListItem(
-                    icon = Icons.Rounded.Wifi,
-                    title = stringResource(R.string.dev_debug_webview_debug),
-                    subtitle = stringResource(R.string.dev_debug_webview_debug_subtitle),
-                    checked = toggles.webViewDebug,
-                    onCheckedChange = onSetWebViewDebug,
-                    showDivider = false,
-                )
-            }
-        }
+/** 显示类调试开关：Compose 布局检查器。 */
+@Composable
+private fun DebugDisplaySection(
+    toggles: DevOptionsViewModel.DevToggles,
+    viewModel: DevOptionsViewModel
+) {
+    AppSectionHeader(
+        title = stringResource(R.string.dev_debug_display_group),
+        icon = Icons.Rounded.Memory,
+    )
+    AppCard {
+        AppListItem(
+            icon = Icons.Rounded.Memory,
+            title = stringResource(R.string.dev_debug_compose_layout),
+            subtitle = stringResource(R.string.dev_debug_compose_layout_subtitle),
+            checked = toggles.composeLayoutInspector,
+            onCheckedChange = viewModel::setComposeLayoutInspector,
+            showDivider = false,
+        )
+    }
+}
 
-        // 日志查看器
-        item {
-            AppSectionHeader(
-                title = stringResource(R.string.dev_options_log_viewer),
-                icon = Icons.AutoMirrored.Rounded.Article,
-            )
-            AppCard {
-                AppListItem(
-                    icon = Icons.AutoMirrored.Rounded.Article,
-                    title = stringResource(R.string.dev_options_log_viewer),
-                    onViewClick = onOpenLogViewer,
-                    showDivider = false,
-                )
-            }
-        }
+/** 网络类调试开关：WebView 远程调试。 */
+@Composable
+private fun DebugNetworkSection(
+    toggles: DevOptionsViewModel.DevToggles,
+    viewModel: DevOptionsViewModel
+) {
+    AppSectionHeader(
+        title = stringResource(R.string.dev_debug_network_group),
+        icon = Icons.Rounded.Wifi,
+    )
+    AppCard {
+        AppListItem(
+            icon = Icons.Rounded.Wifi,
+            title = stringResource(R.string.dev_debug_webview_debug),
+            subtitle = stringResource(R.string.dev_debug_webview_debug_subtitle),
+            checked = toggles.webViewDebug,
+            onCheckedChange = viewModel::setWebViewDebug,
+            showDivider = false,
+        )
+    }
+}
+
+/** 日志查看器入口。 */
+@Composable
+private fun DebugLogViewerSection(onOpenLogViewer: () -> Unit) {
+    AppSectionHeader(
+        title = stringResource(R.string.dev_options_log_viewer),
+        icon = Icons.AutoMirrored.Rounded.Article,
+    )
+    AppCard {
+        AppListItem(
+            icon = Icons.AutoMirrored.Rounded.Article,
+            title = stringResource(R.string.dev_options_log_viewer),
+            onViewClick = onOpenLogViewer,
+            showDivider = false,
+        )
     }
 }
 
