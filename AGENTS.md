@@ -476,6 +476,27 @@ AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。�
    （本批已踩过一次：mock 后 4 例假失败，根因是把「被测方法」也桩掉了）。
    正确做法是把判定抽成纯函数直接测，或用真实对象 + 假 KV。
 
+#### 可选能力不得拖垮核心路径（强制约束，G3 批次）
+
+`tools` 是 MCP 的**核心能力**，`prompts` / `resources` 是**可选能力**。这个区别必须
+体现在错误处理上，否则只提供工具的 server（生态里绝大多数）会连不上。
+
+1. **prompts/resources 不支持时返回空集合，不得抛异常**：`listPrompts` /
+   `listResources` 一律返回空列表。`tools/list` 失败才抛——那意味着该 server 不可用
+   （置 FAILED）。两者的失败语义不能混。
+2. **能力声明只是提示，不是保证**：`initialize` 的 `capabilities` 按规范是自述，
+   既可能「声明了但实现缺失」，也可能「没声明但能用」。故枚举前可用它做快速路径
+   **跳过请求**，但必须同时容忍「声明了却失败」并降级为空列表。
+3. **`messages` / `contents` 缺失必须抛异常，不能返回空串**：返回空串时，用户点了
+   prompt 却得到一片空白，而现象与「这个 prompt 正文就是空的」**完全无法区分**。
+   静默降级只适用于 list，不适用于 get。
+4. **prompt / resource 正文来自外部 server，属不可信数据**：必须经
+   `McpContentSanitizer` 中和后才能喂给模型，与 `tools/call` 结果同等对待。
+5. **`content` 有两种合法形状**：`tools/call` 的 `content` 是**数组**（多个块），
+   `prompts/get` 的 `message.content` 是**单个块对象**。只处理数组会让 prompt 正文恒为空。
+6. **只消费文本，不解base64**：`resources/read` 的单条 contents 若是 `blob`（二进制）
+   直接忽略，不要试着解码再喂给模型。
+
 #### server 形态与启用态必须收进治理模型（强制约束，G2 批次）
 
 规划 §5 里的 `ServerPolicy` 写的是 `name` / `kind` / `enabled` / 三组名单 / `remotelyExposed`，

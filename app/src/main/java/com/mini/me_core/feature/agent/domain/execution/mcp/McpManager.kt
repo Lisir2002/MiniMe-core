@@ -277,6 +277,53 @@ class McpManager @Inject constructor(
         }
     }
 
+    // ── G3：远端 server 的 prompts / resources 消费侧 ────────────────
+
+    /**
+     * 某 server 暴露的 prompts（远端）。
+     *
+     * 不走缓存：每次调用都实时 `prompts/list`。与 [getServerTools] 读缓存的取舍相反，
+     * 因为 prompts 是 **user-controlled**（由用户/远端显式选用），变更频率低但
+     * 「此刻有哪些可用」直接决定用户能选到什么；缓存一旦陈旧，UI 会列出已被删掉的
+     * prompt，用户点了才发现。
+     *
+     * server 未声明该能力或枚举失败时返回空列表（见 [McpClient.listPrompts]），
+     * 故调用方不必区分「不支持」与「没有」。
+     */
+    suspend fun listServerPrompts(serverName: String): List<McpPromptDescriptor> {
+        val client = synchronized(activeClients) { activeClients[serverName] }
+        return client?.listPrompts().orEmpty()
+    }
+
+    /** 某 server 暴露的 resources，语义与 [listServerPrompts] 相同。 */
+    suspend fun listServerResources(serverName: String): List<McpResourceDescriptor> {
+        val client = synchronized(activeClients) { activeClients[serverName] }
+        return client?.listResources().orEmpty()
+    }
+
+    /**
+     * 取某 server 的一个 prompt 正文（已扁平化并经内容净化）。
+     *
+     * server 不存在或未声明 prompts 能力时抛 [McpException]——这是**显式调用**
+     * 语义下的合理失败：用户点名要某个 prompt 却拿不到，必须让他知道。
+     */
+    suspend fun getServerPrompt(
+        serverName: String,
+        promptName: String,
+        arguments: Map<String, String> = emptyMap()
+    ): String {
+        val client = synchronized(activeClients) { activeClients[serverName] }
+            ?: throw McpException(message = "未连接的 server: $serverName")
+        return client.getPrompt(promptName, arguments)
+    }
+
+    /** 读某 server 的一个 resource 文本内容。语义与 [getServerPrompt] 相同。 */
+    suspend fun readServerResource(serverName: String, uri: String): String {
+        val client = synchronized(activeClients) { activeClients[serverName] }
+            ?: throw McpException(message = "未连接的 server: $serverName")
+        return client.readResource(uri)
+    }
+
     /** 断开单个服务器：关闭连接并只移除该服务器注册的工具。 */
     private fun disconnectServer(name: String) {
         synchronized(activeClients) {
