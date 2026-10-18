@@ -1019,7 +1019,15 @@ internal fun SettingsMenu(
             action = { onOpen(SettingsSection.Providers) }
         ),
         MenuItem(
-            section = SettingsSection.McpCenter,
+            // F2：入口收敛到「能力中心」这一个页面。
+            // 原先此处与能力中心是同一分组里并列的两个入口，用户要先判断「工具去哪看、
+            // MCP 去哪看」——这正是要消除的心智负担。现在 MCP 服务与内置能力同属统一能力页
+            // 的「MCP 服务」分组，本项改为跳转该页，不再作为独立 section 入口。
+            //
+            // 注意 `SettingsSection.McpCenter` 的渲染分支与其编辑能力（新增/编辑/删除 server、
+            // 日志查看）**一并保留**：它是仓库里唯一的 MCP 编辑实现载体，删掉功能即丢失。
+            // 它仅从「菜单入口」不可达，仍可由能力页与日志回跳路径抵达。
+            section = null,
             group = groupAI,
             title = stringResource(SettingsSection.McpCenter.titleRes),
             subtitle = buildString {
@@ -1045,7 +1053,7 @@ internal fun SettingsMenu(
                 stringResource(R.string.settings_keyword_tools),
                 stringResource(R.string.settings_keyword_tools),
             ),
-            action = { onOpen(SettingsSection.McpCenter) }
+            action = onNavigateToCapabilityCenter
         ),
         MenuItem(
             section = SettingsSection.Permissions,

@@ -423,6 +423,21 @@ AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。�
 7. **MCP 注解不可信**：`annotations`（`readOnlyHint` / `destructiveHint` / `idempotentHint` / `openWorldHint`）按 MCP 规范属**不可信提示**，默认值为 `destructiveHint=true` / `openWorldHint=true`。审批与安全判定必须按「假定最坏」处理，不得因工具声明了 `readOnlyHint` 就跳过审批。
 8. **灰度开关**：`NormFlowSettingsRepository.builtin_as_mcp_enabled`（默认 false）。该开关**刻意不挂 normFlow 总闸**——内置 MCP 化是协议层能力而非「规范流程」实验，挂上会语义混淆。关闭时 `McpManager` 不装载内置 server，存量行为逐字节不变。
 
+#### 统一能力页规约（强制约束，F2 批次）
+
+「能力中心」与「MCP 中心」合并为**一个页面**：内置三分组与远端 MCP server 在同一列表里管理，二者由同一个 `GroupCard` Composable 渲染（`CapabilityGroupCard` 数据类型同构——若二者形状不同，合并就名存实亡）。
+
+1. **工具注册表必须响应式**：`ToolRegistry` 内部是 `ConcurrentHashMap`，**无变更通知**，而远端 MCP 工具是运行期动态注册/注销的。故 `ToolRegistry.version: StateFlow<Long>` 是唯一变更信号，聚合层必须 `combine` 它，**禁止在构造期把 `getAvailableTools()` 存成普通 List**（旧 `CapabilityCenterViewModel` 的缺陷：进入页面后连接/断开 server，工具列表永不变化）。
+2. **版本号只在内容真变化时推进**：同名同分组重复注册（server 重连的幂等路径）**不得**推进版本号，否则每次重连都让整页重组而 UI 无变化；注销不存在的工具同样不得推进。`ToolRegistryVersionTest` 钉住这两条。
+3. **禁止缓存由注册表派生的映射**：`CapabilityRegistry` 的远端 server→工具映射每次分组重算时重建。用 `by lazy` 缓存会导致「首次算出后新增的远端工具永不出现，但总数会变」的自相矛盾。
+4. **新增依赖走数据源清单**：聚合器的 8 个数据源由 `CapabilitySources` 显式持有（豁免 `LongParameterList` 并注明理由），新增数据源只改这一处。
+5. **「需审批」徽章只认本地策略**：`ToolPermissionPolicy.ASK` 是唯一依据，**MCP `annotations` 一律不参与**——按 MCP 规范那是不可信提示，`destructiveHint` 默认 true、`readOnlyHint` 默认 false。
+6. **状态卡工具数走注册表全量**，不得按分组求和：远端 server 配置已删但工具尚未注销的窗口内，该工具不属于任何分组，求和会漏计。
+7. **入口收敛到一处**：设置页的「MCP」菜单项改为跳转统一能力页。原 `SettingsSection.McpCenter` 的渲染分支与编辑能力**保留不删**——它是仓库里唯一的 MCP 编辑实现载体（新增/编辑/删除 server、查看日志），删掉功能即丢失；仅从菜单不可达。
+8. **路由保留不删**：`capability_center` 按 `unified_capability_page_enabled` 分流到新页或旧三 Tab 页，保证存量深链与灰度回退都有效。详情页路由 `capability_group_detail/{groupId}` 的 server 名须 `Uri.encode` / `Uri.decode`（server 名含 `.`/`-`，属不可信导航参数）。
+9. **灰度开关**：`NormFlowSettingsRepository.unified_capability_page_enabled`（默认 false，不挂 normFlow 总闸）。新增开关必须同时补 `exportConfig` / `importConfig` 两处，否则配置分发会漏。
+10. **新增字符串须补英文**：`values/` 加了 key 就必须在 `values-en/` 同步，否则 `lintRelease` 的 `MissingTranslation` 直接挂门禁。
+
 ### MCP（Model Context Protocol）
 
 - **客户端（已实施）**：应用实现了 MCP 客户端（`feature/agent/domain/mcp/`），可连接远程 HTTP / 本地 stdio 服务器并动态注册其提供的工具（`McpManager` / `McpClient` / `McpTool`）。

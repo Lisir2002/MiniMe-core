@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- F2 unified capability page -->
+    <string name="capability_unified_subtitle">Built-in capabilities, MCP services and skills</string>
+    <string name="capability_group_section_builtin">Built-in</string>
+    <string name="capability_group_section_remote">MCP Services</string>
+    <string name="capability_group_section_skill">Skills</string>
+    <string name="capability_group_tool_count">%1$d tools</string>
+    <string name="capability_group_exposed">Exposed externally</string>
+    <string name="capability_group_internal_only">Internal only</string>
+    <string name="capability_badge_core">Always on</string>
+    <string name="capability_badge_deferred">On demand</string>
+    <string name="capability_badge_ask">Needs approval</string>
+    <string name="capability_remote_empty">No MCP service yet</string>
+    <string name="capability_remote_empty_subtitle">Once added, its tools are governed alongside built-in capabilities.</string>
+    <string name="capability_status_card_title">Agent overview</string>
+    <string name="capability_detail_tab_info">MCP Details</string>
+    <string name="capability_detail_tab_tools">MCP Tools</string>
+    <string name="capability_detail_enabled">Enabled</string>
+    <string name="capability_detail_disabled">Disabled</string>
+    <string name="capability_detail_group_name">Group ID</string>
+    <string name="capability_detail_kind">Type</string>
+    <string name="capability_detail_kind_builtin">Built-in MCP server (declared in code, not editable)</string>
+    <string name="capability_detail_kind_remote">External MCP server</string>
+    <string name="capability_detail_tool_count">Tool count</string>
+    <string name="capability_detail_status">Connection status</string>
+    <string name="capability_detail_group_missing">This group no longer exists</string>
+</resources>

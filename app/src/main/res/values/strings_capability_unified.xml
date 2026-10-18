@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- F2 统一能力页 -->
+    <string name="capability_unified_subtitle">内置能力、MCP 服务与技能</string>
+    <string name="capability_group_section_builtin">内置能力</string>
+    <string name="capability_group_section_remote">MCP 服务</string>
+    <string name="capability_group_section_skill">技能</string>
+    <string name="capability_group_tool_count">%1$d 个工具</string>
+    <string name="capability_group_exposed">对外暴露</string>
+    <string name="capability_group_internal_only">仅内部使用</string>
+    <string name="capability_badge_core">常驻</string>
+    <string name="capability_badge_deferred">按需</string>
+    <string name="capability_badge_ask">需审批</string>
+    <string name="capability_remote_empty">尚未添加 MCP 服务</string>
+    <string name="capability_remote_empty_subtitle">添加后其工具会与内置能力一同受治理。</string>
+    <string name="capability_status_card_title">Agent 概览</string>
+    <string name="capability_detail_tab_info">MCP 详情</string>
+    <string name="capability_detail_tab_tools">MCP 工具</string>
+    <string name="capability_detail_enabled">已启用</string>
+    <string name="capability_detail_disabled">已禁用</string>
+    <string name="capability_detail_group_name">分组标识</string>
+    <string name="capability_detail_kind">类型</string>
+    <string name="capability_detail_kind_builtin">内置 MCP server（代码内置，不可编辑）</string>
+    <string name="capability_detail_kind_remote">外部 MCP server</string>
+    <string name="capability_detail_tool_count">工具数量</string>
+    <string name="capability_detail_status">连接状态</string>
+    <string name="capability_detail_group_missing">该分组已不存在</string>
+</resources>

@@ -40,6 +40,15 @@ class McpTool(
     /** server 上的原始工具名，tools/call 必须用它。 */
     val remoteName: String = descriptor.name
 
+    /**
+     * F2：提供该工具的 server 名。
+     *
+     * 工具名本身已带 `mcp__<server>__<tool>` 命名空间前缀（见 [name]），但前缀解析不适合
+     * 作为归属判据（server 名可含 `.`、`-`，前缀匹配会有歧义）。统一能力页需要按 server
+     * 把工具归到各自的服务卡片下，故显式暴露来源，不让消费方去猜。
+     */
+    val serverName: String = client.serverName
+
     /** B3：MCP 工具一律延迟加载（与基类默认值一致，显式声明防默认值漂移）。 */
     override val exposure = ToolExposure.DEFERRED
 
