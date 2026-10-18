@@ -13,7 +13,16 @@ data class McpServerConfig(
     val args: List<String> = emptyList(),
     val env: Map<String, String> = emptyMap(),
     val enabled: Boolean = true,
+    /** 黑名单：这些工具不注册、不进模型可见面。 */
     val disabledTools: Set<String> = emptySet(),
+    /**
+     * F3：白名单（收窄到最小可见面）。非空时**只有**这些工具可用，且优先于 [disabledTools]。
+     *
+     * 为空表示「未启用白名单」，而非「白名单为空」——二者语义不同，故不能用空集区分
+     * 「没配」与「配了但一个都不给」，后者应通过 `disabledTools` 表达。
+     */
+    val enabledTools: Set<String> = emptySet(),
+    /** 灰名单：这些工具可见，但每次执行前需用户确认。 */
     val requireApprovalTools: Set<String> = emptySet(),
     /**
      * F1：内置能力分组。非空即表示这台 server 是**内置 server**（进程内 MCP server，

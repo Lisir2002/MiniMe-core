@@ -68,4 +68,8 @@
     <string name="mcp_env_value">变量值</string>
     <string name="mcp_env_value_hint">如 sk-xxxx</string>
     <string name="mcp_add_env_var">添加环境变量</string>
+
+    <!-- F3 工具治理：白名单模式 -->
+    <string name="mcp_whitelist_mode">白名单模式</string>
+    <string name="mcp_whitelist_mode_desc">仅启用被勾选的工具，其余全部隐藏</string>
 </resources>

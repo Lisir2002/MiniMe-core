@@ -184,8 +184,11 @@ class McpManager @Inject constructor(
             val client = McpClient(serverName = cfg.name, transport = transport)
             client.connect()
 
-            val tools = client.tools.map { McpTool(client, it) }
-            val enabledTools = tools.filter { it.remoteName !in cfg.disabledTools }
+            // F3：策略在此处定一次，判定逻辑全在 ServerPolicy —— 注册过滤、审批标记、
+            // UI 徽章读同一套规则，不可能各自判出不同结果。
+            val policy = ServerPolicy.from(cfg)
+            val tools = client.tools.map { McpTool(client, it, policy) }
+            val enabledTools = tools.filter { policy.isToolEnabled(it.remoteName) }
             val registered = synchronized(activeClients) {
                 activeClients[cfg.name] = client
                 val names = mutableSetOf<String>()

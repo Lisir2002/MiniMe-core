@@ -121,17 +121,38 @@ class McpConfigRepositoryImpl @Inject constructor(
                         }
                     }
                     put("enabled", server.enabled)
-                    if (server.disabledTools.isNotEmpty()) {
-                        putJsonArray("disabledTools") { server.disabledTools.forEach { add(it) } }
-                    }
-                    if (server.requireApprovalTools.isNotEmpty()) {
-                        putJsonArray("requireApprovalTools") { server.requireApprovalTools.forEach { add(it) } }
-                    }
+                    putToolGovernanceSets(server)
                 }
             }
         }
         val root = buildJsonObject { put("mcpServers", serversObj) }
         return PRETTY_JSON.encodeToString(JsonObject.serializer(), root)
+    }
+
+    /** 从配置对象读取字符串集合；键缺失或类型不符一律回退空集（fail-soft，坏字段不拖垮整个配置）。 */
+    private fun stringSet(obj: kotlinx.serialization.json.JsonObject, key: String): Set<String> =
+        (obj[key] as? kotlinx.serialization.json.JsonArray)?.mapNotNull {
+            (it as? JsonPrimitive)?.contentOrNull
+        }?.toSet() ?: emptySet()
+
+    /**
+     * 序列化工具治理三组集合（黑名单 / 白名单 / 灰名单）。
+     *
+     * 三组集合语义见 `ServerPolicy`。F3 起新增 `enabledTools`，为控制方法长度把三者
+     * 收拢到一处——新增第四组时只改这里，不会再撑爆 [serialize] 的复杂度阈值。
+     */
+    private fun kotlinx.serialization.json.JsonObjectBuilder.putToolGovernanceSets(
+        server: McpServerConfig
+    ) {
+        if (server.disabledTools.isNotEmpty()) {
+            putJsonArray("disabledTools") { server.disabledTools.forEach { add(it) } }
+        }
+        if (server.enabledTools.isNotEmpty()) {
+            putJsonArray("enabledTools") { server.enabledTools.forEach { add(it) } }
+        }
+        if (server.requireApprovalTools.isNotEmpty()) {
+            putJsonArray("requireApprovalTools") { server.requireApprovalTools.forEach { add(it) } }
+        }
     }
 
     override fun parse(raw: String): List<McpServerConfig> {
@@ -148,12 +169,10 @@ class McpConfigRepositoryImpl @Inject constructor(
             val command = (obj["command"] as? JsonPrimitive)?.contentOrNull
             val url = (obj["url"] as? JsonPrimitive)?.contentOrNull
 
-            val disabledTools = (obj["disabledTools"] as? JsonArray)?.mapNotNull {
-                (it as? JsonPrimitive)?.contentOrNull
-            }?.toSet() ?: emptySet()
-            val requireApprovalTools = (obj["requireApprovalTools"] as? JsonArray)?.mapNotNull {
-                (it as? JsonPrimitive)?.contentOrNull
-            }?.toSet() ?: emptySet()
+            val disabledTools = stringSet(obj, "disabledTools")
+            // F3：白名单。存量配置缺失该键即为空集 = 未启用白名单，行为不变。
+            val enabledTools = stringSet(obj, "enabledTools")
+            val requireApprovalTools = stringSet(obj, "requireApprovalTools")
 
             when {
                 !command.isNullOrBlank() -> {
@@ -170,6 +189,7 @@ class McpConfigRepositoryImpl @Inject constructor(
                         env = env,
                         enabled = enabled,
                         disabledTools = disabledTools,
+                        enabledTools = enabledTools,
                         requireApprovalTools = requireApprovalTools
                     )
                 }
@@ -183,6 +203,7 @@ class McpConfigRepositoryImpl @Inject constructor(
                         headers = headers,
                         enabled = enabled,
                         disabledTools = disabledTools,
+                        enabledTools = enabledTools,
                         requireApprovalTools = requireApprovalTools
                     )
                 }
