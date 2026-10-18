@@ -3,6 +3,7 @@ package com.mini.me_core.feature.agent.domain.execution.tool.explorer
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.domain.container.CommandEngine
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolParameter
@@ -36,6 +37,8 @@ class SearchCodeTool @Inject constructor(
     }
 
     override val name = "search"
+    /** B1：代码搜索为核心工具，常驻上下文（CORE）。 */
+    override val exposure = ToolExposure.CORE
     override val description = "按 rg 风格搜索文本。例：args=\"-n \\\"fun main\\\" ~/workspace/app\"。"
     override val permissionPolicy = ToolPermissionPolicy.AUTO_APPROVE
     override val capabilities = setOf(ToolCapability.READ_WORKSPACE)

@@ -3,6 +3,7 @@ package com.mini.me_core.feature.agent.domain.execution.tool.question
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolParameter
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
@@ -38,6 +39,8 @@ class AskUserQuestionTool @Inject constructor(
     }
 
     override val name = "askUserQuestion"
+    /** B1：用户提问为核心工具，常驻上下文（CORE）。 */
+    override val exposure = ToolExposure.CORE
     override val capabilities = setOf(ToolCapability.USER_INTERACTION)
 
     override val description =

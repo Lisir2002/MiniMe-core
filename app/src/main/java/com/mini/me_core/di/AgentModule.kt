@@ -301,6 +301,7 @@ object AgentModule {
         playbookAbortTool: com.mini.me_core.feature.agent.domain.execution.tool.playbook.PlaybookAbortTool,
         gitOpsTool: com.mini.me_core.feature.agent.domain.execution.tool.git.GitOpsTool,
         gitRemoteTool: com.mini.me_core.feature.agent.domain.execution.tool.git.GitRemoteTool,
+        toolCatalogTool: com.mini.me_core.feature.agent.domain.execution.tool.ToolCatalogTool,
         resultTypeRegistry: com.mini.me_core.feature.agent.domain.execution.tool.ToolResultTypeRegistry
     ): ToolRegistry {
         return ToolRegistry().apply {
@@ -375,6 +376,8 @@ object AgentModule {
             registerTool("gitops", gitOpsTool)
             // ══ 远端仓库操作工具：remote 管理、fetch/pull/push/push_tag/clone，内建推送纪律（ASK 审批）
             registerTool("git_remote", gitRemoteTool)
+            // ══ B2 工具目录元工具：DEFERRED 工具的检索入口，CORE 常驻（灰度开关关闭时无实际收窄效果）
+            registerTool("tool_catalog", toolCatalogTool)
 
             // ══ D2-3 轨迹摘要提取器登记（norm-chain §3.8.2：规则表挂 ToolResultTypeRegistry，
             //    仅少数工具定制，其余走通用截断）。提取器签名 (args, resultData) → 一行摘要。
@@ -475,6 +478,9 @@ object AgentModule {
         // ── 上下文压缩 ──
         contextCompactor: com.mini.me_core.feature.agent.domain.execution.workflow.ContextCompactor,
         observationMasker: com.mini.me_core.feature.agent.domain.execution.workflow.ObservationMasker,
+        // ── B2 工具延迟加载 ──
+        toolLoadingPolicy: com.mini.me_core.feature.agent.domain.execution.tool.ToolLoadingPolicy,
+        deferredToolExpansion: com.mini.me_core.feature.agent.domain.execution.tool.DeferredToolExpansion,
         // ── 计划审批 ──
         planApprovalManager: com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalManager,
         // ── 工具产物 ──
@@ -523,6 +529,8 @@ object AgentModule {
             promptProvider, permissionManager, policyEngine,
             // ── 上下文压缩 ──
             contextCompactor, observationMasker,
+            // ── B2 工具延迟加载 ──
+            toolLoadingPolicy, deferredToolExpansion,
             // ── 计划审批 ──
             planApprovalManager,
             // ── 工具产物 ──

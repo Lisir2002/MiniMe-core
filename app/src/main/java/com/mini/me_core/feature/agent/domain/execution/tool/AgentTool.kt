@@ -112,6 +112,21 @@ enum class ToolPermissionPolicy {
     AUTO_APPROVE, ASK
 }
 
+/**
+ * B1 工具暴露分级（Deferred Loading）：控制工具是否默认进入每轮模型上下文。
+ *
+ * 背景：内置工具已 40+，全量清单每轮下发既稀释模型注意力、又放大 token 与缓存前缀体积。
+ * 分级后仅 [CORE] 常驻，[DEFERRED] 经 `tool_catalog` 元工具检索命中或历史实际调用按需展开
+ * （LRU，见 [com.mini.me_core.feature.agent.domain.execution.tool.ToolLoadingPolicy]）。
+ * 灰度开关关闭时加载策略原样返回全量清单，存量行为不变。
+ */
+enum class ToolExposure {
+    /** 常驻：每轮默认暴露给模型（当前为核心文件/搜索/Shell/待办/计划/用户提问/模式切换 + tool_catalog）。 */
+    CORE,
+    /** 延迟加载：默认不进上下文，命中目录检索或被实际调用后按需展开。 */
+    DEFERRED
+}
+
 enum class ToolCapability {
     READ_WORKSPACE,
     WRITE_WORKSPACE,
@@ -169,6 +184,13 @@ abstract class AgentTool {
      * 新工具命名规约见 AGENTS.md「工具命名规约」：统一 snake_case，按能力域加前缀（如 browser_、git_、job_ 等）。
      */
     open val aliases: Set<String> = emptySet()
+
+    /**
+     * B1 暴露分级：默认 [ToolExposure.DEFERRED]——新工具不默认进每轮上下文（防工具清单
+     * 膨胀稀释模型注意力）；确需常驻的显式覆写为 [ToolExposure.CORE]（当前仅 10 个核心
+     * 工具 + tool_catalog 元工具，新增 CORE 需同步 ToolLoadingPolicy 的规范顺序表）。
+     */
+    open val exposure: ToolExposure = ToolExposure.DEFERRED
 
     open val permissionPolicy: ToolPermissionPolicy = ToolPermissionPolicy.AUTO_APPROVE
     open val capabilities: Set<ToolCapability> = emptySet()

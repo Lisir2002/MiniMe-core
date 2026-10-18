@@ -5,6 +5,7 @@ import com.mini.me_core.core.util.LineDiff
 import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepository
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
 import com.mini.me_core.feature.agent.domain.execution.tool.PendingToolPermission
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
@@ -35,6 +36,8 @@ class ReadFileTool @Inject constructor(
     private val v2Agent: V2AgentRepository,
 ) : AgentTool() {
     override val name = "readFile"
+    /** B1：文件读取为核心工具，常驻上下文（CORE）。 */
+    override val exposure = ToolExposure.CORE
     override val description = "读取指定路径的文件内容。支持工作区文件或容器绝对路径的系统文件。单次读取受文件大小限制，超大文件可通过 start_line 分段读取。"
     override val capabilities = setOf(ToolCapability.READ_WORKSPACE)
 
@@ -191,6 +194,8 @@ class WriteFileTool @Inject constructor(
     private val v2Agent: V2AgentRepository,
 ) : AgentTool() {
     override val name = "writeFile"
+    /** B1：文件写入为核心工具，常驻上下文（CORE）。 */
+    override val exposure = ToolExposure.CORE
     override val description = "向指定路径写入完整文件内容。若文件存在则根据 overwrite 决定是否覆盖。支持写入工作区文件或容器系统文件。局部修改推荐使用 editFile。"
     override val permissionPolicy = ToolPermissionPolicy.ASK
     override val capabilities = setOf(ToolCapability.WRITE_WORKSPACE)

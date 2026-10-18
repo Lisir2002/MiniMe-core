@@ -9,6 +9,7 @@ import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.execution.permission.DangerousCommandGuard
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
 import com.mini.me_core.feature.agent.domain.execution.tool.PendingToolPermission
 import com.mini.me_core.feature.agent.domain.execution.tool.StreamingAgentTool
@@ -133,6 +134,8 @@ class ExecuteCommandTool @Inject constructor(
     }
 
     override val name = "Bash"
+    /** B1：Shell 执行为核心工具，常驻上下文（CORE）。 */
+    override val exposure = ToolExposure.CORE
     // 历史名兼容：早期提示词/模型常直接写 bash，注册表按别名回查路由到本工具
     override val aliases = setOf("bash")
     override val description = "在容器或远程 SSH 执行 Shell 命令（npm、git 等）。耗时任务勿挂后台，改用 terminal 工具常驻管理，便于查看实时输出与管理进程。"

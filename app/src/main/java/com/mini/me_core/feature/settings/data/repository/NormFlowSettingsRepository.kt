@@ -41,6 +41,8 @@ class NormFlowSettingsRepository @Inject constructor(
         const val GUARD_PATH_BOUNDARY_ENABLED_KEY = "guard_path_boundary_enabled"
         // 用量卡片显示项（逗号分隔，默认仅 token）
         const val USAGE_CARD_ITEMS_KEY = "usage_card_items"
+        // B2 工具延迟加载（Deferred Loading）灰度开关（默认关：存量全量行为不变）
+        const val DEFERRED_TOOL_LOADING_ENABLED_KEY = "deferred_tool_loading_enabled"
     }
 
     val normFlowEnabledFlow: Flow<Boolean> = kv.observeBool(NS, NORM_FLOW_ENABLED_KEY).map { it ?: true }
@@ -72,6 +74,8 @@ class NormFlowSettingsRepository @Inject constructor(
     val usageCardItemsFlow: Flow<Set<String>> = kv.observeString(NS, USAGE_CARD_ITEMS_KEY).map { raw ->
         raw?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet() ?: setOf("token")
     }
+    // B2 工具延迟加载灰度开关（默认 false：关闭时每轮下发全量工具清单，与存量行为一致）
+    val deferredToolLoadingEnabledFlow: Flow<Boolean> = kv.observeBool(NS, DEFERRED_TOOL_LOADING_ENABLED_KEY).map { it ?: false }
 
     suspend fun setNormFlowEnabled(enabled: Boolean) { kv.putBool(NS, NORM_FLOW_ENABLED_KEY, enabled) }
     suspend fun setStepInjectEnabled(enabled: Boolean) { kv.putBool(NS, STEP_INJECT_ENABLED_KEY, enabled) }
@@ -92,6 +96,8 @@ class NormFlowSettingsRepository @Inject constructor(
     suspend fun setGuardPathBoundaryEnabled(enabled: Boolean) { kv.putBool(NS, GUARD_PATH_BOUNDARY_ENABLED_KEY, enabled) }
     // 用量卡片显示项
     suspend fun setUsageCardItems(items: Set<String>) { kv.putString(NS, USAGE_CARD_ITEMS_KEY, items.joinToString(",")) }
+    // B2 工具延迟加载灰度开关
+    suspend fun setDeferredToolLoadingEnabled(enabled: Boolean) { kv.putBool(NS, DEFERRED_TOOL_LOADING_ENABLED_KEY, enabled) }
     suspend fun getUsageCardItems(): Set<String> = usageCardItemsFlow.first()
     // 推理预算强度
     suspend fun setReasoningBudgetLevel(level: String) { kv.putString(NS, REASONING_BUDGET_LEVEL_KEY, level) }
@@ -191,6 +197,8 @@ class NormFlowSettingsRepository @Inject constructor(
     suspend fun isGuardDangerousCommandActive(): Boolean = isToolGuardActive() && guardDangerousCommandEnabledFlow.first()
     suspend fun isGuardLargeFileActive(): Boolean = isToolGuardActive() && guardLargeFileEnabledFlow.first()
     suspend fun isGuardPathBoundaryActive(): Boolean = isToolGuardActive() && guardPathBoundaryEnabledFlow.first()
+    // B2 工具延迟加载（总开关 && 自身开关；关闭时全量下发，存量行为不变）
+    suspend fun isDeferredToolLoadingActive(): Boolean = normFlowEnabledFlow.first() && deferredToolLoadingEnabledFlow.first()
 
     // 配置导出/导入（手动 JSON 构造）
     fun exportConfig(): String {
@@ -215,6 +223,7 @@ class NormFlowSettingsRepository @Inject constructor(
         kv.getBool(NS, IDLE_CONVERGE_ENABLED_KEY)?.let { entries.add("\"idle_converge_enabled\":$it") }
         kv.getInt(NS, IDLE_CONVERGE_ROUNDS_KEY)?.let { entries.add("\"idle_converge_rounds\":$it") }
         kv.getBool(NS, PLAYBOOK_AUTO_ENABLED_KEY)?.let { entries.add("\"playbook_auto_enabled\":$it") }
+        kv.getBool(NS, DEFERRED_TOOL_LOADING_ENABLED_KEY)?.let { entries.add("\"deferred_tool_loading_enabled\":$it") }
         kv.getString(NS, ACTIVE_PRESET_KEY)?.let { entries.add("\"active_preset\":\"$it\"") }
         sb.append(entries.joinToString(","))
         sb.append("}")
@@ -249,6 +258,7 @@ class NormFlowSettingsRepository @Inject constructor(
                         "idle_converge_enabled" -> kv.putBool(NS, IDLE_CONVERGE_ENABLED_KEY, value.toBoolean())
                         "idle_converge_rounds" -> kv.putInt(NS, IDLE_CONVERGE_ROUNDS_KEY, value.toLong())
                         "playbook_auto_enabled" -> kv.putBool(NS, PLAYBOOK_AUTO_ENABLED_KEY, value.toBoolean())
+                        "deferred_tool_loading_enabled" -> kv.putBool(NS, DEFERRED_TOOL_LOADING_ENABLED_KEY, value.toBoolean())
                     }
                 }
             }

@@ -7,6 +7,7 @@ import com.mini.me_core.feature.agent.domain.session.plan.PlanService
 import com.mini.me_core.feature.agent.domain.session.plan.PlanStatus
 import com.mini.me_core.feature.agent.domain.session.plan.statusEnum
 import com.mini.me_core.feature.agent.domain.execution.tool.AbstractContextualTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolParameter
@@ -51,6 +52,8 @@ class PlanTool @Inject constructor(
     }
 
     override val name = "plan"
+    /** B1：计划协作为核心工具，常驻上下文（CORE）。 */
+    override val exposure = ToolExposure.CORE
     override val description = "管理当前会话的实施计划（每会话单计划）。" +
         "action=propose 用 title + steps 提议新计划（可带 pending_selection 待定选择，供用户选择）；" +
         "action=get 读取当前计划；action=update_steps 用 steps 更新步骤（可传 plan_id 指定）；" +

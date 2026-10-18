@@ -18,6 +18,9 @@ import com.mini.me_core.feature.agent.domain.session.MessagePersistenceUseCase
 import okhttp3.OkHttpClient
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolLoadingPolicy
+import com.mini.me_core.feature.agent.domain.execution.tool.DeferredToolExpansion
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolRegistry
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
 import com.mini.me_core.feature.settings.data.remote.ModelMetadataService
@@ -70,7 +73,11 @@ class SubAgentRunner @Inject constructor(
     private val agentAssetRegistry: AgentAssetRegistry,
     private val policyEngine: ToolPermissionPolicyEngine,
     private val messagePersistenceUseCase: MessagePersistenceUseCase,
-    private val modelMetadataService: ModelMetadataService
+    private val modelMetadataService: ModelMetadataService,
+    /** B4：子代理工具白名单收窄为 CORE + tool_catalog（灰度关闭时退化为全量）。 */
+    private val toolLoadingPolicy: ToolLoadingPolicy,
+    /** B4：子代理实际调用 DEFERRED 工具时刷新主会话展开集（发现惠及主代理）。 */
+    private val deferredToolExpansion: DeferredToolExpansion
 ) {
     private companion object {
         const val TAG = "SubAgentRunner"
@@ -162,7 +169,12 @@ class SubAgentRunner @Inject constructor(
         val seed = stage.seed
         val systemPrompt = buildSystemPrompt(agentName, stageGoal, stage, seed)
         val messages = buildInitialMessages(agentName, stageGoal, sessionId, seed).toMutableList()
-        val whitelist = toolRegistry.get().getAvailableTools(AgentMode.AUTO)
+        // B4 白名单收窄：CORE + tool_catalog 常驻（灰度开关关闭时退化为全量，存量行为不变）。
+        // 注意：registry 仍是执行事实源——白名单只限制模型可见面，子代理经 catalog 发现后
+        // 直接猜名调用同样可执行（soft-hide 语义），命中记录进主会话展开集惠及主代理。
+        val whitelist = toolLoadingPolicy.assembleCoreTools(
+            toolRegistry.get().getAvailableTools(AgentMode.AUTO)
+        )
         val context = buildAgentContext(mainContext, sessionId, agentName, messages)
 
         val toolActions = mutableListOf<String>()
@@ -250,6 +262,11 @@ class SubAgentRunner @Inject constructor(
                 tool.executeWithContext(toolCall.arguments, context)
             } catch (e: Exception) {
                 ToolResult.Error("子代理工具执行失败: ${e.message}", "TOOL_EXECUTION_FAILED")
+            }
+            // B4：子代理实际调用 DEFERRED 工具 → 刷新主会话展开集（soft-hide 调用同样记录，
+            // 让主代理下一轮也能直接用该工具；CORE 常驻无需记录）。
+            if (tool.exposure == ToolExposure.DEFERRED) {
+                context.sessionId?.let { sid -> deferredToolExpansion.recordCall(sid, tool.name) }
             }
             // 写工具记录产出物路径（D5-8 阶段产物清单）。
             if (isWriteTool(toolCall)) {

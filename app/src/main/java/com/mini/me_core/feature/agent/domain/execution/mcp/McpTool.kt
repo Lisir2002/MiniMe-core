@@ -3,6 +3,7 @@ package com.mini.me_core.feature.agent.domain.execution.mcp
 import com.mini.me_core.core.util.FileLogger
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolParameter
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
 import kotlinx.serialization.json.JsonArray
@@ -23,6 +24,8 @@ import java.security.MessageDigest
  *   绕过受限的 ParameterType 枚举——MCP 工具可以有任意复杂的入参 schema。
  * - 对模型暴露的 [name] 做命名空间化（`mcp__server__tool`）并清洗成 function-calling 合法字符，
  *   避免多个 server 工具重名；真正调用时用原始 [remoteName] 走 tools/call。
+ * - B3：显式声明 [ToolExposure.DEFERRED]——MCP 工具数量不可控（多 server 叠加），
+ *   绝不默认进上下文，只经 `tool_catalog` 检索或实际调用按需展开。
  */
 class McpTool(
     private val client: McpClient,
@@ -36,6 +39,9 @@ class McpTool(
 
     /** server 上的原始工具名，tools/call 必须用它。 */
     val remoteName: String = descriptor.name
+
+    /** B3：MCP 工具一律延迟加载（与基类默认值一致，显式声明防默认值漂移）。 */
+    override val exposure = ToolExposure.DEFERRED
 
     override val name: String = buildNamespacedName(client.serverName, descriptor.name)
 

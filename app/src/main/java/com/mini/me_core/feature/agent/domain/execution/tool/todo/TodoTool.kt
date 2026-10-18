@@ -7,6 +7,7 @@ import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.core.model.TodoItem
 import com.mini.me_core.feature.agent.domain.core.model.TodoStatus
 import com.mini.me_core.feature.agent.domain.execution.tool.AbstractContextualTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolEvent
@@ -40,6 +41,8 @@ class TodoTool @Inject constructor(
     }
 
     override val name = "todo"
+    /** B1：任务清单为核心工具，常驻上下文（CORE）。 */
+    override val exposure = ToolExposure.CORE
     override val description = "用当前完整 items 列表替换会话任务清单。只需提交完整列表，" +
         "无需 action、todo_id 或单项更新。items 可为空数组表示清空；每项为 " +
         "{subject, description, status, priority}。status 可为 pending、in_progress、completed。"

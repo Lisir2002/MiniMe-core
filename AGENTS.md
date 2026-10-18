@@ -393,6 +393,16 @@ AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。�
 4. **改名/历史名迁移**：旧名通过 `AgentTool.aliases`（`override val aliases = setOf("bash")`）登记，`ToolRegistry` 查找时自动回查别名；别名只参与路由，不进入 `getToolNames()`/工具定义列表。迁移期内权限记忆、playbook 引用旧名不破。**别名与既有正式名冲突时拒绝登记**（防遮蔽）。
 5. **改名即破缓存**：正式名变更会让 Anthropic prompt 缓存前缀失效（tools 数组参与缓存），非必要不改名；确需改名必须走 aliases 过渡，并同步 `docs/tool-orchestration-optimization.md` 的度量基线。
 
+#### 工具暴露分级规约（强制约束，B 批次）
+
+内置工具 40+ 全量下发会稀释模型注意力并放大 token/缓存前缀体积，`AgentTool.exposure` 实行分级加载：
+
+1. **默认 DEFERRED**：新工具一律 `override val exposure = ToolExposure.DEFERRED`（基类默认即此），不默认进每轮上下文；MCP 工具（`McpTool`）显式 DEFERRED。
+2. **CORE 常驻白名单**：仅 10 个核心工具显式 `ToolExposure.CORE`——`readFile`/`writeFile`/`editFile`/`list`/`search`/`Bash`/`todo`/`plan`/`askUserQuestion`/`switchMode`，加 `tool_catalog` 元工具（检索入口，必须常驻）。**新增 CORE 必须同步 `ToolLoadingPolicy.CANONICAL_CORE_ORDER` 规范序表**（跨会话逐字节稳定，保缓存前缀）。
+3. **发现路径**：模型经 `tool_catalog(query=...)` 检索（`ToolCatalog`，中英混合分词），命中刷新进 `DeferredToolExpansion`（按会话 LRU，上限 12）；DEFERRED 工具被实际调用同样刷新（soft-hide：未曝光但可猜名调用，registry 仍是执行事实源）。
+4. **灰度开关**：`NormFlowSettingsRepository.deferred_tool_loading_enabled`（默认 false）。关闭时 `ToolLoadingPolicy` 原样返回全量清单，存量行为逐字节不变；开启后 CORE 规范序在前、已展开 DEFERRED 追加尾部（只增尾不重排）。
+5. **SubAgent 收窄**：`SubAgentRunner` 白名单取 CORE + catalog（`assembleCoreTools`），其 catalog 命中/调用记录进主会话展开集，发现惠及主代理。
+
 ### MCP（Model Context Protocol）
 
 - **客户端（已实施）**：应用实现了 MCP 客户端（`feature/agent/domain/mcp/`），可连接远程 HTTP / 本地 stdio 服务器并动态注册其提供的工具（`McpManager` / `McpClient` / `McpTool`）。

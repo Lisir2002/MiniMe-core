@@ -5,6 +5,7 @@ import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSessio
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.core.model.AgentMode
 import com.mini.me_core.feature.agent.domain.execution.tool.AbstractContextualTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
 import com.mini.me_core.feature.agent.domain.execution.tool.PendingToolPermission
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
@@ -38,6 +39,8 @@ class SwitchModeTool @Inject constructor(
     private val switchHistory = mutableMapOf<String, MutableList<Long>>()
 
     override val name = "switchMode"
+    /** B1：模式切换为核心工具，常驻上下文（CORE）。 */
+    override val exposure = ToolExposure.CORE
     override val description = "在 BUILD 与 PLAN 模式间切换：PLAN 构思复杂方案，BUILD 落地修改。切换需用户授权；AUTO 模式只能在界面手动进入，处于 AUTO 时可用本工具切到 PLAN 退出。"
     override val permissionPolicy = ToolPermissionPolicy.ASK
     override val capabilities = setOf(ToolCapability.MODIFY_SESSION_STATE)

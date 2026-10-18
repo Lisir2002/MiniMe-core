@@ -34,9 +34,12 @@ import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillScope
 import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillStateRepository
 import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillType
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.DeferredToolExpansion
 import com.mini.me_core.feature.agent.domain.execution.tool.StreamingAgentTool
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolBatchPolicy
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolLoadingPolicy
 import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalChoice
 import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalManager
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionManager
@@ -116,6 +119,10 @@ class StatefulAgentWorkflow @Inject constructor(
     private val contextCompactor: ContextCompactor,
     /** D1 Observation Masking：发送前把旧轮次工具输出占位符化（不落库的请求视图）。 */
     private val observationMasker: ObservationMasker,
+    /** B2 延迟加载：每轮按 CORE + 展开集重组模型可见工具清单（灰度开关关闭时返回全量）。 */
+    private val toolLoadingPolicy: ToolLoadingPolicy,
+    /** B2 延迟加载：按会话记录 catalog 命中/实际调用，LRU 维护 DEFERRED 工具展开集。 */
+    private val deferredToolExpansion: DeferredToolExpansion,
     private val planApprovalManager: PlanApprovalManager,
     private val toolOutputStore: ToolOutputStore,
     private val modelMetadataService: ModelMetadataService,
@@ -383,6 +390,11 @@ class StatefulAgentWorkflow @Inject constructor(
             )
         }
         val tool = toolRegistry.getTool(call.name)
+        // B2 延迟加载：DEFERRED 工具被实际调用即刷新展开集（LRU）——模型正在用的工具
+        // 不会在下一轮重组时丢出上下文；CORE 工具本就常驻，无需记录（省 LRU 配额）。
+        if (tool != null && tool.exposure == ToolExposure.DEFERRED) {
+            currentContext.sessionId?.let { sid -> deferredToolExpansion.recordCall(sid, tool.name) }
+        }
         val policy = tool?.retryPolicy ?: RetryPolicy()
         // D2-3 耗时采集：单工具执行（含自动重试）的墙钟耗时，供轨迹/用量卡片聚合。
         val startMs = System.currentTimeMillis()
@@ -1044,6 +1056,12 @@ class StatefulAgentWorkflow @Inject constructor(
                         // 仅作用于发送给模型的消息，不写回 state/DB：完整输出留在历史里可按需取回。
                         // system+tools 前缀（A1/A2 缓存断点所在）不受本变换影响，缓存稳定性保持。
                         val requestMessages = observationMasker.mask(compactedMessages)
+
+                        // B2 延迟加载：重组本轮模型可见工具清单——CORE 规范序常驻 +
+                        // 本会话已展开的 DEFERRED 工具尾部追加（上一轮 catalog 命中/实际调用刷新）。
+                        // 灰度开关关闭时原样返回全量（存量行为不变）；tools 前缀顺序确定，
+                        // 展开只增尾部不重排，prompt 缓存前缀（A1）不漂移。
+                        currentTools = toolLoadingPolicy.assembleRoundTools(currentContext.sessionId, tools)
 
                         // 正文累积同样走流式归一化（AUTO_DETECT）：防御兼容网关全量重发 content 导致的
                         // 正文线性放大，并附带裸 base64 折叠 + 200k 长度护栏。

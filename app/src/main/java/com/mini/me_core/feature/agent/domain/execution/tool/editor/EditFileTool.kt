@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.agent.domain.execution.tool.editor
 
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ParameterType
 import com.mini.me_core.feature.agent.domain.execution.tool.PendingToolPermission
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
@@ -57,6 +58,8 @@ class EditFileTool @Inject constructor(
     private val v2Agent: V2AgentRepository,
 ) : AgentTool() {
     override val name = "editFile"
+    /** B1：文件编辑为核心工具，常驻上下文（CORE）。 */
+    override val exposure = ToolExposure.CORE
     override val description =
         "精确字符串替换修改已有文件，局部修改首选。edits 多处修改整批原子执行，任一处失配即整批回滚；整文件重写用 writeFile。"
     override val permissionPolicy = ToolPermissionPolicy.ASK

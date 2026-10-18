@@ -5,6 +5,7 @@ import com.mini.me_core.datalayer.repository.AgentRepository as V2AgentRepositor
 import com.mini.me_core.datalayer.store.GenerationMarkerStore
 import com.mini.mecore.datalayer.sqldelight.agent.Agent_session as V2AgentSession
 import com.mini.me_core.feature.agent.domain.execution.workflow.CompactionCooldown
+import com.mini.me_core.feature.agent.domain.execution.tool.DeferredToolExpansion
 import com.mini.me_core.feature.agent.presentation.MessageRole
 import java.util.UUID
 import javax.inject.Inject
@@ -16,6 +17,8 @@ class SessionUseCase @Inject constructor(
     private val generationMarkerStore: GenerationMarkerStore,
     /** D2：会话删除时清理压缩冷却窗口记录，避免 Map 随会话删除无限增长。 */
     private val compactionCooldown: CompactionCooldown,
+    /** B2：会话删除时清理延迟加载展开集记录，避免 Map 随会话删除无限增长。 */
+    private val deferredToolExpansion: DeferredToolExpansion,
 ) {
     companion object {
         private const val TAG = "SessionUseCase"
@@ -129,6 +132,7 @@ class SessionUseCase @Inject constructor(
     suspend fun deleteSession(sessionId: String) {
         v2Agent.deleteSession(sessionId)
         compactionCooldown.forget(sessionId)
+        deferredToolExpansion.forget(sessionId)
     }
 
     suspend fun deleteSessionsByWorkspace(workspacePath: String): Int {
@@ -136,6 +140,7 @@ class SessionUseCase @Inject constructor(
         sessions.forEach {
             v2Agent.deleteSession(it.id)
             compactionCooldown.forget(it.id)
+            deferredToolExpansion.forget(it.id)
         }
         FileLogger.i(TAG, "工作区级联删除 ${sessions.size} 个会话（workspacePath=$workspacePath）")
         return sessions.size
