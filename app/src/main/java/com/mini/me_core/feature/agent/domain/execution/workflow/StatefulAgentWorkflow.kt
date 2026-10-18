@@ -35,6 +35,7 @@ import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillStateRepositor
 import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillType
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
 import com.mini.me_core.feature.agent.domain.execution.tool.StreamingAgentTool
+import com.mini.me_core.feature.agent.domain.execution.tool.ToolBatchPolicy
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
 import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalChoice
 import com.mini.me_core.feature.agent.domain.execution.tool.mode.PlanApprovalManager
@@ -89,6 +90,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Named
 
@@ -346,6 +348,68 @@ class StatefulAgentWorkflow @Inject constructor(
         /** 仅 sendFile 等展示型工具：随结果附带的文件卡片元数据，供 UI 渲染，不回放进模型上下文。 */
         val attachments: List<com.mini.me_core.feature.agent.presentation.AgentAttachment> = emptyList()
     )
+
+    /**
+     * C2 单调用执行（partial failure 语义）：
+     * - 依赖调用已失败 → 跳过（[ToolBatchPolicy.DEPENDENCY_FAILED_CODE]），不盲跑；
+     * - 执行抛异常 → 错误结果归档，不连坐同层其余调用；
+     * - 协程取消必须传播（CancellationException 不当工具失败吞掉）。
+     * 耗时采集与自动重试经 [ToolDependencyScheduler.runWithRetry]（D2-3）。
+     *
+     * @param plan 调度计划，提供依赖图供跳过判定
+     * @param resultsById 本批已完成结果（并发 Map；依赖必在更早层，读取无竞态）
+     * @param emit 流式过程输出转发（channelFlow 的 send）
+     */
+    private suspend fun runBatchCall(
+        call: ToolCall,
+        plan: ToolDependencyScheduler.SchedulePlan,
+        resultsById: ConcurrentHashMap<String, ToolRunResult>,
+        currentContext: AgentContext,
+        emit: suspend (AgentEvent) -> Unit
+    ): ToolRunResult {
+        val failedDep = ToolBatchPolicy.failedDependency(call, plan.dependencies) { depId ->
+            resultsById[depId]?.isError == true
+        }
+        if (failedDep != null) {
+            return ToolRunResult(
+                ToolResult.Error(
+                    "依赖的调用 $failedDep 失败，本调用已跳过",
+                    ToolBatchPolicy.DEPENDENCY_FAILED_CODE
+                ).toTransportString(),
+                true,
+                errorClass = ToolErrorClass.FATAL
+            )
+        }
+        val tool = toolRegistry.getTool(call.name)
+        val policy = tool?.retryPolicy ?: RetryPolicy()
+        // D2-3 耗时采集：单工具执行（含自动重试）的墙钟耗时，供轨迹/用量卡片聚合。
+        val startMs = System.currentTimeMillis()
+        return try {
+            val result = dependencyScheduler.runWithRetry(
+                tool, call,
+                execute = { t, c ->
+                    if (t is StreamingAgentTool) {
+                        toolBatchExecutor.runStream(t, c, currentContext) { emit(it) }
+                    } else {
+                        toolBatchExecutor.runSync(t, c, currentContext)
+                    }
+                },
+                isRetryable = { r ->
+                    r.isError && r.errorClass?.let { it in policy.retryable } == true
+                }
+            )
+            result.copy(durationMs = (System.currentTimeMillis() - startMs).coerceAtLeast(0))
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (e: Exception) {
+            ToolRunResult(
+                ToolResult.Error("工具执行异常: ${e.message}", "TOOL_EXCEPTION").toTransportString(),
+                true,
+                errorClass = ToolErrorClass.FATAL,
+                durationMs = (System.currentTimeMillis() - startMs).coerceAtLeast(0)
+            )
+        }
+    }
 
     /** 需要在外部环境中执行的副作用 (SideEffect) */
     sealed interface AgentSideEffect {
@@ -1337,52 +1401,48 @@ class StatefulAgentWorkflow @Inject constructor(
                         val runResults = if (toolCalls.isEmpty()) {
                             emptyList()
                         } else {
-                            // L4 依赖感知调度：按工具声明的 dependsOn 构建依赖图并拓扑分层，
-                            // 无依赖的工具并行、有依赖的自动串行；可重试错误按指数退避自动重试。
-                            val plan = dependencyScheduler.buildSchedule(toolCalls, toolRegistry)
-                            if (plan.hasCycle) {
-                                toolCalls.map { call ->
-                                    ToolRunResult(
-                                        ToolResult.Error("调度失败: ${plan.cycleMessage}", "DEPENDENCY_CYCLE").toTransportString(),
-                                        true,
-                                        errorClass = ToolErrorClass.FATAL
-                                    )
-                                }
-                            } else {
-                                val resultsById = HashMap<String, ToolRunResult>()
-                                for (layer in plan.layers) {
-                                    coroutineScope {
-                                        layer.map { call ->
-                                            async {
-                                                val tool = toolRegistry.getTool(call.name)
-                                                val policy = tool?.retryPolicy ?: RetryPolicy()
-                                                // D2-3 耗时采集：单工具执行（含自动重试）的墙钟耗时，供轨迹/用量卡片聚合。
-                                                val startMs = System.currentTimeMillis()
-                                                val result = dependencyScheduler.runWithRetry(
-                                                    tool, call,
-                                                    execute = { t, c ->
-                                                        if (t is StreamingAgentTool) {
-                                                            toolBatchExecutor.runStream(t, c, currentContext) { send(it) }
-                                                        } else {
-                                                            toolBatchExecutor.runSync(t, c, currentContext)
-                                                        }
-                                                    },
-                                                    isRetryable = { r ->
-                                                        r.isError && r.errorClass?.let { it in policy.retryable } == true
-                                                    }
-                                                )
-                                                resultsById[call.id] = result.copy(durationMs = (System.currentTimeMillis() - startMs).coerceAtLeast(0))
+                            // C2 partial failure：async 块并发写结果，须用并发 Map（普通 HashMap 并发 put 有丢写/结构损坏风险）。
+                            val resultsById = ConcurrentHashMap<String, ToolRunResult>()
+                            // C2 batch 上限：单回合超过 MAX_CALLS_PER_BATCH 的调用分 chunk 顺序执行
+                            // （chunk 间天然保序，跨 chunk 的依赖调用仍在先者完成后再跑；防一次打爆下游）。
+                            for (chunk in ToolBatchPolicy.chunkCalls(toolCalls)) {
+                                // L4 依赖感知调度：按工具声明的 dependsOn 构建依赖图并拓扑分层，
+                                // 无依赖的工具并行、有依赖的自动串行；可重试错误按指数退避自动重试。
+                                val plan = dependencyScheduler.buildSchedule(chunk, toolRegistry)
+                                if (plan.hasCycle) {
+                                    chunk.forEach { call ->
+                                        resultsById[call.id] = ToolRunResult(
+                                            ToolResult.Error("调度失败: ${plan.cycleMessage}", "DEPENDENCY_CYCLE").toTransportString(),
+                                            true,
+                                            errorClass = ToolErrorClass.FATAL
+                                        )
+                                    }
+                                } else {
+                                    for (layer in plan.layers) {
+                                        // C2 写操作同层串行：层内任一调用具备写操作能力 → 串行保写顺序。
+                                        if (ToolBatchPolicy.layerRequiresSerialization(layer, toolRegistry)) {
+                                            layer.forEach { call ->
+                                                resultsById[call.id] = runBatchCall(call, plan, resultsById, currentContext) { send(it) }
                                             }
-                                        }.awaitAll()
+                                        } else {
+                                            coroutineScope {
+                                                layer.map { call ->
+                                                    async {
+                                                        resultsById[call.id] = runBatchCall(call, plan, resultsById, currentContext) { send(it) }
+                                                    }
+                                                }.awaitAll()
+                                            }
+                                        }
                                     }
                                 }
-                                // 按原始顺序返回，保证与 toolCalls.forEachIndexed 组装结果一致。
-                                toolCalls.map {
-                                    resultsById[it.id] ?: ToolRunResult(
-                                        ToolResult.Error("工具未执行", "TOOL_NOT_EXECUTED").toTransportString(),
-                                        true
-                                    )
-                                }
+                            }
+                            // 按原始顺序返回，保证与 toolCalls.forEachIndexed 组装结果一致。
+                            // partial failure 语义：每个 call ID 都有结果（含跳过/异常兜底）。
+                            toolCalls.map {
+                                resultsById[it.id] ?: ToolRunResult(
+                                    ToolResult.Error("工具未执行", "TOOL_NOT_EXECUTED").toTransportString(),
+                                    true
+                                )
                             }
                         }
 

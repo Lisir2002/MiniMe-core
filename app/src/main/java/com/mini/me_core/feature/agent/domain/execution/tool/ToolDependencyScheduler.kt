@@ -14,9 +14,13 @@ class ToolDependencyScheduler {
 
     /**
      * 分层执行计划：每层内的 call 可并行，层间按依赖序串行。
+     *
+     * @param dependencies callId -> 须先执行的依赖 callId 集合。C2 partial failure 语义：
+     *   依赖调用失败时后续调用据此判定跳过（见 [ToolBatchPolicy.failedDependency]）。
      */
     data class SchedulePlan(
         val layers: List<List<ToolCall>>,
+        val dependencies: Map<String, Set<String>> = emptyMap(),
         /** 检测到循环依赖时的描述；非 null 表示调度失败，不应执行。 */
         val cycleMessage: String? = null
     ) {
@@ -66,7 +70,7 @@ class ToolDependencyScheduler {
                 val cycle = remaining.joinToString(" -> ") { byId[it]?.name ?: it }
                 return SchedulePlan(emptyList(), cycleMessage = "检测到循环依赖: $cycle")
             }
-            layers.add(ready.mapNotNull { byId[it] })
+                layers.add(ready.mapNotNull { byId[it] })
             ready.forEach { id ->
                 remaining.remove(id)
                 dependents[id]?.forEach { dep ->
@@ -74,7 +78,7 @@ class ToolDependencyScheduler {
                 }
             }
         }
-        return SchedulePlan(layers)
+        return SchedulePlan(layers, dependencies = deps)
     }
 
     /**
