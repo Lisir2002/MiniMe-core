@@ -1059,6 +1059,11 @@
     <string name="chat_context_compressed">Context compressed</string>
     <string name="chat_compressing_context">Compressing context</string>
     <string name="chat_retrying">Network fluctuation, retrying %1$s/%2$s</string>
+    <string name="chat_retrying_connection">Unstable connection, retrying %1$s/%2$s</string>
+    <string name="chat_retrying_slow_server">Server responding slowly, retrying %1$s/%2$s</string>
+    <string name="chat_retrying_rate_limit">Rate limited, retrying %1$s/%2$s</string>
+    <string name="chat_retrying_server_busy">Server busy, retrying %1$s/%2$s</string>
+    <string name="chat_retrying_stream_api">Server stream error, retrying %1$s/%2$s</string>
     <string name="llm_error_network_abort">Connection interrupted. Check your network and try again.</string>
     <string name="llm_error_network_reset">Connection reset. Check your network and try again.</string>
     <string name="llm_error_dns">Could not resolve the server address. Check your network or DNS settings.</string>

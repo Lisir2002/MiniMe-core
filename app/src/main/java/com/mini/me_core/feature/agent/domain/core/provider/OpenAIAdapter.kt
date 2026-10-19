@@ -270,7 +270,7 @@ class OpenAIAdapter @Inject constructor(
             AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
             val watchdogFired = java.util.concurrent.atomic.AtomicBoolean(false)
             try {
-                streamWithStaircaseRetry(attemptOnce = { onProduced ->
+                streamWithStaircaseRetry(attemptOnce = { attempt, onProduced ->
                     watchdogFired.set(false)
                     val textBuilder = StringBuilder()
                     val toolAccs = LinkedHashMap<Int, OpenAIToolAcc>()
@@ -285,9 +285,13 @@ class OpenAIAdapter @Inject constructor(
                     )
 
                     body.use { rb ->
-                        // 首字节超时 watchdog：60s 内未收到首个内容块则关闭流，触发可重试的 IOException。
+                        // 首字节超时 watchdog：渐进式耐心（见 progressiveFirstByteTimeoutMs），
+                        // 重试逐级加码，避免把「服务端慢思考」误杀成连接中断。
                         val firstByteReceived = java.util.concurrent.atomic.AtomicBoolean(false)
-                        val watchdog = launchFirstByteWatchdog({ watchdogFired.set(true); rb.close() }) { firstByteReceived.get() }
+                        val watchdog = launchFirstByteWatchdog(
+                            { watchdogFired.set(true); rb.close() },
+                            timeoutMs = progressiveFirstByteTimeoutMs(attempt, requestTimeout)
+                        ) { firstByteReceived.get() }
                         val closeHandle = coroutineContext[Job]?.invokeOnCompletion {
                             runCatching { rb.close() }
                         }
@@ -369,7 +373,7 @@ class OpenAIAdapter @Inject constructor(
                     onProduced()
                     emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = finishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens)))
                 },
-                onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) },
+                onRetry = { attempt, max, reason -> emit(AIStreamChunk.Retrying(attempt, max, reason)) },
                 maxRetries = retryCount.coerceAtLeast(0)
             )
             } catch (e: CancellationException) {
@@ -407,7 +411,7 @@ class OpenAIAdapter @Inject constructor(
         // 首字节前失败可安全重试；一旦开始吐字（onProduced 已调用）再失败则上抛，避免重复文本。
         try {
             streamWithStaircaseRetry(
-                attemptOnce = { onProduced ->
+                attemptOnce = { attempt, onProduced ->
             watchdogFired.set(false)
             val textBuilder = StringBuilder()
             // tool_call index -> 累积中的工具调用（保序）。
@@ -423,10 +427,10 @@ class OpenAIAdapter @Inject constructor(
             )
 
             body.use { rb ->
-                // 首字节超时 watchdog：requestTimeout 秒内未收到首个内容块则关闭流，触发可重试的 IOException。
+                // 首字节超时 watchdog：渐进式耐心（见 progressiveFirstByteTimeoutMs）。
                 // 非流式请求的超时由共享 OkHttp client 控制（120s），requestTimeout 主要影响流式首字节等待。
                 val firstByteReceived = java.util.concurrent.atomic.AtomicBoolean(false)
-                val watchdogTimeoutMs = (requestTimeout * 1000L).coerceAtLeast(MIN_FIRST_BYTE_TIMEOUT_MS)
+                val watchdogTimeoutMs = progressiveFirstByteTimeoutMs(attempt, requestTimeout)
                 val watchdog = launchFirstByteWatchdog(
                     { watchdogFired.set(true); rb.close() },
                     timeoutMs = watchdogTimeoutMs
@@ -518,7 +522,7 @@ class OpenAIAdapter @Inject constructor(
             onProduced()
             emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = finishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens)))
             },
-            onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) },
+            onRetry = { attempt, max, reason -> emit(AIStreamChunk.Retrying(attempt, max, reason)) },
             maxRetries = retryCount.coerceAtLeast(0)
             )
         } catch (e: CancellationException) {

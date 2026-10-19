@@ -54,6 +54,7 @@ import com.mini.me_core.core.theme.Radius
 import com.mini.me_core.core.theme.Spacing
 import com.mini.me_core.core.theme.LocalAppDarkMode
 import com.mini.me_core.core.theme.tokens.LocalAppTheme
+import com.mini.me_core.feature.agent.domain.core.provider.RetryReason
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
@@ -109,9 +110,22 @@ internal fun CompactionProgressBubble() {
     }
 }
 
-/** 网络重试期间的临时状态气泡，不落库。 */
+/** 网络重试期间的临时状态气泡，不落库。
+ *
+ * 文案按 [RetryReason] 分化：历史实现一律显示「网络波动」，把「服务端慢思考」
+ * 「触发限速」也误导成网络问题（好网络下用户频繁看到即源于此）。诚实的原因文案
+ * 让用户知道该检查什么。
+ */
 @Composable
-internal fun RetryingBubble(attempt: Int, maxRetries: Int) {
+internal fun RetryingBubble(attempt: Int, maxRetries: Int, reason: RetryReason = RetryReason.UNKNOWN) {
+    val messageRes = when (reason) {
+        RetryReason.CONNECTION -> R.string.chat_retrying_connection
+        RetryReason.SLOW_SERVER -> R.string.chat_retrying_slow_server
+        RetryReason.RATE_LIMIT -> R.string.chat_retrying_rate_limit
+        RetryReason.SERVER_BUSY -> R.string.chat_retrying_server_busy
+        RetryReason.STREAM_API -> R.string.chat_retrying_stream_api
+        RetryReason.UNKNOWN -> R.string.chat_retrying
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start
@@ -127,7 +141,7 @@ internal fun RetryingBubble(attempt: Int, maxRetries: Int) {
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Text(
-                    text = stringResource(R.string.chat_retrying, attempt, maxRetries),
+                    text = stringResource(messageRes, attempt, maxRetries),
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium
                 )

@@ -1010,7 +1010,7 @@ class AIAgentViewModel @Inject constructor(
                         maybePeriodicPersist(sessionId, taskId, latestStreamingContent, latestStreamingReasoning)
                     }
                     is AgentEvent.Retrying -> {
-                        setRetryState(sessionId, RetryState(event.attempt, event.maxRetries))
+                        setRetryState(sessionId, RetryState(event.attempt, event.maxRetries, event.reason))
                     }
                     is AgentEvent.CompactionStarted -> {
                         setRetryState(sessionId, null)

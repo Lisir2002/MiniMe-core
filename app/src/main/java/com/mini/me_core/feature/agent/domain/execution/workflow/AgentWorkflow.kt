@@ -3,6 +3,7 @@ package com.mini.me_core.feature.agent.domain.execution.workflow
 import com.mini.me_core.feature.agent.domain.core.model.AgentContext
 import com.mini.me_core.feature.agent.domain.core.model.AgentMode
 import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorKind
+import com.mini.me_core.feature.agent.domain.core.provider.RetryReason
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCall
 import kotlinx.coroutines.flow.Flow
@@ -46,8 +47,16 @@ sealed class AgentEvent {
         val attachments: List<com.mini.me_core.feature.agent.presentation.AgentAttachment> = emptyList()
     ) : AgentEvent()
 
-    /** 网络请求正在重试（首字节前失败触发自动重试）。仅用于 UI 实时展示，不落库。 */
-    data class Retrying(val attempt: Int, val maxRetries: Int) : AgentEvent()
+    /**
+     * 网络请求正在重试（首字节前失败触发自动重试）。仅用于 UI 实时展示，不落库。
+     *
+     * [reason] 区分重试原因，UI 按原因出文案——好网络下「服务端慢思考」不该报成「网络波动」。
+     */
+    data class Retrying(
+        val attempt: Int,
+        val maxRetries: Int,
+        val reason: RetryReason = RetryReason.UNKNOWN
+    ) : AgentEvent()
 
     /** 正在进行上下文压缩。仅用于 UI 实时展示，不落库。 */
     data class CompactionStarted(val estimatedTokens: Int) : AgentEvent()

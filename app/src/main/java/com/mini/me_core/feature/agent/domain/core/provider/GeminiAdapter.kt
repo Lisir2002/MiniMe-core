@@ -236,7 +236,7 @@ class GeminiAdapter @Inject constructor(
 
         try {
             streamWithStaircaseRetry(
-                attemptOnce = { onProduced ->
+                attemptOnce = { attempt, onProduced ->
                 watchdogFired.set(false)
                 val textBuilder = StringBuilder()
                 val toolCalls = mutableListOf<ToolCall>()
@@ -247,13 +247,13 @@ class GeminiAdapter @Inject constructor(
                 val body = streamingApi.streamGenerateContent(url = url, apiKey = apiKey, request = request)
 
                 body.use { rb ->
-                    // 首字节超时 watchdog：requestTimeout 秒内未收到首个内容块则关闭流，触发可重试的 IOException。
+                    // 首字节超时 watchdog：渐进式耐心（见 progressiveFirstByteTimeoutMs），
+                    // 重试逐级加码，避免把「服务端慢思考」误杀成连接中断。
                     // 非流式请求的超时由共享 OkHttp client 控制（120s），requestTimeout 主要影响流式首字节等待。
                     val firstByteReceived = java.util.concurrent.atomic.AtomicBoolean(false)
-                    val watchdogTimeoutMs = (requestTimeout * 1000L).coerceAtLeast(MIN_FIRST_BYTE_TIMEOUT_MS)
                     val watchdog = launchFirstByteWatchdog(
                         { watchdogFired.set(true); rb.close() },
-                        timeoutMs = watchdogTimeoutMs
+                        timeoutMs = progressiveFirstByteTimeoutMs(attempt, requestTimeout)
                     ) { firstByteReceived.get() }
                     val closeHandle = coroutineContext[Job]?.invokeOnCompletion {
                         runCatching { rb.close() }
@@ -326,7 +326,7 @@ class GeminiAdapter @Inject constructor(
                 onProduced()
                 emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = currentFinishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens)))
                 },
-                onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) },
+                onRetry = { attempt, max, reason -> emit(AIStreamChunk.Retrying(attempt, max, reason)) },
                 maxRetries = retryCount.coerceAtLeast(0)
             )
         } catch (e: CancellationException) {

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import com.mini.me_core.feature.agent.domain.core.model.AgentImage
 import com.mini.me_core.feature.agent.domain.core.model.WorkflowStatus
 import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorKind
+import com.mini.me_core.feature.agent.domain.core.provider.RetryReason
 import com.mini.me_core.feature.agent.presentation.component.EnvironmentComponentState
 import kotlinx.serialization.Serializable
 
@@ -19,9 +20,15 @@ sealed class AgentUIState {
 /**
  * 网络请求重试状态（仅用于 UI 实时展示「正在重试 (N/M)...」提示）。
  * 与 [AgentUIState] 解耦：重试是 Streaming 的子状态，不改变顶层 agent 状态机。
+ *
+ * [reason] 决定气泡文案：好网络下的「服务端慢思考」不该显示成「网络波动」。
  */
 @Immutable
-data class RetryState(val attempt: Int, val maxRetries: Int)
+data class RetryState(
+    val attempt: Int,
+    val maxRetries: Int,
+    val reason: RetryReason = RetryReason.UNKNOWN
+)
 
 @Immutable
 data class AgentUIMessage(

@@ -724,7 +724,7 @@ fun AIChatPanel(
                                 TailKind.COMPACTING -> CompactionProgressBubble()
                                 TailKind.RETRYING -> {
                                     val rs = retryState
-                                    if (rs != null) RetryingBubble(rs.attempt, rs.maxRetries) else Box(Modifier)
+                                    if (rs != null) RetryingBubble(rs.attempt, rs.maxRetries, rs.reason) else Box(Modifier)
                                 }
                                 TailKind.NONE -> Box(Modifier)
                             }

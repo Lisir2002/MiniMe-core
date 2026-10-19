@@ -56,8 +56,17 @@ sealed class AIStreamChunk {
     /** 模型新吐出的一小段思考过程（增量，非累积）。仅用于 UI 实时展示，不进入上下文回放。 */
     data class ReasoningDelta(val text: String) : AIStreamChunk()
     data class Final(val response: AIResponse) : AIStreamChunk()
-    /** 网络请求正在重试。仅用于 UI 实时展示，不进入上下文回放。 */
-    data class Retrying(val attempt: Int, val maxRetries: Int) : AIStreamChunk()
+    /**
+     * 网络请求正在重试。仅用于 UI 实时展示，不进入上下文回放。
+     *
+     * [reason] 区分重试原因（连接不稳 / 服务端慢 / 限速），UI 按原因出文案——
+     * 历史教训：好网络下把「服务端慢思考」误报成「网络波动」是重信任体感的头号来源。
+     */
+    data class Retrying(
+        val attempt: Int,
+        val maxRetries: Int,
+        val reason: RetryReason = RetryReason.UNKNOWN
+    ) : AIStreamChunk()
 }
 
 interface AIProvider {

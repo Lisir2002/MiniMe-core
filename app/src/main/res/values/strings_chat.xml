@@ -108,6 +108,12 @@
     <string name="chat_context_compressed">上下文已压缩</string>
     <string name="chat_compressing_context">正在压缩上下文</string>
     <string name="chat_retrying">网络波动，正在重试 %1$s/%2$s</string>
+    <!-- 重试原因分化文案：诚实告知用户真实原因，不再一律「网络波动」 -->
+    <string name="chat_retrying_connection">连接不稳定，正在重试 %1$s/%2$s</string>
+    <string name="chat_retrying_slow_server">服务端响应慢，正在重试 %1$s/%2$s</string>
+    <string name="chat_retrying_rate_limit">触发限速，正在重试 %1$s/%2$s</string>
+    <string name="chat_retrying_server_busy">服务端繁忙，正在重试 %1$s/%2$s</string>
+    <string name="chat_retrying_stream_api">服务端流式错误，正在重试 %1$s/%2$s</string>
     <!-- LLM 失败归类横幅标题（kind → 友好文案；原文仍可在展开后查看） -->
     <string name="llm_error_network_abort">网络连接中断，请检查网络后重试</string>
     <string name="llm_error_network_reset">网络连接被重置，请检查网络后重试</string>

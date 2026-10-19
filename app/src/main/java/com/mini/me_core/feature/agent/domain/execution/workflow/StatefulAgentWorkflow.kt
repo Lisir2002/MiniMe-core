@@ -23,6 +23,7 @@ import com.mini.me_core.feature.agent.domain.core.provider.AIResponse
 import com.mini.me_core.feature.agent.domain.core.provider.AIStreamChunk
 import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorClassifier
 import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorKind
+import com.mini.me_core.feature.agent.domain.core.provider.RetryReason
 import com.mini.me_core.feature.agent.domain.core.provider.SystemPromptSegment
 import com.mini.me_core.feature.agent.domain.core.provider.isRetriableNetworkError
 import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
@@ -1120,7 +1121,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                                 reasoningAcc.reset()
                                                 textThrottle.reset()
                                                 reasoningThrottle.reset()
-                                                send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries))
+                                                send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries, chunk.reason))
                                             }
                                             is AIStreamChunk.Final -> finalResponse = chunk.response
                                         }
@@ -1147,7 +1148,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                         if (fallback != null) {
                                             fallbackUsed = true
                                             FileLogger.i(TAG, "主 provider [${activeConfig.name}] 首字节前失败，故障转移到备用 provider [${activeConfig.fallbackProviderId}]: ${e.message}")
-                                            send(AgentEvent.Retrying(1, 1))
+                                            send(AgentEvent.Retrying(1, 1, RetryReason.CONNECTION))
                                             streamProvider = fallback
                                             continue
                                         }
@@ -1300,7 +1301,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                             reasoning2.reset()
                                             textThrottle2.reset()
                                             reasoningThrottle2.reset()
-                                            send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries))
+                                            send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries, chunk.reason))
                                         }
                                         is AIStreamChunk.Final -> final2 = chunk.response
                                     }

@@ -1222,7 +1222,7 @@
     <ID>FunctionNaming:StatusBubbles.kt$@Composable internal fun BlinkingCursor(color: androidx.compose.ui.graphics.Color)</ID>
     <ID>FunctionNaming:StatusBubbles.kt$@Composable internal fun CompactionProgressBubble()</ID>
     <ID>FunctionNaming:StatusBubbles.kt$@Composable internal fun ReasoningBubble( text: String, initiallyExpanded: Boolean = true, cache: MarkdownRenderCache? = null, // 问题23：是否处于「思考仍在进行」阶段（流式思考中且正文尚未开始）。 // 为 true 时在内容末尾显示跳动点，明确「思考仍在继续」；思考分块到达的间隙动画不消失。 // 一旦正文开始流式（live=false），动画移交给 StreamingBubble，此处不再重复打点。 live: Boolean = false )</ID>
-    <ID>FunctionNaming:StatusBubbles.kt$@Composable internal fun RetryingBubble(attempt: Int, maxRetries: Int)</ID>
+    <ID>FunctionNaming:StatusBubbles.kt$@Composable internal fun RetryingBubble(attempt: Int, maxRetries: Int, reason: RetryReason = RetryReason.UNKNOWN)</ID>
     <ID>FunctionNaming:StatusBubbles.kt$@Composable internal fun StreamingBubble(text: String)</ID>
     <ID>FunctionNaming:StatusBubbles.kt$@Composable internal fun ThinkingBubble()</ID>
     <ID>FunctionNaming:StatusBubbles.kt$@Composable internal fun TypingDots( color: Color, dotSize: androidx.compose.ui.unit.Dp = 6.dp )</ID>
