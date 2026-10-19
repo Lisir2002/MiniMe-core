@@ -468,6 +468,20 @@ fun AppNavigation(
         rightSidebarOpen = false
     }
 
+    // ── 左右侧边栏互斥：同一时刻只允许一侧展开，避免两侧抽屉叠满屏幕 ──
+    // 以「状态变化 → 收起对侧」双向守卫，覆盖范围最广：左侧边缘手势、顶栏菜单、
+    // 返回栈重建（设置/打包器/文件阅读页返回后自动重开左侧）等所有入口都无需逐个埋点。
+    // 两侧不会互锁：任一侧变为「展开」只会把对侧置为「收起」，而对侧为收起态时
+    // 其守卫条件不成立，effect 至多触发一跳即收敛。
+    // 左侧展开（含边缘手势拖出）→ 收起右侧工具抽屉。
+    LaunchedEffect(drawerState.isOpen) {
+        if (drawerState.isOpen) rightSidebarOpen = false
+    }
+    // 右侧工具抽屉展开 → 收起左侧抽屉。
+    LaunchedEffect(rightSidebarOpen) {
+        if (rightSidebarOpen) drawerState.close()
+    }
+
     // 侧边栏需要的数据。
     val currentWorkspace by workspaceViewModel.current.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(currentWorkspace) {
@@ -611,7 +625,11 @@ fun AppNavigation(
                         )
                         navController.navigate("settings")
                     },
-                    onOpenRightSidebar = { rightSidebarOpen = true }
+                    onOpenRightSidebar = {
+                        // 互斥：先让左侧抽屉开始收起，避免右侧滑入时左侧仍在动画中错位。
+                        scope.launch { drawerState.close() }
+                        rightSidebarOpen = true
+                    }
                 )
             }
             composable("settings") {
