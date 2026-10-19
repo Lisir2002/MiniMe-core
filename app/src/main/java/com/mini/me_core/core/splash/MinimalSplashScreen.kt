@@ -40,8 +40,8 @@ import com.mini.me_core.R
 /**
  * Minimal splash style: flowing gradient + "MiniMe" text fade-in, no particles.
  *
- * A1 退场门闩：初始化就绪即退（[awaitReadyThenDismiss]），最短展示 [MIN_DISPLAY_MS] 防闪，
- * 最长 [MINIMAL_TOTAL_MS] 兜底。A3：动效关闭时跳过淡入与漂移，就绪即退。
+ * 退场门闩：初始化就绪即退（[awaitReadyThenDismiss]），最短展示 [MIN_DISPLAY_MS] 防闪，
+ * 最长 [MINIMAL_TOTAL_MS] 兜底。动效关闭时跳过淡入与漂移，就绪即退。
  */
 @Composable
 fun MinimalSplashScreen(

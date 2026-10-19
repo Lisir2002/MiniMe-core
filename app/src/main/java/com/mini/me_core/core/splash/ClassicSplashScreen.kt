@@ -25,10 +25,10 @@ import com.mini.me_core.core.theme.ScaledAnimation
 /**
  * Classic splash style: static gradient background + "MiniMe" logo fade-in.
  *
- * A4 正名实现：原 CLASSIC 与 OFF 同行为（无动画），名不副实；
+ * 正名实现：原 CLASSIC 与 OFF 同行为（无动画），名不副实；
  * 现实现为「静态 Logo 淡入」——无粒子、无漂移动画，只有一次 800ms 淡入。
  *
- * A1 退场门闩与 [MinimalSplashScreen] 一致：就绪即退 + 最短展示 + [MINIMAL_TOTAL_MS] 硬上限；
+ * 退场门闩与 [MinimalSplashScreen] 一致：就绪即退 + 最短展示 + [MINIMAL_TOTAL_MS] 硬上限；
  * 动效关闭时跳过淡入，就绪即退。
  */
 @Composable
@@ -48,11 +48,11 @@ fun ClassicSplashScreen(
             logoAlpha.snapTo(1f)
         }
         if (animDisabled) {
-            // A3：关闭动效——无淡入，就绪即退。
+            // 关闭动效——无淡入，就绪即退。
             AppInitState.awaitReady()
             onDismiss()
         } else {
-            // A1：就绪即退 + 最短展示 + 硬上限。
+            // 就绪即退 + 最短展示 + 硬上限。
             awaitReadyThenDismiss(onDismiss, MINIMAL_TOTAL_MS)
         }
     }

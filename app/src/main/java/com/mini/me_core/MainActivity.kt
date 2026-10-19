@@ -300,7 +300,7 @@ class MainActivity : ComponentActivity() {
 
                         // 启动动画（覆盖在最上层，动画结束后自动移除）
                         // F1.8: 根据用户选择的 splash style 渲染不同动画风格
-                        // A5: rememberSaveable——配置变更（旋转/深浅色/字体）重建 Activity 时不重播
+                        // rememberSaveable——配置变更（旋转/深浅色/字体）重建 Activity 时不重播
                         val splashStyle by themeSettings.splashStyleFlow.collectAsStateWithLifecycle(
                             initialValue = com.mini.me_core.core.splash.SplashStyle.PARTICLE
                         )
@@ -318,7 +318,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 com.mini.me_core.core.splash.SplashStyle.CLASSIC -> {
-                                    // A4: 静态 Logo 淡入（原与 OFF 同行为，名不副实）
+                                    // 静态 Logo 淡入（原与 OFF 同行为，名不副实）
                                     com.mini.me_core.core.splash.ClassicSplashScreen(
                                         onDismiss = { showSplash = false }
                                     )

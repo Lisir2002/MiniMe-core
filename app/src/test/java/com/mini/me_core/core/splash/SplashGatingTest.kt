@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * A1/A2 启动画面门闩与真实进度纯函数单元测试。
+ * 启动画面门闩与真实进度纯函数单元测试。
  *
  * 覆盖：
  * 1. shouldDismissSplash 三条退场路径（就绪+最短 / 总时长硬上限 / 未就绪不退）

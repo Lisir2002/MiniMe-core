@@ -17,7 +17,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 
 /**
- * B2: 全屏背景径向渐变缓存持有者。
+ * 全屏背景径向渐变缓存持有者。
  *
  * 渐变中心/半径由画布尺寸决定、颜色由主题决定——splash 生命周期内两者恒定，
  * 实际仅构建一次。非 Compose 状态：draw 内惰性构建，零重组、零每帧分配。
@@ -117,7 +117,7 @@ fun ParticleSplashCanvas(
     val primaryGlow = remember(primaryArgb) { createGlowSprite(primaryArgb) }
     val onBgGlow = remember(onBgArgb) { createGlowSprite(onBgArgb) }
 
-    // B2: 背景渐变按主题色缓存（尺寸在 draw 内惰然补齐），不再每帧新建。
+    // 背景渐变按主题色缓存（尺寸在 draw 内惰然补齐），不再每帧新建。
     val bgGradientCache = remember(primaryArgb, bgArgb) { BackgroundGradientCache(primaryArgb, bgArgb) }
 
     // Pre-compute per-particle tinted colors whenever theme colors change.
@@ -125,7 +125,7 @@ fun ParticleSplashCanvas(
         particleSystem.precomputeColors(primaryArgb, onBgArgb)
     }
 
-    // B1/B2: 每帧绘制的 Paint 与 RectF 全部提到组合层复用，杜绝每帧分配。
+    // 每帧绘制的 Paint 与 RectF 全部提到组合层复用，杜绝每帧分配。
     val bgPaint = remember { Paint() }
     val corePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
     val glowPaint = remember { Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true } }
@@ -159,7 +159,7 @@ fun ParticleSplashCanvas(
                 SplashStage.SHATTER -> 0.15f * (1f - stageProgress)
                 else -> 0.08f
             }
-            // B2: shader 缓存复用；浓度变化只调 paint.alpha（等效原端点 alpha 调制）。
+            // shader 缓存复用；浓度变化只调 paint.alpha（等效原端点 alpha 调制）。
             val gradientRadius = maxOf(w, h) * 0.9f
             bgPaint.shader = bgGradientCache.obtain(cx, cy, gradientRadius)
             bgPaint.alpha = (centerGlowAlpha * 255).toInt().coerceIn(0, 255)
@@ -199,7 +199,7 @@ fun ParticleSplashCanvas(
                 dstRect.set(px - glowRadius, py - glowRadius, px + glowRadius, py + glowRadius)
                 native.drawBitmap(glowBmp, null, dstRect, glowPaint)
 
-                // B1: 核心圆改实心绘制（预着色数组取色）——
+                // 核心圆改实心绘制（预着色数组取色）——
                 // 原每粒子每帧新建 RadialGradient + intArrayOf + floatArrayOf
                 // （1800 粒子 ≈ 每帧 5400 个临时对象），柔边由外层 glow sprite 提供。
                 corePaint.color = if (usePrimaryGlow) {

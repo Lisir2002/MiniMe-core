@@ -32,7 +32,7 @@ class GlassShard(
 )
 
 /**
- * B4: 逐碎片的预计算静态 shader。
+ * 逐碎片的预计算静态 shader。
  *
  * 边沿斜面渐变与对角高光带均在碎片局部坐标系中静态（多边形边界不随动画变化），
  * 构造期算一次，draw 时零分配复用。正面/背面各一份（背面变暗由 faceDim 烘焙）。
@@ -66,7 +66,7 @@ class GlassShatterEffect(
 ) {
     val shards: List<GlassShard>
 
-    // B4: 与 shards 按下标 1:1 对齐的预计算 shader（draw 零分配复用）。
+    // 与 shards 按下标 1:1 对齐的预计算 shader（draw 零分配复用）。
     private var shardShaders: List<ShardShaders> = emptyList()
 
     private val camera = Camera()
@@ -98,7 +98,7 @@ class GlassShatterEffect(
 
     // Reusable paths (cleared per use)
     private val path = Path()
-    // B4: 尾迹路径池化（原每碎片每帧 new Path()）
+    // 尾迹路径池化（原每碎片每帧 new Path()）
     private val tailPath = Path()
 
     init {
@@ -169,7 +169,7 @@ class GlassShatterEffect(
                 flatPoly[k * 2 + 1] = polyY[k]
             }
 
-            // B4: 边沿斜面 + 对角高光渐变在局部坐标系静态——构造期预计算
+            // 边沿斜面 + 对角高光渐变在局部坐标系静态——构造期预计算
             // （原每碎片每帧新建 2 个 LinearGradient），正面/背面各一份。
             var polyTop = Float.MAX_VALUE
             var polyBottom = -Float.MAX_VALUE
@@ -226,7 +226,7 @@ class GlassShatterEffect(
             )
         }
 
-        // B4: shards 与 shardShaders 必须同序重排，保持下标 1:1 对齐。
+        // shards 与 shardShaders 必须同序重排，保持下标 1:1 对齐。
         val order = shardList.indices.shuffled()
         shards = order.map { shardList[it] }
         shardShaders = order.map { shaderList[it] }
@@ -298,7 +298,7 @@ class GlassShatterEffect(
                 specPaint.shader = tailGradient
                 specPaint.strokeWidth = 2f
                 specPaint.style = Paint.Style.STROKE
-                // B4: tail Path 池化复用（原每碎片每帧新建）。
+                // tail Path 池化复用（原每碎片每帧新建）。
                 tailPath.reset()
                 tailPath.moveTo(tailStartX, tailStartY)
                 tailPath.lineTo(tailEndX, tailEndY)
@@ -349,7 +349,7 @@ class GlassShatterEffect(
             canvas.drawPath(path, fillPaint)
 
             // ── 3. Beveled edge stroke: gradient top bright → bottom dark ──
-            // B4: 用构造期预计算的局部坐标渐变（含 faceDim 烘焙），draw 零分配。
+            // 用构造期预计算的局部坐标渐变（含 faceDim 烘焙），draw 零分配。
             val shaders = shardShaders[index]
             edgePaint.shader = if (backFace) shaders.edgeBack else shaders.edgeNormal
             edgePaint.alpha = (255 * alpha * faceDim).toInt().coerceIn(0, 255)

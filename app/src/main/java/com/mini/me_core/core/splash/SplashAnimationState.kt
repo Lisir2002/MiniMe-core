@@ -15,7 +15,7 @@ package com.mini.me_core.core.splash
  */
 
 /**
- * A1 启动画面最短展示时长（毫秒）。
+ * 启动画面最短展示时长（毫秒）。
  *
  * 初始化就绪过快时（如温启动/数据层命中缓存），仍展示这么久再退，
  * 避免启动画面「闪一下就没」造成的视觉不稳定。就绪信号由 [AppInitState] 提供。
@@ -23,7 +23,7 @@ package com.mini.me_core.core.splash
 const val MIN_DISPLAY_MS: Long = 1200L
 
 /**
- * A1 非逐帧风格（MINIMAL / CLASSIC）的总时长硬上限（毫秒）。
+ * 非逐帧风格（MINIMAL / CLASSIC）的总时长硬上限（毫秒）。
  *
  * 二者无逐帧时间轴，用固定上限兜底：正常由就绪信号提前放行。
  */

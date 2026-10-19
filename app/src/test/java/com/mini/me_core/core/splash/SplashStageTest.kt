@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * D1 启动动画时间轴纯函数单元测试。
+ * 启动动画时间轴纯函数单元测试。
  *
  * 覆盖：
  * 1. SplashStage.fromElapsed 三档边界映射（严格 < 语义）

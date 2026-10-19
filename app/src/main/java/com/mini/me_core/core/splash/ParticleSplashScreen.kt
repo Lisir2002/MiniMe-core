@@ -90,8 +90,8 @@ private fun stageTextRes(phase: StartupPhase): Int = when (phase) {
  * - F1.5: Upgraded skip button (pill shape, outline, pressed scale, last-2s error color)
  * - F1.6: Cross-fade transition during FADE_OUT stage
  * - F1.7: Bottom progress bar + stage text (real startup phases, not fake timeline)
- * - A1: Exit gate = init ready (AppInitState) AND min display; total duration as hard cap
- * - A3: Honors LocalAnimationScale (0 = skip animation entirely)
+ * - Exit gate = init ready (AppInitState) AND min display; total duration as hard cap
+ * - Honors LocalAnimationScale (0 = skip animation entirely)
  *
  * @param onDismiss Called when animation completes (or skip is pressed).
  */
@@ -130,19 +130,19 @@ fun ParticleSplashScreen(
     )
     var skipButtonVisible by remember { mutableStateOf(true) }
 
-    // B5: 跳过按钮倒计时按秒派生——elapsedMs 每帧变，但剩余秒数每秒才变一次，
+    // 跳过按钮倒计时按秒派生——elapsedMs 每帧变，但剩余秒数每秒才变一次，
     // derivedStateOf 让按钮子树只在整秒边界重组（原每帧重组）。
     val remainingSec by remember { derivedStateOf { SplashStage.remainingSeconds(elapsedMs, quality) } }
     val isUrgent by remember { derivedStateOf { remainingSec <= 2 && remainingSec > 0 } }
 
-    // A2: 真实启动阶段（MiniMeCore 三阶段上报）与就绪态。
+    // 真实启动阶段（MiniMeCore 三阶段上报）与就绪态。
     // startupReady 由主循环每帧从 AppInitState.isReady 采样（volatile 读，无重组成本），
     // 翻 true 时触发一次重组，让进度条平滑走到 1.0。
     val startupPhase by StartupProgress.phase.collectAsState()
     var startupReady by remember { mutableStateOf(AppInitState.isReady) }
     val animDisabled = animScale <= 0f
 
-    // F1.7 + A2: 进度条目标值 = 真实阶段权重；animateFloatAsState 平滑过渡。
+    // F1.7: 进度条目标值 = 真实阶段权重；animateFloatAsState 平滑过渡。
     val progress by animateFloatAsState(
         targetValue = StartupProgress.progressOf(startupPhase, startupReady),
         animationSpec = ScaledAnimation.tween(400, scale = animScale),
@@ -150,7 +150,7 @@ fun ParticleSplashScreen(
     )
     val stageResId = stageTextRes(startupPhase)
 
-    // B5: 百分比文本按 100ms 采样——progress 是每帧动画值，直接在组合里读
+    // 百分比文本按 100ms 采样——progress 是每帧动画值，直接在组合里读
     // 会让 Text 每帧重组；协程采样（快照读，不订阅重组）则最多 10 次/秒。
     var displayedPercent by remember { mutableIntStateOf(100) }
     LaunchedEffect(Unit) {
@@ -164,13 +164,13 @@ fun ParticleSplashScreen(
     LaunchedEffect(screenWidthPx, screenHeightPx, animDisabled) {
         if (screenWidthPx <= 0f || screenHeightPx <= 0f) return@LaunchedEffect
         if (animDisabled) {
-            // A3：用户关闭动效——跳过粒子动画，就绪即退（500ms 淡出 tween 时长为 0，瞬间交接）。
+            // 用户关闭动效——跳过粒子动画，就绪即退（500ms 淡出 tween 时长为 0，瞬间交接）。
             AppInitState.awaitReady()
             isDismissing = true
             return@LaunchedEffect
         }
         if (particleSystem == null) {
-            // B4: 构造（文本位图采样 + O(n²) 半平面裁剪）移到 Default 线程，
+            // 构造（文本位图采样 + O(n²) 半平面裁剪）移到 Default 线程，
             // 不再占冷启动关键路径的主线程；首帧前无 Canvas，底层先显示纯色背景。
             val (ps, gs) = withContext(Dispatchers.Default) {
                 val ps = ParticleSystem(screenWidthPx, screenHeightPx, density, quality)
@@ -193,14 +193,14 @@ fun ParticleSplashScreen(
                 startNanos = frameNanos
                 lastNanos = frameNanos
             }
-            // A3: dt 乘动效缩放（scale>1 更慢；<=0 已在上方短路，不会到这里）。
+            // dt 乘动效缩放（scale>1 更慢；<=0 已在上方短路，不会到这里）。
             val dt = (frameNanos - lastNanos) / 1_000_000f * animScale
             lastNanos = frameNanos
             elapsedMs = (frameNanos - startNanos) / 1_000_000L
             if (AppInitState.isReady && !startupReady) startupReady = true
             particleSystem?.update(elapsedMs, dt)
 
-            // A1: 就绪即退 + 最短展示 + 总时长硬上限。
+            // 就绪即退 + 最短展示 + 总时长硬上限。
             if (shouldDismissSplash(
                     elapsedMs,
                     MIN_DISPLAY_MS,
