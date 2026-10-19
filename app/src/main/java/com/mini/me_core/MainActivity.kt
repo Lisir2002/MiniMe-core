@@ -705,57 +705,20 @@ fun AppNavigation(
                     onNavigateBack = { navController.popBackStack() },
                 )
             }
-            // F2（D5）：`capability_center` 路由保留，但按灰度开关分流到统一能力页或旧三Tab 页。
-            // 路由本身不删除——它是设置页与侧边栏唯一的跨路由跳转目标，删掉会让存量深链失效。
             composable("capability_center") {
-                val unifiedViewModel: com.mini.me_core.feature.capability.presentation.UnifiedCapabilityViewModel =
-                    hiltViewModel()
-                val unifiedOverview by unifiedViewModel.overview.collectAsStateWithLifecycle()
-                if (unifiedOverview.unifiedPageEnabled) {
-                    com.mini.me_core.feature.capability.presentation.component.UnifiedCapabilityScreen(
-                        onNavigateBack = { navController.popBackStack() },
-                        onOpenGroupDetail = { groupId ->
-                            //编码：分组 id 是 server 名（含 `.`/`-`），需转义后才不会被 NavHost 误解析
-                            navController.navigate("capability_group_detail/${Uri.encode(groupId)}")
-                        },
-                        onOpenSkillDetail = { skillId ->
-                            navController.navigate("skill_detail/$skillId")
-                        },
-                        onEditSkill = { skillId ->
-                            navController.navigate("skill_edit/$skillId")
-                        }
-                    )
-                } else {
-                    val capabilityViewModel: com.mini.me_core.feature.capability.presentation.CapabilityCenterViewModel =
-                        hiltViewModel()
-                    val currentSessionMode by agentViewModel.currentSessionMode.collectAsStateWithLifecycle()
-                    com.mini.me_core.feature.capability.presentation.component.CapabilityCenterScreen(
-                        viewModel = capabilityViewModel,
-                        currentSessionMode = currentSessionMode,
-                        onNavigateBack = { navController.popBackStack() },
-                        onOpenSkillDetail = { skillId ->
-                            navController.navigate("skill_detail/$skillId")
-                        },
-                        onEditSkill = { skillId ->
-                            navController.navigate("skill_edit/$skillId")
-                        }
-                    )
-                }
-            }
-            // F2：能力分组详情页（MCP 详情 / MCP 工具 双 Tab）。
-            // server 名可能含 `.`/`-`，导航参数一律 URI 编码后再拼路由，解码失败则不进入详情页
-            // （此时退回首屏而非崩溃——分组 id 来自导航参数，属不可信输入）。
-            composable("capability_group_detail/{groupId}") { entry ->
-                val rawGroupId = entry.arguments?.getString("groupId")
-                val groupId = rawGroupId?.let { Uri.decode(it) }
-                if (groupId.isNullOrBlank()) {
-                    navController.popBackStack()
-                } else {
-                    com.mini.me_core.feature.capability.presentation.component.CapabilityGroupDetailScreen(
-                        groupId = groupId,
-                        onNavigateBack = { navController.popBackStack() }
-                    )
-                }
+                val capabilityViewModel: com.mini.me_core.feature.capability.presentation.CapabilityCenterViewModel = hiltViewModel()
+                val currentSessionMode by agentViewModel.currentSessionMode.collectAsStateWithLifecycle()
+                com.mini.me_core.feature.capability.presentation.component.CapabilityCenterScreen(
+                    viewModel = capabilityViewModel,
+                    currentSessionMode = currentSessionMode,
+                    onNavigateBack = { navController.popBackStack() },
+                    onOpenSkillDetail = { skillId ->
+                        navController.navigate("skill_detail/$skillId")
+                    },
+                    onEditSkill = { skillId ->
+                        navController.navigate("skill_edit/$skillId")
+                    }
+                )
             }
             composable("skill_detail/{skillId}") { entry ->
                 val skillId = entry.arguments?.getString("skillId") ?: ""

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="capability_center_title">能力中心</string>
-    <string name="capability_center_subtitle">内置能力、MCP 服务与技能</string>
+    <string name="capability_center_subtitle">技能管理、MCP 工具服务等</string>
     <string name="capability_tab_tools">工具</string>
     <string name="capability_tab_agent">Agent</string>
     <string name="capability_tab_skills">技能</string>

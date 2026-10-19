@@ -306,7 +306,7 @@
 
     <!-- Capability center -->
     <string name="capability_center_title">Capability Center</string>
-    <string name="capability_center_subtitle">Built-in capabilities, MCP services and skills</string>
+    <string name="capability_center_subtitle">Skill management, MCP tool services, etc.</string>
     <string name="capability_tab_tools">Tools</string>
     <string name="capability_tab_agent">Agent</string>
     <string name="capability_tab_skills">Skills</string>

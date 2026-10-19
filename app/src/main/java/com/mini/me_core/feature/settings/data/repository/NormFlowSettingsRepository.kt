@@ -45,8 +45,6 @@ class NormFlowSettingsRepository @Inject constructor(
         const val DEFERRED_TOOL_LOADING_ENABLED_KEY = "deferred_tool_loading_enabled"
         // F1 内置能力 MCP 化灰度开关（默认关：关闭时只装载远端 server，存量行为不变）
         const val BUILTIN_AS_MCP_ENABLED_KEY = "builtin_as_mcp_enabled"
-        // F2 统一能力页灰度开关（默认关：关闭时能力中心保持旧「工具/Agent/技能」三 Tab）
-        const val UNIFIED_CAPABILITY_PAGE_ENABLED_KEY = "unified_capability_page_enabled"
     }
 
     val normFlowEnabledFlow: Flow<Boolean> = kv.observeBool(NS, NORM_FLOW_ENABLED_KEY).map { it ?: true }
@@ -84,10 +82,6 @@ class NormFlowSettingsRepository @Inject constructor(
     // F1 内置能力 MCP 化（默认 false：关闭时 McpManager 只装载远端 server，存量行为不变）
     val builtinAsMcpEnabledFlow: Flow<Boolean> = kv.observeBool(NS, BUILTIN_AS_MCP_ENABLED_KEY).map { it ?: false }
 
-    /** F2 统一能力页开关（默认 false → 保持旧三 Tab 页面形态）。 */
-    val unifiedCapabilityPageEnabledFlow: Flow<Boolean> =
-        kv.observeBool(NS, UNIFIED_CAPABILITY_PAGE_ENABLED_KEY).map { it ?: false }
-
     suspend fun setNormFlowEnabled(enabled: Boolean) { kv.putBool(NS, NORM_FLOW_ENABLED_KEY, enabled) }
     suspend fun setStepInjectEnabled(enabled: Boolean) { kv.putBool(NS, STEP_INJECT_ENABLED_KEY, enabled) }
     suspend fun setToolGuardEnabled(enabled: Boolean) { kv.putBool(NS, TOOL_GUARD_ENABLED_KEY, enabled) }
@@ -112,11 +106,6 @@ class NormFlowSettingsRepository @Inject constructor(
 
     // F1 内置能力 MCP 化开关
     suspend fun setBuiltinAsMcpEnabled(enabled: Boolean) { kv.putBool(NS, BUILTIN_AS_MCP_ENABLED_KEY, enabled) }
-
-    /** F2：统一能力页开关。 */
-    suspend fun setUnifiedCapabilityPageEnabled(enabled: Boolean) {
-        kv.putBool(NS, UNIFIED_CAPABILITY_PAGE_ENABLED_KEY, enabled)
-    }
     suspend fun getUsageCardItems(): Set<String> = usageCardItemsFlow.first()
     // 推理预算强度
     suspend fun setReasoningBudgetLevel(level: String) { kv.putString(NS, REASONING_BUDGET_LEVEL_KEY, level) }
@@ -228,13 +217,6 @@ class NormFlowSettingsRepository @Inject constructor(
      */
     suspend fun isBuiltinAsMcpActive(): Boolean = builtinAsMcpEnabledFlow.first()
 
-    /**
-     * F2：统一能力页是否启用。
-     *
-     * 同样**不挂 normFlow 总闸**——页面形态与「规范流程」实验无关，理由同 [isBuiltinAsMcpActive]。
-     */
-    suspend fun isUnifiedCapabilityPageActive(): Boolean = unifiedCapabilityPageEnabledFlow.first()
-
     // 配置导出/导入（手动 JSON 构造）
     fun exportConfig(): String {
         val sb = StringBuilder("{")
@@ -260,7 +242,6 @@ class NormFlowSettingsRepository @Inject constructor(
         kv.getBool(NS, PLAYBOOK_AUTO_ENABLED_KEY)?.let { entries.add("\"playbook_auto_enabled\":$it") }
         kv.getBool(NS, DEFERRED_TOOL_LOADING_ENABLED_KEY)?.let { entries.add("\"deferred_tool_loading_enabled\":$it") }
         kv.getBool(NS, BUILTIN_AS_MCP_ENABLED_KEY)?.let { entries.add("\"builtin_as_mcp_enabled\":$it") }
-        kv.getBool(NS, UNIFIED_CAPABILITY_PAGE_ENABLED_KEY)?.let { entries.add("\"unified_capability_page_enabled\":$it") }
         kv.getString(NS, ACTIVE_PRESET_KEY)?.let { entries.add("\"active_preset\":\"$it\"") }
         sb.append(entries.joinToString(","))
         sb.append("}")
@@ -297,8 +278,6 @@ class NormFlowSettingsRepository @Inject constructor(
                         "playbook_auto_enabled" -> kv.putBool(NS, PLAYBOOK_AUTO_ENABLED_KEY, value.toBoolean())
                         "deferred_tool_loading_enabled" -> kv.putBool(NS, DEFERRED_TOOL_LOADING_ENABLED_KEY, value.toBoolean())
                         "builtin_as_mcp_enabled" -> kv.putBool(NS, BUILTIN_AS_MCP_ENABLED_KEY, value.toBoolean())
-                        "unified_capability_page_enabled" ->
-                            kv.putBool(NS, UNIFIED_CAPABILITY_PAGE_ENABLED_KEY, value.toBoolean())
                     }
                 }
             }
