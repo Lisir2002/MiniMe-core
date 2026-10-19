@@ -64,7 +64,6 @@ data class LogViewerUiState(
 
     // 实时尾随
     val liveTailEnabled: Boolean = false,
-    val hasNewLogs: Boolean = false,
 
     // ── 新增字段（运行日志查看器 UI 重构）──
     /** 各等级行数统计（文件/日期作用域内、等级/Tag/搜索过滤前），供筛选栏数量徽章使用。 */

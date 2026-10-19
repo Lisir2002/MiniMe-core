@@ -36,10 +36,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
 import com.mini.me_core.R
 import com.mini.me_core.core.theme.components.AppDialog
 import com.mini.me_core.core.theme.components.AppStatusDot
@@ -96,6 +100,12 @@ fun LogViewerScreen(
                 }
             }
     }
+
+    // ── 实时性：查看器在前台期间定时静默重载，保证看到最新日志 ──
+    // 历史教训：旧实现依赖 FileObserver(logDir, CLOSE_WRITE) 感知新日志，而 FileLogger 的
+    // 常驻 BufferedWriter 从不关闭文件，事件永不触发，内容停在进入页面那一刻。改为在
+    // RESUMED 期间轮询：离开前台（HOME / 切页）自动停，回到前台立即补一次。
+    LogViewerAutoRefresh(viewModel)
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -219,6 +229,26 @@ fun LogViewerScreen(
     }
 }
 
+/**
+ * 查看器前台轮询：RESUMED 期间每 [LOG_VIEWER_POLL_INTERVAL_MS] 静默重载一次。
+ *
+ * 为什么轮询而不是 FileObserver：FileLogger 写文件用的是常驻 BufferedWriter，
+ * 正常轮询期间从不 close，CLOSE_WRITE 事件永不触发（只有日志轮转/进程死亡才触发），
+ * 旧监听实际上是死的。repeatOnLifecycle(RESUMED) 保证离开前台自动停、回前台立即补一次。
+ */
+@Composable
+private fun LogViewerAutoRefresh(viewModel: SettingsViewModel) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(Unit) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                delay(LOG_VIEWER_POLL_INTERVAL_MS)
+                viewModel.refreshLogsSilently()
+            }
+        }
+    }
+}
+
 /** 控制栏（竖屏堆叠 / 横屏左侧栏共用）。 */
 @Composable
 private fun ControlPanel(
@@ -337,3 +367,11 @@ private fun quickRangeLabel(mode: DateRangeMode): String = when (mode) {
     DateRangeMode.SINGLE_FILE -> stringResource(R.string.log_status_range_all)
     DateRangeMode.CUSTOM -> "自定义"
 }
+
+/**
+ * 查看器前台轮询间隔（毫秒）。
+ *
+ * 2s 是「实时感」与开销的折中：FileLogger 的定时 flush 周期为 500ms，轮询前会先 flush，
+ * 因此最多约 2s 的可见延迟；每轮只读文件尾部若干 KB，CPU/IO 开销可忽略。
+ */
+private const val LOG_VIEWER_POLL_INTERVAL_MS = 2_000L

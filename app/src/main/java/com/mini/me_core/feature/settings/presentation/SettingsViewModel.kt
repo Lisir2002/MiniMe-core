@@ -397,8 +397,9 @@ class SettingsViewModel @Inject constructor(
     fun setSearchQuery(query: String) = logViewerSection.setSearchQuery(query)
     fun resetFilters() = logViewerSection.resetFilters()
     fun toggleLiveTail() = logViewerSection.toggleLiveTail()
-    fun dismissNewLogs() = logViewerSection.dismissNewLogs()
     fun setAutoScrolling(autoScrolling: Boolean) = logViewerSection.setAutoScrolling(autoScrolling)
+    /** 查看器在屏期间的定时静默重载（保持内容新鲜，见 LogViewerScreen 轮询）。 */
+    fun refreshLogsSilently() = logViewerSection.refreshLogsSilently()
 
     // ── NormFlowSection 委托面 ───────────────────────────────────────────
     val normFlowEnabled: StateFlow<Boolean> = normFlowSection.normFlowEnabled
@@ -496,11 +497,6 @@ class SettingsViewModel @Inject constructor(
     fun deleteGlobalRule(rule: PermissionRule) = permissionSection.deleteGlobalRule(rule)
     fun deleteProjectRule(rule: PermissionRule) = permissionSection.deleteProjectRule(rule)
     fun promoteRuleToGlobal(rule: PermissionRule) = permissionSection.promoteRuleToGlobal(rule)
-
-    override fun onCleared() {
-        super.onCleared()
-        logViewerSection.onCleared()
-    }
 
     private companion object {
         /** 仪表盘空转轮数轮询间隔（毫秒）：前台展示足够实时，避免高频刷新。 */

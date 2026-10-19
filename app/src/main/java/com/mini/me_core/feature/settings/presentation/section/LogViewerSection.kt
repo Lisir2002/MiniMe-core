@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import android.annotation.SuppressLint
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -35,9 +34,6 @@ internal class LogViewerSection(
 
     // ── 筛选防抖触发器：每次筛选变化递增，外层 debounce 300ms 后消费 ──
     private val _filterTrigger = MutableStateFlow(0L)
-
-    // ── 实时尾随文件观察器 ──
-    private var _liveTailFileObserver: android.os.FileObserver? = null
 
     private val _logLevel = MutableStateFlow(LogLevel.VERBOSE)
     val logLevel: StateFlow<LogLevel> = _logLevel.asStateFlow()
@@ -79,10 +75,8 @@ internal class LogViewerSection(
         }
     }
 
-    /** ViewModel.onCleared 回调：停止实时尾随。 */
-    fun onCleared() {
-        stopLiveTail()
-    }
+    // 实时尾随不再持有 FileObserver（CLOSE_WRITE 对常驻 BufferedWriter 永不触发，见
+    // toggleLiveTail 注释），ViewModel onCleared 无需再回调本类。
 
     fun setLogLevel(level: LogLevel) {
         scope.launch {
@@ -94,6 +88,20 @@ internal class LogViewerSection(
         loadLogs(
             filterServerName = filterServerName?.takeIf { it.isNotBlank() },
             preferredFileName = _logViewerState.value.selectedFileName
+        )
+    }
+
+    /**
+     * 静默重载：不置 loading 标志，供查看器在屏期间的定时轮询调用（避免每轮闪一下加载态）。
+     *
+     * 读取链路与 [refreshLogs] 完全相同——[com.mini.me_core.core.util.FileLogger.listLogFiles]
+     * 内部先 flush 再列文件，「写→读」一致性契约不变，轮询看到的永远是已落盘的最新行。
+     */
+    fun refreshLogsSilently() {
+        loadLogs(
+            filterServerName = _logViewerState.value.filterServerName,
+            preferredFileName = _logViewerState.value.selectedFileName,
+            silent = true
         )
     }
 
@@ -329,42 +337,21 @@ internal class LogViewerSection(
 
     // ── 实时尾随 ──
 
+    /**
+     * 切换实时尾随：开启时立即补读一次最新日志，不必等下一轮轮询。
+     *
+     * 历史教训（本轮修复）：旧实现用 `FileObserver(logDir, CLOSE_WRITE)` 感知新日志，
+     * 但 FileLogger 的常驻 BufferedWriter 在正常轮询期间**从不关闭文件**，CLOSE_WRITE
+     * 永不触发；且 `hasNewLogs` 徽标没有任何 UI 消费。尾随开关实际是死的，查看器内容
+     * 停在进入页面那一刻——用户反馈「看不见最新的所有日志」正是这个根因。
+     *
+     * 现在「保持内容新鲜」由 LogViewerScreen 在前台（RESUMED）期间的定时静默重载负责
+     * （见 `refreshLogsSilently`）；本开关只控制**是否自动贴底**，语义与名字相符。
+     */
     fun toggleLiveTail() {
         val current = _logViewerState.value
-        if (current.liveTailEnabled) {
-            stopLiveTail()
-        } else {
-            startLiveTail()
-        }
-    }
-
-    // 双参 FileObserver(File, Int) 自 API 1 起可用，API 29 仅将其废弃而未移除，旧系统上该构造有独立实现、不经过新增的无参构造。
-    // lint 基于新 SDK 的类结构保守地经无参构造报 NewApi，此处已人工确认全版本安全，就地抑制；项目内 ExtensionLoader、SyncEngine 为同一写法。
-    @SuppressLint("NewApi")
-    private fun startLiveTail() {
-        _logViewerState.update { it.copy(liveTailEnabled = true, hasNewLogs = false) }
-        // 启动 FileObserver 监听日志目录变化
-        val logDir = FileLogger.getLogDir() ?: return
-        _liveTailFileObserver = object : android.os.FileObserver(logDir, android.os.FileObserver.CLOSE_WRITE) {
-            override fun onEvent(event: Int, path: String?) {
-                if (path != null && path.startsWith("log-")) {
-                    _logViewerState.update { it.copy(hasNewLogs = true) }
-                }
-            }
-        }.apply { startWatching() }
-        // 立即刷新一次
-        refreshLogs()
-    }
-
-    private fun stopLiveTail() {
-        _liveTailFileObserver?.stopWatching()
-        _liveTailFileObserver = null
-        _logViewerState.update { it.copy(liveTailEnabled = false, hasNewLogs = false) }
-    }
-
-    fun dismissNewLogs() {
-        _logViewerState.update { it.copy(hasNewLogs = false) }
-        refreshLogs()
+        _logViewerState.update { it.copy(liveTailEnabled = !current.liveTailEnabled) }
+        if (!current.liveTailEnabled) refreshLogs()
     }
 
     // ── 防抖触发 ──
@@ -408,25 +395,29 @@ internal class LogViewerSection(
         _logViewerState.update { it.copy(isAutoScrolling = autoScrolling) }
     }
 
-    // ── 核心加载逻辑 ──
-
-    /** 流式读取日志：从文件尾部向前扫描，只读最后 N 行。 */
-    private fun loadLogs(filterServerName: String?, preferredFileName: String?) {
+    /** 核心加载逻辑：流式读取日志，从文件尾部向前扫描，只读最后 N 行。 */
+    private fun loadLogs(filterServerName: String?, preferredFileName: String?, silent: Boolean = false) {
         scope.launch {
             val snapshot = _logViewerState.value
-            _logViewerState.update {
-                it.copy(
-                    loading = true,
-                    filterServerName = filterServerName,
-                    error = null
-                )
+            // silent（定时轮询）不置 loading：查看器已在前台展示内容，闪加载态只会造成抖动。
+            if (!silent) {
+                _logViewerState.update {
+                    it.copy(
+                        loading = true,
+                        filterServerName = filterServerName,
+                        error = null
+                    )
+                }
             }
             val state = withContext(Dispatchers.IO) {
                 runCatching {
                     readLogsIntoState(snapshot, filterServerName, preferredFileName)
                 }.getOrElse { e ->
-                    LogViewerUiState(
+                    // 读失败时保留当前状态只改 error：轮询期内偶发 IO 失败（如文件轮转瞬间）
+                    // 不应把用户已选的日子/等级/Tag 筛选一并清掉。
+                    _logViewerState.value.copy(
                         filterServerName = filterServerName,
+                        loading = false,
                         error = "读取日志失败: ${e.message}"
                     )
                 }
