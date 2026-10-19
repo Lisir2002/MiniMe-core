@@ -201,10 +201,13 @@ class ParticleSystem(
         val points = mutableListOf<Float>()
         val centerOffsetY = centerY - bitmapH / 2f
 
+        // B3: 按行批量读取像素（每行一次 getPixels JNI），替代逐点 getPixel
+        // （1080p 屏约 10 万次 JNI 调用，全在主线程构造期）。
+        val rowPixels = IntArray(bitmapW)
         for (py in 0 until bitmapH step stepPx) {
+            bitmap.getPixels(rowPixels, 0, bitmapW, 0, py, bitmapW, 1)
             for (px in 0 until bitmapW step stepPx) {
-                val pixel = bitmap.getPixel(px, py)
-                val alpha = android.graphics.Color.alpha(pixel)
+                val alpha = android.graphics.Color.alpha(rowPixels[px])
                 if (alpha > 60) {
                     // 边缘检测：alpha在60-150之间的是边缘粒子，增加权重
                     val isEdge = alpha < 150

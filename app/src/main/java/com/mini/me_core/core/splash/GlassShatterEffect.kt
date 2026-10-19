@@ -32,6 +32,19 @@ class GlassShard(
 )
 
 /**
+ * B4: 逐碎片的预计算静态 shader。
+ *
+ * 边沿斜面渐变与对角高光带均在碎片局部坐标系中静态（多边形边界不随动画变化），
+ * 构造期算一次，draw 时零分配复用。正面/背面各一份（背面变暗由 faceDim 烘焙）。
+ */
+private class ShardShaders(
+    val edgeNormal: Shader,
+    val edgeBack: Shader,
+    val specNormal: Shader,
+    val specBack: Shader,
+)
+
+/**
  * Glass shatter effect — realistic glass material.
  *
  * Each shard renders 5 layers:
@@ -52,6 +65,9 @@ class GlassShatterEffect(
     private val targetShardCount: Int = 35,
 ) {
     val shards: List<GlassShard>
+
+    // B4: 与 shards 按下标 1:1 对齐的预计算 shader（draw 零分配复用）。
+    private var shardShaders: List<ShardShaders> = emptyList()
 
     private val camera = Camera()
     private val matrix = Matrix()
@@ -80,8 +96,10 @@ class GlassShatterEffect(
     private val shadowDx = 4f * density
     private val shadowDy = 6f * density
 
-    // Reusable path (cleared per shard)
+    // Reusable paths (cleared per use)
     private val path = Path()
+    // B4: 尾迹路径池化（原每碎片每帧 new Path()）
+    private val tailPath = Path()
 
     init {
         camera.setLocation(0f, 0f, -(screenHeightPx / density / 72f * 2f))
@@ -97,6 +115,7 @@ class GlassShatterEffect(
         val screenCx = screenWidthPx / 2f
         val screenCy = screenHeightPx * 0.4f
         val shardList = mutableListOf<GlassShard>()
+        val shaderList = mutableListOf<ShardShaders>()
 
         for (i in 0 until seedCount) {
             var polyX = floatArrayOf(0f, 0f, screenWidthPx, screenWidthPx, 0f)
@@ -150,6 +169,44 @@ class GlassShatterEffect(
                 flatPoly[k * 2 + 1] = polyY[k]
             }
 
+            // B4: 边沿斜面 + 对角高光渐变在局部坐标系静态——构造期预计算
+            // （原每碎片每帧新建 2 个 LinearGradient），正面/背面各一份。
+            var polyTop = Float.MAX_VALUE
+            var polyBottom = -Float.MAX_VALUE
+            var polyLeft = Float.MAX_VALUE
+            var polyRight = -Float.MAX_VALUE
+            for (k in 0 until n) {
+                val vx = polyX[k]
+                val vy = polyY[k]
+                if (vy < polyTop) polyTop = vy
+                if (vy > polyBottom) polyBottom = vy
+                if (vx < polyLeft) polyLeft = vx
+                if (vx > polyRight) polyRight = vx
+            }
+            val sx = polyLeft + (polyRight - polyLeft) * specX
+            val sy = polyTop + (polyBottom - polyTop) * specY
+            val ex = polyLeft + (polyRight - polyLeft) * (1f - specX)
+            val ey = polyTop + (polyBottom - polyTop) * (1f - specY)
+            fun edgeShader(dim: Float): Shader = LinearGradient(
+                scx, polyTop, scx, polyBottom,
+                Color.argb((230 * dim).toInt().coerceIn(0, 255), 255, 255, 255),
+                Color.argb((76 * dim).toInt().coerceIn(0, 255), 60, 60, 60),
+                Shader.TileMode.CLAMP
+            )
+            fun specShader(dim: Float): Shader = LinearGradient(
+                sx, sy, ex, ey,
+                Color.argb((150 * dim).toInt().coerceIn(0, 255), 255, 255, 255),
+                Color.argb(0, 255, 255, 255),
+                Shader.TileMode.CLAMP
+            )
+            shaderList.add(
+                ShardShaders(
+                    edgeNormal = edgeShader(1f),
+                    edgeBack = edgeShader(0.4f),
+                    specNormal = specShader(1f),
+                    specBack = specShader(0.4f),
+                )
+            )
             shardList.add(
                 GlassShard(
                     polygon = flatPoly,
@@ -169,8 +226,10 @@ class GlassShatterEffect(
             )
         }
 
-        shardList.shuffle()
-        shards = shardList
+        // B4: shards 与 shardShaders 必须同序重排，保持下标 1:1 对齐。
+        val order = shardList.indices.shuffled()
+        shards = order.map { shardList[it] }
+        shardShaders = order.map { shaderList[it] }
     }
 
     private fun clipHalfPlane(
@@ -212,7 +271,8 @@ class GlassShatterEffect(
         // Gravity increases over time
         val gravity = 1200f * ease
 
-        for (shard in shards) {
+        for (index in shards.indices) {
+            val shard = shards[index]
             // Displacement: damped velocity
             val displace = ease * shard.speedDp
             val tx = shard.outwardX * displace
@@ -238,7 +298,8 @@ class GlassShatterEffect(
                 specPaint.shader = tailGradient
                 specPaint.strokeWidth = 2f
                 specPaint.style = Paint.Style.STROKE
-                val tailPath = Path()
+                // B4: tail Path 池化复用（原每碎片每帧新建）。
+                tailPath.reset()
                 tailPath.moveTo(tailStartX, tailStartY)
                 tailPath.lineTo(tailEndX, tailEndY)
                 canvas.drawPath(tailPath, specPaint)
@@ -287,45 +348,17 @@ class GlassShatterEffect(
             fillPaint.color = Color.WHITE
             canvas.drawPath(path, fillPaint)
 
-            // ── 3. Beveled edge stroke: LinearGradient top bright → bottom dark ──
-            // Find polygon bounds in local (matrix-applied) space for gradient.
-            var polyTop = Float.MAX_VALUE
-            var polyBottom = -Float.MAX_VALUE
-            var polyLeft = Float.MAX_VALUE
-            var polyRight = -Float.MAX_VALUE
-            for (k in 0 until shard.polygon.size / 2) {
-                val vx = shard.polygon[k * 2]
-                val vy = shard.polygon[k * 2 + 1]
-                if (vy < polyTop) polyTop = vy
-                if (vy > polyBottom) polyBottom = vy
-                if (vx < polyLeft) polyLeft = vx
-                if (vx > polyRight) polyRight = vx
-            }
-            // Edge gradient: bright white top (0.9 alpha) → dark gray bottom (0.3 alpha)
-            val edgeGradient = LinearGradient(
-                scx, polyTop, scx, polyBottom,
-                Color.argb((230 * faceDim).toInt().coerceIn(0, 255), 255, 255, 255),
-                Color.argb((76 * faceDim).toInt().coerceIn(0, 255), 60, 60, 60),
-                Shader.TileMode.CLAMP
-            )
-            edgePaint.shader = edgeGradient
+            // ── 3. Beveled edge stroke: gradient top bright → bottom dark ──
+            // B4: 用构造期预计算的局部坐标渐变（含 faceDim 烘焙），draw 零分配。
+            val shaders = shardShaders[index]
+            edgePaint.shader = if (backFace) shaders.edgeBack else shaders.edgeNormal
             edgePaint.alpha = (255 * alpha * faceDim).toInt().coerceIn(0, 255)
             canvas.drawPath(path, edgePaint)
             edgePaint.shader = null
 
             // ── 4. Diagonal specular highlight band ──
             // From one corner (based on specularX/Y) to opposite corner.
-            val sx = polyLeft + (polyRight - polyLeft) * shard.specularX
-            val sy = polyTop + (polyBottom - polyTop) * shard.specularY
-            val ex = polyLeft + (polyRight - polyLeft) * (1f - shard.specularX)
-            val ey = polyTop + (polyBottom - polyTop) * (1f - shard.specularY)
-            val specGradient = LinearGradient(
-                sx, sy, ex, ey,
-                Color.argb((150 * faceDim).toInt().coerceIn(0, 255), 255, 255, 255),
-                Color.argb(0, 255, 255, 255),
-                Shader.TileMode.CLAMP
-            )
-            specPaint.shader = specGradient
+            specPaint.shader = if (backFace) shaders.specBack else shaders.specNormal
             specPaint.alpha = (200 * alpha * faceDim).toInt().coerceIn(0, 255)
             specPaint.style = Paint.Style.FILL
             canvas.drawPath(path, specPaint)

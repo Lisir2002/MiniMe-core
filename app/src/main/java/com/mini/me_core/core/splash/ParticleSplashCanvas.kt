@@ -17,6 +17,37 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 
 /**
+ * B2: 全屏背景径向渐变缓存持有者。
+ *
+ * 渐变中心/半径由画布尺寸决定、颜色由主题决定——splash 生命周期内两者恒定，
+ * 实际仅构建一次。非 Compose 状态：draw 内惰性构建，零重组、零每帧分配。
+ */
+private class BackgroundGradientCache(
+    private val primaryArgb: Int,
+    private val bgArgb: Int,
+) {
+    private var cx = Float.NaN
+    private var cy = Float.NaN
+    private var radius = Float.NaN
+    private var cached: Shader? = null
+
+    fun obtain(cx: Float, cy: Float, radius: Float): Shader {
+        val hit = cached
+        val sameGeometry = hit != null && this.cx == cx && this.cy == cy && this.radius == radius
+        if (sameGeometry) return hit
+        return RadialGradient(
+            cx, cy, radius,
+            primaryArgb,
+            bgArgb,
+            Shader.TileMode.CLAMP
+        ).also {
+            cached = it
+            this.cx = cx; this.cy = cy; this.radius = radius
+        }
+    }
+}
+
+/**
  * Pre-rendered multi-layer glow sprite.
  *
  * 3-stop radial gradient baked into one bitmap:
@@ -86,10 +117,26 @@ fun ParticleSplashCanvas(
     val primaryGlow = remember(primaryArgb) { createGlowSprite(primaryArgb) }
     val onBgGlow = remember(onBgArgb) { createGlowSprite(onBgArgb) }
 
+    // B2: 背景渐变按主题色缓存（尺寸在 draw 内惰然补齐），不再每帧新建。
+    val bgGradientCache = remember(primaryArgb, bgArgb) { BackgroundGradientCache(primaryArgb, bgArgb) }
+
     // Pre-compute per-particle tinted colors whenever theme colors change.
     LaunchedEffect(primaryArgb, onBgArgb, particleSystem) {
         particleSystem.precomputeColors(primaryArgb, onBgArgb)
     }
+
+    // B1/B2: 每帧绘制的 Paint 与 RectF 全部提到组合层复用，杜绝每帧分配。
+    val bgPaint = remember { Paint() }
+    val corePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
+    val glowPaint = remember { Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true } }
+    val pulsePaint = remember { Paint() }
+    val shimmerPaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
+    val frostPaint = remember { Paint() }
+    val flashPaint = remember { Paint() }
+    val dstRect = remember { RectF() }
+    // 窗口特效用的预计算色值（白 × 固定 alpha），避免每帧 Color 对象分配。
+    val shimmerArgb = remember { androidx.compose.ui.graphics.Color.White.copy(alpha = 0.05f).toArgb() }
+    val whiteBase = remember { androidx.compose.ui.graphics.Color.White.toArgb() and 0x00FFFFFF }
 
     Canvas(modifier = modifier) {
         val w = size.width
@@ -112,27 +159,26 @@ fun ParticleSplashCanvas(
                 SplashStage.SHATTER -> 0.15f * (1f - stageProgress)
                 else -> 0.08f
             }
+            // B2: shader 缓存复用；浓度变化只调 paint.alpha（等效原端点 alpha 调制）。
             val gradientRadius = maxOf(w, h) * 0.9f
-            val gradient = RadialGradient(
-                cx, cy, gradientRadius,
-                primaryColor.copy(alpha = centerGlowAlpha).toArgb(),
-                bgArgb,
-                Shader.TileMode.CLAMP
-            )
-            val bgPaint = Paint()
-            bgPaint.shader = gradient
+            bgPaint.shader = bgGradientCache.obtain(cx, cy, gradientRadius)
+            bgPaint.alpha = (centerGlowAlpha * 255).toInt().coerceIn(0, 255)
             native.drawRect(0f, 0f, w, h, bgPaint)
-
-            // ── Per-frame paints (reused, no allocation) ──
-            val corePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                isFilterBitmap = true
-            }
-            // Temp RectF for glow blit — reused across iterations.
-            val dstRect = RectF()
 
             val mix = particleSystem.colorMix
             val count = particleSystem.count
+
+            // 优化：HOLD 呼吸光晕的 sin 值与核心 alpha 只取决于 stage/mix/elapsedMs，
+            // 与粒子索引无关——提到循环外算一次（原每粒子每帧重算）。
+            val glowAlpha = when (stage) {
+                SplashStage.HOLD -> (0.45f + 0.2f * kotlin.math.sin(elapsedMs * 0.005f)).coerceIn(0.4f, 0.65f)
+                SplashStage.EXPLODE -> 0.6f
+                SplashStage.CONVERGE -> 0.6f - 0.15f * mix
+                else -> 0.45f
+            }
+            val coreAlpha = (255 * (0.8f + 0.2f * mix)).toInt().coerceIn(0, 255)
+            // 优化：发光半径增强，HOLD时6.5倍，飞行时9倍
+            val glowMul = if (stage == SplashStage.HOLD) 6.5f else 9f
 
             for (i in 0 until count) {
                 val px = particleSystem.x[i]
@@ -146,40 +192,23 @@ fun ParticleSplashCanvas(
                 // As mix→1: normal particles fade to onBackground, accents stay primary.
                 val usePrimaryGlow = accent || mix < 0.5f
 
-                // 优化：发光半径增强，HOLD时6.5倍，飞行时9倍
-                val glowMul = if (stage == SplashStage.HOLD) 6.5f else 9f
                 val glowRadius = sz * glowMul
                 val glowBmp = if (usePrimaryGlow) primaryGlow else onBgGlow
 
-                // 优化：发光alpha增强，HOLD时0.45-0.65
-                val glowAlpha = when (stage) {
-                    SplashStage.HOLD -> (0.45f + 0.2f * kotlin.math.sin(elapsedMs * 0.005f)).coerceIn(0.4f, 0.65f)
-                    SplashStage.EXPLODE -> 0.6f
-                    SplashStage.CONVERGE -> 0.6f - 0.15f * mix
-                    else -> 0.45f
-                }
                 glowPaint.alpha = (glowAlpha * 255).toInt().coerceIn(0, 255)
                 dstRect.set(px - glowRadius, py - glowRadius, px + glowRadius, py + glowRadius)
                 native.drawBitmap(glowBmp, null, dstRect, glowPaint)
 
-                // 优化：核心用径向渐变替代实心圆，中心亮、边缘透明，更柔和
-                val coreColor = if (usePrimaryGlow) particleSystem.primaryTinted[i]
-                                else particleSystem.onBgTinted[i]
-                val coreAlpha = (255 * (0.8f + 0.2f * mix)).toInt().coerceIn(0, 255)
-                val coreRadius = sz * 1.2f
-                val coreGradient = RadialGradient(
-                    px, py, coreRadius,
-                    intArrayOf(
-                        coreColor,
-                        (coreColor and 0x00FFFFFF) or (coreAlpha * 0.6).toInt().shl(24),
-                        0x00000000
-                    ),
-                    floatArrayOf(0f, 0.7f, 1f),
-                    Shader.TileMode.CLAMP
-                )
-                corePaint.shader = coreGradient
-                native.drawCircle(px, py, coreRadius, corePaint)
-                corePaint.shader = null
+                // B1: 核心圆改实心绘制（预着色数组取色）——
+                // 原每粒子每帧新建 RadialGradient + intArrayOf + floatArrayOf
+                // （1800 粒子 ≈ 每帧 5400 个临时对象），柔边由外层 glow sprite 提供。
+                corePaint.color = if (usePrimaryGlow) {
+                    particleSystem.primaryTinted[i]
+                } else {
+                    particleSystem.onBgTinted[i]
+                }
+                corePaint.alpha = coreAlpha
+                native.drawCircle(px, py, sz * 1.2f, corePaint)
             }
 
             // ── Aggregation flash pulse at text formation (start of HOLD, 300ms) ──
@@ -188,7 +217,6 @@ fun ParticleSplashCanvas(
                 val pulseT = stageProgress / 0.6f  // 0→1 over 300ms of 500ms hold
                 val pulseAlpha = (1f - pulseT) * 0.35f
                 val pulseRadius = maxOf(w, h) * (0.15f + 0.45f * pulseT)
-                val pulsePaint = Paint()
                 val pulseGlow = RadialGradient(
                     cx, cy, pulseRadius,
                     primaryColor.copy(alpha = pulseAlpha).toArgb(),
@@ -197,13 +225,13 @@ fun ParticleSplashCanvas(
                 )
                 pulsePaint.shader = pulseGlow
                 native.drawRect(0f, 0f, w, h, pulsePaint)
+                pulsePaint.shader = null
             }
 
             // Shimmer sweep during HOLD (subtle light sweep across settled text)
             if (stage == SplashStage.HOLD && quality.enableCracks) {
                 val sweepX = cx - w * 0.5f + (w * 1.5f) * stageProgress
-                val shimmerPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-                shimmerPaint.color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.05f).toArgb()
+                shimmerPaint.color = shimmerArgb
                 native.save()
                 native.clipRect(sweepX - 80f * density, 0f, sweepX + 80f * density, h)
                 native.drawColor(shimmerPaint.color)
@@ -216,9 +244,8 @@ fun ParticleSplashCanvas(
             // this canvas overlay is the universal fallback.
             if (stage == SplashStage.SHATTER && stageProgress < 0.133f) {
                 val frostT = stageProgress / 0.133f  // 0→1 over ~400ms of 3s shatter
-                val frostAlpha = (1f - frostT) * 0.18f
-                val frostPaint = Paint()
-                frostPaint.color = androidx.compose.ui.graphics.Color.White.copy(alpha = frostAlpha).toArgb()
+                val frostAlpha = ((1f - frostT) * 0.18f * 255).toInt().coerceIn(0, 255)
+                frostPaint.color = whiteBase or (frostAlpha shl 24)
                 native.drawRect(0f, 0f, w, h, frostPaint)
             }
 
@@ -236,9 +263,8 @@ fun ParticleSplashCanvas(
             // 200ms out of 3000ms shatter = 0.0667 progress window.
             if (stage == SplashStage.SHATTER && stageProgress < 0.0667f) {
                 val flashT = stageProgress / 0.0667f
-                val flashAlpha = (1f - flashT) * 0.9f
-                val flashPaint = Paint()
-                flashPaint.color = androidx.compose.ui.graphics.Color.White.copy(alpha = flashAlpha).toArgb()
+                val flashAlpha = ((1f - flashT) * 0.9f * 255).toInt().coerceIn(0, 255)
+                flashPaint.color = whiteBase or (flashAlpha shl 24)
                 native.drawRect(0f, 0f, w, h, flashPaint)
             }
         }

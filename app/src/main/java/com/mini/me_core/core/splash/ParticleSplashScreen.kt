@@ -31,7 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,7 +54,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mini.me_core.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 /**
  * 纯函数：启动画面是否应当退场。
@@ -124,9 +130,10 @@ fun ParticleSplashScreen(
     )
     var skipButtonVisible by remember { mutableStateOf(true) }
 
-    // Countdown seconds
-    val remainingSec = SplashStage.remainingSeconds(elapsedMs, quality)
-    val isUrgent = remainingSec <= 2 && remainingSec > 0
+    // B5: 跳过按钮倒计时按秒派生——elapsedMs 每帧变，但剩余秒数每秒才变一次，
+    // derivedStateOf 让按钮子树只在整秒边界重组（原每帧重组）。
+    val remainingSec by remember { derivedStateOf { SplashStage.remainingSeconds(elapsedMs, quality) } }
+    val isUrgent by remember { derivedStateOf { remainingSec <= 2 && remainingSec > 0 } }
 
     // A2: 真实启动阶段（MiniMeCore 三阶段上报）与就绪态。
     // startupReady 由主循环每帧从 AppInitState.isReady 采样（volatile 读，无重组成本），
@@ -143,6 +150,16 @@ fun ParticleSplashScreen(
     )
     val stageResId = stageTextRes(startupPhase)
 
+    // B5: 百分比文本按 100ms 采样——progress 是每帧动画值，直接在组合里读
+    // 会让 Text 每帧重组；协程采样（快照读，不订阅重组）则最多 10 次/秒。
+    var displayedPercent by remember { mutableIntStateOf(100) }
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            displayedPercent = (progress * 100).roundToInt()
+            delay(100)
+        }
+    }
+
     // Main animation loop
     LaunchedEffect(screenWidthPx, screenHeightPx, animDisabled) {
         if (screenWidthPx <= 0f || screenHeightPx <= 0f) return@LaunchedEffect
@@ -153,10 +170,19 @@ fun ParticleSplashScreen(
             return@LaunchedEffect
         }
         if (particleSystem == null) {
-            particleSystem = ParticleSystem(screenWidthPx, screenHeightPx, density, quality)
-            glassShatter = if (quality.enable3D) {
-                GlassShatterEffect(screenWidthPx, screenHeightPx, density, quality.shardCount)
-            } else null
+            // B4: 构造（文本位图采样 + O(n²) 半平面裁剪）移到 Default 线程，
+            // 不再占冷启动关键路径的主线程；首帧前无 Canvas，底层先显示纯色背景。
+            val (ps, gs) = withContext(Dispatchers.Default) {
+                val ps = ParticleSystem(screenWidthPx, screenHeightPx, density, quality)
+                val gs = if (quality.enable3D) {
+                    GlassShatterEffect(screenWidthPx, screenHeightPx, density, quality.shardCount)
+                } else {
+                    null
+                }
+                ps to gs
+            }
+            particleSystem = ps
+            glassShatter = gs
         }
 
         var startNanos = 0L
@@ -199,6 +225,7 @@ fun ParticleSplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(colors.background)
             .alpha(overlayAlpha.value)
             .onSizeChanged { size ->
                 screenWidthPx = size.width.toFloat()
@@ -267,7 +294,7 @@ fun ParticleSplashScreen(
             )
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "${(progress * 100).toInt()}%",
+                text = "$displayedPercent%",
                 fontSize = 12.sp,
                 color = colors.onSurfaceVariant,
             )
