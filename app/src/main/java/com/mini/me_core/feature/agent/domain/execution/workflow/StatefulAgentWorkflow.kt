@@ -25,6 +25,7 @@ import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorClassifier
 import com.mini.me_core.feature.agent.domain.core.provider.LlmErrorKind
 import com.mini.me_core.feature.agent.domain.core.provider.RetryReason
 import com.mini.me_core.feature.agent.domain.core.provider.SystemPromptSegment
+import com.mini.me_core.feature.agent.domain.core.provider.classifyRetryReason
 import com.mini.me_core.feature.agent.domain.core.provider.isRetriableNetworkError
 import com.mini.me_core.feature.agent.domain.knowledge.skill.Skill
 import com.mini.me_core.feature.agent.domain.knowledge.skill.SkillExecutionContext
@@ -102,7 +103,11 @@ import javax.inject.Named
  * 阶段三重构 (完全版)：基于不可变状态 (Immutable State) 与 MVI 架构的 Agent 工作流引擎。
  * 通过定义明确的 AgentSessionState, AgentAction 与 AgentSideEffect，
  * 采用 Reducer 来进行状态扭转，将纯函数的业务逻辑与带有副作用的外部环境操作完全解耦。
+ *
+ * @Suppress LongParameterList：聚合数十个领域协作者的装配签名（历史演进形成），
+ *   按「分层注释 + 命名实参」维护；继续拆间接层会稀释可读性，与 ModelCallRouter 同策略。
  */
+@Suppress("LongParameterList")
 class StatefulAgentWorkflow @Inject constructor(
     private val toolRegistry: ToolRegistry,
     private val aiProviderRepository: AIProviderRepository,
@@ -114,6 +119,10 @@ class StatefulAgentWorkflow @Inject constructor(
     @Named("proxy") private val proxyOkHttpClient: OkHttpClient,
     // 代理健康检测器，模型请求失败时自动诊断代理状态。
     private val proxyHealthMonitor: com.mini.me_core.feature.proxy.domain.ProxyHealthMonitor,
+    /** 内置多线路：端点健康记账（连续失败熔断 / EWMA 延迟），换线路由与选路共用。 */
+    private val endpointHealthRegistry: com.mini.me_core.core.network.EndpointHealthRegistry,
+    /** 内置多线路：候选端点生成与故障转移选路（用户配置 URL 永远首选）。 */
+    private val endpointRouter: com.mini.me_core.core.network.ModelEndpointRouter,
     private val promptProvider: SystemPromptProvider,
     private val permissionManager: ToolPermissionManager,
     private val policyEngine: ToolPermissionPolicyEngine,
@@ -204,7 +213,8 @@ class StatefulAgentWorkflow @Inject constructor(
         proxyOkHttpClient = proxyOkHttpClient,
         modelMetadataService = modelMetadataService,
         visionModelSettingsRepository = visionModelSettingsRepository,
-        compactionModelSettingsRepository = compactionModelSettingsRepository
+        compactionModelSettingsRepository = compactionModelSettingsRepository,
+        endpointRouter = endpointRouter
     )
     /** 结果脱敏/整形：媒体提取与剥离、图片净化、识图文本回退。 */
     private val resultSanitizer = ResultSanitizer(modelCallRouter)
@@ -245,6 +255,13 @@ class StatefulAgentWorkflow @Inject constructor(
          * 达到该轮次仍未结束则强制收尾并报错，避免只能靠用户手动停止。
          */
         const val MAX_ITERATIONS = 50
+
+        /**
+         * 单轮端点级换线上限（内置多线路）：首字节前失败时最多换几条候选线路。
+         * 2 次封顶——候选序列本身很短（用户 URL + 官方 URL），且每次换线都是一次
+         * 完整请求尝试；超限交给 provider 级故障转移 / 上层报错，不拖长用户等待。
+         */
+        const val MAX_ENDPOINT_SWITCHES = 2
 
         /**
          * D2-1 空转软收敛：连续 N 轮无实质产出（文件写 / 命令执行 / run_code / 产出性读动作）后
@@ -1094,7 +1111,12 @@ class StatefulAgentWorkflow @Inject constructor(
                             // 一旦已输出 TextDelta（acc/reasoningAcc 非空）则不切换，避免重复文本。
                             var streamProvider: AIProvider = providerInUse
                             var fallbackUsed = false
+                            // 端点级换线计数（内置多线路）：单轮最多 MAX_ENDPOINT_SWITCHES 次，
+                            // 在 provider 级故障转移之前生效——换线路比换 provider 更轻
+                            // （用户配置与 API Key 都不变，只改请求出口）。
+                            var endpointSwitchCount = 0
                             while (true) {
+                                val streamStartMs = System.currentTimeMillis()
                                 try {
                                     streamProvider.completeStream(
                                         effectiveSystemPrompt,
@@ -1129,15 +1151,42 @@ class StatefulAgentWorkflow @Inject constructor(
                                     // 流正常结束：补发窗口内最后一次累积，避免尾部内容滞后于最终事件。
                                     if (textThrottle.flush()) send(AgentEvent.AssistantDelta(acc.text))
                                     if (reasoningThrottle.flush()) send(AgentEvent.ReasoningDelta(reasoningAcc.text))
+                                    // 端点健康记账：成功即清零失败计数并更新 EWMA 延迟，
+                                    // 供下次选路排序（内置多线路的状态来源）。
+                                    endpointHealthRegistry.recordSuccess(
+                                        streamProvider.baseUrl,
+                                        System.currentTimeMillis() - streamStartMs
+                                    )
                                     break
                                 } catch (e: CancellationException) {
                                     throw e
                                 } catch (e: Exception) {
                                     coroutineContext.ensureActive()
+                                    // 端点健康记账：失败即累计（连续达阈值自动熔断，下次选路避开）。
+                                    // 注意先记账再换线——记的是「刚失败的这条线路」。
+                                    endpointHealthRegistry.recordFailure(streamProvider.baseUrl)
                                     // 网络错误时自动诊断代理（不经过模型调用，避免模型绕圈子）。
                                     if (isRetriableNetworkError(e) && activeConfig.needsProxy) {
                                         FileLogger.w(TAG, "模型请求网络错误，自动触发代理健康诊断: ${e.message}")
                                         proxyHealthMonitor.forceCheck()
+                                    }
+                                    // 端点级换线（内置多线路）：首字节前失败且是连接类错误时，
+                                    // 换到下一条候选线路再试（用户配置与 Key 都不变，只改请求出口）。
+                                    // 仅 CONNECTION 类错误才换——限速/服务端错误换线路无意义，
+                                    // 交给阶梯重试与 provider 级故障转移处理。
+                                    if (shouldSwitchEndpoint(e, endpointSwitchCount, acc.text, reasoningAcc.text)) {
+                                        val nextEndpoint = endpointRouter.nextEndpoint(activeConfig, streamProvider.baseUrl)
+                                        if (nextEndpoint != null) {
+                                            endpointSwitchCount++
+                                            FileLogger.i(
+                                                TAG,
+                                                "端点 [${streamProvider.baseUrl}] 首字节前失败，切换到备用线路 " +
+                                                    "[$nextEndpoint]（${endpointSwitchCount}/$MAX_ENDPOINT_SWITCHES）: ${e.message}"
+                                            )
+                                            send(AgentEvent.Retrying(endpointSwitchCount, MAX_ENDPOINT_SWITCHES, RetryReason.CONNECTION))
+                                            streamProvider.baseUrl = nextEndpoint
+                                            continue
+                                        }
                                     }
                                     // 仅在首字节前（未输出任何文本/思考）且错误可重试时才故障转移
                                     if (!fallbackUsed && acc.text.isEmpty() && reasoningAcc.text.isEmpty()
@@ -1687,6 +1736,24 @@ class StatefulAgentWorkflow @Inject constructor(
      * 流式归一化护栏可观测埋点：全量重发去重 / 超长截断 / base64 折叠触发时打 warn。
      * 带 sessionId、model、去重次数、原始接收字节 vs 归一化后字节的放大比率，便于发现"异常放大上游"。
      */
+    /**
+     * 是否应该做端点级换线（内置多线路）：
+     * ① 本轮换线次数未达 [MAX_ENDPOINT_SWITCHES]；② 首字节前失败（未输出任何
+     * 正文/思考——吐字后换线会重复输出）；③ 连接类错误（限速/服务端错误换线路
+     * 无意义，交给阶梯重试与 provider 级故障转移）。
+     *
+     * 抽为纯函数：调用点的 if 条件超过 detekt ComplexCondition 阈值，
+     * 且三要素各自可独立单测验证。
+     */
+    private fun shouldSwitchEndpoint(
+        error: Exception,
+        endpointSwitchCount: Int,
+        text: String,
+        reasoning: String
+    ): Boolean = endpointSwitchCount < MAX_ENDPOINT_SWITCHES &&
+        text.isEmpty() && reasoning.isEmpty() &&
+        classifyRetryReason(error) == RetryReason.CONNECTION
+
     private fun logNormalizerGuardrails(
         sessionId: String?,
         model: String,

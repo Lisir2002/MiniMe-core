@@ -186,6 +186,26 @@ object AgentModule {
         @Named("direct") direct: OkHttpClient
     ): OkHttpClient = direct
 
+    /**
+     * 端点健康注册表（内置多线路的状态底座）：进程内单例，纯内存态。
+     * 与 OkHttp 连接池同生命周期——健康数据是易逝的运行时状态，重启即重置。
+     */
+    @Provides
+    @Singleton
+    fun provideEndpointHealthRegistry(): com.mini.me_core.core.network.EndpointHealthRegistry =
+        com.mini.me_core.core.network.EndpointHealthRegistry()
+
+    /**
+     * 模型端点路由器（内置优化网络线路的选路核心）：读 [provideEndpointHealthRegistry]
+     * 的健康状态为每次模型调用选端点。无健康数据时原序返回用户配置 URL——存量行为零变化。
+     */
+    @Provides
+    @Singleton
+    fun provideModelEndpointRouter(
+        healthRegistry: com.mini.me_core.core.network.EndpointHealthRegistry
+    ): com.mini.me_core.core.network.ModelEndpointRouter =
+        com.mini.me_core.core.network.ModelEndpointRouter(healthRegistry)
+
     @Provides
     @Singleton
     @Named("OpenAI")
@@ -484,6 +504,7 @@ object AgentModule {
     // StatefulAgentWorkflow 依赖按层分组（层内保持注入/实参原顺序，未做任何重排或实例化改动）：
     // 模型/供应商层 → 网络/代理层 → 提示词/权限/审批 → 上下文压缩 → 计划审批 → 工具产物
     // → 模型/设置配置 → 会话/持久化 → 工具执行调度 → 技能/Hook/唤醒 → 目标/计划 → 护栏 → 设置/护栏日志 → 轨迹/剧本。
+    @Suppress("LongParameterList") // 分层注释的装配签名（历史演进形成），与 StatefulAgentWorkflow 同策略
     @Provides
     @Singleton
     fun provideAgentWorkflow(
@@ -497,6 +518,9 @@ object AgentModule {
         @Named("direct") okHttpClient: OkHttpClient,
         @Named("proxy") proxyOkHttpClient: OkHttpClient,
         proxyHealthMonitor: com.mini.me_core.feature.proxy.domain.ProxyHealthMonitor,
+        // 内置多线路：端点健康记账（熔断/EWMA）与选路/换线路由。
+        endpointHealthRegistry: com.mini.me_core.core.network.EndpointHealthRegistry,
+        endpointRouter: com.mini.me_core.core.network.ModelEndpointRouter,
         // ── 提示词 / 权限 / 审批 ──
         promptProvider: SystemPromptProvider,
         permissionManager: ToolPermissionManager,
@@ -551,6 +575,8 @@ object AgentModule {
             toolRegistry, aiProviderRepository, openAIApi, anthropicApi, geminiApi,
             // ── 网络/代理层 ──
             okHttpClient, proxyOkHttpClient, proxyHealthMonitor,
+            // ── 内置多线路 ──
+            endpointHealthRegistry, endpointRouter,
             // ── 提示词 / 权限 / 审批 ──
             promptProvider, permissionManager, policyEngine,
             // ── 上下文压缩 ──

@@ -1,6 +1,7 @@
 package com.mini.me_core.feature.agent.domain.execution.workflow
 
 import com.mini.me_core.core.util.FileLogger
+import com.mini.me_core.core.network.ModelEndpointRouter
 import com.mini.me_core.feature.agent.data.remote.anthropic.AnthropicApi
 import com.mini.me_core.feature.agent.data.remote.gemini.GeminiApi
 import com.mini.me_core.feature.agent.data.remote.openai.OpenAIApi
@@ -40,7 +41,9 @@ internal class ModelCallRouter(
     private val proxyOkHttpClient: OkHttpClient,
     private val modelMetadataService: ModelMetadataService,
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
-    private val compactionModelSettingsRepository: CompactionModelSettingsRepository
+    private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
+    /** 内置多线路选路：为用户配置 URL 排序候选端点（无健康数据时原序=用户配置，存量行为不变）。 */
+    private val endpointRouter: ModelEndpointRouter
 ) {
 
     private companion object {
@@ -113,11 +116,15 @@ internal class ModelCallRouter(
         // 代理路由选择：needsProxy 开关真正生效，决定模型请求走直连还是代理。
         val useProxy = config.needsProxy
         val clientForProvider = if (useProxy) proxyOkHttpClient else okHttpClient
+        // 端点选路（内置多线路）：无健康数据时返回用户配置 URL（原序，存量行为零变化）；
+        // 用户配置端点熔断中才改选同类型官方端点（同一把 Key，不引入第三方线路）。
+        // useFullUrl=true 时用户填的是完整请求地址，选路直通不换（见 ModelEndpointRouter）。
+        val chosenBaseUrl = endpointRouter.selectEndpoint(config)
         // 代理路由日志：记录每个模型的网络出口，便于排查"代理污染模型接口"类问题。
         FileLogger.i(
             TAG,
             "模型网络路由: name=${config.name} model=${config.effectiveModel} " +
-                "baseUrl=${config.baseUrl} needsProxy=$useProxy → ${if (useProxy) "代理出口(mihomo)" else "直连(NO_PROXY)"}"
+                "baseUrl=${config.baseUrl} endpoint=$chosenBaseUrl needsProxy=$useProxy → ${if (useProxy) "代理出口(mihomo)" else "直连(NO_PROXY)"}"
         )
         val provider: AIProvider = when (config.type) {
             ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi, clientForProvider)
@@ -125,7 +132,7 @@ internal class ModelCallRouter(
             else -> OpenAIAdapter(openAIApi, clientForProvider)
         }
         provider.apiKey = config.apiKey
-        provider.baseUrl = config.baseUrl
+        provider.baseUrl = chosenBaseUrl
         provider.model = config.effectiveModel
         provider.useFullUrl = config.useFullUrl
         provider.useResponseApi = config.useResponseApi
