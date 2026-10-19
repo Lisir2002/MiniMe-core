@@ -28,10 +28,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -48,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,8 +67,10 @@ import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionPolicy
 import com.mini.me_core.feature.capability.domain.CapabilityGroupCard
 import com.mini.me_core.feature.capability.domain.CapabilitySkillGroupCard
+import com.mini.me_core.feature.capability.domain.CapabilityStatusCard
 import com.mini.me_core.feature.capability.domain.CapabilityToolCard
 import com.mini.me_core.feature.capability.presentation.UnifiedCapabilityViewModel
+import com.mini.me_core.feature.settings.data.repository.ExecutionMode
 import com.mini.me_core.feature.settings.presentation.SkillsViewModel
 import com.mini.me_core.feature.settings.presentation.component.SkillsScreen
 
@@ -73,11 +79,6 @@ import com.mini.me_core.feature.settings.presentation.component.SkillsScreen
  *
  * 这三者在协议层已统一为 MCP（内置三分组对应三台进程内 MCP server，见 F1），
  * 因此 UI 侧不必再分「工具页 / MCP 页 / 技能页」三处——一张列表、同一套卡片渲染。
- *
- * H1 两级层级：本页是**入口列表**——每张卡片标明接入形态（本地内置 / 远端接入），
- * 点卡片进入该 server 的能力中心（工具 / 提示词 / 资源，见
- * [CapabilityGroupDetailScreen]）。原 D4 置于顶部的「Agent 概览」状态卡已迁到
- * 独立的 Agent 设置页（`SettingsSection.Agent`），本页回归列表单一职责。
  *
  * 灰度开关 `unified_capability_page_enabled` 关闭时不走本组件，
  * 由 [CapabilityCenterScreen] 保持旧三Tab 形态。
@@ -131,8 +132,10 @@ fun UnifiedCapabilityScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
-            // D4 原「Agent 概览」状态卡已移出：Agent 改为独立设置页（SettingsSection.Agent），
-            // 本页回归「server 列表」单一职责——入口只回答「有哪些能力、点什么进去」。
+            // D4：原「Agent」Tab 的五字段升格为顶部全局状态卡。
+            overview.statusCard?.let { card ->
+                item(key = "status_card") { CapabilityStatusCardItem(card) }
+            }
             builtinSection(builtin, onOpenGroupDetail)
             remoteSection(remote, onOpenGroupDetail)
             skillSection(
@@ -362,6 +365,90 @@ private fun SkillGroupBody(
 }
 
 // ──────────────────────────────────────────────
+// 顶部状态卡（D4）
+// ──────────────────────────────────────────────
+
+/**
+ * Agent 概览状态卡：执行模式 · Provider · 权限规则 N · 工具 43 · 技能 N。
+ *
+ * 由旧「Agent」Tab 升格而来。原先它独占一个 Tab 却只放这几行字，平白多占一屏；
+ * 升格到列表顶部后它成了**全局上下文条**——看任何分组前先知道当前运行环境与能力规模。
+ */
+@Composable
+private fun CapabilityStatusCardItem(card: CapabilityStatusCard) {
+    val colors = MaterialTheme.colorScheme
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Radius.lg),
+        colors = CardDefaults.cardColors(containerColor = colors.surfaceVariant.copy(alpha = 0.45f))
+    ) {
+        Column(modifier = Modifier.padding(Spacing.lg)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.capability_status_card_title),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.onSurfaceVariant
+                )
+                Text(
+                    text = executionModeText(card.executionMode),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.primary
+                )
+            }
+            Spacer(Modifier.height(Spacing.md))
+            Text(
+                text = card.activeProviderName
+                    ?: stringResource(R.string.capability_agent_no_provider),
+                style = MaterialTheme.typography.titleSmall,
+                color = colors.onSurface
+            )
+            card.activeProviderModel?.let { model ->
+                Text(
+                    text = model,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(Spacing.md))
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+                MiniStat(Icons.Rounded.Lock, card.permissionRuleCount.toString())
+                MiniStat(Icons.Rounded.Inventory2, card.toolCount.toString())
+                MiniStat(Icons.Rounded.Bolt, card.skillCount.toString())
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniStat(icon: androidx.compose.ui.graphics.vector.ImageVector, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(Modifier.width(Spacing.xs))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun executionModeText(mode: ExecutionMode): String = when (mode) {
+    ExecutionMode.LOCAL_PROOT -> stringResource(R.string.capability_agent_execution_local)
+    ExecutionMode.REMOTE_SSH -> stringResource(R.string.capability_agent_execution_remote)
+}
+
+// ──────────────────────────────────────────────
 // 分组卡片（内置与远端共用）
 // ──────────────────────────────────────────────
 
@@ -417,29 +504,17 @@ private fun GroupCard(group: CapabilityGroupCard, onClick: () -> Unit) {
 }
 
 /**
- * 分组卡片的徽章行（G2 / H1）。
+ * 分组卡片的徽章行（G2）。
  *
  * 抽出成独立函数有两个理由：一是 [GroupCard] 加入形态/禁用两枚徽章后已超detekt
- * `LongMethod` 阈值；二是徽章的**显示条件**本身是一条不变量——集中在一处，
- * 才不会被后续改动零散地改成「一律都印」。
- *
- * H1：**每张卡片都必须印接入形态**（本地内置 / 远端接入）——用户要求「每张列表卡片
- * 写好是本地内置还是远端接入」。内置分组的形态恒为本地内置，印出来不是废话：
- * 没有它，用户无法从卡片上区分「这台是进程内的还是连出去的」。
- * 传输类型（HTTP / STDIO）只对远端有意义，作为形态之后的第二枚补充徽章。
+ * `LongMethod` 阈值；二是徽章的**显示条件**本身是一条不变量——形态徽章只对远端
+ * server 有意义（内置分组的形态恒为「内置」，印出来是废话），禁用徽章只在禁用时出现。
+ * 集中在一处，才不会被后续改动零散地改成「一律都印」。
  */
 @Composable
 private fun GroupBadgeRow(group: CapabilityGroupCard) {
     val colors = MaterialTheme.colorScheme
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        Pill(
-            text = if (group.isBuiltin) {
-                stringResource(R.string.capability_group_form_builtin)
-            } else {
-                stringResource(R.string.capability_group_form_remote)
-            },
-            tint = if (group.isBuiltin) colors.primary else colors.tertiary
-        )
         if (!group.isBuiltin) {
             Pill(
                 text = if (group.remotelyExposed) {

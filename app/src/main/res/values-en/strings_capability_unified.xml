@@ -36,9 +36,6 @@
     <string name="capability_skill_no_mcp_exposure">No skill is currently exposed over MCP (needs to be a prompt or script skill and enabled).</string>
     <string name="capability_group_kind">%1$s</string>
     <string name="capability_group_disabled">Disabled</string>
-    <!-- Access form: every group card must state "Built-in locally" or "Remote access" -->
-    <string name="capability_group_form_builtin">Built-in locally</string>
-    <string name="capability_group_form_remote">Remote access</string>
     <string name="capability_kind_builtin">In-process</string>
     <string name="capability_kind_http">Remote HTTP</string>
     <string name="capability_kind_stdio">Local process</string>
