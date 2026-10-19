@@ -39,14 +39,6 @@ class McpServerSession(
     private val serverName: String = McpProtocol.SERVER_NAME,
     /** F1：本会话服务的能力分组（null = 全量，即 HostServer 的既有行为）。 */
     private val builtinGroup: BuiltinGroup? = null,
-    /**
-     * F4：技能适配器（prompts / resources）。
-     *
-     * 默认传 [EmptySkillMcpAdapter] 而非 `null`：技能是**用户维度**的能力，
-     * 内置三分组 server 服务的是工具维度，故刻意不接技能。给默认值而非要求显式传参，
-     * 是为了让「哪台 server 暴露技能」在装配处一目了然，又不必改所有既有构造点。
-     */
-    private val skillAdapter: SkillMcpAdapter = EmptySkillMcpAdapter,
     private val json: Json = Json { ignoreUnknownKeys = true }
 ) {
     private companion object {
@@ -82,11 +74,6 @@ class McpServerSession(
             "ping" -> resultResponse(id, buildJsonObject { })
             "tools/list" -> handleListTools(id)
             "tools/call" -> handleCallTool(id, root)
-            // F4：技能经 MCP 原生协议暴露（PROMPT 型 → prompts，SCRIPT 型 → resources）
-            "prompts/list" -> handleListPrompts(id)
-            "prompts/get" -> handleGetPrompt(id, root)
-            "resources/list" -> handleListResources(id)
-            "resources/read" -> handleReadResource(id, root)
             else -> {
                 FileLogger.w(TAG, "未知方法 $method")
                 errorResponse(id, -32601, "Method not found: $method")
@@ -94,30 +81,12 @@ class McpServerSession(
         }
     }
 
-    /**
-     * F4：当前会话可暴露的 prompt / resource 数量（仅用于启动日志观测）。
-     *
-     * 刻意不缓存：技能列表会被用户随时增删，缓存必然过期。
-     */
-    fun promptCount(): Int = skillAdapter.listPrompts().size
-
-    fun resourceCount(): Int = skillAdapter.listResources().size
-
     // ── 各方法实现 ──────────────────────────────────────────────
 
     private fun initializeResult(): JsonObject = buildJsonObject {
         put("protocolVersion", McpProtocol.PROTOCOL_VERSION)
         putJsonObject("capabilities") {
             putJsonObject("tools") { }
-            // F4：prompts / resources 的能力**按实际是否接入技能声明**。
-            // 规范要求「支持 prompts MUST 声明 prompts capability」——反之也成立：
-            // 没接技能却声明能力，等于对外承诺一个只会返回空列表的方法。
-            // listChanged 本实现暂不声明：技能列表变化由宿主 App 内部消化，
-            // 不经本 server 推送（尚无 `notifications/prompts/list_changed` 的触发点）。
-            if (skillAdapter.hasSkills()) {
-                putJsonObject("prompts") { }
-                putJsonObject("resources") { }
-            }
         }
         putJsonObject("serverInfo") {
             put("name", serverName)
@@ -158,49 +127,6 @@ class McpServerSession(
 
         val callResult = adapter.callTool(name, arguments)
         return resultResponse(id, callResult)
-    }
-
-    // ── F4：prompts / resources ───────────────────────────────────
-
-    private fun handleListPrompts(id: JsonElement): JsonObject {
-        val prompts = skillAdapter.listPrompts()
-        val result = buildJsonObject {
-            putJsonArray("prompts") { prompts.forEach { add(it.toPromptDescriptor()) } }
-            // 分页游标：本实现一次性返回全量，故不带 nextCursor。
-            // 规范把 nextCursor 设为可选，客户端见到缺失即视为单页。
-        }
-        return resultResponse(id, result)
-    }
-
-    private fun handleGetPrompt(id: JsonElement, root: JsonObject): JsonObject {
-        val params = root["params"] as? JsonObject
-            ?: return errorResponse(id, -32602, "Invalid params")
-        val name = (params["name"] as? JsonPrimitive)?.contentOrNull
-            ?: return errorResponse(id, -32602, "Missing prompt name")
-        // 未知 prompt 名按规范返回 -32602（Invalid params），不是 -32601：
-        // 方法本身存在，只是参数值无效。
-        val skill = skillAdapter.getPrompt(name)
-            ?: return errorResponse(id, -32602, "Unknown prompt: $name")
-        return resultResponse(id, skill.toPromptResult())
-    }
-
-    private fun handleListResources(id: JsonElement): JsonObject {
-        val resources = skillAdapter.listResources()
-        val result = buildJsonObject {
-            putJsonArray("resources") { resources.forEach { add(it.toResourceDescriptor()) } }
-        }
-        return resultResponse(id, result)
-    }
-
-    private fun handleReadResource(id: JsonElement, root: JsonObject): JsonObject {
-        val params = root["params"] as? JsonObject
-            ?: return errorResponse(id, -32602, "Invalid params")
-        val uri = (params["uri"] as? JsonPrimitive)?.contentOrNull
-            ?: return errorResponse(id, -32602, "Missing resource uri")
-        // URI 来自外部客户端（不可信输入）：畸形 URI 走「资源不存在」，不抛异常。
-        val skill = skillAdapter.getResource(uri)
-            ?: return errorResponse(id, -32602, "Unknown resource: $uri")
-        return resultResponse(id, skill.toResourceResult())
     }
 
     // ── 响应构造 ────────────────────────────────────────────────

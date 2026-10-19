@@ -260,15 +260,6 @@ object AgentModule {
         return retrofit.create(com.mini.me_core.feature.agent.data.remote.gemini.GeminiApi::class.java)
     }
 
-    // ── F4：技能 → MCP prompts/resources 的端口绑定 ──
-    // 对外只暴露 SkillMcpAdapter 端口，实现（DefaultSkillMcpAdapter）不外泄，
-    // 便于测试时替换为桩实现。
-    @Provides
-    @Singleton
-    fun provideSkillMcpAdapter(
-        delegate: com.mini.me_core.feature.agent.domain.execution.mcp.server.DefaultSkillMcpAdapter
-    ): com.mini.me_core.feature.agent.domain.execution.mcp.server.SkillMcpAdapter = delegate
-
     @Provides
     @Singleton
     fun provideCommandEngine(delegate: DelegatingCommandEngine): CommandEngine = delegate

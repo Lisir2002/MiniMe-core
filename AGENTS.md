@@ -452,27 +452,11 @@ AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。�
 7. **白名单模式下 UI 操作的是 `enabledTools`**：`McpEditorDialog` 的每工具开关在两种模式下操作不同集合，但对用户是同一个「可用吗」的真值。切换白名单模式时**必须清空另一模式的集合**——两套集合共存会因「拒绝优先」产生难以预料的结果。
 8. **`enabledTools` 须落盘**：`McpConfigRepositoryImpl` 的序列化与解析都要处理，存量配置缺失该键即为空集（行为不变）。
 
-#### 技能归 MCP 能力规约（强制约束，F4 批次）
-
-技能此前只有 App 内消费路径（`load_skill` 工具 / 技能中心 UI），在协议层完全不可见——外部 MCP 客户端无法发现「这台设备会写文档、会跑构建」。F4 把技能接入 MCP 的 `prompts` / `resources` 两个原生方法。
-
-1. **按 type 分派，只有两条映射**：`PROMPT` → `prompts`、`SCRIPT` → `resources`。分派谓词 `Skill.asPromptOrNull` / `asResourceOrNull` 是**唯一实现**（在 `SkillMcpAdapter.kt`），服务端 list/get、UI 徽章计数全部复用同一对函数。禁止在别处重写 `type == PROMPT` 判断——两处口径一旦分叉，就会出现「UI 显示 3 个 prompt、协议只返回 2 条」这类最难排查的数字不一致。
-2. **`SkillType.MCP` 刻意不暴露**：它是「调用某个已连 MCP 工具」的包装，属能力的**消费方**。同时暴露会在协议层形成「技能暴露技能」的环。它的别名关系在 UI 上以 `mcpTool` 徽章显式展示，让用户能对上号。
-3. **`list` 与 `get` 必须同口径**：四个方法共用分派谓词，保证「list 里出现的 get 一定取得到」。否则会出现悬空条目——客户端遍历 list 后逐个 get 必然报错。
-4. **`resources/read` 只读不执行**：`resources` 的语义是「只读内容」。读到的是**脚本文本**（技能定义 + 入口脚本名），真正执行仍走 `runSkillScript`（需 ZTH 审批）。若在 `read` 里执行，等于让外部客户端借 `resources/read` 绕过审批，属安全缺陷。
-5. **URI 是不可信输入**：`minime://skill/{id}` 用自定义 scheme 而非 `file://`（后者会被客户端当真实路径去打开，而技能可能内置、可能来自状态覆盖，并非磁盘普通文件）。`SkillResourceUri.parseId` 对异 scheme、空 id、多层路径一律返回 `null`，由上层按「资源不存在」处理，**不得抛出**。
-6. **capabilities 按实际条件声明**：`initialize` 仅在 `hasSkills()` 为真时声明 `prompts` / `resources`。`hasSkills()` 的语义是「**当前**有可暴露技能」而非「接了技能源」——全部技能都是 MCP 型或都被禁用时不得声明。声明了能力却恒返回空列表，等于对外承诺一个永远空实现的接口，客户端会反复重试。
-7. **未知名称回 `-32602` 而非 `-32601`**：方法存在、参数值无效，是 `-32602`（Invalid params）；`-32601`（Method not found）只用于协议层根本没有的方法。
-8. **内置三分组 server 刻意不接技能**：`BuiltinMcpServerFactory` 构造会话时用默认的 `EmptySkillMcpAdapter`。内置分组是**工具维度**，技能是**用户维度**；让进程内 server 也暴露 prompts 会污染批次 B 的工具可见面。只有对外的 HostServer 装配 `DefaultSkillMcpAdapter`。
-9. **技能仓库异常必须降级而非上抛**：`DefaultSkillMcpAdapter` 读技能列表用 `runCatching` 回退空列表。它位于 MCP 请求处理路径上，目录权限异常不应让整个 server 变成 500——退化成「当前无技能暴露」才是正确降级。
-10. **数据源用 `listSkillsSync` 而非 Flow**：MCP 请求是同步一问一答，取不到也等不来 Flow；技能列表规模有限（几十条），同步读盘可接受。
-
 ### MCP（Model Context Protocol）
 
 - **客户端（已实施）**：应用实现了 MCP 客户端（`feature/agent/domain/mcp/`），可连接远程 HTTP / 本地 stdio 服务器并动态注册其提供的工具（`McpManager` / `McpClient` / `McpTool`）。
 - **服务器（已实施）**：内置 MCP 服务器（`feature/agent/domain/mcp/server/`）使应用成为「客户端 + 服务器」双角色：`McpServerManager` 管理开关/端口/token/审批，`McpHttpServer` 用 Ktor CIO 起 Streamable HTTP 端点（`POST/GET/DELETE /mcp`，Bearer 鉴权 + SSE），`McpServerSession` 解析 JSON-RPC（initialize / tools/list / tools/call / ping），`AgentToolMcpAdapter` 把 `ToolRegistry` 中允许暴露的 `AgentTool` 映射为 MCP 工具并复用 `ToolPermissionManager` 审批，把 App 能力开放给外部 MCP 客户端（手机当开发后端）。
 - **内置能力 MCP 化（F1，见上节规约）**：`BuiltinMcpServerFactory` 把 43 个内置工具经**真实 MCP 往返**暴露为三个 server（`MiniMe-Core` / `MiniMe-Chat` / `MiniMe-Data`），与远端 server 在 MCP Center 同表管理。开关关闭时零行为变更。
-- **技能经 MCP 暴露（F4，见上节规约）**：`McpServerSession` 支持 `prompts/list` / `prompts/get` / `resources/list` / `resources/read`，数据经 `SkillMcpAdapter` 端口（实现 `DefaultSkillMcpAdapter`）从 `SkillStateRepository` 取；`PROMPT` 型映射 prompts、`SCRIPT` 型映射 `minime://skill/{id}` resources、`MCP` 型作为远端工具别名不暴露。
 
 ### 依赖注入
 

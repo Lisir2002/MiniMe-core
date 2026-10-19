@@ -33,7 +33,6 @@ class McpServerManager @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val toolRegistry: ToolRegistry,
     private val permissionManager: ToolPermissionManager,
-    private val skillMcpAdapter: SkillMcpAdapter,
     private val kv: KVStore,
 ) {
     private companion object {
@@ -176,20 +175,13 @@ class McpServerManager @Inject constructor(
             val adapter = AgentToolMcpAdapter(toolRegistry, permissionManager, requireApproval = _requireApproval.value)
             val settings = McpServerSettings(enabled = true, port = _port.value, token = _token.value,
                 requireApproval = _requireApproval.value, autoStart = _autoStart.value)
-            val session = McpServerSession(adapter, skillAdapter = skillMcpAdapter)
-            val server = McpHttpServer(settings = settings, session = session)
+            val server = McpHttpServer(settings = settings, session = McpServerSession(adapter))
             val ok = server.start()
             if (ok) {
                 httpServer = server
                 _isRunning.value = true
                 updateServerUrl()
-                val promptCount = session.promptCount()
-                val resourceCount = session.resourceCount()
-                FileLogger.i(
-                    TAG,
-                    "内置 MCP 服务器已启动: ${_serverUrl.value}, 工具数=${adapter.listTools().size}, " +
-                        "prompts=$promptCount, resources=$resourceCount"
-                )
+                FileLogger.i(TAG, "内置 MCP 服务器已启动: ${_serverUrl.value}, 工具数=${adapter.listTools().size}")
             }
             return ok
         } catch (e: Exception) {
