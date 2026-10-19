@@ -46,10 +46,10 @@ internal class AgentSessionStore(private val db: AgentDb) {
     suspend fun renameSession(id: String, title: String, now: Long = System.currentTimeMillis()) =
         withContext(Dispatchers.IO) { q.updateSessionTitle(title, now, id) }
 
-    suspend fun deleteSession(id: String) = withContext(Dispatchers.IO) { q.deleteSession(id) }
-
-    /** 备份「覆盖恢复」专用：清空会话大表（消息/待办需各自调用 deleteAllMessages / deleteAllTodos）。 */
-    suspend fun deleteAllSessions() = withContext(Dispatchers.IO) { q.deleteAllSessions() }
+    // 删除会话一律走 AgentRepository.deleteSession（单事务级联，含外键层次）。
+    // 这里不再暴露单表 deleteSession：agent_message / agent_checkpoint 外键指向 agent_session，
+    // PRAGMA foreign_keys=ON 下直接删父行必抛 SQLiteConstraintException（删除崩溃根因）。
+    // 全量清空（备份覆盖恢复）走 AgentRepository.deleteAllSessions（逐会话级联）。
 
     suspend fun getAllSessionsByWorkspaceOnce(workspacePath: String): List<Agent_session> =
         withContext(Dispatchers.IO) { q.selectSessionsByWorkspace(workspacePath).executeAsList() }

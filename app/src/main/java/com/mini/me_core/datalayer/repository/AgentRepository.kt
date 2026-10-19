@@ -85,10 +85,30 @@ class AgentRepository(private val db: AgentDb) : WakeQueueStore {
     suspend fun renameSession(id: String, title: String, now: Long = System.currentTimeMillis()) =
         sessions.renameSession(id, title, now)
 
-    suspend fun deleteSession(id: String) = sessions.deleteSession(id)
+    /**
+     * 删除会话及其全部关联数据（单事务级联）。
+     *
+     * 历史上这里是单表 `DELETE FROM agent_session`，而 EncryptedDriverFactory 强制
+     * `PRAGMA foreign_keys=ON`：只要有消息或检查点的会话，一删就抛
+     * `SQLiteConstraintException: FOREIGN KEY constraint failed` 且无人捕获 —— 对话列表
+     * 点击删除即崩溃。现在按外键层次在 [runInTx] 内一次删净（见 [AgentTx.deleteSessionCascade]），
+     * SessionUseCase.deleteSession / deleteSessionsByWorkspace 两个调用方无需改动即获得级联。
+     */
+    suspend fun deleteSession(id: String) = runInTx { it.deleteSessionCascade(id) }
 
-    /** 备份「覆盖恢复」专用：清空会话大表（消息/待办需各自调用 deleteAllMessages / deleteAllTodos）。 */
-    suspend fun deleteAllSessions() = sessions.deleteAllSessions()
+    /**
+     * 备份「覆盖恢复」专用：清空全部会话及其关联数据（单事务逐会话级联）。
+     *
+     * 过去是裸 `DELETE FROM agent_session`：PRAGMA foreign_keys=ON 下只要库里存在消息/检查点，
+     * 覆盖恢复的 clearSessions 就整段失败（safeDaoSuspend 吞异常只打日志），旧会话清不掉、
+     * 备份会话又 upsert 进来，新旧混杂。现在先取 id 列表（事务外），再在 [runInTx] 内按
+     * [AgentTx.deleteSessionCascade] 的同一外键层次逐会话删净；BackupRestorer 随后的
+     * deleteAllMessages / deleteAllTodos 自然成为空操作。
+     */
+    suspend fun deleteAllSessions() {
+        val ids = sessions.getAllOnce().map { it.id }
+        runInTx { tx -> ids.forEach { tx.deleteSessionCascade(it) } }
+    }
 
     suspend fun getAllSessionsByWorkspaceOnce(workspacePath: String): List<Agent_session> =
         sessions.getAllSessionsByWorkspaceOnce(workspacePath)

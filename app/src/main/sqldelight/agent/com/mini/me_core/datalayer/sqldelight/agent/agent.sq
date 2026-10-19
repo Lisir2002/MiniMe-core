@@ -144,9 +144,9 @@ UPDATE agent_session SET updated_at = ? WHERE id = ?;
 deleteSession:
 DELETE FROM agent_session WHERE id = ?;
 
--- 备份「覆盖恢复」专用：清空会话大表（消息/待办需各自单独清空，见 deleteAllMessages / deleteAllTodos）。
-deleteAllSessions:
-DELETE FROM agent_session;
+-- 全量清空会话一律走 AgentRepository.deleteAllSessions（逐会话级联，外键安全）。
+-- 这里不提供裸 deleteAllSessions：agent_message / agent_checkpoint 外键指向 agent_session，
+-- PRAGMA foreign_keys=ON 下直接清父表必抛 SQLiteConstraintException。
 
 updateSessionProviderModel:
 UPDATE agent_session SET provider_id = ?, model = ? WHERE id = ?;
@@ -187,6 +187,18 @@ selectMessagesBySessionPaged:
 SELECT * FROM (
   SELECT * FROM agent_message WHERE session_id = ? ORDER BY seq DESC, created_at DESC LIMIT ?
 ) AS agent_message ORDER BY seq ASC, created_at ASC;
+
+-- 会话级联删除专用：part/tool_call 外键指向 agent_message，
+-- 必须先于 deleteMessagesBySession 执行，否则 deleteSession 抛 FOREIGN KEY 约束失败。
+deleteMessagePartsBySession:
+DELETE FROM agent_message_part WHERE message_id IN (SELECT id FROM agent_message WHERE session_id = ?);
+
+deleteToolCallsBySession:
+DELETE FROM agent_tool_call WHERE message_id IN (SELECT id FROM agent_message WHERE session_id = ?);
+
+-- agent_checkpoint 与 agent_message 一样外键指向 agent_session，删会话前必须先删。
+deleteAgentCheckpointsBySession:
+DELETE FROM agent_checkpoint WHERE session_id = ?;
 
 deleteMessagesBySession:
 DELETE FROM agent_message WHERE session_id = ?;
@@ -968,6 +980,10 @@ UPDATE zth_user_confirmed_sentinels SET rollback_flag = 1 WHERE session_id = ?;
 
 deleteSentinelById:
 DELETE FROM zth_user_confirmed_sentinels WHERE id = ?;
+
+-- 会话级联删除：sentinels 是会话域用户状态（按 session_id 查询），随会话一起清。
+deleteSentinelsBySession:
+DELETE FROM zth_user_confirmed_sentinels WHERE session_id = ?;
 
 selectRejectionAuditsAll:
 SELECT * FROM zth_sentinel_plan_rejection_audits ORDER BY created_at_ms ASC;
