@@ -334,15 +334,4 @@ class ParticleSystem(
         }
         colorMix = 1f - t * 0.3f
     }
-
-    /** Reset converge state (called when starting animation fresh) */
-    fun reset() {
-        convergeInit = false
-        colorMix = 0f
-        for (i in 0 until count) {
-            x[i] = centerX
-            y[i] = centerY
-            sizeScale[i] = 1.5f
-        }
-    }
 }

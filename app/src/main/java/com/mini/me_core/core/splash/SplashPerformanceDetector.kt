@@ -10,9 +10,9 @@ import java.io.File
 /**
  * Device performance tier for adaptive splash animation quality.
  *
- * HIGH:  ≥8 cores, ≥6GB RAM — full effects, 1200 particles, 40 shards, 6s
- * MEDIUM: 4-7 cores, 4-6GB RAM — simplified, 800 particles, 25 shards, 5s
- * LOW:   <4 cores, <4GB RAM — minimal, 400 particles, 12 shards, no 3D, 4s
+ * HIGH:  ≥8 cores, ≥6GB RAM — full effects, 1800 particles, 40 shards, 6s
+ * MEDIUM: 4-7 cores, 4-6GB RAM — simplified, 1200 particles, 25 shards, 5s
+ * LOW:   <4 cores, <4GB RAM — minimal, 600 particles, 12 shards, no 3D, 4s
  */
 enum class SplashQualityLevel(
     val particleCount: Int,
