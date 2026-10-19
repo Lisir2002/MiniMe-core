@@ -115,6 +115,10 @@
     <string name="settings_keepalive_subtitle">显示前台通知，避免退到后台时系统杀进程</string>
     <string name="settings_norm_flow">AGENT规范</string>
     <string name="settings_norm_flow_subtitle">单轮注入纪律与工具护栏的统一开关</string>
+    <string name="settings_agent">Agent 设置</string>
+    <string name="settings_agent_subtitle">执行模式、模型供应商与能力规模总览</string>
+    <string name="settings_permissions_subtitle_agent">工具调用前的授权规则</string>
+    <string name="settings_providers_subtitle_agent">API Key 与默认模型</string>
     <string name="settings_norm_flow_group">规范流程开关</string>
     <string name="settings_norm_flow_master">总开关</string>
     <string name="settings_norm_flow_master_desc">关闭后 step 前注入与工具护栏整体停用</string>

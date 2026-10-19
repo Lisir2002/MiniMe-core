@@ -149,6 +149,7 @@ enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Logs(R.string.settings_logs),
     Permissions(R.string.settings_permissions),
     NormFlow(R.string.settings_norm_flow),
+    Agent(R.string.settings_agent),
     RemoteServers(R.string.settings_remote_servers),
     Backup(R.string.settings_backup),
     Security(R.string.settings_security),
@@ -684,6 +685,13 @@ fun SettingsScreen(
                     onPromote = { viewModel.promoteRuleToGlobal(it) },
                     onDeleteGlobal = { viewModel.deleteGlobalRule(it) }
                 )
+                // H1：Agent 独立设置页（执行模式 / 供应商 / 能力规模总览 + 跳转入口）。
+                SettingsSection.Agent -> AgentSettingsScreen(
+                    onNavigateBack = { section = SettingsSection.Menu },
+                    onNavigateToCapabilityCenter = onNavigateToCapabilityCenter,
+                    onNavigateToPermissions = { section = SettingsSection.Permissions },
+                    onNavigateToProviders = { section = SettingsSection.Providers }
+                )
                 SettingsSection.NormFlow -> {
                     NormFlowSection(
                         normFlowEnabled = normFlowEnabled,
@@ -1088,6 +1096,22 @@ internal fun SettingsMenu(
             iconBgDark = Color(0xFF155E75),
             keywords = listOf("norm", "flow", "step", "inject", "guard", stringResource(R.string.settings_norm_flow)),
             action = { onOpen(SettingsSection.NormFlow) }
+        ),
+        // H1：Agent 独立设置页。执行模式 / 供应商 / 能力规模总览原挂在统一能力页顶部，
+        // 用户要求「把 agent 单独拿出来做一个单独的设置页面」，迁到此入口。
+        MenuItem(
+            section = SettingsSection.Agent,
+            group = groupAI,
+            title = stringResource(SettingsSection.Agent.titleRes),
+            subtitle = stringResource(R.string.settings_agent_subtitle),
+            icon = Icons.Rounded.Memory,
+            iconBgLight = Color(0xFFF59E0B),
+            iconBgDark = Color(0xFF92400E),
+            keywords = listOf(
+                "agent", "execution", "mode", "provider", "overview",
+                stringResource(R.string.settings_agent)
+            ),
+            action = { onOpen(SettingsSection.Agent) }
         ),
         // 能力中心入口（自侧边栏移入设置）：技能管理、MCP 工具服务等，独立路由跳转，不走 section 切换。
         MenuItem(

@@ -179,6 +179,10 @@
     <!-- Norm flow (D1-7, aligned with norm-chain-design.md §3.5) -->
     <string name="settings_norm_flow">AGENT Spec</string>
     <string name="settings_norm_flow_subtitle">Master switch for per-step injection discipline and tool guards</string>
+    <string name="settings_agent">Agent Settings</string>
+    <string name="settings_agent_subtitle">Execution mode, model provider and capability overview</string>
+    <string name="settings_permissions_subtitle_agent">Approval rules before tool calls</string>
+    <string name="settings_providers_subtitle_agent">API keys and default model</string>
     <string name="settings_norm_flow_group">Norm Flow Switches</string>
     <string name="settings_norm_flow_master">Master Switch</string>
     <string name="settings_norm_flow_master_desc">When off, per-step injection and tool guards are disabled entirely</string>

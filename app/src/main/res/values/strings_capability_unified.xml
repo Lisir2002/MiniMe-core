@@ -36,6 +36,9 @@
     <string name="capability_skill_no_mcp_exposure">当前没有技能经 MCP 对外暴露（需为提示词或脚本型且已启用）。</string>
     <string name="capability_group_kind">%1$s</string>
     <string name="capability_group_disabled">已禁用</string>
+    <!-- 接入形态：每张分组卡片都必须标明「本地内置」还是「远端接入」 -->
+    <string name="capability_group_form_builtin">本地内置</string>
+    <string name="capability_group_form_remote">远端接入</string>
     <string name="capability_kind_builtin">进程内</string>
     <string name="capability_kind_http">远端 HTTP</string>
     <string name="capability_kind_stdio">本地进程</string>
