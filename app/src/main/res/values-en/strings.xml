@@ -2660,13 +2660,4 @@
     <string name="remote_connection_delete_confirm_message">Delete the connection \"%1$s\"? Mounts depending on it will stop working. This action cannot be undone.</string>
     <string name="remote_mount_delete_confirm_title">Delete mount</string>
     <string name="remote_mount_delete_confirm_message">Delete the mount \"%1$s\"? Only the local mount configuration is removed; remote files are kept. This action cannot be undone.</string>
-    <!-- G1 capability governance feature gates -->
-    <string name="dev_feature_gate_group">Capability governance (experimental)</string>
-    <string name="dev_feature_gate_deferred">Deferred tool loading</string>
-    <string name="dev_feature_gate_deferred_sub">On-demand tools stay out of the model context until needed. When off, all tools are in context every turn.</string>
-    <string name="dev_feature_gate_builtin_mcp">Builtin capabilities over MCP</string>
-    <string name="dev_feature_gate_builtin_mcp_sub">Expose the 43 builtin tools as three in-process MCP servers (Core / Chat / Data) discoverable by external MCP clients.</string>
-    <string name="dev_feature_gate_unified_page">Unified capability page</string>
-    <string name="dev_feature_gate_unified_page_sub">Merge Capability Center, MCP Center and Skills into one list. When off, the legacy three-tab page is used.</string>
-    <string name="dev_feature_gate_deferred_sub_blocked">Takes effect only together with the NormFlow master switch (currently off).</string>
 </resources>

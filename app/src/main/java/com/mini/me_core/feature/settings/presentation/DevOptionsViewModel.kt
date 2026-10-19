@@ -3,7 +3,6 @@ package com.mini.me_core.feature.settings.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mini.me_core.datalayer.store.KVStore
-import com.mini.me_core.feature.settings.data.repository.NormFlowSettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +22,6 @@ import javax.inject.Inject
 class DevOptionsViewModel @Inject constructor(
     private val kv: KVStore,
     private val memoryMonitor: com.mini.me_core.core.performance.MemoryMonitor,
-    private val normFlowSettingsRepository: NormFlowSettingsRepository,
 ) : ViewModel() {
 
     private companion object {
@@ -41,42 +39,8 @@ class DevOptionsViewModel @Inject constructor(
         val webViewDebug: Boolean = false,
     )
 
-    /**
-     * G1：能力治理灰度开关。
-     *
-     * 这三个开关此前**只有仓储层的 setter、没有任何调用点**——用户无法开启，
-     * 意味着批次 B/F1/F2 的成果默认状态下全部不可见。放在开发者选项而非普通设置，
-     * 是因为它们都会改变对外行为（哪些工具进模型上下文、哪些能力对外可达、
-     * 页面形态切换），属于需要用户明确知情的高影响开关。
-     *
-     * 数据源是 [NormFlowSettingsRepository] 的既有 Flow（而非另开 KV 读一遍），
-     * 这样开关状态与消费侧（`McpManager` / `CapabilityRegistry` / `ToolLoadingPolicy`）
-     * 读的是同一份来源，不会出现「界面显示已开、实际读到的还是旧值」。
-     */
-    data class FeatureToggles(
-        /** B2：工具延迟加载——按需工具不常驻模型上下文。 */
-        val deferredToolLoadingEnabled: Boolean = false,
-        /** F1：内置能力 MCP 化——43 个内置工具成为三台进程内 MCP server。 */
-        val builtinAsMcpEnabled: Boolean = false,
-        /** F2/F4：统一能力页——内置分组 / MCP 服务 / 技能合并为一张列表。 */
-        val unifiedCapabilityPageEnabled: Boolean = false,
-        /**
-         * 规范流总开关。
-         *
-         * 刻意放进同一模型：延迟加载的**生效条件**是
-         * `normFlowEnabled && deferredToolLoadingEnabled`（见
-         * `NormFlowSettingsRepository.isDeferredToolLoadingActive`），
-         * 所以只开延迟加载、不开总开关时开关显示「已开」但实际无效果。
-         * UI 必须能据此提示，否则就是一个骗人的开关。
-         */
-        val normFlowEnabled: Boolean = true,
-    )
-
     private val _toggles = MutableStateFlow(loadToggles())
     val toggles: StateFlow<DevToggles> = _toggles.asStateFlow()
-
-    private val _featureToggles = MutableStateFlow(FeatureToggles())
-    val featureToggles: StateFlow<FeatureToggles> = _featureToggles.asStateFlow()
 
     private val _kvEntries = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val kvEntries: StateFlow<List<Pair<String, String>>> = _kvEntries.asStateFlow()
@@ -87,28 +51,6 @@ class DevOptionsViewModel @Inject constructor(
         _memory.asStateFlow()
 
     init {
-        // 灰度开关初值：读仓储的 Flow 首值。三个开关默认 false，
-        // 与「存量行为完全一致」的灰度约定相同。
-        viewModelScope.launch {
-            normFlowSettingsRepository.deferredToolLoadingEnabledFlow.collect { v ->
-                _featureToggles.value = _featureToggles.value.copy(deferredToolLoadingEnabled = v)
-            }
-        }
-        viewModelScope.launch {
-            normFlowSettingsRepository.builtinAsMcpEnabledFlow.collect { v ->
-                _featureToggles.value = _featureToggles.value.copy(builtinAsMcpEnabled = v)
-            }
-        }
-        viewModelScope.launch {
-            normFlowSettingsRepository.unifiedCapabilityPageEnabledFlow.collect { v ->
-                _featureToggles.value = _featureToggles.value.copy(unifiedCapabilityPageEnabled = v)
-            }
-        }
-        viewModelScope.launch {
-            normFlowSettingsRepository.normFlowEnabledFlow.collect { v ->
-                _featureToggles.value = _featureToggles.value.copy(normFlowEnabled = v)
-            }
-        }
         refreshKv()
         viewModelScope.launch {
             while (true) {
@@ -136,18 +78,6 @@ class DevOptionsViewModel @Inject constructor(
     private fun update(key: String, v: Boolean, copy: DevToggles.() -> DevToggles) {
         kv.putBool(NS, key, v)
         _toggles.value = copy(_toggles.value)
-    }
-
-    fun setDeferredToolLoadingEnabled(v: Boolean) = viewModelScope.launch {
-        normFlowSettingsRepository.setDeferredToolLoadingEnabled(v)
-    }
-
-    fun setBuiltinAsMcpEnabled(v: Boolean) = viewModelScope.launch {
-        normFlowSettingsRepository.setBuiltinAsMcpEnabled(v)
-    }
-
-    fun setUnifiedCapabilityPageEnabled(v: Boolean) = viewModelScope.launch {
-        normFlowSettingsRepository.setUnifiedCapabilityPageEnabled(v)
     }
 
     fun refreshKv() {

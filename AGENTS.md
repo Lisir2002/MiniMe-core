@@ -452,31 +452,6 @@ AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。�
 7. **白名单模式下 UI 操作的是 `enabledTools`**：`McpEditorDialog` 的每工具开关在两种模式下操作不同集合，但对用户是同一个「可用吗」的真值。切换白名单模式时**必须清空另一模式的集合**——两套集合共存会因「拒绝优先」产生难以预料的结果。
 8. **`enabledTools` 须落盘**：`McpConfigRepositoryImpl` 的序列化与解析都要处理，存量配置缺失该键即为空集（行为不变）。
 
-#### 灰度开关必须有 UI 出口（强制约束，G1 批次）
-
-`builtin_as_mcp_enabled` / `unified_capability_page_enabled` / `deferred_tool_loading_enabled`
-三个开关曾只有仓储层 setter、**零调用点**——用户开不起来，于是批次 B / F1 / F2 / F4
-的成果在默认状态下**一条都看不到**。功能做完但用户无法触及，等于没做。
-
-1. **开关落地即须有 UI 出口**：新增灰度开关时，同批必须提供可见入口，且放在
-   「设置 → 关于 → 开发者选项」的**调试Tab**（`DevOptionsScreen`）而非普通设置——
-   它们都会改变对外行为（哪些工具进模型上下文、哪些能力对外可达、页面形态切换），
-   属于需要用户明确知情的高影响开关。
-2. **延迟加载是两级串联开关**：`isDeferredToolLoadingActive()` 的生效条件是
-   `normFlowEnabled && deferredToolLoadingEnabled`。故 UI 在总开关关闭时必须显式提示
-   「需同时开启规范流总开关」，否则就是一个骗人的开关。判定已抽为纯函数
-   `deferredToolLoadingEffective(normFlowEnabled, deferredEnabled)` 供直接单测。
-3. **另两个开关刻意不挂 normFlow 总闸**：`isBuiltinAsMcpActive` 与
-   `isUnifiedCapabilityPageActive` 只读自己的键。内置 MCP 化是协议层能力、
-   统一页是页面形态，都不是「规范流程」实验的一部分；挂上会造成语义混淆
-   （关normFlow 就连带让内置分组无法枚举）。
-4. **开关状态与消费侧必须同源**：UI 订阅 `NormFlowSettingsRepository` 的既有 Flow，
-   不另开一路 KV 读取。否则会出现「界面显示已开、实际读到的还是旧值」。
-5. **不要 mock 被测对象本身**：判定「开关是否生效」时不要 mock
-   `NormFlowSettingsRepository`——它就是被测对象，桩掉之后断言恒真、测试形同虚设
-   （本批已踩过一次：mock 后 4 例假失败，根因是把「被测方法」也桩掉了）。
-   正确做法是把判定抽成纯函数直接测，或用真实对象 + 假 KV。
-
 #### 技能归 MCP 能力规约（强制约束，F4 批次）
 
 技能此前只有 App 内消费路径（`load_skill` 工具 / 技能中心 UI），在协议层完全不可见——外部 MCP 客户端无法发现「这台设备会写文档、会跑构建」。F4 把技能接入 MCP 的 `prompts` / `resources` 两个原生方法。

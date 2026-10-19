@@ -56,13 +56,4 @@
     <string name="dev_data_db_table_count">表数量</string>
     <string name="dev_data_db_rows">行数</string>
     <string name="dev_data_db_todo">TODO：表数据浏览待实现</string>
-    <!-- G1 能力治理灰度开关 -->
-    <string name="dev_feature_gate_group">能力治理（实验）</string>
-    <string name="dev_feature_gate_deferred">工具延迟加载</string>
-    <string name="dev_feature_gate_deferred_sub">按需工具不常驻模型上下文，需要时才加载。关闭时全部工具每轮都在上下文里。</string>
-    <string name="dev_feature_gate_builtin_mcp">内置能力 MCP 化</string>
-    <string name="dev_feature_gate_builtin_mcp_sub">把 43 个内置工具变成三台进程内 MCP server（Core / Chat / Data），可被外部 MCP 客户端发现与调用。</string>
-    <string name="dev_feature_gate_unified_page">统一能力页</string>
-    <string name="dev_feature_gate_unified_page_sub">把「能力中心」「MCP 中心」「技能」合并为一张列表。关闭时使用旧的三 Tab 页面。</string>
-    <string name="dev_feature_gate_deferred_sub_blocked">需同时开启「规范流总开关」才生效（当前未开启）。</string>
 </resources>
