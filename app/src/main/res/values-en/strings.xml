@@ -81,7 +81,7 @@
     <string name="settings_default_models_subtitle">Configure default preferences like the vision (multimodal) model</string>
     <string name="settings_vision_model">Vision model (multimodal)</string>
     <string name="settings_compaction_model">Compaction model</string>
-    <string name="settings_mcp">Tool Services</string>
+    <string name="settings_mcp">MCP Services</string>
     <string name="settings_container">Container Image</string>
     <string name="settings_logs">Runtime Logs</string>
     <string name="settings_log_viewer">Log Viewer</string>
@@ -103,7 +103,7 @@
     <string name="settings_terminal_subtitle">Environment, bundles, appearance, keyboard, SSH</string>
     <string name="settings_terminal_container_subtitle">Container images, terminal appearance, keyboard, SSH</string>
     <string name="settings_backup">Backup &amp; Restore</string>
-    <string name="settings_security">Security Settings</string>
+    <string name="settings_security">Security</string>
     <string name="settings_remote_audit_logs">Operation Audit</string>
     <string name="settings_about">About</string>
     <string name="settings_design_gallery">UI Component Gallery</string>
@@ -141,15 +141,15 @@
     <string name="settings_mcp_server_connect_hint">On a real device, access the address above on the same WiFi. On an emulator, run adb reverse tcp:PORT tcp:PORT then visit http://localhost:PORT/mcp</string>
     <string name="settings_container_current">Current: %1$s</string>
     <string name="settings_container_builtin_alpine">Built-in Alpine</string>
-    <string name="settings_log_current">Current: %1$s</string>
+    <string name="settings_theme_current">Current theme: %1$s</string>
     <string name="settings_log_viewer_subtitle">View recent logs, filterable by MCP name</string>
     <string name="settings_permissions_empty">No saved permission rules</string>
-    <string name="settings_permissions_count">%1$d saved</string>
+    <string name="settings_permissions_count">%1$d rules saved</string>
     <string name="settings_remote_subtitle">Manage SFTP / FTP workspace sync</string>
     <string name="settings_theme_title">Appearance Theme</string>
     <string name="settings_theme_subtitle">Follow the system or use a fixed light/dark mode</string>
     <string name="settings_browser_title">Browser &amp; Fingerprint</string>
-    <string name="settings_browser_subtitle">Manage browser fingerprint profiles and anti-bot strategies</string>
+    <string name="settings_browser_subtitle">Browser fingerprint and anti-detection profiles</string>
     <string name="fingerprint_manager_title">Fingerprint Manager</string>
     <string name="fingerprint_current">Current</string>
     <string name="fingerprint_available">Available</string>
@@ -177,9 +177,9 @@
     <string name="settings_keepalive_title">Background Keep-alive</string>
     <string name="settings_keepalive_subtitle">Show a foreground notification to prevent the system from killing the process in background</string>
     <!-- Norm flow (D1-7, aligned with norm-chain-design.md §3.5) -->
-    <string name="settings_norm_flow">AGENT Spec</string>
-    <string name="settings_norm_flow_subtitle">Master switch for per-step injection discipline and tool guards</string>
-    <string name="settings_agent">Agent Settings</string>
+    <string name="settings_norm_flow">Spec Flow</string>
+    <string name="settings_norm_flow_subtitle">Master switch for per-round injection discipline and tool guards</string>
+    <string name="settings_agent">Agent Overview</string>
     <string name="settings_agent_subtitle">Execution mode, model provider and capability overview</string>
     <string name="settings_permissions_subtitle_agent">Approval rules before tool calls</string>
     <string name="settings_providers_subtitle_agent">API keys and default model</string>
@@ -341,14 +341,14 @@
 
     <!-- Settings category titles -->
     <string name="settings_category_ai">AI Config</string>
-    <string name="settings_category_ai_agent">AI Config &amp; Agent</string>
+    <string name="settings_category_ai_agent">AI &amp; Agent</string>
     <string name="settings_category_environment">Runtime Environment</string>
     <string name="settings_category_data_security">Data &amp; Security</string>
     <string name="settings_category_system_app">System &amp; App</string>
     <string name="settings_category_tools">Tools &amp; Permissions (Function Calling)</string>
     <string name="settings_category_other">Other</string>
     <string name="settings_security_subtitle">Credential encryption · Biometrics · Emergency channel</string>
-    <string name="settings_remote_audit_subtitle">Connections · Credentials · Backups · Security · Skills</string>
+    <string name="settings_remote_audit_subtitle">View and export key operation logs</string>
     <!-- Operation audit screen (MiniMe) -->
     <string name="audit_stats_total">Total</string>
     <string name="audit_stats_failed">Failed</string>
@@ -2040,7 +2040,7 @@
     <string name="settings_keyword_servers">Servers</string>
     <string name="settings_keyword_terminal">Terminal</string>
     <string name="settings_keyword_tools">Tools</string>
-    <string name="settings_mihomo_proxy_desc">mihomo proxy (VPN) · import subscription / manual YAML · leave to the model</string>
+    <string name="settings_mihomo_proxy_desc">Proxy switch, subscriptions and routing rules</string>
     <string name="swipe_confirm_execute_hint">Swipe to confirm execution (C.4.8 strictest mode)</string>
     <string name="swipe_confirm_verified">✓ Swipe confirmed (SwipeVerified)</string>
     <string name="tc_ai_combo_desc">AI recommended combo (Python + rg + Git + Bash + Curl)</string>
@@ -2424,10 +2424,10 @@
     <string name="settings_zth_subtitle">AI behavior confirmation tier</string>
 
     <!-- Advanced Settings -->
-    <string name="settings_advanced_title">Advanced</string>
+    <string name="settings_advanced_title">Advanced Options</string>
     <string name="settings_advanced_subtitle">Zero hallucination tolerance · Experimental · Developer options</string>
     <string name="settings_advanced_desc">Advanced features requiring careful configuration. Understand the impact before changing.</string>
-    <string name="settings_advanced_menu_subtitle">Zero hallucination tolerance and more</string>
+    <string name="settings_advanced_menu_subtitle">Experimental options such as zero-hallucination tolerance</string>
 
     <!-- Tier display names -->
     <string name="settings_zth_tier_name_disabled">Disabled (0)</string>

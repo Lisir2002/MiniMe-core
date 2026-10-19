@@ -997,7 +997,8 @@ internal fun SettingsMenu(
         MenuItem(
             section = SettingsSection.Providers,
             group = groupAI,
-            title = "模型管理",
+            // 与 Providers 二级页标题同源（i18n），不再硬编码中文。
+            title = stringResource(SettingsSection.Providers.titleRes),
             subtitle = run {
                 val parts = mutableListOf<String>()
                 // 供应商信息：数量 + 活跃供应商
@@ -1264,7 +1265,7 @@ internal fun SettingsMenu(
             section = SettingsSection.Theme,
             group = groupSystem,
             title = stringResource(R.string.settings_theme_title),
-            subtitle = stringResource(R.string.settings_log_current, themeLabel),
+            subtitle = stringResource(R.string.settings_theme_current, themeLabel),
             icon = Icons.Rounded.DarkMode,
             iconBgLight = Color(0xFF8B5CF6),
             iconBgDark = Color(0xFF4C1D95),
