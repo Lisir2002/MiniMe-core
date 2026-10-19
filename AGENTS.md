@@ -720,6 +720,7 @@ python3 scripts/check-persistence.py
 | **配置导出内容为空** | **exportConfig 中用 getString 读取实际用 putBool/putInt 写入的键** | **导出时必须用与写入时一致的类型读取方法** |
 | **删除会话/工作区即崩溃** | `EncryptedDriverFactory` 强制 `PRAGMA foreign_keys=ON`（SQLite 默认 OFF），单表删 `agent_session` 父行时子表（agent_message 等）仍引用该行，FK 约束抛异常且 UI 未捕获 | 删除一律走 `AgentTx.deleteSessionCascade` 单事务级联（先子后父）；新增子表必须同步补级联语句，补回归测试 |
 | **日志查看器看不见最新日志** | FileObserver(CLOSE_WRITE) 对常驻 BufferedWriter 永不触发——正常写日志期间文件从不 close，事件源实际是死的 | 查看器在前台用 `repeatOnLifecycle(RESUMED)` 轮询 + 读前 flush；凡「事件驱动的新鲜度承诺」，先确认该事件在正常运行时真的会发生 |
+| **压缩过的会话每轮提问都「网络不稳定」** | **压缩死锁**：①token 估算按 chars/4，中文低估约 4 倍，真实载荷已超窗口数倍还以为没到阈值；②压缩请求把整个 head 无预算拼进一条消息——会话多大压缩请求就多大，超限会话的压缩请求必然同样超限被拒（实测 622k tokens vs 128k 窗口）；③失败被 catch 后原样返回却照样 emit 压缩完成事件，UI 假报成功、DB 分毫未动；④超限载荷在网关侧表现为超时/重置/5xx，落入可重试类别 → 重试风暴 | 估算改 CJK-aware（`ModelContextPolicy.estimateTokens(text)`，中文每字≈1 token）；压缩请求自带输入预算（上限×0.5），超预算走滚动窗口逐段摘要（`ContextCompactor.summarizeHead`）；失败 emit `CompactionFailed` 而非冒充完成，并记失败冷却 |
 
 ## app-template 模块开发约束
 
