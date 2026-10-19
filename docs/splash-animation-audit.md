@@ -3,7 +3,7 @@
 > 2026-10 启动动画（`core/splash`）针对性审计 + 联网调研 + 分级强化方案。
 > 用户原话：「针对化审计启动动画设计，联网学习一下，给出强化方案」。
 >
-> 本文只出方案，不实施代码。实施批次与范围待用户拍板（见 §7 决策点）。
+> 本文只出方案并分批评审落地。落地状态：**A（接线真实初始化）✅ `ef78809` / B（性能优化）✅ `b16dd4d` / D（测试与收尾）✅ `236dc6c` / C（系统级 SplashScreen 分层）⏸ 待用户拍板（见 §7、§10）**。A/B/D 三批均四门禁（compile/test/detekt/lint，压内存参数）全绿。
 > 审计对象：`app/src/main/java/com/mini/me_core/core/splash/` 9 文件 1525 行，
 > 集成点 `MainActivity.kt:293-317`、`MiniMeCore.kt:240`、`ThemeSettingsRepository.kt:41-47`。
 
