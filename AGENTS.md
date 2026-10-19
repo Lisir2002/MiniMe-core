@@ -603,6 +603,7 @@ Hilt 被广泛使用。各 Feature 模块定义自己的 DI 模块（如 `AgentM
 4. 诊断不可读库时，日志必须带 `size=` 与 `head=`（前 8 字节 hex）：`head` 非 SQLite 魔数 `53 51 4c 69` 即可判定为加密库或真损坏，是区分「密钥不匹配」与「文件损坏」的第一手证据。
 5. **DEK「存在但解不开」≠「不存在」**：一律 fail-close 抛异常，**绝不**生成新 DEK 覆盖——覆盖后旧密文永久不可解（6 库报废）。见 `UnifiedKeyManager.DekRead`。
 6. **禁止对 `db_*` 直接 `rotateDek`**：库文件是整体加密的，换 DEK 而不重加密文件 = 该库立即不可读；必须走 `KeyRotationMigrator`。`emergencyReset` 同理只清非 `db_*` 的 DEK。
+7. **外键强制开启（`PRAGMA foreign_keys=ON`）下，删父行前子行必须已清空**：所有「删除会话/工作区」类操作走 `AgentTx.deleteSessionCascade` 一个事务内按依赖序级联（先子后父）；新增引用 `agent_session`/`agent_message` 的子表时，级联语句与回归测试同步补齐。另注意：被 `safeDaoSuspend` 之类吞异常的删除失败是**静默**数据不一致（覆盖恢复曾因此假成功）。
 
 **数据访问**：业务读写全部经 `datalayer/repository` 门面；`data/local/entity/*.kt` 为纯 Kotlin data class（已剥离 Room 注解），仅当 DTO 被领域/UI/Firebase 层复用（如 `V2Xxx.toEntity()`、Backup 的 `toDto/toEntity`）。
 
@@ -717,6 +718,8 @@ python3 scripts/check-persistence.py
 | **设置项重启后丢失** | **KVStore putJson 写 jsonVal 列，但 getString 读 stringVal 列，读写列不匹配** | **putJson 必须配 getJson；putBool 配 getBool；putInt 配 getInt；putString 配 getString** |
 | **容器初始化状态重启后丢失** | **Singleton 的 MutableStateFlow 初始值硬编码（如 Idle），未从磁盘标记恢复** | **init 块中必须根据磁盘状态（文件标记/DB/KV）初始化 StateFlow，不能硬编码默认值** |
 | **配置导出内容为空** | **exportConfig 中用 getString 读取实际用 putBool/putInt 写入的键** | **导出时必须用与写入时一致的类型读取方法** |
+| **删除会话/工作区即崩溃** | `EncryptedDriverFactory` 强制 `PRAGMA foreign_keys=ON`（SQLite 默认 OFF），单表删 `agent_session` 父行时子表（agent_message 等）仍引用该行，FK 约束抛异常且 UI 未捕获 | 删除一律走 `AgentTx.deleteSessionCascade` 单事务级联（先子后父）；新增子表必须同步补级联语句，补回归测试 |
+| **日志查看器看不见最新日志** | FileObserver(CLOSE_WRITE) 对常驻 BufferedWriter 永不触发——正常写日志期间文件从不 close，事件源实际是死的 | 查看器在前台用 `repeatOnLifecycle(RESUMED)` 轮询 + 读前 flush；凡「事件驱动的新鲜度承诺」，先确认该事件在正常运行时真的会发生 |
 
 ## app-template 模块开发约束
 
