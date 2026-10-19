@@ -3,47 +3,10 @@ package com.mini.me_core.feature.agent.domain.execution.tool
 import com.mini.me_core.feature.agent.domain.core.model.AgentMode
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Singleton
-import kotlinx.serialization.Serializable
-
-/**
- * F1 内置能力分组（D1：静态声明于 `AgentModule.provideToolRegistry` 的注册处）。
- *
- * 分组是**用户心智**语义（用户找工具时先想「我要操作文件还是操作任务」），
- * 与 [ToolCapability] 的**安全**语义（能不能改网络）正交，两套轴不混用。
- *
- * 每组对应一台内置 MCP server（见 `BuiltinMcpServerFactory`），本地能力在协议层
- * 由此成为真正的 MCP server，与远端 server 同款治理、同样可被外部客户端发现。
- */
-@Serializable
-enum class BuiltinGroup(
-    /** 内置 MCP server 名（协议层对外标识）。 */
-    val serverName: String,
-    /** UI 展示名（工具分组标题下的能力描述）。 */
-    val displayName: String,
-    /**
-     * 默认是否允许对外暴露。
-     *
-     * CORE 组只含工作区/执行类工具，默认允许；CHAT 组含 askUserQuestion 等强依赖
-     * App 内 UI 的工具，DATA 组含 browser / device_storage / network_proxy 等依赖
-     * 本机登录态与系统权限的工具，两者默认仅内部使用。
-     */
-    val remotelyExposedByDefault: Boolean
-) {
-    CORE("MiniMe-Core", "工作区与执行", true),
-    CHAT("MiniMe-Chat", "会话协作与编排", false),
-    DATA("MiniMe-Data", "外部世界与工程", false)
-}
 
 @Singleton
 class ToolRegistry {
     private val tools = ConcurrentHashMap<String, AgentTool>()
-
-    /**
-     * 工具名 -> 内置分组。未登记（如远端 MCP 工具）的工具不出现在此表。
-     *
-     * 与 [tools] 并行维护，`unregister` 时同步清理，避免留下悬空分组。
-     */
-    private val builtinGroups = ConcurrentHashMap<String, BuiltinGroup>()
 
     /**
      * 别名 -> 正式名 的映射，用于历史工具名迁移期兼容（见 [AgentTool.aliases]）。
@@ -51,17 +14,8 @@ class ToolRegistry {
      */
     private val aliasMap = ConcurrentHashMap<String, String>()
 
-    /**
-     * 注册工具。
-     *
-     * @param builtinGroup 内置能力分组；本地内置工具须显式声明，远端 MCP 工具传 null
-     *   （不参与内置分组，也不计入分组覆盖率统计）。
-     */
-    fun register(name: String, tool: AgentTool, builtinGroup: BuiltinGroup? = null) {
+    fun register(name: String, tool: AgentTool) {
         tools[name] = tool
-        if (builtinGroup != null) {
-            builtinGroups[name] = builtinGroup
-        }
         tool.aliases.forEach { alias ->
             // 别名不得与既有正式名冲突（防遮蔽），也不得抢占已被其他工具登记的别名（防劫持）
             if (!tools.containsKey(alias) && !aliasMap.containsKey(alias)) {
@@ -79,22 +33,7 @@ class ToolRegistry {
         if (removed != null) {
             removed.aliases.forEach { aliasMap.remove(it) }
         }
-        // 分组随工具一同清理：远端 server 断开时不得残留分组登记
-        builtinGroups.remove(name)
     }
-
-    /** 查询内置分组；非内置工具（含远端 MCP 工具）返回 null。 */
-    fun getBuiltinGroup(name: String): BuiltinGroup? = builtinGroups[name]
-
-    /** 某分组下的全部工具（按名称排序）；远端工具不在任何分组内，故不出现在结果中。 */
-    fun getToolsByBuiltinGroup(group: BuiltinGroup): List<AgentTool> =
-        builtinGroups.entries
-            .filter { it.value == group }
-            .mapNotNull { tools[it.key] }
-            .sortedBy { it.name }
-
-    /** 已声明分组的工具数量（分组覆盖率统计用）。 */
-    fun getGroupedToolCount(): Int = builtinGroups.size
 
     fun getToolNames(): Set<String> {
         return tools.keys.toSet()

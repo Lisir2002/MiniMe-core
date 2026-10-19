@@ -30,7 +30,6 @@ import com.mini.me_core.feature.agent.domain.execution.tool.browser.BrowserAgent
 import java.net.Proxy
 import com.mini.me_core.feature.agent.domain.core.prompt.SystemPromptProvider
 import com.mini.me_core.feature.agent.domain.execution.workflow.AgentWorkflow
-import com.mini.me_core.feature.agent.domain.execution.tool.BuiltinGroup
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionManager
 import com.mini.me_core.feature.agent.domain.execution.permission.ToolPermissionPolicyEngine
 import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
@@ -344,12 +343,8 @@ object AgentModule {
         return ToolRegistry().apply {
             // L3 联动注册：工具注册到 ToolRegistry 时，同步把 provides 类型登记到中央注册表，
             // 供依赖调度（L4）、结果缓存（L5）、增量索引（L6）按类型消费。
-            //
-            // F1：builtinGroup 为内置能力分组（本地能力据此成为三台内置 MCP server）。
-            // 约束：新增内置工具必须显式声明分组，否则不会出现在任何内置分组里，
-            // 且会被 BuiltinGroupCoverageTest 判为漏标注。
-            fun registerTool(name: String, tool: AgentTool, group: BuiltinGroup) {
-                register(name, tool, group)
+            fun registerTool(name: String, tool: AgentTool) {
+                register(name, tool)
                 tool.provides.forEach { type ->
                     resultTypeRegistry.register(
                         type = type,
@@ -361,60 +356,64 @@ object AgentModule {
                     )
                 }
             }
-
-            // ── F1 · MiniMe-Core（13）：工作区与执行，默认允许对外暴露 ──
-            registerTool("readFile", readFileTool, BuiltinGroup.CORE)
-            registerTool("writeFile", writeFileTool, BuiltinGroup.CORE)
-            registerTool("editFile", editFileTool, BuiltinGroup.CORE)
-            registerTool("list", listFilesTool, BuiltinGroup.CORE)
-            registerTool("search", searchCodeTool, BuiltinGroup.CORE)
-            registerTool("Bash", executeCommandTool, BuiltinGroup.CORE)
-            registerTool("run_code", runCodeTool, BuiltinGroup.CORE)
-            registerTool("terminal", terminalSessionTool, BuiltinGroup.CORE)
-            registerTool("sendFile", sendFileTool, BuiltinGroup.CORE)
-            registerTool("viewImage", viewImageTool, BuiltinGroup.CORE)
-            registerTool("check_environment", checkEnvironmentTool, BuiltinGroup.CORE)
-            registerTool("ensure_android_env", ensureAndroidEnvTool, BuiltinGroup.CORE)
-            registerTool("switch_container_arch", switchContainerArchTool, BuiltinGroup.CORE)
-
-            // ── F1 · MiniMe-Chat（22）：会话协作与编排，默认仅内部使用 ──
-            registerTool("askUserQuestion", askUserQuestionTool, BuiltinGroup.CHAT)
-            registerTool("switchMode", switchModeTool, BuiltinGroup.CHAT)
-            registerTool("todo", todoTool, BuiltinGroup.CHAT)
-            registerTool("plan", planTool, BuiltinGroup.CHAT)
-            registerTool("goal", goalTool, BuiltinGroup.CHAT)
-            registerTool("memory", memoryTool, BuiltinGroup.CHAT)
-            registerTool("loadSkill", loadSkillTool, BuiltinGroup.CHAT)
-            registerTool("runSkillScript", runSkillScriptTool, BuiltinGroup.CHAT)
-            registerTool("load_rule", loadRuleTool, BuiltinGroup.CHAT)
-            registerTool("loadSop", loadSopTool, BuiltinGroup.CHAT)
-            registerTool("intent_analyze", intentAnalyzeTool, BuiltinGroup.CHAT)
-            registerTool("manageMcp", manageMcpTool, BuiltinGroup.CHAT)
-            registerTool("tool_catalog", toolCatalogTool, BuiltinGroup.CHAT)
-
-            // ── F1 · MiniMe-Data（8）：外部世界与工程，默认仅内部使用 ──
-            registerTool("websearch", webSearchTool, BuiltinGroup.DATA)
-            registerTool("webfetch", webFetchTool, BuiltinGroup.DATA)
-            registerTool("browser", browserTool, BuiltinGroup.DATA)
-            registerTool("generateImage", generateImageTool, BuiltinGroup.DATA)
-            registerTool("device_storage", storageTool, BuiltinGroup.DATA)
-            registerTool("network_proxy", networkProxyTool, BuiltinGroup.DATA)
-            registerTool("gitops", gitOpsTool, BuiltinGroup.DATA)
-            registerTool("git_remote", gitRemoteTool, BuiltinGroup.DATA)
-
-            // ── F1 · MiniMe-Chat 补登记：会话编排工具（成组声明，语义同 MiniMe-Chat）──
-            registerTool("playbook_start", playbookStartTool, BuiltinGroup.CHAT)
-            registerTool("playbook_advance", playbookAdvanceTool, BuiltinGroup.CHAT)
-            registerTool("playbook_status", playbookStatusTool, BuiltinGroup.CHAT)
-            registerTool("playbook_abort", playbookAbortTool, BuiltinGroup.CHAT)
-            registerTool("job_start", jobStartTool, BuiltinGroup.CHAT)
-            registerTool("job_status", jobStatusTool, BuiltinGroup.CHAT)
-            registerTool("job_kill", jobKillTool, BuiltinGroup.CHAT)
-            registerTool("job_log", jobLogTool, BuiltinGroup.CHAT)
-            registerTool("schedule", scheduleTool, BuiltinGroup.CHAT)
-            // ══ 内置能力分组结束 ══
-            // 工具的分组登记已统一在上面按 MiniMe-Core / MiniMe-Chat / MiniMe-Data 三段完成。
-            // 下方仅登记轨迹摘要提取器与执行期钩子，不再重复 registerTool。
+            registerTool("readFile", readFileTool)
+            registerTool("sendFile", sendFileTool)
+            registerTool("viewImage", viewImageTool)
+            registerTool("writeFile", writeFileTool)
+            registerTool("editFile", editFileTool)
+            registerTool("Bash", executeCommandTool)
+            registerTool("run_code", runCodeTool)
+            registerTool("check_environment", checkEnvironmentTool)
+            registerTool("ensure_android_env", ensureAndroidEnvTool)
+            registerTool("switch_container_arch", switchContainerArchTool)
+            registerTool("terminal", terminalSessionTool)
+            registerTool("list", listFilesTool)
+            registerTool("search", searchCodeTool)
+            registerTool("loadSkill", loadSkillTool)
+            registerTool("runSkillScript", runSkillScriptTool)
+            // ══ 分层规则正文按需加载（D3-3）：load_rule(rule_name) 取完整正文（摘要/正文两级形态）
+            registerTool("load_rule", loadRuleTool)
+            // ══ SOP 标准作业正文按需加载（D4-4）：loadSop(sop_name) 取完整编号步骤（摘要常驻 + 按需取正文）
+            registerTool("loadSop", loadSopTool)
+            registerTool("askUserQuestion", askUserQuestionTool)
+            registerTool("manageMcp", manageMcpTool)
+            registerTool("websearch", webSearchTool)
+            registerTool("webfetch", webFetchTool)
+            registerTool("switchMode", switchModeTool)
+            registerTool("todo", todoTool)
+            registerTool("memory", memoryTool)
+            // ══ T2I 文生图工具：generateImage(prompt="...", width, height, steps, hd, model)
+            registerTool("generateImage", generateImageTool)
+            // ══ 内置服务浏览器：模型在共享 WebView 会话中浏览/操作网页（含容器服务与登录站点）
+            registerTool("browser", browserTool)
+            // ══ 设备存储护栏工具：结构化 list/read/write/delete + ASK 确认（见设计「护栏」）
+            registerTool("device_storage", storageTool)
+            // ══ 网络代理工具（VPN 形态）：模型自助管理容器内 mihomo 代理，ASK 确认 + MODIFY_NETWORK 能力隔离
+            registerTool("network_proxy", networkProxyTool)
+            // ══ 会话任务目标状态机（DSH goal）：set/get/update/done/abandon + 每轮注入
+            registerTool("goal", goalTool)
+            // ══ 后台任务（DSH jobs）：job_start/status/kill/log，长任务后台执行 + Room 持久化
+            registerTool("job_start", jobStartTool)
+            registerTool("job_status", jobStatusTool)
+            registerTool("job_kill", jobKillTool)
+            registerTool("job_log", jobLogTool)
+            // ══ 定时提醒（DSH schedule）：create(after/at/every) + list + cancel，到点注入会话
+            registerTool("schedule", scheduleTool)
+            // ══ 计划协作（DSH plan + Claude Code Plan/Spec）：propose/get/approve/abandon + 每轮注入 pendingSelection
+            registerTool("plan", planTool)
+            // ══ 用户意图判定平台（D0）：规则预分类五形态 + behaviorMode，Parser 门控（task/command）建议调用
+            registerTool("intent_analyze", intentAnalyzeTool)
+            // ══ Playbook 剧本编排（D5-4，norm-chain §3.3.5）：start/advance/status/abort 四工具
+            registerTool("playbook_start", playbookStartTool)
+            registerTool("playbook_advance", playbookAdvanceTool)
+            registerTool("playbook_status", playbookStatusTool)
+            registerTool("playbook_abort", playbookAbortTool)
+            // ══ GitOps 工程化工具：提交规范校验/建议、hooks 状态、发版前体检/打 Tag、版本日志生成
+            registerTool("gitops", gitOpsTool)
+            // ══ 远端仓库操作工具：remote 管理、fetch/pull/push/push_tag/clone，内建推送纪律（ASK 审批）
+            registerTool("git_remote", gitRemoteTool)
+            // ══ B2 工具目录元工具：DEFERRED 工具的检索入口，CORE 常驻（灰度开关关闭时无实际收窄效果）
+            registerTool("tool_catalog", toolCatalogTool)
 
             // ══ D2-3 轨迹摘要提取器登记（norm-chain §3.8.2：规则表挂 ToolResultTypeRegistry，
             //    仅少数工具定制，其余走通用截断）。提取器签名 (args, resultData) → 一行摘要。
