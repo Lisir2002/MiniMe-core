@@ -2,9 +2,18 @@
 <resources>
     <!--
         冷启动窗口背景：与应用浅色背景色 #F8FAFC 一致，避免纯白与浅蓝背景之间的跳变。
-        不再使用 SplashScreen 主题/图标——粒子动画直接在 Compose 中作为覆盖层显示。
+        系统级启动画面（SplashScreen API）作为进程创建期到 Compose 首帧之间的免费窗口，
+        其背景与图标在 Theme.MiniMeCore.Splash 中定义；Compose 粒子动画退居品牌延展层。
     -->
     <style name="Theme.MiniMeCore" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">#F8FAFC</item>
+    </style>
+
+    <!-- 系统级启动画面主题：进程创建期由系统窗口顶住，App 绘制首帧前不消失。 -->
+    <style name="Theme.MiniMeCore.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#F8FAFC</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+        <item name="windowSplashScreenAnimationDuration">0</item>
+        <item name="postSplashScreenTheme">@style/Theme.MiniMeCore</item>
     </style>
 </resources>

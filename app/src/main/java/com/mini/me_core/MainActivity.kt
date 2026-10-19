@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -164,6 +165,13 @@ class MainActivity : ComponentActivity() {
         // 早于 super 调用时，基类内部的 mSavedStateRegistry / mConfigChangeTracker 尚未初始化，
         // 会在低版本 AndroidX Activity 上触发 NPE 或警告，导致冷启动偶发 1-2s 秒退。
         super.onCreate(savedInstanceState)
+
+        // 系统级启动画面：进程创建期由系统窗口顶住，直到初始化就绪信号置位后才交棒给 Compose
+        // （AppInitState 内置 1.5s 超时兜底，就绪必达）。就绪前不消失，避免纯时间轴造成的
+        // 提前/滞后放人；Compose 粒子动画在此之后作为品牌延展层继续播放。
+        installSplashScreen().setKeepOnScreenCondition {
+            !com.mini.me_core.core.splash.AppInitState.isReady
+        }
 
         // F6.1：T5 MainActivity.onCreate 开始；T6 下一帧回调即首帧绘制完成。
         com.mini.me_core.core.performance.StartupTracer.mark("activity_create", "MainActivity.onCreate")

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  系统级启动画面（SplashScreen API）图标：复用启动器前景的代码符号 >{_ 母题，
+  置于品牌色圆角方块上，在浅色（#F8FAFC）与深色（#0F172A）冷启动窗口背景上均清晰可见。
+  viewBox = 108×108，自适应图标 foreground 规范。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 品牌色圆角方块主体 -->
+    <path
+        android:fillColor="#4F46E5"
+        android:pathData="M10,10 L98,10 A8,8 0 0 1 106,18 L106,90 A8,8 0 0 1 98,98 L10,98 A8,8 0 0 1 2,90 L2,18 A8,8 0 0 1 10,10 Z" />
+
+    <!-- 代码符号 > （左半，粗线条圆角） -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M24,32 L42,50 L24,68 L20,64 L34,50 L20,36 Z" />
+
+    <!-- 代码符号 { （右半，花括号风格） -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M66,24 C70,24 72,26 72,30 L72,40 C72,43 70,44 66,46 L62,48 C60,49 60,50 62,51 L66,53 C70,55 72,56 72,59 L72,78 C72,82 70,84 66,84 L62,84 C58,84 56,82 56,78 L56,59 C56,56 58,55 62,53 L62,51 C58,49 56,48 56,45 L56,30 C56,26 58,24 62,24 Z" />
+
+    <!-- 代码符号 _ （下划线，表示命令行） -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M36,72 L60,72 L60,78 L36,78 Z" />
+</vector>
