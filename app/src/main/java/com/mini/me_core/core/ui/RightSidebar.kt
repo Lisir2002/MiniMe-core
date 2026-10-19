@@ -170,7 +170,7 @@ fun RightSidebar(
 /**
  * 侧边栏菜单项：图标块 + 文字 的整块可点击区域。
  *
- * 与左侧抽屉底部导航按钮（DrawerSettingsButton / DrawerPackagerButton）共用同一套令牌：
+ * 复用与抽屉导航图标同一套设计令牌（[AppNavIcon] 图标块、clip md 点击热区、bodyLarge/Medium/onSurface 文字）：
  * [AppNavIcon] 图标块、clip md 点击热区、垂直 [Spacing.sm] 内边距、
  * bodyLarge / Medium / onSurface 文字。无障碍描述挂在行上（与左侧一致）。
  */
@@ -252,7 +252,7 @@ private fun groups(): List<SidebarGroup> = listOf(
                 icon = Icons.Rounded.Android,
                 labelRes = R.string.right_sidebar_packager,
                 route = "packager",
-                // 与左侧抽屉「应用打包器」按钮同色（紫）。
+                // 应用打包器入口：紫色图标块，与导航图标令牌一致。
                 iconBgLight = Color(0xFF8B5CF6),
                 iconBgDark = Color(0xFF6D28D9),
             ),
@@ -277,7 +277,7 @@ private fun groups(): List<SidebarGroup> = listOf(
                 icon = Icons.Rounded.Settings,
                 labelRes = R.string.right_sidebar_settings,
                 route = "settings",
-                // 与左侧抽屉「设置」按钮同色（天蓝）。
+                // 设置入口：天蓝色图标块，与导航图标令牌一致。
                 iconBgLight = Color(0xFF0EA5E9),
                 iconBgDark = Color(0xFF0369A1),
             ),

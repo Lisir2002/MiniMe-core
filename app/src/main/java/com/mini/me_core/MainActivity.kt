@@ -537,14 +537,6 @@ fun AppNavigation(
                         sessionExportLauncher.launch("minime-session-$safeTitle-${System.currentTimeMillis()}.tar.gz")
                     },
                     onUndoDelete = { agentViewModel.undoDeleteSession() },
-                    onNavigateToSettings = {
-                        scope.launch { drawerState.close() }
-                        navController.navigate("settings")
-                    },
-                    onNavigateToPackager = {
-                        scope.launch { drawerState.close() }
-                        navController.navigate("packager")
-                    },
                     currentThemeMode = currentThemeMode,
                     onCycleTheme = onCycleTheme,
                     // 侧边栏「工作目录」tab：复用工作区 ViewModel，切换时若有运行会话则确认

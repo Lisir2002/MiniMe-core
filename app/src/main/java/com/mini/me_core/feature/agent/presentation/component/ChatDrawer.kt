@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.text.KeyboardActions
@@ -73,8 +72,6 @@ fun ChatDrawerContent(
     onRename: (ChatSession, String) -> Unit,
     onExport: (ChatSession) -> Unit,
     onUndoDelete: () -> Unit = {},
-    onNavigateToSettings: () -> Unit,
-    onNavigateToPackager: () -> Unit = {},
     currentThemeMode: AppThemeMode,
     onCycleTheme: () -> Unit,
     workspaceViewModel: WorkspaceViewModel? = null,
@@ -185,25 +182,16 @@ fun ChatDrawerContent(
             color = MaterialTheme.colorScheme.outlineVariant,
             modifier = Modifier.padding(vertical = Spacing.sm)
         )
-        // 底部导航：左侧「设置」（图标 + 文字），右侧「主题切换」纯图标按钮。
+        // 底部仅保留「主题切换」纯图标按钮，贴右排列；
+        // 设置与打包器入口已收敛到右侧工具抽屉（避免两侧重复）。
         // 两侧各留 Spacing.md 边距，与侧边栏内容左右对齐，视觉更舒适。
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.md),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                DrawerSettingsButton(
-                    contentDescription = stringResource(R.string.chat_settings),
-                    onClick = onNavigateToSettings
-                )
-                Spacer(Modifier.width(Spacing.md))
-                DrawerPackagerButton(
-                    onClick = onNavigateToPackager
-                )
-            }
             DrawerBottomIconButton(
                 icon = when (currentThemeMode) {
                     AppThemeMode.DARK -> Icons.Rounded.DarkMode
