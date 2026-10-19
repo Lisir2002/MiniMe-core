@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,13 +55,37 @@ import com.mini.me_core.R
 import kotlinx.coroutines.isActive
 
 /**
+ * 纯函数：启动画面是否应当退场。
+ *
+ * 三条退场路径（满足任一即退）：
+ * 1. 播放达到质量档总时长（硬上限，防初始化异常时无限等待）；
+ * 2. 初始化就绪（[AppInitState.isReady]）且已展示最短时长；
+ * 3. 用户点跳过（由调用方直接置 isDismissing，不经本函数）。
+ */
+internal fun shouldDismissSplash(
+    elapsedMs: Long,
+    minDisplayMs: Long,
+    isReady: Boolean,
+    totalDurationMs: Long,
+): Boolean = elapsedMs >= totalDurationMs || (elapsedMs >= minDisplayMs && isReady)
+
+/** 启动阶段 → 阶段文案（F1.7 由时间轴硬编码改为真实阶段映射）。 */
+private fun stageTextRes(phase: StartupPhase): Int = when (phase) {
+    StartupPhase.STARTING, StartupPhase.DATA_LAYER -> R.string.splash_stage_data
+    StartupPhase.CORE_SERVICES -> R.string.splash_stage_ai
+    StartupPhase.ASYNC_WARMUP -> R.string.splash_stage_ui
+}
+
+/**
  * Particle splash screen host.
  *
  * Handles:
  * - F1.1: Quality detection → particle count / duration
  * - F1.5: Upgraded skip button (pill shape, outline, pressed scale, last-2s error color)
  * - F1.6: Cross-fade transition during FADE_OUT stage
- * - F1.7: Bottom progress bar + stage text (5 init phases)
+ * - F1.7: Bottom progress bar + stage text (real startup phases, not fake timeline)
+ * - A1: Exit gate = init ready (AppInitState) AND min display; total duration as hard cap
+ * - A3: Honors LocalAnimationScale (0 = skip animation entirely)
  *
  * @param onDismiss Called when animation completes (or skip is pressed).
  */
@@ -103,9 +128,30 @@ fun ParticleSplashScreen(
     val remainingSec = SplashStage.remainingSeconds(elapsedMs, quality)
     val isUrgent = remainingSec <= 2 && remainingSec > 0
 
+    // A2: 真实启动阶段（MiniMeCore 三阶段上报）与就绪态。
+    // startupReady 由主循环每帧从 AppInitState.isReady 采样（volatile 读，无重组成本），
+    // 翻 true 时触发一次重组，让进度条平滑走到 1.0。
+    val startupPhase by StartupProgress.phase.collectAsState()
+    var startupReady by remember { mutableStateOf(AppInitState.isReady) }
+    val animDisabled = animScale <= 0f
+
+    // F1.7 + A2: 进度条目标值 = 真实阶段权重；animateFloatAsState 平滑过渡。
+    val progress by animateFloatAsState(
+        targetValue = StartupProgress.progressOf(startupPhase, startupReady),
+        animationSpec = ScaledAnimation.tween(400, scale = animScale),
+        label = "splash_progress"
+    )
+    val stageResId = stageTextRes(startupPhase)
+
     // Main animation loop
-    LaunchedEffect(screenWidthPx, screenHeightPx) {
+    LaunchedEffect(screenWidthPx, screenHeightPx, animDisabled) {
         if (screenWidthPx <= 0f || screenHeightPx <= 0f) return@LaunchedEffect
+        if (animDisabled) {
+            // A3：用户关闭动效——跳过粒子动画，就绪即退（500ms 淡出 tween 时长为 0，瞬间交接）。
+            AppInitState.awaitReady()
+            isDismissing = true
+            return@LaunchedEffect
+        }
         if (particleSystem == null) {
             particleSystem = ParticleSystem(screenWidthPx, screenHeightPx, density, quality)
             glassShatter = if (quality.enable3D) {
@@ -121,12 +167,21 @@ fun ParticleSplashScreen(
                 startNanos = frameNanos
                 lastNanos = frameNanos
             }
-            val dt = (frameNanos - lastNanos) / 1_000_000f
+            // A3: dt 乘动效缩放（scale>1 更慢；<=0 已在上方短路，不会到这里）。
+            val dt = (frameNanos - lastNanos) / 1_000_000f * animScale
             lastNanos = frameNanos
             elapsedMs = (frameNanos - startNanos) / 1_000_000L
+            if (AppInitState.isReady && !startupReady) startupReady = true
             particleSystem?.update(elapsedMs, dt)
 
-            if (elapsedMs >= SplashStage.totalDurationMs(quality)) {
+            // A1: 就绪即退 + 最短展示 + 总时长硬上限。
+            if (shouldDismissSplash(
+                    elapsedMs,
+                    MIN_DISPLAY_MS,
+                    startupReady,
+                    SplashStage.totalDurationMs(quality),
+                )
+            ) {
                 isDismissing = true
             }
         }
@@ -139,16 +194,6 @@ fun ParticleSplashScreen(
             overlayAlpha.animateTo(0f, ScaledAnimation.tween(500, scale = animScale))
             onDismiss()
         }
-    }
-
-    // F1.7: Progress percentage — simulated init progress mapped to animation timeline
-    val progress = (elapsedMs.toFloat() / SplashStage.totalDurationMs(quality).toFloat()).coerceIn(0f, 1f)
-    val stageResId = when {
-        progress < 0.20f -> R.string.splash_stage_data
-        progress < 0.45f -> R.string.splash_stage_ai
-        progress < 0.70f -> R.string.splash_stage_terminal
-        progress < 0.85f -> R.string.splash_stage_browser
-        else -> R.string.splash_stage_ui
     }
 
     Box(

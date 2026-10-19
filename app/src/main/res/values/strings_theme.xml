@@ -15,6 +15,8 @@
     <string name="theme_section_custom_colors_sub">覆盖预设颜色，点击圆点选择</string>
     <string name="theme_section_display">显示偏好</string>
     <string name="theme_section_display_sub">圆角、字体大小和动效</string>
+    <string name="theme_section_splash">启动动画</string>
+    <string name="theme_section_splash_sub">选择冷启动时播放的动画风格</string>
     <string name="theme_reset_confirm_title">恢复出厂主题？</string>
     <string name="theme_reset_confirm_msg">将清除所有自定义颜色和显示偏好，恢复到默认预设和外观模式。</string>
     <string name="theme_reset_confirm_button">确认恢复</string>

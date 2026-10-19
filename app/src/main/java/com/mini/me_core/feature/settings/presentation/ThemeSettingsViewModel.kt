@@ -3,12 +3,16 @@ package com.mini.me_core.feature.settings.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.compose.ui.graphics.Color
+import com.mini.me_core.core.splash.SplashStyle
 import com.mini.me_core.core.theme.ThemeSettingsManager
 import com.mini.me_core.core.theme.tokens.CornerStyle
 import com.mini.me_core.core.theme.tokens.ThemeMode
 import com.mini.me_core.core.theme.tokens.ThemeSettings
+import com.mini.me_core.feature.settings.data.repository.ThemeSettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -21,10 +25,15 @@ import javax.inject.Inject
 @HiltViewModel
 class ThemeSettingsViewModel @Inject constructor(
     private val themeManager: ThemeSettingsManager,
+    private val themeSettingsRepository: ThemeSettingsRepository,
 ) : ViewModel() {
 
     /** 当前主题设置（模式 + 预设 ID + 自定义颜色 + 背景图 + 显示偏好）。 */
     val settings: StateFlow<ThemeSettings> = themeManager.settings
+
+    /** A4: 当前启动动画风格（默认 PARTICLE，由 ThemeSettingsRepository 持久化）。 */
+    val splashStyle: StateFlow<SplashStyle> = themeSettingsRepository.splashStyleFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SplashStyle.PARTICLE)
 
     // ──  已有方法 ──
 
@@ -87,6 +96,11 @@ class ThemeSettingsViewModel @Inject constructor(
     /** 设置动效强度（0.0-1.0）。 */
     fun setAnimationScale(scale: Float) {
         viewModelScope.launch { themeManager.setAnimationScale(scale) }
+    }
+
+    /** A4: 设置启动动画风格（下次冷启动生效）。 */
+    fun setSplashStyle(style: SplashStyle) {
+        viewModelScope.launch { themeSettingsRepository.setSplashStyle(style) }
     }
 
     /**

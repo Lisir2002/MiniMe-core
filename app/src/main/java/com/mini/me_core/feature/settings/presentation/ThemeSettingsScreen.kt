@@ -115,6 +115,7 @@ fun ThemeSettingsScreen(
     val colors = LocalAppTheme.current.colors
     val isDark = LocalAppTheme.current.isDark
     val settings by viewModel.settings.collectAsState()
+    val splashStyle by viewModel.splashStyle.collectAsState()
     val currentPreset = ThemePresets.byId(settings.presetId)
 
     var showResetConfirm by remember { mutableStateOf(false) }
@@ -230,7 +231,23 @@ fun ThemeSettingsScreen(
             }
         }
 
-        // ── Section 5: 颜色自定义 ──
+        // ── Section 5: 启动动画风格（A4：接入风格切换入口）──
+        item(key = "splash_style") {
+            Column(modifier = Modifier.padding(top = 24.dp)) {
+                AppSectionHeader(
+                    title = stringResource(R.string.theme_section_splash),
+                    subtitle = stringResource(R.string.theme_section_splash_sub),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+                SplashStyleSelector(
+                    selectedStyle = splashStyle,
+                    onStyleSelected = { viewModel.setSplashStyle(it) },
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+        }
+
+        // ── Section 6: 颜色自定义 ──
         item(key = "custom_colors") {
             Column(modifier = Modifier.padding(top = 24.dp)) {
                 AppSectionHeader(
@@ -540,6 +557,59 @@ private fun AppearanceModeSelector(
                             color = if (isSelected) colors.onBrandContainer
                             else colors.textSecondary,
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ──────────────────────────────────────────────
+// 启动动画风格选择器（A4：2x2 网格，四风格单选）
+// ──────────────────────────────────────────────
+
+@Composable
+@Suppress("FunctionNaming") // @Composable 函数按项目惯例使用 PascalCase，detekt 已知误报
+private fun SplashStyleSelector(
+    selectedStyle: com.mini.me_core.core.splash.SplashStyle,
+    onStyleSelected: (com.mini.me_core.core.splash.SplashStyle) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalAppTheme.current.colors
+
+    AppCard(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(com.mini.me_core.core.theme.tokens.PrimitiveSpacing.Sm),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            com.mini.me_core.core.splash.SplashStyle.entries.chunked(2).forEach { rowStyles ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    rowStyles.forEach { style ->
+                        val isSelected = style == selectedStyle
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(LocalCornerRadius.current.lg))
+                                .background(
+                                    if (isSelected) colors.brandContainer else Color.Transparent
+                                )
+                                .clickable { onStyleSelected(style) }
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = stringResource(style.labelRes),
+                                fontSize = LocalComponentTokens.current.text.bodySmallFontSize,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) colors.onBrandContainer
+                                else colors.textSecondary,
+                            )
+                        }
                     }
                 }
             }

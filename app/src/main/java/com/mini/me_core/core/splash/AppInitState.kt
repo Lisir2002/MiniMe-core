@@ -2,6 +2,9 @@ package com.mini.me_core.core.splash
 
 import android.os.Handler
 import android.os.Looper
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -24,9 +27,14 @@ object AppInitState {
 
     private val timeoutHandler = Handler(Looper.getMainLooper())
 
+    // 就绪信号量：markReady / 超时兜底任一触发即 complete。
+    // 晚于两者调用的 awaitReady 立即返回（CompletableDeferred 已完成）。
+    private val readyDeferred = CompletableDeferred<Unit>()
+
     private val timeoutRunnable = Runnable {
         if (marked.compareAndSet(false, true)) {
             isReady = true
+            readyDeferred.complete(Unit)
         }
     }
 
@@ -44,6 +52,40 @@ object AppInitState {
         if (marked.compareAndSet(false, true)) {
             isReady = true
             timeoutHandler.removeCallbacks(timeoutRunnable)
+            readyDeferred.complete(Unit)
         }
     }
+
+    /**
+     * 挂起等待初始化就绪。
+     *
+     * 正常由 [markReady] 唤醒；初始化异常时由类加载即启动的 1.5s 超时兜底唤醒，
+     * 因此本函数必会在 TIMEOUT_MS 内返回，调用方无需再套超时
+     * （防御性 withTimeoutOrNull 仅防未来改动破坏该不变量）。
+     */
+    suspend fun awaitReady() {
+        withTimeoutOrNull(TIMEOUT_MS * 2) {
+            readyDeferred.await()
+        }
+    }
+}
+
+/**
+ * A1 共享退场门闩（挂起）：等初始化就绪 → 补足最短展示 → 退场；
+ * [maxTotalMs] 为硬上限，就绪异常不达时也能收尾。
+ *
+ * 由 MINIMAL / CLASSIC 两类「非逐帧」启动风格复用。
+ * 调用方需已在 LaunchedEffect 中播放完淡入动画。
+ */
+internal suspend fun awaitReadyThenDismiss(
+    onDismiss: () -> Unit,
+    maxTotalMs: Long,
+) {
+    val startMs = android.os.SystemClock.elapsedRealtime()
+    withTimeoutOrNull(maxTotalMs) {
+        AppInitState.awaitReady()
+        val waited = android.os.SystemClock.elapsedRealtime() - startMs
+        if (waited < MIN_DISPLAY_MS) delay(MIN_DISPLAY_MS - waited)
+    }
+    onDismiss()
 }

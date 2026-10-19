@@ -2418,6 +2418,14 @@
     <string name="tc_bindings_hint">Extra Bindings</string>
     <string name="tc_add_binding">Add Binding</string>
     <string name="splash_skip">Skip</string>
+    <string name="splash_logo_text">MiniMe</string>
+    <string name="splash_style_particle">Particle</string>
+    <string name="splash_style_minimal">Minimal Gradient</string>
+    <string name="splash_style_classic">Static Logo</string>
+    <string name="splash_style_off">Off</string>
+    <string name="splash_stage_data">Loading local data</string>
+    <string name="splash_stage_ai">Initializing AI services</string>
+    <string name="splash_stage_ui">Preparing interface</string>
 
     <!-- Security Settings Refactor -->
     <string name="settings_zth_title">Zero Hallucination Tolerance</string>

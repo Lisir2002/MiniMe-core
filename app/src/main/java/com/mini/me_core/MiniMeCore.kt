@@ -207,6 +207,9 @@ class MiniMeCore : Application() {
         // ── [启动/1/3] 数据层初始化（同步，必须先于任何 UI 查询）──
         // 正常启动只输出这一条 Info 汇总；崩溃恢复/库预热/自检等细节全部降级为 Debug/Verbose，
         // 仅当某环节失败时才以 W/E 级别显眼输出上下文。
+        com.mini.me_core.core.splash.StartupProgress.update(
+            com.mini.me_core.core.splash.StartupPhase.DATA_LAYER
+        )
         FileLogger.i(TAG, "[启动/1/3] 数据层初始化")
 
         // 通用启动期迁移框架：按序执行所有一次性数据迁移任务。
@@ -229,6 +232,9 @@ class MiniMeCore : Application() {
         StartupSelfCheck.runDataLayerChecks(agentDriver)
 
         // ── [启动/2/3] 核心服务启动（同步）──
+        com.mini.me_core.core.splash.StartupProgress.update(
+            com.mini.me_core.core.splash.StartupPhase.CORE_SERVICES
+        )
         FileLogger.i(TAG, "[启动/2/3] 核心服务启动")
         credentialRequestBridge.start()
         mcpManager.start()
@@ -240,6 +246,9 @@ class MiniMeCore : Application() {
         com.mini.me_core.core.splash.AppInitState.markReady()
 
         // ── [启动/3/3] 异步预热（不阻塞首帧，后台并行）──
+        com.mini.me_core.core.splash.StartupProgress.update(
+            com.mini.me_core.core.splash.StartupPhase.ASYNC_WARMUP
+        )
         FileLogger.i(TAG, "[启动/3/3] 异步预热")
         // 内置文档 + 提示词提取（覆盖式，随 App 升级更新）
         appScope.launch {
