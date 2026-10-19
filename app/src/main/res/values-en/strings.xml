@@ -177,7 +177,7 @@
     <string name="settings_keepalive_title">Background Keep-alive</string>
     <string name="settings_keepalive_subtitle">Show a foreground notification to prevent the system from killing the process in background</string>
     <!-- Norm flow (D1-7, aligned with norm-chain-design.md §3.5) -->
-    <string name="settings_norm_flow">Spec Flow</string>
+    <string name="settings_norm_flow">Spec Orchestration</string>
     <string name="settings_norm_flow_subtitle">Master switch for per-round injection discipline and tool guards</string>
     <string name="settings_agent">Agent Overview</string>
     <string name="settings_agent_subtitle">Execution mode, model provider and capability overview</string>

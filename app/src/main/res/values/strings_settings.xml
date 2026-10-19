@@ -113,7 +113,7 @@
     <string name="fingerprint_empty">暂无指纹配置</string>
     <string name="settings_keepalive_title">后台运行保活</string>
     <string name="settings_keepalive_subtitle">显示前台通知，避免退到后台时系统杀进程</string>
-    <string name="settings_norm_flow">规范流程</string>
+    <string name="settings_norm_flow">规范编排</string>
     <string name="settings_norm_flow_subtitle">每轮注入纪律与工具护栏的总开关</string>
     <string name="settings_agent">Agent 总览</string>
     <string name="settings_agent_subtitle">执行模式、模型供应商与能力规模总览</string>
