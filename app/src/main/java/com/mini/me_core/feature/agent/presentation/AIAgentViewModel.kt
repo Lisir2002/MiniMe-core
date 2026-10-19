@@ -1026,6 +1026,13 @@ class AIAgentViewModel @Inject constructor(
                     AgentEvent.CompactionFinished -> {
                         setCompacting(sessionId, false)
                     }
+                    is AgentEvent.CompactionFailed -> {
+                        // 压缩失败不再冒充完成：清掉「压缩中」并留痕（日志查看器可见）。
+                        // 本轮请求仍会带着未压缩上下文继续——若载荷确实超限，随后的请求失败
+                        // 会给出网络类错误，此处日志是定位「为什么压缩没用」的第一手证据。
+                        setCompacting(sessionId, false)
+                        FileLogger.w(TAG, "上下文压缩失败: ${event.reason}")
+                    }
                     is AgentEvent.AssistantText -> {
                         val normalized = if (event.content.hasVisibleContent()) event.content else ""
                         val reasoning = event.reasoning.takeIf { it.hasVisibleContent() }
@@ -1529,15 +1536,25 @@ class AIAgentViewModel @Inject constructor(
         sessionJobs[sid]?.let { if (it.isActive) return }
         val job = viewModelScope.launch {
             setCompacting(sid, true)
+            var compactionFailure: String? = null
             try {
                 val changed = agentWorkflow.compactSession(sid) { event ->
                     when (event) {
                         is AgentEvent.CompactionStarted -> setCompacting(sid, true)
                         AgentEvent.CompactionFinished -> setCompacting(sid, false)
+                        is AgentEvent.CompactionFailed -> {
+                            compactionFailure = event.reason
+                            setCompacting(sid, false)
+                        }
                         else -> {}
                     }
                 }
-                val resultText = if (changed) context.getString(R.string.agent_context_compacted) else context.getString(R.string.agent_context_no_compaction)
+                val resultText = when {
+                    compactionFailure != null ->
+                        context.getString(R.string.agent_compaction_failed, compactionFailure)
+                    changed -> context.getString(R.string.agent_context_compacted)
+                    else -> context.getString(R.string.agent_context_no_compaction)
+                }
                 messagePersistenceUseCase.persist(
                     sessionId = sid,
                     role = MessageRole.ASSISTANT,

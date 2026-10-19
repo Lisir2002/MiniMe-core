@@ -55,6 +55,15 @@ sealed class AgentEvent {
     /** 上下文压缩流程已结束（成功或失败）。仅用于 UI 实时展示，不落库。 */
     object CompactionFinished : AgentEvent()
 
+    /**
+     * 上下文压缩失败（LLM 摘要调用抛错 / 返回空摘要）。
+     *
+     * 历史教训：失败路径曾 emit [CompactionFinished] 冒充完成——UI 显示"压缩成功"而
+     * DB 分毫未动，会话永远卡在超限载荷状态，每轮请求都被供应商拒绝，用户侧只看到
+     * "网络不稳定"却找不到原因。失败必须与成功可区分。
+     */
+    data class CompactionFailed(val reason: String) : AgentEvent()
+
     /** 整个流程因错误终止（如流式请求被网络中断、达到迭代上限）。与 [Completed] 区别：携带错误，UI 应展示错误而非成功。 */
     data class Failed(val error: String, val errorKind: LlmErrorKind? = null) : AgentEvent()
 
