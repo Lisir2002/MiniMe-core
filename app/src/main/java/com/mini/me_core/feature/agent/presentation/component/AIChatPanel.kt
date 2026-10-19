@@ -28,8 +28,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,7 +42,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -52,7 +49,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -241,9 +237,6 @@ fun AIChatPanel(
             isSpeaking = false
         }
     )
-
-    // F2.5：待确认的模型切换 (providerId, modelName)
-    var pendingModelSwitch by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
@@ -850,11 +843,7 @@ fun AIChatPanel(
                 isBusy = isBusy,
                 activeProvider = activeProvider,
                 providers = providers,
-                onSelectModel = { p, m ->
-                    // F2.5：切换模型前弹出确认对话框，选择保留上下文 / 清空上下文
-                    if (m != activeModel) pendingModelSwitch = p to m
-                    else viewModel.setSessionProviderModel(p, m)
-                },
+                    onSelectModel = { p, m -> viewModel.setSessionProviderModel(p, m) },
                 onNavigateToSettings = onNavigateToSettings,
                 currentMode = currentMode,
                 onToggleMode = { viewModel.setSessionMode(it) },
@@ -897,59 +886,6 @@ fun AIChatPanel(
                         inputText = content
                         viewModel.updateInputDraft(content)
                     }
-                )
-            }
-
-            // F2.5：模型切换确认对话框
-            pendingModelSwitch?.let { (p, m) ->
-                val contextLimit = activeModelMetadata?.contextTokens ?: 0
-                val usageRatio = if (contextLimit > 0) sessionLastInputTokens.toFloat() / contextLimit else 0f
-                val overLong = usageRatio > 0.8f
-                AlertDialog(
-                    onDismissRequest = { pendingModelSwitch = null },
-                    title = { Text(stringResource(R.string.model_switch_title)) },
-                    text = {
-                        Column {
-                            Text(
-                                stringResource(R.string.model_switch_current_to_new, activeModel.ifBlank { "—" }, m),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                stringResource(R.string.model_switch_context_tokens, formatTokenCount(sessionLastInputTokens)),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (overLong) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (overLong) {
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    stringResource(R.string.model_switch_warning),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        Column {
-                            TextButton(onClick = {
-                                viewModel.setSessionProviderModel(p, m)
-                                pendingModelSwitch = null
-                            }) { Text(stringResource(R.string.model_switch_keep)) }
-                            TextButton(onClick = {
-                                // 清空上下文：新会话显式绑定用户所选模型。
-                                // 旧实现 setSessionProviderModel + newSession 两步走存在竞态：
-                                // 非空会话时 setSessionProviderModel 不写默认模型，
-                                // 新会话仍读旧默认模型，用户选的模型丢失。
-                                viewModel.newSessionWithModel(p, m)
-                                pendingModelSwitch = null
-                            }) { Text(stringResource(R.string.model_switch_clear)) }
-                            TextButton(onClick = { pendingModelSwitch = null }) {
-                                Text(stringResource(R.string.chat_action_cancel))
-                            }
-                        }
-                    },
-                    dismissButton = null
                 )
             }
 
