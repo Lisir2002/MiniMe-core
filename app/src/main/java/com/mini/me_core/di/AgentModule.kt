@@ -123,6 +123,15 @@ object AgentModule {
             // 连接池调优（默认 5 连接 / 5min 保活）。模型接口常往返复用，
             // 放宽到 8 连接 / 15min 提升长连接复用率，降低首字节（TTFT）延迟。
             .connectionPool(okhttp3.ConnectionPool(8, 15, TimeUnit.MINUTES))
+            // 长连接保活探测（30s）：「好网络仍报网络波动」的核心修复之一。
+            // HTTP/2 长连接在移动端 WiFi↔4G 切换 / NAT 超时后往往已半死，
+            // 但双方都不知情——请求发到死连接上要等超时才发现，白白浪费几十秒，
+            // 表现为「网络波动，正在重试」。30s ping 周期让死连接被及时探出并摘除，
+            // 下次请求直接新建连接。（仅对 HTTP/2 生效；HTTP/1.1 自动忽略。）
+            .pingInterval(30, TimeUnit.SECONDS)
+            // 连接失败自动重建重试（OkHttp 默认 true，显式声明表意图）：
+            // 池中 stale 连接首次写失败时静默换新连接重发，用户无感。
+            .retryOnConnectionFailure(true)
             // 短 TTL DNS 缓存，避免每次连接走系统 DNS（弱网可省几十~几百 ms）。
             // 系统解析失败时回退公共 DNS（223.5.5.5 等）兜底，规避
             // "Unable to resolve host"（被网络分流/私人 DNS 劫持时系统查不到、公共 DNS 却可查）。
@@ -154,6 +163,13 @@ object AgentModule {
             // 未启用直连；以 @Singleton 无依赖 Holder 避免与 ClashProxyManager 成环。
             .proxySelector(proxyRouteHolder.selector)
             .connectionPool(okhttp3.ConnectionPool(8, 15, TimeUnit.MINUTES))
+            // 长连接保活探测（30s）：同 directClient——HTTP/2 长连接在 WiFi↔4G 切换 /
+            // NAT 超时后半死时双方都不知情，30s ping 周期及时探出并摘除，
+            // 避免请求打到死连接上等超时才被发现（「好网络仍报网络波动」根因之一）。
+            .pingInterval(30, TimeUnit.SECONDS)
+            // 连接失败自动重建重试（OkHttp 默认 true，显式声明表意图）：
+            // 池中 stale 连接首次写失败时静默换新连接重发，用户无感。
+            .retryOnConnectionFailure(true)
             .dns(com.mini.me_core.core.network.PublicDnsFallback(com.mini.me_core.core.network.CachingDns()))
             .build()
     }
