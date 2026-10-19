@@ -3,6 +3,7 @@ package com.mini.me_core.core.theme
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.tween
@@ -87,6 +88,19 @@ object ScaledAnimation {
         visibilityThreshold: T? = null
     ): AnimationSpec<T> = springImpl(dampingRatio, stiffness, visibilityThreshold, LocalAnimationScale.current)
 
+    /**
+     * 缩放版 spring（Composable 上下文），返回有限动画规格 [FiniteAnimationSpec]。
+     *
+     * 位移类过渡（slideIn/slideOut 等）的 animationSpec 参数只接受有限动画规格，
+     * 因此这里与 [spring] 语义一致、仅返回类型收窄，便于抽屉/页面进出场景直接套用。
+     */
+    @Composable
+    fun <T> finiteSpring(
+        dampingRatio: Float = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+        stiffness: Float = androidx.compose.animation.core.Spring.StiffnessMedium,
+    ): FiniteAnimationSpec<T> =
+        springImpl(dampingRatio, stiffness, null, LocalAnimationScale.current)
+
     /** 缩放版 spring（手动传入 scale）。 */
     fun <T> spring(
         dampingRatio: Float,
@@ -101,17 +115,25 @@ object ScaledAnimation {
         stiffness: Float,
         visibilityThreshold: T?,
         scale: Float
-    ): AnimationSpec<T> {
+    ): FiniteAnimationSpec<T> {
         val effectiveStiffness = if (scale <= 0f) {
             androidx.compose.animation.core.Spring.StiffnessHigh * 10f
         } else {
             (stiffness / scale).coerceAtLeast(1f)
         }
-        return if (visibilityThreshold != null) {
-            androidx.compose.animation.core.spring(dampingRatio = dampingRatio, stiffness = effectiveStiffness, visibilityThreshold = visibilityThreshold)
+        val effectiveVisibilityThreshold: T? = visibilityThreshold
+        return if (effectiveVisibilityThreshold != null) {
+            androidx.compose.animation.core.spring(
+                dampingRatio = dampingRatio,
+                stiffness = effectiveStiffness,
+                visibilityThreshold = effectiveVisibilityThreshold
+            )
         } else {
-            androidx.compose.animation.core.spring(dampingRatio = dampingRatio, stiffness = effectiveStiffness)
-        } as AnimationSpec<T>
+            androidx.compose.animation.core.spring(
+                dampingRatio = dampingRatio,
+                stiffness = effectiveStiffness
+            )
+        } as FiniteAnimationSpec<T>
     }
 
     /** 当前是否禁用了动画（scale<=0）。 */

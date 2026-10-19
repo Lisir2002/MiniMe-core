@@ -881,6 +881,11 @@ fun AppNavigation(
                 rightSidebarOpen = false
                 navController.navigate(route)
             },
+            // 屏幕右缘向内滑动呼出：与互斥守卫保持一致，先收左侧抽屉再展开右侧。
+            onOpenRequest = {
+                scope.launch { drawerState.close() }
+                rightSidebarOpen = true
+            },
         )
         } // Box 闭合
     }
