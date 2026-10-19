@@ -237,32 +237,26 @@ class McpManager @Inject constructor(
      * - 其余：Streamable HTTP。
      *
      * 从 connectOne() 和 testConnection() 中提取，消除重复逻辑。
-     *
-     * G2：形态判定走 [ServerKind.derive] 这唯一入口，不再就地判`builtinGroup`/`isStdio`
-     * ——形态判定此前散落在此处与 [ServerPolicy] 两处，漂移会让「策略认为是内置、
-     * 传输层却按 HTTP 连出去」这类错误极难定位。
      */
     private suspend fun createTransport(cfg: McpServerConfig): McpTransport {
-        return when (ServerKind.derive(cfg)) {
-            ServerKind.BUILTIN -> {
-                builtinMcpServerFactory.createTransport(
-                    cfg.builtinGroup ?: error("builtin server requires builtinGroup: ${cfg.name}")
-                )
+        val builtinGroup = cfg.builtinGroup
+        if (builtinGroup != null) {
+            return builtinMcpServerFactory.createTransport(builtinGroup)
+        }
+        return if (cfg.isStdio) {
+            containerEngine.notReadyHint()?.let {
+                throw IllegalStateException(it)
             }
-            ServerKind.REMOTE_STDIO -> {
-                containerEngine.notReadyHint()?.let {
-                    throw IllegalStateException(it)
-                }
-                StdioTransport(
-                    serverName = cfg.name,
-                    engine = containerEngine,
-                    program = cfg.command ?: error("stdio MCP server requires command: ${cfg.name}"),
-                    programArgs = cfg.args,
-                    projectPath = workspaceRepository.currentPath(),
-                    extraEnv = cfg.env
-                )
-            }
-            ServerKind.REMOTE_HTTP -> StreamableHttpTransport(
+            StdioTransport(
+                serverName = cfg.name,
+                engine = containerEngine,
+                program = cfg.command ?: error("stdio MCP server requires command: ${cfg.name}"),
+                programArgs = cfg.args,
+                projectPath = workspaceRepository.currentPath(),
+                extraEnv = cfg.env
+            )
+        } else {
+            StreamableHttpTransport(
                 endpoint = cfg.url.orEmpty(),
                 client = okHttpClient,
                 extraHeaders = cfg.headers

@@ -62,7 +62,6 @@ import com.mini.me_core.core.theme.components.AppEmptyState
 import com.mini.me_core.core.theme.components.AppTopAppBar
 import com.mini.me_core.core.ui.rememberPersistentLazyListState
 import com.mini.me_core.feature.agent.domain.execution.mcp.McpServerStatus
-import com.mini.me_core.feature.agent.domain.execution.mcp.ServerKind
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionPolicy
 import com.mini.me_core.feature.capability.domain.CapabilityGroupCard
@@ -498,61 +497,24 @@ private fun GroupCard(group: CapabilityGroupCard, onClick: () -> Unit) {
                 )
             }
             Spacer(Modifier.height(Spacing.sm))
-            GroupBadgeRow(group)
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                if (!group.isBuiltin) {
+                    Pill(
+                        text = if (group.remotelyExposed) {
+                            stringResource(R.string.capability_group_exposed)
+                        } else {
+                            stringResource(R.string.capability_group_internal_only)
+                        },
+                        tint = if (group.remotelyExposed) colors.tertiary else colors.onSurfaceVariant
+                    )
+                }
+                Pill(
+                    text = stringResource(R.string.capability_agent_tool_count) + " " + group.tools.size,
+                    tint = colors.onSurfaceVariant
+                )
+            }
         }
     }
-}
-
-/**
- * 分组卡片的徽章行（G2）。
- *
- * 抽出成独立函数有两个理由：一是 [GroupCard] 加入形态/禁用两枚徽章后已超detekt
- * `LongMethod` 阈值；二是徽章的**显示条件**本身是一条不变量——形态徽章只对远端
- * server 有意义（内置分组的形态恒为「内置」，印出来是废话），禁用徽章只在禁用时出现。
- * 集中在一处，才不会被后续改动零散地改成「一律都印」。
- */
-@Composable
-private fun GroupBadgeRow(group: CapabilityGroupCard) {
-    val colors = MaterialTheme.colorScheme
-    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        if (!group.isBuiltin) {
-            Pill(
-                text = if (group.remotelyExposed) {
-                    stringResource(R.string.capability_group_exposed)
-                } else {
-                    stringResource(R.string.capability_group_internal_only)
-                },
-                tint = if (group.remotelyExposed) colors.tertiary else colors.onSurfaceVariant
-            )
-            Pill(
-                text = stringResource(R.string.capability_group_kind, kindLabel(group.kind)),
-                tint = colors.onSurfaceVariant
-            )
-        }
-        if (!group.enabled) {
-            Pill(
-                text = stringResource(R.string.capability_group_disabled),
-                tint = colors.error
-            )
-        }
-        Pill(
-            text = stringResource(R.string.capability_agent_tool_count) + " " + group.tools.size,
-            tint = colors.onSurfaceVariant
-        )
-    }
-}
-
-/**
- * server 形态的本地化标签（G2）。
- *
- * 在 UI 层做这次映射、而不是直接印枚举名，是为了让枚举新增取值时**编译期就暴露**
- * 缺字符串（`when` 需穷尽），不会静默印出 `REMOTE_STDIO` 这种开发者词汇给用户。
- */
-@Composable
-private fun kindLabel(kind: ServerKind): String = when (kind) {
-    ServerKind.BUILTIN -> stringResource(R.string.capability_kind_builtin)
-    ServerKind.REMOTE_HTTP -> stringResource(R.string.capability_kind_http)
-    ServerKind.REMOTE_STDIO -> stringResource(R.string.capability_kind_stdio)
 }
 
 /**
