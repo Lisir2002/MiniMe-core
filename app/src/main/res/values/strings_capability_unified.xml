@@ -39,25 +39,4 @@
     <string name="capability_kind_builtin">进程内</string>
     <string name="capability_kind_http">远端 HTTP</string>
     <string name="capability_kind_stdio">本地进程</string>
-<!-- G4 prompts / resources 浏览 -->
-    <string name="capability_detail_tab_prompts">提示词</string>
-    <string name="capability_detail_tab_resources">资源</string>
-    <string name="capability_assets_loading">正在读取…</string>
-    <string name="capability_assets_unsupported_prompts">该 server 未暴露 prompts\n可能是未连接，或握手时未声明该能力。</string>
-    <string name="capability_assets_unsupported_resources">该 server 未暴露 resources\n可能是未连接，或握手时未声明该能力。</string>
-    <string name="capability_assets_empty_prompts">该 server 没有提供任何 prompt。</string>
-    <string name="capability_assets_empty_resources">该 server 没有提供任何 resource。</string>
-    <string name="capability_assets_failed">读取失败：%1$s</string>
-    <string name="capability_assets_retry">重试</string>
-    <string name="capability_asset_args_count">参数 %1$d</string>
-    <string name="capability_asset_arg_required">必填</string>
-    <string name="capability_asset_arg_optional">选填</string>
-    <string name="capability_asset_fetch_prompt">获取提示词</string>
-    <string name="capability_asset_read_resource">读取</string>
-    <string name="capability_asset_body_empty">（正文为空）</string>
-    <string name="capability_asset_no_description">无描述</string>
-    <string name="capability_asset_mime">类型 %1$s</string>
-    <string name="capability_asset_expand">展开</string>
-    <string name="capability_asset_collapse">收起</string>
-    <string name="capability_asset_body_label">正文</string>
 </resources>

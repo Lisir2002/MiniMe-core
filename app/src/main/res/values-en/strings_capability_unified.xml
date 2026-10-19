@@ -39,25 +39,4 @@
     <string name="capability_kind_builtin">In-process</string>
     <string name="capability_kind_http">Remote HTTP</string>
     <string name="capability_kind_stdio">Local process</string>
-<!-- G4 prompts / resources browsing -->
-    <string name="capability_detail_tab_prompts">Prompts</string>
-    <string name="capability_detail_tab_resources">Resources</string>
-    <string name="capability_assets_loading">Loading…</string>
-    <string name="capability_assets_unsupported_prompts">This server exposes no prompts.\nIt may be disconnected, or did not declare the capability at handshake.</string>
-    <string name="capability_assets_unsupported_resources">This server exposes no resources.\nIt may be disconnected, or did not declare the capability at handshake.</string>
-    <string name="capability_assets_empty_prompts">This server provides no prompt.</string>
-    <string name="capability_assets_empty_resources">This server provides no resource.</string>
-    <string name="capability_assets_failed">Failed to read: %1$s</string>
-    <string name="capability_assets_retry">Retry</string>
-    <string name="capability_asset_args_count">%1$d args</string>
-    <string name="capability_asset_arg_required">required</string>
-    <string name="capability_asset_arg_optional">optional</string>
-    <string name="capability_asset_fetch_prompt">Get prompt</string>
-    <string name="capability_asset_read_resource">Read</string>
-    <string name="capability_asset_body_empty">(empty body)</string>
-    <string name="capability_asset_no_description">No description</string>
-    <string name="capability_asset_mime">Type %1$s</string>
-    <string name="capability_asset_expand">Expand</string>
-    <string name="capability_asset_collapse">Collapse</string>
-    <string name="capability_asset_body_label">Body</string>
 </resources>

@@ -51,19 +51,14 @@ import com.mini.me_core.feature.capability.domain.CapabilityGroupCard
 import com.mini.me_core.feature.capability.presentation.UnifiedCapabilityViewModel
 
 /**
- * F2 能力分组详情页：详情 / 工具 / 提示词 / 资源 四 Tab。
+ * F2 能力分组详情页：「MCP 详情 / MCP 工具」双 Tab。
  *
  * 内置分组与远端 server 共用本页面——二者在协议层同构，详情页自然也同构。
  * 内置分组走详情 Tab 时展示的是分组元信息（server 名、对外暴露状态、工具总数），
  * 因为内置 server 不可编辑（配置在代码里，不落盘）；远端 server 则额外承载
  * 编辑入口（由调用方通过回调接入）。
  *
- * G4：后两个 Tab 是可选能力的浏览面。它们**恒定存在而不按 handshake 声明裁剪**——
- * `capabilities` 只是自述，据此隐藏 Tab 会让「没声明却能用」的 server 永久无从下手。
- * 取不到时由页面自己把原因说清楚。
- *
  * @param groupId 分组 id：内置为 `BuiltinGroup.serverName`（`MiniMe-Core` 等），远端为 server 名。
- *   该 id 同时也是 `McpManager` 里那份 client 的键，故可直接用作 prompts/resources 的寻址依据。
  */
 @Composable
 fun CapabilityGroupDetailScreen(
@@ -108,19 +103,12 @@ fun CapabilityGroupDetailScreen(
             AppSegmentedControl(
                 tabs = listOf(
                     stringResource(R.string.capability_detail_tab_info),
-                    stringResource(R.string.capability_detail_tab_tools),
-                    stringResource(R.string.capability_detail_tab_prompts),
-                    stringResource(R.string.capability_detail_tab_resources)
+                    stringResource(R.string.capability_detail_tab_tools)
                 ),
                 selectedIndex = selectedTab,
                 onSelect = { selectedTab = it }
             )
-            when (selectedTab) {
-                0 -> GroupInfoTab(group)
-                1 -> GroupToolsTab(group)
-                2 -> GroupPromptsTab(group)
-                else -> GroupResourcesTab(group)
-            }
+            if (selectedTab == 0) GroupInfoTab(group) else GroupToolsTab(group)
         }
     }
 }

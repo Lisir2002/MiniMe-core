@@ -498,31 +498,6 @@ AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。�
 6. **只消费文本，不解base64**：`resources/read` 的单条 contents 若是 `blob`（二进制）
    直接忽略，不要试着解码再喂给模型。
 
-#### 降级丢掉的原因，必须在下一个消费点之前补回来（强制约束，G4 批次）
-
-上一条要求「list 失败返回空集合」，这对核心路径是对的，但**同一个「空」在 UI 上是
-信息丢失**：三种截然不同的原因（不支持 / 请求失败 / 确实为空）压成同一个空列表后，
-用户既不知道该不该点重试，也不知道该查网络还是换个 server。
-
-1. **降级函数要留一双 GUI 精度的孪生兄弟**：`listPrompts()` 保持返回 `List`（签名与
-   行为都不变，核心路径照用），另出 `listPromptsDetailed()` 返回
-   `OptionalCapability<McpPromptDescriptor>`（`Listed` / `Unsupported` / `Failed`）。
-   新增 Detailed 层时**必须先写测试钉住「声明了却回错误码 ⇒ Failed，不是 Unsupported」**——
-   这条区分就是整批的全部价值，混淆了它就等于没做。
-2. **不用 `Result<T>` 表达可选能力**：它只有成功/失败两态，装不下「不支持」；
-   而「不支持」恰恰是最常见、最不该被当成错误呈现给用户的结果。
-3. **UI 状态必须是五态而不是「列表 + 加载中」**：`Idle / Loading / Ready / Unsupported /
-   Failed`。二态写法必然把后两种渲成「暂无」。配套的另一条是**失败必须带上 server 原文**：
-   `prompts/get` 最常见的失败是缺必填参数，那段报错是用户唯一能据此改输入的线索，
-   换成「读取失败，请重试」等于让他盲猜。
-4. **加载状态机放 domain 层，不放 ViewModel**：本仓没有 `kotlinx-coroutines-test`
-   （`Dispatchers.setMain` 不可用），ViewModel 里的逻辑无法可靠断言。写成普通 suspend
-   由 ViewModel 去 launch，测试侧既能 `runBlocking` 直接跑，也避开 Main dispatcher。
-5. **去重但不永久挡门**：`Loading` 中重复调用应跳过，但必须留 `force` 出口——
-   上一轮请求持续挂起时，非强制调用会被永久挡在门外，表现为「点了重试没反应」。
-6. **Tab 恒定显示，不按 `capabilities` 裁剪**：能力声明只是自述，据此隐藏 UI 入口
-   会让「没声明却能用」的 server 永久无从下手。取不到时由页面自己把原因说清楚。
-
 #### server 形态与启用态必须收进治理模型（强制约束，G2 批次）
 
 规划 §5 里的 `ServerPolicy` 写的是 `name` / `kind` / `enabled` / 三组名单 / `remotelyExposed`，
