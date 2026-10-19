@@ -5,7 +5,6 @@ import com.mini.me_core.feature.agent.domain.execution.tool.AgentTool
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolCapability
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolExposure
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolParameter
-import com.mini.me_core.feature.agent.domain.execution.tool.ToolPermissionPolicy
 import com.mini.me_core.feature.agent.domain.execution.tool.ToolResult
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -26,17 +25,11 @@ import java.security.MessageDigest
  * - 对模型暴露的 [name] 做命名空间化（`mcp__server__tool`）并清洗成 function-calling 合法字符，
  *   避免多个 server 工具重名；真正调用时用原始 [remoteName] 走 tools/call。
  * - B3：显式声明 [ToolExposure.DEFERRED]——MCP 工具数量不可控（多 server 叠加），
- *   绝不默认进上下文，只经`tool_catalog` 检索或实际调用按需展开。
- * - F3：接受 [policy]，把用户在 `requireApprovalTools` 里的勾选落到 [permissionPolicy]。
- *   此前该配置是**断线**的（只在配置读写与 UI 勾选里存在，执行侧零消费），用户勾了
- *   「需审批」却照样直接放行。判定在**构造期**完成而非执行期，好处是本地审批通路、
- *   UI 徽章与实际执行三者读同一个值，不可能出现「界面说要审批、实际没拦」。
+ *   绝不默认进上下文，只经 `tool_catalog` 检索或实际调用按需展开。
  */
 class McpTool(
     private val client: McpClient,
-    private val descriptor: McpToolDescriptor,
-    /** F3：server 的工具治理策略（白/黑/灰名单）；默认无限制，保持既有调用点零影响。 */
-    private val policy: ServerPolicy = ServerPolicy.Unrestricted,
+    private val descriptor: McpToolDescriptor
 ) : AgentTool() {
 
     private companion object {
@@ -58,17 +51,6 @@ class McpTool(
 
     /** B3：MCP 工具一律延迟加载（与基类默认值一致，显式声明防默认值漂移）。 */
     override val exposure = ToolExposure.DEFERRED
-
-    /**
-     * F3：用户在 `requireApprovalTools` 里勾选的工具一律 `ASK`，其余 `AUTO_APPROVE`。
-     *
-     * 注意这是**唯一**新增的审批输入源。MCP `annotations`（`readOnlyHint` 等）按规范
-     * 不可信且 `destructiveHint` 默认 true，绝不参与判定——外部工具自称只读不构成保证。
-     * 未勾选的工具仍交由本地权限引擎按 capabilities / 权限规则 / 沙箱等既有维度判定，
-     * 本字段只是**额外的收紧**，不是替代。
-     */
-    override val permissionPolicy: ToolPermissionPolicy =
-        if (policy.requiresApproval(remoteName)) ToolPermissionPolicy.ASK else ToolPermissionPolicy.AUTO_APPROVE
 
     override val name: String = buildNamespacedName(client.serverName, descriptor.name)
 

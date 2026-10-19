@@ -1281,9 +1281,6 @@
     <string name="mcp_empty_hint">Tap + in the top-right corner to add a remote HTTP or local stdio server</string>
     <string name="mcp_disabled">Disabled</string>
     <string name="mcp_not_connected">Not connected</string>
-    <!-- F3 tool governance: whitelist mode -->
-    <string name="mcp_whitelist_mode">Whitelist mode</string>
-    <string name="mcp_whitelist_mode_desc">Only enabled tools are exposed; the rest are hidden</string>
     <string name="mcp_connected">Connected</string>
     <string name="mcp_connecting">Connecting…</string>
     <string name="mcp_connection_failed">Connection failed</string>

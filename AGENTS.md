@@ -439,19 +439,6 @@ AI Agent 通过工具系统（`feature/agent/domain/tool/`）与环境交互。�
 9. **灰度开关**：`NormFlowSettingsRepository.unified_capability_page_enabled`（默认 false，不挂 normFlow 总闸）。新增开关必须同时补 `exportConfig` / `importConfig` 两处，否则配置分发会漏。
 10. **新增字符串须补英文**：`values/` 加了 key 就必须在 `values-en/` 同步，否则 `lintRelease` 的 `MissingTranslation` 直接挂门禁。
 
-#### MCP 工具治理规约（强制约束，F3 批次）
-
-`requireApprovalTools` 此前是**断线**的：用户能在 `McpEditorDialog` 勾选、勾选结果正确写入 `mcp.json`，但执行侧零消费——工具照样直接放行。这是权限提示失真，属安全缺陷。F3 用 `ServerPolicy` 接通。
-
-1. **判定只在一处**：`ServerPolicy.isToolEnabled` / `requiresApproval` 是唯一判定入口，`McpManager`（注册过滤）、`McpTool.permissionPolicy`（执行侧审批）、`CapabilityRegistry`（UI 徽章）全部读它。三处各判一次必然漂移，漂移的后果是「界面说要审批、实际没拦」。
-2. **审批判定落在构造期**：`McpTool.permissionPolicy` 在构造时由 `ServerPolicy` 定死，`AgentToolMcpAdapter.approve` 已有的 `tool.permissionPolicy == AUTO_APPROVE` 判定因此自动生效，**无需改动**。这保证了「徽章 / 执行 / 审批卡」读同一个值。
-3. **MCP `annotations` 一律不参与判定**：按规范它是不可信提示（`readOnlyHint` 默认 false、`destructiveHint` 默认 true、`openWorldHint` 默认 true），外部工具自称只读不构成保证。
-4. **黑名单优先（拒绝优先）**，白名单与黑名单同时命中时按黑名单。依据是联网核实的生态约定：`mcp-cli` 明确 `disabledTools → BLOCKED（absolute precedence）`（security-first precedence model），`mcp-compress-router` 为 `The denylist wins on conflict`，`synthorg` 更严格——两表重叠直接**在加载期报配置错误**。不采纳少数「白名单优先」实现的理由：白名单是粗粒度的日常收窄，黑名单通常是踩坑后的针对性封禁；同时命中几乎总是说明用户曾想封禁它。
-5. **空集合 ≠ 白名单为空**：`enabledTools` 为空表示「未启用白名单」。故 `ServerPolicy.hasWhitelist` 用 `isNotEmpty()` 判定；「配了白名单但一个都不给」应通过 `disabledTools` 表达。
-6. **`ServerPolicy.from` 必须映射全部集合字段**：`from()` 是手写字段映射，加字段时极易漏（`enabledTools` 就漏过一次，导致用户配的白名单静默失效）。`ServerPolicyTest` 用反射断言配置与策略的 `Set<String>` 字段集**一一对应**，防止再次漏映射。
-7. **白名单模式下 UI 操作的是 `enabledTools`**：`McpEditorDialog` 的每工具开关在两种模式下操作不同集合，但对用户是同一个「可用吗」的真值。切换白名单模式时**必须清空另一模式的集合**——两套集合共存会因「拒绝优先」产生难以预料的结果。
-8. **`enabledTools` 须落盘**：`McpConfigRepositoryImpl` 的序列化与解析都要处理，存量配置缺失该键即为空集（行为不变）。
-
 ### MCP（Model Context Protocol）
 
 - **客户端（已实施）**：应用实现了 MCP 客户端（`feature/agent/domain/mcp/`），可连接远程 HTTP / 本地 stdio 服务器并动态注册其提供的工具（`McpManager` / `McpClient` / `McpTool`）。

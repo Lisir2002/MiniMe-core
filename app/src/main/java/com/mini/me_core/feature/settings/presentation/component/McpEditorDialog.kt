@@ -103,20 +103,13 @@ fun McpServerEditDialog(
         }
     }
 
-    // 工具权限字段 (enabledTools / disabledTools / requireApprovalTools)
+    // 工具权限字段 (disabledTools / requireApprovalTools)
     val disabledToolsSet = remember {
         mutableStateListOf<String>().apply { addAll(initial?.disabledTools ?: emptyList()) }
-    }
-    // F3：白名单。非空即「白名单模式」——只暴露列出的工具。空集表示未启用。
-    val enabledToolsSet = remember {
-        mutableStateListOf<String>().apply { addAll(initial?.enabledTools ?: emptyList()) }
     }
     val requireApprovalToolsSet = remember {
         mutableStateListOf<String>().apply { addAll(initial?.requireApprovalTools ?: emptyList()) }
     }
-    // 白名单模式开关：一旦切换，两种模式的集合必须清空，否则残留项会让用户以为
-    // 白名单外的工具仍被黑名单兜住，实际却是白名单已把它们排除了（拒绝优先）。
-    var whitelistMode by remember { mutableStateOf(initial?.enabledTools?.isNotEmpty() == true) }
 
     val canSave = name.isNotBlank() && if (isStdio) command.isNotBlank() else url.isNotBlank()
 
@@ -348,42 +341,6 @@ fun McpServerEditDialog(
                                 .padding(horizontal = 20.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // F3：白名单模式开关。
-                            // 默认关闭 = 黑名单模式（只勾掉不想要的）。打开后仅列出被勾的工具，
-                            // 适合「这个 server 只暴露这三个」的场景，也便于审阅最小可见面。
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = stringResource(R.string.mcp_whitelist_mode),
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.mcp_whitelist_mode_desc),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Switch(
-                                    checked = whitelistMode,
-                                    onCheckedChange = { checked ->
-                                        whitelistMode = checked
-                                        // 切换即清空另一模式的集合：两套集合同时存在会因
-                                        //「拒绝优先」产生难以预料的结果（详见 ServerPolicy）。
-                                        if (checked) {
-                                            disabledToolsSet.clear()
-                                            enabledToolsSet.clear()
-                                            enabledToolsSet.addAll(tools.map { it.name })
-                                        } else {
-                                            enabledToolsSet.clear()
-                                        }
-                                    }
-                                )
-                            }
-
                             if (tools.isEmpty()) {
                                 Box(
                                     modifier = Modifier
@@ -410,14 +367,7 @@ fun McpServerEditDialog(
                                 }
                             } else {
                                 tools.forEach { tool ->
-                                    // 白名单模式下开关操作 enabledTools，黑名单模式下操作
-                                    // disabledTools 的反向——两种模式下用户看到的都是同一个
-                                    // 「这个工具可用吗」的真值，不需要理解两套集合。
-                                    val isToolEnabled = if (whitelistMode) {
-                                        tool.name in enabledToolsSet
-                                    } else {
-                                        tool.name !in disabledToolsSet
-                                    }
+                                    val isToolEnabled = tool.name !in disabledToolsSet
                                     val isApprovalRequired = tool.name in requireApprovalToolsSet
 
                                     Card(
@@ -445,17 +395,7 @@ fun McpServerEditDialog(
                                                 Switch(
                                                     checked = isToolEnabled,
                                                     onCheckedChange = { checked ->
-                                                        if (whitelistMode) {
-                                                            if (checked) {
-                                                                enabledToolsSet.add(tool.name)
-                                                            } else {
-                                                                enabledToolsSet.remove(tool.name)
-                                                            }
-                                                        } else if (checked) {
-                                                            disabledToolsSet.remove(tool.name)
-                                                        } else {
-                                                            disabledToolsSet.add(tool.name)
-                                                        }
+                                                        if (checked) disabledToolsSet.remove(tool.name) else disabledToolsSet.add(tool.name)
                                                     }
                                                 )
                                             }
@@ -557,7 +497,6 @@ fun McpServerEditDialog(
                                         .toMap(),
                                     enabled = enabled,
                                     disabledTools = disabledToolsSet.toSet(),
-                                    enabledTools = enabledToolsSet.toSet(),
                                     requireApprovalTools = requireApprovalToolsSet.toSet()
                                 )
                             } else {
@@ -570,7 +509,6 @@ fun McpServerEditDialog(
                                         .toMap(),
                                     enabled = enabled,
                                     disabledTools = disabledToolsSet.toSet(),
-                                    enabledTools = enabledToolsSet.toSet(),
                                     requireApprovalTools = requireApprovalToolsSet.toSet()
                                 )
                             }
