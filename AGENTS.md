@@ -10,6 +10,7 @@
 - [关键命令](#关键命令)
 - [边界规则（Always / Ask First / Never）](#边界规则always--ask-first--never)
 - [资产同步纪律](#资产同步纪律)
+- [实战经验沉淀纪律](#实战经验沉淀纪律)
 - [Git 提交规范](#git-提交规范)
 - [分支与改动工作流](#分支与改动工作流)
 - [版本号规范](#版本号规范)
@@ -116,6 +117,7 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 - 遵循 [Git 提交规范](#git-提交规范)：Conventional Commits。
 - 新功能 / 复杂多文件改动 / 架构重构：新建分支（`feat/xxx` / `refactor/xxx`），验证后合回 `main` 并清理。
 - **技术瓶颈主动联网搜索学习**：遇到算法实现、性能优化、复杂动画、第三方库集成、系统API用法等技术瓶颈时，必须主动联网搜索最佳实践、开源项目实现、Stack Overflow 解决方案、官方文档等，不得用简陋方案凑合。搜索后需评估方案适用性，结合项目实际情况落地，不盲目复制。
+- **出问题必须沉淀经验**：CI 门禁失败 / 工具链/网络/环境受阻 / 同一问题复发 / 采用非惯例解法时，按 [docs/Experience/](./docs/Experience/README.md) 规范写经验文档后再关问题；经验文档是活文档，须随我们的实际情况持续更新（更新协议见该 README §4）。
 
 ### Ask First（先询问确认）
 
@@ -144,6 +146,16 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 - **UI 文案 → 必须同步 strings.xml**：任何新增或修改用户可见的中文文案（按钮、标题、提示、Toast 等），**必须**将其提取为 string resource 写入 `app/src/main/res/values/strings.xml`（中文）和 `app/src/main/res/values-en/strings.xml`（英文翻译），并在 `.kt` 代码中用 `stringResource(R.string.xxx)` 或 `context.getString(R.string.xxx)` 引用。**禁止在 .kt 文件中硬编码中文 UI 文案。** 命名规范：语义化英文全小写下划线分隔，通用文案用 `common_` 前缀跨页面复用。
 - **模块文档 / 设计文档（已停用）**：曾经的 `docs/modules/`（模块开发文档）与 `docs/plan-docs/`（设计文档）目录已按维护者决定**整体删除**，对应纪律（模块文档同步、设计文档前置）随之停用，`.githooks/pre-commit` 校验已停用（`spec-check.sh` 已删除）。新增/删除 feature 模块不再要求配套模块文档。
 - **设计文档落地后清理规则（硬性约束）**：`docs/` 下的一次性设计文档（如 `*-design.md`）在设计内容**全部落地完成**后，必须及时删除，不得保留过时设计文档。部分落地的设计文档可保留作为后续开发参考，但需在文档头部标注已落地阶段和待落地阶段。规范类文档（`ui-standards.md`、`ci-release.md`、`AGENTS.md`、`PLAN.md`、`SECURITY.md`、`docs/workflow/工作流程规范.md`）不属于设计文档，必须持续保留并实时更新。版本日志（`docs/Version Log/`）为历史记录，永久保留。
+
+## 实战经验沉淀纪律
+
+**目的：让每个坑只被踩一次。** 实战中遇到的问题必须沉淀为经验文档，形成可检索、可持续更新的工程资产，不靠口头传承和会话记忆。
+
+- **写什么**：按 `docs/Experience/` 体系执行——模板、命名（`EXP-NNN-<主题>.md`）、索引登记、更新协议见 [docs/Experience/README.md](./docs/Experience/README.md)。
+- **何时写**（满足任一即写）：CI 门禁失败修复后；工具链/网络/环境受阻解决后；同一问题第二次出现（说明上次没沉淀到位）；采用非惯例解法时；本文件或工作流程规范的变更依据来自实战教训时。**先写经验再关问题**，不允许"修完就散"。
+- **活文档协议**：任何人复用中发现环境变化（网络策略、工具版本、CI 配置改变导致步骤失效），必须更新正文并在文末「更新记录」追加一行；「最后验证日期」是内容最后被确认成立的日期，不是编辑日期；每个大版本或每季度过一次索引，超 6 个月未验证的标「待验证」，确认过时的标「已归档」。
+- **与规则双向同步**：经验中固化的规则进本文件与[工作流程规范](./docs/workflow/工作流程规范.md)；规则条目引用的实战依据指向对应 EXP 文档，两边不许脱节。
+- **与「常见坑」的分工**：一行能装下的速察进下方[常见坑](#常见坑)表；完整方法论（根因链、可复制命令、验证方法）进 `docs/Experience/`。
 
 ## 通用工作流程（必读）
 
@@ -598,6 +610,7 @@ python3 scripts/check-persistence.py
 | **日志查看器看不见最新日志** | FileObserver(CLOSE_WRITE) 对常驻 BufferedWriter 永不触发——正常写日志期间文件从不 close，事件源实际是死的 | 查看器在前台用 `repeatOnLifecycle(RESUMED)` 轮询 + 读前 flush；凡「事件驱动的新鲜度承诺」，先确认该事件在正常运行时真的会发生 |
 | **压缩过的会话每轮提问都「网络不稳定」** | **压缩死锁**：①token 估算按 chars/4，中文低估约 4 倍，真实载荷已超窗口数倍还以为没到阈值；②压缩请求把整个 head 无预算拼进一条消息——会话多大压缩请求就多大，超限会话的压缩请求必然同样超限被拒（实测 622k tokens vs 128k 窗口）；③失败被 catch 后原样返回却照样 emit 压缩完成事件，UI 假报成功、DB 分毫未动；④超限载荷在网关侧表现为超时/重置/5xx，落入可重试类别 → 重试风暴 | 估算改 CJK-aware（`ModelContextPolicy.estimateTokens(text)`，中文每字≈1 token）；压缩请求自带输入预算（上限×0.5），超预算走滚动窗口逐段摘要（`ContextCompactor.summarizeHead`）；失败 emit `CompactionFailed` 而非冒充完成，并记失败冷却 |
 | **网络很好仍显示「网络波动，正在重试」** | **六环叠加**：①OkHttp 未配 pingInterval——HTTP/2 长连接在 WiFi↔4G 切换/NAT 超时后半死但双方不知情，请求打到死连接上等超时才暴露（主因）；②首字节 watchdog 固定 60s 把「服务端排队/慢思考」误杀成连接中断（底层 `Software caused connection abort`），重试仍 60s，于是一次次被砍成重试风暴；③退避无 jitter，多会话同步重试惊群；④无重试预算，一次故障被放大成分钟级卡顿；⑤`streamWithStaircaseRetry` 的 `attemptOnce` 从不消费 onProduced 标记——注释声称「吐字后不重试」实现却整体重来，用户看到内容重复输出、token 双倍计费（三适配器全中）；⑥UI 一律报「网络波动」，把限速/服务端慢也误导成网络问题 | OkHttp 双客户端 `.pingInterval(30, SECONDS)` 及时探出摘除死连接；重试改 full jitter 指数退避 + `RetryBudget` 三道闸（次数/单次 10s/累计 15s，超限上抛交上层故障转移）；渐进式首字节耐心 60s→120s→180s 放过慢但活着的服务端；吐字后失败直接上抛不重试；`RetryReason` 六分类 + UI 分档文案；内置多线路 `EndpointHealthRegistry`（3 次连续失败熔断 60s + EWMA 延迟排序）与 `ModelEndpointRouter`（用户配置 URL 永远首选、同类型官方 URL 次选、useFullUrl 直通不换），首字节前 CONNECTION 类失败端点级换线 ≤2 次 |
+| **环境/工具链类问题（git 推送断、Release 资产下不了、脚本行为与预期不符等）** | 沙箱网络对非白名单域名 TLS 中断、zsh 与 bash 行为差异等，报错信息不直接指向根因 | 先查 [docs/Experience/](./docs/Experience/README.md) 是否已有对应经验（EXP-001 网络通道 / EXP-005 zsh 陷阱）；没有则按 EXP 模板沉淀后再继续 |
 
 ## app-template 模块开发约束
 
@@ -623,6 +636,7 @@ app-template 是「前端应用转安卓应用」的模版壳模块，内置默�
 |---|---|
 | `AGENTS.md` | 本规范（AI 纪律源，运行时被加载） |
 | `docs/ci-release.md` | 云端构建发版运维手册 |
+| `docs/Experience/` | 实战经验库（EXP 文档：出问题必沉淀、随环境持续更新的活文档） |
 | `app/build.gradle.kts` | 构建配置 + 版本号动态推导（勿手写 versionName） |
 | `app/src/main/java/com/mini/me_core/datalayer/repository/AgentRepository.kt` | V2 数据门面（`AgentRepository` 业务聚合 + `data/local/entity/*.kt` 纯 DTO，DOMAIN/UI/Firebase 复用） |
 | `app/src/main/java/com/mini/me_core/core/db/V1toV2FullMigrator.kt` | 旧 Room 域库 → V2 一次性移植器（纯 SQLite，幂等，只跑一次） |
