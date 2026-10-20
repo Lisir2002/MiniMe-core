@@ -1,0 +1,87 @@
+# MiniMe-core 变更记录
+
+## 版本线（三条，互不干扰）
+
+| 线 | 谁定 | 格式 | 当前取值 |
+|---|---|---|---|
+| **软件发版版本**（git tag / Release） | **维护者确认** | **四段式 `x.x.x.x`**，A=颠覆性预留 / B=框架级结构性预留 / C=框架级重构 / **D=默认发版 +1** | 体系 `0.0.1.x`，已发至 `v0.0.1.10` |
+| **引擎版本**（`MiniMeEngine.VERSION`） | 引擎自定 | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.0`（R1） |
+| 主题包版本（`manifest.version`） | 主题作者自定 | 自由 | 默认包 `1.0.0` |
+
+### 发版三条硬规矩（2026-10-21 维护者裁定）
+
+1. **软件发版一律走项目四段式规范**，禁止自创三段式 SemVer。
+2. **按项目规矩不允许发 rc tag**（CI `android-release.yml` 拒绝预发布 tag，只发正式版）——本批次不打 `-rcN` tag。
+3. **大更新期间需要中间版本做测试迭代**：每次发版前**必须先询问维护者、由维护者确认发版版本号**，确认后才打 tag。不得自行决定版本号与是否发版。
+
+> 引擎版本是另一条线，**只用于主题包 `manifest.engineVersion` 兼容判定**，不得当软件发版版本用。
+> 二段式逢九进一：R1 `1.0` → R2 `1.1` … R9 `1.8` → R10 `1.9` → 转正 `2.0`（不存在 `1.10`）。
+
+## R1 引擎内核（数据 + 编译）— 已完成，待发版
+
+**引擎版本 `1.0`** ｜ 模块：`:theme-engine`（纯 JVM，零 UI 依赖）｜ 单测：**131 项全绿**
+**软件发版状态：未发版** —— 按规矩须先向维护者确认版本号后再打 tag。
+
+### 交付范围（分批实施计划 §3 R1 原文）
+
+| 交付项 | 状态 | 落点 |
+|---|---|---|
+| `:theme-engine` 骨架 | ✅ | 四包无环：`api`（契约叶）← `schema` ← `tokens` ← `fallback` ← `compiler` |
+| 十子系统 `@Immutable` data class | ✅ | `ColorTokens` / `TypographyTokens` / `ShapeTokens` / `SizeTokens` / `SpacingTokens` / `MotionTokens` / `InteractionTokens` / `ElevationTokens` / `OpacityTokens` / `GlassTokens` |
+| DTCG Format 解析 | ✅ | `DtcgParser`（version / `$value` / `$type` / `$description` / `$extensions` / 别名 `{path}` / 组级类型继承 / 嵌套扁平等价） |
+| 编译器三规则（§5.1） | ✅ | `SetMerger`（规则 2/3）+ `AliasResolver`（规则 1） |
+| 复合型字段别名 | ✅ | `AliasResolver.resolveComposite`（spring / glass / typography / shadow 四型 + 必填校验） |
+| 导入校验全行（§5.2） | ✅ | `ThemeValidator` + `DtcgParser` 体积上限 |
+| 默认主题包（纯白 iOS） | ✅ | `theme-engine/src/main/resources/default-theme.json`（core + dark/highContrast/reducedMotion/reducedTransparency） |
+| 内置 fallback 快照 | ✅ | `FallbackTheme.rawValues`（196 条常量，零 IO / 零 JSON / 零反射） |
+
+### 验收逐条（对照 §3 R1 验收原文）
+
+| 验收项 | 状态 | 覆盖测试 |
+|---|---|---|
+| 别名拓扑：断链 / 循环 / 类型不符拒绝 | ✅ | `AliasResolverTest`（断链诊断含引用方与目标、环路径输出、自引用环、顶层与复合字段类型不符） |
+| 三规则逐条 | ✅ | `SetMergerTest`（后者覆盖 / 未激活跳过 / 可叠加按序 / 未声明与重复激活拒绝 / 规则 3 顶层与复合字段别名拒绝） |
+| **「先合并后解析」专项**（dark 覆盖 primitive → 语义别名换值，含 `glass.thin.tintAlpha` 复合字段） | ✅ | `AliasResolverTest` 前两条 + `ThemeCompilerEndToEndTest`（dark 下 accent=#0A84FF、`glass.thin.tintAlpha`=0.45；扩展组 `chart.c1` 亦随语义色换值） |
+| 玻璃 opaque 拒绝路径 | ✅ | `ThemeValidatorTest`（启用时半透明 → `GLASS_OPAQUE_VIOLATION`；未启用时跳过；引用缺失令牌 → `SCHEMA_INVALID`） |
+| fallback 三路径（快照损坏 / 编译异常 / 包不存在） | ✅ | `ThemeLoaderTest`（9 项：null / 空白 / 坏 JSON / 缺 sets / 断链 / 引擎版本不兼容 + 内置包成功 + 最小包回填） |
+| §6.1.4 总表逐行有令牌且端到端可读 | ✅ | `FallbackConsistencyTest`（172 词汇表路径全覆盖 + 十子系统条目分布 62/14/6/13/11/13/26/2/15/10）+ `SnapshotAccessorsTest`（十子系统访问器逐项取值） |
+| 门禁绿（纯库批次，无 APK） | ✅ | `gradle :theme-engine:test` → 128 tests, 0 failed |
+
+### 单测清单（128 项）
+
+| 测试文件 | 数量 | 关注面 |
+|---|---|---|
+| `SemVerTest` | 9 | 版本号解析 / 排序 / 区间（空白与逗号分隔）/ rc 优先级 |
+| `TokenValueTest` | 10 | hex 规范化与 `#RRGGBBAA` 解析 / alpha / source-over 合成 / 单位 / 复合 schema |
+| `DtcgParserTest` | 30 | 结构 / 类型 / 别名语法 / 保留键白名单 / 512KB 上限 / `$extensions` 解析 |
+| `SetMergerTest` | 8 | 规则 2/3 |
+| `AliasResolverTest` | 13 | 规则 1 + 别名拓扑 + 复合型 + 扩展组别名 |
+| `ThemeValidatorTest` | 21 | §5.2 全行 + WCAG 数学 |
+| `ThemeCompilerEndToEndTest` | 11 | 默认包五上下文 + 扩展组 + WCAG golden 基线 |
+| `ThemeLoaderTest` | 9 | 降级三路径 + 成功路径 |
+| `FallbackConsistencyTest` | 6 | fallback 防漂移 + 词汇表自洽 |
+| `SnapshotAccessorsTest` | 11 | 十子系统强类型访问器 |
+
+### 偏离与决策记录（与设计文档的差异，逐条说明）
+
+1. **`@Immutable` 为引擎自定义标记** —— 联网核实 `androidx.annotation`（73 个注解）**不含** `Immutable`，Compose 版位于 `androidx.compose.runtime`。R1 纯 JVM 模块不引入 Compose，故自建 `org.minime.core.api.Immutable`（语义等价，KDoc 注明 R2 接入 `:theme-ui` 时可机械替换 import）。连带移除 `androidx.annotation` 依赖——引擎零外部注解依赖。
+2. **纯 JVM 模块** —— §4.2 的 runtime/motion/shape/material/components/page 依赖 Compose，全部推迟到 R2+ 的 `:theme-ui`（Android library）。引擎内核保持「纯 JVM 可完整单测」。
+3. **颜色 hex 采用 `#RRGGBBAA`（末位 alpha）** —— 与 iOS/Android 十六进制惯例一致；4 位简写按 `#ARGB`。实现初期误按 AARRGGBB 解析，导致 `#000000FF` alpha=0、对比度全链路 1:1，由端到端冒烟暴露并修复，`TokenValueTest` 固化。
+4. **DTCG 类型名映射** —— DTCG 拼写 `fontFamily` / `cubicBezier` 与 Kotlin 枚举名（`FONT_FAMILY` / `CUBIC_BEZIER`）不同，改用显式 `RAW_NAMES` 表映射（大小写不敏感），避免依赖枚举名巧合。
+5. **SemVer 区间支持空白与逗号两种分隔** —— 白皮书示例写作 `">=1.0.0 <2.0.0"`（空格），实现初期仅支持逗号，导致默认包 `engineVersion` 被误判非法；现两种均支持，并校验区间须被比较器完整覆盖（拒绝夹带非法字符）。
+6. **体积上限按「紧凑重序列化」计** —— `sets` 子树经 org.json 紧凑序列化（去空白）后计字节；实测输入需约 620KB 才触发 512KB 上限（原始带缩进输入会先被压小）。此语义已写入测试注释。
+7. **扩展组（`$extensions.minime.<group>`）为包级常驻** —— 不参与 `resolutionOrder`、无修饰符交互（白皮书 §3.7 的编辑器/终端/图表开放词汇由主题包整体提供）；合并于 set 之后进入同一张表，因此**扩展组内允许别名**（`chart.c1 = {color.semantic.accent}`，dark 下随语义色换值）。实现初期漏掉扩展组合并，被端到端测试发现（fallback 恰好同值掩盖了此缺陷）。
+8. **`elevation.overlay` 提前到 R1** —— 白皮书列为二期 `ShadowValue` 相关，但 `elevation` 在十子系统中已占位（2 条：`hairline` + `overlay`），为避免「有槽位无值」，R1 一并落地。
+9. **动效人格不建令牌** —— `personality`（ios/standard/custom）是消费方对六槽 spring 的**组合选择**，建令牌会与六槽形成双真源；由组件层读取组合（R2+）。
+10. **空/空白输入归入「包不存在」** —— `ThemeLoader.load(null | 空白)` → `PACK_NOT_FOUND`；仅「非空但非法 JSON」→ `PACK_CORRUPT`。
+11. **DTCG 版本取 preview-draft 偏离** —— 解析器读 `version` 字段但不做强制等值校验（模块 2025.10 stable 与官方 draft 仍在演进），避免未来格式升级直接拒包；结构规则（sets/resolutionOrder）由 MiniMe Resolver 稳定子集自行约束。
+12. **WCAG 警告 golden 基线（light 20 条）** —— 默认包亮色下 `text.secondary/tertiary/quaternary/placeholder` 与五档背景的组合低于 4.5:1（最低 1.36:1，对应 iOS 实际观感的次级文本）。**这是已知且符合设计意图的**（iOS 系统色本身如此），记为警告不阻断；`ThemeCompilerEndToEndTest` 以 golden 断言固化，后续若调整色板须同步更新。
+13. **色值校正（联网核实 Apple 系统色数据点）** —— `teal` 由初稿 `#30B0C7` 校正为 iOS `#5AC8FA`；分隔符透明度按 60%（非初稿 65%）；`scrimBright` 采用 0.35 阶梯。
+14. **默认主题包 glass 默认关闭** —— 纯白风格下 `glass.enabled = false`（与 §6.8 玻璃为可选增强一致），玻璃材质配方与 tintAlpha 阶梯仍全量提供，`reducedTransparency` 修饰符将其进一步不透明化。
+
+### 已知缺口（不属于 R1 范围）
+
+- TokenVocabulary 仅覆盖标准词汇表 172 条；开放词汇（editor/terminal/chart 等 24 条）由扩展组提供、可缺省。
+- 无运行时主题切换 / 持久化 / 预编译缓存（R2）。
+- 无 UI、无 Compose 提供层、无 M3 映射（R2）。
+- 主题包导入性能未压测（R2 门禁 ≤200ms）。
