@@ -8,11 +8,19 @@
 - **自动触发**：`git push origin v0.1.0-rcN` / `git push origin v0.1.0`，CI 接收 `v*` tag push 事件后自动启动。
 - **手动触发**（仅测试用）：GitHub Actions 页面 → `android-release.yml` → Run workflow（workflow_dispatch），versionName = `manual-<run_number>`，**不作为正式发版**。
 
+## 本地分块编译验证与云端分工
+
+**本地只做分块编译验证（快、按变更面精准触发）；全量构建 / 全量单测 / detekt / 发版由本手册所述云端链路执行。** 完整规约（变更面 → 编译块路由表、各模块编译命令、无本地构建环境的降级路径）见 [AGENTS.md 本地分块编译验证与云端全量分工](../AGENTS.md#本地分块编译验证与云端全量分工编译验证规约)，此处仅列与发版相关的边界：
+
+- 打 Tag 前，本地分块编译必须已过（或已确认云端 `ci.yml` 对对应提交全绿），**不许带着编译红打 Tag**。
+- `v*` Tag 一旦推送即触发不可逆的正式发版（主应用只发正式版 tag，预发布 tag 会被 `android-release.yml` 直接拒绝），推送前按「发版规范」逐条核对。
+- 云端 `ci.yml`（push 到 main 触发）负责日常全量门禁：release 全量构建 → `:app:testReleaseUnitTest` → `:app:detekt`；本文链路（Tag 触发）负责发版产物：签名构建 → Release 页面 → APK 资产。
+
 ## CI 全流程（单 job `build`，6 个逻辑阶段）
 
 > workflow 实际是**单 job 多 step**结构（jobs.build），下述 6 个阶段是按职责划分的逻辑阶段，对应 step 序列。
 
-1. **variables** → `Display release tag info` + `Verify versionCode monotonic`（versionCode 单调递增校验）+ `Determine release name`（手动触发用 `manual-<run_number>`）+ `Determine prerelease flag`（tag 含 `-rc/-dev/-beta/-alpha` 后缀自动标记 prerelease）
+1. **variables** → `Display release tag info` + `Verify versionCode monotonic`（versionCode 单调递增校验）+ `Determine release name`（手动触发用 `manual-<run_number>`）+ `Determine prerelease flag`（tag 含预发布后缀时标记 prerelease；注意主应用已被 `Reject pre-release tags` 门禁拒绝此类 tag，该分支实际不会命中）
 2. **build** → `:app:testReleaseUnitTest`（发版质量门禁）→ `:app:assembleRelease` → 正式签名构建 APK 到 `app/build/outputs/apk/release/app-release.apk` → `Rename APK` 重命名为 `dist/MiniMe-<版本号>-<变体>.apk`（如 `MiniMe-v0.0.15-release.apk`，**release 仅 arm64-v8a**，重命名同时做 ABI 校验：`lib/` 必须含 `arm64-v8a`；debug 变体保留双 ABI 用于模拟器开发）
 3. **upload-mapping** → `Upload R8 mapping`（`actions/upload-artifact@v4`，artifact 名 `r8-mapping-<tag>`，90 天保留，`if-no-files-found: ignore` 不阻塞）
 4. **create-release** → `Generate release notes` + `Create GitHub Release & Upload assets`（`softprops/action-gh-release@v2`，prerelease 取决于 tag 是否含预发布后缀；标题基础格式 `MiniMe <版本号>`，AI/维护者发版后补充「— 更新内容概括」；正文遵循 AGENTS.md「发版说明格式」统一规约，条目为「**4-9字小标题**：20-40字说明」结构）

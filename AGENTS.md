@@ -54,19 +54,55 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 ## 关键命令
 
 ```bash
-# 日常开发冒烟（AI 改完编译型代码默认跑这个；debug buildType 快，不跑 R8）
-./gradlew :app:assembleDebug
-# Release 链路验证 / 发布包（release 仅 arm64-v8a；debug 保留双 ABI 用于模拟器）
-./gradlew :app:assembleRelease
-# Release AAB
-./gradlew :app:bundleRelease
-# 单元测试（push 前必跑，release classpath 与 CI 门禁同款）
-./gradlew :app:testReleaseUnitTest
-# Debug classpath 单测
-./gradlew :app:testDebugUnitTest
+# ── 本地分块编译验证（提交前按「变更面 → 编译块」路由表选用，见下节规约）──
+./gradlew :app:compileDebugKotlin                        # :app 纯代码改动（最快，不打包）
+./gradlew :app:assembleDebug                             # :app 资源/清单改动，或提交冒烟
+./gradlew :terminal-emulator:compileDebugJavaWithJavac   # 终端模拟器模块（纯 Java library）
+./gradlew :terminal-view:compileDebugJavaWithJavac       # 终端视图模块（纯 Java library）
+./gradlew :logviewer-app:compileDebugKotlin              # 日志查看器应用
+./gradlew :app-template:compileDebugKotlin               # 模板应用
+./gradlew :lint-checks:compileJava                       # 自定义 lint 规则（JVM library）
+./gradlew help                                           # 构建脚本改动：配置期全模块求值校验
+
+# ── Release 链路与全量测试（本地可选；发版全量由云端 CI 门禁执行）──
+./gradlew :app:assembleRelease                           # release 仅 arm64-v8a
+./gradlew :app:bundleRelease                             # Release AAB
+./gradlew :app:testDebugUnitTest                         # 本地可选快速反馈
+./gradlew :app:testReleaseUnitTest                       # 云端门禁同款（ci.yml 每次 push 自动跑）
 ```
 
 > **注意：项目已无 flavor 概念**，不要使用 `assembleUniversal/assembleArmsolo/assembleX86solo` 等旧命令。完整构建 `./gradlew build` 含 lint + 全量编译耗时极长，日常不用。
+
+## 本地分块编译验证与云端全量分工（编译验证规约）
+
+**原则：本地只承担分块编译验证（快、按变更面精准触发）；全量构建 / 全量单测 / detekt / 发版一律由云端 CI 执行。编译验证不可跳过，只是按层分工。**
+
+### 1. 变更面 → 编译块路由表（提交前必过对应块）
+
+| 变更面 | 本地必跑编译块 | 说明 |
+|---|---|---|
+| 纯文档（`*.md` / `docs/**`）/ 纯资源文案 | 跳过 | 不影响编译产物 |
+| `:app` 内 Kotlin/Java 改动 | `:app:compileDebugKotlin` | 单模块闭环，最快反馈 |
+| `:app` 资源 / `AndroidManifest.xml` 改动 | `:app:assembleDebug` | 需资源合并与打包验证 |
+| `:terminal-emulator` / `:terminal-view` 改动 | 对应模块 `compileDebugJavaWithJavac` **+** `:app:assembleDebug` | 纯 Java library，且被 `:app` 依赖，须验证下游 |
+| `:logviewer-app` / `:app-template` 改动 | 对应模块 `compileDebugKotlin` | 独立应用，与 `:app` 无耦合 |
+| `:lint-checks` 改动 | `:lint-checks:compileJava` | JVM library |
+| 构建脚本改动（`*.gradle.kts` / `settings.gradle.kts` / `libs.versions.toml` / `gradle.properties` / wrapper） | `./gradlew help` + 受影响模块编译块 | 配置期问题最先暴露 |
+| 跨模块 / 无法判定影响面 | 本地跑完上表全部编译块 | 或直接交云端 CI 全量兜底 |
+
+### 2. 本地 / 云端职责划分
+
+| 阶段 | 本地 | 云端 CI |
+|---|---|---|
+| 提交前 | 按路由表跑分块编译验证，0 error 才许提交 | — |
+| 每次 push 到 `main` | — | `ci.yml`：skill 脚本语法检查 → release 全量构建 → `:app:testReleaseUnitTest` → `:app:detekt`（硬门禁） |
+| 打 `v*` Tag | — | `android-release.yml`：`testReleaseUnitTest` → `assembleRelease` → 正式签名 → 创建 Release 上传 APK |
+
+### 3. 边界
+
+- 本地分块编译**不等于**质量放行：单测与静态分析门禁以云端 `ci.yml` 结果为准，失败必须修复后重新推送。
+- 无本地构建环境（缺 Android SDK 等）时，分块编译验证移交云端：推送后盯 `ci.yml` run 结果，红即修，**不许无验证推送编译型改动**。
+- 发版前仍需按「发版流程」在真机完成功能实测，本地分块编译不替代第三层（功能实测）与第四层（关联回归）。
 
 ## 边界规则（Always / Ask First / Never）
 
@@ -74,8 +110,8 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 
 - 永远使用中文回复。
 - 文件操作/搜索优先使用专用工具（Read/Edit/Write/Grep/Glob），**不要**用 shell 命令替代。
-- 编译型代码（`.kt` / `.gradle.kts` / `AndroidManifest.xml`）改动提交前，先 `./gradlew :app:assembleDebug` 验证可编译。
-- 任何 `git push` 前，先 `./gradlew :app:testReleaseUnitTest` 且全部通过（纯文档/资源文案/纯 `.md` 改动除外）。
+- 编译型代码（`.kt` / `.gradle.kts` / `AndroidManifest.xml`）改动提交前，按[本地分块编译验证路由表](#1-变更面--编译块路由表提交前必过对应块)跑对应编译块，0 error 才许提交（`:app` 纯代码改动用 `:app:compileDebugKotlin`；改资源/清单用 `:app:assembleDebug`）。
+- 全量单测（`:app:testReleaseUnitTest`）与 detekt 门禁由云端 `ci.yml` 在每次 push 到 `main` 时自动执行；本地不再要求推送前跑全量测试，但**必须盯云端门禁结果，红即修**（纯文档/资源文案/纯 `.md` 改动除外）。
 - 遵循[资产同步纪律](#资产同步纪律)：prompts / docs / strings.xml / 模块文档四类变更必须同步。
 - 遵循 [Git 提交规范](#git-提交规范)：Conventional Commits。
 - 新功能 / 复杂多文件改动 / 架构重构：新建分支（`feat/xxx` / `refactor/xxx`），验证后合回 `main` 并清理。
@@ -113,7 +149,7 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
 
 编程验证、功能设计、Bug 修复、发版、汇报、质量门禁的标准步骤，统一见 **[docs/workflow/工作流程规范.md](./docs/workflow/工作流程规范.md)**。关键红线：
 
-- 改完代码必须过「编译 → 测试 → 功能检查 → 回归 → 自查」五步才算完成，不许带着报错往下走；
+- 改完代码必须过「分块编译（本地）→ 全量测试（云端门禁）→ 功能检查 → 回归 → 自查」五步才算完成，不许带着报错往下走；各步分工见[本地分块编译验证与云端全量分工](#本地分块编译验证与云端全量分工编译验证规约)；
 - 做新功能先理解需求、检索借鉴、分析优缺点，再给方案；不第一时间拍脑袋；
 - 修 Bug 必须深度审计相关与关联模块、上网学习同类方案、定位根因后再修，禁止只改报错那一行；
 - CI 失败超 2 次、重大架构变更、安全问题，必须停下来报告；
@@ -146,8 +182,8 @@ MiniMe-core 是运行在 Android 真机与虚拟环境（模拟器/虚拟机）�
   - **日常 Bug 修复 / 补单元测试 / CI与构建配置 / 纯文档 / 资源文案**：直接在 `main` 分支提交，无需新建分支，避免分支过滥。
   - **预览版（RC）热修复**：已发 RC Tag 后发现问题，必须从**该 RC Tag** 拉 `hotfix/xxx` 分支修复（**勿从最新 `main` 或功能分支拉**，否则会把已合入的未发版功能带进修复包），修复验证后升 rc 序号打 Tag 发修复版，再合回 `main` 并清理分支（详见「发版流程」）。
 - **改动前先定分支**：涉及新功能开发时，先确认分支命名（如 `feat/session-model`），避免不同主题混在同一分支。
-- **提交前必跑冒烟**：改完编译型代码（`.kt` / `.gradle.kts` / `AndroidManifest.xml`）→ 提交前默认 `./gradlew :app:assembleDebug` 验证可编译（debug buildType 快，不跑 R8）。验证 release 链路用 `:app:assembleRelease`，**项目已无 flavor 概念，不要使用 assembleUniversalDebug/assembleArmsolo 等旧命令**。
-- **推送到远端前必跑单元测试**：任何 `git push` 到远端之前，必须先跑一次单元测试 `./gradlew :app:testReleaseUnitTest`（release classpath，与 CI 门禁同款），确认测试全部通过后再推送。改动不涉及逻辑（纯文档 / 资源文案 / 纯 `.md`）时可跳过。
+- **提交前必跑分块编译**：改完编译型代码（`.kt` / `.gradle.kts` / `AndroidManifest.xml`）→ 提交前按[分块编译路由表](#1-变更面--编译块路由表提交前必过对应块)跑对应编译块验证可编译（debug buildType 快，不跑 R8）。验证 release 链路用 `:app:assembleRelease`，**项目已无 flavor 概念，不要使用 assembleUniversalDebug/assembleArmsolo 等旧命令**。
+- **全量测试移交云端**：不再要求推送前本地跑 `:app:testReleaseUnitTest`；每次 push 到远端 `main` 时 `ci.yml` 自动以 release classpath 跑全量单测 + detekt 硬门禁。本地可选跑 `:app:testDebugUnitTest` 做提交前快速反馈；推送后必须确认云端门禁通过。改动不涉及逻辑（纯文档 / 资源文案 / 纯 `.md`）时云端 CI 自动跳过（paths-ignore）。
 - **合并入 main**：本地合并并确认无冲突后，及时清理已被合并的本地分支（`git branch -d <branch_name>`，删前用 `git branch --merged main` 确认安全）；已推送过的分支同步删除远端（`git push origin --delete <branch_name>`），避免本地删了远端残留。分支删除不影响已打的 Tag，Tag 独立引用提交，可随时 `git show <tag>` 追溯。
 
 ## 版本号规范
