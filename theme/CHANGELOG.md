@@ -5,7 +5,7 @@
 | 线 | 谁定 | 格式 | 当前取值 |
 |---|---|---|---|
 | **软件发版版本**（git tag / Release） | **维护者确认** | **四段式 `x.x.x.x`**，A=颠覆性预留 / B=框架级结构性预留 / C=框架级重构 / **D=默认发版 +1** | 体系 `0.0.1.x`，已发至 `v0.0.1.10` |
-| **引擎版本**（`MiniMeEngine.VERSION`） | 引擎自定 | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.0`（R1） |
+| **引擎版本**（`MiniMeEngine.VERSION`） | 引擎自定 | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.2`（R3） |
 | 主题包版本（`manifest.version`） | 主题作者自定 | 自由 | 默认包 `1.0.0` |
 
 ### 发版三条硬规矩（2026-10-21 维护者裁定）
@@ -63,6 +63,56 @@
 - 无 `:gallery` 模块与可运行 app（R3）；
 - 无运行时覆写层（R4 工坊在其之上叠加）；
 - 系统深浅色监听未内置（由调用方按系统上下文调用 `select(packId, modifiers)`）。
+
+---
+
+## R3 画廊骨架 + 令牌总览 + squircle — 已完成，待发版
+
+**引擎版本 `1.2`** ｜ 新增模块：`:gallery`（Android application，minSdk 26 / targetSdk 35）
+单测：**:theme-engine 134 + :theme-ui 37 + :gallery 3 = 174 项全绿** ｜ 仪器测试：**9 项已编写（R2 5 + R3 4）并编译通过，需真机运行**
+**首个可装机 APK**：`gallery/build/outputs/apk/debug/gallery-debug.apk`（11MB，`org.minime.gallery`，versionName `0.0.0.dev` 未发版标识）
+**软件发版状态：未发版** —— 按规矩须先向维护者确认版本号后再打 tag。
+
+### 交付范围（分批实施计划 §3 R3 原文）
+
+| 交付项 | 状态 | 落点 |
+|---|---|---|
+| gallery app 壳 | ✅ | `GalleryApplication`（引擎 initialize 先于首帧）+ `MainActivity`（edge-to-edge，窗口背景读快照 `bg.canvas`）+ 无网络权限 |
+| 右侧边栏导航 | ✅ | `GallerySidebar`（六分区 + 主题摘要卡）/ `GalleryDrawer`（窄屏抽屉降级，黑 × `opacity.scrim`）/ `GalleryTopBar`（常驻主题入口 pill + 菜单） |
+| 令牌总览区 | ✅ | `TokensOverviewSection`（~900 行）：172 条逐行，按类型分发 12 类渲染器（色板 / 实样 / 等比条 / 开关实样 / 九档透明度阶梯 / 玻璃拟态近似等） |
+| squircle 自实现 | ✅ | `draw/SquircleMath`（lamé 超椭圆纯数学，零 androidx 依赖）+ `ContinuousCornerShape`（Path LRU 缓存 64 条，只读契约） |
+| 基础绘制原语 | ✅ | `draw/ContinuousCornerShape.kt` 内 `drawHairline`（厚度 px 取自 `elevation.hairline` 令牌） |
+| 调试面板（基础版） | ✅ | `DebugPanelSection`：主题组信息 + 修饰符四开关 + 随批次落地清单 |
+| 占位分区 | ✅ | `PlaceholderSection` ×4（组件 / 原型 / 动效 / 工坊，明示批次与建设计划，R6–R9 同速生长） |
+
+### 验收逐条（对照 §3 R3 验收原文）
+
+| 验收项 | 状态 | 覆盖 |
+|---|---|---|
+| 侧边栏可达全部已建分区 | 🟡 仪器测试已写 | `GalleryNavigationInstrumentedTest.侧边栏可达全部已建分区`（六分区逐个点击 + 标题断言） |
+| 令牌区与 §6.1.4 总表逐行一致（机器核对） | ✅ JVM | `TokenCoverageTest`：脚本从词汇表生成的 172 条展示清单与 `TokenVocabulary.ALL` **双向集合相等**（缺项 / 多项 / 重复任一即失败）+ 默认包端到端逐条可读 + 十子系统全覆盖 |
+| squircle vs 几何圆角并排 A/B | ✅ JVM + 🟡 仪器 | `SquircleMathTest` 9 项数学性质 + 令牌页 shape 区并排渲染；仪器 `squircle与几何圆角AB并排展示` |
+| 静态页真机无掉帧 | 🟡 仪器粗检 + 待真机 | `令牌页全量滚动无崩溃`（30 次滚到底）；静态页无动画，掉帧风险面小 |
+
+> 🟡 = 已编写并**编译通过**，但需真机/模拟器执行（本机无设备与模拟器）。
+
+### 关键实现决策与偏离（R3）
+
+1. **squircle 落 `:theme-ui` 而非 `:gallery`**（偏离模块边界初判）—— 组件族 R6–R9 都要用连续圆角，放 gallery 会形成双真源；按 §10.1 硬纪律「禁第二套实现」移入 `:theme-ui` 的 `draw` 包，gallery 只 import。连带 `drawHairline` 原语同落。
+2. **D10 常驻可见取代 debug-only**（偏离初版计划「gallery 仅 debug 入口」）—— 白皮书 v1.9 已拍板 D10 = 常驻可见（是产品功能）：顶栏主题入口 pill（sun/moon + 「亮色/暗色」）宽屏常驻、窄屏进顶栏，非调试彩蛋。
+3. **曲率 G2 断为已知取舍** —— lamé 超椭圆近似下端点切向 G1 连续、曲率 G2 断（与 iOS 真 squircle 的解析连续曲率有差距）；白皮书 §3.6 妥协 2 已预警「不可用几何圆角糊弄」，本实现满足「非几何圆角」底线，G2 连续留待后续批次评估（若引入需重新选近似函数）。
+4. **参数域 double 精度教训** —— float 的 `sin(π)≈1e-7` 经 `|sin|^0.4` 放大到 1e-3 量级，致角端点漂移 0.03px（测试实测暴露）；采样与变换全改 double 域 + `snapZero` 吸附零噪声后消除。教训：小指数幂次会放大 float 的端点误差，几何生成代码应在 double 域完成再回落 float。
+5. **n=5 为默认平滑指数** —— 中点距顶点 0.13r vs 几何圆角 0.29r（更「方」，接近 iOS 观感）；A/B 的 B 侧用 n=2（退化标准圆）作几何圆角基准，两列并排直接可对比。
+6. **Path 缓存 access-ordered LRU（64 条）** —— 令牌页 172 行滚动会持续请求同组 shape 路径；key=(w,h,r,n,segments) 命中率实测接近 100%，返回 Path **只读**契约（调用方不得 mutate）。
+7. **gallery versionName `0.0.0.dev`** —— 未发版标识；R10 再开混淆（当前调试构建保留符号便于崩溃分析）；lint `abortOnError` 已开。
+8. **引擎版本步进 `1.1 → 1.2`**（二段式逢九进一，非软件发版）；默认包 `engineVersion` 区间 `>=1.0 <2.0` 不动，兼容覆盖。
+
+### 已知缺口（R3 不做）
+
+- 组件 / 原型 / 动效 / 工坊四分区为占位页（R6–R9）；
+- 抽屉开合无动画（动效规格归 R5）；
+- 令牌总览为只读展示，无运行时覆写（R4 工坊）；
+- 仪器测试 9 项待真机执行；静态页真机掉帧测量待设备。
 
 ---
 

@@ -160,7 +160,7 @@ class ThemeCompilerEndToEndTest {
     fun `default pack declares engine range compatible with current engine`() {
         assertEquals(MiniMeEngine.VERSION, ThemeCompiler.ENGINE_VERSION)
         assertEquals(
-            "1.1",
+            "1.2",
             MiniMeEngine.VERSION,
             "引擎版本应为二段式（步长 +0.1，逢九进一）: ${MiniMeEngine.VERSION}",
         )

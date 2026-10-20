@@ -1,11 +1,11 @@
 # minime-core
 
-MiniMe 主题引擎内核（R1）。纯 JVM 库，零 UI 依赖——可脱离 Android 完整单测。
+MiniMe 主题引擎内核（R3）。引擎纯 JVM 零 UI 依赖，可脱离 Android 完整单测；R3 起新增首个可装机界面 `:gallery`。
 
 对应设计文档：
 
-- [MiniMe-core 主题引擎白皮书](file:///workspace/MiniMe-core-主题引擎白皮书.md)（§5 令牌规范 / §6 十子系统 / §6.8 玻璃）
-- [MiniMe-core 分批实施计划](file:///workspace/MiniMe-core-分批实施计划.md)（§3 R1 引擎内核）
+- [MiniMe-core 主题引擎白皮书](file:///workspace/MiniMe-core-主题引擎白皮书.md)（§5 令牌规范 / §6 十子系统 / §6.8 玻璃 / §10 验证页面）
+- [MiniMe-core 分批实施计划](file:///workspace/MiniMe-core-分批实施计划.md)（§3 R1–R10）
 - [主题引擎审计报告](file:///workspace/MiniMe-core-主题引擎审计报告.md) / [安全审计报告](file:///workspace/MiniMe-core-安全审计报告.md)
 - 变更记录：[CHANGELOG.md](CHANGELOG.md)
 
@@ -14,9 +14,8 @@ MiniMe 主题引擎内核（R1）。纯 JVM 库，零 UI 依赖——可脱离 A
 | 模块 | 说明 |
 |---|---|
 | `:theme-engine` | 令牌数据 + DTCG 解析 + 编译器 + 内置 fallback（**纯 JVM**，可脱离 Android 完整单测） |
-| `:theme-ui` | 运行时（`ThemeManager`）+ 十子系统提供层 + M3 映射层（Android library，Compose） |
-
-R3+ 将新增 `:gallery`（验证页面，首个可运行界面）。
+| `:theme-ui` | 运行时（`ThemeManager`）+ 十子系统提供层 + M3 映射层 + 绘制原语（`draw` 包：squircle / 连续圆角 / 发丝线） |
+| `:gallery` | 验证页面 app（Android application）：侧边栏导航 + 令牌总览（172 条逐行）+ squircle A/B + 调试面板，**首个可装机界面** |
 
 ## 包结构（无环）
 
@@ -31,6 +30,18 @@ fallback  内置兜底快照（常量构造，零 IO）
   ↑
 compiler  导入期校验 + 合并器 + 别名解析 + 编译器 + 加载器（§4.2「导入器」）
 ```
+
+`:theme-ui` 内 `draw` 包 = 自绘原语单一真源：`SquircleMath`（lamé 超椭圆纯数学，JVM 可测）+ `ContinuousCornerShape`（Path LRU 缓存，只读契约）+ `drawHairline`（发丝线，厚度取自 `elevation.hairline`）。组件族 R6–R9 复用，禁第二套实现。
+
+## Gallery 分区（白皮书 §10）
+
+| 分区 | 状态 | 内容 |
+|---|---|---|
+| 令牌总览 | ✅ R3 | 172 条逐行（机器核对 `TokenCoverageTest`），shape 区含 squircle vs 几何圆角 A/B |
+| 调试面板 | ✅ R3 | 主题组信息 + 修饰符四开关（dark / highContrast / reducedMotion / reducedTransparency） |
+| 组件目录 / 页面原型 / 动效检验 / 主题工坊 | ⏳ 占位 | R6 / R8 / R5 / R4 依次落地 |
+
+导航：宽屏（≥840dp）右侧边栏常驻；窄屏顶栏菜单开抽屉。顶栏主题入口常驻可见（D10）。
 
 ## 快速开始
 
@@ -113,9 +124,17 @@ if (result.degraded) log.w("主题降级: ${result.error?.code}")
 ## 构建与测试
 
 ```bash
-gradle :theme-engine:test     # 128 项单测
-gradle :theme-engine:build    # 编译 + 测试
+gradle test                    # 三模块全部单测（174 项）
+gradle :gallery:assembleDebug  # 产出 APK：gallery/build/outputs/apk/debug/gallery-debug.apk
 ```
+
+| 模块 | 单测 | 说明 |
+|---|---|---|
+| `:theme-engine` | 134 | 纯 JVM（结果在 `build/test-results/test/`） |
+| `:theme-ui` | 37 | Android library（`testDebugUnitTest`，含 squircle 数学 9 项） |
+| `:gallery` | 3 | 令牌覆盖机器核对（`TokenCoverageTest`：172 条双向集合相等） |
+
+仪器测试 9 项（R2 换肤 5 + R3 导航 4）已编译通过，需真机/模拟器执行（`connectedDebugAndroidTest`）。
 
 > 沙箱内 `./gradlew` 需下载 Gradle 发行版（网络受限）；本机已装 Gradle 9.3.0 时直接用 `gradle`。
 
@@ -123,8 +142,8 @@ gradle :theme-engine:build    # 编译 + 测试
 
 | 线 | 格式 | 当前取值 |
 |---|---|---|
-| **软件发版版本**（git tag / Release） | **四段式 `x.x.x.x`**（项目规范：A=颠覆性预留 / B=框架级结构性预留 / C=框架级重构 / **D=默认发版 +1**） | 体系 `0.0.1.x`，已发至 `v0.0.1.10`；**R1 待维护者确认后发版** |
-| **引擎版本** `MiniMeEngine.VERSION` | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.0`（`ThemeCompiler.ENGINE_VERSION` 同源） |
+| **软件发版版本**（git tag / Release） | **四段式 `x.x.x.x`**（项目规范：A=颠覆性预留 / B=框架级结构性预留 / C=框架级重构 / **D=默认发版 +1**） | 体系 `0.0.1.x`，已发至 `v0.0.1.10`；**R3 待维护者确认后发版** |
+| **引擎版本** `MiniMeEngine.VERSION` | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.2`（`ThemeCompiler.ENGINE_VERSION` 同源） |
 | 主题包版本 `manifest.version` | 自由 | 默认包 `1.0.0` |
 
 ### 发版三条硬规矩
