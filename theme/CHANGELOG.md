@@ -17,6 +17,55 @@
 > 引擎版本是另一条线，**只用于主题包 `manifest.engineVersion` 兼容判定**，不得当软件发版版本用。
 > 二段式逢九进一：R1 `1.0` → R2 `1.1` … R9 `1.8` → R10 `1.9` → 转正 `2.0`（不存在 `1.10`）。
 
+## R2 运行时 + M3 映射 — 已完成，待发版
+
+**引擎版本 `1.1`** ｜ 新增模块：`:theme-ui`（Android library，AGP 8.9.3 / Kotlin 2.2.21 / Compose BOM 2025.12.01 / compileSdk 35）
+单测：**:theme-ui 28 项 + :theme-engine 131 项 = 159 项全绿** ｜ 仪器测试：**5 项已编写，需真机运行**
+**软件发版状态：未发版** —— 按规矩须先向维护者确认版本号后再打 tag。
+
+### 交付范围（分批实施计划 §3 R2 原文）
+
+| 交付项 | 状态 | 落点 |
+|---|---|---|
+| `ThemeManager` | ✅ | `runtime/ThemeManager`：StateFlow + 内存快照缓存 + 后台编译 + 节流（后到者取消前到）+ 降级链 |
+| 持久化 | ✅ | `runtime/ThemeStore`（接口，同步可读）+ `SharedPreferencesThemeStore`（Android）+ `InMemoryThemeStore`（测试） |
+| 主题包存储 | ✅ | `runtime/ThemePackRepository` + `FileThemePackRepository`（含 packId 路径穿越校验）+ 内存实现 |
+| 子系统实例复用 | ✅ | `runtime/SnapshotReuser`（§8.2 重组最小化，换肤性能主路径） |
+| 十子系统提供层 | ✅ | `LocalTokens`：`staticCompositionLocalOf` ×10（默认值为 fallback 子系统，未包裹主题也可取到值） |
+| 主题入口 | ✅ | `MiniMeTheme`（同时提供十个 local + M3 `MaterialTheme`）、`MiniMeThemeBootstrap`（Android 接入） |
+| M3 映射层 | ✅ | `m3/M3Mapping`：color→`ColorScheme`、typography→`Typography`、shape→`Shapes`（§9.1 范围声明：仅此三个子系统） |
+
+### 验收逐条（对照 §3 R2 验收原文）
+
+| 验收项 | 状态 | 覆盖 |
+|---|---|---|
+| 换肤 ≤1 个组合 pass | 🟡 仪器测试已写 | `ThemeSwitchInstrumentedTest.identicalThemeDoesNotRecomposeConsumers` / `switchRecomposesChangedSubsystemOnly` |
+| 无 Activity 重建 | 🟡 仪器测试已写 | `themeSwitchDoesNotRecreateContent`（换肤是数据替换，节点仍在） |
+| 冷启动首帧即目标主题 | ✅ JVM 侧 + 🟡 仪器 | `ThemeManagerTest.initializeAppliesPersistedSelectionSynchronously`；仪器 `firstFrameShowsPersistedDarkTheme` |
+| 导入 ≤200ms（典型包） | ✅ 实测 | `CompilePerformanceTest`（JVM p50 2.4ms）+ 仪器 `importTypicalPackWithinBudget` |
+| 相等子系统复用跳过重组 | ✅ JVM 侧 + 🟡 仪器 | `SnapshotReuserTest`（亮→暗 ≥6 个子系统复用）+ `ThemeManagerTest.switchingToDarkReusesUnchangedSubsystemInstances` |
+
+> 🟡 = 已编写并**编译通过**，但需真机/模拟器执行（本机无设备与模拟器）。
+
+### 关键实现决策与偏离（R2）
+
+1. **不做磁盘快照缓存**（偏离 §8.2「内存 + 磁盘」）——实测编译 p50 **2.4ms**（196 条令牌，JVM 桌面，`CompilePerformanceTest` 固化），冷启动在 `setContent` 前同步编译即可满足「首帧即目标主题」；磁盘缓存需新增 TokenValue 序列化层，收益（ms 级）不足以抵消复杂度与出错面。若后续包规模显著增长（>1000 令牌）再引入。
+2. **持久化用 SharedPreferences 而非 DataStore** —— DataStore 是异步 Flow，冷启动 `setContent` 前拿不到值会导致首帧跳变；SP 读同步，满足硬要求。写用 `commit()`（同步落盘）换取进程被杀时选择不丢。
+3. **M3 映射走 `Xxx().copy(...)` 而非全参数构造** —— M3 的 `ColorScheme`/`Typography`/`Shapes` 字段集随 BOM 演进，全参数构造升版即断裂。且 `ColorScheme` 无无参构造，故以 `lightColorScheme()`/`darkColorScheme()` 为基底（按 `bg.canvas` 感知亮度自动选基底），未映射的 M3 角色也跟随主题深浅。
+4. **`staticCompositionLocalOf` 而非 `compositionLocalOf`** —— 换肤是全树数据替换，值变则整树重组是预期行为；static 只记录读了 local 的组合，全局变更更快。
+5. **提供层默认值为 fallback 子系统** —— 任何 composable 未包裹 `MiniMeTheme` 也能取到值（预览与独立组件友好），不静默降级到任意色。
+6. **Android DEX 不允许方法名含空格** —— androidTest 会被 dex 化，故仪器测试方法名一律驼峰；纯 JVM 的 unit test 不经 dex，保留「反引号 + 空格」可读性命名。（D8 报 `Space characters in SimpleName ... are not allowed`）
+7. **android.jar 的 `org.json` 是 stub** —— Android 自带 `org.json`（方法返回 null），会覆盖真实实现并让解析器拿到 null 的 `sets`；`:theme-ui` 的 unit test 与 androidTest 必须显式注入 `org.json:json`。生产环境用平台实现（无需打包）。
+8. **环境**：本机无 Android SDK，已安装 `platforms;android-35` + `build-tools;35.0.0` + `platform-tools` 与 JDK 17（`/opt/android-sdk`，`local.properties` 指向）。
+
+### 已知缺口（R2 不做）
+
+- 无 `:gallery` 模块与可运行 app（R3）；
+- 无运行时覆写层（R4 工坊在其之上叠加）；
+- 系统深浅色监听未内置（由调用方按系统上下文调用 `select(packId, modifiers)`）。
+
+---
+
 ## R1 引擎内核（数据 + 编译）— 已完成，待发版
 
 **引擎版本 `1.0`** ｜ 模块：`:theme-engine`（纯 JVM，零 UI 依赖）｜ 单测：**131 项全绿**

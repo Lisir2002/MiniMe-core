@@ -58,7 +58,7 @@ class SemVerTest {
 
     @Test
     fun `current engine version satisfies its compat range`() {
-        // MiniMeEngine.VERSION = 1.0，区间 >=1.0 <2.0
+        // 引擎版本落在自身兼容区间内（当前 1.1，区间 >=1.0 <2.0）
         val engine = v(org.minime.core.api.MiniMeEngine.VERSION)
         assertTrue(SemVer.satisfies(engine, org.minime.core.api.MiniMeEngine.COMPAT_RANGE))
         assertTrue(SemVer.satisfies(v("1.0"), ">=1.0 <2.0"))

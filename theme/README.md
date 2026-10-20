@@ -13,9 +13,10 @@ MiniMe 主题引擎内核（R1）。纯 JVM 库，零 UI 依赖——可脱离 A
 
 | 模块 | 说明 |
 |---|---|
-| `:theme-engine` | 令牌数据 + DTCG 解析 + 编译器 + 内置 fallback（纯 JVM，JVM 17） |
+| `:theme-engine` | 令牌数据 + DTCG 解析 + 编译器 + 内置 fallback（**纯 JVM**，可脱离 Android 完整单测） |
+| `:theme-ui` | 运行时（`ThemeManager`）+ 十子系统提供层 + M3 映射层（Android library，Compose） |
 
-R2+ 将新增 `:theme-ui`（Android library，Compose 运行时与提供层）。
+R3+ 将新增 `:gallery`（验证页面，首个可运行界面）。
 
 ## 包结构（无环）
 
@@ -34,23 +35,28 @@ compiler  导入期校验 + 合并器 + 别名解析 + 编译器 + 加载器（�
 ## 快速开始
 
 ```kotlin
-val loader = ThemeLoader()
+// —— Application.onCreate：initialize() 必须在 setContent 之前，否则首帧会先 fallback 再跳变 ——
+val manager = MiniMeThemeBootstrap.create(this)
+manager.initialize()
 
-// 1) 内置默认包（light 上下文）
-val light = loader.loadBundledDefault()
+setContent {
+    MiniMeTheme(manager) { App() }   // 首帧即目标主题
+}
 
-// 2) 同一包在 dark / highContrast 等修饰符下编译
-val dark = loader.loadBundledDefault(listOf("dark"))
-val darkHc = loader.loadBundledDefault(listOf("dark", "highContrast"))
+// —— 切换（后台编译 + 节流：连点只让最后一次生效） ——
+manager.select("ocean", listOf("dark"))
 
-// 3) 导入第三方主题包 JSON（失败一律降级为内置 fallback，绝不让 App 处于无主题状态）
-val result = loader.load(json)
-if (result.degraded) log.w("主题降级: ${result.error?.code} ${result.error?.message}")
-result.warnings.forEach { log.w("导入警告: ${it.code} ${it.message}") }
+// —— 消费：十子系统提供层（组件唯一消费面） ——
+@Composable
+fun Card(…) {
+    val color = MiniMeTokens.LocalColor.current
+    val motion = MiniMeTokens.LocalMotion.current
+    …
+}
 
-// 4) 消费：十子系统强类型访问器
-val color = result.snapshot.color
-Text(text = "…", color = color.textPrimary.toComposeColor(), style = result.snapshot.typography.body.toStyle())
+// —— 引擎内核也可单独使用（纯 JVM，无 Android 依赖） ——
+val result = ThemeLoader().load(json)
+if (result.degraded) log.w("主题降级: ${result.error?.code}")
 ```
 
 ## 编译器三规则（白皮书 §5.1）

@@ -15,7 +15,7 @@ package org.minime.core.api
  */
 object MiniMeEngine {
     /** 引擎版本（二段式，逢九进一）。R1 = 1.0，R2 = 1.1 … R10 = 1.9，转正 = 2.0 */
-    const val VERSION: String = "1.0"
+    const val VERSION: String = "1.1"
 
     /** 引擎兼容区间（供主题包 manifest.engineVersion 参照） */
     const val COMPAT_RANGE: String = ">=1.0 <2.0"
