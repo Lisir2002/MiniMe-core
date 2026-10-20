@@ -69,15 +69,6 @@ class McpServerManager @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    fun settingsSnapshot(): McpServerSettings = McpServerSettings(
-        enabled = _isRunning.value || _autoStart.value,
-        port = _port.value,
-        token = _token.value,
-        requireApproval = _requireApproval.value,
-        autoStart = _autoStart.value,
-        allowLan = _allowLan.value
-    )
-
     init {
         scope.launch {
             _port.value = (kv.getInt(MCP_SERVER_NS, MCP_PORT_KEY) ?: DEFAULT_PORT.toLong()).toInt()
@@ -100,12 +91,21 @@ class McpServerManager @Inject constructor(
         }
     }
 
+    fun settingsSnapshot(): McpServerSettings = McpServerSettings(
+        enabled = _isRunning.value || _autoStart.value,
+        port = _port.value,
+        token = _token.value,
+        requireApproval = _requireApproval.value,
+        autoStart = _autoStart.value,
+        allowLan = _allowLan.value
+    )
+
     fun getLocalIpAddress(): String {
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces()
             while (interfaces.hasMoreElements()) {
                 val interfaces2 = interfaces.nextElement()
-                if (interfaces2.isLoopback || !interfaces2.isUp()) continue
+                if (interfaces2.isLoopback || !interfaces2.isUp) continue
                 val addresses = interfaces2.inetAddresses
                 while (addresses.hasMoreElements()) {
                     val address = addresses.nextElement()
