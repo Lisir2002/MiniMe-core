@@ -14,6 +14,8 @@ import kotlinx.serialization.Serializable
  * @param token Bearer token，空串表示不鉴权（不建议）。
  * @param requireApproval 远程调用强制审批总开关（默认开）：开启时即使工具 AUTO_APPROVE 也弹审批。
  * @param autoStart App 启动时自动拉起服务。
+ * @param allowLan 是否绑定 0.0.0.0 暴露给局域网（默认 false，仅绑回环 127.0.0.1）。
+ *   需用户显式开启；开启即对全网卡明文暴露（token 鉴权 + requireApproval 仍生效）。
  */
 @Serializable
 data class McpServerSettings(
@@ -21,5 +23,6 @@ data class McpServerSettings(
     val port: Int = 3000,
     val token: String = "",
     val requireApproval: Boolean = true,
-    val autoStart: Boolean = false
+    val autoStart: Boolean = false,
+    val allowLan: Boolean = false
 )

@@ -26,6 +26,7 @@ const val MCP_PORT_KEY = "port"
 const val MCP_TOKEN_KEY = "token"
 const val MCP_REQUIRE_APPROVAL_KEY = "require_approval"
 const val MCP_AUTO_START_KEY = "auto_start"
+const val MCP_ALLOW_LAN_KEY = "allow_lan"
 
 /** 内置 MCP 服务器服务管理。 */
 @Singleton
@@ -58,6 +59,10 @@ class McpServerManager @Inject constructor(
     private val _autoStart = MutableStateFlow(false)
     val autoStart: StateFlow<Boolean> = _autoStart.asStateFlow()
 
+    // 是否允许局域网访问（默认 false → 仅绑回环 127.0.0.1）。true 时绑 0.0.0.0 暴露给局域网。
+    private val _allowLan = MutableStateFlow(false)
+    val allowLan: StateFlow<Boolean> = _allowLan.asStateFlow()
+
     private val _serverUrl = MutableStateFlow("")
     val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
 
@@ -69,7 +74,8 @@ class McpServerManager @Inject constructor(
         port = _port.value,
         token = _token.value,
         requireApproval = _requireApproval.value,
-        autoStart = _autoStart.value
+        autoStart = _autoStart.value,
+        allowLan = _allowLan.value
     )
 
     init {
@@ -77,6 +83,7 @@ class McpServerManager @Inject constructor(
             _port.value = (kv.getInt(MCP_SERVER_NS, MCP_PORT_KEY) ?: DEFAULT_PORT.toLong()).toInt()
             _requireApproval.value = kv.getBool(MCP_SERVER_NS, MCP_REQUIRE_APPROVAL_KEY) ?: true
             _autoStart.value = kv.getBool(MCP_SERVER_NS, MCP_AUTO_START_KEY) ?: false
+            _allowLan.value = kv.getBool(MCP_SERVER_NS, MCP_ALLOW_LAN_KEY) ?: false
 
             var savedToken = kv.getString(MCP_SERVER_NS, MCP_TOKEN_KEY)
             if (savedToken.isNullOrBlank()) {
@@ -98,7 +105,7 @@ class McpServerManager @Inject constructor(
             val interfaces = NetworkInterface.getNetworkInterfaces()
             while (interfaces.hasMoreElements()) {
                 val interfaces2 = interfaces.nextElement()
-                if (interfaces2.isLoopback || !interfaces2.isUp) continue
+                if (interfaces2.isLoopback || !interfaces2.isUp()) continue
                 val addresses = interfaces2.inetAddresses
                 while (addresses.hasMoreElements()) {
                     val address = addresses.nextElement()
@@ -114,7 +121,8 @@ class McpServerManager @Inject constructor(
     }
 
     private fun updateServerUrl() {
-        val ip = getLocalIpAddress()
+        // 未开启「允许局域网」时展示回环地址，与实际绑定（127.0.0.1）一致，避免误导用户以为已暴露。
+        val ip = if (_allowLan.value) getLocalIpAddress() else "127.0.0.1"
         _serverUrl.value = "http://$ip:${_port.value}/mcp"
     }
 
@@ -131,6 +139,20 @@ class McpServerManager @Inject constructor(
         kv.putBool(MCP_SERVER_NS, MCP_REQUIRE_APPROVAL_KEY, requireApproval)
         kv.putBool(MCP_SERVER_NS, MCP_AUTO_START_KEY, autoStart)
 
+        if (wasRunning) startServerInternal()
+    }
+
+    /**
+     * 切换「允许局域网访问」（默认关）。开启后服务绑定 0.0.0.0 暴露给局域网（token 鉴权 +
+     * requireApproval 仍生效），关闭则仅绑回环 127.0.0.1。变更即时重启服务生效。
+     */
+    suspend fun setAllowLan(enabled: Boolean) = withContext(Dispatchers.IO) {
+        if (_allowLan.value == enabled) return@withContext
+        val wasRunning = _isRunning.value
+        if (wasRunning) stopServerInternal()
+        _allowLan.value = enabled
+        kv.putBool(MCP_SERVER_NS, MCP_ALLOW_LAN_KEY, enabled)
+        updateServerUrl()
         if (wasRunning) startServerInternal()
     }
 
@@ -174,7 +196,8 @@ class McpServerManager @Inject constructor(
             stopServerInternal()
             val adapter = AgentToolMcpAdapter(toolRegistry, permissionManager, requireApproval = _requireApproval.value)
             val settings = McpServerSettings(enabled = true, port = _port.value, token = _token.value,
-                requireApproval = _requireApproval.value, autoStart = _autoStart.value)
+                requireApproval = _requireApproval.value, autoStart = _autoStart.value,
+                allowLan = _allowLan.value)
             val server = McpHttpServer(settings = settings, session = McpServerSession(adapter))
             val ok = server.start()
             if (ok) {
@@ -194,7 +217,8 @@ class McpServerManager @Inject constructor(
 
     private suspend fun stopServerInternal() {
         try {
-            httpServer?.stop(); httpServer = null; _isRunning.value = false
+            httpServer?.stop(); httpServer = null
+            _isRunning.value = false
             FileLogger.i(TAG, "内置 MCP 服务器已停止")
         } catch (e: Exception) {
             FileLogger.w(TAG, "停止内置 MCP 服务器出错（忽略）: ${e.message}", e)

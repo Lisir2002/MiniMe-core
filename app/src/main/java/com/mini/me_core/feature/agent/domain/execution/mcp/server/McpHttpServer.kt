@@ -39,7 +39,13 @@ import kotlinx.serialization.json.JsonObject
  * - `GET /mcp`：SSE 保活长连接（客户端拉取服务端推送，首期仅空流保活）。
  * - `DELETE /mcp`：结束会话（返回 200，便于客户端优雅关闭）。
  *
- * 鉴权：每个请求校验 `Authorization: Bearer <token>`（常量时间比较），失败回 401。
+ * 安全（对齐 MCP Streamable HTTP 规范「Security & Endpoint」三条要求）：
+ * - **认证**：每个请求校验 `Authorization: Bearer <token>`（常量时间比较），失败回 401；
+ * - **绑定地址**：默认仅回环 `127.0.0.1`；仅当 [McpServerSettings.allowLan] 为 true 时才绑
+ *   `0.0.0.0`（规范：本地运行应只绑 localhost，而非所有网卡）；
+ * - **DNS 重绑定防护**：请求携带 `Origin` 头一律回 403——本服务合法客户端为非浏览器 MCP
+ *   客户端（不发送 Origin），携带 Origin 的请求来自浏览器页面（含被重绑定的恶意页）。
+ *
  * 配置变更走「重建服务器」生效（见 [McpServerManager]），本类持有一份启动快照。
  */
 class McpHttpServer(
@@ -73,13 +79,17 @@ class McpHttpServer(
     /** 启动 Ktor 服务器。返回是否成功（失败原因记入日志）。 */
     suspend fun start(): Boolean = try {
         stop()
-        val server = embeddedServer(CIO, port = settings.port, host = "0.0.0.0") {
+        // 安全默认：仅绑定回环 127.0.0.1。仅在用户显式开启「允许局域网」时才绑定 0.0.0.0
+        // （所有网卡）——对齐 MCP Streamable HTTP 规范「本地运行应只绑 localhost」与本项目
+        // proxy 的 allow-lan=false 设计，避免默认对局域网 / Wi-Fi 暴露。
+        val host = if (settings.allowLan) "0.0.0.0" else "127.0.0.1"
+        val server = embeddedServer(CIO, port = settings.port, host = host) {
             serverModule()
         }
         server.start(wait = false)
         engine = server
         startCleanupLoop()
-        FileLogger.i(TAG, "MCP 服务器已监听 0.0.0.0:${settings.port}$ENDPOINT")
+        FileLogger.i(TAG, "MCP 服务器已监听 $host:${settings.port}$ENDPOINT")
         true
     } catch (e: Exception) {
         FileLogger.e(TAG, "启动 MCP 服务器失败: ${e.message}", e)
@@ -113,7 +123,7 @@ class McpHttpServer(
                 // 超过上限时移除最旧的
                 while (sessions.size > MAX_SESSIONS) {
                     val oldest = sessions.minByOrNull { it.value } ?: break
-                    sessions.remove(oldest.key)
+                    sessions.remove(oldest)
                     FileLogger.i(TAG, "会话数超上限，移除最旧会话: ${oldest.key}")
                 }
             }
@@ -124,20 +134,15 @@ class McpHttpServer(
         routing {
             route(ENDPOINT) {
                 post {
-                    if (!authenticate(call)) {
-                        call.respondText("Unauthorized", ContentType.Text.Plain, HttpStatusCode.Unauthorized)
-                        return@post
-                    }
+                    if (!guardRequest(call)) return@post
                     handlePost(call)
                 }
                 get {
-                    if (!authenticate(call)) {
-                        call.respondText("Unauthorized", ContentType.Text.Plain, HttpStatusCode.Unauthorized)
-                        return@get
-                    }
+                    if (!guardRequest(call)) return@get
                     handleGet(call)
                 }
                 delete {
+                    if (!guardRequest(call)) return@delete
                     call.respondText("OK", ContentType.Text.Plain, HttpStatusCode.OK)
                 }
             }
@@ -215,5 +220,29 @@ class McpHttpServer(
         val header = call.request.headers[HttpHeaders.Authorization].orEmpty()
         val presented = header.removePrefix("Bearer").trim()
         return McpServerSecurity.isValidToken(settings.token, presented)
+    }
+
+    /**
+     * 统一请求守卫：DNS 重绑定防护 + Bearer 鉴权。POST / GET / DELETE 全部经过。
+     *
+     * - Origin 头存在即回 403：本服务合法客户端为非浏览器 MCP 客户端，不发送 Origin；
+     *   携带 Origin 的请求来自浏览器页面（含被 DNS 重绑定的恶意页），一律挡掉
+     *   （MCP Streamable HTTP 规范「Origin 存在且非法 → 403 Forbidden」）。
+     * - Bearer token 校验（常量时间比较），失败回 401。
+     *
+     * @return true 放行；false 表示已写错误响应，调用方应直接 return。
+     */
+    private suspend fun guardRequest(call: ApplicationCall): Boolean {
+        val origin = call.request.headers[HttpHeaders.Origin]
+        if (!origin.isNullOrBlank()) {
+            FileLogger.w(TAG, "拒绝携带 Origin 头的请求（DNS 重绑定防护）: $origin")
+            call.respondText("Forbidden", ContentType.Text.Plain, HttpStatusCode.Forbidden)
+            return false
+        }
+        if (!authenticate(call)) {
+            call.respondText("Unauthorized", ContentType.Text.Plain, HttpStatusCode.Unauthorized)
+            return false
+        }
+        return true
     }
 }
