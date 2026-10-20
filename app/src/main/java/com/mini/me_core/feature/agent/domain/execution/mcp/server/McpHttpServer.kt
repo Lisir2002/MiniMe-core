@@ -123,7 +123,7 @@ class McpHttpServer(
                 // 超过上限时移除最旧的
                 while (sessions.size > MAX_SESSIONS) {
                     val oldest = sessions.minByOrNull { it.value } ?: break
-                    sessions.remove(oldest)
+                    sessions.remove(oldest.key)
                     FileLogger.i(TAG, "会话数超上限，移除最旧会话: ${oldest.key}")
                 }
             }
