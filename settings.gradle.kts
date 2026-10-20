@@ -3,7 +3,9 @@ pluginManagement {
         google()
         mavenCentral()
         gradlePluginPortal()
-        maven { url = uri("https://jitpack.io") }
+        // 注：原此处声明了 https://jitpack.io，但项目无任何 jitpack（com.github.*）插件 /
+        // 依赖使用它，属未用的第三方仓库（扩大供应链面）。按安全审计建议移除；
+        // 如将来确需 jitpack 产物再恢复。
     }
     resolutionStrategy {
         eachPlugin {
@@ -36,7 +38,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url = uri("https://jitpack.io") }
+        // 注：原此处声明了 https://jitpack.io，但全项目无 com.github.* 依赖，属未用仓库，
+        // 按安全审计建议移除。如将来确需再恢复。
     }
 }
 rootProject.name = "app"
