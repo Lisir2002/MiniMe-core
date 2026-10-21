@@ -50,3 +50,10 @@ include(":terminal-view")
 include(":logviewer-app")
 include(":lint-checks")
 include(":app-template")
+
+// 主题引擎（theme/ 子树仓库：R1–R3.5 已交付，R4+ 滚动迭代；白皮书 §4.2 / §10）。
+// 三模块均为 library，:app 暂不依赖——引擎按接入期排期进入主程序 UI（存量迁移属接入期）。
+// 模块路径前缀 theme:（如 :theme:theme-ui）；构建配置统一走根版本目录与本 wrapper（Gradle 8.14）。
+include(":theme:theme-engine")
+include(":theme:theme-ui")
+include(":theme:minime-ui")

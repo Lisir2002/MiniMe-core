@@ -1,11 +1,13 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
+    id("com.android.library")
+    kotlin("android")
+    kotlin("plugin.compose")
 }
 
 // R2：运行时 + 提供层 + M3 映射（Android library）。
-// 引擎内核（:theme-engine）保持纯 JVM，可脱离 Android 完整单测；本模块只做「平台接线」。
+// 引擎内核（:theme-engine，路径 :theme:theme-engine）保持纯 JVM，可脱离 Android 完整单测；
+// 本模块只做「平台接线」。插件无版本声明——版本由主程序根 build.gradle.kts 统一管理
+// （AGP 8.9.3 / Kotlin 2.2.21，与 :app 同源）；依赖版本走主程序 gradle/libs.versions.toml。
 android {
     namespace = "org.minime.core.ui"
     compileSdk = 35
@@ -38,13 +40,13 @@ kotlin {
 }
 
 dependencies {
-    api(project(":theme-engine"))
+    api(project(":theme:theme-engine"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
-    implementation(libs.androidx.material3)
+    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.core.ktx)
 
     implementation(libs.kotlinx.coroutines.core)
@@ -52,7 +54,7 @@ dependencies {
 
     // android.jar 自带 org.json **stub**（方法返回 null），会覆盖真实实现并让解析器拿到 null 的 sets。
     // 生产环境用平台 org.json（Android 自带），单元测试必须显式注入真实实现。
-    testImplementation(libs.org.json)
+    testImplementation(libs.json)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlinx.coroutines.test)
 
@@ -61,7 +63,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
-    androidTestImplementation(libs.org.json) // android.jar 的 org.json 是 stub，必须注入真实实现
+    androidTestImplementation(libs.json) // android.jar 的 org.json 是 stub，必须注入真实实现
     androidTestImplementation(libs.kotlinx.coroutines.test)
     testRuntimeOnly(libs.junit.platform.launcher)
 }

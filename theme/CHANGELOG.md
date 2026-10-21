@@ -66,6 +66,40 @@
 
 ---
 
+## R4 期工程：subtree 集成 MiniMe-core 主程序仓库 — 已完成，待发版
+
+**引擎版本 `1.2`（不变）** ｜ 2026-10-21 维护者裁定：引擎代码以 `git subtree` 形态合入主程序仓库 `Lisir2002/MiniMe-core` 的 `theme/` 子目录——单一 main、引擎 4 个提交历史完整保留、主程序构建统一管理
+**集成前状态**：引擎在本地独立 git 仓库开发（4 提交从未推送）；裁定后删独立脚手架、改构建路径、并主程序 catalog 与 settings
+
+### 集成改动清单
+
+| # | 改动 | 说明 |
+|---|---|---|
+| 1 | subtree 合入 | `git subtree add --prefix=theme/ . main`，merge commit 保历史；引擎原有 `settings.gradle.kts`/`gradle/`/`gradlew`/`gradle.properties` 独立脚手架全部删除——构建统一走主程序根 |
+| 2 | 插件声明改直接式 | 三模块 `alias(libs.plugins.*)` → `id(...) version "..."`（AGP 8.9.3 / Kotlin 2.2.21，与主程序根 `build.gradle.kts` 同源；主程序 `settings.gradle.kts` 的 `pluginManagement.resolutionStrategy` 负责插件模块映射） |
+| 3 | 模块路径 | `project(":theme-engine")` → `project(":theme:theme-engine")`；`project(":theme-ui")` → `project(":theme:theme-ui")` |
+| 4 | 版本目录统一 | 引擎依赖全部改走主程序 `gradle/libs.versions.toml`：新增 11 条（junit-jupiter / junit-platform-launcher / junit-vintage-engine / robolectric / androidx-test-ext-junit / androidx-test-runner / kotlinx-coroutines-test / androidx-core-ktx / androidx-compose-runtime / androidx-compose-foundation / androidx-compose-ui-test-junit4）；org.json 复用主 catalog `libs.json`（20240303）；`androidx-material3` 更名对齐主 catalog `androidx-compose-material3` |
+| 5 | settings include | 主程序 `settings.gradle.kts` 增 `:theme:theme-engine` / `:theme:theme-ui` / `:theme:minime-ui`；`:app` 暂不依赖引擎（接入期排期） |
+| 6 | compileSdk 差异 | 引擎三模块保持 **35**（主程序 app 为 36）：CI 门禁只构建 `:app`（`compileReleaseKotlin` + `testReleaseUnitTest` + `lintRelease`），不触碰引擎模块 SDK 校验；将来引擎进 CI 时统一 36（无 API 差异） |
+
+### 验收逐条
+
+| 验收项 | 状态 | 覆盖 |
+|---|---|---|
+| 全项目配置加载（catalog 引用 / 模块脚本 / 插件映射） | ✅ | 主 wrapper（Gradle 8.14）`help` 通过 |
+| 引擎 178 项单测在主程序构建下全绿 | ✅ | `:theme:theme-engine:test` 134 + `:theme:theme-ui:testDebugUnitTest` 37 + `:theme:minime-ui:testDebugUnitTest` 7 |
+| `:app` 侧零影响 | ✅ | 未改 `:app` 任何配置；CI 门禁任务不变 |
+| 引擎历史完整可溯 | ✅ | `git log theme/` 可见 R1–R3.5 全部提交 |
+
+### 关键实现决策与偏离（集成）
+
+1. **编译走主程序 wrapper 8.14 而非引擎本地 9.3.0**——一个构建只能一个 Gradle 版本；AGP 8.9.3 在 8.14 下与 9.3.0 行为一致（已验证 178 项全绿）。
+2. **删引擎独立脚手架而非保留双构建**——子目录 `settings.gradle.kts` 会被 IDE/工具误识别为独立构建，保留即双真源；统一构建是 subtree 集成的目的。
+3. **catalog 命名向主程序对齐**（`androidx-compose-material3` 等）——主 catalog 是全构建唯一版本目录，命名不一致会造成「同名不同义」的维护陷阱。
+4. **`:app` 不依赖引擎模块**——引擎 R6+ 才进入主程序 UI；提前依赖会让主程序 CI 背上 178 项与 Robolectric（用户已被告知并选择「CI 只跑 :app」的轻形态；引擎测试由本地/引擎 CI 跑）。
+
+---
+
 ## R3.5 结构重整：Gallery 嵌入主程序（`:gallery` → `:minime-ui`）— 已完成，待发版
 
 **引擎版本 `1.2`（不变）** ｜ 结构变更：删除 `:gallery`（Android application），新增 `:minime-ui`（Android library）——**本仓库从此无任何 application 模块，不再产出可装机 APK**

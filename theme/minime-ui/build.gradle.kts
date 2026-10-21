@@ -1,7 +1,7 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
+    id("com.android.library")
+    kotlin("android")
+    kotlin("plugin.compose")
 }
 
 // R3.5：minime-ui——MiniMe 主程序的 UI 层引擎（白皮书 §10 Design Gallery 的可嵌入形态）。
@@ -14,7 +14,10 @@ plugins {
 // 2. 状态外置——ThemeManager 由宿主创建并传入（DebugPanelSection(manager)），库不建单例；
 // 3. 零 Context 持有——库代码不得引用 Context / Activity / Application；
 // 4. 可选聚合部件——nav/ 侧边栏与顶栏是「参考导航」，接入方通常自备导航；
-// 5. 禁第二套实现——组件与绘制原语一律 import :theme-ui（§10.1 硬纪律 1）。
+// 5. 禁第二套实现——组件与绘制原语一律 import :theme-ui（路径 :theme:theme-ui，§10.1 硬纪律 1）。
+//
+// 集成说明（subtree 合入主程序）：插件无版本声明——版本由主程序根 build.gradle.kts
+// 统一管理（AGP 8.9.3 / Kotlin 2.2.21）；依赖版本统一走主程序 gradle/libs.versions.toml。
 android {
     namespace = "org.minime.core.ui.gallery"
     compileSdk = 35
@@ -62,13 +65,13 @@ androidComponents {
 }
 
 dependencies {
-    api(project(":theme-ui"))
+    api(project(":theme:theme-ui"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
-    implementation(libs.androidx.material3)
+    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
 
@@ -78,7 +81,7 @@ dependencies {
     // ---- JVM 单元测试（无需设备） ----
     // 1) 令牌覆盖机器核对（§10.3：展示清单 × 词汇表双向集合相等）
     testImplementation(libs.junit.jupiter)
-    testImplementation(libs.org.json)
+    testImplementation(libs.json)
     testImplementation(libs.kotlinx.coroutines.test)
     testRuntimeOnly(libs.junit.platform.launcher)
 

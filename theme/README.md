@@ -124,27 +124,32 @@ if (result.degraded) log.w("主题降级: ${result.error?.code}")
 
 ## 构建与测试
 
+> 本目录是 **MiniMe-core 主程序仓库的子树**（`git subtree`，历史与独立开发期完整保留）。
+> 引擎三模块的 Gradle 路径带 `:theme:` 前缀，构建配置统一走**主程序根**的
+> `gradle/libs.versions.toml` 与 wrapper（Gradle 8.14）——在仓库根执行：
+
 ```bash
-gradle test                     # 三模块全部单测（178 项，JVM 自包含，无需设备）
-gradle :minime-ui:assembleDebug # 产出 AAR：minime-ui/build/outputs/aar/minime-ui-debug.aar
-gradle :minime-ui:lintDebug     # lint（abortOnError = true）
+./gradlew :theme:theme-engine:test          # 纯 JVM（134 项，无需设备）
+./gradlew :theme:theme-ui:testDebugUnitTest # Android library（37 项）
+./gradlew :theme:minime-ui:testDebugUnitTest # 令牌覆盖 + Robolectric（7 项）
+./gradlew :theme:minime-ui:lintDebug        # lint（abortOnError = true）
 ```
 
-| 模块 | 单测 | 说明 |
+| 模块（仓库内路径） | 单测 | 说明 |
 |---|---|---|
-| `:theme-engine` | 134 | 纯 JVM（结果在 `build/test-results/test/`） |
-| `:theme-ui` | 37 | Android library（`testDebugUnitTest`，含 squircle 数学 9 项） |
-| `:minime-ui` | 7 | `TokenCoverageTest` 3（172 条双向集合相等）+ `GalleryEmbedRobolectricTest` 4（Robolectric + Compose UI 测试：侧边栏可达 / A/B 并排 / 主题切换 / 全量滚动） |
+| `:theme:theme-engine` | 134 | 纯 JVM（结果在 `theme/theme-engine/build/test-results/test/`） |
+| `:theme:theme-ui` | 37 | Android library（`testDebugUnitTest`，含 squircle 数学 9 项） |
+| `:theme:minime-ui` | 7 | `TokenCoverageTest` 3（172 条双向集合相等）+ `GalleryEmbedRobolectricTest` 4（Robolectric + Compose UI 测试：侧边栏可达 / A/B 并排 / 主题切换 / 全量滚动） |
 
-> `:minime-ui` 的 Compose UI 测试只跑 **debug 变体**（release 变体已禁用单测：测试载体清单 `ui-test-manifest` 仅 debug 生效）。Robolectric 屏幕配置 `w840dp-h800dp`（Robolectric 无真实字体度量，默认小屏放不下侧边栏六项）。
+合计 **178 项**。`:theme:minime-ui` 的 Compose UI 测试只跑 **debug 变体**（release 变体已禁用单测：测试载体清单 `ui-test-manifest` 仅 debug 生效）。Robolectric 屏幕配置 `w840dp-h800dp`（Robolectric 无真实字体度量，默认小屏放不下侧边栏六项）。
 
-> 沙箱内 `./gradlew` 需下载 Gradle 发行版（网络受限）；本机已装 Gradle 9.3.0 时直接用 `gradle`。
+> compileSdk：引擎三模块为 **35**（主程序 app 为 36）——CI 只构建 `:app`（ci.yml 门禁为 `:app:compileReleaseKotlin` + `:app:testReleaseUnitTest` + `lintRelease`），不触碰引擎模块的 SDK 校验；引擎测试由本地或引擎专属 CI 跑。将来引擎模块进入 CI 门禁时，把三处 `compileSdk` 统一为 36 即可（无 API 依赖差异）。
 
 ## 版本（三条线，互不干扰）
 
 | 线 | 格式 | 当前取值 |
 |---|---|---|
-| **软件发版版本**（git tag / Release） | **四段式 `x.x.x.x`**（项目规范：A=颠覆性预留 / B=框架级结构性预留 / C=框架级重构 / **D=默认发版 +1**） | 体系 `0.0.1.x`，已发至 `v0.0.1.10`；**R3.5 待维护者确认后发版** |
+| **软件发版版本**（git tag / Release） | **四段式 `x.x.x.x`**（项目规范：A=颠覆性预留 / B=框架级结构性预留 / C=框架级重构 / **D=默认发版 +1**） | 主程序体系 `0.0.1.x`，已发至 `v0.0.1.10`；**引擎 R3.5 待维护者确认后随主程序发版** |
 | **引擎版本** `MiniMeEngine.VERSION` | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.2`（`ThemeCompiler.ENGINE_VERSION` 同源） |
 | 主题包版本 `manifest.version` | 自由 | 默认包 `1.0.0` |
 
@@ -161,5 +166,7 @@ gradle :minime-ui:lintDebug     # lint（abortOnError = true）
 
 ```bash
 # ① 先向维护者确认版本号  ② 只在 main 主线上打 tag（严禁功能分支发版）
+# 引擎随主程序仓库一同发版：tag 打在 MiniMe-core 主程序仓库（本目录为其 theme/ 子树），
+# 引擎版本 MiniMeEngine.VERSION 是独立的兼容性线，不占软件发版版本号。
 git tag -a v0.0.1.11 -m "…"
 ```
