@@ -37,6 +37,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.Android
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Terminal
@@ -502,6 +503,15 @@ private fun groups(): List<SidebarGroup> = listOf(
                 route = "git",
                 iconBgLight = Color(0xFFF97316),
                 iconBgDark = Color(0xFFC2410C),
+            ),
+            SidebarEntry(
+                icon = Icons.Rounded.Palette,
+                labelRes = R.string.right_sidebar_theme_gallery,
+                route = "theme_gallery",
+                // 新主题引擎演示入口：玫红图标块，与现有绿/青/紫/橙/天蓝全区分。
+                // 演示页与旧主题引擎完全隔离、相互不影响（R4 接入期第一批）。
+                iconBgLight = Color(0xFFF43F5E),
+                iconBgDark = Color(0xFFBE123C),
             ),
         ),
     ),

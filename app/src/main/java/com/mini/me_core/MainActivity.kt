@@ -806,6 +806,13 @@ fun AppNavigation(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
+            // 新主题引擎演示（R4 接入期第一批）：自研主题引擎 Design Gallery。
+            // 与旧主题引擎完全隔离、相互不影响——引擎子树自带主题作用域，
+            // ThemeManager 由演示页 ViewModel 独享；返回走系统返回键（无应用内
+            // 返回钮，与聊天主屏一致）；本路由无敏感内容，不进 FLAG_SECURE 名单。
+            composable("theme_gallery") {
+                com.mini.me_core.feature.themegallery.presentation.ThemeGalleryScreen()
+            }
             composable("browser") {
                 com.mini.me_core.feature.browser.presentation.ServiceBrowserScreen(
                     browserController = browserController,

@@ -2629,7 +2629,6 @@
     <string name="right_sidebar_git">Git Management</string>
     <string name="right_sidebar_theme_gallery">New Theme Engine Demo</string>
     <string name="right_sidebar_settings">Settings</string>
-    <string name="theme_gallery_back">Back</string>
 
     <!-- Crash & ANR monitor -->
     <string name="crash_clear_confirm_title">Clear crash records</string>
