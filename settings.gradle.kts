@@ -52,7 +52,8 @@ include(":lint-checks")
 include(":app-template")
 
 // 主题引擎（theme/ 子树仓库：R1–R3.5 已交付，R4+ 滚动迭代；白皮书 §4.2 / §10）。
-// 三模块均为 library，:app 暂不依赖——引擎按接入期排期进入主程序 UI（存量迁移属接入期）。
+// 三模块均为 library；:app 经 :theme:minime-ui 依赖（Design Gallery 演示页，
+// R4 接入期第一批——与旧主题引擎完全隔离，互不影响；存量 UI 迁移仍属接入期）。
 // 模块路径前缀 theme:（如 :theme:theme-ui）；构建配置统一走根版本目录与本 wrapper（Gradle 8.14）。
 include(":theme:theme-engine")
 include(":theme:theme-ui")

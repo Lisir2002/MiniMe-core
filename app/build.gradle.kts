@@ -566,6 +566,11 @@ dependencies {
     implementation(project(":terminal-emulator"))
     implementation(project(":terminal-view"))
 
+    // 自研主题引擎 Design Gallery 演示页（theme/ 子树，R4 接入期第一批）。
+    // 经 api 传递链得 theme-ui → theme-engine 全部公开类型；仅演示页消费，
+    // 与主程序旧主题引擎（com.mini.me_core.core.theme）完全隔离，互不影响。
+    implementation(project(":theme:minime-ui"))
+
     // Material Icons
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)

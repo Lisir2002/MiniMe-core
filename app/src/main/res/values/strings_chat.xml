@@ -152,6 +152,9 @@
     <string name="right_sidebar_browser">内置浏览器</string>
     <string name="right_sidebar_packager">应用打包器</string>
     <string name="right_sidebar_git">Git 管理</string>
+    <string name="right_sidebar_theme_gallery">新主题引擎演示</string>
+    <!-- 新主题引擎演示页（Design Gallery，theme/ 子树）：与旧主题引擎完全隔离，正式版可见 -->
+    <string name="theme_gallery_back">返回</string>
     <string name="right_sidebar_settings">设置</string>
     <string name="chat_copy_code">复制代码</string>
     <string name="chat_copy_command">复制命令</string>
