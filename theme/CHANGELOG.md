@@ -5,7 +5,7 @@
 | 线 | 谁定 | 格式 | 当前取值 |
 |---|---|---|---|
 | **软件发版版本**（git tag / Release） | **维护者确认** | **四段式 `x.x.x.x`**，A=颠覆性预留 / B=框架级结构性预留 / C=框架级重构 / **D=默认发版 +1** | 体系 `0.0.1.x`，已发至 `v0.0.1.10` |
-| **引擎版本**（`MiniMeEngine.VERSION`） | 引擎自定 | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.2`（R3） |
+| **引擎版本**（`MiniMeEngine.VERSION`） | 引擎自定 | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.2`（R3；R3.5 纯结构重整不变） |
 | 主题包版本（`manifest.version`） | 主题作者自定 | 自由 | 默认包 `1.0.0` |
 
 ### 发版三条硬规矩（2026-10-21 维护者裁定）
@@ -66,7 +66,65 @@
 
 ---
 
+## R3.5 结构重整：Gallery 嵌入主程序（`:gallery` → `:minime-ui`）— 已完成，待发版
+
+**引擎版本 `1.2`（不变）** ｜ 结构变更：删除 `:gallery`（Android application），新增 `:minime-ui`（Android library）——**本仓库从此无任何 application 模块，不再产出可装机 APK**
+单测：**:theme-engine 134 + :theme-ui 37 + :minime-ui 7 = 178 项全绿** ｜ 门禁形态：仪器测试 9 项 **整体退役**，等价覆盖改为 **Robolectric JVM 自包含**（无需设备，CI/本地可跑）
+**软件发版状态：未发版** —— 按规矩须先向维护者确认版本号后再打 tag。
+
+### 交付范围（2026-10-21 维护者三板裁定落地）
+
+| 裁定 | 落地 |
+|---|---|
+| ① 新层定名 `minime-ui`（不叫 gallery-ui） | 模块 `:minime-ui`，`namespace = org.minime.core.ui.gallery` |
+| ② 按接入方真实消费形态整理（= MiniMe-core 主程序的旧版 UI 层引擎） | library 形态 + API 五原则（见白皮书 §10.1.1） |
+| ③ 不做独立 UI App，只做主程序内置的示例页面群 | `:gallery` 整体删除（app 壳 / MainActivity / res / manifest / androidTest） |
+
+### 搬迁明细（git mv 保历史，11 文件）
+
+| 原（`:gallery`，`org.minime.gallery`） | 新（`:minime-ui`，`org.minime.core.ui.gallery`） |
+|---|---|
+| `sections/` ×5（SectionContent / TokensOverviewSection / TokenOverviewSpec / DebugPanelSection / PlaceholderSection） | `pages/` ×5（**页面即单元**，函数名保留） |
+| `GalleryIcons.kt` / `ThemeModifiers.kt` | 库根包 |
+| `GallerySidebar.kt` / `GalleryTopBar.kt` | `nav/` 包（**可选聚合部件**：参考导航，非库内导航状态） |
+| `nav/GallerySection.kt` | `nav/GallerySection.kt`（`icon()` internal 扩展随迁） |
+| `src/test/.../sections/TokenCoverageTest.kt` | `src/test/.../pages/TokenCoverageTest.kt`（JVM 照跑） |
+
+### 验收逐条
+
+| 验收项 | 状态 | 覆盖 |
+|---|---|---|
+| 页面群 + 导航部件整体可用 | ✅ JVM | `GalleryEmbedRobolectricTest`（4 项）：侧边栏可达全部已建分区（六分区逐个点击 + 标记文本断言） |
+| squircle vs 几何圆角 A/B 并排 | ✅ JVM | `squircle与几何圆角AB并排展示`（配对断言：两类标签均存在且数量相等） |
+| 顶栏主题入口切换真实生效 | ✅ JVM | `顶栏主题入口切换真实生效`（点「切换亮暗色」→ 断言「包版本 1.0.0 · dark」） |
+| 令牌页全量滚动无崩溃 | ✅ JVM | `令牌页全量滚动无崩溃`（10 次滚到页脚） |
+| 令牌区与 §6.1.4 总表机器核对 | ✅ JVM | `TokenCoverageTest`（3 项，172 条双向集合相等） |
+| 全量测试门禁 | ✅ | `gradle test` → 178 项 0 失败；`:minime-ui:lintDebug`（abortOnError）通过；`:minime-ui:assembleDebug` AAR 正常 |
+| 包名零残留 | ✅ | 全仓扫描 `org.minime.gallery` 零命中 |
+
+### 关键实现决策与偏离（R3.5）
+
+1. **删独立 App**（偏离 R3 的「首个可装机界面」定位）——维护者裁定 Gallery 嵌入主程序、不做单独 UI App；`:gallery` application 整体删除，app 壳（GalleryApplication / MainActivity / res / manifest）不留。后果：本仓库不再有可装机产物，R3 产出的 11MB APK 作废（未发版，无tag，无损失）。
+2. **API 五原则**（白皮书新增 §10.1.1）：页面即单元（库内无导航状态）/ 状态外置（ThemeManager 宿主注入，initialize 先于首帧）/ 零 Context 持有 / 可选聚合部件（nav/ 侧边栏顶栏是参考导航）/ 禁第二套实现。
+3. **仪器测试 → Robolectric 移植**——删 app 后仪器测试失去 LAUNCHER 载体；整体移植为 JVM 自包含（`createComposeRule` + `RobolectricTestRunner`，vintage engine 跑在 JUnit Platform 下）。原 9 项中 4 项导航/A/B 由 `GalleryEmbedRobolectricTest` 等价覆盖（R2 换肤 5 项仍属接入期，随主程序 UI 落地）。
+4. **`unitTests.isIncludeAndroidResources = true` + 官方 `ui-test-manifest`**——library 模块默认 false，Robolectric 会落到默认清单导致 ComponentActivity 无法解析；自建 debug 清单会与官方载体 manifest merger 冲突（exported 属性），故只用官方 `debugImplementation(libs.androidx.compose.ui.test.manifest)`。
+5. **release 变体禁用单测**——`ui-test-manifest` 仅 debug 生效，release 跑 UI 测试必失败；`androidComponents.beforeVariants(selector().withBuildType("release")) { enableUnitTest = false }`，Compose UI 测试只跑 debug 变体（`testReleaseUnitTest` 任务已不存在）。
+6. **Robolectric 无真实字体度量**——文本测得偏大使侧栏项偏高，默认 470dp 屏高放不下 6 个分区（后两项零高、点击落空）；`@Config(qualifiers = "w840dp-h800dp")` 解决。
+7. **`hasText` 默认精确匹配坑**——移植时缩短断言串导致 `performScrollToNode` 找不到节点；全部改 `substring = true`。
+8. **包名归位 `org.minime.core.ui.gallery`**——与模块定位（主程序 UI 层引擎的示例面）一致；`sections` → `pages` 更名同步体现「页面即单元」。
+9. **版本线不动**——纯结构重整，引擎版本维持 `1.2`（不发版、不打 tag，等维护者确认版本号）。
+
+### 已知缺口（R3.5 不做）
+
+- 真机验收仍缺设备：Robolectric 只覆盖逻辑与语义树，真机观感 / 掉帧测量待接入主程序后随真机批次执行；
+- 组件 / 原型 / 动效 / 工坊四分区仍为占位页（R6–R9）；
+- 工坊分区（R4）的覆写层在 `:minime-ui` 落地时须遵守状态外置原则（宿主注入 ThemeManager）。
+
+---
+
 ## R3 画廊骨架 + 令牌总览 + squircle — 已完成，待发版
+
+> **已被 R3.5 接替**：本批的 `:gallery` application 形态与可装机 APK 在 2026-10-21 维护者裁定后作废（未发版、无 tag、无损失）；页面群整体搬迁至 `:minime-ui` library，见下节 R3.5。本批的引擎侧成果（squircle / 令牌总览 / 调试面板 / 覆盖测试）全部保留。
 
 **引擎版本 `1.2`** ｜ 新增模块：`:gallery`（Android application，minSdk 26 / targetSdk 35）
 单测：**:theme-engine 134 + :theme-ui 37 + :gallery 3 = 174 项全绿** ｜ 仪器测试：**9 项已编写（R2 5 + R3 4）并编译通过，需真机运行**

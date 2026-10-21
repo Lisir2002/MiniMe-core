@@ -1,6 +1,6 @@
 # minime-core
 
-MiniMe 主题引擎内核（R3）。引擎纯 JVM 零 UI 依赖，可脱离 Android 完整单测；R3 起新增首个可装机界面 `:gallery`。
+MiniMe 主题引擎内核（R3.5）。引擎纯 JVM 零 UI 依赖，可脱离 Android 完整单测；示例页面群落 `:minime-ui`（library，嵌入主程序，**本仓库无 application 模块、无可装机产物**）。
 
 对应设计文档：
 
@@ -15,7 +15,7 @@ MiniMe 主题引擎内核（R3）。引擎纯 JVM 零 UI 依赖，可脱离 Andr
 |---|---|
 | `:theme-engine` | 令牌数据 + DTCG 解析 + 编译器 + 内置 fallback（**纯 JVM**，可脱离 Android 完整单测） |
 | `:theme-ui` | 运行时（`ThemeManager`）+ 十子系统提供层 + M3 映射层 + 绘制原语（`draw` 包：squircle / 连续圆角 / 发丝线） |
-| `:gallery` | 验证页面 app（Android application）：侧边栏导航 + 令牌总览（172 条逐行）+ squircle A/B + 调试面板，**首个可装机界面** |
+| `:minime-ui` | 示例页面群（Android library，`org.minime.core.ui.gallery`）：`pages/` 六个分区页面 + `nav/` 可选导航部件（侧边栏 / 顶栏，参考导航）。**嵌入主程序使用**，页面即单元、状态外置、零 Context 持有（白皮书 §10.1.1 五原则） |
 
 ## 包结构（无环）
 
@@ -33,7 +33,7 @@ compiler  导入期校验 + 合并器 + 别名解析 + 编译器 + 加载器（�
 
 `:theme-ui` 内 `draw` 包 = 自绘原语单一真源：`SquircleMath`（lamé 超椭圆纯数学，JVM 可测）+ `ContinuousCornerShape`（Path LRU 缓存，只读契约）+ `drawHairline`（发丝线，厚度取自 `elevation.hairline`）。组件族 R6–R9 复用，禁第二套实现。
 
-## Gallery 分区（白皮书 §10）
+## Gallery 分区（白皮书 §10，落 `:minime-ui` 的 `pages/`）
 
 | 分区 | 状态 | 内容 |
 |---|---|---|
@@ -42,6 +42,7 @@ compiler  导入期校验 + 合并器 + 别名解析 + 编译器 + 加载器（�
 | 组件目录 / 页面原型 / 动效检验 / 主题工坊 | ⏳ 占位 | R6 / R8 / R5 / R4 依次落地 |
 
 导航：宽屏（≥840dp）右侧边栏常驻；窄屏顶栏菜单开抽屉。顶栏主题入口常驻可见（D10）。
+侧边栏与顶栏在 `nav/` 包作为**可选聚合部件**交付——宿主可整体采用，也可只取页面自组导航（D12）。
 
 ## 快速开始
 
@@ -124,17 +125,18 @@ if (result.degraded) log.w("主题降级: ${result.error?.code}")
 ## 构建与测试
 
 ```bash
-gradle test                    # 三模块全部单测（174 项）
-gradle :gallery:assembleDebug  # 产出 APK：gallery/build/outputs/apk/debug/gallery-debug.apk
+gradle test                     # 三模块全部单测（178 项，JVM 自包含，无需设备）
+gradle :minime-ui:assembleDebug # 产出 AAR：minime-ui/build/outputs/aar/minime-ui-debug.aar
+gradle :minime-ui:lintDebug     # lint（abortOnError = true）
 ```
 
 | 模块 | 单测 | 说明 |
 |---|---|---|
 | `:theme-engine` | 134 | 纯 JVM（结果在 `build/test-results/test/`） |
 | `:theme-ui` | 37 | Android library（`testDebugUnitTest`，含 squircle 数学 9 项） |
-| `:gallery` | 3 | 令牌覆盖机器核对（`TokenCoverageTest`：172 条双向集合相等） |
+| `:minime-ui` | 7 | `TokenCoverageTest` 3（172 条双向集合相等）+ `GalleryEmbedRobolectricTest` 4（Robolectric + Compose UI 测试：侧边栏可达 / A/B 并排 / 主题切换 / 全量滚动） |
 
-仪器测试 9 项（R2 换肤 5 + R3 导航 4）已编译通过，需真机/模拟器执行（`connectedDebugAndroidTest`）。
+> `:minime-ui` 的 Compose UI 测试只跑 **debug 变体**（release 变体已禁用单测：测试载体清单 `ui-test-manifest` 仅 debug 生效）。Robolectric 屏幕配置 `w840dp-h800dp`（Robolectric 无真实字体度量，默认小屏放不下侧边栏六项）。
 
 > 沙箱内 `./gradlew` 需下载 Gradle 发行版（网络受限）；本机已装 Gradle 9.3.0 时直接用 `gradle`。
 
@@ -142,7 +144,7 @@ gradle :gallery:assembleDebug  # 产出 APK：gallery/build/outputs/apk/debug/ga
 
 | 线 | 格式 | 当前取值 |
 |---|---|---|
-| **软件发版版本**（git tag / Release） | **四段式 `x.x.x.x`**（项目规范：A=颠覆性预留 / B=框架级结构性预留 / C=框架级重构 / **D=默认发版 +1**） | 体系 `0.0.1.x`，已发至 `v0.0.1.10`；**R3 待维护者确认后发版** |
+| **软件发版版本**（git tag / Release） | **四段式 `x.x.x.x`**（项目规范：A=颠覆性预留 / B=框架级结构性预留 / C=框架级重构 / **D=默认发版 +1**） | 体系 `0.0.1.x`，已发至 `v0.0.1.10`；**R3.5 待维护者确认后发版** |
 | **引擎版本** `MiniMeEngine.VERSION` | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.2`（`ThemeCompiler.ENGINE_VERSION` 同源） |
 | 主题包版本 `manifest.version` | 自由 | 默认包 `1.0.0` |
 
