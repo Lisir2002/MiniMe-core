@@ -15,7 +15,7 @@ package org.minime.core.api
  */
 object MiniMeEngine {
     /** 引擎版本（二段式，逢九进一）。R1 = 1.0，R2 = 1.1 … R10 = 1.9，转正 = 2.0 */
-    const val VERSION: String = "1.2"
+    const val VERSION: String = "1.3"
 
     /** 引擎兼容区间（供主题包 manifest.engineVersion 参照） */
     const val COMPAT_RANGE: String = ">=1.0 <2.0"
@@ -51,6 +51,8 @@ enum class CompileErrorCode {
     SNAPSHOT_BUILD_FAILED,
     /** 引擎内部未预期异常（含编译器 bug）——G1 降级路径 3 */
     ENGINE_INTERNAL,
+    /** diff 包结构版本高于本引擎支持（R4.3 DiffSerializer；diffVersion 单调递增） */
+    DIFF_VERSION_UNSUPPORTED,
 }
 
 class ThemeCompileException(
