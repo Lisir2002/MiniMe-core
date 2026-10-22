@@ -2,7 +2,11 @@
 
 package com.mini.me_core.feature.themegallery.presentation
 
+import android.content.Context
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.fadeIn
@@ -24,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -71,10 +76,41 @@ fun ThemeGalleryScreen(
     MiniMeEngineTheme(manager = viewModel.manager) {
         val state by viewModel.uiState.collectAsStateWithLifecycle()
         val snapshot by viewModel.manager.snapshot.collectAsStateWithLifecycle()
+        val context = LocalContext.current
         // 窄屏抽屉显隐：由宿主控制（引擎 GalleryDrawer 无 open 参数）。
         var drawerOpen by remember { mutableStateOf(false) }
         // 系统返回优先关抽屉，其次才退出演示页（交还 NavHost 返回栈）。
         BackHandler(enabled = drawerOpen) { drawerOpen = false }
+
+        // ---------- R4.3 diff 主题包传输（SAF 零权限；设计 §8.4） ----------
+        // 导出：工坊 onSaveDiff(json, name) → CREATE_DOCUMENT → 用户选定位置后回写
+        var pendingExportJson by remember { mutableStateOf<String?>(null) }
+        // 导入：OPEN_DOCUMENT → 读文本（KB 级直读；>1MB 拒绝）→ 回填工坊弹确认对话框
+        var pendingImportJson by remember { mutableStateOf<String?>(null) }
+        var pendingImportError by remember { mutableStateOf<String?>(null) }
+        val createDiffLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument(DIFF_MIME_TYPE),
+        ) { uri ->
+            val json = pendingExportJson
+            pendingExportJson = null
+            if (uri != null && json != null) {
+                // 写失败（存储满/权限回收）静默降级：用户刚授权过该 URI，重走导出即可
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use {
+                        it.write(json.toByteArray(Charsets.UTF_8))
+                    }
+                }
+            }
+        }
+        val openDiffLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            val (text, error) = runCatching { readDiffText(context, uri) }
+                .getOrElse { null to "读取失败：${it.message}" }
+            pendingImportJson = text
+            pendingImportError = error
+        }
 
         Box(
             modifier = Modifier
@@ -109,6 +145,19 @@ fun ThemeGalleryScreen(
                             SectionContent(
                                 section = state.section,
                                 manager = viewModel.manager,
+                                onSaveDiff = { json, suggestedName ->
+                                    pendingExportJson = json
+                                    createDiffLauncher.launch(suggestedName)
+                                },
+                                onPickDiff = {
+                                    openDiffLauncher.launch(DIFF_INPUT_TYPES)
+                                },
+                                pendingImportJson = pendingImportJson,
+                                pendingImportError = pendingImportError,
+                                onPendingImportConsumed = {
+                                    pendingImportJson = null
+                                    pendingImportError = null
+                                },
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -126,6 +175,19 @@ fun ThemeGalleryScreen(
                         SectionContent(
                             section = state.section,
                             manager = viewModel.manager,
+                            onSaveDiff = { json, suggestedName ->
+                                pendingExportJson = json
+                                createDiffLauncher.launch(suggestedName)
+                            },
+                            onPickDiff = {
+                                openDiffLauncher.launch(DIFF_INPUT_TYPES)
+                            },
+                            pendingImportJson = pendingImportJson,
+                            pendingImportError = pendingImportError,
+                            onPendingImportConsumed = {
+                                pendingImportJson = null
+                                pendingImportError = null
+                            },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -175,3 +237,28 @@ private const val DRAWER_SLIDE_MS = 220
 
 /** 抽屉遮罩淡入淡出时长（毫秒，会再乘全局动效缩放）。 */
 private const val DRAWER_FADE_MS = 180
+
+// ---------- R4.3 diff 主题包传输（SAF） ----------
+
+/** diff 包 MIME（DTCG 媒体类型，设计 §8.4） */
+private const val DIFF_MIME_TYPE = "application/design-tokens+json"
+
+/** 文件选择器输入类型（专有 MIME 优先，application/json 兜底——部分文件管理器不认 +json 后缀） */
+private val DIFF_INPUT_TYPES = arrayOf(DIFF_MIME_TYPE, "application/json")
+
+/** diff 包体积上限（KB 级；超过即非 diff 包，拒绝并提示——设计 §8.4） */
+private const val MAX_DIFF_BYTES = 1_000_000
+
+/**
+ * 读 diff 文本：URI → (文本, 错误)。diff 包 KB 级，主线程直读可接受；
+ * 超过 1MB 或读取失败返回错误信息（由工坊确认对话框以错误态呈现）。
+ */
+private fun readDiffText(context: Context, uri: Uri): Pair<String?, String?> =
+    context.contentResolver.openInputStream(uri)?.use { stream ->
+        val bytes = stream.readBytes()
+        if (bytes.size > MAX_DIFF_BYTES) {
+            null to "文件超过 1MB（${bytes.size / 1024}KB），不是 diff 主题包（diff 包为 KB 级）"
+        } else {
+            bytes.toString(Charsets.UTF_8) to null
+        }
+    } ?: (null to "无法打开所选文件")

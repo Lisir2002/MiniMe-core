@@ -31,6 +31,9 @@ import org.minime.core.ui.MiniMeThemeBootstrap
 import org.minime.core.ui.runtime.FileThemePackRepository
 import org.minime.core.ui.runtime.SharedPreferencesThemeStore
 import org.minime.core.ui.runtime.ThemeManager
+import org.minime.core.schema.ColorValue
+import org.minime.core.schema.DimensionValue
+import org.minime.core.schema.TypographyValue
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -137,5 +140,158 @@ class WorkshopEmbedRobolectricTest {
             }
         }
         rule.onNodeWithText("当前为 fallback 基座（无主题包），覆写不可用").assertExists()
+    }
+
+    // ---------- R4.3 diff 导入导出（设计 §8；真机等价验收） ----------
+
+    /** 造一个含 2 条覆写的 diff 包文本（导出器与导入器分离，验证「导入」而非既有态） */
+    private fun sampleDiffJson(context: Context): String {
+        val exporter = MiniMeThemeBootstrap.create(context).also { it.initialize() }
+        exporter.applyOverrides(
+            mapOf(
+                "color.primitive.systemBlue" to ColorValue.fromHex("#FF0000"),
+                "typography.body" to TypographyValue(
+                    fontSize = DimensionValue(15f, "sp"),
+                    lineHeight = DimensionValue(20f, "sp"),
+                ),
+            ),
+        )
+        return exporter.exportDiff("2026-10-22T14:30:00+08:00")
+    }
+
+    @Test
+    fun 导入确认对话框呈现摘要指纹与样本() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val diffJson = sampleDiffJson(context)
+        val manager = MiniMeThemeBootstrap.create(context).also { it.initialize() }
+
+        rule.setContent {
+            MiniMeTheme(manager = manager) {
+                WorkshopSection(
+                    manager = manager,
+                    pendingImportJson = diffJson,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        rule.onNodeWithText("导入 diff 主题包").assertExists()
+        rule.onNodeWithText("共 2 条覆写 · 基于 built-in 1.0.0").assertExists()
+        // 指纹 banner：MATCH（导出器与导入器同为内置包）
+        rule.onNodeWithText("基础包匹配（built-in，同包 diff）").assertExists()
+        // 分类 chips（工坊六分类口径）
+        rule.onNodeWithText("色板 1").assertExists()
+        rule.onNodeWithText("字阶 1").assertExists()
+        // 样本（前 8 条，path = 值摘要）
+        rule.onNodeWithText("color.primitive.systemBlue = #FF0000FF").assertExists()
+        rule.onNodeWithText("typography.body = 15sp/20sp").assertExists()
+        // 预览零改态
+        Assert.assertTrue(manager.overlays.value.isEmpty())
+    }
+
+    @Test
+    fun 确认应用后覆写生效且回调消费() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val diffJson = sampleDiffJson(context)
+        val manager = MiniMeThemeBootstrap.create(context).also { it.initialize() }
+        var consumed = false
+
+        rule.setContent {
+            MiniMeTheme(manager = manager) {
+                WorkshopSection(
+                    manager = manager,
+                    pendingImportJson = diffJson,
+                    onPendingImportConsumed = { consumed = true },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        rule.onNodeWithText("应用").performClick()
+        rule.waitForIdle()
+
+        Assert.assertTrue("应用后应回调消费（宿主据此关对话框）", consumed)
+        Assert.assertEquals(setOf("color.primitive.systemBlue", "typography.body"), manager.overlays.value.keys)
+    }
+
+    @Test
+    fun 取消导入零改态() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val diffJson = sampleDiffJson(context)
+        val manager = MiniMeThemeBootstrap.create(context).also { it.initialize() }
+        var consumed = false
+
+        rule.setContent {
+            MiniMeTheme(manager = manager) {
+                WorkshopSection(
+                    manager = manager,
+                    pendingImportJson = diffJson,
+                    onPendingImportConsumed = { consumed = true },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        rule.onNodeWithText("取消").performClick()
+        rule.waitForIdle()
+
+        Assert.assertTrue(consumed)
+        Assert.assertTrue("取消后 overlays 零改态", manager.overlays.value.isEmpty())
+    }
+
+    @Test
+    fun 坏包预览以错误态呈现且无应用钮() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val manager = MiniMeThemeBootstrap.create(context).also { it.initialize() }
+
+        rule.setContent {
+            MiniMeTheme(manager = manager) {
+                WorkshopSection(
+                    manager = manager,
+                    pendingImportJson = "not json {{{",
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        rule.onNodeWithText("导入 diff 主题包").assertExists()
+        rule.onNodeWithText("导入被拒绝 · PACK_CORRUPT").assertExists()
+        // 坏包无「应用」钮（错误态）
+        rule.onNodeWithText("应用").assertDoesNotExist()
+    }
+    @Test
+    fun 导出钮回调回传diff文本() {
+        lateinit var manager: ThemeManager
+        var savedJson: String? = null
+        var savedName: String? = null
+        rule.setContent {
+            MiniMeTheme(manager = newManager()) {
+                manager = newManager()
+                WorkshopSection(
+                    manager = manager,
+                    onSaveDiff = { json, name ->
+                        savedJson = json
+                        savedName = name
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        // 无覆写时导出钮禁用（点击无回调）
+        rule.onNodeWithText("导出 diff").performClick()
+        rule.waitForIdle()
+        Assert.assertNull("无覆写时导出不可用", savedJson)
+
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        rule.waitForIdle()
+        rule.onNodeWithText("导出 diff").performClick()
+        rule.waitForIdle()
+
+        Assert.assertNotNull("onSaveDiff 应被回调", savedJson)
+        Assert.assertTrue(savedJson!!.contains("minime-diff"))
+        Assert.assertTrue(savedJson!!.contains("${'$'}tokens"))
+        Assert.assertTrue(savedName!!.startsWith("minime-diff-"))
+        Assert.assertTrue(savedName!!.endsWith(".tokens.json"))
     }
 }
