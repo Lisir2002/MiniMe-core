@@ -438,4 +438,50 @@ class ThemeManagerTest {
 
         assertEquals("#FF0000FF", manager.snapshot.value.color.accent.hex, "命中后再覆写仍以 p1 为基础包")
     }
+
+    // ---------- baseSnapshot（工坊 diff 原值源，R4.2） ----------
+
+    @Test
+    fun `overlays keep baseSnapshot at unoverlaid values`() = runTest {
+        val manager = manager()
+        manager.initialize()
+        val base = manager.baseSnapshot.value!!
+        val originalAccent = base.color.accent.hex
+
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+
+        assertEquals(originalAccent, manager.baseSnapshot.value!!.color.accent.hex, "原值面貌不随覆写漂移")
+        assertEquals("#FF0000FF", manager.snapshot.value.color.accent.hex, "生效值已换")
+    }
+
+    @Test
+    fun `select updates baseSnapshot to the new pack`() = runTest {
+        val packs = InMemoryThemePackRepository().apply { save("dark-pack", json) }
+        val manager = manager(packs = packs)
+        manager.initialize()
+
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+        manager.select("dark-pack", listOf("dark"))
+        advanceUntilIdle()
+
+        assertEquals("#0A84FFFF", manager.baseSnapshot.value!!.color.accent.hex, "换包后原值 = 新包原初面貌")
+    }
+
+    @Test
+    fun `resetOverrides restores snapshot to baseSnapshot`() = runTest {
+        val manager = manager()
+        manager.initialize()
+        val base = manager.baseSnapshot.value!!
+
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+        manager.resetOverrides()
+        advanceUntilIdle()
+
+        // 语义相等（快照为 data class 全等）——实例不必同一：reuse 层会拼装复用子系统
+        assertEquals(base, manager.snapshot.value, "还原后生效快照回到基础快照（内容全等）")
+        assertEquals(base.color.accent.hex, manager.snapshot.value.color.accent.hex)
+    }
 }

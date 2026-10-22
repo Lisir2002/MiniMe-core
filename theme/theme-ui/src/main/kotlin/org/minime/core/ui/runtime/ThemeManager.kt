@@ -66,6 +66,16 @@ class ThemeManager(
     private val _overlays = MutableStateFlow<Map<String, TokenValue>>(emptyMap())
     val overlays: StateFlow<Map<String, TokenValue>> = _overlays.asStateFlow()
 
+    /**
+     * 当前基础包的**无覆写态**快照（工坊「当前生效值 vs 主题包原值」diff 的原值源）。
+     *
+     * 只在无覆写编译成功时更新（initialize / select / importAndApply）；
+     * 覆写编译（[recompileWithOverlay]）成功**不**更新——保持该基础包的原初面貌，
+     * 与 [overlays] 配对即得完整 diff。null = 尚无可用基础包。
+     */
+    private val _baseSnapshot = MutableStateFlow<ThemeSnapshot?>(null)
+    val baseSnapshot: StateFlow<ThemeSnapshot?> = _baseSnapshot.asStateFlow()
+
     /** 内存快照缓存：(packId, modifiers, overlay) → 编译产物（连同来源 json）。切换命中即对象替换（§8.2 零 I/O） */
     private val cache = HashMap<CacheKey, CacheEntry>()
 
@@ -108,6 +118,7 @@ class ThemeManager(
 
         cache[CacheKey(packId, modifiers, emptyMap())]?.let { entry ->
             _snapshot.value = entry.snapshot
+            _baseSnapshot.value = entry.snapshot
             currentJson = entry.json // 缓存命中零 I/O：来源 json 随条目带回（覆写编译的输入）
             return
         }
@@ -116,6 +127,7 @@ class ThemeManager(
         if (json == null) {
             // 无包可选（未安装且无内置）：保持 fallback 快照
             _snapshot.value = FallbackTheme.snapshot
+            _baseSnapshot.value = FallbackTheme.snapshot
             _status.value = ThemeStatus.Ready(
                 packId = FALLBACK_ID, version = "fallback",
                 modifiers = emptyList(), warnings = 0, degraded = true,
@@ -127,6 +139,7 @@ class ThemeManager(
             .onSuccess { result ->
                 currentJson = json
                 _snapshot.value = result.snapshot
+                _baseSnapshot.value = result.snapshot
                 _status.value = ThemeStatus.Ready(
                     packId, result.snapshot.meta.packVersion, modifiers,
                     warnings = result.warnings.size, degraded = false,
@@ -139,6 +152,7 @@ class ThemeManager(
                         val result = compileInto(builtIn, BUILT_IN, emptyList(), emptyMap())
                         currentJson = builtIn
                         _snapshot.value = result.snapshot
+                        _baseSnapshot.value = result.snapshot
                         _status.value = ThemeStatus.Ready(
                             BUILT_IN, result.snapshot.meta.packVersion, emptyList(),
                             warnings = result.warnings.size, degraded = true,
@@ -179,6 +193,7 @@ class ThemeManager(
             store.saveSelection(packId, modifiers)
             _overlays.value = emptyMap()
             _snapshot.value = entry.snapshot
+            _baseSnapshot.value = entry.snapshot
             _status.value = ThemeStatus.Ready(
                 packId, entry.snapshot.meta.packVersion, modifiers,
                 warnings = 0, degraded = false,
@@ -206,6 +221,7 @@ class ThemeManager(
                 store.saveSelection(packId, modifiers)
                 _overlays.value = emptyMap()
                 _snapshot.value = result.snapshot
+                _baseSnapshot.value = result.snapshot
                 _status.value = ThemeStatus.Ready(
                     packId, result.snapshot.meta.packVersion, modifiers,
                     warnings = result.warnings.size, degraded = false,
@@ -236,6 +252,7 @@ class ThemeManager(
         currentJson = json
         _overlays.value = emptyMap()
         _snapshot.value = result.snapshot
+        _baseSnapshot.value = result.snapshot
         _status.value = ThemeStatus.Ready(
             packId, result.snapshot.meta.packVersion, modifiers,
             warnings = result.warnings.size, degraded = false,
