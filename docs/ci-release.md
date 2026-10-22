@@ -13,14 +13,14 @@
 **本地只做分块编译验证（快、按变更面精准触发）；全量构建 / 全量单测 / detekt / 发版由本手册所述云端链路执行。** 完整规约（变更面 → 编译块路由表、各模块编译命令、无本地构建环境的降级路径）见 [AGENTS.md 本地分块编译验证与云端全量分工](../AGENTS.md#本地分块编译验证与云端全量分工编译验证规约)，此处仅列与发版相关的边界：
 
 - 打 Tag 前，本地分块编译必须已过（或已确认云端 `ci.yml` 对对应提交全绿），**不许带着编译红打 Tag**。
-- `v*` Tag 一旦推送即触发不可逆的正式发版（主应用只发正式版 tag，预发布 tag 会被 `android-release.yml` 直接拒绝），推送前按「发版规范」逐条核对。
+- `v*` Tag 一旦推送即触发不可逆的正式发版（主应用只发正式版 tag，预发布 tag 默认被 `android-release.yml` 的 `Reject pre-release tags` 门禁直接拒绝；唯一例外是仓库变量 `ALLOW_RC_TAG` 一次性 allowlist，见下），推送前按「发版规范」逐条核对。
 - 云端 `ci.yml`（push 到 main 触发）负责日常全量门禁：release 全量构建 → `:app:testReleaseUnitTest` → `:app:detekt`；本文链路（Tag 触发）负责发版产物：签名构建 → Release 页面 → APK 资产。
 
 ## CI 全流程（单 job `build`，6 个逻辑阶段）
 
 > workflow 实际是**单 job 多 step**结构（jobs.build），下述 6 个阶段是按职责划分的逻辑阶段，对应 step 序列。
 
-1. **variables** → `Display release tag info` + `Verify versionCode monotonic`（versionCode 单调递增校验）+ `Determine release name`（手动触发用 `manual-<run_number>`）+ `Determine prerelease flag`（tag 含预发布后缀时标记 prerelease；注意主应用已被 `Reject pre-release tags` 门禁拒绝此类 tag，该分支实际不会命中）
+1. **variables** → `Display release tag info` + `Reject pre-release tags`（预发布 tag 拒绝门禁；命中仓库变量 `ALLOW_RC_TAG` allowlist 时放行并打 notice）+ `Verify versionCode monotonic`（versionCode 单调递增校验）+ `Determine release name`（手动触发用 `manual-<run_number>`）+ `Determine prerelease flag`（tag 含预发布后缀时标记 prerelease；仅 ALLOW_RC_TAG 放行的 rc tag 会命中该分支）
 2. **build** → `:app:testReleaseUnitTest`（发版质量门禁）→ `:app:assembleRelease` → 正式签名构建 APK 到 `app/build/outputs/apk/release/app-release.apk` → `Rename APK` 重命名为 `dist/MiniMe-<版本号>-<变体>.apk`（如 `MiniMe-v0.0.15-release.apk`，**release 仅 arm64-v8a**，重命名同时做 ABI 校验：`lib/` 必须含 `arm64-v8a`；debug 变体保留双 ABI 用于模拟器开发）
 3. **upload-mapping** → `Upload R8 mapping`（`actions/upload-artifact@v4`，artifact 名 `r8-mapping-<tag>`，90 天保留，`if-no-files-found: ignore` 不阻塞）
 4. **create-release** → `Generate release notes` + `Create GitHub Release & Upload assets`（`softprops/action-gh-release@v2`，prerelease 取决于 tag 是否含预发布后缀；标题基础格式 `MiniMe <版本号>`，AI/维护者发版后补充「— 更新内容概括」；正文遵循 AGENTS.md「发版说明格式」统一规约，条目为「**4-9字小标题**：20-40字说明」结构）
@@ -45,6 +45,15 @@ curl -s -u "<owner>:<token>" \
   "https://api.github.com/repos/<owner>/<repo>/releases/tags/<tag>" \
   | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('tag_name'),d.get('prerelease'));[print(a['name'],a['size'],a['browser_download_url']) for a in d.get('assets',[])]"
 ```
+
+## 预发布 tag 一次性 allowlist（ALLOW_RC_TAG）
+
+主应用默认只发正式版 tag（`vX.Y.Z`），`android-release.yml` 的 `Reject pre-release tags` 门禁拒绝一切 `-rc/-beta/-alpha/-dev` 后缀。确需发 RC 的批次，由维护者裁定后按一次性 allowlist 放行：
+
+- **仓库变量**（Settings → Secrets and variables → Actions → Variables）：`ALLOW_RC_TAG`，值为**不带 `v` 前缀**的版本号（如 `0.0.1.11-rc1`）；带/不带 `v` 前缀的 tag 均参与比对。
+- **生效行为**：tag 命中 allowlist → 门禁打 `::notice::` 放行，`Determine prerelease flag` 将其标记为 pre-release（Release 页为 Prerelease）；未命中的预发布 tag 仍直接拒绝。
+- **用后清理**：正式版 tag（转正）打出后，维护者应删除该仓库变量，恢复「只发正式版」默认纪律。
+- **首次启用记录（R4 批次，2026-10-22 维护者裁定）**：R4（主题工坊 + diff 主题包）整批完成后发 `0.0.1.11-rc1` 做测试迭代，允许这一次绕过 rc tag 规矩；其余批次 rc tag 仍拒绝。
 
 ## 产物校验清单（构建完成后必跑）
 

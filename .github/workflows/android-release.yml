@@ -147,16 +147,26 @@ jobs:
 
       # RC 版拒绝门禁：主应用只发正式版（vX.Y.Z），不再发任何 -rc/-beta/-alpha/-dev 预发布 tag。
       # 误打/误推预发布 tag 时在此直接失败并给出明确提示，避免产生 prerelease Release。
+      # 一次性例外（R4 维护者裁定 2026-10-22）：仓库变量 ALLOW_RC_TAG allowlist——
+      #   值为不带 v 前缀的版本号（如 0.0.1.11-rc1）；tag 命中即放行（本次 R4 发版
+      #   绕过 rc tag 规矩），其余预发布 tag 仍拒绝。正式版转正后应由维护者清空该变量。
       - name: Reject pre-release tags (main app ships formal only)
         if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          ALLOW_RC_TAG: ${{ vars.ALLOW_RC_TAG }}
         run: |
           set -e
           tag="${GITHUB_REF_NAME}"
           if [[ "$tag" =~ -(rc|beta|alpha|dev)([0-9.]*)$ ]]; then
-            echo "::error::主应用不发预发布 tag（$tag）。主应用只接受形如 vX.Y.Z 的正式版 tag（不含 -rc/-beta/-alpha/-dev 后缀），请改用正式 tag 触发发布。"
-            exit 1
+            allow="${ALLOW_RC_TAG:-}"
+            if [[ -n "$allow" && ( "$tag" == "$allow" || "$tag" == "v${allow}" ) ]]; then
+              echo "::notice::tag $tag 命中 ALLOW_RC_TAG 一次性 allowlist（R4 维护者裁定），放行。正式版转正后请清空仓库变量 ALLOW_RC_TAG。"
+            else
+              echo "::error::主应用不发预发布 tag（$tag）。主应用只接受形如 vX.Y.Z 的正式版 tag（不含 -rc/-beta/-alpha/-dev 后缀），请改用正式 tag 触发发布。"
+              exit 1
+            fi
           fi
-          echo "✓ tag 为正式版格式：$tag"
+          echo "✓ tag 为正式版格式（或命中 ALLOW_RC_TAG allowlist）：$tag"
 
       # 校验 versionCode 单调递增：versionCode = git tag 四段版本号映射（见 build.gradle.kts gitVersionCode()），
       # 与提交数无关，rebase/squash 改写历史不影响单调性；此处按同一映射比较当前 tag 与上个 Release tag。
