@@ -5,7 +5,7 @@
 | 线 | 谁定 | 格式 | 当前取值 |
 |---|---|---|---|
 | **软件发版版本**（git tag / Release） | **维护者确认** | **四段式 `x.x.x.x`**，A=颠覆性预留 / B=框架级结构性预留 / C=框架级重构 / **D=默认发版 +1** | 体系 `0.0.1.x`，已发至 `v0.0.1.10` |
-| **引擎版本**（`MiniMeEngine.VERSION`） | 引擎自定 | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.2`（R3；R3.5 纯结构重整不变） |
+| **引擎版本**（`MiniMeEngine.VERSION`） | 引擎自定 | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.3`（R4.3；diff 主题包导入导出） |
 | 主题包版本（`manifest.version`） | 主题作者自定 | 自由 | 默认包 `1.0.0` |
 
 ### 发版三条硬规矩（2026-10-21 维护者裁定）
@@ -16,6 +16,48 @@
 
 > 引擎版本是另一条线，**只用于主题包 `manifest.engineVersion` 兼容判定**，不得当软件发版版本用。
 > 二段式逢九进一：R1 `1.0` → R2 `1.1` … R9 `1.8` → R10 `1.9` → 转正 `2.0`（不存在 `1.10`）。
+
+## R4.3 diff 主题包：导入导出 + 确认对话框 + 引擎 1.3 — 已完成，待发版
+
+**引擎版本 `1.3`（本轮落定）** —— 二段式步进 +0.1（R4.1/R4.2 均为 `1.2`，`1.3` 随导入导出收尾落定）；主题包 `engineVersion` 兼容区间 `>=1.0 <2.0` 不变
+单测：**:theme-engine 155 → 173（DiffSerializerTest 18 项）+ :theme-ui 47 → 54（ThemeManagerTest +7 项，debug/release 双变体）+ :minime-ui 18 → 23（WorkshopEmbedRobolectricTest 4 → 9 项）= 250 项全绿** ｜ **`:app` 侧门禁全绿**（compileReleaseKotlin / testReleaseUnitTest 1387 / detekt / lintRelease）
+**软件发版状态：未发版** —— 同 R4.1/R4.2：R4 整批完成后按维护者裁定发 `0.0.1.11-rc1`（本次发版绕过 rc tag 规矩，CI tag 守卫加一次性 allowlist）。
+
+### 交付范围（对照 charter §7 R4.3 行「diff 主题包（round-trip）、一键还原、输入确认、引擎版本 1.3 落定、keystore 材料收集」）
+
+| 交付项 | 状态 | 落点 |
+|---|---|---|
+| diff 包序列化器 | ✅ | `schema/DiffSerializer`（theme-engine，纯函数）：DTCG 2025.10 稳定版对齐 + minime 专有扩展命名空间；round-trip / 三形态（minime diff 包 / 纯 DTCG / 坏包）/ 基础包语义指纹 / diffVersion 单调递增拒绝 |
+| 运行时导入导出 API | ✅ | `runtime/DiffTransfer`（类型层：`DiffPreviewResult` sealed + `ImportResult` + 值摘要）+ `runtime/ThemeManager`：`exportDiff` / `previewDiff`（零改态 + 预标注两类必挂路径）/ `importDiff`（全量替换，复用 R4.1 防改坏回滚） |
+| 工坊导入导出 UI | ✅ | `WorkshopSection` 顶栏「导出 diff / 导入 diff」两枚自绘文字钮 + `WorkshopDiffImportDialog` 确认对话框（摘要行 / 六分类 chips / 指纹三态 banner / blocked banner / 样本 mono / 应用-取消）；导出文件名 `minime-diff-yyyyMMdd-HHmmss.tokens.json` |
+| 宿主 SAF 接线 | ✅ | `ThemeGalleryScreen`：`CreateDocument("application/design-tokens+json")` + `OpenDocument()` 双 launcher，零权限；1MB 上限；读失败经对话框错误态呈现 |
+| 输入确认 | ✅ | 预览与应用严格分离：`previewDiff` 纯解析零改态，对话框禁用态明示必挂路径（词汇表外 / 类型不符），确认才 `importDiff` |
+| 引擎版本 1.3 | ✅ | `MiniMeEngine.VERSION` `1.2` → `1.3`（本表「当前取值」列同步）；端到端版本自洽测试断言同步步进 |
+
+### 验收推进（R4.1/R4.2 遗留 ⏳ 项）
+
+| 遗留验收项 | R4.3 后状态 | 说明 |
+|---|---|---|
+| 3/4 round-trip 导入导出 | ✅（本轮） | charter §5 验收 3/4：`DiffSerializerTest` 18 项（含 typography 复合体 delta 断言）+ `ThemeManagerTest` 端到端 round-trip（export→import→overlays 相等）|
+| 8 引擎版本 1.3 | ✅（本轮） | `MiniMeEngine.VERSION = 1.3`；`default pack declares engine range compatible with current engine` 断言同步；兼容区间 `>=1.0 <2.0` 不动 |
+| 5 WCAG 爆炸回滚面板化 | ✅（R4.2） | 工坊预览列实时矩阵 + 三级还原 UI（R4.2 已交付）|
+| 7 真机零 ANR | ⏳ 待维护者 | JVM 侧滑杆链路已覆盖（R4.2 Robolectric）；diff 导入导出为 KB 级文件 IO + 纯解析，无新增卡顿面，仍归入真机抽查 |
+| keystore 材料收集 | ⏳ R4.4 | 需维护者提供 base64 keystore + store/key 密码 + alias（R4.4 发版前置，不阻塞本轮）|
+
+### 关键实现决策与偏离（R4.3）
+
+1. **格式 = DTCG 2025.10 对齐 + minime 专有扩展**（维护者裁定 1）——值部分严守 DTCG Format Module（组嵌套 / `$value` / 组级 `$type` 继承 / 颜色对象 / dimension·duration 对象 / typography 标准复合体 §9.8）；MiniMe 专有数据（diffVersion / 基础包指纹 / 导出时间 / count 自检）收在顶层 `minime` 命名空间（对应 DTCG §3.2 元数据扩展精神）；布尔与 glass 用扩展 `$type`（DTCG 无 boolean / glass 类型）+ `$description` 自文档，未知 type 工具按 `$value` 跳过。外部工具（Figma / Tokens Studio / Style Dictionary v4 一等支持）可直接消费值部分。
+2. **复合值组装 DTCG 复合体**（维护者裁定 2，对初版设计「逐字段平铺」的修正）——typography 组装标准复合体（lineHeight 以 fontSize 乘数呈现：导出 ÷fontSize、导入 ×fontSize 还原 sp）；glass 组装 minime 扩展复合体；spring 无 DTCG 类型且与 cubicBezier 不等价，三条 number 平铺。乘数除法有 ~1e-15 Double 微误差 → round-trip 断言 typography 字段走 delta（≤0.001），其余类型精确。
+3. **导入即全量替换**（维护者裁定 4）——importDiff 语义 = 「导入一个主题快照」：全量替换当前 overlays；合并语义的叠加不可追溯，YAGNI。替换复用 R4.1 `recompileWithOverlay`（后台 + last-wins + 失败回滚），防改坏不双修。
+4. **预览预标注必挂路径**（对 charter「输入确认」的增强）——`previewDiff` 除指纹三态外，还提前算出词汇表外路径（SCHEMA_INVALID）与类型不符路径（TYPE_MISMATCH），对话框据此禁用「应用」并给出明细前 4 条 mono 展示——优于让用户点了才失败（TokenTypeCheck 非抛错判定式复用）。
+5. **指纹为语义指纹**（对「字节指纹」的 refinement）——sha256(manifest.name|version|各 set 令牌 path=规范化值按字典序)，同包不同 JSON 序列化（空格/键序）指纹一致；三态 MATCH/MISMATCH/UNKNOWN 只警告不阻断（diff 的核心价值是「在近似基础上快速换肤」，强制匹配会把有用工作一刀切掉）。
+6. **`elevation.hairline` 是 px 原生例外**——真实像素发丝线（非 dp），导出 px 原样、导入保留 px 不按 DTCG px≡dp 规范转换（`PX_NATIVE_PATHS` 白名单）；其余 dp→px、sp→rem(÷16)、rem→sp(×16)、ms 原样，全部有 §8.2.1/§8.5 规范明文依据。
+7. **形态 B（纯 DTCG 文件）全量提取为 overlays**——外部 DTCG 包可整体导入（与当前基础同值条目也进 overlays，无害；确认对话框显示真实条数）；diff 不导出别名（覆写语义是字面值替换，不注入引用结构）。
+8. **自绘确认对话框**（同 R4.2 自绘控件策略，R6 弹窗族未就绪）——卡片为 scrim 兄弟节点，须 `clickable(onClick = {})` 吞点击防冒泡误关；错误态以 `WorkshopErrorBanner` 呈现且无「应用」钮。
+9. **实现期三处引擎修复**（设计文档未预见，先改码后同步文档）：rem→sp ×16 换算缺失（mapImportUnit 改返 Pair<单位, 倍数>）；DTCG typography lineHeight 是 number 乘数与内部 schema 的 dimension 声明冲突（导入侧特例放行 number，组装时 ×fontSize 还原）；形态 B 根级遍历误食 `minime` 命名空间段（rootAsTree 参数跳过）。
+10. **测试 `$` 模板插值坑**（Kotlin raw string）——测试 JSON 内 `"$tokens"` 在三引号字符串中仍是插值，须写 `"${'$'}tokens"`（29 处批量修正，与 DtcgParserTest 惯例一致）。
+
+---
 
 ## R4.2 主题工坊：令牌覆写面板（画廊 WORKSHOP 分区）— 已完成，待真机抽查
 
