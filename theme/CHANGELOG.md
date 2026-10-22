@@ -17,6 +17,43 @@
 > 引擎版本是另一条线，**只用于主题包 `manifest.engineVersion` 兼容判定**，不得当软件发版版本用。
 > 二段式逢九进一：R1 `1.0` → R2 `1.1` … R9 `1.8` → R10 `1.9` → 转正 `2.0`（不存在 `1.10`）。
 
+## R4.1 主题调节与工坊：运行时覆写层（引擎侧底座）— 已完成，待发版
+
+**引擎版本 `1.2`（不变）** —— 按批次 charter 拆分，`1.3` 随 R4.3（导入导出 + 防改坏收尾）落定；主题包 `engineVersion` 区间 `>=1.0 <2.0` 不变
+单测：**:theme-engine 134 → 147（OverlayApplierTest 13 项）+ :theme-ui 37 → 44（ThemeManagerTest +7 项）= 191 项全绿** ｜ :minime-ui 7 项不变 ｜ **`:app` 侧门禁全绿**（compileReleaseKotlin / testReleaseUnitTest / detekt / lintRelease）
+**软件发版状态：未发版** —— R4 整批完成后按维护者裁定发 `0.0.1.11-rc1`（本次发版绕过 rc tag 规矩，CI tag 守卫加一次性 allowlist）。
+
+### 交付范围（对照 charter §7 R4.1 行）
+
+| 交付项 | 状态 | 落点 |
+|---|---|---|
+| 覆写层装配 | ✅ | `compiler/OverlayApplier`：覆写 Map → 合成 `overrides` set 挂 `resolutionOrder` **最末**（modifier < overlay），走既有编译流水线 |
+| 共享类型判定 | ✅ | `schema/TokenTypeCheck`：解析/别名/覆写三处共用的类型一致性判定单一真源（`AliasResolver` 原私有 `matchesType` 抽出委托） |
+| 运行时入口 | ✅ | `runtime/ThemeManager`：`overlays: StateFlow` + `applyOverrides(entries)` / `resetOverrides(paths)` + 解析缓存 + 缓存键含覆写 |
+| 防改坏 | ✅ | 编译失败 → 快照保持上一版（G1）+ **覆写表回滚到上一版**（overlays 与快照一致）+ `ThemeStatus.Failed` 报 §5.2 错误码 |
+| 会话语义 | ✅ | 覆写纯内存态（不写 Store/Repository，默认包零污染）；`select` / `importAndApply` / `initialize` 建立新基础即清覆写 |
+
+### 验收逐条（对照 charter §5，R4.1 覆盖项）
+
+| 验收项 | 状态 | 覆盖 |
+|---|---|---|
+| 1 覆写 primitive 后语义别名换值（§5.1 规则 1 运行时证明） | ✅ JVM | `OverlayApplierTest.overridingPrimitiveRevaluesSemanticAliases`（accent 跟随 systemBlue）+ `ThemeManagerTest.applyOverridesAppliesWithAliasFollowing` |
+| 2 复合字段（glass）覆写正确 | ✅ JVM | `OverridingGlassRecipeReplacesComposite` / `OverridingGlassScalarTokenRevaluesCompositeFieldAlias`（tintAlpha 字段别名跟随）+ spring/typography 覆写 |
+| 6 一键还原 / 子系统重置 / 覆写不污染默认包 | ✅ JVM | `ResetOverridesRestoresBaseValues` / `ResetOverridesByPathKeepsTheRest` / `OverlayDoesNotLeakIntoBasePackObject` |
+| 3/4/5/7/8 | ⏳ | round-trip（R4.3）/ WCAG 爆炸回滚面板化（R4.2–R4.3）/ 真机零 ANR（R4.2 后）/ lint 目录外零新增（随 R4.2 UI）/ 引擎版本 1.3（R4.3） |
+
+### 关键实现决策与偏离（R4.1）
+
+1. **模型层合成集，而非 JSON 序列化**（对 charter §3「序列化为 overlay JSON 走 compileInto」的手段 refinement）——`compileInto` 的输入本就是 `ThemePack` 模型（`compileJson` = parse + compile），把覆写挂成合成集后直接走 `compiler.compile`，与走 JSON **同一流水线**（SetMerger 按序合并 → AliasResolver 先合并后解析 → 校验全行）。JSON 序列化推迟到 R4.3 导出 diff 主题包真正需要时再造——与 R2「不做磁盘快照缓存」同款决策：现在造序列化层收益（本批无消费方）不足以抵消出错面。覆写值经 `TokenTypeCheck`（与别名解析共用）+ 值类构造器（hex 规范化 / 单位白名单）保证一致性，不依赖解析器兜底。
+2. **节流复用 `select` 的「取消前者」语义**（对 charter「150ms 节流」的手段 refinement）——验收项是「面板操作零 ANR」：连续覆写取消在途编译、只让最后一次生效，比 150ms debounce 更强（零排队且零尾延迟）；编译在 `Dispatchers.Default`（p50 2.4ms），主线程零负担。
+3. **覆写路径限标准词汇表 172 条**——开放词汇（editor/terminal/chart 扩展组）由主题包整体提供，覆写涉及扩展组合并语义与冲突判定，推迟到后续批次（`SCHEMA_INVALID` 明示，不放行静默失败）。
+4. **失败回滚覆写态**——防改坏不仅保快照，还把 `overlays` 表回滚到上一版，保证「面板 diff 显示 ↔ 实际生效」一致；被更新请求取消的在途编译不触发回滚（CancellationException 早退，新请求已持更新态）。
+5. **覆写随基础包切换清零**——选包 = 用该包原初面貌（工坊会话结束）；导入同理（导入包的差异已成为包内字面量，无需再叠覆写）。
+6. **解析缓存 `packFor(json)`**——连续覆写免重复解析同一份 JSON；`invalidate` 同步清（包更新后旧解析不残留）。
+7. **合成集名冲突防御**——基础包含名为 `overrides` 的集时明示拒绝（否则 resolutionOrder 重复引用的校验报错难定位）。
+
+---
+
 ## R2 运行时 + M3 映射 — 已完成，待发版
 
 **引擎版本 `1.1`** ｜ 新增模块：`:theme-ui`（Android library，AGP 8.9.3 / Kotlin 2.2.21 / Compose BOM 2025.12.01 / compileSdk 35）

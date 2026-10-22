@@ -1,5 +1,6 @@
 package org.minime.core.ui.runtime
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -11,22 +12,36 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.minime.core.api.CompileErrorCode
 import org.minime.core.api.ThemeCompileException
+import org.minime.core.compiler.CompileResult
+import org.minime.core.compiler.OverlayApplier
 import org.minime.core.compiler.ThemeCompiler
 import org.minime.core.fallback.FallbackTheme
+import org.minime.core.schema.DtcgParser
+import org.minime.core.schema.ThemePack
+import org.minime.core.schema.TokenValue
 import org.minime.core.tokens.ThemeSnapshot
 
 /**
- * 主题管理器（R2 运行时，白皮书 §8.1 时序 + §8.2 性能设计点）。
+ * 主题管理器（R2 运行时，白皮书 §8.1 时序 + §8.2 性能设计点；R4 叠加覆写层）。
  *
  * 职责边界：
  * - **持有**当前生效快照（`StateFlow<ThemeSnapshot>`）；
  * - **持久化**选择（[ThemeStore]，同步可读保证首帧不闪）；
  * - **缓存**已编译快照（内存，切换 = 对象替换，换肤路径零 I/O）；
- * - **后台**编译新包（导入不卡 UI）+ **合并**连续切换请求（节流）；
- * - **降级**：任何失败都保持上一个可用快照，绝不无主题（G1）。
+ * - **后台**编译新包（导入不卡 UI）+ **合并**连续请求（节流：只让最后一次生效）；
+ * - **降级**：任何失败都保持上一个可用快照，绝不无主题（G1）；
+ * - **覆写层**（R4）：[overlays] 内存态（路径 → 值），经 [OverlayApplier] 挂到
+ *   resolutionOrder 最末走同一编译流水线（禁第二套合并逻辑）；失败回滚上一版覆写态。
  *
- * 不负责：包的下载/商店（二期）、覆写编辑（R4 工坊在其之上叠加覆写层）、
- * 系统深浅色监听（由调用方按系统上下文调用 [select] 传入修饰符）。
+ * 不负责：包的下载/商店（二期）、系统深浅色监听（由调用方按系统上下文调用 [select] 传入修饰符）。
+ *
+ * 覆写语义约定：
+ * - **内存态**：覆写不写回 [ThemeStore] / [ThemePackRepository]（默认包零污染）——
+ *   显式导出 diff 主题包由工坊侧负责（R4.3）；
+ * - **随基础包切换清零**：[select] / [importAndApply] / [initialize] 建立新基础时
+ *   覆写即会话结束（换包 = 用该包原初面貌）；
+ * - **last-wins**：连续覆写（拖动色板/滑杆）取消在途编译，只让最后一次生效，
+ *   与 [select] 同一节流语义（不排队编译，面板操作零 ANR）。
  */
 class ThemeManager(
     private val store: ThemeStore,
@@ -43,11 +58,26 @@ class ThemeManager(
     private val _status = MutableStateFlow<ThemeStatus>(ThemeStatus.Idle)
     val status: StateFlow<ThemeStatus> = _status.asStateFlow()
 
-    /** 内存快照缓存：(packId, modifiers) → 编译产物。切换命中即对象替换（§8.2） */
-    private val cache = HashMap<CacheKey, ThemeSnapshot>()
+    /**
+     * 当前运行时覆写（路径 → 值；空 map = 无覆写）。
+     * 工坊面板读取本表做「当前生效值 vs 主题包原值」diff 高亮；
+     * 编译失败时本表回滚到上一版（与快照保持一致的防改坏语义）。
+     */
+    private val _overlays = MutableStateFlow<Map<String, TokenValue>>(emptyMap())
+    val overlays: StateFlow<Map<String, TokenValue>> = _overlays.asStateFlow()
+
+    /** 内存快照缓存：(packId, modifiers, overlay) → 编译产物（连同来源 json）。切换命中即对象替换（§8.2 零 I/O） */
+    private val cache = HashMap<CacheKey, CacheEntry>()
 
     /** 当前后台编译任务；新请求到达即取消旧任务（节流：只让最后一次生效） */
     private var pendingJob: Job? = null
+
+    /** 当前**实际生效**的基础包 JSON（覆写编译的输入；fallback 态为 null） */
+    private var currentJson: String? = null
+
+    /** 解析缓存：json → ThemePack（覆写编译免重复解析；[invalidate] 时清） */
+    private var parsedJson: String? = null
+    private var parsedPack: ThemePack? = null
 
     /** 当前**实际生效**的包标识（调试面板/工坊读取；失败时取降级后的包，而非失败目标） */
     val currentPackId: String get() = when (val s = _status.value) {
@@ -72,11 +102,13 @@ class ThemeManager(
      * 失败路径：顺序降级 缓存 → 内置包 → fallback，任何一步失败都不阻塞启动。
      */
     fun initialize() {
+        _overlays.value = emptyMap() // 冷启动无覆写（覆写是会话态，导出才落盘）
         val packId = store.currentPackId() ?: BUILT_IN
         val modifiers = store.currentModifiers()
 
-        cache[CacheKey(packId, modifiers)]?.let {
-            _snapshot.value = it
+        cache[CacheKey(packId, modifiers, emptyMap())]?.let { entry ->
+            _snapshot.value = entry.snapshot
+            currentJson = entry.json // 缓存命中零 I/O：来源 json 随条目带回（覆写编译的输入）
             return
         }
 
@@ -91,8 +123,9 @@ class ThemeManager(
             return
         }
 
-        runCatching { compileInto(json, packId, modifiers) }
+        runCatching { compileInto(json, packId, modifiers, emptyMap()) }
             .onSuccess { result ->
+                currentJson = json
                 _snapshot.value = result.snapshot
                 _status.value = ThemeStatus.Ready(
                     packId, result.snapshot.meta.packVersion, modifiers,
@@ -103,7 +136,8 @@ class ThemeManager(
                 // 降级链：目标包失败 → 内置包 → fallback。前两者成功即视为「降级可用」
                 val fellBack = builtInJson?.let { builtIn ->
                     runCatching {
-                        val result = compileInto(builtIn, BUILT_IN, emptyList())
+                        val result = compileInto(builtIn, BUILT_IN, emptyList(), emptyMap())
+                        currentJson = builtIn
                         _snapshot.value = result.snapshot
                         _status.value = ThemeStatus.Ready(
                             BUILT_IN, result.snapshot.meta.packVersion, emptyList(),
@@ -132,17 +166,21 @@ class ThemeManager(
      *
      * 合并语义：编译成功后才发射新快照（§8.1「完成才允许切换」），
      * 失败则保持当前快照并把 [ThemeStatus.Failed] 交给设置页呈现。
+     *
+     * 覆写语义：选包 = 用该包**原初面貌**——成功时清空覆写（工坊会话结束）。
      */
     fun select(packId: String, modifiers: List<String>) {
         pendingJob?.cancel()
-        val key = CacheKey(packId, modifiers)
+        val key = CacheKey(packId, modifiers, emptyMap())
 
-        cache[key]?.let { cached ->
+        cache[key]?.let { entry ->
             // 命中缓存：直接切换（零 I/O，对象替换）
+            currentJson = entry.json
             store.saveSelection(packId, modifiers)
-            _snapshot.value = cached
+            _overlays.value = emptyMap()
+            _snapshot.value = entry.snapshot
             _status.value = ThemeStatus.Ready(
-                packId, cached.meta.packVersion, modifiers,
+                packId, entry.snapshot.meta.packVersion, modifiers,
                 warnings = 0, degraded = false,
             )
             return
@@ -160,10 +198,13 @@ class ThemeManager(
         _status.value = ThemeStatus.Loading(packId, modifiers)
         pendingJob = scope.launch {
             val outcome = runCatching {
-                withContext(computeDispatcher) { compileInto(json, packId, modifiers) }
+                withContext(computeDispatcher) { compileInto(json, packId, modifiers, emptyMap()) }
             }
+            if (outcome.isFailure && outcome.exceptionOrNull() is CancellationException) return@launch
             outcome.onSuccess { result ->
+                currentJson = json
                 store.saveSelection(packId, modifiers)
+                _overlays.value = emptyMap()
                 _snapshot.value = result.snapshot
                 _status.value = ThemeStatus.Ready(
                     packId, result.snapshot.meta.packVersion, modifiers,
@@ -188,39 +229,141 @@ class ThemeManager(
         packId: String,
         json: String,
         modifiers: List<String> = emptyList(),
-    ): org.minime.core.compiler.CompileResult = withContext(computeDispatcher) {
-        val result = compileInto(json, packId, modifiers)
+    ): CompileResult = withContext(computeDispatcher) {
+        val result = compileInto(json, packId, modifiers, emptyMap())
         packs.save(packId, json)
         store.saveSelection(packId, modifiers)
+        currentJson = json
+        _overlays.value = emptyMap()
         _snapshot.value = result.snapshot
         _status.value = ThemeStatus.Ready(
             packId, result.snapshot.meta.packVersion, modifiers,
             warnings = result.warnings.size, degraded = false,
         )
-        org.minime.core.compiler.CompileResult(result.snapshot, result.warnings)
+        result
+    }
+
+    // ---------- R4 运行时覆写 ----------
+
+    /**
+     * 应用覆写（合并语义：同名路径后者覆盖前者；与既有覆写叠加）。
+     *
+     * 走 [OverlayApplier] → 同一编译流水线（后台线程 + last-wins 节流）：
+     * 编译成功才发射新快照；失败回滚到上一版覆写态并报告 [ThemeStatus.Failed]
+     * （防改坏：面板爆炸不会把主题留在半坏状态）。
+     *
+     * 空 map 为 no-op（无意义请求不起编译）。
+     */
+    fun applyOverrides(entries: Map<String, TokenValue>) {
+        if (entries.isEmpty()) return
+        val previous = _overlays.value
+        val merged = previous + entries
+        _overlays.value = merged
+        recompileWithOverlay(target = merged, rollbackTo = previous)
+    }
+
+    /**
+     * 重置覆写：[paths] 为空 = 全部还原；否则仅移除指定路径（子系统级重置）。
+     * 无可重置项为 no-op。
+     */
+    fun resetOverrides(paths: Collection<String> = emptyList()) {
+        val previous = _overlays.value
+        if (previous.isEmpty()) return
+        val remaining = if (paths.isEmpty()) emptyMap() else previous - paths.toSet()
+        if (remaining == previous) return
+        _overlays.value = remaining
+        recompileWithOverlay(target = remaining, rollbackTo = previous)
+    }
+
+    /** 覆写编译：取消在途 → 后台编译 → 成功发射 / 失败回滚覆写态 */
+    private fun recompileWithOverlay(target: Map<String, TokenValue>, rollbackTo: Map<String, TokenValue>) {
+        pendingJob?.cancel()
+        val packId = currentPackId
+        val modifiers = _snapshot.value.meta.activeModifiers
+        val json = currentJson
+        if (json == null) {
+            // fallback 态（无基础包）：覆写无处施加——回滚覆写态并报告（overlays 表与快照保持一致）
+            _overlays.value = rollbackTo
+            _status.value = ThemeStatus.Failed(
+                packId, modifiers, CompileErrorCode.PACK_NOT_FOUND,
+                "当前无主题包可覆写（fallback 态）",
+            )
+            return
+        }
+
+        _status.value = ThemeStatus.Loading(packId, modifiers)
+        pendingJob = scope.launch {
+            val outcome = runCatching {
+                withContext(computeDispatcher) { compileInto(json, packId, modifiers, target) }
+            }
+            // 被更新的覆写请求取消 → 不回滚（新请求已持更新态），也不抢状态
+            if (outcome.isFailure && outcome.exceptionOrNull() is CancellationException) return@launch
+            outcome.onSuccess { result ->
+                _snapshot.value = result.snapshot
+                _status.value = ThemeStatus.Ready(
+                    packId, result.snapshot.meta.packVersion, modifiers,
+                    warnings = result.warnings.size, degraded = false,
+                )
+            }.onFailure { error ->
+                _overlays.value = rollbackTo // 防改坏：回滚到上一版覆写态（与快照一致）
+                _status.value = ThemeStatus.Failed(
+                    packId, modifiers,
+                    (error as? ThemeCompileException)?.code ?: CompileErrorCode.ENGINE_INTERNAL,
+                    error.message ?: "覆写编译失败",
+                )
+            }
+        }
     }
 
     // ---------- 内部 ----------
 
-    /** 编译 + 子系统实例复用（§8.2）+ 写缓存 */
-    private fun compileInto(json: String, packId: String, modifiers: List<String>): org.minime.core.compiler.CompileResult {
-        val result = compiler.compileJson(json, modifiers)
+    /** 编译（覆写挂载 + 子系统实例复用 §8.2 + 写缓存） */
+    private fun compileInto(
+        json: String,
+        packId: String,
+        modifiers: List<String>,
+        overlay: Map<String, TokenValue>,
+    ): CompileResult {
+        val result = compiler.compile(OverlayApplier.apply(packFor(json), overlay), modifiers)
         val reused = SnapshotReuser.reuse(_snapshot.value.takeIf { _status.value !is ThemeStatus.Idle }, result.snapshot)
-        val final = if (reused === result.snapshot) result else org.minime.core.compiler.CompileResult(reused, result.warnings)
-        cache[CacheKey(packId, modifiers)] = final.snapshot
+        val final = if (reused === result.snapshot) result else CompileResult(reused, result.warnings)
+        cache[CacheKey(packId, modifiers, overlay)] = CacheEntry(json, final.snapshot)
         return final
+    }
+
+    /** 解析缓存（覆写路径免重复解析同一份 JSON）；与 [currentJson] 同步失效 */
+    private fun packFor(json: String): ThemePack {
+        val cached = parsedPack
+        if (cached != null && parsedJson == json) return cached
+        val pack = DtcgParser().parse(json)
+        parsedJson = json
+        parsedPack = pack
+        return pack
     }
 
     /** 丢弃缓存（主题包更新后调用）；packId 为 null 时全清 */
     fun invalidate(packId: String? = null) {
         if (packId == null) {
             cache.clear()
+            parsedJson = null
+            parsedPack = null
             return
         }
         cache.keys.filter { it.packId == packId }.forEach { cache.remove(it) }
+        if (currentPackId == packId) {
+            parsedJson = null
+            parsedPack = null
+        }
     }
 
-    private data class CacheKey(val packId: String, val modifiers: List<String>)
+    private data class CacheKey(
+        val packId: String,
+        val modifiers: List<String>,
+        val overlay: Map<String, TokenValue>,
+    )
+
+    /** 缓存条目：编译产物连同来源 json（命中切换零 I/O，且覆写编译可直接取基础包） */
+    private data class CacheEntry(val json: String, val snapshot: ThemeSnapshot)
 
     companion object {
         /** 内置默认包标识 */

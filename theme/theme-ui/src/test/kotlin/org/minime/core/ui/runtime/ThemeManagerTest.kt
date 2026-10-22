@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.minime.core.api.CompileErrorCode
+import org.minime.core.schema.ColorValue
 import org.minime.core.tokens.ThemeSnapshot
 import kotlin.coroutines.ContinuationInterceptor
 
@@ -284,5 +285,157 @@ class ThemeManagerTest {
         assertSame(light.interaction, dark.interaction)
         assertSame(light.size, dark.size)
         assertTrue(light.color !== dark.color, "color 变了")
+    }
+
+    // ---------- R4 运行时覆写层 ----------
+
+    @Test
+    fun `applyOverrides applies with alias following`() = runTest {
+        val manager = manager()
+        manager.initialize()
+        assertEquals("#007AFFFF", manager.snapshot.value.color.accent.hex)
+
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+
+        // §5.1 规则 1 运行时证明：primitive 被覆写 → 语义别名 accent 跟随
+        assertEquals("#FF0000FF", manager.snapshot.value.color.accent.hex)
+        assertEquals(
+            mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")),
+            manager.overlays.value,
+        )
+        assertTrue(manager.status.value is ThemeStatus.Ready)
+    }
+
+    @Test
+    fun `resetOverrides restores base values`() = runTest {
+        val manager = manager()
+        manager.initialize()
+
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+        manager.resetOverrides()
+        advanceUntilIdle()
+
+        assertEquals("#007AFFFF", manager.snapshot.value.color.accent.hex, "全部还原 = 回基础包面貌")
+        assertTrue(manager.overlays.value.isEmpty())
+        assertTrue(manager.status.value is ThemeStatus.Ready)
+    }
+
+    @Test
+    fun `resetOverrides by path keeps the rest`() = runTest {
+        val manager = manager()
+        manager.initialize()
+
+        manager.applyOverrides(
+            mapOf(
+                "color.primitive.systemBlue" to ColorValue.fromHex("#FF0000"),
+                "color.primitive.systemGreen" to ColorValue.fromHex("#00FF00"),
+            )
+        )
+        advanceUntilIdle()
+        manager.resetOverrides(listOf("color.primitive.systemBlue"))
+        advanceUntilIdle()
+
+        assertEquals("#007AFFFF", manager.snapshot.value.color.accent.hex, "systemBlue 还原")
+        assertEquals(
+            "#00FF00FF",
+            manager.snapshot.value.color.stateSuccess.hex,
+            "systemGreen 覆写仍在（state.success = {color.primitive.systemGreen}）",
+        )
+        assertEquals(setOf("color.primitive.systemGreen"), manager.overlays.value.keys)
+    }
+
+    @Test
+    fun `failed override rolls back to previous good state`() = runTest {
+        val glassPack = """
+            {"version":"2025.10","manifest":{"name":"glass-pack","version":"1.0.0","engineVersion":">=1.0 <2.0"},
+             "sets":{"core":{
+               "color.primitive.systemBlue":{"${'$'}value":"#007AFF","${'$'}type":"color"},
+               "color.semantic.accent":{"${'$'}value":"{color.primitive.systemBlue}","${'$'}type":"color"},
+               "color.semantic.text.primary":{"${'$'}value":"#000000","${'$'}type":"color"},
+               "glass.enabled":{"${'$'}value":true,"${'$'}type":"boolean"},
+               "glass.regular":{"${'$'}type":"glass","${'$'}value":{"blur":"20dp","saturation":1.8,
+                 "tint":"{color.semantic.accent}","tintAlpha":0.72,"hairline":true}}}},
+             "resolutionOrder":[{"set":"core"}],
+             "${'$'}extensions":{"minime":{"glass":{"consumers":["color.semantic.text.primary"]}}}}
+        """.trimIndent()
+        val store = InMemoryThemeStore("glass-pack", emptyList())
+        val packs = InMemoryThemePackRepository().apply { save("glass-pack", glassPack) }
+        val manager = manager(store, packs)
+        manager.initialize()
+
+        // 先应用一个合法覆写（accent 变红）作为「上一版好状态」
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+        val good = manager.snapshot.value
+        assertEquals("#FF0000FF", good.color.accent.hex)
+
+        // 再应用一个会把玻璃表面消费令牌改半透明的覆写 → GLASS_OPAQUE_VIOLATION
+        manager.applyOverrides(mapOf("color.semantic.text.primary" to ColorValue.fromHex("#00000080")))
+        advanceUntilIdle()
+
+        // 防改坏：快照保持上一版好状态，覆写表回滚（与快照一致），失败可诊断
+        assertSame(good, manager.snapshot.value, "编译失败保持上一个可用快照（G1）")
+        assertEquals(setOf("color.primitive.systemBlue"), manager.overlays.value.keys, "覆写表回滚到上一版")
+        val status = manager.status.value as ThemeStatus.Failed
+        assertEquals(CompileErrorCode.GLASS_OPAQUE_VIOLATION, status.code)
+    }
+
+    @Test
+    fun `select clears overlays`() = runTest {
+        val packs = InMemoryThemePackRepository().apply {
+            save("p1", json)
+            save("dark-pack", json)
+        }
+        val manager = manager(packs = packs)
+        manager.initialize()
+
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+        assertEquals("#FF0000FF", manager.snapshot.value.color.accent.hex)
+
+        // 换包 = 工坊会话结束：覆写清零，新包以原初面貌生效
+        manager.select("dark-pack", listOf("dark"))
+        advanceUntilIdle()
+
+        assertTrue(manager.overlays.value.isEmpty(), "select 成功后覆写清零")
+        assertEquals("#0A84FFFF", manager.snapshot.value.color.accent.hex)
+    }
+
+    @Test
+    fun `rapid overrides coalesce to the last one`() = runTest {
+        val manager = manager()
+        manager.initialize()
+
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#00FF00")))
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#0000FF")))
+        advanceUntilIdle()
+
+        assertEquals("#0000FFFF", manager.snapshot.value.color.accent.hex, "连续覆写只让最后一次生效（无排队编译）")
+        assertEquals(
+            mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#0000FF")),
+            manager.overlays.value,
+        )
+    }
+
+    @Test
+    fun `overlay after cache-hit select uses the cached pack`() = runTest {
+        val packs = InMemoryThemePackRepository().apply { save("p1", json) }
+        val manager = manager(packs = packs)
+        manager.initialize()
+        manager.select("p1", emptyList())
+        advanceUntilIdle()
+
+        manager.select(ThemeManager.BUILT_IN, emptyList())
+        advanceUntilIdle()
+        manager.select("p1", emptyList()) // 缓存命中（零 I/O）：currentJson 须随条目恢复
+        advanceUntilIdle()
+
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+
+        assertEquals("#FF0000FF", manager.snapshot.value.color.accent.hex, "命中后再覆写仍以 p1 为基础包")
     }
 }

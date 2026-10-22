@@ -5,9 +5,7 @@ import org.minime.core.api.ThemeCompileException
 import org.minime.core.schema.BooleanValue
 import org.minime.core.schema.ColorValue
 import org.minime.core.schema.CompositeSchemas
-import org.minime.core.schema.CubicBezierValue
 import org.minime.core.schema.DimensionValue
-import org.minime.core.schema.DurationValue
 import org.minime.core.schema.GlassValue
 import org.minime.core.schema.NumberValue
 import org.minime.core.schema.RawField
@@ -16,6 +14,7 @@ import org.minime.core.schema.ShadowValue
 import org.minime.core.schema.SpringValue
 import org.minime.core.schema.StringValue
 import org.minime.core.schema.TokenType
+import org.minime.core.schema.TokenTypeCheck
 import org.minime.core.schema.TokenValue
 import org.minime.core.schema.TypographyValue
 
@@ -167,26 +166,12 @@ class AliasResolver(private val tokens: Map<String, RawToken>) {
     // ---------- 类型校验 ----------
 
     private fun checkValueType(path: String, expected: TokenType, actual: TokenValue, what: String) {
-        if (!matchesType(expected, actual)) {
+        if (!TokenTypeCheck.matches(expected, actual)) {
             throw ThemeCompileException(
                 CompileErrorCode.TYPE_MISMATCH,
                 "令牌 \"$path\" 类型不符: 期望 $expected，$what 实际为 ${actual::class.simpleName}（$actual）",
             )
         }
-    }
-
-    private fun matchesType(expected: TokenType, value: TokenValue): Boolean = when (expected) {
-        TokenType.COLOR -> value is ColorValue
-        TokenType.DIMENSION -> value is DimensionValue
-        TokenType.DURATION -> value is DurationValue
-        TokenType.NUMBER -> value is NumberValue
-        TokenType.BOOLEAN -> value is BooleanValue
-        TokenType.STRING, TokenType.FONT_FAMILY, TokenType.FONT_WEIGHT -> value is StringValue
-        TokenType.CUBIC_BEZIER -> value is CubicBezierValue
-        TokenType.TYPOGRAPHY -> value is TypographyValue
-        TokenType.SHADOW -> value is ShadowValue
-        TokenType.SPRING -> value is SpringValue
-        TokenType.GLASS -> value is GlassValue
     }
 
     private fun Map<String, TokenValue>.number(field: String, path: String): Float =
