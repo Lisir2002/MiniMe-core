@@ -16,10 +16,13 @@ import org.minime.core.compiler.CompileResult
 import org.minime.core.compiler.OverlayApplier
 import org.minime.core.compiler.ThemeCompiler
 import org.minime.core.fallback.FallbackTheme
+import org.minime.core.schema.DiffSerializer
 import org.minime.core.schema.DtcgParser
 import org.minime.core.schema.ThemePack
+import org.minime.core.schema.TokenTypeCheck
 import org.minime.core.schema.TokenValue
 import org.minime.core.tokens.ThemeSnapshot
+import org.minime.core.tokens.TokenVocabulary
 
 /**
  * 主题管理器（R2 运行时，白皮书 §8.1 时序 + §8.2 性能设计点；R4 叠加覆写层）。
@@ -37,11 +40,13 @@ import org.minime.core.tokens.ThemeSnapshot
  *
  * 覆写语义约定：
  * - **内存态**：覆写不写回 [ThemeStore] / [ThemePackRepository]（默认包零污染）——
- *   显式导出 diff 主题包由工坊侧负责（R4.3）；
+ *   diff 主题包的显式导出（[exportDiff]）只产文本，落盘经宿主 SAF（R4.3）；
  * - **随基础包切换清零**：[select] / [importAndApply] / [initialize] 建立新基础时
  *   覆写即会话结束（换包 = 用该包原初面貌）；
  * - **last-wins**：连续覆写（拖动色板/滑杆）取消在途编译，只让最后一次生效，
  *   与 [select] 同一节流语义（不排队编译，面板操作零 ANR）。
+ * - **diff 导入即替换**（R4.3）：[importDiff] 以文件内容全量替换当前 overlays
+ *   （非合并），复用 [recompileWithOverlay] 的防改坏回滚。
  */
 class ThemeManager(
     private val store: ThemeStore,
@@ -332,6 +337,96 @@ class ThemeManager(
         }
     }
 
+    // ---------- R4.3 diff 主题包 ----------
+
+    /**
+     * 导出：当前覆写表 + 基础包元信息 → diff 包文本（DTCG 2025.10 对齐 + minime 命名空间）。
+     *
+     * 纯函数编排（[DiffSerializer] 保纯、可 JVM 单测）：指纹对**当前基础包**计算
+     * （语义指纹，同包不同序列化结果一致）；`exportedAt` 可注入保测试确定性。
+     *
+     * 边界：覆写为空仍导出（count=0，UI 层可提示「无可导出内容」）；
+     * fallback 态（无基础包）抛 [IllegalStateException]——UI 侧导出钮在
+     * overlays 为空时禁用，该态不可达（防御性断言）。
+     */
+    fun exportDiff(exportedAt: String = nowIso()): String {
+        val json = currentJson ?: error("当前无主题包可导出 diff（fallback 态）")
+        val base = DiffSerializer.DiffBaseMeta(
+            packId = currentPackId,
+            packVersion = _snapshot.value.meta.packVersion,
+            fingerprint = DiffSerializer.computeFingerprint(packFor(json)),
+        )
+        return DiffSerializer.serialize(_overlays.value, base, exportedAt)
+    }
+
+    /**
+     * 预览：纯解析、**零改态**（确认对话框只消费本结果，不碰 overlays/快照/状态）。
+     *
+     * 与 [importDiff] 严格分离：本方法不编译、不改态，坏包走 [DiffPreviewResult.Failed]；
+     * 「应用必失败」的两类路径（词汇表外 / 类型不符）在 [DiffPreviewResult.Ok] 里标注，
+     * 对话框据此禁用「应用」钮并给出可诊断信息（优于让用户点了才失败）。
+     */
+    fun previewDiff(json: String): DiffPreviewResult {
+        val parsed = try {
+            DiffSerializer.deserialize(json)
+        } catch (e: DiffSerializer.DiffFormatException) {
+            return DiffPreviewResult.Failed(e.code, e.message ?: "diff 包解析失败")
+        }
+
+        val vocabularyMisses = parsed.overlays.keys.filterNot { TokenVocabulary.isKnown(it) }
+        val typeMisses = parsed.overlays.entries
+            .filter { (path, value) ->
+                val declared = TokenVocabulary.typeOf(path)
+                declared != null && !TokenTypeCheck.matches(declared, value)
+            }
+            .map { it.key }
+
+        val fileFingerprint = parsed.meta.baseFingerprint
+        val fingerprint = if (fileFingerprint == null) {
+            FingerprintState.UNKNOWN // 形态 B（纯 DTCG）或未声明指纹：无从比对
+        } else {
+            when (val current = currentJson?.let { DiffSerializer.computeFingerprint(packFor(it)) }) {
+                null -> FingerprintState.UNKNOWN // fallback 态：无当前包可比
+                fileFingerprint -> FingerprintState.MATCH
+                else -> FingerprintState.MISMATCH
+            }
+        }
+
+        return DiffPreviewResult.Ok(
+            overlays = parsed.overlays,
+            total = parsed.overlays.size,
+            fingerprint = fingerprint,
+            basePackId = parsed.meta.basePackId,
+            basePackVersion = parsed.meta.basePackVersion,
+            exportedAt = parsed.meta.exportedAt,
+            sample = parsed.overlays.entries.take(SAMPLE_SIZE)
+                .map { (path, value) -> "$path = ${summarizeTokenValue(value)}" },
+            vocabularyMisses = vocabularyMisses,
+            typeMisses = typeMisses,
+        )
+    }
+
+    /**
+     * 应用 diff 包：deserialize + **全量替换**当前 overlays（导入即替换，设计 §7；
+     * 合并语义留真需求时再加，YAGNI）。
+     *
+     * 替换走 R4.1 同一覆写编译管线（[recompileWithOverlay]：后台 + last-wins +
+     * 失败回滚）——[ImportResult.Applied] 仅表示「已进入应用流程」，编译失败经
+     * [status] 的 [ThemeStatus.Failed] 暴露且 overlays 回滚到上一版（防改坏）。
+     * 坏包（格式层）直接 [ImportResult.Rejected]，零改态。
+     */
+    fun importDiff(json: String): ImportResult {
+        val parsed = try {
+            DiffSerializer.deserialize(json)
+        } catch (e: DiffSerializer.DiffFormatException) {
+            return ImportResult.Rejected(e.code, e.message ?: "diff 包解析失败")
+        }
+        val previous = _overlays.value
+        _overlays.value = parsed.overlays
+        recompileWithOverlay(target = parsed.overlays, rollbackTo = previous)
+        return ImportResult.Applied(parsed.overlays.size)
+    }
+
     // ---------- 内部 ----------
 
     /** 编译（覆写挂载 + 子系统实例复用 §8.2 + 写缓存） */
@@ -387,5 +482,11 @@ class ThemeManager(
         const val BUILT_IN = "built-in"
         /** 兜底快照标识（调试面板显示用，非真实包） */
         const val FALLBACK_ID = "fallback"
+
+        /** 预览样本条数（对话框样本列表上限，设计 §7） */
+        private const val SAMPLE_SIZE = 8
+
+        /** 导出时间默认值（ISO 8601 含偏移量；测试注入固定值保确定性） */
+        private fun nowIso(): String = java.time.OffsetDateTime.now().toString()
     }
 }

@@ -5,12 +5,16 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.json.JSONObject
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.minime.core.api.CompileErrorCode
 import org.minime.core.schema.ColorValue
+import org.minime.core.schema.DimensionValue
+import org.minime.core.schema.TypographyValue
 import org.minime.core.tokens.ThemeSnapshot
 import kotlin.coroutines.ContinuationInterceptor
 
@@ -483,5 +487,176 @@ class ThemeManagerTest {
         // 语义相等（快照为 data class 全等）——实例不必同一：reuse 层会拼装复用子系统
         assertEquals(base, manager.snapshot.value, "还原后生效快照回到基础快照（内容全等）")
         assertEquals(base.color.accent.hex, manager.snapshot.value.color.accent.hex)
+    }
+
+    // ---------- R4.3 diff 主题包（导出/预览/导入） ----------
+
+    @Test
+    fun `exportDiff emits minime namespace with fingerprint`() = runTest {
+        val manager = manager()
+        manager.initialize()
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+
+        val json = manager.exportDiff("2026-10-22T14:30:00+08:00")
+        val root = JSONObject(json)
+        val minime = root.getJSONObject("minime")
+        assertEquals("minime-diff", minime.getString("format"))
+        assertEquals(1, minime.getInt("diffVersion"))
+        assertEquals(1, minime.getInt("count"))
+        assertEquals("built-in", minime.getString("basePackId"))
+        assertEquals("2026-10-22T14:30:00+08:00", minime.getString("exportedAt"))
+        assertTrue(minime.getString("baseFingerprint").startsWith("sha256:"), "基础包语义指纹")
+
+        // 令牌树：组嵌套形态 + 颜色对象形态（hex 保真源）
+        val blue = root.getJSONObject("\$tokens").getJSONObject("color")
+            .getJSONObject("primitive").getJSONObject("systemBlue")
+        assertEquals("color", blue.getString("\$type"))
+        assertEquals("#FF0000FF", blue.getJSONObject("\$value").getString("hex"))
+    }
+
+    @Test
+    fun `exportDiff without base pack fails fast`() = runTest {
+        val manager = manager()
+        // 未 initialize：fallback 态（无基础包 JSON）——UI 侧导出钮在 overlays 空时禁用，此处为防御断言
+        assertThrows<IllegalStateException> { manager.exportDiff("t") }
+    }
+
+    @Test
+    fun `previewDiff parses without mutating state`() = runTest {
+        val manager = manager()
+        manager.initialize()
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+        val before = manager.overlays.value
+        val exported = manager.exportDiff("2026-10-22T14:30:00+08:00")
+
+        val preview = manager.previewDiff(exported)
+        assertTrue(preview is DiffPreviewResult.Ok, "导出物必须可预览: $preview")
+        preview as DiffPreviewResult.Ok
+        assertEquals(1, preview.total)
+        assertEquals(FingerprintState.MATCH, preview.fingerprint)
+        assertEquals("built-in", preview.basePackId)
+        assertEquals("2026-10-22T14:30:00+08:00", preview.exportedAt)
+        assertEquals(listOf("color.primitive.systemBlue"), preview.sample.map { it.substringBefore(" = ") })
+        assertTrue(preview.sample.single().contains("#FF0000FF"), "样本含值摘要")
+        assertTrue(preview.vocabularyMisses.isEmpty())
+        assertTrue(preview.typeMisses.isEmpty())
+
+        // 零改态：overlays 与状态机都不动（确认对话框只消费预览，不碰运行时）
+        assertEquals(before, manager.overlays.value)
+        assertTrue(manager.status.value is ThemeStatus.Ready)
+    }
+
+    @Test
+    fun `previewDiff reports fingerprint three states`() = runTest {
+        val manager = manager()
+        manager.initialize()
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+        val exported = JSONObject(manager.exportDiff("t"))
+
+        // MISMATCH：篡改文件声明的基础包指纹（警告级，不阻断——对话框 banner 呈现）
+        exported.getJSONObject("minime").put("baseFingerprint", "sha256:" + "0".repeat(64))
+        val mismatched = manager.previewDiff(exported.toString())
+        assertEquals(FingerprintState.MISMATCH, (mismatched as DiffPreviewResult.Ok).fingerprint)
+
+        // UNKNOWN：形态 B（纯 DTCG，无 minime 段）——无从比对
+        val formB = """
+            {
+              "color": { "${'$'}type": "color", "primitive": { "systemGreen": { "${'$'}value": "#00FF00" } } }
+            }
+        """.trimIndent()
+        val formBPreview = manager.previewDiff(formB)
+        assertTrue(formBPreview is DiffPreviewResult.Ok)
+        formBPreview as DiffPreviewResult.Ok
+        assertEquals(FingerprintState.UNKNOWN, formBPreview.fingerprint)
+        assertEquals(1, formBPreview.total)
+        assertEquals(ColorValue.fromHex("#00FF00"), formBPreview.overlays["color.primitive.systemGreen"])
+        assertTrue(formBPreview.vocabularyMisses.isEmpty())
+    }
+
+    @Test
+    fun `importDiff round trips exported overlays`() = runTest {
+        val manager = manager()
+        manager.initialize()
+        val overlays = mapOf(
+            "color.primitive.systemBlue" to ColorValue.fromHex("#FF0000"),
+            "typography.body" to TypographyValue(
+                fontSize = DimensionValue(15f, "sp"),
+                lineHeight = DimensionValue(20f, "sp"),
+                fontWeight = "600",
+            ),
+        )
+        manager.applyOverrides(overlays)
+        advanceUntilIdle()
+        val exported = manager.exportDiff("t")
+
+        manager.resetOverrides()
+        advanceUntilIdle()
+        assertTrue(manager.overlays.value.isEmpty(), "先清空再导入（验证替换而非合并）")
+
+        val result = manager.importDiff(exported)
+        assertTrue(result is ImportResult.Applied)
+        assertEquals(2, (result as ImportResult.Applied).count)
+        advanceUntilIdle()
+
+        assertEquals(overlays.keys, manager.overlays.value.keys)
+        val body = manager.overlays.value["typography.body"] as TypographyValue
+        // typography lineHeight 乘数（20/15）Double 微误差 → delta 兜底
+        assertEquals(15f, body.fontSize.value, 0.001f)
+        assertEquals(20f, body.lineHeight!!.value, 0.001f)
+        assertEquals("#FF0000FF", manager.snapshot.value.color.accent.hex, "导入后生效（别名跟随）")
+    }
+
+    @Test
+    fun `importDiff rejects broken pack and keeps overlays`() = runTest {
+        val manager = manager()
+        manager.initialize()
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+        val before = manager.overlays.value
+
+        val result = manager.importDiff("not json {{{")
+        assertTrue(result is ImportResult.Rejected)
+        result as ImportResult.Rejected
+        assertEquals("PACK_CORRUPT", result.code)
+        assertEquals(before, manager.overlays.value, "坏包零改态")
+
+        advanceUntilIdle()
+        assertTrue(manager.status.value is ThemeStatus.Ready, "坏包不污染状态机")
+    }
+
+    @Test
+    fun `importDiff rolls back when overlay compile fails`() = runTest {
+        val manager = manager()
+        manager.initialize()
+        manager.applyOverrides(mapOf("color.primitive.systemBlue" to ColorValue.fromHex("#FF0000")))
+        advanceUntilIdle()
+        val good = manager.overlays.value
+
+        // 词汇表外路径：格式层放行（预览标注 vocabularyMisses），覆写编译期被 OverlayApplier 拒绝
+        val outOfVocabulary = """
+            {
+              "minime": { "format": "minime-diff", "diffVersion": 1 },
+              "${'$'}tokens": {
+                "chart": { "palette": { "rainbow": { "${'$'}type": "color", "${'$'}value": "#FF0000" } } }
+              }
+            }
+        """.trimIndent()
+        val preview = manager.previewDiff(outOfVocabulary)
+        assertTrue(preview is DiffPreviewResult.Ok)
+        preview as DiffPreviewResult.Ok
+        assertEquals(listOf("chart.palette.rainbow"), preview.vocabularyMisses)
+        assertEquals(good, manager.overlays.value, "预览本身零改态")
+
+        val result = manager.importDiff(outOfVocabulary)
+        assertTrue(result is ImportResult.Applied, "格式层接受；失败发生在编译期")
+        advanceUntilIdle()
+
+        assertEquals(good, manager.overlays.value, "编译失败回滚到上一版覆写（防改坏）")
+        val status = manager.status.value
+        assertTrue(status is ThemeStatus.Failed)
+        assertEquals(CompileErrorCode.SCHEMA_INVALID, (status as ThemeStatus.Failed).code)
     }
 }
