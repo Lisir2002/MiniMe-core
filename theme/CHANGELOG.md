@@ -17,6 +17,46 @@
 > 引擎版本是另一条线，**只用于主题包 `manifest.engineVersion` 兼容判定**，不得当软件发版版本用。
 > 二段式逢九进一：R1 `1.0` → R2 `1.1` … R9 `1.8` → R10 `1.9` → 转正 `2.0`（不存在 `1.10`）。
 
+## R4.2 主题工坊：令牌覆写面板（画廊 WORKSHOP 分区）— 已完成，待真机抽查
+
+**引擎版本 `1.2`（不变）** —— 拆分不变：`1.3` 随 R4.3（导入导出 + 防改坏收尾）落定
+单测：**:theme-engine 147 → 155（ContrastTest 8 项）+ :theme-ui 44 → 47（ThemeManagerTest +3 项）+ :minime-ui 7 → 18（WorkshopSpecTest 7 + WorkshopEmbedRobolectricTest 4）= 220 项全绿** ｜ **`:app` 侧门禁全绿**（compileReleaseKotlin / testReleaseUnitTest 1387 / detekt / lintRelease）
+**软件发版状态：未发版** —— 同 R4.1：R4 整批完成后按维护者裁定发 `0.0.1.11-rc1`（本次发版绕过 rc tag 规矩，CI tag 守卫加一次性 allowlist）。
+
+### 交付范围（对照 charter §7 R4.2 行「工坊分区 UI：WORKSHOP 占位替换（三区 + 令牌树 + 类型编辑器 + 实时读数）」）
+
+| 交付项 | 状态 | 落点 |
+|---|---|---|
+| 三区布局 | ✅ | `WorkshopSection`：顶栏（标题 + 覆写计数 + 重置本类 / 全部还原自绘文字钮）+ 六分类 tab（capsule）+ 工作区（640dp 断点：宽屏左实时预览右令牌控件，窄屏上下堆叠 42/58） |
+| 令牌树 | ✅ | `WorkshopTree`：十子系统 → 六分类分组折叠树（116 条路径），叶行 diff 圆点（accent=已覆写 / separator=原值）+ 语义名 + 路径 mono + 值摘要 + 选中高亮 |
+| 类型分发编辑器 | ✅ | `WorkshopEditor`：hex 输入 / 单滑杆 / 三滑杆（spring）/ 步进 / 开关 / glass 五字段逐字段 / typography 五字段逐字段（可空字段带置空）/ fontFamily 分段；令牌头 + diff 行（当前值 accent / 原值删除线）+「还原此条」 |
+| 实时读数 | ✅ | `WorkshopWcag`：26 格 WCAG 2.x 包络法矩阵（文本五档 × 背景五档 + accent×surface）随覆写实时重算 + 四级 LevelBadge；`WorkshopPreview`：文本 / 按钮 / 卡片列表行 / 色板条 / 玻璃样本 / 动效点播（spring 参数取自当前快照）样张 |
+| WCAG 单一真源 | ✅ | `theme-engine` `tokens/Contrast`：sRGB 线性化 + §6.8.5 包络法（前景/背景依次 source-over 合成到白/黑极端背景取更差比值），UI 只消费结果（引擎侧 JVM 对拍 8 项：白/黑 21 精确、#767676 AA 边缘 4.54、包络 FAIL 2.63 等） |
+| diff 原值源 | ✅ | `ThemeManager.baseSnapshot`：无覆写态快照（initialize/select/importAndApply 成功路径更新；覆写编译不更新），工坊「当前值 vs 原值」diff 原值 |
+| 自举纪律 | ✅ | 全部控件自绘（滑杆 / 开关 / 步进 / hex / 分段）+ 令牌消费；fallback 态编辑器禁用明示；无第三方控件依赖 |
+
+### 验收推进（R4.1 遗留 ⏳ 项）
+
+| R4.1 验收项 | R4.2 后状态 | 说明 |
+|---|---|---|
+| 5 WCAG 爆炸回滚面板化 | ✅（本轮） | 工坊预览列实时 WCAG 矩阵 + 「全部还原 / 重置本类 / 还原此条」UI 入口（回滚能力 R4.1 `resetOverrides` 已交付 JVM 侧，本轮补面板化） |
+| lint 目录外零新增 | ✅（本轮） | `lintRelease` 全绿，无新增 issue |
+| 3/4 round-trip 导入导出 | ⏳ R4.3 | diff 主题包（需 JSON 序列化器） |
+| 7 真机零 ANR | ⏳ 待维护者 | charter §7 R4.2 行明含「门禁 + 真机抽查」；JVM 侧滑杆拖动→覆写→还原链路已由 WorkshopEmbedRobolectricTest 覆盖 |
+| 引擎版本 1.3 | ⏳ R4.3 | 随导入导出落定 |
+
+### 关键实现决策与偏离（R4.2）
+
+1. **`baseSnapshot` 为 charter 未列的最小必要扩展**——charter §4 diff 面板需要「原值」参照，覆写态快照已被污染，无覆写态快照是 diff 行删除线显示的唯一正确来源；更新点限定 7 处无覆写成功路径（initialize 缓存命中 / 无包 fallback / 编译成功 / 降级 built-in、select 缓存命中 / 编译成功、importAndApply 成功），覆写编译（recompileWithOverlay）不更新（保持原初面貌）。
+2. **窄屏 640dp 断点上下堆叠**（对 charter「三区」的细化）——预览 42% / 控制台 58%，顶栏与 tab 常驻顶部；Robolectric 840dp 测试屏即走窄屏分支，宽屏分支由维护者真机抽查覆盖。
+3. **WCAG 矩阵置预览列顶部（55/45 分栏）**——包络法读数是覆写核心安全信号（防改坏），优先于样张可见性。
+4. **自绘控件全量替代设想中的 R6 组件族**——滑杆（awaitEachGesture + down 即跳转 + drag、44dp 触达、onSizeChanged 定位）、开关（size.switch 令牌 iOS 风）、步进（−/＋ 36dp 圆）、hex（BasicTextField 实时提交 / 非法红边）、分段（sans/mono）——R6 组件族就绪前不阻塞工坊；组件族落成后按同一规格回收（与 charter §8 自举纪律本意一致：工坊先行验证控件规格，R6 提炼为通用族）。
+5. **typography 可空字段「置空」钮**——letterSpacing / fontWeight 可空（null = 不设置），逐字段滑杆 + 显式置空，避免空值歧义。
+6. **fallback 态明示不可用**——无主题包（FALLBACK_ID）时编辑器禁用 + 文案明示，不提供「改了不生效」的静默死路。
+7. **`Float.fmt()` 命名冲突改用 `wsFmt()`**——WorkshopSpec 的 internal 版与 TokensOverviewSection 的 private 版同包同签名冲突；tree/editor/preview 使用处批量替换。
+
+---
+
 ## R4.1 主题调节与工坊：运行时覆写层（引擎侧底座）— 已完成，待发版
 
 **引擎版本 `1.2`（不变）** —— 按批次 charter 拆分，`1.3` 随 R4.3（导入导出 + 防改坏收尾）落定；主题包 `engineVersion` 区间 `>=1.0 <2.0` 不变

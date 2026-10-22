@@ -30,3 +30,11 @@ val ColorTokens.textPrimaryColor: androidx.compose.ui.graphics.Color get() = tex
 val ColorTokens.textSecondaryColor: androidx.compose.ui.graphics.Color get() = textSecondary.compose()
 val ColorTokens.separatorColor: androidx.compose.ui.graphics.Color get() = borderSeparator.compose()
 val ColorTokens.fillPrimaryColor: androidx.compose.ui.graphics.Color get() = fillPrimary.compose()
+
+/** 状态三色（§3.4 语义状态面；工坊错误条 / WCAG 徽标 / 预览色板消费） */
+val ColorTokens.stateErrorColor: androidx.compose.ui.graphics.Color get() = stateError.compose()
+val ColorTokens.stateSuccessColor: androidx.compose.ui.graphics.Color get() = stateSuccess.compose()
+val ColorTokens.stateWarningColor: androidx.compose.ui.graphics.Color get() = stateWarning.compose()
+
+/** 第三级文本色（工坊 diff 原值 / 弱化读数） */
+val ColorTokens.textTertiaryColor: androidx.compose.ui.graphics.Color get() = textTertiary.compose()

@@ -185,7 +185,9 @@ class GalleryEmbedRobolectricTest {
         GallerySection.COMPONENTS -> "随 R6–R9 交付"
         GallerySection.PROTOTYPES -> "随 R8 交付"
         GallerySection.MOTION -> "随 R5 交付"
-        GallerySection.WORKSHOP -> "随 R4 交付"
+        // R4.2 起 WORKSHOP 已是真实工坊页（非占位）；marker 取预览列必然渲染的
+        // WCAG 矩阵标题（不依赖 fallback 态，且避开侧边栏同名 label「主题工坊」）
+        GallerySection.WORKSHOP -> "WCAG 对比度矩阵"
         GallerySection.DEBUG -> "包版本"
     }
 }
