@@ -87,6 +87,59 @@
 
 ---
 
+## R5.5 工坊布局重构：小屏优先 + 演示带 + 手风琴内嵌 — 已完成，待发版
+
+**引擎版本 `1.4` 不变**（纯 UI 层重构，无引擎变更）｜ 单测：**:minime-ui 39 → 44**（`WorkshopLayoutRobolectricTest` 5 项布局契约）｜ 门禁合计 **1691 项全绿**（theme-engine 192 + theme-ui release 68 + minime-ui debug 44 + :app 1387，app 侧不变）
+**软件发版状态：未发版** —— 按维护者 2026-10-23 裁定「用你推荐的，现在开始做这个，然后发 rc3」随 R5.5-D 发 `0.0.1.11-rc3`（同 rc2：CI tag 守卫 allowlist 同步更新）。
+
+### 背景（两次维护者指示 + 病灶量化）
+
+1. 维护者：「样板页面不要屏幕切割区块显示」（R5 期）——工坊「三层蛋糕」未清：6 处 `weight` 切割（0.42/0.58 窄屏 × 0.6/0.4 控制台内 × 0.55/0.45 预览内）+ placeholder 卡片空占 + 两级 tab 重名。
+2. 维护者：「等比例写死宽高，影响小屏手机的操作体验」——**核心痛点是小屏操作体验而非美观**。360×640 实测量化：编辑器实得 ≈169dp（SpringEditor 需 200dp+ 溢出）、树 ≈2.5 行；`size.touchTarget=44dp` 触摸下限被挤压——零和博弈，调比例无解。
+3. 维护者定案：「我想要一个固定在顶部的演示区域占内容区域的 1/5，其余部分是可滑动的参数调控内容」。
+
+### 交付范围（对照 charter §7 提交拆分 A–D）
+
+| 提交 | 交付项 | 落点 |
+|---|---|---|
+| A | 布局常量真源 | `WorkshopLayoutSpec`（新建）：`DEMO_BAND_RATIO=0.2f` + `PARAM_FLOW_RATIO=0.8f`（口径文档，实现为 `weight(1f)`，KDoc 记录 fraction 三重扣减坑）+ `DemoGroup` 六组枚举 + `defaultDemoGroup` 联动映射 + `DEMO_BAND_TAG` / `PARAM_FLOW_TAG` testTag 常量 |
+| A | 工坊主体重写 | `WorkshopSection`（~590 行）：`Box` → `Column{ TopBar → Column(weight 1f){ 演示带(0.2) → 分类 tab → status banner → 参数流 LazyColumn(weight 1f, listState) } }`；删 `BoxWithConstraints` 640dp 双分支（宽窄同构一套布局）；删 `WorkshopConsole` / `WorkshopEditorPlaceholder`；切类清 `selectedPath` + 演示带默认组联动；`onSelect` 再点选中行收起 |
+| A | 演示带 | `WorkshopDemoBand`（`git mv` from WorkshopPreview.kt + 重写，~430 行）：`Column{ DemoGroupChips 六组小 chip + LazyRow(weight 1f) }`；六组样本扩展（文本 4 / 按钮 2 / 卡片 3 / 配色 5 / 玻璃拟态 1 / 动效点播 1）；`DemoTokens` 一次取齐供 LazyListScope 消费；透明底零卡片 |
+| A | 树 → 手风琴内嵌 | `WorkshopTree` composable → `LazyListScope.workshopTreeItems(...)`：叶行 = `Column{ WorkshopTreeRow + if(path==selectedPath) WorkshopEditorInline }`；新增 `WorkshopEditorInline`（accent 竖线 + 「正在编辑：path」行 + `WorkshopEditorContent` 内嵌，clip + padding start 12） |
+| A | 编辑器拆 content | `WorkshopEditorCard` → `internal fun WorkshopEditorContent(path, manager, overridable, modifier)`：去卡片框、modifier 参数化，供流内内嵌与调用方复用；四段结构（令牌头 / diff 行 / 类型分发 / 还原此条）不变 |
+| A | 选中即滚动 | `WorkshopSpec.flowIndexOf(category, path)` + Section `LaunchedEffect(selectedPath, category)` → `listState.animateScrollToItem(...)`：既是契约测试修复（小屏叶行多在视口外）也是产品缺陷修复（手风琴展开必须入视口） |
+| A | fallback 明示迁移 | 原占位页文案迁参数流流首首项（`!overridable` 时显示「当前为 fallback 基座（无主题包），覆写不可用」） |
+| A | WCAG 折叠块 | 私有 `WorkshopWcagFoldBlock`：摘要行「WCAG 对比度矩阵 · 26 格 · 实时读数」+ 默认折叠，展开调 `WorkshopWcagMatrix` |
+| B | 布局契约测试 | `WorkshopLayoutRobolectricTest` 5 项（基类 w360dp-h640dp 小屏首要约束）：演示带占内容区 1/5（band/(band+flow) ∈ [0.15,0.25]）/ 宽屏同构（方法级 @Config w840dp-h800dp）/ 手风琴同刻单开（performScrollToNode + 展开转移 + 再点收起）/ 切类联动演示带默认组 / 默认组映射全覆盖 |
+| B | 既有测试全绿 | `WorkshopEmbedRobolectricTest` 7 项架构切换后全绿（fallback 文案随占位页删除改断言、滑杆拖动经「选中即滚动」入视口后恢复） |
+
+### 关键实现决策与踩坑（R5.5）
+
+1. **`fillMaxHeight(fraction)` 在 Column 内的基数陷阱**（主代码踩坑转 KDoc）——fraction 基数是「剩余空间」而非内容区：演示带 0.2 + tab + 参数流 0.8 三重扣减致实测比例漂移至 0.367。正解 = 演示带 `fillMaxHeight(0.2)` + tab `wrapContentHeight` + 参数流 `weight(1f)`；`PARAM_FLOW_RATIO` 保留为口径文档（常量无使用方，KDoc 说明实现原因）。测试口径同步修正为 `band/(band+flow)`（tab 为分隔条不计内容区）。
+2. **LazyColumn「组合了但未放置」0-bounds 节点**（测试踩坑转产品修复）——item 部分越出 viewport 时语义树有节点但 `boundsInWindow` 全 0，`performTouchInput` 打到 (0,0) 静默失效。诊断法：`fetchSemanticsNodes()` + 打印 bounds 对比（滑杆 bounds `Rect(0,0,0,0)` vs 「正在编辑」行 y 641-676 vs 参数流视口底 800）。根因 = 编辑器顶部落到视口底线外 → 产品修复「选中即滚动」。
+3. **折叠态读取纪律**（R5.5 实测补录）——`LazyListScope` 扩展非 composable，`groupExpanded[key]` 必须在 item 的 composable lambda 内读，否则折叠点击不重组。
+4. **宽窄同构删双分支**（charter D2）——`BoxWithConstraints` + 640dp 分支整体删除：演示带 LazyRow 天然横滑适配窄屏，参数流 LazyColumn 天然纵滑，一套布局消两端（契约测试宽屏同构项固化）。
+5. **演示带 chip 行与分类 tab 两级**（charter D1，维护者推荐项）——chip 行选「看哪组样本」、tab 切「调哪类令牌」；切类时 chip 跳默认组（defaultDemoGroup），手动 chip 切换优先。
+
+### 验收推进（对照 charter §6，7 项）
+
+| 验收项 | 状态 | 覆盖 |
+|---|---|---|
+| 1 演示带占内容区 1/5 | ✅ JVM | `WorkshopLayoutRobolectricTest.演示带占内容区五分之一`（band/(band+flow) ∈ [0.15,0.25]） |
+| 2 参数流可滑动占 4/5 | ✅ JVM | 同上（flow 为 LazyColumn weight(1f)，契约项 1 的补数） |
+| 3 手风琴同刻单开 | ✅ JVM | `WorkshopLayoutRobolectricTest.手风琴同刻单开`（点 B 后只剩 B 编辑上下文 + 再点收起） |
+| 4 分类 tab → 演示带联动 | ✅ JVM | `WorkshopLayoutRobolectricTest.切类联动演示带默认组` + `默认组映射覆盖全部分类` |
+| 5 宽窄同构（一套布局） | ✅ JVM | `WorkshopLayoutRobolectricTest.宽屏同构演示带比例不变`（w840dp-h800dp 重放同一断言） |
+| 6 小屏零溢出 | ⏳ 真机 | 360×640 实机：SpringEditor ≥200dp / 触摸目标 44dp / 树行高——随 rc3 真机实测流程 |
+| 7 既有交互不回退 | ✅ JVM + ⏳ 真机 | `WorkshopEmbedRobolectricTest` 7 项全绿；真机目测随 rc3 |
+
+### 已知缺口（R5.5 不做）
+
+- 真机小屏零溢出示证（验收 6）与目测（5 / 7 的真机部分）：随 rc3 真机实测流程；
+- R5 二期 10 模式不动效层实现，不变。
+
+---
+
 ## R4.3 diff 主题包：导入导出 + 确认对话框 + 引擎 1.3 — 已完成，待发版
 
 **引擎版本 `1.3`（本轮落定）** —— 二段式步进 +0.1（R4.1/R4.2 均为 `1.2`，`1.3` 随导入导出收尾落定）；主题包 `engineVersion` 兼容区间 `>=1.0 <2.0` 不变
