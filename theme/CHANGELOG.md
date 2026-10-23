@@ -4,8 +4,8 @@
 
 | 线 | 谁定 | 格式 | 当前取值 |
 |---|---|---|---|
-| **软件发版版本**（git tag / Release） | **维护者确认** | **四段式 `x.x.x.x`**，A=颠覆性预留 / B=框架级结构性预留 / C=框架级重构 / **D=默认发版 +1** | 体系 `0.0.1.x`，已发至 `v0.0.1.10` |
-| **引擎版本**（`MiniMeEngine.VERSION`） | 引擎自定 | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.3`（R4.3；diff 主题包导入导出） |
+| **软件发版版本**（git tag / Release） | **维护者确认** | **四段式 `x.x.x.x`**，A=颠覆性预留 / B=框架级结构性预留 / C=框架级重构 / **D=默认发版 +1** | 体系 `0.0.1.x`，正式版已发至 `v0.0.1.10`；大更新中间测试版 `0.0.1.11-rc1`（R4 整批，2026-10-21） |
+| **引擎版本**（`MiniMeEngine.VERSION`） | 引擎自定 | **二段式 `主.次`，步长 +0.1，逢九进一** | `1.4`（R5；动效层） |
 | 主题包版本（`manifest.version`） | 主题作者自定 | 自由 | 默认包 `1.0.0` |
 
 ### 发版三条硬规矩（2026-10-21 维护者裁定）
@@ -16,6 +16,76 @@
 
 > 引擎版本是另一条线，**只用于主题包 `manifest.engineVersion` 兼容判定**，不得当软件发版版本用。
 > 二段式逢九进一：R1 `1.0` → R2 `1.1` … R9 `1.8` → R10 `1.9` → 转正 `2.0`（不存在 `1.10`）。
+
+## R5 动效层：模式目录 + 解析层 + 检验区 + 抽屉收敛 + 仪器测试回收 — 已完成，待发版
+
+**引擎版本 `1.4`（本轮落定）** —— 二段式步进 +0.1（R4.3 为 `1.3`，随动效规格表落定）；主题包 `engineVersion` 兼容区间 `>=1.0 <2.0` 不变
+单测：**:theme-engine 173 → 192（MotionCatalogTest 9 + ReducedMotionPolicyTest 5 + MotionResolversTest 5）+ :theme-ui 54 → 68（MotionSpecsTest 11 + MiniMeMotionSchemeTest 3；debug/release 双变体各 68）+ :minime-ui 23 → 39（MotionSectionRobolectricTest 8 + MotionScaleWiringRobolectricTest 3 + ThemeSwitchRobolectricTest 5）** ｜ 门禁合计 **1686 项全绿**（theme-engine 192 + theme-ui release 68 + minime-ui debug 39 + :app 1387，app 侧不变）｜ **仪器测试源集整体退役**：theme-ui androidTest 5 项删除（`1d206419`），R2 换肤 5 项验收等价回收为 minime-ui JVM 5 项进 CI
+**软件发版状态：未发版** —— R5 完成后按维护者裁定发 `0.0.1.11-rc2`（同 rc1：本次发版绕过 rc tag 规矩，CI tag 守卫 allowlist 同步更新）。
+
+### 交付范围（对照 charter §7 提交拆分 A–E；F/G 为文档与发版）
+
+| 提交 | 交付项 | 落点 |
+|---|---|---|
+| A | 动效模式目录规格表 | `motion/MotionPattern` + `MotionCatalog`（theme-engine）：五类别（过渡 / 反馈 / 加载与进度 / 手势驱动 / 状态变形）× **26 模式全量登记**（MVP 16 实现 + 二期 10 登记标注 `mvp=false` 不实现）；规格三要素机器可验（六槽之一 + 时长覆写令牌 + 降级行为逐模式落项） |
+| A | reducedMotion 降级决策器 | `motion/ReducedMotion`：`MotionScale` 系统四档 + `EffectiveMotion` 解析 + 降级时长换算；四级降级行为（SHORT_TWEEN_HALF / STATIC / DIRECT / NONE）逐模式落项 |
+| A | 铁律工程化 + 令牌补全 | `DurationCap` 三类上限（反馈 ≤200 / 过渡 ≤300 / 任意 ≤400ms，铁律 1）+ 豁免登记制（含理由，防静默豁免）；`interaction.shakeDamping`（0.4）补令牌（铁律 8：规格即令牌——数值不复制进规格表，标称时长与默认包 duration 档位双锚）；引擎 `1.3 → 1.4` |
+| A | CI 门禁补三模块 | `ci.yml` 增「Theme engine and gallery tests」步骤：theme-engine + theme-ui release + minime-ui debug 单测进合并链路（此前主题引擎断言写了不跑 = 没有门禁；R5-A push 首次运行即绿，run 39896424293） |
+| B | 动效解析层 | theme-engine `MotionResolvers`（槽位 / 时长 / 参数唯一解析入口，消费方不再各自遍历子树）；theme-ui `MotionSpecs` 工厂（目录 id → Compose `AnimationSpec` + 标称时长 + **初速度单独下发**供手势速度交接 + 降级接线；spinner 为铁律 2 唯一 linear 例外） |
+| B | M3 回喂契约 | `MiniMeMotionScheme`（版本无关稳定契约：六槽与 M3 `MotionScheme` 同构、只读、`MotionTokens` 唯一真源）+ `LocalMotionSpecs` / `LocalMiniMeMotionScheme` 提供层接入 `MiniMeTheme` |
+| B | 系统级降级读取 | `MotionScaleProvider` 读 `ANIMATOR_DURATION_SCALE`（系统级优先于主题包级；PARTIAL 不叠加降级；读不到按 NORMAL 不误降级） |
+| C | 动效检验区 | `MotionSection`（492 行，MOTION 占位替换）：五类别 tab + 可滚动模式清单点播 / 播放 + **0.25× 慢放**（压缩喂给 spec 的播放时间 ÷4 + snapTo——spring 无时长参数，曲线保真）+ 对照控件 + 铁律 9 双标注 UI 化（槽位 path + 时长覆写令牌 + 标称 ms + 阻尼覆写令牌 + 降级行为）；二期模式置灰 chip 取代播放钮；**零卡片分块**（遵守维护者 2026-10-23 指示） |
+| C | WorkshopPreview 去分块 | 删 PreviewCard 卡片外框 → 类别 tab + 透明行 + 分隔线；`PreviewTokens` 一次取齐供 LazyListScope 消费；顺带修复清单 LazyColumn `fillMaxSize` 在 Column 内挤出上方区域（改 `weight(1f)`）与预览 / 工坊三处 tab 重名（改名配色 / 玻璃拟态 / 动效点播） |
+| D | 抽屉动画收敛 | `ThemeGalleryScreen` 窄屏抽屉删硬编码（`DRAWER_SLIDE_MS` / `DRAWER_FADE_MS` + 自选 spring，R3 壳级 workaround），改 `Animatable` 进度驱动，规格经 `LocalMotionSpecs.require("page.push/pop")` 取（Q3 导航语义：SPATIAL_DEFAULT 槽 + SLOW 300ms spring）；滑移 / 淡变 / 内容区反向视差（`interaction.parallaxFactor=0.5`）由同一进度驱动——单源同步无「两层错速」；可中断（铁律 6：开合切换从当前值当前速度接管）；降级 OFF → tween 150ms |
+| D | 接线缺口修复 | `MiniMeTheme` 内挂 `MotionScaleProvider`（提交 B 遗留：此前 `LocalMotionScale` 永远走兜底 NORMAL，系统无障碍开关在主题引擎内完全失效） |
+| E | 仪器测试回收 | `ThemeSwitchRobolectricTest`（minime-ui 5 项）：R2 换肤 5 项验收 JVM 化（首帧即暗色 / 变化子系统 ≤1 pass / 相同主题零重组 / 导入宽松预算 / 换肤不重建内容） |
+| E | 退役测试删除 | `ThemeSwitchInstrumentedTest`（theme-ui androidTest）删除 + `testInstrumentationRunner` 与 androidTest 依赖六条清理（`1d206419`，维护者裁定「删除+清理依赖」）；版本目录条目保留（五条仍被 minime-ui / app 引用） |
+
+### 验收推进（对照 charter §6，13 项）
+
+| 验收项 | 状态 | 覆盖 |
+|---|---|---|
+| 1 规格三要素机器可验，「无主」禁止 | ✅ JVM | `MotionCatalogTest`：26 模式逐项声明槽位 + 时长覆写令牌 + 降级行为；NONE 槽仅触觉模式 |
+| 2 铁律 1 / 2 / 6 | ✅ JVM | `duration caps hold with explicit exemptions only`（三类上限 + 豁免登记含理由）；铁律 2 唯一 linear 例外 = spinner（MotionSpecsTest）；铁律 6 可中断 = 抽屉 Animatable 当前值当前速度接管（R5-D） |
+| 3 降级表逐行 + 系统级优先 | ✅ JVM | `ReducedMotionPolicyTest` 5 项（spatial→半时长短 tween / spinner、shimmer→静态 / 视差→直切）；`MotionScaleWiringRobolectricTest` 3 项（OFF→tween 150ms / NORMAL→spring / PARTIAL 不叠加） |
+| 4 解析层输出正确 | ✅ JVM | `MotionResolversTest` 5 项（唯一入口）+ `MotionSpecsTest` 11 项（六槽 spring ↔ 令牌一一对应、duration 档位映射、初速度下发、降级接线） |
+| 4b 回喂契约无第三真源且与官方解耦 | ✅ JVM | `MiniMeMotionSchemeTest` 3 项：六槽参数与 `MotionTokens` 一一相等；版本无关契约（白皮书 D5 定论） |
+| 5 检验区播放 / 慢放 / 对照 / 双标注 / 无卡片分块 | ✅ Robolectric + ⏳ 真机目测 | `MotionSectionRobolectricTest` 8 项：五类别 tab / 双标注文本 / 阻尼覆写 / 二期置灰且无播放钮 / tab 切换 / 降级态切换 / 点播驱动演示区 / 慢放点播 |
+| 6 低端机慢放无 jank | ⏳ 真机 | 低端机 + 省电模式复查，随 rc2 真机实测流程 |
+| 7 抽屉手感不回退（对照 rc1） | ⏳ 真机 | Q3 已按 rc1 手感选参（page.push/pop ~300ms + 视差 0.5）；真机对照随 rc2 流程维护者确认 |
+| 8 R2 5 项回收 | ✅ JVM | `ThemeSwitchRobolectricTest` 5 项 + 退役删除闭环（`1d206419`） |
+| 8b 样板页无卡片分块 | ✅ Robolectric + ⏳ 真机目测 | MotionSection 零卡片外框 + WorkshopPreview 去 PreviewCard；GalleryEmbed 回归断言同步修 |
+| 9 目录外零新增 | ✅ 扫描实证 | 全仓 main 源扫描：解析层（MotionSpecs / MotionResolvers / MiniMeMotionScheme）外 `tween(` / `spring(` / `keyframes(` / 硬编码 duration 零命中；detekt 全绿 |
+| 10 引擎版本 1.4 落定 | ✅ | `MiniMeEngine.VERSION = 1.4`；默认包 `engineVersion` 兼容区间断言不变 |
+| 8c CI 门禁三模块进合并链路 | ✅ CI 实证 | `ci.yml` 新增步骤；R5-A push 首次运行即绿（run 39896424293），后续 D / E / E 收尾 push 亦全绿 |
+
+### 关键实现决策与偏离（R5）
+
+1. **D5 定论：官方 MotionScheme 暂不可用，落地版本无关回喂契约**（对 Q2 裁定的实施期修正）——material3 1.4.0 的 `MotionScheme` 在 Kotlin 层为 `internal`（编译实证；`javap` 只见 JVM ACC_PUBLIC 是先前误判），官方转 public 是 1.5.0-beta02（带 `@ExperimentalMaterial3ExpressiveApi`）。裁定精神保留、形式调整：`MiniMeMotionScheme` 六槽同构只读契约先行，1.5 stable 后仅需约 40 行桥接适配器接入 `MaterialTheme(motionScheme=…)`，本批代码与调用方零改动。
+2. **抽屉取 page.push/pop 导航语义**（Q3 裁定）——语义上接受「抽屉是浮层但取导航模式」：规格表是模式库，消费方按手感取用；右滑入 / 左滑出 ~300ms 与 rc1 手感最接近，收敛回退最小。
+3. **0.25× 慢放 = 压缩播放时间而非乘时长**（对 charter 风险 1 的正解）——spring 无时长语义，乘时长会失真；实现为把喂给 spec 的播放时间 ÷4 + snapTo 驱动，曲线保真（MotionSectionRobolectricTest 固化）。
+4. **初速度单独下发**（对契约的增强）——手势速度交接（抽屉可中断接管）需要 spec 之外的初速度通道，MotionSpecs 输出含 initialVelocity，与标称时长解耦。
+5. **PARTIAL 档不叠加降级**（对两级分离的明确化）——系统级优先于主题包级；主题包 reducedMotion 修饰符是编译期行为、系统 animator scale 是运行时行为，二者不叠加（白皮书铁律 7 补「两级分离」表）。
+6. **回收期重大发现：换肤 UI 层全树重组**（R2 遗留设计缺陷，见下节）——处置为记录真实行为 + 遗留项 L1，不在 R5 修复（超出批次范围）。
+7. **退役仪器测试删除而非归档**（维护者裁定「删除+清理依赖」）——等价覆盖已入 CI；原测试自 R2 起从未进 CI（CI 不跑 connectedAndroidTest），其「motion 不重组」断言已知必败，留存只是地雷；theme-ui androidTest 源集与依赖整体清理，模块内零死配置。
+8. **CI 注释计数更正**——R5-A `ci.yml` 注释「264 项」混用 @Test 注解数与用例数（R5-A 时点正确为 269 项 = theme-engine 192 + theme-ui release 54 + minime-ui debug 23），本提交更正并注明时点与口径。
+
+### 回收期重大发现（R5-E）：CompositionLocalProvider 全树失效（R2 §8.2 UI 层未兑现）
+
+`ThemeSwitchInstrumentedTest.switchRecomposesChangedSubsystemOnly` 的「motion 未变不重组」断言在当前实现下**不可能通过**——`CompositionLocalProvider` 任一 provided 值变化时，其 content 内**所有**子 scope 全量失效重组，与读者是否读取变化的 local 无关。三重最小复实验证：① 不读任何 local 的探针同样 +1；② 计数器类加 `@Stable` 无效；③ 分层 provider 同样全量（内层 scope 隐式依赖整个 provider table）。
+
+即 R2 §8.2「相等子系统跳过重组」只兑现到**快照层实例复用**（SnapshotReuser 省分配），**UI 层是全树重组**；真实门禁是 StateFlow 相等去重（相同主题重应用 → 快照相等 → 不发射 → 零重组，`identicalThemeDoesNotRecomposeConsumers` 已固化）。原 androidTest 自 R2 起从未进 CI，缺陷被掩盖至今。
+
+**处置**：断言改写为「记录真实行为」（motion +1 写死，防未来修复时静默通过 / 误读）；修复方向（换肤全树重组）超出 R5 范围，记入遗留项 **L1**（建议订阅式令牌消费——各子系统独立 flow / derivedState——或按子系统拆顶层 provider 作用域，需 R6+ 立项评估）。白皮书 v1.11 §15 审计缺口 L1 同步收录。
+
+### 已知缺口（R5 不做）
+
+- 真机手感验收（验收 6 / 7）与检验区目测（5 / 8b）：随 rc2 真机实测流程；
+- 二期 10 模式（目录已登记、`mvp=false`）：检验区置灰展示，实现排后续批次；
+- 换肤 UI 层全树重组（L1）：R6+ 立项评估；
+- `androidx-test-runner` 版本目录条目失去 libs 引用（app 以字面量自持 runner）：留待统一清理评审。
+
+---
 
 ## R4.3 diff 主题包：导入导出 + 确认对话框 + 引擎 1.3 — 已完成，待发版
 
@@ -165,6 +235,8 @@
 | 相等子系统复用跳过重组 | ✅ JVM 侧 + 🟡 仪器 | `SnapshotReuserTest`（亮→暗 ≥6 个子系统复用）+ `ThemeManagerTest.switchingToDarkReusesUnchangedSubsystemInstances` |
 
 > 🟡 = 已编写并**编译通过**，但需真机/模拟器执行（本机无设备与模拟器）。
+
+> **已被 R5-E 接替**：本批 5 项仪器测试（`ThemeSwitchInstrumentedTest`）自 R2 起从未进 CI（CI 不跑 connectedAndroidTest），且「换肤只重组变化子系统」断言在当前实现下必败（`CompositionLocalProvider` content 全树失效——R5-E 回收期重大发现，见上节）；已由 `ThemeSwitchRobolectricTest`（minime-ui，5 项 JVM）等价回收，原文件与 theme-ui androidTest 源集整体删除（`1d206419`）。
 
 ### 关键实现决策与偏离（R2）
 
