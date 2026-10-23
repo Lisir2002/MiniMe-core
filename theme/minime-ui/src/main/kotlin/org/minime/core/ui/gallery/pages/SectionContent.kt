@@ -30,7 +30,7 @@ fun SectionContent(
         GallerySection.DEBUG -> DebugPanelSection(manager = manager, modifier = modifier)
         GallerySection.COMPONENTS -> PlaceholderSection(GallerySection.COMPONENTS, modifier)
         GallerySection.PROTOTYPES -> PlaceholderSection(GallerySection.PROTOTYPES, modifier)
-        GallerySection.MOTION -> PlaceholderSection(GallerySection.MOTION, modifier)
+        GallerySection.MOTION -> MotionSection(modifier = modifier)
         // 主题工坊（R4）：覆写层运行时 + 类型分发编辑器 + WCAG 实时读数 + diff 导入导出
         GallerySection.WORKSHOP -> WorkshopSection(
             manager = manager,

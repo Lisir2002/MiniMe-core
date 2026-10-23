@@ -184,7 +184,9 @@ class GalleryEmbedRobolectricTest {
         GallerySection.TOKENS -> "全部值实时读自当前生效快照"
         GallerySection.COMPONENTS -> "随 R6–R9 交付"
         GallerySection.PROTOTYPES -> "随 R8 交付"
-        GallerySection.MOTION -> "随 R5 交付"
+        // R5 起 MOTION 已是真实动效检验页（非占位）；marker 取对照控件恒定渲染的
+        // reducedMotion 标签（MotionControls 位于清单上方，无需滚动即见）
+        GallerySection.MOTION -> "reducedMotion"
         // R4.2 起 WORKSHOP 已是真实工坊页（非占位）；marker 取预览列必然渲染的
         // WCAG 矩阵标题（不依赖 fallback 态，且避开侧边栏同名 label「主题工坊」）
         GallerySection.WORKSHOP -> "WCAG 对比度矩阵"
