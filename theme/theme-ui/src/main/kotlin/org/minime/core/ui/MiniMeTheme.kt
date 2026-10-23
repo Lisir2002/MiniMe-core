@@ -13,6 +13,7 @@ import org.minime.core.ui.m3.toTypography
 import org.minime.core.ui.motion.LocalMotionScale
 import org.minime.core.ui.motion.LocalMotionSpecs
 import org.minime.core.ui.motion.LocalMiniMeMotionScheme
+import org.minime.core.ui.motion.MotionScaleProvider
 import org.minime.core.ui.motion.MotionSpecs
 import org.minime.core.ui.motion.toMiniMeMotionScheme
 import org.minime.core.ui.runtime.ThemeManager
@@ -30,9 +31,25 @@ import org.minime.core.ui.runtime.ThemeManager
  * - **进行中动效不取消**：spring 参数对象不可变，在飞动画按旧规格跑完，天然承接；
  * - **子系统实例复用**：相等子系统在上游 `ThemeManager` 已复用旧实例（§8.2），
  *   因此这些子树**零重组**（R2 验收项的依据）。
+ *
+ * R5 追加：整树由 [MotionScaleProvider] 包裹——系统级无障碍缩放
+ * （`Settings.Global.ANIMATOR_DURATION_SCALE`）在引擎内自足读取，
+ * 宿主无需额外接线；读不到按 NORMAL（不误降级）。
  */
 @Composable
 fun MiniMeTheme(
+    snapshot: ThemeSnapshot,
+    content: @Composable () -> Unit,
+) {
+    // R5：系统级缩放在此挂载（引擎自足）。读取是一次性的——设置变更需重组才刷新，
+    // 与动效层其余部分同语义（主题包覆写同样需要重编译/重选才生效）。
+    MotionScaleProvider {
+        MiniMeThemeContent(snapshot = snapshot, content = content)
+    }
+}
+
+@Composable
+private fun MiniMeThemeContent(
     snapshot: ThemeSnapshot,
     content: @Composable () -> Unit,
 ) {
