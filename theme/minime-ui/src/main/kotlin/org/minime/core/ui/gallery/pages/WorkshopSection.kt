@@ -5,35 +5,37 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import org.minime.core.ui.LocalThemeSnapshot
 import org.minime.core.ui.MiniMeTokens
 import org.minime.core.ui.draw.ContinuousCornerShape
 import org.minime.core.ui.m3.toFontFamily
@@ -59,8 +61,17 @@ import java.util.Locale
 /**
  * 分区五：主题工坊（白皮书 §10.7 / charter §4）——R4 替换 WORKSHOP 占位页。
  *
- * 三区布局：**顶栏**（标题 + 覆写计数 + diff 导入导出 + 重置）+ **分类 tab**（色板 / 字阶 /
- * 圆角 / 间距 / 动效 / 玻璃）+ **工作区**（宽屏左实时预览右令牌控件；窄屏上下堆叠）。
+ * **R5.5 布局重构**（charter §3，维护者指令 2026-10-23 21:41：「固定顶部演示区域
+ * 占内容区域的 1/5，其余部分是可滑动的参数调控内容」）——内容区两段式：
+ * - **演示带**（[WorkshopLayoutSpec.DEMO_BAND_RATIO] = 1/5，固定不滚动）：组 chip +
+ *   横滑样本带，覆写即时换肤的常驻对照（「改完立刻看见」）；
+ * - **参数流**（[WorkshopLayoutSpec.PARAM_FLOW_RATIO] = 4/5，`LazyColumn` 滚动）：
+ *   WCAG 对比度读数（折叠块，流首）+ 令牌树 + 手风琴编辑器（选中叶行内嵌展开，
+ *   同刻单开）。
+ *
+ * 宽窄屏同构（charter D2）：本布局不再有 640dp 双分支——宽度不是瓶颈，一套布局
+ * 消两端。原三层蛋糕病灶（0.42/0.58 上下切 × 0.6/0.4 控制台内切 × 0.55/0.45 预览
+ * 内切 + placeholder 卡片空占 + 两级 tab 重名）见 charter §1.1，已全部消除。
  *
  * 数据面（全部外置，页面即单元——API 五原则）：
  * - 当前生效值：[LocalThemeSnapshot]（MiniMeTheme 随 manager.snapshot 重组）；
@@ -84,11 +95,13 @@ fun WorkshopSection(
     onPendingImportConsumed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val snapshot = LocalThemeSnapshot.current
     val overlays by manager.overlays.collectAsState()
     val status by manager.status.collectAsState()
+    val spacing = MiniMeTokens.LocalSpacing.current
     var category by remember { mutableStateOf(WorkshopCategory.PALETTE) }
     var selectedPath by remember { mutableStateOf<String?>(null) }
+    // 演示带当前样本组（切类时按 defaultDemoGroup 联动；手动 chip 切换优先直到下次切类）
+    var demoGroup by remember { mutableStateOf(defaultDemoGroup(category)) }
 
     // fallback 态（无主题包）：覆写无处施加——编辑器与 diff 传输禁用并明示
     val overridable = manager.currentPackId != ThemeManager.FALLBACK_ID
@@ -124,46 +137,74 @@ fun WorkshopSection(
                 onResetCategory = { manager.resetOverrides(WorkshopSpec.pathsOf(category)) },
                 onResetAll = { manager.resetOverrides() },
             )
-            WorkshopCategoryTabs(
-                current = category,
-                onSelect = {
-                    category = it
-                    selectedPath = null // 换类即清选择（选中路径可能不属新类）
-                },
-            )
-            (status as? ThemeStatus.Failed)?.let { failed ->
-                WorkshopErrorBanner(code = failed.code.name, message = failed.message)
-            }
 
-            BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                // 640dp = Material medium 断点：工坊工作区自有响应式（宿主 840dp 管侧栏）
-                val wide = maxWidth >= 640.dp
-                if (wide) {
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        WorkshopPreview(modifier = Modifier.weight(1f).fillMaxSize())
-                        WorkshopConsole(
-                            manager = manager,
-                            category = category,
-                            selectedPath = selectedPath,
-                            overridable = overridable,
-                            groupExpanded = groupExpanded,
-                            onSelect = { selectedPath = it },
-                            modifier = Modifier.weight(1f).fillMaxSize(),
-                        )
+            // ---------- 内容区（R5.5）：演示带 1/5 + 分类 tab + 参数流 4/5 ----------
+            Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                // 演示带（固定 1/5）：组 chip + 横滑样本，覆写即时换肤的常驻对照
+                WorkshopDemoBand(
+                    demoGroup = demoGroup,
+                    onDemoGroup = { demoGroup = it },
+                    modifier = Modifier
+                        .fillMaxHeight(WorkshopLayoutSpec.DEMO_BAND_RATIO)
+                        .fillMaxWidth(),
+                )
+                // 分类 tab（贴参数流顶；切类清选择 + 演示带联动默认组）
+                WorkshopCategoryTabs(
+                    current = category,
+                    onSelect = {
+                        category = it
+                        selectedPath = null // 换类即清选择（选中路径可能不属新类）
+                        demoGroup = defaultDemoGroup(it)
+                    },
+                )
+                (status as? ThemeStatus.Failed)?.let { failed ->
+                    WorkshopErrorBanner(code = failed.code.name, message = failed.message)
+                }
+                // 参数流（4/5，可滚动）：fallback 明示 / WCAG 读数（折叠）+ 令牌树 + 手风旋编辑器
+                // weight(1f) 吃掉演示带与 tab 之外的剩余高度——注意不能用 fillMaxHeight(0.8)：
+                // Column 内 fraction 的基数是「剩余空间」，0.2+tab+0.8 会三重扣减导致比例漂移
+                val listState = rememberLazyListState()
+                // 手风琴「选中即滚动」：展开的编辑器必须进入视口（R5.5 修复——否则深行
+                // 点击后编辑器落在视口线外，LazyColumn 给 0-bounds 节点不可操作）
+                LaunchedEffect(selectedPath, category) {
+                    selectedPath?.let { path ->
+                        listState.animateScrollToItem(WorkshopSpec.flowIndexOf(category, path))
                     }
-                } else {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        WorkshopPreview(modifier = Modifier.weight(0.42f).fillMaxWidth())
-                        WorkshopConsole(
-                            manager = manager,
-                            category = category,
-                            selectedPath = selectedPath,
-                            overridable = overridable,
-                            groupExpanded = groupExpanded,
-                            onSelect = { selectedPath = it },
-                            modifier = Modifier.weight(0.58f).fillMaxWidth(),
-                        )
+                }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .semantics { testTag = WorkshopLayoutSpec.PARAM_FLOW_TAG },
+                ) {
+                    if (!overridable) {
+                        // fallback 态明示（原 R5.5 前由编辑器占位卡片承担，重构后迁至流首）
+                        item(key = "fallback-notice") {
+                            Text(
+                                text = "当前为 fallback 基座（无主题包），覆写不可用",
+                                style = MiniMeTokens.LocalTypography.current.callout.toTextStyle(),
+                                color = MiniMeTokens.LocalColor.current.textSecondaryColor,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = spacing.s24.value.dp, vertical = spacing.s12.value.dp),
+                            )
+                        }
+                    } else {
+                        item(key = "wcag-fold") {
+                            WorkshopWcagFoldBlock(modifier = Modifier.fillMaxWidth())
+                        }
                     }
+                    workshopTreeItems(
+                        category = category,
+                        selectedPath = selectedPath,
+                        overlays = overlays,
+                        overridable = overridable,
+                        groupExpanded = groupExpanded,
+                        manager = manager,
+                        // 再点选中行 = 收起（手风琴同刻单开 + 可关）
+                        onSelect = { selectedPath = if (it == selectedPath) null else it },
+                    )
                 }
             }
         }
@@ -606,76 +647,48 @@ private fun WorkshopDiffBlockedBanner(vocabularyMisses: List<String>, typeMisses
 /** 必挂路径明细上限（对话框空间有限） */
 private const val BLOCKED_DETAIL_LIMIT = 4
 
-// ---------- 右控制台（编辑器 + 令牌树） ----------
+// ---------- WCAG 读数折叠块（R5.5 流首；默认折叠 = 操作优先，展开看 26 格矩阵） ----------
 
 @Composable
-private fun WorkshopConsole(
-    manager: ThemeManager,
-    category: WorkshopCategory,
-    selectedPath: String?,
-    overridable: Boolean,
-    groupExpanded: SnapshotStateMap<String, Boolean>,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val overlays by manager.overlays.collectAsState()
-    val spacing = MiniMeTokens.LocalSpacing.current
-
-    Column(modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .weight(0.6f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = spacing.s12.value.dp, vertical = spacing.s4.value.dp),
-        ) {
-            if (selectedPath != null) {
-                WorkshopEditorCard(
-                    path = selectedPath,
-                    manager = manager,
-                    overridable = overridable,
-                )
-            } else {
-                WorkshopEditorPlaceholder(overridable = overridable)
-            }
-        }
-        WorkshopTree(
-            category = category,
-            selectedPath = selectedPath,
-            overlays = overlays,
-            groupExpanded = groupExpanded,
-            onSelect = onSelect,
-            modifier = Modifier.weight(0.4f).fillMaxWidth(),
-        )
-    }
-}
-
-/** 未选中态提示（或 fallback 态禁用说明） */
-@Composable
-private fun WorkshopEditorPlaceholder(overridable: Boolean) {
+private fun WorkshopWcagFoldBlock(modifier: Modifier = Modifier) {
     val color = MiniMeTokens.LocalColor.current
     val typography = MiniMeTokens.LocalTypography.current
     val spacing = MiniMeTokens.LocalSpacing.current
-    val shape = MiniMeTokens.LocalShape.current
+    var expanded by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(ContinuousCornerShape(shape.radiusCard.value.dp))
-            .background(color.surfaceColor)
-            .padding(horizontal = spacing.s16.value.dp, vertical = spacing.s24.value.dp),
-    ) {
-        Text(
-            text = if (overridable) "从下方令牌树选择一条令牌" else "当前为 fallback 基座（无主题包），覆写不可用",
-            style = typography.callout.toTextStyle(),
-            color = color.textSecondaryColor,
-        )
-        if (overridable) {
-            Spacer(Modifier.height(spacing.s4.value.dp))
+    Column(modifier = modifier.padding(horizontal = 12.dp, vertical = spacing.s4.value.dp)) {
+        // 摘要行（点击展开/收起矩阵）——折叠态即流首紧凑读数入口
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(ContinuousCornerShape(MiniMeTokens.LocalShape.current.radiusButton.value.dp))
+                .clickable { expanded = !expanded }
+                .padding(horizontal = spacing.s12.value.dp, vertical = spacing.s8.value.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
-                text = "编辑即时生效于整个画廊（全局实时）；内存态，导出 diff 主题包才落盘（R4.3）。",
+                text = if (expanded) "▾" else "▸",
+                style = typography.caption1.toTextStyle(),
+                color = color.textSecondaryColor,
+            )
+            Spacer(Modifier.width(spacing.s8.value.dp))
+            Text(
+                text = "WCAG 对比度矩阵",
+                style = typography.callout.toTextStyle(),
+                color = color.textPrimaryColor,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "26 格 · 实时读数",
                 style = typography.caption2.toTextStyle(),
                 color = color.textSecondaryColor,
+            )
+        }
+        if (expanded) {
+            WorkshopWcagMatrix(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = spacing.s8.value.dp),
             )
         }
     }

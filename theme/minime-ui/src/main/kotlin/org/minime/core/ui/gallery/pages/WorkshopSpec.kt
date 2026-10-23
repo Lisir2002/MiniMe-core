@@ -161,6 +161,29 @@ object WorkshopSpec {
 
     /** 路径的语义名（树与编辑器标题用） */
     fun displayName(path: String): String = path.substringAfterLast('.')
+
+    // ---------- 参数流布局索引（R5.5 手风琴「选中即滚动」用） ----------
+
+    /**
+     * 选中 path 在参数流 LazyColumn 中的 item 索引（0 基）。
+     *
+     * 流结构：item 0 = fallback 明示 / WCAG 折叠块（二选一，见 [WorkshopSection]），
+     * 其后按 [groupsOf] 顺序每组「头 1 项 + 路径 N 项」。手风琴展开后编辑器内嵌于
+     * 所点行的同一 item 内，滚动到该行即编辑器进入视口。
+     *
+     * 与 WorkshopSection 的 LazyColumn 组装顺序必须逐项对应——由
+     * [WorkshopLayoutRobolectricTest] 的滚动断言间接守护（滚动后滑杆可操作）。
+     */
+    fun flowIndexOf(category: WorkshopCategory, path: String): Int {
+        var index = 1 // item 0 = 流首块（fallback 明示 / WCAG 折叠）
+        for (group in groupsOf(category)) {
+            index += 1 // 组头
+            val at = group.paths.indexOf(path)
+            if (at >= 0) return index + at
+            index += group.paths.size
+        }
+        return 0 // 不在本类（理论上不会：selectedPath 切类时已清）
+    }
 }
 
 /** Float 紧凑格式（去尾零，最多两位）——工坊各页读数共用（避开总览页私有同名） */

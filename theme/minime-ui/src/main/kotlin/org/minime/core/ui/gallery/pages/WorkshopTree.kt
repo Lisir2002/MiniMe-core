@@ -6,13 +6,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,8 +39,10 @@ import org.minime.core.schema.TokenValue
 import org.minime.core.ui.LocalThemeSnapshot
 import org.minime.core.ui.MiniMeTokens
 import org.minime.core.ui.draw.ContinuousCornerShape
+import org.minime.core.ui.m3.toFontFamily
 import org.minime.core.ui.m3.toTextStyle
 import org.minime.core.tokens.ThemeSnapshot
+import org.minime.core.ui.runtime.ThemeManager
 import org.minime.core.ui.gallery.accentColor
 import org.minime.core.ui.gallery.fillPrimaryColor
 import org.minime.core.ui.gallery.separatorColor
@@ -49,44 +51,54 @@ import org.minime.core.ui.gallery.textPrimaryColor
 import org.minime.core.ui.gallery.textSecondaryColor
 
 /**
- * 工坊令牌树（charter §4「令牌树」）。
+ * 工坊令牌树的流内 items（R5.5：树并入参数流，charter §3）。
  *
  * 结构：分类（[WorkshopCategory]）→ 二级分组（[WorkshopGroup]，可折叠）→ 叶（可覆写路径）。
  * 叶行三要素：语义名 + 完整路径（工程标识）+ 当前值摘要；被覆写的叶带 accent 圆点
  * （diff 高亮的导航侧），选中叶整行高亮。
  *
  * 值全部读自当前生效快照（[LocalThemeSnapshot].raw）——覆写成功后本树即时反映；
- * 「当前值 vs 原值」的完整对照在编辑器卡内（读 baseSnapshot）。
+ * 「当前值 vs 原值」的完整对照在编辑器内（读 baseSnapshot）。
+ *
+ * **手风琴（R5.5）**：选中叶的行下方内嵌 [WorkshopEditorContent]（同刻单开由单一
+ * `selectedPath` 天然保证；再点选中行 = 收起，由调用侧 `onSelect` 的取逻辑决定）。
+ * 展开区 = accent 竖线 + surfaceColor 底 + 左缩进，替代 R5.5 前的常驻编辑器卡
+ * （去「未选中也空占 60%」的比例切割，charter §1.1 病灶 1）。
+ *
+ * 折叠态读取纪律：`groupExpanded` 的读必须发生在 item 的 composable lambda 内
+ * （本扩展函数自身非 composable，直接读不触发重组——折叠点击将无响应）。
  */
-@Composable
-fun WorkshopTree(
+fun LazyListScope.workshopTreeItems(
     category: WorkshopCategory,
     selectedPath: String?,
     overlays: Map<String, TokenValue>,
+    overridable: Boolean,
     groupExpanded: SnapshotStateMap<String, Boolean>,
+    manager: ThemeManager,
     onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
-    val snapshot = LocalThemeSnapshot.current
     val groups = WorkshopSpec.groupsOf(category)
 
-    LazyColumn(modifier = modifier.fillMaxSize()) {
-        groups.forEach { group ->
-            val key = "${category.subsystem}/${group.title}"
+    groups.forEach { group ->
+        val key = "${category.subsystem}/${group.title}"
+        item(key = "header-$key") {
             val expanded = groupExpanded[key] ?: true
-            item(key = "header-$key") {
-                WorkshopGroupHeader(
-                    title = group.title,
-                    count = group.paths.size,
-                    expanded = expanded,
-                    onToggle = { groupExpanded[key] = !expanded },
-                )
-            }
+            WorkshopGroupHeader(
+                title = group.title,
+                count = group.paths.size,
+                expanded = expanded,
+                onToggle = { groupExpanded[key] = !expanded },
+            )
+        }
+        items(
+            items = group.paths,
+            key = { it },
+        ) { path ->
+            // expanded 在 composable lambda 内读：折叠切换时这些 item 重组显隐
+            val expanded = groupExpanded[key] ?: true
             if (expanded) {
-                items(
-                    items = group.paths,
-                    key = { it },
-                ) { path ->
+                val snapshot = LocalThemeSnapshot.current
+                Column(modifier = Modifier.fillMaxWidth()) {
                     WorkshopTreeRow(
                         path = path,
                         snapshot = snapshot,
@@ -94,8 +106,65 @@ fun WorkshopTree(
                         selected = path == selectedPath,
                         onClick = { onSelect(path) },
                     )
+                    // 手风琴：选中行下方内嵌编辑器（无独立 LazyColumn，滚动流天然承载）
+                    if (path == selectedPath) {
+                        WorkshopEditorInline(
+                            path = path,
+                            manager = manager,
+                            overridable = overridable,
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+/**
+ * 手风琴展开区（R5.5）：accent 竖线 + surfaceColor 底 + 左缩进 + 上下文行。
+ *
+ * 「正在编辑：路径」行明示上下文（charter §7 风险对策：展开后树的行-编辑器-行
+ * 混合流中，用户需要知道正在编辑谁）。
+ */
+@Composable
+private fun WorkshopEditorInline(
+    path: String,
+    manager: ThemeManager,
+    overridable: Boolean,
+) {
+    val color = MiniMeTokens.LocalColor.current
+    val typography = MiniMeTokens.LocalTypography.current
+    val spacing = MiniMeTokens.LocalSpacing.current
+    val shape = MiniMeTokens.LocalShape.current
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = spacing.s4.value.dp),
+    ) {
+        // accent 竖线（展开态标识；pill 圆角；fillMaxHeight 跟随兄弟列高度）
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .fillMaxHeight()
+                .clip(ContinuousCornerShape(shape.radiusPill.value.dp))
+                .background(color.accentColor),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "正在编辑：$path",
+                style = typography.caption2.toTextStyle().copy(fontFamily = "monospace".toFontFamily()),
+                color = color.accentColor,
+                modifier = Modifier.padding(start = spacing.s12.value.dp, bottom = spacing.s4.value.dp),
+            )
+            WorkshopEditorContent(
+                path = path,
+                manager = manager,
+                overridable = overridable,
+                modifier = Modifier
+                    .clip(ContinuousCornerShape(shape.radiusCard.value.dp))
+                    .padding(start = spacing.s12.value.dp),
+            )
         }
     }
 }

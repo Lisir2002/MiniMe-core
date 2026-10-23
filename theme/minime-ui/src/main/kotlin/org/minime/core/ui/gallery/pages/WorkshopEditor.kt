@@ -85,8 +85,20 @@ import kotlin.math.roundToInt
  * 所有编辑动作 = `manager.applyOverrides(mapOf(path to 新值))`（单条合并语义；
  * R4.1 运行时的后台编译 / last-wins / 失败回滚不在本页重复实现）。
  */
+/**
+ * 编辑器内容（无框版——R5.5 手风琴内嵌）。
+ *
+ * 外框由调用方提供：树的手风琴展开态给「accent 竖线 + surfaceColor 底 + 左缩进」
+ * （[WorkshopTree] 内），独立卡片场景可自套圆角底。令牌头 / diff 行 / 类型分发 /
+ * 还原此条四段不变。
+ */
 @Composable
-fun WorkshopEditorCard(path: String, manager: ThemeManager, overridable: Boolean) {
+internal fun WorkshopEditorContent(
+    path: String,
+    manager: ThemeManager,
+    overridable: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val snapshot = LocalThemeSnapshot.current
     val base by manager.baseSnapshot.collectAsState()
     val overlays by manager.overlays.collectAsState()
@@ -100,9 +112,8 @@ fun WorkshopEditorCard(path: String, manager: ThemeManager, overridable: Boolean
     val overridden = path in overlays
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clip(ContinuousCornerShape(shape.radiusCard.value.dp))
             .background(color.surfaceColor)
             .padding(horizontal = spacing.s16.value.dp, vertical = spacing.s12.value.dp),
     ) {
