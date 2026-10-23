@@ -34,9 +34,12 @@ import org.robolectric.annotation.Config
  * 重组计数 / 首帧 / 不重建内容均可在 Robolectric 的组合运行时上确定性验证。
  *
  * 落在 minime-ui 的原因：Robolectric + compose 测试基建在本模块
- * （theme-ui 单测跑 JUnit Platform、无 Robolectric 依赖；其 androidTest
- * 保留设备侧复核）。方法名用反引号中文——JVM 单测不经 dex，无 DEX
- * SimpleName 限制（与仪器测试的驼峰约定差异即此）。
+ * （theme-ui 单测跑 JUnit Platform、无 Robolectric 依赖）。方法名用反引号
+ * 中文——JVM 单测不经 dex，无 DEX SimpleName 限制（与仪器测试的驼峰约定
+ * 差异即此）。原 androidTest 已随本提交删除：其 motion 断言已知必败
+ * （见下文「回收期重大发现」），CI 又从不执行 androidTest，留存只是地雷；
+ * 设备侧 wall-clock 复核走每批 RC 真机实测流程（charter Q4），不依赖
+ * androidTest。
  *
  * 与原仪器测试的差异（charter Q4）：
  * - 导入耗时用**宽松断言**：Robolectric 计时不准，只卡量级（≤5000ms，

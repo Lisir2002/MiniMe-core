@@ -14,8 +14,6 @@ android {
 
     defaultConfig {
         minSdk = 26
-        // R2 验收需要仪器测试（换肤重组计数、冷启动首帧、导入耗时）
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -58,13 +56,9 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlinx.coroutines.test)
 
-    // 仪器测试（R2 验收项：换肤重组计数 / 首帧即目标主题 / 导入耗时，需真机或模拟器）
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation(libs.androidx.test.ext.junit)
-    androidTestImplementation(libs.androidx.test.runner)
-    androidTestImplementation(libs.json) // android.jar 的 org.json 是 stub，必须注入真实实现
-    androidTestImplementation(libs.kotlinx.coroutines.test)
+    // R5-E：原 androidTest（R2 换肤仪器测试）已 Robolectric 化回收到 :minime-ui
+    // （ThemeSwitchRobolectricTest，CI 可跑），本模块无 androidTest 源集——
+    // 依赖与 testInstrumentationRunner 一并移除，零死配置。
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
