@@ -9,7 +9,7 @@ import org.minime.core.tokens.TokenVocabulary
 /**
  * 令牌总览的机器核对（白皮书 §10.3）：
  *
- * 1. **双向集合相等**——展示清单与引擎词汇表 172 条一一对应：
+ * 1. **双向集合相等**——展示清单与引擎词汇表 173 条一一对应：
  *    词汇表新增而清单未跟 → 缺项失败；清单多写 → 多项失败；
  * 2. **端到端可读**——用默认主题包真实编译出快照，清单每条路径都能取到值
  *    （证明「总览区每个值都从 snapshot.raw 读取」这条硬纪律 2 真实成立）；
@@ -24,7 +24,7 @@ class TokenCoverageTest {
     )
 
     @Test
-    fun `展示清单与词汇表 172 条双向集合相等`() {
+    fun `展示清单与词汇表 173 条双向集合相等`() {
         val specPaths = TokenOverviewSpec.ALL_PATHS
         val vocabPaths = TokenVocabulary.ALL.keys
 

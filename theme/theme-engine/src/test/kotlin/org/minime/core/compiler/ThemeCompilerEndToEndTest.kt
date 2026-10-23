@@ -52,8 +52,8 @@ class ThemeCompilerEndToEndTest {
     fun `light context yields complete effective token table`() {
         val result = compile()
         val raw = result.snapshot.raw
-        // 词汇表 172 条 + 扩展组 24 条（editor 2 / terminal 16 / chart 6）
-        assertEquals(196, raw.size, "生效表规模 = 词汇表 + 扩展组: ${raw.size}")
+        // 词汇表 173 条 + 扩展组 24 条（editor 2 / terminal 16 / chart 6）
+        assertEquals(197, raw.size, "生效表规模 = 词汇表 + 扩展组: ${raw.size}")
         for (path in TokenVocabulary.ALL.keys) {
             assertTrue(path in raw, "生效表缺少词汇表路径: $path")
         }
@@ -160,7 +160,7 @@ class ThemeCompilerEndToEndTest {
     fun `default pack declares engine range compatible with current engine`() {
         assertEquals(MiniMeEngine.VERSION, ThemeCompiler.ENGINE_VERSION)
         assertEquals(
-            "1.3",
+            "1.4",
             MiniMeEngine.VERSION,
             "引擎版本应为二段式（步长 +0.1，逢九进一）: ${MiniMeEngine.VERSION}",
         )

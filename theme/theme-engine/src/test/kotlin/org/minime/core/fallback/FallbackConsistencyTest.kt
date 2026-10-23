@@ -68,7 +68,7 @@ class FallbackConsistencyTest {
             FallbackTheme.rawValues.size,
             "fallback=${FallbackTheme.rawValues.size} 与默认包生效表=${compiled.size} 规模应一致",
         )
-        assertEquals(196, FallbackTheme.rawValues.size)
+        assertEquals(197, FallbackTheme.rawValues.size)
     }
 
     @Test
@@ -129,7 +129,7 @@ class FallbackConsistencyTest {
                 "size" to 13,
                 "spacing" to 11,
                 "motion" to 13,
-                "interaction" to 26,
+                "interaction" to 27,
                 "elevation" to 2,
                 "opacity" to 15,
                 "glass" to 10,
@@ -148,7 +148,7 @@ class FallbackConsistencyTest {
             ),
             "十子系统条目分布与白皮书 §6 清单不一致（词汇表增删须同步白皮书）",
         )
-        assertEquals(172, TokenVocabulary.SIZE)
+        assertEquals(173, TokenVocabulary.SIZE)
     }
 
     private companion object {

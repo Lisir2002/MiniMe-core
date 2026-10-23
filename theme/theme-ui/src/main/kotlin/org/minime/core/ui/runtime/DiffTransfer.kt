@@ -52,7 +52,7 @@ sealed interface DiffPreviewResult {
         val exportedAt: String?,
         /** 前 8 条「path = 值摘要」（对话框样本列表，mono 字体渲染） */
         val sample: List<String>,
-        /** 不在标准词汇表（172 条）的路径——应用必失败（SCHEMA_INVALID），对话框须呈现 */
+        /** 不在标准词汇表（173 条）的路径——应用必失败（SCHEMA_INVALID），对话框须呈现 */
         val vocabularyMisses: List<String>,
         /** 值类型与词汇表声明类型不符的路径——应用必失败（TYPE_MISMATCH），对话框须呈现 */
         val typeMisses: List<String>,

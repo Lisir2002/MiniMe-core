@@ -12,9 +12,9 @@ import org.minime.core.schema.TokenValue
  * 边界约定（§6.1.2）：motion 管「动画怎么动」，interaction 管「交互怎么判定」——
  * 本子系统全部为行为参数，可被主题包覆盖。
  *
- * 子树键（26 项）：`flickVelocity` / `flickDismissRatio` / `dragDismissRatio` /
+ * 子树键（27 项）：`flickVelocity` / `flickDismissRatio` / `dragDismissRatio` /
  * `backDismissRatio` / `swipeRevealRatio` / `swipeActionRatio` / `pressScale` /
- * `cardPressScale` / `overlayScale` / `shakeDistance` / `shakeCycles` /
+ * `cardPressScale` / `overlayScale` / `shakeDistance` / `shakeCycles` / `shakeDamping` /
  * `itemEnterOffset` / `stagger.menu` / `stagger.list` / `maxStaggerItems` /
  * `streamFloodThreshold` / `rubberBandDamping` / `parallaxFactor` /
  * `longPressTimeout` / `bannerAutoDismiss` / `selectSheetThreshold` /
@@ -47,6 +47,10 @@ data class InteractionTokens(
 
     val shakeDistance: DimensionValue get() = subtree.dimension("shakeDistance")
     val shakeCycles: NumberValue get() = subtree.number("shakeCycles")
+
+    /** action.error 低阻尼覆写值（§6.4.2 铁律 6：dampingRatio ≈ 0.4，自然衰减约 2 次往复；R5 补令牌，铁律 8） */
+    val shakeDamping: NumberValue get() = subtree.number("shakeDamping")
+
     val itemEnterOffset: DimensionValue get() = subtree.dimension("itemEnterOffset")
 
     // ---------- 时序参数（§6.4.1/§6.5.4/§6.6.4） ----------

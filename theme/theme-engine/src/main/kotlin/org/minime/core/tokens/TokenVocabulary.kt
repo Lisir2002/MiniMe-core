@@ -3,7 +3,7 @@ package org.minime.core.tokens
 import org.minime.core.schema.TokenType
 
 /**
- * 引擎词汇表（白皮书 §6.1.4 设计值令牌化总表的机器形态）：172 条标准令牌路径 → 声明类型。
+ * 引擎词汇表（白皮书 §6.1.4 设计值令牌化总表的机器形态）：173 条标准令牌路径 → 声明类型。
  *
  * 用途：
  * - 导入校验：主题包声明的令牌类型须与词汇表一致（§5.2 校验行：词汇表类型不符 → 拒绝）；
@@ -14,7 +14,7 @@ import org.minime.core.schema.TokenType
  */
 object TokenVocabulary {
 
-    /** 全部标准令牌路径 → 声明类型（172 条，与默认主题包 core set 一一对应） */
+    /** 全部标准令牌路径 → 声明类型（173 条，与默认主题包 core set 一一对应） */
     val ALL: Map<String, TokenType> = mapOf(
         "color.primitive.label" to TokenType.COLOR,
         "color.primitive.opaqueSeparator" to TokenType.COLOR,
@@ -110,6 +110,7 @@ object TokenVocabulary {
         "interaction.rubberBandDamping" to TokenType.NUMBER,
         "interaction.selectSheetThreshold" to TokenType.NUMBER,
         "interaction.shakeCycles" to TokenType.NUMBER,
+        "interaction.shakeDamping" to TokenType.NUMBER,
         "interaction.shakeDistance" to TokenType.DIMENSION,
         "interaction.stagger.list" to TokenType.DURATION,
         "interaction.stagger.menu" to TokenType.DURATION,
@@ -206,5 +207,5 @@ object TokenVocabulary {
     )
 
     /** 词表条目数（一致性测试锚点：默认包 / fallback 覆盖数须等于此值） */
-    const val SIZE: Int = 172
+    const val SIZE: Int = 173
 }

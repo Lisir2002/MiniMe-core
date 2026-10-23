@@ -23,7 +23,7 @@ import org.minime.core.tokens.TokenVocabulary
  * 复合型字段别名同理（如覆写 `glass.regular.tintAlpha` → `glass.regular.tint` 字段跟随）。
  *
  * 作用域约束（R4.1）：
- * - 只允许覆写**标准词汇表**路径（[TokenVocabulary.ALL] 的 172 条）——工坊编辑的是
+ * - 只允许覆写**标准词汇表**路径（[TokenVocabulary.ALL] 的 173 条）——工坊编辑的是
  *   十子系统标准令牌；开放词汇（editor/terminal/chart 扩展组）由主题包整体提供，
  *   覆写它们涉及扩展组合并语义，留待后续批次；
  * - 覆写值类型须与词汇表声明类型一致（[TokenTypeCheck] 共享判定，与别名解析同一真源）；
@@ -59,7 +59,7 @@ object OverlayApplier {
             val type = TokenVocabulary.typeOf(path)
                 ?: throw ThemeCompileException(
                     CompileErrorCode.SCHEMA_INVALID,
-                    "覆写路径不在标准词汇表: \"$path\"（R4.1 仅支持 172 条标准令牌；开放词汇覆写待后续批次）",
+                    "覆写路径不在标准词汇表: \"$path\"（R4.1 仅支持 ${TokenVocabulary.SIZE} 条标准令牌；开放词汇覆写待后续批次）",
                 )
             TokenTypeCheck.requireMatches(path, type, value)
             // 全字面量（无别名）：合并期即终值，解析期原样穿过（规则 3 同款确定性）

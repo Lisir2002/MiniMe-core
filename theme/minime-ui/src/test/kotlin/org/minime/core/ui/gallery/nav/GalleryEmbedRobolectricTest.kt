@@ -171,12 +171,12 @@ class GalleryEmbedRobolectricTest {
         rule.setContent {
             MiniMeTheme(manager) { TokensOverviewSection(Modifier.fillMaxSize()) }
         }
-        // 反复滚到底部（172 行 + 区头），静态页稳定性粗检
+        // 反复滚到底部（词汇表全量行 + 区头），静态页稳定性粗检
         repeat(10) {
-            rule.onNode(hasScrollAction()).performScrollToNode(hasText("以上 172 条", substring = true))
+            rule.onNode(hasScrollAction()).performScrollToNode(hasText("引擎词汇表全量", substring = true))
             rule.waitForIdle()
         }
-        rule.onNodeWithText("以上 172 条", substring = true).assertExists()
+        rule.onNodeWithText("引擎词汇表全量", substring = true).assertExists()
     }
 
     /** 每个分区在内容区的独有文本（避开与侧边栏同名的页眉/副标题） */

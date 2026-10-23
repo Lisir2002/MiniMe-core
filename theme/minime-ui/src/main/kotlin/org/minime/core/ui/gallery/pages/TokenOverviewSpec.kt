@@ -3,7 +3,7 @@ package org.minime.core.ui.gallery.pages
 /**
  * 令牌总览展示清单（白皮书 §10.3 机器核对的 gallery 侧锚点）。
  *
- * 与引擎词汇表 `TokenVocabulary.ALL`（172 条）**双向集合相等**由
+ * 与引擎词汇表 `TokenVocabulary.ALL`（173 条）**双向集合相等**由
  * `TokenCoverageTest` 断言：词汇表新增而清单未跟 → 缺项失败；
  * 清单多写而词汇表没有 → 多项失败。
  *
@@ -180,6 +180,7 @@ object TokenOverviewSpec {
             "interaction.rubberBandDamping",
             "interaction.selectSheetThreshold",
             "interaction.shakeCycles",
+            "interaction.shakeDamping",
             "interaction.shakeDistance",
             "interaction.stagger.list",
             "interaction.stagger.menu",

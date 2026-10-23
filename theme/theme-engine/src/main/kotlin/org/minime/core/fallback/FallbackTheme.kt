@@ -28,7 +28,7 @@ import org.minime.core.tokens.ThemeSnapshot
  */
 object FallbackTheme {
 
-    /** 全量 fallback 令牌表（172 标准词汇 + 24 扩展路径，共 196 条） */
+    /** 全量 fallback 令牌表（173 标准词汇 + 24 扩展路径，共 197 条） */
     val rawValues: Map<String, TokenValue> = linkedMapOf(
         // ---------- color ----------
         "color.primitive.label" to ColorValue("#000000FF"),
@@ -176,6 +176,7 @@ object FallbackTheme {
         "interaction.rubberBandDamping" to NumberValue(0.5f),
         "interaction.selectSheetThreshold" to NumberValue(7.0f),
         "interaction.shakeCycles" to NumberValue(2.0f),
+        "interaction.shakeDamping" to NumberValue(0.4f),
         "interaction.shakeDistance" to DimensionValue(4f, "dp"),
         "interaction.stagger.list" to DurationValue(30.0f),
         "interaction.stagger.menu" to DurationValue(20.0f),

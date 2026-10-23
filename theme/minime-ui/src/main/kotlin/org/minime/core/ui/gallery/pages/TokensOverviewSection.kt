@@ -54,12 +54,13 @@ import org.minime.core.ui.gallery.surfaceColor
 import org.minime.core.ui.gallery.textPrimaryColor
 import org.minime.core.ui.gallery.textSecondaryColor
 import org.minime.core.tokens.ThemeSnapshot
+import org.minime.core.tokens.TokenVocabulary
 
 /**
  * 分区一：令牌总览（白皮书 §10.3）。
  *
  * 十子系统逐行展示，全部值实时读自当前生效快照 `snapshot.raw`（硬纪律 2：禁硬编码值）；
- * 展示清单 [TokenOverviewSpec] 与词汇表 172 条的双向集合相等由
+ * 展示清单 [TokenOverviewSpec] 与词汇表 173 条的双向集合相等由
  * `TokenCoverageTest` 机器核对（缺项即失败）。
  *
  * 每行 = 语义名（强调）+ 令牌路径（等宽，工程标识）+ 按类型的实样——
@@ -122,7 +123,7 @@ private fun OverviewIntro() {
         Spacer(Modifier.height(spacing.s4.value.dp))
         Text(
             text = "全部值实时读自当前生效快照（ThemeSnapshot.raw）——本页即设计系统的活文档。" +
-                "展示清单与引擎词汇表 172 条逐行机器核对（TokenCoverageTest）。",
+                "展示清单与引擎词汇表 ${TokenVocabulary.SIZE} 条逐行机器核对（TokenCoverageTest）。",
             style = typography.footnote.toTextStyle(),
             color = color.textSecondaryColor,
         )
@@ -137,7 +138,7 @@ private fun OverviewFooter() {
 
     Column(modifier = Modifier.padding(horizontal = spacing.gutter.value.dp, vertical = spacing.s24.value.dp)) {
         Text(
-            text = "以上 172 条 = 引擎词汇表全量（§6.1.4）。主题包可覆盖其中任意值，" +
+            text = "以上 ${TokenVocabulary.SIZE} 条 = 引擎词汇表全量（§6.1.4）。主题包可覆盖其中任意值，" +
                 "覆写后本页实时反映（R4 工坊落地）。",
             style = typography.caption1.toTextStyle(),
             color = color.textSecondaryColor,

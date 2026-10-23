@@ -195,6 +195,17 @@ jobs:
       - name: Run unit tests (release)
         run: ./gradlew --warning-mode=all :app:testReleaseUnitTest --stacktrace
 
+      # 主题引擎三模块单测（R5 补门禁，2026-10-23）：
+      # theme-engine（纯 JVM：编译器/快照/动效规格表/降级决策器）、
+      # theme-ui（运行时 + M3 映射）、minime-ui（画廊 Robolectric）。
+      # 补门禁的原因：此前 CI 与发版 workflow 均只跑 :app:* 任务，主题引擎的
+      # 264 项单测（含 R5 的动效铁律断言：铁律 1 时长上限 / 铁律 8 规格即令牌）
+      # 在合并与发版链路上都不执行——断言写了却不跑等于没有门禁。
+      # 变体说明：theme-ui 跑 release 变体（与 app 一致）；minime-ui 只保留 debug
+      # 变体单测（release 变体已按项目约定禁用单测）。
+      - name: Theme engine and gallery tests
+        run: ./gradlew --warning-mode=all :theme:theme-engine:test :theme:theme-ui:testReleaseUnitTest :theme:minime-ui:testDebugUnitTest --stacktrace
+
       # Lint 门禁（baseline 渐进式）：app/lint-baseline.xml 收录存量 error 视为已知，
       # abortOnError=true 下任何「新增 error」都会让本步骤失败、阻断合并；warning 不阻断。
       # 与 android-release.yml 的 Lint 步骤保持一致，提前在 CI 阶段发现问题。

@@ -124,7 +124,7 @@ class ThemeLoaderTest {
         )
         assertFalse(result.degraded, "最小包应可编译: ${result.error?.message}")
         val raw: Map<String, TokenValue> = result.snapshot.raw
-        assertEquals(196, raw.size, "fallback 回填后仍为完整生效表")
+        assertEquals(197, raw.size, "fallback 回填后仍为完整生效表")
         assertEquals("#123456FF", result.snapshot.color.primitiveOrNull("systemBlue")?.hex)
         // 语义层 accent 未覆写 → 取 fallback 值（不因包小而缺失）
         assertEquals("#007AFFFF", result.snapshot.color.accent.hex)

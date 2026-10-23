@@ -171,6 +171,7 @@
         "overlayScale": { "$value": "0.96", "$type": "number" },
         "shakeDistance": { "$value": "4dp", "$type": "dimension" },
         "shakeCycles": { "$value": "2", "$type": "number" },
+        "shakeDamping": { "$value": "0.4", "$type": "number" },
         "itemEnterOffset": { "$value": "8dp", "$type": "dimension" },
         "stagger": {
           "menu": { "$value": "20ms", "$type": "duration" },

@@ -30,7 +30,7 @@ data class WorkshopGroup(val title: String, val paths: List<String>)
  */
 object WorkshopSpec {
 
-    /** 分类下的全部可覆写路径（词汇表 172 条中属该子系统者） */
+    /** 分类下的全部可覆写路径（词汇表 173 条中属该子系统者） */
     fun pathsOf(category: WorkshopCategory): List<String> =
         TokenOverviewSpec.PATHS.getValue(category.subsystem)
 

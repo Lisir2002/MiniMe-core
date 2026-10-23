@@ -299,9 +299,9 @@ class ThemeValidatorTest {
 
     @Test
     fun `token vocabulary covers ten subsystems with declared size`() {
-        assertEquals(172, org.minime.core.tokens.TokenVocabulary.SIZE)
+        assertEquals(173, org.minime.core.tokens.TokenVocabulary.SIZE)
         assertEquals(
-            172,
+            173,
             org.minime.core.tokens.TokenVocabulary.ALL.size,
             "SIZE 常量须与 ALL 实际条目一致",
         )
