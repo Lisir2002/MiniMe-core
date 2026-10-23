@@ -95,6 +95,15 @@ data class MotionPattern(
     val reducedMotion: ReducedMotion,
     /** 参数令牌路径（interaction.* 等；须在词汇表内——铁律 8） */
     val paramTokens: List<String>,
+    /**
+     * 弹簧阻尼比覆写令牌（白皮书 §6.4.2「低阻尼 spring」）。
+     *
+     * 槽位 spring 的 damping 是该槽位的**默认**阻尼；个别模式需要不同阻尼
+     * （如 `action.error` 的 dampingRatio ≈ 0.4 自然衰减），必须在目录里**显式标注**
+     * 覆写令牌名（铁律 9 双标注的第三项），由消费方解析令牌取真实值——
+     * 禁止消费方按模式 id 特判（那会让目录失去唯一真源地位）。
+     */
+    val dampingOverrideToken: String? = null,
     /** 是否 R5 MVP（false = 二期登记项） */
     val mvp: Boolean,
     val consumers: String,
@@ -256,6 +265,7 @@ object MotionCatalog {
             durationCap = DurationCap.FEEDBACK,
             reducedMotion = ReducedMotion.SHORT_TWEEN_HALF,
             paramTokens = listOf("interaction.shakeDistance", "interaction.shakeCycles", "interaction.shakeDamping"),
+            dampingOverrideToken = "interaction.shakeDamping",
             mvp = true,
             consumers = "表单校验（R6+）",
         ),
@@ -506,6 +516,7 @@ object MotionCatalog {
                 if (p.slot.isAnimated) add(p.slot.path)
                 add(p.durationToken.path)
                 addAll(p.paramTokens)
+                p.dampingOverrideToken?.let { add(it) }
             }
         }.toSet()
 }

@@ -10,6 +10,11 @@ import org.minime.core.tokens.ThemeSnapshot
 import org.minime.core.ui.m3.toColorScheme
 import org.minime.core.ui.m3.toShapes
 import org.minime.core.ui.m3.toTypography
+import org.minime.core.ui.motion.LocalMotionScale
+import org.minime.core.ui.motion.LocalMotionSpecs
+import org.minime.core.ui.motion.LocalMiniMeMotionScheme
+import org.minime.core.ui.motion.MotionSpecs
+import org.minime.core.ui.motion.toMiniMeMotionScheme
 import org.minime.core.ui.runtime.ThemeManager
 
 /**
@@ -32,9 +37,20 @@ fun MiniMeTheme(
     content: @Composable () -> Unit,
 ) {
     // 映射只在对应子系统变化时重算：remember 的 key 用子系统实例本身
+    val motionScale = LocalMotionScale.current
     val colorScheme = remember(snapshot.color) { snapshot.color.toColorScheme() }
     val typography = remember(snapshot.typography) { snapshot.typography.toTypography() }
     val shapes = remember(snapshot.shape) { snapshot.shape.toShapes() }
+    // R5：六槽 spring 只读回喂动效方案（单一真源仍是 MotionTokens）
+    val motionScheme = remember(snapshot.motion) { snapshot.motion.toMiniMeMotionScheme() }
+    // R5：动效规格工厂（消费方唯一入口，避免各处自行拼 AnimationSpec）
+    val motionSpecs = remember(snapshot.motion, snapshot.interaction, motionScale) {
+        MotionSpecs(
+            motion = snapshot.motion,
+            interaction = snapshot.interaction,
+            scale = motionScale,
+        )
+    }
 
     CompositionLocalProvider(
         MiniMeTokens.LocalColor provides snapshot.color,
@@ -48,6 +64,8 @@ fun MiniMeTheme(
         MiniMeTokens.LocalOpacity provides snapshot.opacity,
         MiniMeTokens.LocalGlass provides snapshot.glass,
         LocalThemeSnapshot provides snapshot,
+        LocalMotionSpecs provides motionSpecs,
+        LocalMiniMeMotionScheme provides motionScheme,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
