@@ -354,7 +354,7 @@ jobs:
       # 用于线上 crash stack 反混淆与版本回溯。文件不存在时跳过，不阻塞流程。
       - name: Upload R8 mapping (Run artifact)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: r8-mapping-${{ github.ref_name }}
           path: app/build/outputs/mapping/release/mapping.txt
@@ -365,7 +365,7 @@ jobs:
       # 即使 Create GitHub Release step 因 tag 竞态 / GITHUB_TOKEN 权限失败，APK 仍在 Run Artifacts 内 90 天可下载。
       - name: Upload release APK (Run artifact safety net)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-apk-${{ github.ref_name }}
           # 用 ${{ env.APK_PREFIX }} 表达式展开（幂等动作的 path 是字面量，${APK_PREFIX} 不会自动展开）
