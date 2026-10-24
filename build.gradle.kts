@@ -17,5 +17,5 @@ plugins {
     id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
     // OWASP Dependency-Check：依赖 CVE 扫描（任务在 :app 模块配置，见 .github/workflows/dependency-check.yml）
     // 注意：12.x 起仅发布到 Gradle Plugin Portal（settings.gradle.kts 的 pluginManagement 已含 gradlePluginPortal）
-    id("org.owasp.dependencycheck") version "12.1.8" apply false
+    id("org.owasp.dependencycheck") version "13.0.0" apply false
 }
