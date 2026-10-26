@@ -7,7 +7,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     kotlin("android")
-    kotlin("plugin.serialization") version "2.2.21"
+    kotlin("plugin.serialization") version "2.4.21"
 }
 
 // 统一签名策略：复用主应用唯一官方密钥（app/minime.jks + keystore.properties，CI 从 Secrets 恢复）。
@@ -113,9 +113,9 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.webkit:webkit:1.16.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.webkit:webkit:1.18.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
 }
 
 // ── P1-04 任务图守卫：release 产出 fail-closed ─────────────────────────────
