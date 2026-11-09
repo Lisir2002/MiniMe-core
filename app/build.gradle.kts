@@ -8,7 +8,7 @@ plugins {
     kotlin("android")
 
     kotlin("plugin.compose")
-    kotlin("plugin.serialization") version "2.2.21"
+    kotlin("plugin.serialization") version "2.4.21"
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
     id("app.cash.sqldelight")
@@ -594,16 +594,16 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("org.robolectric:robolectric:4.17")
     testImplementation("androidx.test:core:1.6.1")
     // mockk：mock final class（如 ZthTierRepository），纯 JVM 单测即用
-    testImplementation("io.mockk:mockk:1.14.2")
+    testImplementation("io.mockk:mockk:1.14.11")
     implementation(libs.json)
 
     // SQLDelight
     implementation(libs.sqldelight.android.driver)
     implementation(libs.sqldelight.coroutines.extensions)
-    testImplementation("app.cash.sqldelight:sqlite-driver:2.2.1")
+    testImplementation("app.cash.sqldelight:sqlite-driver:2.4.1")
     implementation(libs.androidx.sqlite.framework)
 
     // 数据库加密
@@ -632,32 +632,32 @@ sqldelight {
         create("AgentDb") {
             packageName.set("com.mini.mecore.datalayer.sqldelight")
             srcDirs("src/main/sqldelight/agent")
-            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
+            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.4.1")
         }
         create("CredentialsDb") {
             packageName.set("com.mini.mecore.datalayer.sqldelight")
             srcDirs("src/main/sqldelight/credentials")
-            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
+            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.4.1")
         }
         create("SettingsDb") {
             packageName.set("com.mini.mecore.datalayer.sqldelight")
             srcDirs("src/main/sqldelight/settings")
-            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
+            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.4.1")
         }
         create("WorkspaceDb") {
             packageName.set("com.mini.mecore.datalayer.sqldelight")
             srcDirs("src/main/sqldelight/workspace")
-            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
+            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.4.1")
         }
         create("T2iDb") {
             packageName.set("com.mini.mecore.datalayer.sqldelight")
             srcDirs("src/main/sqldelight/t2i")
-            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
+            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.4.1")
         }
         create("InfraDb") {
             packageName.set("com.mini.mecore.datalayer.sqldelight")
             srcDirs("src/main/sqldelight/infra")
-            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.2.1")
+            dialect("app.cash.sqldelight:sqlite-3-38-dialect:2.4.1")
         }
     }
 }
